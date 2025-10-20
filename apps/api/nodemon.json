@@ -1,0 +1,15 @@
+{
+  "watch": ["src"],
+  "ext": "ts,js",
+  "ignore": [
+    "node_modules/**",
+    "prisma/**",
+    "**/*.db",
+    "**/*.sqlite",
+    ".prisma/**",
+    "dist/**",
+    "../web/**"
+  ],
+  "legacyWatch": true,
+  "exec": "tsx src/index.ts"
+}

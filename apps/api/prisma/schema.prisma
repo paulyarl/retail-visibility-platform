@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+  VIEWER
+}
+
+model Tenant {
+  id        String         @id @default(cuid())
+  name      String
+  createdAt DateTime       @default(now())
+  users     User[]
+  items     InventoryItem[]
+  photos    PhotoAsset[]
+  syncJobs  SyncJob[]      // <-- add this line
+  @@index([name])
+}
+
+
+model User {
+  id        String   @id @default(cuid())
+  tenantId  String
+  email     String   @unique
+  role      Role     @default(STAFF)
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model InventoryItem {
+  id         String   @id @default(cuid())
+  tenantId   String
+  sku        String
+  name       String
+  priceCents Int      // use integer cents for SQLite to avoid float rounding
+  stock      Int      @default(0)
+  imageUrl   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  photos     PhotoAsset[]
+
+  // Each SKU must be unique within a tenant
+  @@unique([tenantId, sku], name: "uq_tenant_sku")
+  @@index([tenantId, updatedAt])
+}
+
+model PhotoAsset {
+  id              String   @id @default(cuid())
+  tenantId        String
+  inventoryItemId String
+  url             String
+  width           Int?
+  height          Int?
+  contentType     String?
+  bytes           Int?
+  exifRemoved     Boolean  @default(true)
+  capturedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, inventoryItemId])
+  @@index([capturedAt])
+}
+
+model SyncJob {
+  id         String   @id @default(cuid())
+  tenantId   String
+  target     String
+  status     String   @default("queued")
+  attempt    Int      @default(0)
+  payload    Json
+  lastError  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, updatedAt])
+}

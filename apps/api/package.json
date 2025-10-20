@@ -1,0 +1,36 @@
+{
+  "name": "@rvp/api",
+  "version": "1.0.0",
+  "description": "RVP API server (Express + TS + Prisma + SQLite)",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon",
+    "build": "tsc -p .",
+    "start": "node dist/index.js",    
+    "db:seed": "prisma db seed"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.18.3",
+  "dependencies": {
+    "@prisma/client": "^6.17.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^20.19.22",
+    "@types/morgan": "^1.9.10",
+    "nodemon": "^3.1.10",
+    "prisma": "^6.17.1",
+    "morgan": "^1.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "prisma": {
+  "seed": "tsx prisma/seed.ts"
+  } 
+}

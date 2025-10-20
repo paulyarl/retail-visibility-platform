@@ -1,0 +1,38 @@
+# Node / pnpm
+node_modules/
+.pnpm-store/
+pnpm-debug.log
+*.log
+
+# Next.js
+.next/
+out/
+.vercel/
+
+# Build artifacts
+dist/
+coverage/
+*.tsbuildinfo
+
+# Env & secrets
+.env
+.env.*
+apps/*/.env
+apps/*/.env.*
+!/apps/web/.env.example
+!/apps/api/.env.example
+
+# Prisma / SQLite (local dev only)
+apps/api/prisma/dev.db
+apps/api/prisma/dev.db-journal
+*.sqlite
+*.sqlite-journal
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Windsurf cache
+.windsurf/

@@ -1,0 +1,21 @@
+{
+  "name": "retail-visibility-platform",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck || exit 0",
+    "lint": "pnpm -r lint || exit 0"
+  },
+  "license": "ISC",
+  "packageManager": "pnpm@10.18.3"
+}
