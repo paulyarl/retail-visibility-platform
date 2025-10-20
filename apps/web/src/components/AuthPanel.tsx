@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/src/lib/supabase/client';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase/client';
 
 export default function AuthPanel() {
   const [email, setEmail] = useState('');
@@ -14,9 +15,11 @@ export default function AuthPanel() {
       setUserEmail(data.user?.email ?? null);
     };
     run();
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUserEmail(session?.user?.email ?? null);
-    });
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      async (_event: AuthChangeEvent, session: Session | null) => {
+        setUserEmail(session?.user?.email ?? null);
+      }
+    );
     return () => {
       sub.subscription.unsubscribe();
     };
