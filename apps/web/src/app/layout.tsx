@@ -19,7 +19,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white`}
       >
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+        <ThemeProvider 
+          attribute="class" 
+          defaultTheme="system" 
+          enableSystem
+          storageKey="rvp-theme"
+          disableTransitionOnChange={false}
+        >
           <ErrorBoundary>{children}</ErrorBoundary>
           <Analytics />
         </ThemeProvider>

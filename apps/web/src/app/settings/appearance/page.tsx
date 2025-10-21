@@ -40,6 +40,21 @@ export default function AppearanceSettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* Info about custom themes */}
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg mb-4">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Custom Color Themes Coming Soon</p>
+                      <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
+                        Blue, Yellow, and other color themes will be available in a future update. For now, choose between Light, Dark, or System.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Theme Options */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Light Theme */}
@@ -181,21 +196,79 @@ export default function AppearanceSettingsPage() {
           {mounted && (
             <Card>
               <CardHeader>
-                <CardTitle>Preview</CardTitle>
+                <CardTitle>Live Preview</CardTitle>
                 <CardDescription>
                   Currently displaying: {actualTheme === 'dark' ? 'Dark' : 'Light'} theme
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">Sample Card</h3>
-                    <p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">
-                      This is how your content will look with the {actualTheme} theme.
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Light Theme Preview */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400 uppercase tracking-wide">Light Theme</p>
+                    <div className="p-4 bg-white border border-neutral-200 rounded-lg">
+                      <h3 className="text-lg font-semibold text-neutral-900 mb-2">Sample Card</h3>
+                      <p className="text-neutral-600 text-sm mb-4">
+                        Light mode content
+                      </p>
+                      <button className="px-3 py-1.5 bg-primary-600 text-white rounded text-sm font-medium">
+                        Button
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dark Theme Preview */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400 uppercase tracking-wide">Dark Theme</p>
+                    <div className="p-4 bg-neutral-800 border border-neutral-700 rounded-lg">
+                      <h3 className="text-lg font-semibold text-white mb-2">Sample Card</h3>
+                      <p className="text-neutral-400 text-sm mb-4">
+                        Dark mode content
+                      </p>
+                      <button className="px-3 py-1.5 bg-primary-600 text-white rounded text-sm font-medium">
+                        Button
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Blue Theme Preview (Coming Soon) */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400 uppercase tracking-wide">Blue Theme <span className="text-blue-600 dark:text-blue-400">(Soon)</span></p>
+                    <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg">
+                      <h3 className="text-lg font-semibold text-blue-900 mb-2">Sample Card</h3>
+                      <p className="text-blue-700 text-sm mb-4">
+                        Blue theme content
+                      </p>
+                      <button className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm font-medium">
+                        Button
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Yellow Theme Preview (Coming Soon) */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400 uppercase tracking-wide">Yellow Theme <span className="text-yellow-600 dark:text-yellow-400">(Soon)</span></p>
+                    <div className="p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg">
+                      <h3 className="text-lg font-semibold text-yellow-900 mb-2">Sample Card</h3>
+                      <p className="text-yellow-700 text-sm mb-4">
+                        Yellow theme content
+                      </p>
+                      <button className="px-3 py-1.5 bg-yellow-600 text-white rounded text-sm font-medium">
+                        Button
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active Theme Indicator */}
+                <div className="mt-4 p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm text-primary-900 dark:text-primary-100">
+                      You are currently viewing the platform in <strong>{actualTheme}</strong> mode
                     </p>
-                    <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors">
-                      Sample Button
-                    </button>
                   </div>
                 </div>
               </CardContent>
