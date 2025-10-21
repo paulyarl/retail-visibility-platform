@@ -2,22 +2,29 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+type Tenant = {
+  id: string;
+  name: string;
+};
+
 type Item = {
   id: string;
   sku: string;
   name: string;
   priceCents?: number;
   stock?: number;
+  imageUrl?: string;
 };
 
 export default function ItemsClient({
   initialItems,
-  initialTenantId = "demo-tenant",
+  initialTenantId,
 }: {
   initialItems: Item[];
   initialTenantId?: string;
 }) {
-  const [tenantId, setTenantId] = useState(initialTenantId);
+  const [tenantId, setTenantId] = useState(initialTenantId || "");
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [items, setItems] = useState<Item[]>(initialItems ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,15 +49,49 @@ export default function ItemsClient({
     setLoading(true);
     setError(null);
     try {
+      if (!tenantId) {
+        setItems([]);
+        return;
+      }
       const res = await fetch(`/api/items?tenantId=${encodeURIComponent(tenantId)}`);
       const data = await res.json();
-      setItems(Array.isArray(data.items) ? data.items : []);
+      setItems(Array.isArray(data) ? data : []);
     } catch (e) {
       setError("Failed to load items");
     } finally {
       setLoading(false);
     }
   };
+
+  // Load tenants and initialize tenantId (from localStorage or first tenant)
+  useEffect(() => {
+    const loadTenants = async () => {
+      try {
+        const res = await fetch("/api/tenants");
+        const list: Tenant[] = await res.json();
+        setTenants(Array.isArray(list) ? list : []);
+        const saved = typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
+        if (!tenantId) {
+          if (saved && list.some(t => t.id === saved)) {
+            setTenantId(saved);
+          } else if (list.length > 0) {
+            setTenantId(list[0].id);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadTenants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist tenantId
+  useEffect(() => {
+    if (tenantId && typeof window !== "undefined") {
+      localStorage.setItem("tenantId", tenantId);
+    }
+  }, [tenantId]);
 
   useEffect(() => {
     // If tenantId changed from initial, refresh list
@@ -85,7 +126,7 @@ export default function ItemsClient({
         return;
       }
       // Optimistically prepend
-      setItems((prev) => [data.item, ...prev]);
+      setItems((prev) => [data, ...prev]);
       setSku("");
       setName("");
       setPrice("");
@@ -97,17 +138,92 @@ export default function ItemsClient({
     }
   };
 
+  const compressImage = async (file: File, maxWidth = 1024, quality = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        
+        // Resize if needed
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("canvas_failed"));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to JPEG with compression
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl);
+      };
+      
+      img.onerror = () => reject(new Error("image_load_failed"));
+      reader.onerror = () => reject(new Error("read_failed"));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const onUpload = async (item: Item, file: File) => {
+    try {
+      if (!tenantId) {
+        setError("Select a tenant first");
+        return;
+      }
+      
+      // Compress image before upload
+      const dataUrl = await compressImage(file);
+      
+      const body = JSON.stringify({ tenantId, dataUrl, contentType: "image/jpeg" });
+      
+      const res = await fetch(`/api/items/${encodeURIComponent(item.id)}/photos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        setError(payload?.error || "Upload failed");
+        return;
+      }
+      // payload is the created photoAsset, not an item
+      const photoAsset = payload;
+      setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, imageUrl: photoAsset.url } : it)));
+    } catch (_e) {
+      setError("Upload failed");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <section className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-sm opacity-80">Tenant</label>
-          <input
+          <select
             value={tenantId}
             onChange={(e) => setTenantId(e.target.value)}
-            className="px-3 py-2 border rounded bg-white text-black"
-            placeholder="tenant id"
-          />
+            className="px-3 py-2 border rounded bg-white text-black min-w-48"
+          >
+            <option value="" disabled>Select a tenant…</option>
+            {tenants.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -177,6 +293,19 @@ export default function ItemsClient({
                 {typeof i.stock === "number" && (
                   <span className="text-sm opacity-80">stock: {i.stock}</span>
                 )}
+                {i.imageUrl && (
+                  <img src={i.imageUrl} alt="" className="h-10 w-10 object-cover rounded border" />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.currentTarget.files?.[0];
+                    if (f) onUpload(i, f);
+                    e.currentTarget.value = "";
+                  }}
+                  className="text-sm"
+                />
               </li>
             ))}
           </ul>

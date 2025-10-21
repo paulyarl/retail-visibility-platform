@@ -5,10 +5,16 @@ export const dynamic = "force-dynamic";
 export default async function ItemsPage({
   searchParams,
 }: {
-  searchParams?: { tenantId?: string };
+  searchParams?: Promise<{ tenantId?: string }> | { tenantId?: string };
 }) {
-  const tenantId = searchParams?.tenantId ?? "demo-tenant";
-  const res = await fetch(`http://localhost:3000/api/items?tenantId=${encodeURIComponent(tenantId)}`, { cache: 'no-store' });
+  const sp = typeof (searchParams as any)?.then === "function" ? await (searchParams as Promise<{ tenantId?: string }>) : (searchParams as { tenantId?: string } | undefined);
+  const tenantId = sp?.tenantId;
+  if (!tenantId) {
+    // Redirect to tenants page if no tenant selected
+    const { redirect } = await import("next/navigation");
+    redirect("/tenants");
+  }
+  const res = await fetch(`http://localhost:3000/api/items?tenantId=${encodeURIComponent(tenantId as string)}`, { cache: 'no-store' });
   const data = await res.json();
   const items: Array<{ id: string; sku: string; name: string; priceCents?: number; stock?: number }> = data.items ?? [];
   return (

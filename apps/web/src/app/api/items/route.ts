@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const tenantId = searchParams.get('tenantId') ?? 'demo-tenant';
+  const tenantId = searchParams.get('tenantId');
+  if (!tenantId) {
+    return NextResponse.json({ error: 'tenant_required' }, { status: 400 });
+  }
   const base = process.env.API_BASE_URL || 'http://localhost:4000';
   const res = await fetch(`${base}/items?tenantId=${encodeURIComponent(tenantId)}`);
   const data = await res.json();

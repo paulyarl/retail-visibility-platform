@@ -18,7 +18,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     try {
       const res = await fetch("/api/tenants");
       const data = await res.json();
-      setTenants(Array.isArray(data.tenants) ? data.tenants : []);
+      setTenants(Array.isArray(data) ? data : []);
     } catch (_e) {
       setError("Failed to load tenants");
     } finally {
@@ -39,7 +39,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "failed");
-      setTenants((prev) => [data.tenant, ...prev]);
+      setTenants((prev) => [data as Tenant, ...prev]);
       setName("");
     } catch (_e) {
       setError("Failed to create tenant");
@@ -60,7 +60,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       return;
     }
     const data = await res.json();
-    setTenants((prev) => prev.map((t) => (t.id === id ? data.tenant : t)));
+    setTenants((prev) => prev.map((t) => (t.id === id ? (data as Tenant) : t)));
   };
 
   const onDelete = async (id: string) => {
