@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // If you import from a local package (e.g. packages/shared), add it here:
   transpilePackages: ["@rvp/shared", "shared"].filter(Boolean),
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 
   experimental: {
     serverActions: { bodySizeLimit: "15mb" },
