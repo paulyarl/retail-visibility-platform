@@ -1,13 +1,85 @@
+"use client";
+
 import AuthPanel from '@/components/AuthPanel';
+import { AnimatedCard } from '@/components/ui';
+import { motion } from 'framer-motion';
 
 export default function LoginPage() {
   return (
-    <main className="max-w-lg mx-auto py-10 space-y-6">
-      <h1 className="text-2xl font-semibold">Sign in</h1>
-      <p className="text-sm opacity-80">
-        Enter your email to receive a magic link. After signing in, you will be redirected back.
-      </p>
-      <AuthPanel />
-    </main>
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+      
+      <div className="relative w-full max-w-md">
+        {/* Logo/Brand */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-8"
+        >
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-4 shadow-lg">
+            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold text-neutral-900 mb-2">
+            Retail Visibility Platform
+          </h1>
+          <p className="text-neutral-600">
+            Sign in to manage your inventory
+          </p>
+        </motion.div>
+
+        {/* Auth Card */}
+        <AnimatedCard delay={0.2} hover={false} className="p-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-neutral-900 mb-2">Welcome back</h2>
+            <p className="text-sm text-neutral-600">
+              Enter your email to receive a magic link
+            </p>
+          </div>
+          
+          <AuthPanel />
+          
+          {/* Features */}
+          <div className="mt-8 pt-6 border-t border-neutral-200">
+            <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-3">
+              What you get
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-neutral-600">
+                <svg className="w-4 h-4 text-primary-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Manage inventory across locations</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-neutral-600">
+                <svg className="w-4 h-4 text-primary-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Sync with Google Merchant Center</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-neutral-600">
+                <svg className="w-4 h-4 text-primary-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Upload and manage product photos</span>
+              </div>
+            </div>
+          </div>
+        </AnimatedCard>
+
+        {/* Footer */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+          className="text-center mt-6 text-sm text-neutral-600"
+        >
+          <p>Secure authentication powered by Supabase</p>
+        </motion.div>
+      </div>
+    </div>
   );
 }
