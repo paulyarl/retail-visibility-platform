@@ -185,9 +185,9 @@ export default function AdminTenantsPage() {
                         size="sm" 
                         variant="secondary"
                         onClick={() => {
-                          // Store tenant ID and navigate to items
+                          // Store tenant ID and navigate to items with query param
                           localStorage.setItem('tenantId', tenant.id);
-                          window.location.href = '/items';
+                          window.location.href = `/items?tenantId=${tenant.id}`;
                         }}
                       >
                         View Items
