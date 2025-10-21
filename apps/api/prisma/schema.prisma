@@ -21,6 +21,10 @@ model Tenant {
   items     InventoryItem[]
   photos    PhotoAsset[]
   syncJobs  SyncJob[]      // <-- add this line
+  region    String         @default("us-east-1")
+  language  String         @default("en-US")
+  currency  String         @default("USD")
+  data_policy_accepted Boolean @default(false)
   @@index([name])
 }
 
@@ -91,3 +95,4 @@ model SyncJob {
 
   @@index([tenantId, status, updatedAt])
 }
+

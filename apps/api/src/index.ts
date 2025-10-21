@@ -7,6 +7,8 @@ import fs from "fs";
 import path from "path";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
+import { setRequestContext } from "./context";
+import { audit } from "./audit";
 
 const app = express();
 
@@ -15,6 +17,7 @@ app.use(cors({ origin: [/localhost:\d+$/, /\.vercel\.app$/], credentials: false 
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+app.use(setRequestContext);
 
 console.log("✓ Express configured with 50mb body limit");
 
@@ -47,6 +50,7 @@ app.post("/tenants", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
     const tenant = await prisma.tenant.create({ data: { name: parsed.data.name } });
+    await audit({ tenantId: tenant.id, actor: null, action: "tenant.create", payload: { name: parsed.data.name } });
     res.status(201).json(tenant);
   } catch {
     res.status(500).json({ error: "failed_to_create_tenant" });
@@ -320,6 +324,7 @@ app.post(["/items", "/inventory"], async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
     const created = await prisma.inventoryItem.create({ data: parsed.data });
+    await audit({ tenantId: created.tenantId, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
     res.status(201).json(created);
   } catch (e: any) {
     if (e?.code === "P2002") return res.status(409).json({ error: "duplicate_sku" });
@@ -333,6 +338,7 @@ app.put(["/items/:id", "/inventory/:id"], async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
     const updated = await prisma.inventoryItem.update({ where: { id: req.params.id }, data: parsed.data });
+    await audit({ tenantId: updated.tenantId, actor: null, action: "inventory.update", payload: { id: updated.id } });
     res.json(updated);
   } catch {
     res.status(500).json({ error: "failed_to_update_item" });
@@ -364,7 +370,13 @@ app.get("/__ping", (req, res) => {
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
 
-app.listen(port, () => {
-  console.log(`\n✅ API server running → http://localhost:${port}/health`);
-  console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
-});
+// Only start the server when not running tests
+if (process.env.NODE_ENV !== "test") {
+  app.listen(port, () => {
+    console.log(`\n✅ API server running → http://localhost:${port}/health`);
+    console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
+  });
+}
+
+// Export the app for testing
+export { app };
