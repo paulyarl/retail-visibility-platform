@@ -57,9 +57,9 @@ export default function TenantSettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-neutral-50">
-        <div className="bg-white border-b border-neutral-200 mb-6">
+        <div className="bg-white border-b border-neutral-200 dark:border-neutral-700 mb-6">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-3xl font-bold text-neutral-900">{t('settings.tenant.title', 'Tenant Settings')}</h1>
+            <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{t('settings.tenant.title', 'Tenant Settings')}</h1>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -74,9 +74,9 @@ export default function TenantSettingsPage() {
   if (error || !tenant) {
     return (
       <div className="min-h-screen bg-neutral-50">
-        <div className="bg-white border-b border-neutral-200 mb-6">
+        <div className="bg-white border-b border-neutral-200 dark:border-neutral-700 mb-6">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-3xl font-bold text-neutral-900">{t('settings.tenant.title', 'Tenant Settings')}</h1>
+            <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{t('settings.tenant.title', 'Tenant Settings')}</h1>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -94,14 +94,14 @@ export default function TenantSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       {/* Header */}
-      <div className="bg-white border-b border-neutral-200 mb-6">
+      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 mb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-neutral-900">{t('settings.tenant.title', 'Tenant Settings')}</h1>
-              <p className="text-neutral-600 mt-1">{tenant.name}</p>
+              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{t('settings.tenant.title', 'Tenant Settings')}</h1>
+              <p className="text-neutral-600 dark:text-neutral-400 mt-1">{tenant.name}</p>
             </div>
             <Link href="/tenants" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
               ← Back to Tenants
@@ -111,10 +111,6 @@ export default function TenantSettingsPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* Info Alert */}
-        <Alert variant="info" title="Read-Only Settings">
-          {t('settings.tenant.readOnly', 'These settings are currently read-only. Contact support to make changes.')}
-        </Alert>
 
         {/* Tenant Information */}
         <Card>
@@ -124,20 +120,20 @@ export default function TenantSettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between py-3 border-b border-neutral-200">
+              <div className="flex items-center justify-between py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <div>
-                  <p className="text-sm font-medium text-neutral-700">Tenant ID</p>
-                  <p className="text-sm text-neutral-500 mt-1">Unique identifier for your tenant</p>
+                  <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Tenant ID</p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Unique identifier for your tenant</p>
                 </div>
                 <Badge variant="default">{tenant.id}</Badge>
               </div>
 
-              <div className="flex items-center justify-between py-3 border-b border-neutral-200">
+              <div className="flex items-center justify-between py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <div>
-                  <p className="text-sm font-medium text-neutral-700">Tenant Name</p>
-                  <p className="text-sm text-neutral-500 mt-1">Display name for your organization</p>
+                  <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Tenant Name</p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Display name for your organization</p>
                 </div>
-                <p className="text-sm font-medium text-neutral-900">{tenant.name}</p>
+                <p className="text-sm font-medium text-neutral-900 dark:text-white">{tenant.name}</p>
               </div>
             </div>
           </CardContent>
@@ -151,10 +147,10 @@ export default function TenantSettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between py-3 border-b border-neutral-200">
+              <div className="flex items-center justify-between py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <div>
-                  <p className="text-sm font-medium text-neutral-700">{t('settings.tenant.region', 'Region')}</p>
-                  <p className="text-sm text-neutral-500 mt-1">Data center location</p>
+                  <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t('settings.tenant.region', 'Region')}</p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Data center location</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -164,10 +160,10 @@ export default function TenantSettingsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between py-3 border-b border-neutral-200">
+              <div className="flex items-center justify-between py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <div>
-                  <p className="text-sm font-medium text-neutral-700">{t('settings.tenant.language', 'Language')}</p>
-                  <p className="text-sm text-neutral-500 mt-1">Preferred language for the interface</p>
+                  <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t('settings.tenant.language', 'Language')}</p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Preferred language for the interface</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -179,8 +175,8 @@ export default function TenantSettingsPage() {
 
               <div className="flex items-center justify-between py-3">
                 <div>
-                  <p className="text-sm font-medium text-neutral-700">{t('settings.tenant.currency', 'Currency')}</p>
-                  <p className="text-sm text-neutral-500 mt-1">Default currency for pricing</p>
+                  <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t('settings.tenant.currency', 'Currency')}</p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Default currency for pricing</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -202,8 +198,8 @@ export default function TenantSettingsPage() {
           <CardContent>
             <div className="flex items-center justify-between py-3">
               <div>
-                <p className="text-sm font-medium text-neutral-700">{t('settings.tenant.dataPolicy', 'Data Policy Accepted')}</p>
-                <p className="text-sm text-neutral-500 mt-1">Terms and conditions acceptance status</p>
+                <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t('settings.tenant.dataPolicy', 'Data Policy Accepted')}</p>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Terms and conditions acceptance status</p>
               </div>
               <div className="flex items-center gap-2">
                 {tenant.data_policy_accepted ? (
@@ -286,7 +282,7 @@ export default function TenantSettingsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
                 <div>
-                  <p className="text-sm font-medium text-neutral-900">Documentation</p>
+                  <p className="text-sm font-medium text-neutral-900 dark:text-white">Documentation</p>
                   <p className="text-xs text-neutral-500">Learn more about tenant settings</p>
                 </div>
               </a>
@@ -295,7 +291,7 @@ export default function TenantSettingsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
                 <div>
-                  <p className="text-sm font-medium text-neutral-900">Contact Support</p>
+                  <p className="text-sm font-medium text-neutral-900 dark:text-white">Contact Support</p>
                   <p className="text-xs text-neutral-500">Get help from our team</p>
                 </div>
               </a>
