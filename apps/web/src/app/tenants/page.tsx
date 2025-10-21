@@ -22,8 +22,13 @@ export default async function TenantsPage() {
   let loadError: string | null = null;
 
   try {
-    const res = await fetch(`${base}/api/tenants`, { cache: 'no-store' });
+    const url = `${base}/api/tenants`;
+    console.log('[TenantsPage SSR] Fetching from:', url);
+    const res = await fetch(url, { cache: 'no-store' });
+    console.log('[TenantsPage SSR] Response status:', res.status);
     if (!res.ok) {
+      const errorText = await res.text();
+      console.error('[TenantsPage SSR] Error response:', errorText);
       loadError = `Failed to load tenants (status ${res.status})`;
     } else {
       // Be tolerant of either an array or an object shape
