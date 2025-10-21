@@ -185,11 +185,10 @@ const photoUploadHandler = async (req: any, res: any) => {
       return res.status(201).json(created);
     }
 
-    // C) JSON { dataUrl, contentType } → filesystem (enforce <1MB)
+    // C) JSON { dataUrl, contentType } → Supabase Storage or filesystem fallback (enforce <1MB)
     if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
       const parsed = dataUrlSchema.safeParse(req.body || {});
       if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
-      // Allow dataUrl uploads in production for MVP (TODO: switch to multipart/Supabase later)
 
       const match = /^data:[^;]+;base64,(.+)$/i.exec(parsed.data.dataUrl);
       if (!match) return res.status(400).json({ error: "invalid_data_url" });
@@ -201,16 +200,35 @@ const photoUploadHandler = async (req: any, res: any) => {
         : parsed.data.contentType.includes("webp")
         ? ".webp"
         : ".jpg";
-      const filename = `${itemId}-${Date.now()}${ext}`;
-      fs.writeFileSync(path.join(UPLOAD_DIR, filename), buf);
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const url = `${baseUrl}/uploads/${encodeURIComponent(filename)}`;
+      
+      let publicUrl: string;
+
+      // Prefer Supabase Storage if configured
+      if (supabase) {
+        const pathKey = `${item.tenantId}/${item.sku || item.id}/${Date.now()}${ext}`;
+        const { error, data } = await supabase.storage.from("photos").upload(pathKey, buf, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: parsed.data.contentType,
+        });
+        if (error) {
+          console.error("Supabase upload error:", error);
+          return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
+        }
+        publicUrl = supabase.storage.from("photos").getPublicUrl(data.path).data.publicUrl;
+      } else {
+        // Fallback to filesystem
+        const filename = `${itemId}-${Date.now()}${ext}`;
+        fs.writeFileSync(path.join(UPLOAD_DIR, filename), buf);
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        publicUrl = `${baseUrl}/uploads/${encodeURIComponent(filename)}`;
+      }
 
       const created = await prisma.photoAsset.create({
         data: {
           tenantId: item.tenantId,
           inventoryItemId: item.id,
-          url,
+          url: publicUrl,
           contentType: parsed.data.contentType,
           bytes: buf.length,
           exifRemoved: true,
@@ -218,7 +236,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       });
 
       if (!item.imageUrl) {
-        await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
+        await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl } });
       }
       return res.status(201).json(created);
     }
