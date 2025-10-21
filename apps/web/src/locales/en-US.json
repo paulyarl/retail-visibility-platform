@@ -1,0 +1,31 @@
+{
+  "inventory": {
+    "title": "Items",
+    "createItem": "Create item",
+    "sku": "SKU",
+    "name": "Name",
+    "pricePlaceholder": "Price (e.g. 12.99)",
+    "stock": "Stock",
+    "searchPlaceholder": "Search by SKU or name",
+    "noItems": "No items."
+  },
+  "settings": {
+    "tenant": {
+      "title": "Tenant Settings",
+      "region": "Region",
+      "language": "Language",
+      "currency": "Currency",
+      "dataPolicy": "Data Policy Accepted",
+      "readOnly": "These settings are read-only for now"
+    }
+  },
+  "common": {
+    "loading": "Loading…",
+    "refresh": "Refresh",
+    "creating": "Creating…",
+    "create": "Create",
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel"
+  }
+}

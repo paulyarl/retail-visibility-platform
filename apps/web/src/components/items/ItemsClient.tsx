@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "@/lib/useTranslation";
 
 type Tenant = {
   id: string;
@@ -23,6 +24,7 @@ export default function ItemsClient({
   initialItems: Item[];
   initialTenantId?: string;
 }) {
+  const { t } = useTranslation();
   const [tenantId, setTenantId] = useState(initialTenantId || "");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [items, setItems] = useState<Item[]>(initialItems ?? []);
@@ -228,57 +230,57 @@ export default function ItemsClient({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="px-3 py-2 border rounded bg-white text-black flex-1 min-w-40"
-            placeholder="Search by SKU or name"
+            placeholder={t('inventory.searchPlaceholder', 'Search by SKU or name')}
           />
           <button onClick={refresh} disabled={loading}
             className="px-3 py-2 text-sm rounded border hover:bg-gray-100 disabled:opacity-60">
-            {loading ? "Loading…" : "Refresh"}
+            {loading ? t('common.loading', 'Loading…') : t('common.refresh', 'Refresh')}
           </button>
         </div>
         {error && <div className="text-sm text-red-400">{error}</div>}
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-lg font-medium">Create item</h2>
+        <h2 className="text-lg font-medium">{t('inventory.createItem', 'Create item')}</h2>
         <form onSubmit={onCreate} className="grid grid-cols-1 sm:grid-cols-5 gap-2">
           <input
             value={sku}
             onChange={(e) => setSku(e.target.value)}
             className="px-3 py-2 border rounded bg-white text-black"
-            placeholder="SKU"
+            placeholder={t('inventory.sku', 'SKU')}
             required
           />
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="px-3 py-2 border rounded bg-white text-black"
-            placeholder="Name"
+            placeholder={t('inventory.name', 'Name')}
             required
           />
           <input
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             className="px-3 py-2 border rounded bg-white text-black"
-            placeholder="Price (e.g. 12.99)"
+            placeholder={t('inventory.pricePlaceholder', 'Price (e.g. 12.99)')}
             inputMode="decimal"
           />
           <input
             value={stock}
             onChange={(e) => setStock(e.target.value)}
             className="px-3 py-2 border rounded bg-white text-black"
-            placeholder="Stock"
+            placeholder={t('inventory.stock', 'Stock')}
             inputMode="numeric"
           />
           <button disabled={creating} className="px-3 py-2 text-sm rounded border hover:bg-gray-100 disabled:opacity-60">
-            {creating ? "Creating…" : "Create"}
+            {creating ? t('common.creating', 'Creating…') : t('common.create', 'Create')}
           </button>
         </form>
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-lg font-medium">Items</h2>
+        <h2 className="text-lg font-medium">{t('inventory.title', 'Items')}</h2>
         {filtered.length === 0 ? (
-          <p className="text-sm opacity-80">No items.</p>
+          <p className="text-sm opacity-80">{t('inventory.noItems', 'No items.')}</p>
         ) : (
           <ul className="divide-y divide-white/10 border rounded">
             {filtered.map((i) => (
