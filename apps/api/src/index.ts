@@ -18,13 +18,15 @@ app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
 console.log("✓ Express configured with 50mb body limit");
 
-/* -------------------- static dev uploads (dev only) -------------------- */
+/* -------------------- static uploads (filesystem for MVP) -------------------- */
 const DEV = process.env.NODE_ENV !== "production";
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.resolve(process.cwd(), "uploads");
-if (DEV && !fs.existsSync(UPLOAD_DIR)) {
+// Create upload directory in both dev and production for MVP
+if (!fs.existsSync(UPLOAD_DIR)) {
   try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch {}
 }
-if (DEV) app.use("/uploads", express.static(UPLOAD_DIR));
+// Serve uploads statically in both dev and production for MVP
+app.use("/uploads", express.static(UPLOAD_DIR));
 
 /* ----------------------------- health ----------------------------- */
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
@@ -183,11 +185,11 @@ const photoUploadHandler = async (req: any, res: any) => {
       return res.status(201).json(created);
     }
 
-    // C) JSON { dataUrl, contentType } → dev-only filesystem (enforce <1MB)
+    // C) JSON { dataUrl, contentType } → filesystem (enforce <1MB)
     if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
       const parsed = dataUrlSchema.safeParse(req.body || {});
       if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
-      if (!DEV) return res.status(400).json({ error: "dataUrl_not_allowed_in_production" });
+      // Allow dataUrl uploads in production for MVP (TODO: switch to multipart/Supabase later)
 
       const match = /^data:[^;]+;base64,(.+)$/i.exec(parsed.data.dataUrl);
       if (!match) return res.status(400).json({ error: "invalid_data_url" });
