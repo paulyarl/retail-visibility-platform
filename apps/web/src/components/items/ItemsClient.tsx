@@ -2,12 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Pagination, SearchableSelect } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Pagination, AdvancedSearchableSelect, type SelectOption } from "@/components/ui";
 import EditItemModal from "./EditItemModal";
 
 type Tenant = {
   id: string;
   name: string;
+  city?: string;
+  state?: string;
+  region?: string;
 };
 
 type Item = {
@@ -287,12 +290,24 @@ export default function ItemsClient({
         <Card>
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <SearchableSelect
+              <AdvancedSearchableSelect
                 label="Tenant"
                 value={tenantId}
-                onChange={setTenantId}
-                options={tenants.map(t => ({ value: t.id, label: t.name }))}
+                onChange={(value) => setTenantId(value as string)}
+                options={tenants.map(t => ({ 
+                  value: t.id, 
+                  label: t.name,
+                  metadata: {
+                    city: t.city,
+                    state: t.state,
+                    region: t.region,
+                  }
+                }))}
                 placeholder="Select a tenant…"
+                showRecent={true}
+                showFavorites={true}
+                groupBy="state"
+                storageKey="tenant-selector"
               />
               <Input
                 value={q}
