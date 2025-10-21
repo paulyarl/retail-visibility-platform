@@ -62,6 +62,16 @@ export default function AuthPanel() {
           <Alert variant="success" title="Signed In">
             You are signed in as <strong>{userEmail}</strong>
           </Alert>
+          <Button 
+            onClick={() => window.location.href = '/tenants'} 
+            variant="primary" 
+            className="w-full"
+          >
+            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+            Continue to Dashboard
+          </Button>
           <Button onClick={signOut} variant="secondary" className="w-full">
             <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
