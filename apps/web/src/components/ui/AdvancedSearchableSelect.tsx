@@ -381,13 +381,12 @@ function OptionItem({
   index: number;
 }) {
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(option.value)}
+    <div
       data-index={index}
-      className={`w-full px-3 py-2 text-left flex items-center justify-between transition-colors ${
+      className={`w-full px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
         isHighlighted ? 'bg-primary-100' : isSelected ? 'bg-primary-50' : 'hover:bg-neutral-100'
       } ${isSelected ? 'text-primary-700 font-medium' : 'text-neutral-900'}`}
+      onClick={() => onSelect(option.value)}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -411,12 +410,15 @@ function OptionItem({
       </div>
       {showFavorites && (
         <button
-          onClick={(e) => onToggleFavorite(option.value, e)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite(option.value, e);
+          }}
           className={`ml-2 flex-shrink-0 ${isFavorite ? 'text-yellow-500' : 'text-neutral-300 hover:text-yellow-500'}`}
         >
           {isFavorite ? '⭐' : '☆'}
         </button>
       )}
-    </button>
+    </div>
   );
 }
