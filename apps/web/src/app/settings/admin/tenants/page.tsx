@@ -170,11 +170,17 @@ export default function AdminTenantsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Link href={`/tenants`}>
-                        <Button size="sm" variant="secondary">
-                          View Details
-                        </Button>
-                      </Link>
+                      <Button 
+                        size="sm" 
+                        variant="secondary"
+                        onClick={() => {
+                          // Store tenant ID and navigate to tenant settings
+                          localStorage.setItem('tenantId', tenant.id);
+                          window.location.href = '/settings/tenant';
+                        }}
+                      >
+                        View Details
+                      </Button>
                       <Button 
                         size="sm" 
                         variant="secondary"
