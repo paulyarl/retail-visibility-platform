@@ -22,10 +22,5 @@ export default async function ItemsPage({
   const res = await fetch(`${apiBaseUrl}/items?tenantId=${encodeURIComponent(tenantId as string)}`, { cache: 'no-store' });
   const data = await res.json();
   const items: Array<{ id: string; sku: string; name: string; priceCents?: number; stock?: number }> = data ?? [];
-  return (
-    <main className="space-y-6">
-      <h1 className="text-2xl font-semibold">Items</h1>
-      <ItemsClient initialItems={items} initialTenantId={tenantId} />
-    </main>
-  );
+  return <ItemsClient initialItems={items} initialTenantId={tenantId} />;
 }
