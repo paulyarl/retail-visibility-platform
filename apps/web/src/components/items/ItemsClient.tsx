@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge } from "@/components/ui";
+import EditItemModal from "./EditItemModal";
 
 type Tenant = {
   id: string;
@@ -39,6 +40,10 @@ export default function ItemsClient({
   const [price, setPrice] = useState(""); // dollars as string; convert to cents
   const [stock, setStock] = useState("");
   const [creating, setCreating] = useState(false);
+
+  // Edit modal state
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -139,6 +144,36 @@ export default function ItemsClient({
     } finally {
       setCreating(false);
     }
+  };
+
+  const onUpdate = async (updatedItem: Item) => {
+    setError(null);
+    try {
+      const res = await fetch(`/api/items/${encodeURIComponent(updatedItem.id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedItem),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data?.error || "Failed to update item";
+        throw new Error(msg);
+      }
+      // Update local state
+      setItems((prev) => prev.map((item) => (item.id === updatedItem.id ? data : item)));
+    } catch (e) {
+      throw e; // Re-throw to be caught by modal
+    }
+  };
+
+  const handleEditClick = (item: Item) => {
+    setEditingItem(item);
+    setShowEditModal(true);
+  };
+
+  const handleEditClose = () => {
+    setShowEditModal(false);
+    setEditingItem(null);
   };
 
   const compressImage = async (file: File, maxWidth = 1024, quality = 0.8): Promise<string> => {
@@ -370,11 +405,7 @@ export default function ItemsClient({
                       <Button 
                         size="sm" 
                         variant="secondary"
-                        onClick={() => {
-                          // TODO: Open edit modal or navigate to edit page
-                          console.log('Edit item:', i);
-                          alert(`Edit functionality coming soon!\n\nItem: ${i.name}\nSKU: ${i.sku}`);
-                        }}
+                        onClick={() => handleEditClick(i)}
                       >
                         <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -405,6 +436,14 @@ export default function ItemsClient({
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Item Modal */}
+      <EditItemModal
+        isOpen={showEditModal}
+        onClose={handleEditClose}
+        item={editingItem}
+        onSave={onUpdate}
+      />
     </div>
   );
 }
