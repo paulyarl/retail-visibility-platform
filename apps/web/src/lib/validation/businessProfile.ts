@@ -126,37 +126,62 @@ export function isSEOReady(profile: Partial<BusinessProfile>): boolean {
 }
 
 // Country list with codes (ISO 3166-1 alpha-2)
+// Based on Google Merchant Center & Google Maps availability for SWIS/Local Inventory Ads
+// Source: https://support.google.com/merchants/answer/160637
 export const countries = [
+  // North America (2) - Full GMC + Local Inventory Ads support
   { code: 'US', name: 'United States', flag: '🇺🇸' },
   { code: 'CA', name: 'Canada', flag: '🇨🇦' },
-  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
-  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
-  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
-  { code: 'FR', name: 'France', flag: '🇫🇷' },
-  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
-  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
-  { code: 'NL', name: 'Netherlands', flag: '🇳🇱' },
-  { code: 'BE', name: 'Belgium', flag: '🇧🇪' },
-  { code: 'CH', name: 'Switzerland', flag: '🇨🇭' },
+  
+  // Western Europe (17) - Full GMC + Local Inventory Ads support
   { code: 'AT', name: 'Austria', flag: '🇦🇹' },
-  { code: 'SE', name: 'Sweden', flag: '🇸🇪' },
-  { code: 'NO', name: 'Norway', flag: '🇳🇴' },
+  { code: 'BE', name: 'Belgium', flag: '🇧🇪' },
   { code: 'DK', name: 'Denmark', flag: '🇩🇰' },
   { code: 'FI', name: 'Finland', flag: '🇫🇮' },
+  { code: 'FR', name: 'France', flag: '🇫🇷' },
+  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
   { code: 'IE', name: 'Ireland', flag: '🇮🇪' },
+  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
+  { code: 'LU', name: 'Luxembourg', flag: '🇱🇺' },
+  { code: 'NL', name: 'Netherlands', flag: '🇳🇱' },
+  { code: 'NO', name: 'Norway', flag: '🇳🇴' },
   { code: 'PT', name: 'Portugal', flag: '🇵🇹' },
-  { code: 'PL', name: 'Poland', flag: '🇵🇱' },
+  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
+  { code: 'SE', name: 'Sweden', flag: '🇸🇪' },
+  { code: 'CH', name: 'Switzerland', flag: '🇨🇭' },
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'IS', name: 'Iceland', flag: '🇮🇸' },
+  
+  // Central & Eastern Europe (5) - GMC support
   { code: 'CZ', name: 'Czech Republic', flag: '🇨🇿' },
-  { code: 'JP', name: 'Japan', flag: '🇯🇵' },
-  { code: 'KR', name: 'South Korea', flag: '🇰🇷' },
-  { code: 'CN', name: 'China', flag: '🇨🇳' },
+  { code: 'HU', name: 'Hungary', flag: '🇭🇺' },
+  { code: 'PL', name: 'Poland', flag: '🇵🇱' },
+  { code: 'RO', name: 'Romania', flag: '🇷🇴' },
+  { code: 'SK', name: 'Slovakia', flag: '🇸🇰' },
+  
+  // Asia-Pacific (7) - GMC + Local Inventory Ads support
+  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
+  { code: 'HK', name: 'Hong Kong', flag: '🇭🇰' },
   { code: 'IN', name: 'India', flag: '🇮🇳' },
-  { code: 'SG', name: 'Singapore', flag: '🇸🇬' },
+  { code: 'JP', name: 'Japan', flag: '🇯🇵' },
   { code: 'NZ', name: 'New Zealand', flag: '🇳🇿' },
-  { code: 'MX', name: 'Mexico', flag: '🇲🇽' },
-  { code: 'BR', name: 'Brazil', flag: '🇧🇷' },
+  { code: 'SG', name: 'Singapore', flag: '🇸🇬' },
+  { code: 'TW', name: 'Taiwan', flag: '🇹🇼' },
+  
+  // Latin America (4) - GMC support
   { code: 'AR', name: 'Argentina', flag: '🇦🇷' },
+  { code: 'BR', name: 'Brazil', flag: '🇧🇷' },
+  { code: 'CL', name: 'Chile', flag: '🇨🇱' },
+  { code: 'MX', name: 'Mexico', flag: '🇲🇽' },
+  
+  // Middle East & Africa (4) - GMC support
+  { code: 'IL', name: 'Israel', flag: '🇮🇱' },
+  { code: 'SA', name: 'Saudi Arabia', flag: '🇸🇦' },
+  { code: 'AE', name: 'United Arab Emirates', flag: '🇦🇪' },
   { code: 'ZA', name: 'South Africa', flag: '🇿🇦' },
+  
+  // South Korea (1) - Special GMC support
+  { code: 'KR', name: 'South Korea', flag: '🇰🇷' },
 ];
 
 // Helper to format phone number for display
