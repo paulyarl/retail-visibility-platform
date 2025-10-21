@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, AnimatedCard } from '@/components/ui';
 import Protected from '@/components/Protected';
+import PageHeader, { Icons } from '@/components/PageHeader';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -83,26 +84,15 @@ export default function SettingsPage() {
   return (
     <Protected>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-        {/* Header */}
-        <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">Settings</h1>
-                <p className="text-neutral-600 dark:text-neutral-400 mt-1">Manage your account and preferences</p>
-              </div>
-              <button
-                onClick={() => router.push('/tenants')}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 rounded-lg text-neutral-700 font-medium transition-colors"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Back to Dashboard
-              </button>
-            </div>
-          </div>
-        </div>
+        <PageHeader
+          title="Settings"
+          description="Manage your account and preferences"
+          icon={Icons.Settings}
+          backLink={{
+            href: '/tenants',
+            label: 'Back to Dashboard'
+          }}
+        />
 
         {/* Settings Cards */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button, Input, Modal, ModalFooter } from '@/components/ui';
+import PageHeader, { Icons } from '@/components/PageHeader';
 import { motion } from 'framer-motion';
 
 interface User {
@@ -143,34 +144,23 @@ export default function UsersManagementPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 mb-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">User Management</h1>
-              <p className="text-neutral-600 dark:text-neutral-400 mt-1">Manage users, permissions, and access</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button onClick={() => setShowInviteModal(true)}>
-                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Invite User
-              </Button>
-              <Link 
-                href="/settings/admin"
-                className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center gap-1"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Back to Admin
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="User Management"
+        description="Manage users, permissions, and access"
+        icon={Icons.Users}
+        backLink={{
+          href: '/settings/admin',
+          label: 'Back to Admin'
+        }}
+        actions={
+          <Button onClick={() => setShowInviteModal(true)}>
+            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Invite User
+          </Button>
+        }
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         {/* Stats */}

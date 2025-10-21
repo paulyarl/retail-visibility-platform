@@ -8,6 +8,7 @@ import BusinessProfileCard from "@/components/settings/BusinessProfileCard";
 import MapCardSettings from "@/components/tenant/MapCardSettings";
 import SwisPreviewSettings from "@/components/tenant/SwisPreviewSettings";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import PageHeader, { Icons } from "@/components/PageHeader";
 
 type Tenant = {
   id: string;
@@ -95,20 +96,15 @@ export default function TenantSettingsPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 mb-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{t('settings.tenant.title', 'Tenant Settings')}</h1>
-              <p className="text-neutral-600 dark:text-neutral-400 mt-1">{tenant.name}</p>
-            </div>
-            <Link href="/tenants" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-              ← Back to Tenants
-            </Link>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title={t('settings.tenant.title', 'Tenant Settings')}
+        description={tenant.name}
+        icon={Icons.Tenants}
+        backLink={{
+          href: '/tenants',
+          label: 'Back to Tenants'
+        }}
+      />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
 import Protected from '@/components/Protected';
+import PageHeader, { Icons } from '@/components/PageHeader';
 
 const LANGUAGES = [
   {
@@ -77,28 +78,15 @@ export default function LanguageSettingsPage() {
   return (
     <Protected>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-        {/* Header */}
-        <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">Language & Region</h1>
-                <p className="text-neutral-600 dark:text-neutral-400 mt-1">
-                  Choose your preferred language
-                </p>
-              </div>
-              <Link
-                href="/settings"
-                className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-medium flex items-center gap-1"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Back to Settings
-              </Link>
-            </div>
-          </div>
-        </div>
+        <PageHeader
+          title="Language & Region"
+          description="Choose your preferred language"
+          icon={Icons.Language}
+          backLink={{
+            href: '/settings',
+            label: 'Back to Settings'
+          }}
+        />
 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {/* Language Selection */}

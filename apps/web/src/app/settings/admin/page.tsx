@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, AnimatedCard, Spinner } from '@/components/ui';
 import { motion } from 'framer-motion';
+import PageHeader, { Icons } from '@/components/PageHeader';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
@@ -73,26 +74,15 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 mb-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">Admin Dashboard</h1>
-              <p className="text-neutral-600 dark:text-neutral-400 mt-1">Platform administration and configuration</p>
-            </div>
-            <Link 
-              href="/tenants"
-              className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center gap-1"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back to Tenants
-            </Link>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Admin Dashboard"
+        description="Platform administration and configuration"
+        icon={Icons.Admin}
+        backLink={{
+          href: '/tenants',
+          label: 'Back to Tenants'
+        }}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         {/* System Overview */}
