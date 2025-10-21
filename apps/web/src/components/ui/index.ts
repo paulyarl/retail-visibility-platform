@@ -12,3 +12,4 @@ export { Tooltip, type TooltipProps } from './Tooltip';
 export { Tabs, type TabsProps, type Tab } from './Tabs';
 export { Toast, ToastContainer, type ToastProps } from './Toast';
 export { AnimatedCard, type AnimatedCardProps } from './AnimatedCard';
+export { Pagination } from './Pagination';

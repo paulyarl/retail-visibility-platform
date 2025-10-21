@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Badge, Alert, AnimatedCard, Modal, ModalFooter } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Badge, Alert, AnimatedCard, Modal, ModalFooter, Pagination } from "@/components/ui";
 import { motion } from "framer-motion";
 
 type Tenant = { id: string; name: string; createdAt?: string };
@@ -13,6 +13,31 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Pagination and search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Filter and paginate tenants
+  const filteredTenants = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return tenants;
+    return tenants.filter((t) =>
+      t.name.toLowerCase().includes(query) || t.id.toLowerCase().includes(query)
+    );
+  }, [tenants, searchQuery]);
+
+  const paginatedTenants = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredTenants.slice(startIndex, endIndex);
+  }, [filteredTenants, currentPage, pageSize]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const refresh = async () => {
     setLoading(true);
@@ -140,26 +165,37 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
         {/* Tenants List */}
         <AnimatedCard delay={0.1} hover={false}>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <CardTitle>Your Tenants</CardTitle>
                 <CardDescription>Manage your store locations</CardDescription>
               </div>
-              <Badge variant="info">{tenants.length} {tenants.length === 1 ? 'tenant' : 'tenants'}</Badge>
+              <Badge variant="info">{filteredTenants.length} {filteredTenants.length === 1 ? 'tenant' : 'tenants'}</Badge>
             </div>
+            {/* Search Input */}
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or ID..."
+              label="Search Tenants"
+            />
           </CardHeader>
           <CardContent>
-            {tenants.length === 0 ? (
+            {filteredTenants.length === 0 ? (
               <div className="text-center py-12">
                 <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                <h3 className="mt-2 text-sm font-medium text-neutral-900">No tenants</h3>
-                <p className="mt-1 text-sm text-neutral-500">Get started by creating your first tenant.</p>
+                <h3 className="mt-2 text-sm font-medium text-neutral-900">
+                  {searchQuery ? 'No matching tenants' : 'No tenants'}
+                </h3>
+                <p className="mt-1 text-sm text-neutral-500">
+                  {searchQuery ? 'Try a different search term' : 'Get started by creating your first tenant.'}
+                </p>
               </div>
             ) : (
               <div className="divide-y divide-neutral-200">
-                {tenants.map((t, index) => (
+                {paginatedTenants.map((t, index) => (
                   <TenantRow 
                     key={t.id} 
                     tenant={t}
@@ -173,6 +209,18 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
               </div>
             )}
           </CardContent>
+          {filteredTenants.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredTenants.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+          )}
         </AnimatedCard>
       </div>
     </div>

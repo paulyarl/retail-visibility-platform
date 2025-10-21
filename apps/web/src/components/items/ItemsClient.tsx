@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Pagination } from "@/components/ui";
 import EditItemModal from "./EditItemModal";
 
 type Tenant = {
@@ -45,6 +45,10 @@ export default function ItemsClient({
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) return items;
@@ -52,6 +56,17 @@ export default function ItemsClient({
       [i.sku, i.name].some((v) => (v ?? "").toLowerCase().includes(term))
     );
   }, [items, q]);
+
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filtered.slice(startIndex, endIndex);
+  }, [filtered, currentPage, pageSize]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [q]);
 
   const refresh = async () => {
     setLoading(true);
@@ -369,7 +384,7 @@ export default function ItemsClient({
               </div>
             ) : (
               <div className="divide-y divide-neutral-200">
-                {filtered.map((i) => (
+                {paginatedItems.map((i) => (
                   <div key={i.id} className="py-4 flex items-center gap-4">
                     {/* Image */}
                     <div className="flex-shrink-0">
@@ -434,6 +449,18 @@ export default function ItemsClient({
               </div>
             )}
           </CardContent>
+          {filtered.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filtered.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+          )}
         </Card>
       </div>
 
