@@ -9,13 +9,14 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 
 export default function AppearanceSettingsPage() {
   const [mounted, setMounted] = useState(false);
-  const { theme, setTheme, systemTheme } = useTheme();
+  const { theme, setTheme, systemTheme, resolvedTheme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const currentTheme = theme === "system" ? systemTheme : theme;
+  const actualTheme = resolvedTheme; // This is what's actually being displayed
 
   return (
     <Protected>
@@ -177,25 +178,29 @@ export default function AppearanceSettingsPage() {
           </Card>
 
           {/* Preview */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Preview</CardTitle>
-              <CardDescription>See how your theme looks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="p-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">Sample Card</h3>
-                  <p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">
-                    This is how your content will look with the selected theme.
-                  </p>
-                  <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors">
-                    Sample Button
-                  </button>
+          {mounted && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Preview</CardTitle>
+                <CardDescription>
+                  Currently displaying: {actualTheme === 'dark' ? 'Dark' : 'Light'} theme
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">Sample Card</h3>
+                    <p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">
+                      This is how your content will look with the {actualTheme} theme.
+                    </p>
+                    <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors">
+                      Sample Button
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </Protected>
