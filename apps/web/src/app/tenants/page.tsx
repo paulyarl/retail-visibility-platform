@@ -6,23 +6,14 @@ import { headers } from 'next/headers';
 export const dynamic = 'force-dynamic';
 
 export default async function TenantsPage() {
-  // Construct absolute URL for SSR fetch
-  // On Vercel, use VERCEL_URL; locally fall back to headers
-  let base = '';
-  if (process.env.VERCEL_URL) {
-    base = `https://${process.env.VERCEL_URL}`;
-  } else {
-    const hdrs = await headers();
-    const host = hdrs.get('host');
-    const protocol = process.env.VERCEL ? 'https' : 'http';
-    base = host ? `${protocol}://${host}` : 'http://localhost:3000';
-  }
-
+  // Fetch directly from Railway API in SSR to avoid Vercel deployment protection
+  const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+  
   let tenants: Array<{ id: string; name: string; createdAt?: string; created_at?: string }> = [];
   let loadError: string | null = null;
 
   try {
-    const url = `${base}/api/tenants`;
+    const url = `${apiBaseUrl}/tenants`;
     console.log('[TenantsPage SSR] Fetching from:', url);
     const res = await fetch(url, { cache: 'no-store' });
     console.log('[TenantsPage SSR] Response status:', res.status);
