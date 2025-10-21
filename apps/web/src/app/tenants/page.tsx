@@ -38,24 +38,31 @@ export default async function TenantsPage() {
 
   return (
     <Protected>
-      <main className="space-y-6">
-        <AuthPanel />
-        <h1 className="text-2xl font-semibold">Tenants</h1>
-        {loadError ? (
-          <div className="bg-red-950/20 border border-red-900 rounded-lg p-4">
-            <p className="text-red-400 font-medium mb-2">Error Loading Tenants</p>
-            <p className="text-red-300 text-sm">{loadError}</p>
+      {loadError ? (
+        <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 border border-red-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-neutral-900">Error Loading Tenants</h2>
+                <p className="text-sm text-neutral-600">{loadError}</p>
+              </div>
+            </div>
             <button
               onClick={() => window.location.reload()}
-              className="mt-3 px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded text-sm text-white transition-colors"
+              className="w-full px-4 py-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-white font-medium transition-colors"
             >
               Retry
             </button>
           </div>
-        ) : (
-          <TenantsClient initialTenants={tenants as any} />
-        )}
-      </main>
+        </div>
+      ) : (
+        <TenantsClient initialTenants={tenants as any} />
+      )}
     </Protected>
   );
 }

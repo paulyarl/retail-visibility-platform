@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Badge, Alert, AnimatedCard, Modal, ModalFooter } from "@/components/ui";
+import { motion } from "framer-motion";
 
 type Tenant = { id: string; name: string; createdAt?: string };
 
@@ -74,60 +76,112 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   };
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-2">
-        <h2 className="text-lg font-medium">Create tenant</h2>
-        <form onSubmit={onCreate} className="flex flex-wrap gap-2">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="px-3 py-2 border rounded bg-white text-black"
-            placeholder="Tenant name"
-            required
-          />
-          <button disabled={loading} className="px-3 py-2 text-sm rounded border hover:bg-gray-100 disabled:opacity-60">
-            {loading ? "Creating…" : "Create"}
-          </button>
-          <button type="button" onClick={refresh} disabled={loading}
-            className="px-3 py-2 text-sm rounded border hover:bg-gray-100 disabled:opacity-60">
-            {loading ? "Loading…" : "Refresh"}
-          </button>
-        </form>
-        {error && (
-          <div className="bg-red-950/20 border border-red-900 rounded-lg p-3">
-            <p className="text-red-400 text-sm">{error}</p>
+    <div className="min-h-screen bg-neutral-50">
+      {/* Header */}
+      <div className="bg-white border-b border-neutral-200 mb-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-neutral-900">Tenants</h1>
+              <p className="text-neutral-600 mt-1">Manage your store locations and businesses</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button onClick={refresh} disabled={loading} variant="secondary">
+                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {loading ? "Loading…" : "Refresh"}
+              </Button>
+            </div>
           </div>
-        )}
-      </section>
+        </div>
+      </div>
 
-      <section className="space-y-2">
-        <h2 className="text-lg font-medium">Tenants</h2>
-        {tenants.length === 0 ? (
-          <p className="text-sm opacity-80">No tenants.</p>
-        ) : (
-          <ul className="divide-y divide-white/10 border rounded">
-            {tenants.map((t) => (
-              <TenantRow key={t.id} tenant={t}
-                onSelect={() => router.push(`/items?tenantId=${encodeURIComponent(t.id)}`)}
-                onRename={onRename}
-                onDelete={() => onDelete(t.id)}
-              />
-            ))}
-          </ul>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="error" title="Error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
         )}
-      </section>
+
+        {/* Create Tenant Card */}
+        <AnimatedCard delay={0} hover={false}>
+          <CardHeader>
+            <CardTitle>Create New Tenant</CardTitle>
+            <CardDescription>Add a new store or business location</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={onCreate} className="flex gap-3">
+              <div className="flex-1">
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter tenant name (e.g., Downtown Store)"
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={loading} loading={loading}>
+                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {loading ? "Creating…" : "Create Tenant"}
+              </Button>
+            </form>
+          </CardContent>
+        </AnimatedCard>
+
+        {/* Tenants List */}
+        <AnimatedCard delay={0.1} hover={false}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Your Tenants</CardTitle>
+                <CardDescription>Manage your store locations</CardDescription>
+              </div>
+              <Badge variant="info">{tenants.length} {tenants.length === 1 ? 'tenant' : 'tenants'}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {tenants.length === 0 ? (
+              <div className="text-center py-12">
+                <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-neutral-900">No tenants</h3>
+                <p className="mt-1 text-sm text-neutral-500">Get started by creating your first tenant.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-neutral-200">
+                {tenants.map((t, index) => (
+                  <TenantRow 
+                    key={t.id} 
+                    tenant={t}
+                    index={index}
+                    onSelect={() => router.push(`/items?tenantId=${encodeURIComponent(t.id)}`)}
+                    onRename={onRename}
+                    onDelete={() => onDelete(t.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </AnimatedCard>
+      </div>
     </div>
   );
 }
 
-function TenantRow({ tenant, onSelect, onRename, onDelete }: {
+function TenantRow({ tenant, index, onSelect, onRename, onDelete }: {
   tenant: Tenant;
+  index: number;
   onSelect: () => void;
   onRename: (id: string, newName: string) => void;
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(tenant.name);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => setValue(tenant.name), [tenant.name]);
 
@@ -136,29 +190,101 @@ function TenantRow({ tenant, onSelect, onRename, onDelete }: {
     setEditing(false);
   };
 
+  const handleDelete = () => {
+    setShowDeleteModal(false);
+    onDelete();
+  };
+
   return (
-    <li className="p-3 flex flex-wrap items-center gap-2">
-      <button onClick={onSelect} className="underline text-left">
-        <span className="font-medium">{tenant.name}</span>
-        <span className="text-sm opacity-70 ml-2">{tenant.id}</span>
-      </button>
-      <span className="ml-auto" />
-      {editing ? (
-        <>
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            className="px-2 py-1 border rounded bg-white text-black"
-          />
-          <button onClick={save} className="px-2 py-1 text-sm rounded border hover:bg-gray-100">Save</button>
-          <button onClick={() => setEditing(false)} className="px-2 py-1 text-sm rounded border hover:bg-gray-100">Cancel</button>
-        </>
-      ) : (
-        <>
-          <button onClick={() => setEditing(true)} className="px-2 py-1 text-sm rounded border hover:bg-gray-100">Rename</button>
-          <button onClick={onDelete} className="px-2 py-1 text-sm rounded border hover:bg-gray-100">Delete</button>
-        </>
-      )}
-    </li>
+    <>
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: index * 0.05 }}
+        className="py-4 flex items-center gap-4"
+      >
+        {/* Tenant Info */}
+        <div className="flex-1 min-w-0">
+          {editing ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                className="max-w-md"
+                autoFocus
+              />
+              <Button size="sm" onClick={save}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          ) : (
+            <button
+              onClick={onSelect}
+              className="text-left hover:text-primary-600 transition-colors group"
+            >
+              <div className="flex items-center gap-2">
+                <svg className="h-5 w-5 text-neutral-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <div>
+                  <p className="font-medium text-neutral-900 group-hover:text-primary-600">{tenant.name}</p>
+                  <p className="text-xs text-neutral-500 font-mono">{tenant.id}</p>
+                </div>
+              </div>
+            </button>
+          )}
+        </div>
+
+        {/* Actions */}
+        {!editing && (
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Rename
+            </Button>
+            <Button size="sm" variant="danger" onClick={() => setShowDeleteModal(true)}>
+              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </Button>
+            <Button size="sm" onClick={onSelect}>
+              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+              View Items
+            </Button>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Tenant"
+        description="Are you sure you want to delete this tenant?"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <Alert variant="warning">
+            This action cannot be undone. All data associated with this tenant will be permanently deleted.
+          </Alert>
+          <div className="bg-neutral-50 rounded-lg p-4">
+            <p className="text-sm font-medium text-neutral-900">{tenant.name}</p>
+            <p className="text-xs text-neutral-500 font-mono mt-1">{tenant.id}</p>
+          </div>
+        </div>
+        <ModalFooter>
+          <Button variant="ghost" onClick={() => setShowDeleteModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={handleDelete}>
+            Delete Tenant
+          </Button>
+        </ModalFooter>
+      </Modal>
+    </>
   );
 }
