@@ -2,7 +2,16 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   const base = process.env.API_BASE_URL || 'http://localhost:4000';
+  console.log('[API Proxy] Fetching tenants from:', `${base}/tenants`);
   const res = await fetch(`${base}/tenants`);
+  console.log('[API Proxy] Response status:', res.status);
+  
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('[API Proxy] Error response:', text);
+    return NextResponse.json({ error: 'upstream_failed', status: res.status, body: text }, { status: res.status });
+  }
+  
   const data = await res.json();
   return NextResponse.json(data);
 }
