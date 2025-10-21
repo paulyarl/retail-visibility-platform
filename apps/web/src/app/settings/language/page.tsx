@@ -11,36 +11,42 @@ const LANGUAGES = [
     name: 'English (US)',
     nativeName: 'English',
     flag: '🇺🇸',
+    countries: ['United States', 'Canada', 'United Kingdom', 'Australia'],
   },
   {
     code: 'es-ES',
     name: 'Spanish',
     nativeName: 'Español',
     flag: '🇪🇸',
+    countries: ['Spain', 'Mexico', 'Argentina', 'Colombia'],
   },
   {
     code: 'fr-FR',
     name: 'French',
     nativeName: 'Français',
     flag: '🇫🇷',
+    countries: ['France', 'Canada', 'Belgium', 'Switzerland'],
   },
   {
     code: 'de-DE',
     name: 'German',
     nativeName: 'Deutsch',
     flag: '🇩🇪',
+    countries: ['Germany', 'Austria', 'Switzerland'],
   },
   {
     code: 'zh-CN',
     name: 'Chinese (Simplified)',
     nativeName: '简体中文',
     flag: '🇨🇳',
+    countries: ['China', 'Singapore'],
   },
   {
     code: 'ja-JP',
     name: 'Japanese',
     nativeName: '日本語',
     flag: '🇯🇵',
+    countries: ['Japan'],
   },
 ];
 
@@ -121,6 +127,9 @@ export default function LanguageSettingsPage() {
                         </p>
                         <p className="text-sm text-neutral-600 dark:text-neutral-400">
                           {language.name}
+                        </p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                          {language.countries.join(', ')}
                         </p>
                       </div>
                       {selectedLanguage === language.code && (
