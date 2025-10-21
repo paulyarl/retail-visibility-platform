@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -16,10 +17,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-black text-white`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white`}
       >
-        <ErrorBoundary>{children}</ErrorBoundary>
-        <Analytics />
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <ErrorBoundary>{children}</ErrorBoundary>
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   );

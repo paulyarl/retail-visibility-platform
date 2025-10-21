@@ -15,3 +15,4 @@ export { AnimatedCard, type AnimatedCardProps } from './AnimatedCard';
 export { Pagination } from './Pagination';
 export { SearchableSelect } from './SearchableSelect';
 export { AdvancedSearchableSelect, type SelectOption } from './AdvancedSearchableSelect';
+export { ThemeToggle } from './ThemeToggle';
