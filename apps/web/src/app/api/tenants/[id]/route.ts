@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function PUT(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await context.params;
     const body = await _req.json();
-    const res = await fetch(`http://localhost:4000/tenants/${encodeURIComponent(params.id)}`, {
+    const base = process.env.API_BASE_URL || 'http://localhost:4000';
+    const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -15,9 +17,11 @@ export async function PUT(_req: NextRequest, { params }: { params: { id: string 
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const res = await fetch(`http://localhost:4000/tenants/${encodeURIComponent(params.id)}`, {
+    const { id } = await context.params;
+    const base = process.env.API_BASE_URL || 'http://localhost:4000';
+    const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
     if (res.status === 204) return new NextResponse(null, { status: 204 });
