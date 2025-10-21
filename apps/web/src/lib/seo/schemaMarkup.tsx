@@ -5,6 +5,7 @@
  * Target: Rich Result Coverage ≥90%
  */
 
+import React from 'react';
 import type { BusinessProfile } from '@/lib/validation/businessProfile';
 import type { SwisPreviewItem } from '@/components/tenant/SwisPreviewWidget';
 
