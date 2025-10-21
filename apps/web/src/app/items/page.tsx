@@ -16,20 +16,12 @@ export default async function ItemsPage({
     redirect("/tenants");
   }
   
-  // Construct absolute URL for SSR fetch
-  let base = '';
-  if (process.env.VERCEL_URL) {
-    base = `https://${process.env.VERCEL_URL}`;
-  } else {
-    const hdrs = await headers();
-    const host = hdrs.get('host');
-    const protocol = process.env.VERCEL ? 'https' : 'http';
-    base = host ? `${protocol}://${host}` : 'http://localhost:3000';
-  }
+  // Fetch directly from Railway API in SSR to avoid Vercel deployment protection
+  const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
   
-  const res = await fetch(`${base}/api/items?tenantId=${encodeURIComponent(tenantId as string)}`, { cache: 'no-store' });
+  const res = await fetch(`${apiBaseUrl}/items?tenantId=${encodeURIComponent(tenantId as string)}`, { cache: 'no-store' });
   const data = await res.json();
-  const items: Array<{ id: string; sku: string; name: string; priceCents?: number; stock?: number }> = data.items ?? [];
+  const items: Array<{ id: string; sku: string; name: string; priceCents?: number; stock?: number }> = data ?? [];
   return (
     <main className="space-y-6">
       <h1 className="text-2xl font-semibold">Items</h1>
