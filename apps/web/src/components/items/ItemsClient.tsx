@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge } from "@/components/ui";
 
 type Tenant = {
   id: string;
@@ -212,107 +213,184 @@ export default function ItemsClient({
   };
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-sm opacity-80">Tenant</label>
-          <select
-            value={tenantId}
-            onChange={(e) => setTenantId(e.target.value)}
-            className="px-3 py-2 border rounded bg-white text-black min-w-48"
-          >
-            <option value="" disabled>Select a tenant…</option>
-            {tenants.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="px-3 py-2 border rounded bg-white text-black flex-1 min-w-40"
-            placeholder={t('inventory.searchPlaceholder', 'Search by SKU or name')}
-          />
-          <button onClick={refresh} disabled={loading}
-            className="px-3 py-2 text-sm rounded border hover:bg-gray-100 disabled:opacity-60">
-            {loading ? t('common.loading', 'Loading…') : t('common.refresh', 'Refresh')}
-          </button>
+    <div className="min-h-screen bg-neutral-50">
+      {/* Header */}
+      <div className="bg-white border-b border-neutral-200 mb-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-neutral-900">{t('inventory.title', 'Inventory')}</h1>
+              <p className="text-neutral-600 mt-1">Manage your product catalog</p>
+            </div>
+            <Button onClick={refresh} disabled={loading} variant="secondary">
+              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {loading ? t('common.loading', 'Loading…') : t('common.refresh', 'Refresh')}
+            </Button>
+          </div>
         </div>
-        {error && <div className="text-sm text-red-400">{error}</div>}
-      </section>
+      </div>
 
-      <section className="space-y-2">
-        <h2 className="text-lg font-medium">{t('inventory.createItem', 'Create item')}</h2>
-        <form onSubmit={onCreate} className="grid grid-cols-1 sm:grid-cols-5 gap-2">
-          <input
-            value={sku}
-            onChange={(e) => setSku(e.target.value)}
-            className="px-3 py-2 border rounded bg-white text-black"
-            placeholder={t('inventory.sku', 'SKU')}
-            required
-          />
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="px-3 py-2 border rounded bg-white text-black"
-            placeholder={t('inventory.name', 'Name')}
-            required
-          />
-          <input
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="px-3 py-2 border rounded bg-white text-black"
-            placeholder={t('inventory.pricePlaceholder', 'Price (e.g. 12.99)')}
-            inputMode="decimal"
-          />
-          <input
-            value={stock}
-            onChange={(e) => setStock(e.target.value)}
-            className="px-3 py-2 border rounded bg-white text-black"
-            placeholder={t('inventory.stock', 'Stock')}
-            inputMode="numeric"
-          />
-          <button disabled={creating} className="px-3 py-2 text-sm rounded border hover:bg-gray-100 disabled:opacity-60">
-            {creating ? t('common.creating', 'Creating…') : t('common.create', 'Create')}
-          </button>
-        </form>
-      </section>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Tenant</label>
+                <select
+                  value={tenantId}
+                  onChange={(e) => setTenantId(e.target.value)}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="" disabled>Select a tenant…</option>
+                  {tenants.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t('inventory.searchPlaceholder', 'Search by SKU or name')}
+                label="Search"
+              />
+            </div>
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-      <section className="space-y-2">
-        <h2 className="text-lg font-medium">{t('inventory.title', 'Items')}</h2>
-        {filtered.length === 0 ? (
-          <p className="text-sm opacity-80">{t('inventory.noItems', 'No items.')}</p>
-        ) : (
-          <ul className="divide-y divide-white/10 border rounded">
-            {filtered.map((i) => (
-              <li key={i.id} className="p-3 flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm">{i.sku}</span>
-                <span className="font-medium">{i.name}</span>
-                {typeof i.priceCents === "number" && (
-                  <span className="ml-auto text-sm opacity-80">
-                    ${(i.priceCents / 100).toFixed(2)}
-                  </span>
-                )}
-                {typeof i.stock === "number" && (
-                  <span className="text-sm opacity-80">stock: {i.stock}</span>
-                )}
-                {i.imageUrl && (
-                  <img src={i.imageUrl} alt="" className="h-10 w-10 object-cover rounded border" />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const f = e.currentTarget.files?.[0];
-                    if (f) onUpload(i, f);
-                    e.currentTarget.value = "";
-                  }}
-                  className="text-sm"
+        {/* Create Item Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('inventory.createItem', 'Create New Item')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={onCreate} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Input
+                  value={sku}
+                  onChange={(e) => setSku(e.target.value)}
+                  placeholder={t('inventory.sku', 'SKU')}
+                  label="SKU"
+                  required
                 />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={t('inventory.name', 'Name')}
+                  label="Name"
+                  required
+                />
+                <Input
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder={t('inventory.pricePlaceholder', 'Price (e.g. 12.99)')}
+                  label="Price"
+                  type="number"
+                  step="0.01"
+                />
+                <Input
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  placeholder={t('inventory.stock', 'Stock')}
+                  label="Stock"
+                  type="number"
+                />
+              </div>
+              <Button type="submit" disabled={creating} loading={creating}>
+                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {creating ? t('common.creating', 'Creating…') : t('common.create', 'Create Item')}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Items List */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>{t('inventory.title', 'Items')} ({filtered.length})</CardTitle>
+              {filtered.length > 0 && (
+                <Badge variant="info">{filtered.length} items</Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {filtered.length === 0 ? (
+              <div className="text-center py-12">
+                <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-neutral-900">{t('inventory.noItems', 'No items')}</h3>
+                <p className="mt-1 text-sm text-neutral-500">Get started by creating a new item.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-neutral-200">
+                {filtered.map((i) => (
+                  <div key={i.id} className="py-4 flex items-center gap-4">
+                    {/* Image */}
+                    <div className="flex-shrink-0">
+                      {i.imageUrl ? (
+                        <img src={i.imageUrl} alt={i.name} className="h-16 w-16 object-cover rounded-lg border border-neutral-200" />
+                      ) : (
+                        <div className="h-16 w-16 bg-neutral-100 rounded-lg flex items-center justify-center">
+                          <svg className="h-8 w-8 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-neutral-900 truncate">{i.name}</p>
+                        <Badge variant="default">{i.sku}</Badge>
+                      </div>
+                      <div className="mt-1 flex items-center gap-4 text-sm text-neutral-500">
+                        {typeof i.priceCents === "number" && (
+                          <span className="font-medium text-neutral-900">${(i.priceCents / 100).toFixed(2)}</span>
+                        )}
+                        {typeof i.stock === "number" && (
+                          <span>Stock: {i.stock}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex-shrink-0">
+                      <label className="cursor-pointer inline-flex items-center justify-center gap-2 font-medium transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 px-3 py-1.5 text-sm bg-neutral-100 text-neutral-900 hover:bg-neutral-200 focus:ring-neutral-500">
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Upload Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const f = e.currentTarget.files?.[0];
+                            if (f) onUpload(i, f);
+                            e.currentTarget.value = "";
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
