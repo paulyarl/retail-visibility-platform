@@ -12,10 +12,6 @@ const nextConfig: NextConfig = {
 
   experimental: {
     serverActions: { bodySizeLimit: "15mb" },
-    turbopack: {
-      // Point at the monorepo root (where pnpm-lock.yaml lives)
-      root: path.resolve(__dirname, "../.."),
-    },
   },
 };
 
