@@ -91,7 +91,19 @@ export default function SettingsPage() {
               <AnimatedCard
                 key={setting.href}
                 delay={index * 0.1}
-                onClick={() => router.push(setting.href)}
+                onClick={() => {
+                  // Special handling for tenant settings
+                  if (setting.href === '/settings/tenant') {
+                    const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+                    if (tenantId) {
+                      router.push(setting.href);
+                    } else {
+                      router.push('/tenants');
+                    }
+                  } else {
+                    router.push(setting.href);
+                  }
+                }}
                 className="cursor-pointer"
               >
                 <CardHeader>
@@ -135,7 +147,16 @@ export default function SettingsPage() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button
-                  onClick={() => router.push('/settings/tenant')}
+                  onClick={() => {
+                    // Check if tenant is selected
+                    const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+                    if (tenantId) {
+                      router.push('/settings/tenant');
+                    } else {
+                      // Redirect to tenants page to select one first
+                      router.push('/tenants');
+                    }
+                  }}
                   className="flex items-center gap-3 p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors text-left"
                 >
                   <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
