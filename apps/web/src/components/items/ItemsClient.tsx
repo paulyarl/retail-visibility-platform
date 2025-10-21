@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Pagination } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Pagination, SearchableSelect } from "@/components/ui";
 import EditItemModal from "./EditItemModal";
 
 type Tenant = {
@@ -287,19 +287,13 @@ export default function ItemsClient({
         <Card>
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">Tenant</label>
-                <select
-                  value={tenantId}
-                  onChange={(e) => setTenantId(e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="" disabled>Select a tenant…</option>
-                  {tenants.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
+              <SearchableSelect
+                label="Tenant"
+                value={tenantId}
+                onChange={setTenantId}
+                options={tenants.map(t => ({ value: t.id, label: t.name }))}
+                placeholder="Select a tenant…"
+              />
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
