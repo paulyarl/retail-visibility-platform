@@ -9,6 +9,7 @@ import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import { setRequestContext } from "./context";
 import { audit } from "./audit";
+import { dailyRatesJob } from "./jobs/rates";
 
 const app = express();
 
@@ -366,6 +367,9 @@ app.get("/__ping", (req, res) => {
   console.log("PING from", req.ip, "at", new Date().toISOString());
   res.json({ ok: true, when: new Date().toISOString() });
 });
+
+/* ------------------------------ jobs ------------------------------ */
+app.post("/jobs/rates/daily", dailyRatesJob);
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);

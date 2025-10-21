@@ -1,0 +1,97 @@
+{
+  "dashboard": {
+    "title": "RVP - Latency by Region",
+    "description": "Request latency grouped by tenant region (REQ-2025-904)",
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Latency by Region (p95)",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{region!=\"\"}[5m])) by (region, le))",
+            "legendFormat": "{{region}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Latency (seconds)"
+          }
+        ],
+        "alert": {
+          "name": "High Latency by Region",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [2]
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "keep_state",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "API latency in {{region}} exceeded 2s (p95)",
+          "name": "High Latency Alert",
+          "noDataState": "no_data",
+          "notifications": [],
+          "enabled": false
+        }
+      },
+      {
+        "id": 2,
+        "title": "Request Count by Region",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{region!=\"\"}[5m])) by (region)",
+            "legendFormat": "{{region}}",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate by Region",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{region!=\"\",status=~\"5..\"}[5m])) by (region) / sum(rate(http_requests_total{region!=\"\"}[5m])) by (region)",
+            "legendFormat": "{{region}}",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percentunit",
+            "label": "Error Rate"
+          }
+        ]
+      }
+    ],
+    "tags": ["rvp", "latency", "region", "observability"],
+    "timezone": "browser",
+    "version": 1
+  },
+  "notes": [
+    "This dashboard is a placeholder for multi-region observability.",
+    "Currently all requests are tagged with region='us-east-1' (single region).",
+    "Alert is disabled by default (enabled: false).",
+    "To enable: set alert.enabled = true and configure notification channels."
+  ]
+}
