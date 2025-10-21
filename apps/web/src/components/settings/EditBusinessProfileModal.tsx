@@ -52,7 +52,7 @@ export default function EditBusinessProfileModal({
       if (error instanceof z.ZodError) {
         setErrors(prev => ({
           ...prev,
-          [name]: error.errors[0]?.message || 'Invalid value'
+          [name]: error.issues[0]?.message || 'Invalid value'
         }));
         return false;
       }
@@ -119,9 +119,9 @@ export default function EditBusinessProfileModal({
       if (err instanceof z.ZodError) {
         // Set all validation errors
         const newErrors: Record<string, string> = {};
-        err.errors.forEach(error => {
-          if (error.path[0]) {
-            newErrors[error.path[0] as string] = error.message;
+        err.issues.forEach((issue) => {
+          if (issue.path[0]) {
+            newErrors[issue.path[0] as string] = issue.message;
           }
         });
         setErrors(newErrors);

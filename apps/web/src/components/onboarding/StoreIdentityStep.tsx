@@ -37,7 +37,7 @@ export default function StoreIdentityStep({
       if (error instanceof z.ZodError) {
         setErrors(prev => ({
           ...prev,
-          [name]: error.errors[0]?.message || 'Invalid value'
+          [name]: error.issues[0]?.message || 'Invalid value'
         }));
         return false;
       }

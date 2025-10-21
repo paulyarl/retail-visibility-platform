@@ -4,7 +4,8 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
   label?: string;
   error?: string;
   helperText?: string;
-  options: Array<{ value: string; label: string }>;
+  options?: Array<{ value: string; label: string }>;
+  children?: React.ReactNode;
 }
 
 export function Select({
@@ -12,6 +13,7 @@ export function Select({
   error,
   helperText,
   options,
+  children,
   className = '',
   id,
   ...props
@@ -40,11 +42,15 @@ export function Select({
         `}
         {...props}
       >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
+        {options ? (
+          options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))
+        ) : (
+          children
+        )}
       </select>
       {error && (
         <p className="mt-1 text-sm text-error">{error}</p>
