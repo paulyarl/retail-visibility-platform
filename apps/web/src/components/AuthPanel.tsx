@@ -29,7 +29,14 @@ export default function AuthPanel() {
     e.preventDefault();
     if (!email) return;
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined } });
+    // Use current origin for redirect, ensuring it's the production URL
+    const redirectTo = typeof window !== 'undefined' 
+      ? `${window.location.origin}/tenants`
+      : undefined;
+    const { error } = await supabase.auth.signInWithOtp({ 
+      email, 
+      options: { emailRedirectTo: redirectTo } 
+    });
     setLoading(false);
     if (error) alert(error.message);
     else alert('Check your email for the magic link');
