@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard';
 import { Spinner } from '@/components/ui';
 
-export default function OnboardingPage() {
+function OnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantId = searchParams.get('tenantId');
@@ -56,5 +56,20 @@ export default function OnboardingPage() {
       tenantId={tenantId!}
       onComplete={handleComplete}
     />
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="text-center">
+          <Spinner size="lg" className="text-primary-600 mb-4" />
+          <p className="text-neutral-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <OnboardingContent />
+    </Suspense>
   );
 }
