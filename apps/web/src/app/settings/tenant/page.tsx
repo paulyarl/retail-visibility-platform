@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Alert, Spinner } from "@/components/ui";
+import BusinessProfileCard from "@/components/settings/BusinessProfileCard";
+import MapCardSettings from "@/components/tenant/MapCardSettings";
+import SwisPreviewSettings from "@/components/tenant/SwisPreviewSettings";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 
 type Tenant = {
   id: string;
@@ -221,6 +225,53 @@ export default function TenantSettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Business Profile - Feature Flag: FF_BUSINESS_PROFILE */}
+        {isFeatureEnabled('FF_BUSINESS_PROFILE', tenant.id, tenant.region) && (
+          <BusinessProfileCard
+            profile={null} // TODO: Fetch from API
+            loading={false}
+            onUpdate={async (profile) => {
+              console.log('Business profile updated:', profile);
+              // TODO: Implement API call
+            }}
+          />
+        )}
+
+        {/* Map Settings - Feature Flag: FF_MAP_CARD */}
+        {isFeatureEnabled('FF_MAP_CARD', tenant.id, tenant.region) && (
+          <MapCardSettings
+            businessProfile={{
+              business_name: tenant.name,
+              address_line1: '123 Main St', // TODO: Fetch from API
+              city: 'New York',
+              state: 'NY',
+              postal_code: '10001',
+              country_code: 'US',
+            }}
+            displayMap={false} // TODO: Fetch from API
+            privacyMode="precise" // TODO: Fetch from API
+            onSave={async (settings) => {
+              console.log('Map settings updated:', settings);
+              // TODO: Implement API call
+            }}
+          />
+        )}
+
+        {/* SWIS Preview Settings - Feature Flag: FF_SWIS_PREVIEW */}
+        {isFeatureEnabled('FF_SWIS_PREVIEW', tenant.id, tenant.region) && (
+          <SwisPreviewSettings
+            tenantId={tenant.id}
+            enabled={false} // TODO: Fetch from API
+            previewLimit={12} // TODO: Fetch from API
+            sortOrder="updated_desc" // TODO: Fetch from API
+            badgesEnabled={true} // TODO: Fetch from API
+            onSave={async (settings) => {
+              console.log('SWIS settings updated:', settings);
+              // TODO: Implement API call
+            }}
+          />
+        )}
 
         {/* Help Section */}
         <Card>
