@@ -55,6 +55,19 @@ export default function AuthPanel() {
     await supabase.auth.signOut();
   };
 
+  const handleContinue = async () => {
+    // Get user metadata to check role
+    const { data } = await supabase.auth.getUser();
+    const userRole = data.user?.user_metadata?.role;
+    
+    // Redirect based on role
+    if (userRole === 'admin') {
+      window.location.href = '/settings/admin';
+    } else {
+      window.location.href = '/tenants';
+    }
+  };
+
   return (
     <div className="space-y-4">
       {userEmail ? (
@@ -63,7 +76,7 @@ export default function AuthPanel() {
             You are signed in as <strong>{userEmail}</strong>
           </Alert>
           <Button 
-            onClick={() => window.location.href = '/tenants'} 
+            onClick={handleContinue} 
             variant="primary" 
             className="w-full"
           >
