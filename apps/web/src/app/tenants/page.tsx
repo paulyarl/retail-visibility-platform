@@ -3,6 +3,8 @@ import Protected from '@/components/Protected';
 import TenantsClient from '@/components/tenants/TenantsClient';
 import { headers } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 export default async function TenantsPage() {
   // Construct absolute URL for SSR fetch
   // On Vercel, use VERCEL_URL; locally fall back to headers

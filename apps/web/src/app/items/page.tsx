@@ -1,4 +1,5 @@
 import ItemsClient from "@/components/items/ItemsClient";
+import { headers } from 'next/headers';
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,19 @@ export default async function ItemsPage({
     const { redirect } = await import("next/navigation");
     redirect("/tenants");
   }
-  const res = await fetch(`http://localhost:3000/api/items?tenantId=${encodeURIComponent(tenantId as string)}`, { cache: 'no-store' });
+  
+  // Construct absolute URL for SSR fetch
+  let base = '';
+  if (process.env.VERCEL_URL) {
+    base = `https://${process.env.VERCEL_URL}`;
+  } else {
+    const hdrs = await headers();
+    const host = hdrs.get('host');
+    const protocol = process.env.VERCEL ? 'https' : 'http';
+    base = host ? `${protocol}://${host}` : 'http://localhost:3000';
+  }
+  
+  const res = await fetch(`${base}/api/items?tenantId=${encodeURIComponent(tenantId as string)}`, { cache: 'no-store' });
   const data = await res.json();
   const items: Array<{ id: string; sku: string; name: string; priceCents?: number; stock?: number }> = data.items ?? [];
   return (
