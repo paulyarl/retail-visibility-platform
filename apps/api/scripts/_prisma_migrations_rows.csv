@@ -1,0 +1,2 @@
+id,checksum,finished_at,migration_name,logs,rolled_back_at,started_at,applied_steps_count
+46119ff5-da1e-42bf-a515-18051983a582,7d7a090556dbba11ef6167d6f13c683e51a3fe67315e7e7c138782aff5d20f75,2025-10-21 00:58:48.181346+00,20251021005847_init_postgres,,,2025-10-21 00:58:47.986734+00,1

@@ -1,0 +1,3 @@
+id,tenantId,sku,name,priceCents,stock,imageUrl,metadata,createdAt,updatedAt
+cmgzuwyye0003g8r8ng0ni1tm,demo-tenant,SKU-001,Organic Apples,299,50,,,2025-10-21 00:59:30.422,2025-10-21 01:04:09.755
+cmgzuwz5x0005g8r8kcm6axyd,demo-tenant,SKU-002,Whole Milk 1L,349,40,,,2025-10-21 00:59:30.423,2025-10-21 01:04:09.755
