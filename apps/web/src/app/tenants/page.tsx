@@ -39,8 +39,8 @@ export default async function TenantsPage() {
   return (
     <Protected>
       {loadError ? (
-        <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 border border-red-200">
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white dark:bg-neutral-800 rounded-lg shadow-lg p-6 border border-red-200 dark:border-red-800">
             <div className="flex items-center gap-3 mb-4">
               <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

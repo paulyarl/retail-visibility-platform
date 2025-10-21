@@ -107,14 +107,14 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       {/* Header */}
-      <div className="bg-white border-b border-neutral-200 mb-6">
+      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 mb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-neutral-900">Tenants</h1>
-              <p className="text-neutral-600 mt-1">Manage your store locations and businesses</p>
+              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">Tenants</h1>
+              <p className="text-neutral-600 dark:text-neutral-400 mt-1">Manage your store locations and businesses</p>
             </div>
             <div className="flex items-center gap-3">
               <Button onClick={refresh} disabled={loading} variant="secondary">
@@ -186,7 +186,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                 <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                <h3 className="mt-2 text-sm font-medium text-neutral-900">
+                <h3 className="mt-2 text-sm font-medium text-neutral-900 dark:text-white">
                   {searchQuery ? 'No matching tenants' : 'No tenants'}
                 </h3>
                 <p className="mt-1 text-sm text-neutral-500">
@@ -282,7 +282,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
                 <div>
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600">{tenant.name}</p>
+                  <p className="font-medium text-neutral-900 dark:text-white group-hover:text-primary-600">{tenant.name}</p>
                   <p className="text-xs text-neutral-500 font-mono">{tenant.id}</p>
                 </div>
               </div>
@@ -333,8 +333,8 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete 
           <Alert variant="warning">
             This action cannot be undone. All data associated with this tenant will be permanently deleted.
           </Alert>
-          <div className="bg-neutral-50 rounded-lg p-4">
-            <p className="text-sm font-medium text-neutral-900">{tenant.name}</p>
+          <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-4">
+            <p className="text-sm font-medium text-neutral-900 dark:text-white">{tenant.name}</p>
             <p className="text-xs text-neutral-500 font-mono mt-1">{tenant.id}</p>
           </div>
         </div>
