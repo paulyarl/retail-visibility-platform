@@ -135,7 +135,7 @@ export default function SettingsPage() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button
-                  onClick={() => router.push('/onboarding')}
+                  onClick={() => router.push('/settings/tenant')}
                   className="flex items-center gap-3 p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors text-left"
                 >
                   <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -144,8 +144,8 @@ export default function SettingsPage() {
                     </svg>
                   </div>
                   <div>
-                    <div className="font-medium text-neutral-900">Update Profile</div>
-                    <div className="text-sm text-neutral-500">Edit business information</div>
+                    <div className="font-medium text-neutral-900">Tenant Settings</div>
+                    <div className="text-sm text-neutral-500">Update business profile</div>
                   </div>
                 </button>
 
