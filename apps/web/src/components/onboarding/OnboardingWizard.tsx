@@ -11,7 +11,7 @@ import { BusinessProfile } from '@/lib/validation/businessProfile';
 interface OnboardingWizardProps {
   tenantId: string;
   initialStep?: number;
-  onComplete?: () => void;
+  onComplete?: (profile: Partial<BusinessProfile>) => void;
 }
 
 const steps: Step[] = [
@@ -103,7 +103,7 @@ export default function OnboardingWizard({
     } else if (currentStep === 2) {
       // Complete onboarding
       if (onComplete) {
-        onComplete();
+        onComplete(businessData);
       } else {
         router.push('/tenants');
       }
@@ -118,7 +118,7 @@ export default function OnboardingWizard({
 
   const handleSkip = () => {
     if (onComplete) {
-      onComplete();
+      onComplete(businessData);
     } else {
       router.push('/tenants');
     }

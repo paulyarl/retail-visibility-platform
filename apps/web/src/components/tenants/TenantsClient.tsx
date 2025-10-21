@@ -41,8 +41,14 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "failed");
+      
+      // Add to list
       setTenants((prev) => [data as Tenant, ...prev]);
       setName("");
+      
+      // Redirect to onboarding to collect business profile
+      const tenantId = (data as Tenant).id;
+      router.push(`/onboarding?tenantId=${encodeURIComponent(tenantId)}`);
     } catch (_e) {
       setError("Failed to create tenant");
     } finally {
