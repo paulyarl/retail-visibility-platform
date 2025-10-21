@@ -3,9 +3,31 @@
 ## Overview
 To enable the advanced tenant selector features (grouping by state, showing city/state, region filtering), the backend API needs to include business profile data in the tenant responses.
 
+**IMPORTANT:** The API also needs to implement user-based filtering so business owners only see their tenants, while admins see all tenants.
+
 ---
 
 ## 1. Update GET /tenants Endpoint
+
+### Authentication Headers
+The frontend now passes these headers with every request:
+```
+X-User-Id: <supabase_user_id>
+X-User-Email: <user_email>
+X-User-Role: business_owner | admin
+```
+
+### Filtering Logic
+```typescript
+// Pseudo-code for backend
+if (userRole === 'admin') {
+  // Return ALL tenants
+  return getAllTenants();
+} else {
+  // Return only tenants owned by this user
+  return getTenantsByUserId(userId);
+}
+```
 
 ### Current Response:
 ```json
