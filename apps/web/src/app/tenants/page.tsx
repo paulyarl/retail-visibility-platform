@@ -42,7 +42,16 @@ export default async function TenantsPage() {
         <AuthPanel />
         <h1 className="text-2xl font-semibold">Tenants</h1>
         {loadError ? (
-          <div className="text-sm text-red-400">{loadError}</div>
+          <div className="bg-red-950/20 border border-red-900 rounded-lg p-4">
+            <p className="text-red-400 font-medium mb-2">Error Loading Tenants</p>
+            <p className="text-red-300 text-sm">{loadError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-3 px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded text-sm text-white transition-colors"
+            >
+              Retry
+            </button>
+          </div>
         ) : (
           <TenantsClient initialTenants={tenants as any} />
         )}

@@ -93,7 +93,11 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
             {loading ? "Loading…" : "Refresh"}
           </button>
         </form>
-        {error && <div className="text-sm text-red-400">{error}</div>}
+        {error && (
+          <div className="bg-red-950/20 border border-red-900 rounded-lg p-3">
+            <p className="text-red-400 text-sm">{error}</p>
+          </div>
+        )}
       </section>
 
       <section className="space-y-2">
