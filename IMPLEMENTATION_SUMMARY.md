@@ -64,6 +64,27 @@ Successfully deployed and enhanced the **Retail Visibility Platform** - a full-s
 **Files Modified**:
 - `apps/api/src/index.ts`
 
+#### Issue 5: Photo URL Not Persisting (Oct 22, 2025)
+**Problem**: Photos uploaded to Supabase but `GET /items` returned old filesystem URLs
+**Root Cause**: Backend only updated `item.imageUrl` if it was null (`if (!item.imageUrl)`)
+**Solution**: Removed conditional check - always persist Supabase public URL to database
+**Status**: ✅ Fixed
+**Files Modified**:
+- `apps/api/src/index.ts` (lines 146-147, 186-187, 241-242)
+- `apps/api/src/photos.ts` (lines 89-90)
+**Commits**:
+- `dcc6616` - fix: persist Supabase photo URLs to item.imageUrl on upload
+
+#### Issue 6: Edit Item 404 Error (Oct 22, 2025)
+**Problem**: `PUT /api/items/:id` returned 404 → HTML response → JSON parse error
+**Root Cause**: Missing Next.js API proxy route for `/api/items/[id]`
+**Solution**: Created proxy route handler for PUT and DELETE requests
+**Status**: ✅ Fixed
+**Files Created**:
+- `apps/web/src/app/api/items/[id]/route.ts`
+**Commits**:
+- `2145b8f` - fix: add missing API proxy route for PUT/DELETE /items/:id
+
 ### Phase 2: Production-Ready Enhancements (Implemented)
 
 #### Enhancement 1: Supabase Storage Integration
