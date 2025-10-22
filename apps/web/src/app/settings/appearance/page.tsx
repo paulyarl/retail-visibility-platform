@@ -1,35 +1,15 @@
 "use client";
 
-import { useTheme } from "@/contexts/ThemeContext";
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, ThemeToggle } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui";
 import Protected from "@/components/Protected";
 import PageHeader, { Icons } from '@/components/PageHeader';
 
 export default function AppearanceSettingsPage() {
   const [mounted, setMounted] = useState(false);
-  const { theme, setTheme, resolvedTheme } = useTheme();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted) {
-      console.log('[Appearance] Current theme:', theme);
-      console.log('[Appearance] Resolved theme:', resolvedTheme);
-      console.log('[Appearance] localStorage:', localStorage.getItem('rvp-theme'));
-    }
-  }, [mounted, theme, resolvedTheme]);
-
-  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
-    console.log('[Appearance] Changing theme to:', newTheme);
-    setTheme(newTheme);
-  };
-
-  const currentTheme = theme === "system" ? resolvedTheme : theme;
-  const actualTheme = resolvedTheme; // This is what's actually being displayed
+  const theme = 'light'; // Fixed to light mode for now
+  const actualTheme = 'light';
 
   return (
     <Protected>
@@ -72,12 +52,8 @@ export default function AppearanceSettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Light Theme */}
                   <button
-                    onClick={() => handleThemeChange("light")}
-                    className={`relative p-4 border-2 rounded-lg transition-all ${
-                      theme === "light"
-                        ? "border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20"
-                        : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600"
-                    }`}
+                    disabled
+                    className="relative p-4 border-2 rounded-lg border-primary-600 bg-primary-50 opacity-75 cursor-not-allowed"
                   >
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-full h-20 bg-white border border-neutral-200 rounded-md flex items-center justify-center">
@@ -94,7 +70,7 @@ export default function AppearanceSettingsPage() {
                         <p className="font-medium text-neutral-900 dark:text-white">Light</p>
                         <p className="text-xs text-neutral-500 dark:text-neutral-400">Bright and clear</p>
                       </div>
-                      {theme === "light" && (
+                      {true && (
                         <div className="absolute top-2 right-2">
                           <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="currentColor" viewBox="0 0 20 20">
                             <path
@@ -110,12 +86,8 @@ export default function AppearanceSettingsPage() {
 
                   {/* Dark Theme */}
                   <button
-                    onClick={() => handleThemeChange("dark")}
-                    className={`relative p-4 border-2 rounded-lg transition-all ${
-                      theme === "dark"
-                        ? "border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20"
-                        : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600"
-                    }`}
+                    disabled
+                    className="relative p-4 border-2 rounded-lg border-neutral-200 opacity-50 cursor-not-allowed"
                   >
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-full h-20 bg-neutral-900 border border-neutral-700 rounded-md flex items-center justify-center">
@@ -132,7 +104,7 @@ export default function AppearanceSettingsPage() {
                         <p className="font-medium text-neutral-900 dark:text-white">Dark</p>
                         <p className="text-xs text-neutral-500 dark:text-neutral-400">Easy on the eyes</p>
                       </div>
-                      {theme === "dark" && (
+                      {false && (
                         <div className="absolute top-2 right-2">
                           <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="currentColor" viewBox="0 0 20 20">
                             <path
@@ -148,12 +120,8 @@ export default function AppearanceSettingsPage() {
 
                   {/* System Theme */}
                   <button
-                    onClick={() => handleThemeChange("system")}
-                    className={`relative p-4 border-2 rounded-lg transition-all ${
-                      theme === "system"
-                        ? "border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20"
-                        : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600"
-                    }`}
+                    disabled
+                    className="relative p-4 border-2 rounded-lg border-neutral-200 opacity-50 cursor-not-allowed"
                   >
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-full h-20 bg-gradient-to-r from-white to-neutral-900 border border-neutral-300 rounded-md flex items-center justify-center">
@@ -170,7 +138,7 @@ export default function AppearanceSettingsPage() {
                         <p className="font-medium text-neutral-900 dark:text-white">System</p>
                         <p className="text-xs text-neutral-500 dark:text-neutral-400">Match your device</p>
                       </div>
-                      {theme === "system" && (
+                      {false && (
                         <div className="absolute top-2 right-2">
                           <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="currentColor" viewBox="0 0 20 20">
                             <path
@@ -186,34 +154,24 @@ export default function AppearanceSettingsPage() {
                 </div>
 
                 {/* Current Theme Info */}
-                {mounted && (
-                  <div className="mt-6 p-4 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-neutral-900 dark:text-white">Current Theme</p>
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
-                          {theme === "system"
-                            ? `System (currently ${currentTheme})`
-                            : theme ? theme.charAt(0).toUpperCase() + theme.slice(1) : 'Light'}
-                        </p>
-                      </div>
-                      <ThemeToggle />
-                    </div>
-                  </div>
-                )}
+                <div className="mt-6 p-4 bg-neutral-100 rounded-lg">
+                  <p className="text-sm font-medium text-neutral-900">Current Theme: Light</p>
+                  <p className="text-xs text-neutral-600 mt-1">
+                    Dark mode and theme switching will be available in a future update.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Preview */}
-          {mounted && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Live Preview</CardTitle>
-                <CardDescription>
-                  Currently displaying: {actualTheme === 'dark' ? 'Dark' : 'Light'} theme
-                </CardDescription>
-              </CardHeader>
+          <Card>
+            <CardHeader>
+              <CardTitle>Live Preview</CardTitle>
+              <CardDescription>
+                Currently displaying: Light theme
+              </CardDescription>
+            </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Light Theme Preview */}
@@ -286,7 +244,6 @@ export default function AppearanceSettingsPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
         </div>
       </div>
     </Protected>
