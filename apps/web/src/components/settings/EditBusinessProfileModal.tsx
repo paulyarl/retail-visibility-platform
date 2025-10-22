@@ -89,26 +89,12 @@ export default function EditBusinessProfileModal({
       setSaving(true);
       setError(null);
 
-      // Call API to save
-      const response = await fetch('/api/tenant/profile', {
-        method: profile ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validatedData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save business profile');
+      // Call parent's onSave callback (parent will handle API call with tenant_id)
+      if (onSave) {
+        await onSave(validatedData);
       }
-
-      const savedProfile = await response.json();
       
       setSuccess(true);
-      
-      // Call onSave callback
-      if (onSave) {
-        onSave(savedProfile);
-      }
 
       // Close modal after short delay
       setTimeout(() => {
