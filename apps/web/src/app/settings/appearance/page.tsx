@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "next-themes";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, ThemeToggle } from "@/components/ui";
@@ -9,7 +9,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 
 export default function AppearanceSettingsPage() {
   const [mounted, setMounted] = useState(false);
-  const { theme, setTheme, systemTheme, resolvedTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
@@ -23,12 +23,12 @@ export default function AppearanceSettingsPage() {
     }
   }, [mounted, theme, resolvedTheme]);
 
-  const handleThemeChange = (newTheme: string) => {
+  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
     console.log('[Appearance] Changing theme to:', newTheme);
     setTheme(newTheme);
   };
 
-  const currentTheme = theme === "system" ? systemTheme : theme;
+  const currentTheme = theme === "system" ? resolvedTheme : theme;
   const actualTheme = resolvedTheme; // This is what's actually being displayed
 
   return (
