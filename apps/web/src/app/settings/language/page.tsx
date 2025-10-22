@@ -51,16 +51,28 @@ const LANGUAGES = [
   },
 ];
 
+const REGIONS = [
+  { code: 'us-east-1', name: 'US East (N. Virginia)', flag: '🇺🇸' },
+  { code: 'us-west-2', name: 'US West (Oregon)', flag: '🇺🇸' },
+  { code: 'eu-west-1', name: 'EU (Ireland)', flag: '🇪🇺' },
+  { code: 'ap-southeast-1', name: 'Asia Pacific (Singapore)', flag: '🌏' },
+];
+
 export default function LanguageSettingsPage() {
   const [selectedLanguage, setSelectedLanguage] = useState('en-US');
+  const [selectedRegion, setSelectedRegion] = useState('us-east-1');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    // Load saved language preference
-    const saved = localStorage.getItem('language');
-    if (saved) {
-      setSelectedLanguage(saved);
+    // Load saved preferences
+    const savedLanguage = localStorage.getItem('language');
+    const savedRegion = localStorage.getItem('region');
+    if (savedLanguage) {
+      setSelectedLanguage(savedLanguage);
+    }
+    if (savedRegion) {
+      setSelectedRegion(savedRegion);
     }
   }, []);
 
@@ -69,6 +81,11 @@ export default function LanguageSettingsPage() {
     localStorage.setItem('language', code);
     // TODO: Trigger i18n language change
     // i18n.changeLanguage(code);
+  };
+
+  const handleRegionChange = (code: string) => {
+    setSelectedRegion(code);
+    localStorage.setItem('region', code);
   };
 
   if (!mounted) {
@@ -144,6 +161,65 @@ export default function LanguageSettingsPage() {
                     <p className="text-sm font-medium text-neutral-900 dark:text-white">Current Language</p>
                     <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                       {LANGUAGES.find(l => l.code === selectedLanguage)?.nativeName} ({selectedLanguage})
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Region Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Data Center Region</CardTitle>
+              <CardDescription>Select your preferred data center location</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {REGIONS.map((region) => (
+                  <button
+                    key={region.code}
+                    onClick={() => handleRegionChange(region.code)}
+                    className={`relative p-4 border-2 rounded-lg transition-all text-left ${
+                      selectedRegion === region.code
+                        ? 'border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">{region.flag}</span>
+                      <div className="flex-1">
+                        <p className="font-medium text-neutral-900 dark:text-white">
+                          {region.name}
+                        </p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                          {region.code}
+                        </p>
+                      </div>
+                      {selectedRegion === region.code && (
+                        <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Current Selection Info */}
+              <div className="mt-6 p-4 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">
+                    {REGIONS.find(r => r.code === selectedRegion)?.flag}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900 dark:text-white">Current Region</p>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
+                      {REGIONS.find(r => r.code === selectedRegion)?.name}
                     </p>
                   </div>
                 </div>

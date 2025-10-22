@@ -206,9 +206,11 @@ export default function TenantSettingsPage() {
                     className="px-3 py-1.5 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="en-US">English (US)</option>
-                    <option value="es-ES">Español</option>
-                    <option value="fr-FR">Français</option>
-                    <option value="de-DE">Deutsch</option>
+                    <option value="es-ES">Español (Spanish)</option>
+                    <option value="fr-FR">Français (French)</option>
+                    <option value="de-DE">Deutsch (German)</option>
+                    <option value="zh-CN">简体中文 (Chinese Simplified)</option>
+                    <option value="ja-JP">日本語 (Japanese)</option>
                   </select>
                 ) : (
                   <div className="flex items-center gap-2">
