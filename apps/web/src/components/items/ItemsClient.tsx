@@ -59,6 +59,14 @@ export default function ItemsClient({
   // Create form visibility
   const [showCreateForm, setShowCreateForm] = useState(false);
 
+  // Check URL params for create=true
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('create') === 'true') {
+      setShowCreateForm(true);
+    }
+  }, []);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);

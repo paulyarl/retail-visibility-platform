@@ -175,12 +175,14 @@ export default function Home() {
                   View Inventory
                 </Button>
               </Link>
-              <Button variant="primary" className="w-full justify-start">
-                <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add New Product
-              </Button>
+              <Link href="/items?create=true" className="block">
+                <Button variant="primary" className="w-full justify-start">
+                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add New Product
+                </Button>
+              </Link>
             </CardContent>
           </AnimatedCard>
 
@@ -190,33 +192,33 @@ export default function Home() {
               <CardDescription>Set up your retail visibility platform</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="h-6 w-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0">
+              <Link href="/tenants" className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                <div className="h-6 w-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:scale-110 transition-transform">
                   1
                 </div>
                 <div>
-                  <p className="font-medium text-neutral-900">Create a tenant</p>
+                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors">Create a tenant</p>
                   <p className="text-sm text-neutral-600">Set up your store or business</p>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="h-6 w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0">
+              </Link>
+              <Link href="/items?create=true" className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                <div className="h-6 w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
                   2
                 </div>
                 <div>
-                  <p className="font-medium text-neutral-900">Add inventory items</p>
+                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors">Add inventory items</p>
                   <p className="text-sm text-neutral-600">Upload products with photos</p>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="h-6 w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0">
+              </Link>
+              <Link href="/settings/tenant" className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                <div className="h-6 w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
                   3
                 </div>
                 <div>
-                  <p className="font-medium text-neutral-900">Connect to Google</p>
+                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors">Connect to Google</p>
                   <p className="text-sm text-neutral-600">Sync with Google Merchant Center</p>
                 </div>
-              </div>
+              </Link>
             </CardContent>
           </AnimatedCard>
         </div>
