@@ -17,6 +17,7 @@ type Tenant = {
   language?: string;
   currency?: string;
   data_policy_accepted?: boolean;
+  metadata?: any; // Business profile data
 };
 
 export default function TenantSettingsPage() {
@@ -24,6 +25,13 @@ export default function TenantSettingsPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingRegional, setEditingRegional] = useState(false);
+  const [savingRegional, setSavingRegional] = useState(false);
+  const [regionalSettings, setRegionalSettings] = useState({
+    region: '',
+    language: '',
+    currency: '',
+  });
 
   useEffect(() => {
     const loadTenant = async () => {
@@ -42,6 +50,11 @@ export default function TenantSettingsPage() {
         
         if (found) {
           setTenant(found);
+          setRegionalSettings({
+            region: found.region || 'us-east-1',
+            language: found.language || 'en-US',
+            currency: found.currency || 'USD',
+          });
         } else {
           setError("Tenant not found");
         }
@@ -138,8 +151,20 @@ export default function TenantSettingsPage() {
         {/* Regional Settings */}
         <Card>
           <CardHeader>
-            <CardTitle>Regional Settings</CardTitle>
-            <CardDescription>Location and localization preferences</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Regional Settings</CardTitle>
+                <CardDescription>Location and localization preferences</CardDescription>
+              </div>
+              {!editingRegional && (
+                <button
+                  onClick={() => setEditingRegional(true)}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -148,12 +173,25 @@ export default function TenantSettingsPage() {
                   <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t('settings.tenant.region', 'Region')}</p>
                   <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Data center location</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <Badge variant="info">{tenant.region || 'us-east-1'}</Badge>
-                </div>
+                {editingRegional ? (
+                  <select
+                    value={regionalSettings.region}
+                    onChange={(e) => setRegionalSettings({ ...regionalSettings, region: e.target.value })}
+                    className="px-3 py-1.5 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="us-east-1">US East (N. Virginia)</option>
+                    <option value="us-west-2">US West (Oregon)</option>
+                    <option value="eu-west-1">EU (Ireland)</option>
+                    <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
+                  </select>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <Badge variant="info">{regionalSettings.region}</Badge>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between py-3 border-b border-neutral-200 dark:border-neutral-700">
@@ -161,12 +199,25 @@ export default function TenantSettingsPage() {
                   <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t('settings.tenant.language', 'Language')}</p>
                   <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Preferred language for the interface</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                  </svg>
-                  <Badge variant="default">{tenant.language || 'en-US'}</Badge>
-                </div>
+                {editingRegional ? (
+                  <select
+                    value={regionalSettings.language}
+                    onChange={(e) => setRegionalSettings({ ...regionalSettings, language: e.target.value })}
+                    className="px-3 py-1.5 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="en-US">English (US)</option>
+                    <option value="es-ES">Español</option>
+                    <option value="fr-FR">Français</option>
+                    <option value="de-DE">Deutsch</option>
+                  </select>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                    </svg>
+                    <Badge variant="default">{regionalSettings.language}</Badge>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between py-3">
@@ -174,13 +225,69 @@ export default function TenantSettingsPage() {
                   <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t('settings.tenant.currency', 'Currency')}</p>
                   <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Default currency for pricing</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <Badge variant="success">{tenant.currency || 'USD'}</Badge>
-                </div>
+                {editingRegional ? (
+                  <select
+                    value={regionalSettings.currency}
+                    onChange={(e) => setRegionalSettings({ ...regionalSettings, currency: e.target.value })}
+                    className="px-3 py-1.5 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="JPY">JPY (¥)</option>
+                  </select>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <Badge variant="success">{regionalSettings.currency}</Badge>
+                  </div>
+                )}
               </div>
+
+              {editingRegional && (
+                <div className="flex items-center gap-2 pt-4">
+                  <button
+                    onClick={async () => {
+                      setSavingRegional(true);
+                      try {
+                        const response = await fetch(`/api/tenants/${tenant.id}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(regionalSettings),
+                        });
+                        if (!response.ok) throw new Error('Failed to update');
+                        const updated = await response.json();
+                        setTenant(updated);
+                        setEditingRegional(false);
+                      } catch (err) {
+                        console.error('Failed to update regional settings:', err);
+                        alert('Failed to save changes');
+                      } finally {
+                        setSavingRegional(false);
+                      }
+                    }}
+                    disabled={savingRegional}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
+                  >
+                    {savingRegional ? 'Saving...' : 'Save Changes'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRegionalSettings({
+                        region: tenant.region || 'us-east-1',
+                        language: tenant.language || 'en-US',
+                        currency: tenant.currency || 'USD',
+                      });
+                      setEditingRegional(false);
+                    }}
+                    className="px-4 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -221,25 +328,44 @@ export default function TenantSettingsPage() {
         {/* Business Profile - Feature Flag: FF_BUSINESS_PROFILE */}
         {isFeatureEnabled('FF_BUSINESS_PROFILE', tenant.id, tenant.region) && (
           <BusinessProfileCard
-            profile={null} // TODO: Fetch from API
+            profile={tenant.metadata || null}
             loading={false}
             onUpdate={async (profile) => {
-              console.log('Business profile updated:', profile);
-              // TODO: Implement API call
+              try {
+                const response = await fetch('/api/tenant/profile', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    tenant_id: tenant.id,
+                    ...profile,
+                  }),
+                });
+
+                if (!response.ok) {
+                  throw new Error('Failed to update business profile');
+                }
+
+                const updatedTenant = await response.json();
+                setTenant(updatedTenant);
+              } catch (err) {
+                console.error('Failed to update business profile:', err);
+                throw err;
+              }
             }}
           />
         )}
 
         {/* Map Settings - Feature Flag: FF_MAP_CARD */}
-        {isFeatureEnabled('FF_MAP_CARD', tenant.id, tenant.region) && (
+        {isFeatureEnabled('FF_MAP_CARD', tenant.id, tenant.region) && tenant.metadata && (
           <MapCardSettings
             businessProfile={{
-              business_name: tenant.name,
-              address_line1: '123 Main St', // TODO: Fetch from API
-              city: 'New York',
-              state: 'NY',
-              postal_code: '10001',
-              country_code: 'US',
+              business_name: tenant.metadata.business_name || tenant.name,
+              address_line1: tenant.metadata.address_line1 || '',
+              address_line2: tenant.metadata.address_line2,
+              city: tenant.metadata.city || '',
+              state: tenant.metadata.state || '',
+              postal_code: tenant.metadata.postal_code || '',
+              country_code: tenant.metadata.country_code || 'US',
             }}
             displayMap={false} // TODO: Fetch from API
             privacyMode="precise" // TODO: Fetch from API
