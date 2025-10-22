@@ -12,6 +12,13 @@ type Tenant = {
   city?: string;
   state?: string;
   region?: string;
+  metadata?: {
+    city?: string;
+    state?: string;
+    country_code?: string;
+    address_line1?: string;
+    postal_code?: string;
+  };
 };
 
 type Item = {
@@ -319,8 +326,8 @@ export default function ItemsClient({
                   value: t.id, 
                   label: t.name,
                   metadata: {
-                    city: t.city,
-                    state: t.state,
+                    city: t.metadata?.city || t.city,
+                    state: t.metadata?.state || t.state,
                     region: t.region,
                   }
                 }))}
