@@ -79,6 +79,45 @@ app.delete("/tenants/:id", async (req, res) => {
   }
 });
 
+// Tenant profile (business information)
+const tenantProfileSchema = z.object({
+  tenant_id: z.string().min(1),
+  business_name: z.string().min(1).optional(),
+  address_line1: z.string().optional(),
+  address_line2: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  postal_code: z.string().optional(),
+  country_code: z.string().optional(),
+  phone_number: z.string().optional(),
+  email: z.string().email().optional(),
+  contact_person: z.string().optional(),
+});
+
+app.post("/tenant/profile", async (req, res) => {
+  const parsed = tenantProfileSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  
+  try {
+    const { tenant_id, ...profileData } = parsed.data;
+    
+    // Update tenant with business profile data
+    const tenant = await prisma.tenant.update({
+      where: { id: tenant_id },
+      data: {
+        name: profileData.business_name || undefined,
+        // Store additional profile data in metadata JSON field
+        metadata: profileData as any,
+      },
+    });
+    
+    res.json(tenant);
+  } catch (e: any) {
+    console.error("Failed to save tenant profile:", e);
+    res.status(500).json({ error: "failed_to_save_profile" });
+  }
+});
+
 /* ----------------------------- PHOTOS (MOUNTED BEFORE /items) ----------------------------- */
 /** Accept JSON { url } (already uploaded), JSON { dataUrl } (dev), or multipart "file" (server uploads to Supabase or dev FS) */
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
