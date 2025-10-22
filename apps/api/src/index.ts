@@ -91,6 +91,7 @@ const tenantProfileSchema = z.object({
   country_code: z.string().optional(),
   phone_number: z.string().optional(),
   email: z.string().email().optional(),
+  website: z.string().url().optional(),
   contact_person: z.string().optional(),
 });
 
