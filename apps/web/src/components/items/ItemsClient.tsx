@@ -56,6 +56,9 @@ export default function ItemsClient({
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
+  // Create form visibility
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -304,12 +307,20 @@ export default function ItemsClient({
         description="Manage your product catalog"
         icon={Icons.Inventory}
         actions={
-          <Button onClick={refresh} disabled={loading} variant="secondary">
-            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {loading ? t('common.loading', 'Loading…') : t('common.refresh', 'Refresh')}
-          </Button>
+          <div className="flex gap-3">
+            <Button onClick={() => setShowCreateForm(!showCreateForm)} variant="primary">
+              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {showCreateForm ? 'Hide Form' : 'Add New Product'}
+            </Button>
+            <Button onClick={refresh} disabled={loading} variant="secondary">
+              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {loading ? t('common.loading', 'Loading…') : t('common.refresh', 'Refresh')}
+            </Button>
+          </div>
         }
       />
 
@@ -353,11 +364,12 @@ export default function ItemsClient({
         </Card>
 
         {/* Create Item Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('inventory.createItem', 'Create New Item')}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {showCreateForm && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('inventory.createItem', 'Create New Item')}</CardTitle>
+            </CardHeader>
+            <CardContent>
             <form onSubmit={onCreate} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Input
@@ -399,6 +411,7 @@ export default function ItemsClient({
             </form>
           </CardContent>
         </Card>
+        )}
 
         {/* Items List */}
         <Card>
