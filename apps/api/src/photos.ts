@@ -86,6 +86,9 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
       },
     });
 
+    // Always update the item's imageUrl to the latest uploaded photo
+    await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
+
     return res.status(201).json(created);
   } catch (e: any) {
     console.error("photo upload error", e);

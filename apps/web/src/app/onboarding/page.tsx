@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard';
 import { Spinner } from '@/components/ui';
+import PageHeader, { Icons } from '@/components/PageHeader';
 
 function OnboardingContent() {
   const router = useRouter();
@@ -42,20 +43,31 @@ function OnboardingContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center">
         <div className="text-center">
           <Spinner size="lg" className="text-primary-600 mb-4" />
-          <p className="text-neutral-600">Loading onboarding...</p>
+          <p className="text-neutral-600 dark:text-neutral-400">Loading onboarding...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <OnboardingWizard
-      tenantId={tenantId!}
-      onComplete={handleComplete}
-    />
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      <PageHeader
+        title="Onboarding"
+        description="Set up your store in a few steps"
+        icon={Icons.Tenants}
+        backLink={{ href: '/tenants', label: 'Back to Tenants' }}
+      />
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <OnboardingWizard
+          tenantId={tenantId!}
+          onComplete={handleComplete}
+        />
+      </div>
+    </div>
   );
 }
 

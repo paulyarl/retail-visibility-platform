@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Badge, Alert, AnimatedCard, Modal, ModalFooter, Pagination } from "@/components/ui";
 import { motion } from "framer-motion";
+import PageHeader, { Icons } from "@/components/PageHeader";
 
 type Tenant = { id: string; name: string; createdAt?: string };
 
@@ -108,25 +109,19 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 mb-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">Tenants</h1>
-              <p className="text-neutral-600 dark:text-neutral-400 mt-1">Manage your store locations and businesses</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button onClick={refresh} disabled={loading} variant="secondary">
-                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                {loading ? "Loading…" : "Refresh"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Tenants"
+        description="Manage your store locations and businesses"
+        icon={Icons.Tenants}
+        actions={
+          <Button onClick={refresh} disabled={loading} variant="secondary">
+            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {loading ? "Loading…" : "Refresh"}
+          </Button>
+        }
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         {/* Error Alert */}

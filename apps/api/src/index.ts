@@ -143,9 +143,8 @@ const photoUploadHandler = async (req: any, res: any) => {
         },
       });
 
-      if (!item.imageUrl) {
-        await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
-      }
+      // Always update the item's imageUrl to the latest uploaded photo
+      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
       return res.status(201).json(created);
     }
 
@@ -184,9 +183,8 @@ const photoUploadHandler = async (req: any, res: any) => {
         },
       });
 
-      if (!item.imageUrl) {
-        await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl! } });
-      }
+      // Always update the item's imageUrl to the latest uploaded photo
+      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl! } });
       return res.status(201).json(created);
     }
 
@@ -240,9 +238,8 @@ const photoUploadHandler = async (req: any, res: any) => {
         },
       });
 
-      if (!item.imageUrl) {
-        await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl } });
-      }
+      // Always update the item's imageUrl to the latest uploaded photo
+      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl } });
       return res.status(201).json(created);
     }
 

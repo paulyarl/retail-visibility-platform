@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Pagination, AdvancedSearchableSelect, type SelectOption } from "@/components/ui";
 import EditItemModal from "./EditItemModal";
+import PageHeader, { Icons } from "@/components/PageHeader";
 
 type Tenant = {
   id: string;
@@ -81,8 +82,11 @@ export default function ItemsClient({
       }
       const res = await fetch(`/api/items?tenantId=${encodeURIComponent(tenantId)}`);
       const data = await res.json();
+      console.log('[ItemsClient] Refresh response:', data);
+      console.log('[ItemsClient] Image URLs in response:', data.map((item: any) => ({ id: item.id, imageUrl: item.imageUrl })));
       setItems(Array.isArray(data) ? data : []);
     } catch (e) {
+      console.error('[ItemsClient] Refresh error:', e);
       setError("Failed to load items");
     } finally {
       setLoading(false);
@@ -257,33 +261,50 @@ export default function ItemsClient({
         setError(payload?.error || "Upload failed");
         return;
       }
-      // payload is the created photoAsset, not an item
+      
+      console.log('[ItemsClient] Photo upload response:', payload);
+      
+      // payload is the created photoAsset
       const photoAsset = payload;
-      setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, imageUrl: photoAsset.url } : it)));
+      const uploadedUrl = photoAsset.url || photoAsset.publicUrl || photoAsset.signedUrl;
+      
+      if (!uploadedUrl) {
+        console.error('[ItemsClient] No URL in upload response:', payload);
+        setError("Upload succeeded but no URL returned");
+        return;
+      }
+      
+      console.log('[ItemsClient] Setting imageUrl to:', uploadedUrl);
+      
+      // Optimistic update so user sees the image immediately
+      setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, imageUrl: uploadedUrl } : it)));
+      
+      // Refresh from API to pick up any server-side persistence (e.g., Supabase signed/public URL)
+      console.log('[ItemsClient] Refreshing items after upload...');
+      await refresh();
+      
+      console.log('[ItemsClient] Items after refresh:', items.find(it => it.id === item.id));
     } catch (_e) {
+      console.error('[ItemsClient] Upload error:', _e);
       setError("Upload failed");
     }
   };
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 mb-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-neutral-900">{t('inventory.title', 'Inventory')}</h1>
-              <p className="text-neutral-600 mt-1">Manage your product catalog</p>
-            </div>
-            <Button onClick={refresh} disabled={loading} variant="secondary">
-              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {loading ? t('common.loading', 'Loading…') : t('common.refresh', 'Refresh')}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title={t('inventory.title', 'Inventory')}
+        description="Manage your product catalog"
+        icon={Icons.Inventory}
+        actions={
+          <Button onClick={refresh} disabled={loading} variant="secondary">
+            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {loading ? t('common.loading', 'Loading…') : t('common.refresh', 'Refresh')}
+          </Button>
+        }
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         {/* Filters */}
