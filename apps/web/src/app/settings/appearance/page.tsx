@@ -15,6 +15,19 @@ export default function AppearanceSettingsPage() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (mounted) {
+      console.log('[Appearance] Current theme:', theme);
+      console.log('[Appearance] Resolved theme:', resolvedTheme);
+      console.log('[Appearance] localStorage:', localStorage.getItem('rvp-theme'));
+    }
+  }, [mounted, theme, resolvedTheme]);
+
+  const handleThemeChange = (newTheme: string) => {
+    console.log('[Appearance] Changing theme to:', newTheme);
+    setTheme(newTheme);
+  };
+
   const currentTheme = theme === "system" ? systemTheme : theme;
   const actualTheme = resolvedTheme; // This is what's actually being displayed
 
@@ -59,7 +72,7 @@ export default function AppearanceSettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Light Theme */}
                   <button
-                    onClick={() => setTheme("light")}
+                    onClick={() => handleThemeChange("light")}
                     className={`relative p-4 border-2 rounded-lg transition-all ${
                       theme === "light"
                         ? "border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20"
@@ -97,7 +110,7 @@ export default function AppearanceSettingsPage() {
 
                   {/* Dark Theme */}
                   <button
-                    onClick={() => setTheme("dark")}
+                    onClick={() => handleThemeChange("dark")}
                     className={`relative p-4 border-2 rounded-lg transition-all ${
                       theme === "dark"
                         ? "border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20"
@@ -135,7 +148,7 @@ export default function AppearanceSettingsPage() {
 
                   {/* System Theme */}
                   <button
-                    onClick={() => setTheme("system")}
+                    onClick={() => handleThemeChange("system")}
                     className={`relative p-4 border-2 rounded-lg transition-all ${
                       theme === "system"
                         ? "border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20"
