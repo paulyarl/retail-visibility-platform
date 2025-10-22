@@ -16,6 +16,7 @@ enum Role {
 model Tenant {
   id        String         @id @default(cuid())
   name      String
+  metadata  Json?          // Business profile data (address, phone, etc.)
   createdAt DateTime       @default(now())
   users     User[]
   items     InventoryItem[]
