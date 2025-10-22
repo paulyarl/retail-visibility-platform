@@ -229,31 +229,37 @@ export async function syncMerchantAccount(
     const merchantName = merchantData.accountName || merchantData.name || 'Unknown';
     const websiteUrl = merchantData.homepageUri || merchantData.websiteUrl || null;
 
-    // Upsert merchant link
-    await prisma.googleMerchantLink.upsert({
-      where: {
-        accountId_merchantId: {
+    // Upsert merchant link (schema has no composite unique on [accountId, merchantId])
+    // Find existing by (accountId, merchantId), then update by id; else create
+    const existing = await prisma.googleMerchantLink.findFirst({
+      where: { accountId, merchantId },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await prisma.googleMerchantLink.update({
+        where: { id: existing.id },
+        data: {
+          merchantName,
+          websiteUrl,
+          lastSyncAt: new Date(),
+          syncStatus: 'success',
+          syncError: null,
+        },
+      });
+    } else {
+      await prisma.googleMerchantLink.create({
+        data: {
           accountId,
           merchantId,
+          merchantName,
+          websiteUrl,
+          isActive: true,
+          lastSyncAt: new Date(),
+          syncStatus: 'success',
         },
-      },
-      create: {
-        accountId,
-        merchantId,
-        merchantName,
-        websiteUrl,
-        isActive: true,
-        lastSyncAt: new Date(),
-        syncStatus: 'success',
-      },
-      update: {
-        merchantName,
-        websiteUrl,
-        lastSyncAt: new Date(),
-        syncStatus: 'success',
-        syncError: null,
-      },
-    });
+      });
+    }
 
     console.log('[GMC] Synced merchant account:', merchantId);
     return true;
