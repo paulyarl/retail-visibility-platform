@@ -14,18 +14,19 @@ enum Role {
 }
 
 model Tenant {
-  id        String         @id @default(cuid())
-  name      String
-  metadata  Json?          // Business profile data (address, phone, etc.)
-  createdAt DateTime       @default(now())
-  users     User[]
-  items     InventoryItem[]
-  photos    PhotoAsset[]
-  syncJobs  SyncJob[]      // <-- add this line
-  region    String         @default("us-east-1")
-  language  String         @default("en-US")
-  currency  String         @default("USD")
-  data_policy_accepted Boolean @default(false)
+  id                  String               @id @default(cuid())
+  name                String
+  metadata            Json?                // Business profile data (address, phone, etc.)
+  createdAt           DateTime             @default(now())
+  users               User[]
+  items               InventoryItem[]
+  photos              PhotoAsset[]
+  syncJobs            SyncJob[]
+  googleOAuthAccounts GoogleOAuthAccount[]
+  region              String               @default("us-east-1")
+  language            String               @default("en-US")
+  currency            String               @default("USD")
+  data_policy_accepted Boolean             @default(false)
   @@index([name])
 }
 
@@ -89,11 +90,112 @@ model SyncJob {
   attempt    Int      @default(0)
   payload    Json
   lastError  String?
+  source     String   @default("manual") // 'manual', 'google_gmc', 'google_gbp'
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status, updatedAt])
+}
+
+// Google Connect Suite Models (ENH-2026-043 + ENH-2026-044)
+
+model GoogleOAuthAccount {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  googleAccountId     String
+  email               String
+  displayName         String?
+  profilePictureUrl   String?
+  scopes              String[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tokens              GoogleOAuthToken?
+  merchantLinks       GoogleMerchantLink[]
+  gbpLocations        GbpLocation[]
+
+  @@unique([tenantId, googleAccountId])
+  @@map("google_oauth_accounts")
+}
+
+model GoogleOAuthToken {
+  id                    String   @id @default(cuid())
+  accountId             String   @unique
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String
+  tokenType             String   @default("Bearer")
+  expiresAt             DateTime
+  scopes                String[]
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  account               GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("google_oauth_tokens")
+}
+
+model GoogleMerchantLink {
+  id           String    @id @default(cuid())
+  accountId    String
+  merchantId   String
+  merchantName String?
+  websiteUrl   String?
+  isActive     Boolean   @default(true)
+  lastSyncAt   DateTime?
+  syncStatus   String?   @default("pending") // 'pending', 'syncing', 'success', 'error'
+  syncError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  account      GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([merchantId])
+  @@map("google_merchant_links")
+}
+
+model GbpLocation {
+  id             String    @id @default(cuid())
+  accountId      String
+  locationId     String
+  locationName   String
+  storeCode      String?
+  address        String?
+  phoneNumber    String?
+  websiteUrl     String?
+  category       String?
+  isVerified     Boolean?  @default(false)
+  isPublished    Boolean?  @default(false)
+  lastFetchedAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  account        GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  insights       GbpInsightDaily[]
+
+  @@unique([accountId, locationId])
+  @@map("gbp_locations")
+}
+
+model GbpInsightDaily {
+  id                String   @id @default(cuid())
+  locationId        String
+  date              DateTime @db.Date
+  viewsSearch       Int      @default(0)
+  viewsMaps         Int      @default(0)
+  actionsWebsite    Int      @default(0)
+  actionsPhone      Int      @default(0)
+  actionsDirections Int      @default(0)
+  photosCount       Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  location          GbpLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, date])
+  @@index([locationId, date])
+  @@map("gbp_insights_daily")
 }
 
