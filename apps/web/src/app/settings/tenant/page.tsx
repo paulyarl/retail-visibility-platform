@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Alert
 import BusinessProfileCard from "@/components/settings/BusinessProfileCard";
 import MapCardSettings from "@/components/tenant/MapCardSettings";
 import SwisPreviewSettings from "@/components/tenant/SwisPreviewSettings";
+import GoogleConnectCard from "@/components/google/GoogleConnectCard";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import PageHeader, { Icons } from "@/components/PageHeader";
 
@@ -389,6 +390,19 @@ export default function TenantSettingsPage() {
             onSave={async (settings) => {
               console.log('SWIS settings updated:', settings);
               // TODO: Implement API call
+            }}
+          />
+        )}
+
+        {/* Google Connect Suite - Feature Flag: FF_GOOGLE_CONNECT_SUITE */}
+        {isFeatureEnabled('FF_GOOGLE_CONNECT_SUITE', tenant.id, tenant.region) && (
+          <GoogleConnectCard
+            tenantId={tenant.id}
+            onConnect={() => {
+              console.log('[TenantSettings] Google account connecting...');
+            }}
+            onDisconnect={() => {
+              console.log('[TenantSettings] Google account disconnected');
             }}
           />
         )}
