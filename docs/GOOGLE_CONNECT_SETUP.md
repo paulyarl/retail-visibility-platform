@@ -70,7 +70,8 @@ The Google Connect Suite integrates Google Merchant Center and Google Business P
 
 Navigate to `APIs & Services` → `Library` and enable:
 
-1. **Content API for Shopping** (for Merchant Center)
+1. **Merchant API** (for Merchant Center) - https://developers.google.com/merchant/api
+   - Note: This replaces the deprecated "Content API for Shopping"
 2. **My Business Business Information API** (for Business Profile)
 3. **My Business Account Management API** (for Business Profile)
 

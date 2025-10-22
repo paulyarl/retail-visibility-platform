@@ -20,7 +20,7 @@ const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
 // Required scopes for GMC + GBP
 export const GOOGLE_SCOPES = [
-  'https://www.googleapis.com/auth/content', // Google Merchant Center
+  'https://www.googleapis.com/auth/content', // Google Merchant API (replaces deprecated Content API)
   'https://www.googleapis.com/auth/business.manage', // Google Business Profile
   'openid',
   'email',
