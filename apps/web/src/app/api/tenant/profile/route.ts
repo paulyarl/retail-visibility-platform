@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
+async function handleProfileRequest(req: NextRequest, method: string) {
   try {
     const body = await req.json();
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const res = await fetch(`${base}/tenant/profile`, {
-      method: 'POST',
+      method: 'POST', // Backend only accepts POST
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -29,7 +29,15 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (e) {
-    console.error('[API Proxy] POST /tenant/profile error:', e);
+    console.error(`[API Proxy] ${method} /tenant/profile error:`, e);
     return NextResponse.json({ error: 'proxy_failed', message: String(e) }, { status: 500 });
   }
+}
+
+export async function POST(req: NextRequest) {
+  return handleProfileRequest(req, 'POST');
+}
+
+export async function PATCH(req: NextRequest) {
+  return handleProfileRequest(req, 'PATCH');
 }
