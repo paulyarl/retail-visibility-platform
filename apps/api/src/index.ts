@@ -10,6 +10,17 @@ import { createClient } from "@supabase/supabase-js";
 import { setRequestContext } from "./context";
 import { audit } from "./audit";
 import { dailyRatesJob } from "./jobs/rates";
+import {
+  getAuthorizationUrl,
+  decodeState,
+  exchangeCodeForTokens,
+  getUserInfo,
+  encryptToken,
+  decryptToken,
+  refreshAccessToken,
+  revokeToken,
+  GOOGLE_SCOPES,
+} from "./lib/google/oauth";
 
 const app = express();
 
@@ -403,6 +414,230 @@ app.get("/__routes", (_req, res) => {
 app.get("/__ping", (req, res) => {
   console.log("PING from", req.ip, "at", new Date().toISOString());
   res.json({ ok: true, when: new Date().toISOString() });
+});
+
+/* ------------------------------ GOOGLE OAUTH ------------------------------ */
+// ENH-2026-043 + ENH-2026-044: Google Connect Suite
+
+/**
+ * Initiate OAuth flow
+ * GET /google/auth?tenantId=xxx
+ */
+app.get("/google/auth", async (req, res) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenant_id_required" });
+    }
+
+    // Verify tenant exists
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      return res.status(404).json({ error: "tenant_not_found" });
+    }
+
+    // Validate NAP (Name, Address, Phone) is complete
+    const metadata = tenant.metadata as any;
+    if (!metadata?.business_name || !metadata?.city || !metadata?.state) {
+      return res.status(400).json({ 
+        error: "incomplete_business_profile",
+        message: "Please complete your business profile before connecting to Google",
+      });
+    }
+
+    const authUrl = getAuthorizationUrl(tenantId);
+    res.json({ authUrl });
+  } catch (error) {
+    console.error("[Google OAuth] Auth initiation error:", error);
+    res.status(500).json({ error: "oauth_init_failed" });
+  }
+});
+
+/**
+ * OAuth callback handler
+ * GET /google/callback?code=xxx&state=xxx
+ */
+app.get("/google/callback", async (req, res) => {
+  try {
+    const { code, state, error } = req.query;
+
+    // Handle OAuth errors
+    if (error) {
+      console.error("[Google OAuth] Authorization error:", error);
+      return res.redirect(`${process.env.WEB_URL || 'http://localhost:3000'}/settings/tenant?google_error=${error}`);
+    }
+
+    if (!code || !state) {
+      return res.status(400).json({ error: "missing_code_or_state" });
+    }
+
+    // Decode and validate state
+    const stateData = decodeState(state as string);
+    if (!stateData) {
+      return res.status(400).json({ error: "invalid_state" });
+    }
+
+    // Exchange code for tokens
+    const tokens = await exchangeCodeForTokens(code as string);
+    if (!tokens) {
+      return res.status(500).json({ error: "token_exchange_failed" });
+    }
+
+    // Get user info
+    const userInfo = await getUserInfo(tokens.access_token);
+    if (!userInfo) {
+      return res.status(500).json({ error: "user_info_failed" });
+    }
+
+    // Calculate token expiry
+    const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+
+    // Encrypt tokens
+    const accessTokenEncrypted = encryptToken(tokens.access_token);
+    const refreshTokenEncrypted = encryptToken(tokens.refresh_token);
+
+    // Store in database (upsert pattern)
+    const account = await prisma.googleOAuthAccount.upsert({
+      where: {
+        tenantId_googleAccountId: {
+          tenantId: stateData.tenantId,
+          googleAccountId: userInfo.id,
+        },
+      },
+      create: {
+        tenantId: stateData.tenantId,
+        googleAccountId: userInfo.id,
+        email: userInfo.email,
+        displayName: userInfo.name,
+        profilePictureUrl: userInfo.picture,
+        scopes: tokens.scope.split(' '),
+        tokens: {
+          create: {
+            accessTokenEncrypted,
+            refreshTokenEncrypted,
+            tokenType: tokens.token_type,
+            expiresAt,
+            scopes: tokens.scope.split(' '),
+          },
+        },
+      },
+      update: {
+        email: userInfo.email,
+        displayName: userInfo.name,
+        profilePictureUrl: userInfo.picture,
+        scopes: tokens.scope.split(' '),
+        tokens: {
+          upsert: {
+            create: {
+              accessTokenEncrypted,
+              refreshTokenEncrypted,
+              tokenType: tokens.token_type,
+              expiresAt,
+              scopes: tokens.scope.split(' '),
+            },
+            update: {
+              accessTokenEncrypted,
+              refreshTokenEncrypted,
+              expiresAt,
+              scopes: tokens.scope.split(' '),
+            },
+          },
+        },
+      },
+      include: {
+        tokens: true,
+      },
+    });
+
+    console.log("[Google OAuth] Account connected:", account.email);
+
+    // Redirect back to frontend
+    res.redirect(`${process.env.WEB_URL || 'http://localhost:3000'}/settings/tenant?google_connected=true`);
+  } catch (error) {
+    console.error("[Google OAuth] Callback error:", error);
+    res.redirect(`${process.env.WEB_URL || 'http://localhost:3000'}/settings/tenant?google_error=callback_failed`);
+  }
+});
+
+/**
+ * Get Google account status for tenant
+ * GET /google/status?tenantId=xxx
+ */
+app.get("/google/status", async (req, res) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenant_id_required" });
+    }
+
+    const account = await prisma.googleOAuthAccount.findFirst({
+      where: { tenantId },
+      include: {
+        tokens: true,
+        merchantLinks: true,
+        gbpLocations: true,
+      },
+    });
+
+    if (!account) {
+      return res.json({ connected: false });
+    }
+
+    res.json({
+      connected: true,
+      email: account.email,
+      displayName: account.displayName,
+      profilePictureUrl: account.profilePictureUrl,
+      scopes: account.scopes,
+      merchantLinks: account.merchantLinks.length,
+      gbpLocations: account.gbpLocations.length,
+    });
+  } catch (error) {
+    console.error("[Google OAuth] Status check error:", error);
+    res.status(500).json({ error: "status_check_failed" });
+  }
+});
+
+/**
+ * Disconnect Google account
+ * DELETE /google/disconnect?tenantId=xxx
+ */
+app.delete("/google/disconnect", async (req, res) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenant_id_required" });
+    }
+
+    const account = await prisma.googleOAuthAccount.findFirst({
+      where: { tenantId },
+      include: { tokens: true },
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: "account_not_found" });
+    }
+
+    // Revoke tokens with Google
+    if (account.tokens) {
+      const accessToken = decryptToken(account.tokens.accessTokenEncrypted);
+      await revokeToken(accessToken);
+    }
+
+    // Delete from database (cascade will delete tokens, links, locations)
+    await prisma.googleOAuthAccount.delete({
+      where: { id: account.id },
+    });
+
+    console.log("[Google OAuth] Account disconnected:", account.email);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("[Google OAuth] Disconnect error:", error);
+    res.status(500).json({ error: "disconnect_failed" });
+  }
 });
 
 /* ------------------------------ jobs ------------------------------ */
