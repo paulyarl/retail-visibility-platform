@@ -16,6 +16,24 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const theme = localStorage.getItem('rvp-theme') || 'system';
+                const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                const resolvedTheme = theme === 'system' ? systemTheme : theme;
+                if (resolvedTheme === 'dark') {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white`}
       >
@@ -25,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           enableSystem
           storageKey="rvp-theme"
           disableTransitionOnChange={false}
+          enableColorScheme
         >
           <ErrorBoundary>{children}</ErrorBoundary>
           <Analytics />
