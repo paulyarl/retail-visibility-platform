@@ -9,7 +9,8 @@ export type FeatureFlag =
   | 'FF_MAP_CARD'
   | 'FF_SWIS_PREVIEW'
   | 'FF_BUSINESS_PROFILE'
-  | 'FF_DARK_MODE';
+  | 'FF_DARK_MODE'
+  | 'FF_GOOGLE_CONNECT_SUITE';
 
 export type RolloutStrategy = 
   | 'off'           // Feature disabled for all
@@ -55,6 +56,13 @@ const FEATURE_FLAGS: Record<FeatureFlag, FeatureFlagConfig> = {
     flag: 'FF_DARK_MODE',
     strategy: 'off', // Future feature
     percentage: 0,
+  },
+  FF_GOOGLE_CONNECT_SUITE: {
+    flag: 'FF_GOOGLE_CONNECT_SUITE',
+    strategy: 'pilot', // ENH-2026-043/044 - Start with pilot tenants
+    percentage: 0,
+    pilotTenants: [], // Will be populated with pilot merchant IDs
+    pilotRegions: ['us-east-1'], // Start with US East region
   },
 };
 

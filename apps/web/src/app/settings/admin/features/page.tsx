@@ -70,6 +70,10 @@ export default function FeatureFlagsPage() {
       title: 'Dark Mode',
       description: 'Dark theme support across the platform (coming soon)',
     },
+    FF_GOOGLE_CONNECT_SUITE: {
+      title: 'Google Connect Suite',
+      description: 'Unified Google Merchant Center + Business Profile integration (v1: read-only)',
+    },
   };
 
   return (
