@@ -21,6 +21,22 @@ import {
   revokeToken,
   GOOGLE_SCOPES,
 } from "./lib/google/oauth";
+import {
+  listMerchantAccounts,
+  getMerchantAccount,
+  listProducts,
+  getProduct,
+  syncMerchantAccount,
+  getProductStats,
+} from "./lib/google/gmc";
+import {
+  listBusinessAccounts,
+  listLocations,
+  getLocation,
+  syncLocation,
+  getLocationInsights,
+  getAggregatedInsights,
+} from "./lib/google/gbp";
 
 const app = express();
 
@@ -637,6 +653,224 @@ app.delete("/google/disconnect", async (req, res) => {
   } catch (error) {
     console.error("[Google OAuth] Disconnect error:", error);
     res.status(500).json({ error: "disconnect_failed" });
+  }
+});
+
+/* ------------------------------ GOOGLE MERCHANT CENTER ------------------------------ */
+
+/**
+ * List merchant accounts
+ * GET /google/gmc/accounts?tenantId=xxx
+ */
+app.get("/google/gmc/accounts", async (req, res) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenant_id_required" });
+    }
+
+    const account = await prisma.googleOAuthAccount.findFirst({
+      where: { tenantId },
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: "google_account_not_found" });
+    }
+
+    const merchants = await listMerchantAccounts(account.id);
+    res.json({ merchants });
+  } catch (error) {
+    console.error("[GMC] List accounts error:", error);
+    res.status(500).json({ error: "failed_to_list_merchants" });
+  }
+});
+
+/**
+ * Sync merchant account
+ * POST /google/gmc/sync
+ */
+app.post("/google/gmc/sync", async (req, res) => {
+  try {
+    const { tenantId, merchantId } = req.body;
+    
+    if (!tenantId || !merchantId) {
+      return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
+    }
+
+    const account = await prisma.googleOAuthAccount.findFirst({
+      where: { tenantId },
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: "google_account_not_found" });
+    }
+
+    const success = await syncMerchantAccount(account.id, merchantId);
+    
+    if (success) {
+      res.json({ success: true });
+    } else {
+      res.status(500).json({ error: "sync_failed" });
+    }
+  } catch (error) {
+    console.error("[GMC] Sync error:", error);
+    res.status(500).json({ error: "sync_failed" });
+  }
+});
+
+/**
+ * Get merchant products
+ * GET /google/gmc/products?tenantId=xxx&merchantId=xxx
+ */
+app.get("/google/gmc/products", async (req, res) => {
+  try {
+    const { tenantId, merchantId } = req.query;
+    
+    if (!tenantId || !merchantId) {
+      return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
+    }
+
+    const account = await prisma.googleOAuthAccount.findFirst({
+      where: { tenantId: tenantId as string },
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: "google_account_not_found" });
+    }
+
+    const products = await listProducts(account.id, merchantId as string);
+    res.json({ products });
+  } catch (error) {
+    console.error("[GMC] List products error:", error);
+    res.status(500).json({ error: "failed_to_list_products" });
+  }
+});
+
+/**
+ * Get product stats
+ * GET /google/gmc/stats?tenantId=xxx&merchantId=xxx
+ */
+app.get("/google/gmc/stats", async (req, res) => {
+  try {
+    const { tenantId, merchantId } = req.query;
+    
+    if (!tenantId || !merchantId) {
+      return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
+    }
+
+    const account = await prisma.googleOAuthAccount.findFirst({
+      where: { tenantId: tenantId as string },
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: "google_account_not_found" });
+    }
+
+    const stats = await getProductStats(account.id, merchantId as string);
+    res.json({ stats });
+  } catch (error) {
+    console.error("[GMC] Get stats error:", error);
+    res.status(500).json({ error: "failed_to_get_stats" });
+  }
+});
+
+/* ------------------------------ GOOGLE BUSINESS PROFILE ------------------------------ */
+
+/**
+ * List business locations
+ * GET /google/gbp/locations?tenantId=xxx
+ */
+app.get("/google/gbp/locations", async (req, res) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenant_id_required" });
+    }
+
+    const account = await prisma.googleOAuthAccount.findFirst({
+      where: { tenantId },
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: "google_account_not_found" });
+    }
+
+    // First get business accounts
+    const businessAccounts = await listBusinessAccounts(account.id);
+    
+    if (businessAccounts.length === 0) {
+      return res.json({ locations: [] });
+    }
+
+    // Get locations for first business account
+    const locations = await listLocations(account.id, businessAccounts[0].name);
+    res.json({ locations });
+  } catch (error) {
+    console.error("[GBP] List locations error:", error);
+    res.status(500).json({ error: "failed_to_list_locations" });
+  }
+});
+
+/**
+ * Sync location
+ * POST /google/gbp/sync
+ */
+app.post("/google/gbp/sync", async (req, res) => {
+  try {
+    const { tenantId, locationName } = req.body;
+    
+    if (!tenantId || !locationName) {
+      return res.status(400).json({ error: "tenant_id_and_location_name_required" });
+    }
+
+    const account = await prisma.googleOAuthAccount.findFirst({
+      where: { tenantId },
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: "google_account_not_found" });
+    }
+
+    const locationData = await getLocation(account.id, locationName);
+    
+    if (!locationData) {
+      return res.status(404).json({ error: "location_not_found" });
+    }
+
+    const success = await syncLocation(account.id, locationData);
+    
+    if (success) {
+      res.json({ success: true });
+    } else {
+      res.status(500).json({ error: "sync_failed" });
+    }
+  } catch (error) {
+    console.error("[GBP] Sync error:", error);
+    res.status(500).json({ error: "sync_failed" });
+  }
+});
+
+/**
+ * Get location insights
+ * GET /google/gbp/insights?locationId=xxx&days=30
+ */
+app.get("/google/gbp/insights", async (req, res) => {
+  try {
+    const { locationId, days } = req.query;
+    
+    if (!locationId) {
+      return res.status(400).json({ error: "location_id_required" });
+    }
+
+    const daysNum = days ? parseInt(days as string) : 30;
+    const insights = await getAggregatedInsights(locationId as string, daysNum);
+    
+    res.json({ insights });
+  } catch (error) {
+    console.error("[GBP] Get insights error:", error);
+    res.status(500).json({ error: "failed_to_get_insights" });
   }
 });
 
