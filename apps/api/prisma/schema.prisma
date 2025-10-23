@@ -103,14 +103,14 @@ model SyncJob {
 
 model GoogleOAuthAccount {
   id                  String   @id @default(cuid())
-  tenantId            String
-  googleAccountId     String
+  tenantId            String   @map("tenant_id")
+  googleAccountId     String   @map("google_account_id")
   email               String
-  displayName         String?
-  profilePictureUrl   String?
+  displayName         String?  @map("display_name")
+  profilePictureUrl   String?  @map("profile_picture_url")
   scopes              String[]
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   tokens              GoogleOAuthToken?
@@ -123,14 +123,14 @@ model GoogleOAuthAccount {
 
 model GoogleOAuthToken {
   id                    String   @id @default(cuid())
-  accountId             String   @unique
-  accessTokenEncrypted  String
-  refreshTokenEncrypted String
-  tokenType             String   @default("Bearer")
-  expiresAt             DateTime
+  accountId             String   @unique @map("account_id")
+  accessTokenEncrypted  String   @map("access_token_encrypted")
+  refreshTokenEncrypted String   @map("refresh_token_encrypted")
+  tokenType             String   @default("Bearer") @map("token_type")
+  expiresAt             DateTime @map("expires_at")
   scopes                String[]
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   account               GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -139,16 +139,16 @@ model GoogleOAuthToken {
 
 model GoogleMerchantLink {
   id           String    @id @default(cuid())
-  accountId    String
-  merchantId   String
-  merchantName String?
-  websiteUrl   String?
-  isActive     Boolean   @default(true)
-  lastSyncAt   DateTime?
-  syncStatus   String?   @default("pending") // 'pending', 'syncing', 'success', 'error'
-  syncError    String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  accountId    String    @map("account_id")
+  merchantId   String    @map("merchant_id")
+  merchantName String?   @map("merchant_name")
+  websiteUrl   String?   @map("website_url")
+  isActive     Boolean   @default(true) @map("is_active")
+  lastSyncAt   DateTime? @map("last_sync_at")
+  syncStatus   String?   @default("pending") @map("sync_status") // 'pending', 'syncing', 'success', 'error'
+  syncError    String?   @map("sync_error")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   account      GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -159,19 +159,19 @@ model GoogleMerchantLink {
 
 model GbpLocation {
   id             String    @id @default(cuid())
-  accountId      String
-  locationId     String
-  locationName   String
-  storeCode      String?
+  accountId      String    @map("account_id")
+  locationId     String    @map("location_id")
+  locationName   String    @map("location_name")
+  storeCode      String?   @map("store_code")
   address        String?
-  phoneNumber    String?
-  websiteUrl     String?
+  phoneNumber    String?   @map("phone_number")
+  websiteUrl     String?   @map("website_url")
   category       String?
-  isVerified     Boolean?  @default(false)
-  isPublished    Boolean?  @default(false)
-  lastFetchedAt  DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  isVerified     Boolean?  @default(false) @map("is_verified")
+  isPublished    Boolean?  @default(false) @map("is_published")
+  lastFetchedAt  DateTime? @map("last_fetched_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   account        GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   insights       GbpInsightDaily[]
@@ -182,15 +182,15 @@ model GbpLocation {
 
 model GbpInsightDaily {
   id                String   @id @default(cuid())
-  locationId        String
+  locationId        String   @map("location_id")
   date              DateTime @db.Date
-  viewsSearch       Int      @default(0)
-  viewsMaps         Int      @default(0)
-  actionsWebsite    Int      @default(0)
-  actionsPhone      Int      @default(0)
-  actionsDirections Int      @default(0)
-  photosCount       Int      @default(0)
-  createdAt         DateTime @default(now())
+  viewsSearch       Int      @default(0) @map("views_search")
+  viewsMaps         Int      @default(0) @map("views_maps")
+  actionsWebsite    Int      @default(0) @map("actions_website")
+  actionsPhone      Int      @default(0) @map("actions_phone")
+  actionsDirections Int      @default(0) @map("actions_directions")
+  photosCount       Int      @default(0) @map("photos_count")
+  createdAt         DateTime @default(now()) @map("created_at")
 
   location          GbpLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
