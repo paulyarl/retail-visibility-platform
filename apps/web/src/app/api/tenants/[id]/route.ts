@@ -22,15 +22,21 @@ export async function PATCH(_req: NextRequest, context: { params: Promise<{ id: 
     const { id } = await context.params;
     const body = await _req.json();
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
+    console.log('[PATCH /api/tenants/:id] Proxying to:', `${base}/tenants/${id}`);
+    console.log('[PATCH /api/tenants/:id] Body:', body);
+    
     const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    
+    console.log('[PATCH /api/tenants/:id] Response status:', res.status);
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
-  } catch (_e) {
-    return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
+  } catch (e) {
+    console.error('[PATCH /api/tenants/:id] Error:', e);
+    return NextResponse.json({ error: 'proxy_failed', details: String(e) }, { status: 500 });
   }
 }
 
