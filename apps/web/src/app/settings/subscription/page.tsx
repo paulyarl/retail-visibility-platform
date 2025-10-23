@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button } from
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
 import { getQRFeatures } from '@/lib/qr-tiers';
+import { getAdminEmail } from '@/lib/admin-emails';
 
 type Tenant = {
   id: string;
@@ -165,7 +166,8 @@ export default function SubscriptionPage() {
                   variant="primary"
                   onClick={() => {
                     const metadata = tenant.metadata as any;
-                    const adminEmail = metadata?.admin_email || 'admin@yourplatform.com';
+                    // Get email from Email Management configuration
+                    const adminEmail = getAdminEmail('subscription');
                     const requestedTier = tier === 'trial' || tier === 'starter' ? 'Professional' : 'Enterprise';
                     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
                     const adminLink = `${baseUrl}/admin/tiers`;
@@ -383,7 +385,8 @@ export default function SubscriptionPage() {
                   size="lg"
                   onClick={() => {
                     const metadata = tenant.metadata as any;
-                    const adminEmail = metadata?.admin_email || 'admin@yourplatform.com';
+                    // Get email from Email Management configuration
+                    const adminEmail = getAdminEmail('subscription');
                     const requestedTier = tier === 'trial' || tier === 'starter' ? 'Professional' : 'Enterprise';
                     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
                     const adminLink = `${baseUrl}/admin/tiers`;

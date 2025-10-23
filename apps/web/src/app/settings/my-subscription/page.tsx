@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
+import { getAdminEmail } from '@/lib/admin-emails';
 
 interface Tenant {
   id: string;
@@ -68,7 +69,8 @@ export default function MySubscriptionPage() {
 
   const handleSubmitChange = () => {
     const metadata = tenant.metadata as any;
-    const adminEmail = metadata?.admin_email || 'admin@yourplatform.com';
+    // Get email from Email Management configuration
+    const adminEmail = getAdminEmail('subscription');
     const subject = encodeURIComponent(`Subscription Change Request - ${metadata?.businessName || tenant.name}`);
     const body = encodeURIComponent(
       `Hello,\n\n` +
