@@ -12,8 +12,11 @@ export async function GET(req: NextRequest) {
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
+    console.log('[GET /api/tenant] Auth check:', { user: user?.id, authError });
+    
     if (authError || !user) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+      console.error('[GET /api/tenant] Unauthorized:', authError);
+      return NextResponse.json({ error: 'unauthorized', details: 'Not logged in' }, { status: 401 });
     }
 
     // Get user's tenant from database
@@ -23,8 +26,11 @@ export async function GET(req: NextRequest) {
       .eq('id', user.id)
       .single();
 
+    console.log('[GET /api/tenant] User data:', { userData, userError });
+
     if (userError || !userData?.tenantId) {
-      return NextResponse.json({ error: 'tenant_not_found' }, { status: 404 });
+      console.error('[GET /api/tenant] Tenant not found:', userError);
+      return NextResponse.json({ error: 'tenant_not_found', details: 'User has no tenant' }, { status: 404 });
     }
 
     // Fetch tenant from backend API

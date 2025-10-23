@@ -26,10 +26,29 @@ export default function MySubscriptionPage() {
   useEffect(() => {
     const loadTenant = async () => {
       try {
-        const res = await fetch('/api/tenant');
+        // Get current tenant from localStorage
+        const tenantId = localStorage.getItem('tenantId');
+        if (!tenantId) {
+          setLoading(false);
+          return;
+        }
+
+        // Fetch tenant info
+        const res = await fetch(`/api/tenants/${tenantId}`);
         if (res.ok) {
           const data = await res.json();
-          setTenant(data);
+          
+          // Get SKU count
+          const itemsRes = await fetch(`/api/items?tenantId=${tenantId}`);
+          const items = await itemsRes.json();
+          const itemCount = Array.isArray(items) ? items.length : 0;
+          
+          setTenant({
+            ...data,
+            _count: {
+              items: itemCount
+            }
+          });
         }
       } catch (error) {
         console.error('Failed to load tenant:', error);
