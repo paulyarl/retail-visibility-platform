@@ -2,15 +2,17 @@
 
 import { Modal } from '@/components/ui';
 import { QRCodeGenerator } from './QRCodeGenerator';
+import type { SubscriptionTier } from '@/lib/qr-tiers';
 
 interface QRCodeModalProps {
   isOpen: boolean;
   onClose: () => void;
   productUrl: string;
   productName: string;
+  tier?: SubscriptionTier | string | null;
 }
 
-export function QRCodeModal({ isOpen, onClose, productUrl, productName }: QRCodeModalProps) {
+export function QRCodeModal({ isOpen, onClose, productUrl, productName, tier }: QRCodeModalProps) {
   return (
     <Modal
       isOpen={isOpen}
@@ -28,6 +30,7 @@ export function QRCodeModal({ isOpen, onClose, productUrl, productName }: QRCode
           url={productUrl} 
           productName={productName}
           size={256}
+          tier={tier}
         />
         
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">

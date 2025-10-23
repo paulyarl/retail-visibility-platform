@@ -3,16 +3,20 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { Button } from '@/components/ui';
+import { getQRFeatures, type SubscriptionTier } from '@/lib/qr-tiers';
 
 interface QRCodeGeneratorProps {
   url: string;
   productName: string;
   size?: number;
+  tier?: SubscriptionTier | string | null;
 }
 
-export function QRCodeGenerator({ url, productName, size = 256 }: QRCodeGeneratorProps) {
+export function QRCodeGenerator({ url, productName, size = 256, tier }: QRCodeGeneratorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const features = getQRFeatures(tier);
+  const maxResolution = features.maxResolution;
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -37,9 +41,9 @@ export function QRCodeGenerator({ url, productName, size = 256 }: QRCodeGenerato
   const handleDownload = async () => {
     setIsGenerating(true);
     try {
-      // Generate high-res QR code for download
+      // Generate high-res QR code for download (respects tier limits)
       const dataUrl = await QRCode.toDataURL(url, {
-        width: 1024,
+        width: maxResolution,
         margin: 4,
         color: {
           dark: '#000000',
@@ -177,6 +181,21 @@ export function QRCodeGenerator({ url, productName, size = 256 }: QRCodeGenerato
       <p className="text-xs text-neutral-500 text-center max-w-xs">
         Use this QR code on flyers, business cards, or in-store displays to let customers scan and view product details
       </p>
+
+      {/* Tier information */}
+      <div className="text-xs text-neutral-400 text-center">
+        <p>Resolution: {maxResolution}x{maxResolution}px</p>
+        {!features.customColors && (
+          <p className="text-primary-600 mt-1">
+            💎 Upgrade to Professional for branded QR codes with custom colors
+          </p>
+        )}
+        {!features.bulkDownload && (
+          <p className="text-primary-600">
+            💎 Upgrade to Professional for bulk download of all products
+          </p>
+        )}
+      </div>
     </div>
   );
 }
