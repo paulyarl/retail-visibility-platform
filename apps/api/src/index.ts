@@ -38,6 +38,12 @@ import {
   getAggregatedInsights,
 } from "./lib/google/gbp";
 
+// v3.5 imports (TODO: Create Express-compatible route files)
+// import auditRoutes from './routes/audit-express';
+// import policyRoutes from './routes/policy-express';
+// import billingRoutes from './routes/billing-express';
+// import { auditMiddlewareExpress } from './middleware/audit-express';
+
 const app = express();
 
 /* ------------------------- middleware ------------------------- */
@@ -873,6 +879,16 @@ app.get("/google/gbp/insights", async (req, res) => {
     res.status(500).json({ error: "failed_to_get_insights" });
   }
 });
+
+/* ------------------------------ v3.5 AUDIT & BILLING APIs ------------------------------ */
+// TODO: Uncomment after creating Express-compatible route files
+// Apply audit middleware globally (logs all write operations)
+// app.use(auditMiddlewareExpress);
+
+// Mount v3.5 routes
+// app.use(auditRoutes);
+// app.use(policyRoutes);
+// app.use(billingRoutes);
 
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);

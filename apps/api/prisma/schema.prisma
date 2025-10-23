@@ -52,6 +52,36 @@ enum ItemStatus {
   @@map("item_status")
 }
 
+enum ActorType {
+  user
+  system
+  integration
+
+  @@map("actor_type")
+}
+
+enum EntityType {
+  inventory_item
+  tenant
+  policy
+  oauth
+  other
+
+  @@map("entity_type")
+}
+
+enum AuditAction {
+  create
+  update
+  delete
+  sync
+  policy_apply
+  oauth_connect
+  oauth_refresh
+
+  @@map("action")
+}
+
 model Tenant {
   id                  String               @id @default(cuid())
   name                String
@@ -264,3 +294,62 @@ model GbpInsightDaily {
   @@map("gbp_insights_daily")
 }
 
+// v3.5 Models
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  occurredAt  DateTime    @default(now()) @map("occurred_at")
+  actorType   ActorType   @map("actor_type")
+  actorId     String      @map("actor_id")
+  tenantId    String      @map("tenant_id")
+  entityType  EntityType  @map("entity_type")
+  entityId    String      @map("entity_id")
+  action      AuditAction
+  requestId   String?     @map("request_id")
+  ip          String?
+  userAgent   String?     @map("user_agent")
+  diff        Json
+  metadata    Json        @default("{}")
+  piiScrubbed Boolean     @default(true) @map("pii_scrubbed")
+
+  @@index([tenantId, occurredAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([actorType, actorId])
+  @@index([requestId])
+  @@map("audit_log")
+}
+
+model SkuBillingPolicy {
+  id                 String    @id @default(cuid())
+  scope              String    @default("global")
+  countActivePrivate Boolean   @map("count_active_private")
+  countPreorder      Boolean   @map("count_preorder")
+  countZeroPrice     Boolean   @map("count_zero_price")
+  requireImage       Boolean   @map("require_image")
+  requireCurrency    Boolean   @map("require_currency")
+  note               String?
+  updatedBy          String?   @map("updated_by")
+  effectiveFrom      DateTime? @map("effective_from")
+  effectiveTo        DateTime? @map("effective_to")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("sku_billing_policy")
+}
+
+model SkuBillingPolicyHistory {
+  id                 String   @id @default(cuid())
+  scope              String   @default("global")
+  effectiveFrom      DateTime @map("effective_from")
+  effectiveTo        DateTime? @map("effective_to")
+  countActivePrivate Boolean  @map("count_active_private")
+  countPreorder      Boolean  @map("count_preorder")
+  countZeroPrice     Boolean  @map("count_zero_price")
+  requireImage       Boolean  @map("require_image")
+  requireCurrency    Boolean  @map("require_currency")
+  notes              String?
+  updatedBy          String   @map("updated_by")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([scope, effectiveFrom(sort: Desc)])
+  @@map("sku_billing_policy_history")
+}
