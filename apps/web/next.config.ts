@@ -13,6 +13,21 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: "15mb" },
   },
+
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'nbwsiobosqawrugnqddo.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        pathname: '/**',
+      },
+    ],
+  },
 };
 
 export default nextConfig;
