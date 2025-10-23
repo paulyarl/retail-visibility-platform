@@ -388,13 +388,26 @@ const createItemSchema = z.object({
   stock: z.number().int().nonnegative().default(0),
   imageUrl: z.string().url().optional(),
   metadata: z.any().optional(),
+  // v3.4 SWIS fields (required by schema)
+  title: z.string().min(1).optional(),
+  brand: z.string().min(1).optional(),
+  price: z.number().nonnegative().optional(),
+  currency: z.string().length(3).optional(),
 });
 
 app.post(["/items", "/inventory"], async (req, res) => {
   const parsed = createItemSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
-    const created = await prisma.inventoryItem.create({ data: parsed.data });
+    // Auto-populate SWIS fields from legacy fields if not provided
+    const data = {
+      ...parsed.data,
+      title: parsed.data.title || parsed.data.name,
+      brand: parsed.data.brand || 'Unknown',
+      price: parsed.data.price ?? parsed.data.priceCents / 100,
+      currency: parsed.data.currency || 'USD',
+    };
+    const created = await prisma.inventoryItem.create({ data });
     await audit({ tenantId: created.tenantId, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
     res.status(201).json(created);
   } catch (e: any) {
