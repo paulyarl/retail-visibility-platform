@@ -434,7 +434,7 @@ const createItemSchema = z.object({
   currency: z.string().length(3).optional(),
 });
 
-app.post(["/items", "/inventory"], enforcePolicyCompliance, async (req, res) => {
+app.post(["/items", "/inventory"], checkSubscriptionLimits, enforcePolicyCompliance, async (req, res) => {
   const parsed = createItemSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {

@@ -147,13 +147,14 @@ export async function checkSubscriptionLimits(
 
     // Define limits per tier
     const limits: Record<string, { items: number }> = {
+      trial: { items: 500 },
       starter: { items: 500 },
-      pro: { items: 5000 },
+      professional: { items: 5000 },
       enterprise: { items: Infinity },
     };
 
-    const tier = tenant.subscriptionTier || "starter";
-    const limit = limits[tier] || limits.starter;
+    const tier = tenant.subscriptionTier || "trial";
+    const limit = limits[tier] || limits.trial;
 
     // Check if creating new item would exceed limit
     if (req.method === "POST" && tenant._count.items >= limit.items) {
