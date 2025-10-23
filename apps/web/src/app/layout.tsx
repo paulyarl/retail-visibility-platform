@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/react";
+// import { Analytics } from "@vercel/analytics/react"; // Disabled - not configured in Vercel
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-white text-neutral-900`}
       >
         <ErrorBoundary>{children}</ErrorBoundary>
-        <Analytics />
+        {/* <Analytics /> */}
       </body>
     </html>
   );
