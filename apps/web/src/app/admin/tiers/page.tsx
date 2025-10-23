@@ -75,12 +75,16 @@ export default function AdminTiersPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to update tier');
+        if (res.status === 404) {
+          throw new Error(`Tenant not found on production server. This tenant may only exist locally.`);
+        }
+        throw new Error(data.message || data.error || 'Failed to update tier');
       }
 
       setSuccess(`Successfully updated tier for tenant`);
       await loadTenants();
     } catch (err: any) {
+      console.error('Update tier error:', err);
       setError(err.message || 'Failed to update tier');
     } finally {
       setUpdating(null);
