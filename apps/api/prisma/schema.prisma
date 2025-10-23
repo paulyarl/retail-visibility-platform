@@ -160,6 +160,15 @@ model InventoryItem {
   // Full-text search (v3.4.1)
   searchTsv Unsupported("tsvector")? // tsvector, managed by trigger
 
+  // Landing page customization (v3.5.3 - tier-based features)
+  marketingDescription String?      // Professional+ tier: Custom marketing copy
+  imageGallery         String[]     @default([]) // Professional+ tier: Multiple product images
+  customCta            Json?        // Professional+ tier: { text: "Call Now", link: "tel:555...", style: "primary" }
+  socialLinks          Json?        // Professional+ tier: { facebook: "...", instagram: "...", twitter: "..." }
+  customBranding       Json?        // Enterprise tier: { logo: "...", primaryColor: "#...", secondaryColor: "#..." }
+  customSections       Json[]       @default([]) // Enterprise tier: Array of custom content sections
+  landingPageTheme     String?      @default("default") // Enterprise tier: Theme/template selection
+
   tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   photos      PhotoAsset[]
   performance ProductPerformance[]
