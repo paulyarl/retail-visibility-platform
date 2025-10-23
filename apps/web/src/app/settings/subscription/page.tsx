@@ -161,7 +161,24 @@ export default function SubscriptionPage() {
                 <p className="text-3xl font-bold text-neutral-900 mt-4">{tierInfo.price}</p>
               </div>
               {tier !== 'enterprise' && (
-                <Button variant="primary">
+                <Button 
+                  variant="primary"
+                  onClick={() => {
+                    const adminEmail = tenant.metadata?.admin_email || 'admin@yourplatform.com';
+                    const requestedTier = tier === 'trial' || tier === 'starter' ? 'Professional' : 'Enterprise';
+                    const subject = encodeURIComponent(`Upgrade Request - ${tenant.metadata?.businessName || tenant.name}`);
+                    const body = encodeURIComponent(
+                      `Hello,\n\n` +
+                      `I would like to upgrade my subscription.\n\n` +
+                      `Current Plan: ${tierInfo.name}\n` +
+                      `Requested Plan: ${requestedTier}\n` +
+                      `Business: ${tenant.metadata?.businessName || tenant.name}\n` +
+                      `Tenant ID: ${tenant.id}\n\n` +
+                      `Thank you!`
+                    );
+                    window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
+                  }}
+                >
                   Upgrade Plan
                 </Button>
               )}
@@ -355,8 +372,26 @@ export default function SubscriptionPage() {
                 <p className="text-neutral-700 mb-4">
                   Upgrade to {tier === 'trial' || tier === 'starter' ? 'Professional' : 'Enterprise'} for advanced customization and unlimited growth
                 </p>
-                <Button variant="primary" size="lg">
-                  View Upgrade Options
+                <Button 
+                  variant="primary" 
+                  size="lg"
+                  onClick={() => {
+                    const adminEmail = tenant.metadata?.admin_email || 'admin@yourplatform.com';
+                    const requestedTier = tier === 'trial' || tier === 'starter' ? 'Professional' : 'Enterprise';
+                    const subject = encodeURIComponent(`Upgrade Request - ${tenant.metadata?.businessName || tenant.name}`);
+                    const body = encodeURIComponent(
+                      `Hello,\n\n` +
+                      `I would like to upgrade my subscription.\n\n` +
+                      `Current Plan: ${tierInfo.name}\n` +
+                      `Requested Plan: ${requestedTier}\n` +
+                      `Business: ${tenant.metadata?.businessName || tenant.name}\n` +
+                      `Tenant ID: ${tenant.id}\n\n` +
+                      `Thank you!`
+                    );
+                    window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
+                  }}
+                >
+                  Request Upgrade
                 </Button>
               </div>
             </CardContent>

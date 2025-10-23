@@ -268,6 +268,18 @@ export default function EditBusinessProfileModal({
             error={errors.contact_person}
             helperText="Optional - Primary contact for this location"
           />
+
+          {/* Admin Email for Upgrade Requests (Optional) */}
+          <Input
+            type="email"
+            label="Admin Email (Upgrade Requests)"
+            placeholder="admin@example.com"
+            value={formData.admin_email || ''}
+            onChange={(e) => handleChange('admin_email', e.target.value)}
+            onBlur={() => handleBlur('admin_email')}
+            error={errors.admin_email}
+            helperText="Optional - Email address to receive upgrade requests from tenants"
+          />
         </div>
 
         <ModalFooter>
