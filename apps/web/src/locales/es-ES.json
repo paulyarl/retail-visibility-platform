@@ -1,0 +1,31 @@
+{
+  "inventory": {
+    "title": "Artículos",
+    "createItem": "Crear artículo",
+    "sku": "SKU",
+    "name": "Nombre",
+    "pricePlaceholder": "Precio (ej. 12.99)",
+    "stock": "Inventario",
+    "searchPlaceholder": "Buscar por SKU o nombre",
+    "noItems": "No hay artículos."
+  },
+  "settings": {
+    "tenant": {
+      "title": "Configuración del Inquilino",
+      "region": "Región",
+      "language": "Idioma",
+      "currency": "Moneda",
+      "dataPolicy": "Política de Datos Aceptada",
+      "readOnly": "Estas configuraciones son de solo lectura por ahora"
+    }
+  },
+  "common": {
+    "loading": "Cargando…",
+    "refresh": "Actualizar",
+    "creating": "Creando…",
+    "create": "Crear",
+    "error": "Error",
+    "save": "Guardar",
+    "cancel": "Cancelar"
+  }
+}
