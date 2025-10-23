@@ -12,6 +12,7 @@ interface ContactCategory {
   icon: string;
   color: string;
   placeholder: string;
+  purposeBlurb: string;
 }
 
 const CONTACT_CATEGORIES: ContactCategory[] = [
@@ -22,6 +23,7 @@ const CONTACT_CATEGORIES: ContactCategory[] = [
     icon: '💳',
     color: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
     placeholder: 'I have a question about my subscription...',
+    purposeBlurb: 'Use this category for questions about your subscription plan, billing issues, payment methods, plan upgrades or downgrades, invoices, or cancellation requests. Our billing team will respond within 24 hours.',
   },
   {
     id: 'support',
@@ -30,6 +32,7 @@ const CONTACT_CATEGORIES: ContactCategory[] = [
     icon: '🛟',
     color: 'bg-purple-100 text-purple-800 hover:bg-purple-200',
     placeholder: 'I\'m having trouble with...',
+    purposeBlurb: 'Contact our technical support team for help with platform features, troubleshooting errors, bug reports, login issues, or questions about how to use specific functionality. Include screenshots or error messages when possible.',
   },
   {
     id: 'managed_services',
@@ -38,6 +41,7 @@ const CONTACT_CATEGORIES: ContactCategory[] = [
     icon: '🤝',
     color: 'bg-amber-100 text-amber-800 hover:bg-amber-200',
     placeholder: 'I\'m interested in managed services for...',
+    purposeBlurb: 'Interested in having our team manage your inventory for you? This category is for inquiries about our managed services including data entry, catalog setup, product descriptions, photo optimization, and ongoing catalog maintenance. We\'ll provide pricing and timeline estimates.',
   },
   {
     id: 'sales',
@@ -46,6 +50,7 @@ const CONTACT_CATEGORIES: ContactCategory[] = [
     icon: '💼',
     color: 'bg-green-100 text-green-800 hover:bg-green-200',
     placeholder: 'I\'d like to learn more about...',
+    purposeBlurb: 'Interested in learning more about our platform? Request a personalized demo, ask about pricing for your specific needs, inquire about enterprise solutions, or discuss how our platform can help your business. Our sales team will schedule a call at your convenience.',
   },
   {
     id: 'partnerships',
@@ -54,6 +59,7 @@ const CONTACT_CATEGORIES: ContactCategory[] = [
     icon: '🤝',
     color: 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200',
     placeholder: 'I\'d like to discuss a partnership regarding...',
+    purposeBlurb: 'Reach out to discuss partnership opportunities, integration requests, API access, white-label solutions, reseller programs, or strategic collaborations. Our partnerships team will evaluate your proposal and respond with next steps.',
   },
   {
     id: 'general',
@@ -62,6 +68,7 @@ const CONTACT_CATEGORIES: ContactCategory[] = [
     icon: '📧',
     color: 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200',
     placeholder: 'I wanted to reach out about...',
+    purposeBlurb: 'Have a question that doesn\'t fit the other categories? Use this for general inquiries, feedback about the platform, feature suggestions, media inquiries, or any other topics. We\'ll route your message to the appropriate team.',
   },
 ];
 
@@ -159,7 +166,16 @@ export default function ContactPage() {
               <CardTitle>
                 {CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.name}
               </CardTitle>
-              <p className="text-sm text-neutral-600 mt-2">
+              
+              {/* Purpose Blurb */}
+              <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-900">
+                  <strong className="block mb-1">About this category:</strong>
+                  {CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.purposeBlurb}
+                </p>
+              </div>
+              
+              <p className="text-sm text-neutral-600 mt-3">
                 Your message will be sent to our {CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.name.toLowerCase()} team
               </p>
             </CardHeader>
