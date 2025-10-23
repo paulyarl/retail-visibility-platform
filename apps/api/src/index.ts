@@ -121,6 +121,26 @@ app.put("/tenants/:id", async (req, res) => {
   }
 });
 
+// PATCH /tenants/:id - Update tenant subscription tier (admin only)
+const patchTenantSchema = z.object({
+  subscriptionTier: z.enum(['trial', 'starter', 'professional', 'enterprise']).optional(),
+  subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled']).optional(),
+});
+app.patch("/tenants/:id", async (req, res) => {
+  const parsed = patchTenantSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  try {
+    const tenant = await prisma.tenant.update({ 
+      where: { id: req.params.id }, 
+      data: parsed.data 
+    });
+    res.json(tenant);
+  } catch (e: any) {
+    console.error('[PATCH /tenants/:id] Error:', e);
+    res.status(500).json({ error: "failed_to_update_tenant" });
+  }
+});
+
 app.delete("/tenants/:id", async (req, res) => {
   try {
     await prisma.tenant.delete({ where: { id: req.params.id } });
