@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { requireAdmin } from '../middleware/auth';
+import { getComplianceReport } from '../middleware/policy-enforcement';
 
 const router = Router();
 
@@ -166,6 +167,23 @@ router.get('/admin/exports/policy-snapshot.json', requireAdmin, async (req, res)
     res.json(snapshot);
   } catch (error: any) {
     res.status(500).json({ error: 'export_failed' });
+  }
+});
+
+// GET /admin/policy/compliance - Get compliance report for tenant
+router.get('/admin/policy/compliance', requireAdmin, async (req, res) => {
+  try {
+    const { tenantId } = req.query;
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenant_id_required' });
+    }
+
+    const report = await getComplianceReport(tenantId as string);
+    res.json(report);
+  } catch (error: any) {
+    console.error('[Compliance Report] Error:', error);
+    res.status(500).json({ error: 'failed_to_generate_report' });
   }
 });
 

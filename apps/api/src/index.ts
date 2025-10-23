@@ -49,6 +49,7 @@ import subscriptionRoutes from './routes/subscriptions';
 import categoryRoutes from './routes/categories';
 import { auditLogger } from './middleware/audit-logger';
 import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
+import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 
 const app = express();
 
@@ -412,7 +413,7 @@ const createItemSchema = z.object({
   currency: z.string().length(3).optional(),
 });
 
-app.post(["/items", "/inventory"], async (req, res) => {
+app.post(["/items", "/inventory"], enforcePolicyCompliance, async (req, res) => {
   const parsed = createItemSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
@@ -435,7 +436,7 @@ app.post(["/items", "/inventory"], async (req, res) => {
 });
 
 const updateItemSchema = createItemSchema.partial().extend({ tenantId: z.string().min(1).optional() });
-app.put(["/items/:id", "/inventory/:id"], async (req, res) => {
+app.put(["/items/:id", "/inventory/:id"], enforcePolicyCompliance, async (req, res) => {
   const parsed = updateItemSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
