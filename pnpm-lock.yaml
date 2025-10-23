@@ -28,6 +28,9 @@ importers:
       multer:
         specifier: 1.4.5-lts.2
         version: 1.4.5-lts.2
+      nanoid:
+        specifier: ^3.3.7
+        version: 3.3.11
       tslib:
         specifier: ^2.6.2
         version: 2.8.1
