@@ -70,6 +70,8 @@ export default function ContactPage() {
   const [message, setMessage] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [subject, setSubject] = useState('');
 
   const handleSendMessage = () => {
     if (!selectedCategory || !message.trim()) {
@@ -80,17 +82,22 @@ export default function ContactPage() {
     const category = CONTACT_CATEGORIES.find(c => c.id === selectedCategory);
     const adminEmail = getAdminEmail(selectedCategory);
     
-    const subject = encodeURIComponent(`Contact Form: ${category?.name || 'Inquiry'}`);
+    // Use custom subject or default
+    const emailSubject = encodeURIComponent(
+      subject.trim() || `Contact Form: ${category?.name || 'Inquiry'}`
+    );
+    
     const body = encodeURIComponent(
       `Category: ${category?.name}\n\n` +
       `From: ${name || 'Not provided'}\n` +
-      `Email: ${email || 'Not provided'}\n\n` +
+      `Email: ${email || 'Not provided'}\n` +
+      `Phone: ${phone || 'Not provided'}\n\n` +
       `Message:\n${message}\n\n` +
       `---\n` +
       `Sent via Contact Form`
     );
 
-    window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:${adminEmail}?subject=${emailSubject}&body=${body}`;
   };
 
   const handleCategorySelect = (categoryId: EmailCategory) => {
@@ -98,6 +105,7 @@ export default function ContactPage() {
     const category = CONTACT_CATEGORIES.find(c => c.id === categoryId);
     if (category) {
       setMessage(''); // Reset message when changing category
+      setSubject(`Contact Form: ${category.name}`); // Set default subject
     }
   };
 
@@ -188,6 +196,40 @@ export default function ContactPage() {
                   </p>
                 </div>
 
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Your Phone Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="(555) 123-4567"
+                  />
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Provide your phone number for callback
+                  </p>
+                </div>
+
+                {/* Subject */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Subject
+                  </label>
+                  <input
+                    type="text"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Contact Form: Inquiry"
+                  />
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Customize the email subject line
+                  </p>
+                </div>
+
                 {/* Message */}
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -219,6 +261,8 @@ export default function ContactPage() {
                       setMessage('');
                       setName('');
                       setEmail('');
+                      setPhone('');
+                      setSubject('');
                     }}
                   >
                     Cancel
