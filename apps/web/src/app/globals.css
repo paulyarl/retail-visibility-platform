@@ -139,3 +139,50 @@ a {
 a:hover {
   text-decoration: underline;
 }
+
+/* Form Input Styles - Better Visibility */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="url"],
+textarea,
+select {
+  color: var(--neutral-900) !important;
+  font-weight: 400;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--neutral-400) !important;
+  opacity: 1;
+}
+
+/* Ensure dark text in all input states */
+input:focus,
+textarea:focus,
+select:focus {
+  color: var(--neutral-900) !important;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="url"],
+  textarea,
+  select {
+    color: var(--neutral-100) !important;
+  }
+  
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--neutral-500) !important;
+  }
+}
