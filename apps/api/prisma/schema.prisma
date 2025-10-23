@@ -106,10 +106,45 @@ model Tenant {
   stripeCustomerId      String?   @unique
   stripeSubscriptionId  String?   @unique
   
+  // Organization/Chain support (v3.6)
+  organizationId      String?
+  organization        Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  
   @@index([name])
   @@index([subscriptionStatus])
+  @@index([organizationId])
 }
 
+// Organization model for multi-location chains (v3.6)
+model Organization {
+  id                     String    @id @default(cuid())
+  name                   String    // Chain/franchise name
+  ownerId                String    // User who owns the organization
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  
+  // Organization-level subscription (for chains)
+  subscriptionTier       String?   @default("chain_starter") // chain_starter, chain_professional, chain_enterprise
+  subscriptionStatus     String?   @default("trial")
+  trialEndsAt            DateTime?
+  subscriptionEndsAt     DateTime?
+  stripeCustomerId       String?   @unique
+  stripeSubscriptionId   String?   @unique
+  
+  // Chain limits
+  maxLocations           Int       @default(5)      // Max number of locations
+  maxTotalSKUs           Int       @default(2500)   // Shared SKU pool across all locations
+  
+  // Metadata
+  metadata               Json?     // Chain-level settings, branding, etc.
+  
+  // Relations
+  tenants                Tenant[]  // All locations in the chain
+  
+  @@index([ownerId])
+  @@index([subscriptionStatus])
+  @@map("organization")
+}
 
 model User {
   id        String   @id @default(cuid())
