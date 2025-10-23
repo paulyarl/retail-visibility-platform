@@ -3,6 +3,9 @@ import cors from "cors";
 import morgan from "morgan";
 import { prisma } from "./prisma";
 import { z } from "zod";
+
+// Debug: Log DATABASE_URL to verify it's correct
+console.log('[DEBUG] DATABASE_URL:', process.env.DATABASE_URL?.substring(0, 50) + '...');
 import fs from "fs";
 import path from "path";
 import multer from "multer";
@@ -369,8 +372,9 @@ app.get(["/items", "/inventory"], async (req, res) => {
       take: 100,
     });
     res.json(items);
-  } catch {
-    res.status(500).json({ error: "failed_to_list_items" });
+  } catch (e: any) {
+    console.error('[GET /items] Error listing items:', e);
+    res.status(500).json({ error: "failed_to_list_items", message: e?.message });
   }
 });
 
@@ -412,7 +416,8 @@ app.post(["/items", "/inventory"], async (req, res) => {
     res.status(201).json(created);
   } catch (e: any) {
     if (e?.code === "P2002") return res.status(409).json({ error: "duplicate_sku" });
-    res.status(500).json({ error: "failed_to_create_item" });
+    console.error('[POST /items] Error creating item:', e);
+    res.status(500).json({ error: "failed_to_create_item", message: e?.message });
   }
 });
 

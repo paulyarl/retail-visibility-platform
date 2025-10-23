@@ -147,7 +147,7 @@ model InventoryItem {
   eligibilityReason String?
 
   // Full-text search (v3.4.1)
-  searchTsv String? // tsvector, managed by trigger
+  searchTsv Unsupported("tsvector")? // tsvector, managed by trigger
 
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   photos     PhotoAsset[]

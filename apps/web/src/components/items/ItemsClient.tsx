@@ -175,7 +175,14 @@ export default function ItemsClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        const msg = data?.error || "Failed to create item";
+        // Provide user-friendly error messages
+        const errorCode = data?.error || "unknown_error";
+        const errorMessages: Record<string, string> = {
+          duplicate_sku: `Item with SKU "${sku}" already exists for this tenant`,
+          invalid_payload: "Invalid item data. Please check all fields.",
+          failed_to_create_item: "Failed to create item. Please try again.",
+        };
+        const msg = errorMessages[errorCode] || `Error: ${errorCode}`;
         setError(msg);
         return;
       }
