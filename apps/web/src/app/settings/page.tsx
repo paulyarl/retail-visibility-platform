@@ -196,7 +196,16 @@ export default function SettingsPage() {
                 </button>
 
                 <button
-                  onClick={() => router.push('/items')}
+                  onClick={() => {
+                    // Check if tenant is selected
+                    const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+                    if (tenantId) {
+                      router.push(`/items?tenantId=${tenantId}`);
+                    } else {
+                      // Redirect to tenants page to select one first
+                      router.push('/tenants');
+                    }
+                  }}
                   className="flex items-center gap-3 p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors text-left"
                 >
                   <div className="h-10 w-10 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -206,7 +215,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <div className="font-medium text-neutral-900">View Inventory</div>
-                    <div className="text-sm text-neutral-500">Manage your products</div>
+                    <div className="text-sm text-neutral-500">Browse and manage products</div>
                   </div>
                 </button>
               </div>
