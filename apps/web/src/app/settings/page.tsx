@@ -190,21 +190,16 @@ export default function SettingsPage() {
                     </svg>
                   </div>
                   <div>
-                    <div className="font-medium text-neutral-900">Manage Tenants</div>
-                    <div className="text-sm text-neutral-500">Add or edit locations</div>
+                    <div className="font-medium text-neutral-900">View All Tenants</div>
+                    <div className="text-sm text-neutral-500">Browse all business locations</div>
                   </div>
                 </button>
 
                 <button
                   onClick={() => {
-                    // Check if tenant is selected
-                    const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
-                    if (tenantId) {
-                      router.push(`/items?tenantId=${tenantId}`);
-                    } else {
-                      // Redirect to tenants page to select one first
-                      router.push('/tenants');
-                    }
+                    // For admins, go to items page which will prompt for tenant selection
+                    // This maintains consistency with "View All Tenants" approach
+                    router.push('/items');
                   }}
                   className="flex items-center gap-3 p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors text-left"
                 >
@@ -214,8 +209,8 @@ export default function SettingsPage() {
                     </svg>
                   </div>
                   <div>
-                    <div className="font-medium text-neutral-900">View Inventory</div>
-                    <div className="text-sm text-neutral-500">Browse and manage products</div>
+                    <div className="font-medium text-neutral-900">Manage Inventory</div>
+                    <div className="text-sm text-neutral-500">View products across tenants</div>
                   </div>
                 </button>
               </div>
