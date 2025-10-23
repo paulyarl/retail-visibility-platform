@@ -288,11 +288,11 @@ export default function MySubscriptionPage() {
                 <div className="bg-neutral-50 p-4 rounded-lg space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold">Current:</span>
-                    <Badge className={tierInfo.color}>{tierInfo.name}</Badge>
+                    <Badge className={`${tierInfo.color} text-white`}>{tierInfo.name}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold">Requested:</span>
-                    <Badge className={TIER_LIMITS[selectedTier].color}>
+                    <Badge className={`${TIER_LIMITS[selectedTier].color} text-white`}>
                       {TIER_LIMITS[selectedTier].name}
                     </Badge>
                   </div>
