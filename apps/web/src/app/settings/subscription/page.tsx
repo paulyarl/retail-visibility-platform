@@ -164,21 +164,22 @@ export default function SubscriptionPage() {
                 <Button 
                   variant="primary"
                   onClick={() => {
-                    const adminEmail = tenant.metadata?.admin_email || 'admin@yourplatform.com';
+                    const metadata = tenant.metadata as any;
+                    const adminEmail = metadata?.admin_email || 'admin@yourplatform.com';
                     const requestedTier = tier === 'trial' || tier === 'starter' ? 'Professional' : 'Enterprise';
                     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
                     const adminLink = `${baseUrl}/admin/tiers`;
-                    const subject = encodeURIComponent(`Upgrade Request - ${tenant.metadata?.businessName || tenant.name}`);
+                    const subject = encodeURIComponent(`Upgrade Request - ${metadata?.businessName || tenant.name}`);
                     const body = encodeURIComponent(
                       `Hello,\n\n` +
                       `I would like to upgrade my subscription.\n\n` +
                       `Current Plan: ${tierInfo.name}\n` +
                       `Requested Plan: ${requestedTier}\n` +
-                      `Business: ${tenant.metadata?.businessName || tenant.name}\n` +
+                      `Business: ${metadata?.businessName || tenant.name}\n` +
                       `Tenant ID: ${tenant.id}\n\n` +
                       `To approve this request, click here:\n` +
                       `${adminLink}\n\n` +
-                      `Then find "${tenant.metadata?.businessName || tenant.name}" and click the ${requestedTier} tier button.\n\n` +
+                      `Then find "${metadata?.businessName || tenant.name}" and click the ${requestedTier} tier button.\n\n` +
                       `Thank you!`
                     );
                     window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
@@ -381,21 +382,22 @@ export default function SubscriptionPage() {
                   variant="primary" 
                   size="lg"
                   onClick={() => {
-                    const adminEmail = tenant.metadata?.admin_email || 'admin@yourplatform.com';
+                    const metadata = tenant.metadata as any;
+                    const adminEmail = metadata?.admin_email || 'admin@yourplatform.com';
                     const requestedTier = tier === 'trial' || tier === 'starter' ? 'Professional' : 'Enterprise';
                     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
                     const adminLink = `${baseUrl}/admin/tiers`;
-                    const subject = encodeURIComponent(`Upgrade Request - ${tenant.metadata?.businessName || tenant.name}`);
+                    const subject = encodeURIComponent(`Upgrade Request - ${metadata?.businessName || tenant.name}`);
                     const body = encodeURIComponent(
                       `Hello,\n\n` +
                       `I would like to upgrade my subscription.\n\n` +
                       `Current Plan: ${tierInfo.name}\n` +
                       `Requested Plan: ${requestedTier}\n` +
-                      `Business: ${tenant.metadata?.businessName || tenant.name}\n` +
+                      `Business: ${metadata?.businessName || tenant.name}\n` +
                       `Tenant ID: ${tenant.id}\n\n` +
                       `To approve this request, click here:\n` +
                       `${adminLink}\n\n` +
-                      `Then find "${tenant.metadata?.businessName || tenant.name}" and click the ${requestedTier} tier button.\n\n` +
+                      `Then find "${metadata?.businessName || tenant.name}" and click the ${requestedTier} tier button.\n\n` +
                       `Thank you!`
                     );
                     window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
