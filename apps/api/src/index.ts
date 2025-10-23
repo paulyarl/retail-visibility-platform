@@ -47,6 +47,7 @@ import policyRoutes from './routes/policy';
 import billingRoutes from './routes/billing';
 import subscriptionRoutes from './routes/subscriptions';
 import categoryRoutes from './routes/categories';
+import performanceRoutes from './routes/performance';
 import { auditLogger } from './middleware/audit-logger';
 import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
 import { enforcePolicyCompliance } from './middleware/policy-enforcement';
@@ -922,6 +923,7 @@ app.use(policyRoutes);
 app.use(billingRoutes);
 app.use('/subscriptions', subscriptionRoutes);
 app.use('/categories', categoryRoutes);
+app.use('/performance', performanceRoutes);
 
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);

@@ -92,6 +92,7 @@ model Tenant {
   photos              PhotoAsset[]
   syncJobs            SyncJob[]
   googleOAuthAccounts GoogleOAuthAccount[]
+  performance         ProductPerformance[]
   region              String               @default("us-east-1")
   language            String               @default("en-US")
   currency            String               @default("USD")
@@ -159,8 +160,9 @@ model InventoryItem {
   // Full-text search (v3.4.1)
   searchTsv Unsupported("tsvector")? // tsvector, managed by trigger
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  photos     PhotoAsset[]
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  photos      PhotoAsset[]
+  performance ProductPerformance[]
 
   // Each SKU must be unique within a tenant
   @@unique([tenantId, sku], name: "uq_tenant_sku")
@@ -172,19 +174,47 @@ model PhotoAsset {
   tenantId        String
   inventoryItemId String
   url             String
-  width           Int?
-  height          Int?
-  contentType     String?
-  bytes           Int?
-  exifRemoved     Boolean  @default(true)
-  capturedAt      DateTime @default(now())
+  publicUrl       String?
+  signedUrl       String?
   createdAt       DateTime @default(now())
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem  @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId])
+  @@index([inventoryItemId])
+}
+
+model ProductPerformance {
+  id              String    @id @default(cuid())
+  itemId          String
+  tenantId        String
+  date            DateTime  @db.Date
+  
+  // Google Merchant Center Status
+  approvalStatus  String?   // 'approved', 'pending', 'rejected', 'not_synced'
+  rejectionReason String?
+  
+  // Performance Metrics
+  impressions     Int       @default(0)
+  clicks          Int       @default(0)
+  ctr             Decimal   @default(0) @db.Decimal(5, 2)
+  conversions     Int       @default(0)
+  revenue         Decimal   @default(0) @db.Decimal(12, 2)
+  
+  // Visibility Metrics
+  visibilityScore Int       @default(0)
+  searchRank      Int?
+  
+  // Metadata
+  lastUpdated     DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  
+  item            InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
   tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, inventoryItemId])
-  @@index([capturedAt])
+  
+  @@unique([itemId, date])
+  @@index([tenantId, date(sort: Desc)])
+  @@index([approvalStatus])
 }
 
 model SyncJob {
