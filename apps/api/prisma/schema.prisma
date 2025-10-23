@@ -110,9 +110,17 @@ model Tenant {
   organizationId      String?
   organization        Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   
+  // Managed Services (v3.7)
+  serviceLevel           String?  @default("self_service") // self_service, managed_bronze, managed_silver, managed_gold, managed_platinum
+  managedServicesActive  Boolean  @default(false)
+  dedicatedManager       String?  // Staff member assigned to this tenant
+  monthlySkuQuota        Int?     // SKUs included per month in managed service
+  skusAddedThisMonth     Int      @default(0) // Track usage
+  
   @@index([name])
   @@index([subscriptionStatus])
   @@index([organizationId])
+  @@index([serviceLevel])
 }
 
 // Organization model for multi-location chains (v3.6)
