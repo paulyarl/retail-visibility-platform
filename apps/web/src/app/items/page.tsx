@@ -8,8 +8,11 @@ export default async function ItemsPage({
 }: {
   searchParams?: Promise<{ tenantId?: string }> | { tenantId?: string };
 }) {
-  const sp = typeof (searchParams as any)?.then === "function" ? await (searchParams as Promise<{ tenantId?: string }>) : (searchParams as { tenantId?: string } | undefined);
-  const tenantId = sp?.tenantId;
+  // Handle both async and sync searchParams (Next.js 15 compatibility)
+  const resolvedParams = searchParams && typeof searchParams === 'object' && 'then' in searchParams 
+    ? await searchParams 
+    : searchParams;
+  const tenantId = resolvedParams?.tenantId;
   if (!tenantId) {
     // Redirect to tenants page if no tenant selected
     const { redirect } = await import("next/navigation");
