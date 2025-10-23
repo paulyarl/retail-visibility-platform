@@ -186,3 +186,18 @@ select:focus {
     color: var(--neutral-500) !important;
   }
 }
+
+/* List items and general text visibility */
+li span:not([class*="text-"]) {
+  color: var(--neutral-700);
+}
+
+p:not([class*="text-"]) {
+  color: var(--neutral-700);
+}
+
+/* Ensure list items in cards are visible */
+.space-y-2 li span:not([class*="text-"]),
+.space-y-3 li span:not([class*="text-"]) {
+  color: var(--neutral-800);
+}
