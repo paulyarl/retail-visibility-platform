@@ -9,6 +9,13 @@ export async function GET(req: NextRequest) {
   const base = process.env.API_BASE_URL || 'http://localhost:4000';
   const res = await fetch(`${base}/items?tenantId=${encodeURIComponent(tenantId)}`);
   const data = await res.json();
+  
+  // If backend returns error, ensure we return empty array to client
+  if (!res.ok || !Array.isArray(data)) {
+    console.error('[items API] Backend error:', data);
+    return NextResponse.json([], { status: res.ok ? 200 : res.status });
+  }
+  
   return NextResponse.json(data);
 }
 

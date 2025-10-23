@@ -72,17 +72,21 @@ export default function ItemsClient({
   const [pageSize, setPageSize] = useState(25);
 
   const filtered = useMemo(() => {
+    // Ensure items is always an array
+    const itemsArray = Array.isArray(items) ? items : [];
     const term = q.trim().toLowerCase();
-    if (!term) return items;
-    return items.filter((i) =>
+    if (!term) return itemsArray;
+    return itemsArray.filter((i) =>
       [i.sku, i.name].some((v) => (v ?? "").toLowerCase().includes(term))
     );
   }, [items, q]);
 
   const paginatedItems = useMemo(() => {
+    // Ensure filtered is always an array before slicing
+    const filteredArray = Array.isArray(filtered) ? filtered : [];
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    return filtered.slice(startIndex, endIndex);
+    return filteredArray.slice(startIndex, endIndex);
   }, [filtered, currentPage, pageSize]);
 
   // Reset to page 1 when search changes
@@ -101,8 +105,10 @@ export default function ItemsClient({
       const res = await fetch(`/api/items?tenantId=${encodeURIComponent(tenantId)}`);
       const data = await res.json();
       console.log('[ItemsClient] Refresh response:', data);
-      console.log('[ItemsClient] Image URLs in response:', data.map((item: any) => ({ id: item.id, imageUrl: item.imageUrl })));
-      setItems(Array.isArray(data) ? data : []);
+      // Ensure data is an array before processing
+      const itemsArray = Array.isArray(data) ? data : [];
+      console.log('[ItemsClient] Image URLs in response:', itemsArray.map((item: any) => ({ id: item.id, imageUrl: item.imageUrl })));
+      setItems(itemsArray);
     } catch (e) {
       console.error('[ItemsClient] Refresh error:', e);
       setError("Failed to load items");
