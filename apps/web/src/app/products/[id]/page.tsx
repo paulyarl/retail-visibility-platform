@@ -90,7 +90,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       title: product.title,
       description: product.description,
       images: product.imageUrl ? [product.imageUrl] : [],
-      type: 'product',
+      type: 'website',
     },
   };
 }
