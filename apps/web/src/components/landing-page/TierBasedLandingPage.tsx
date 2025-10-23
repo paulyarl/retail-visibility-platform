@@ -70,7 +70,8 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
   const secondaryColor = features.customColors && branding?.secondaryColor ? branding.secondaryColor : '#1e40af';
 
   // Get logo from tenant business profile (Professional+ tier)
-  const businessLogo = tenant.metadata?.logo_url;
+  const metadata = tenant.metadata as any;
+  const businessLogo = metadata?.logo_url;
   const showLogo = (tier === 'professional' || tier === 'enterprise') && businessLogo;
 
   return (
@@ -203,9 +204,9 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
           <h2 className="text-xl font-semibold text-neutral-900 mb-4">About {tenant.metadata?.businessName || tenant.name}</h2>
           
           {/* Business Description */}
-          {tenant.metadata?.business_description && (
+          {metadata?.business_description && (
             <div className="mb-6 pb-6 border-b border-neutral-200">
-              <p className="text-neutral-700 leading-relaxed whitespace-pre-wrap">{tenant.metadata.business_description}</p>
+              <p className="text-neutral-700 leading-relaxed whitespace-pre-wrap">{metadata.business_description}</p>
             </div>
           )}
 
@@ -217,8 +218,8 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
               <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
               </svg>
-              <a href={`tel:${tenant.metadata?.phone_number || tenant.metadata?.phone || ''}`} className="hover:underline">
-                {tenant.metadata?.phone_number || tenant.metadata?.phone || 'Phone not available'}
+              <a href={`tel:${metadata?.phone_number || metadata?.phone || ''}`} className="hover:underline">
+                {metadata?.phone_number || metadata?.phone || 'Phone not available'}
               </a>
             </p>
 
@@ -227,8 +228,8 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
               <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
-              <a href={`mailto:${tenant.metadata?.email || ''}`} className="hover:underline">
-                {tenant.metadata?.email || 'Email not available'}
+              <a href={`mailto:${metadata?.email || ''}`} className="hover:underline">
+                {metadata?.email || 'Email not available'}
               </a>
             </p>
 
@@ -239,10 +240,10 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
               <span>
-                {tenant.metadata?.address_line1 || tenant.metadata?.address || 'Address not available'}
-                {tenant.metadata?.city && `, ${tenant.metadata.city}`}
-                {tenant.metadata?.state && `, ${tenant.metadata.state}`}
-                {tenant.metadata?.postal_code && ` ${tenant.metadata.postal_code}`}
+                {metadata?.address_line1 || metadata?.address || 'Address not available'}
+                {metadata?.city && `, ${metadata.city}`}
+                {metadata?.state && `, ${metadata.state}`}
+                {metadata?.postal_code && ` ${metadata.postal_code}`}
               </span>
             </p>
           </div>
