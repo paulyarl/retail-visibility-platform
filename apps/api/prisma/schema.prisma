@@ -44,6 +44,14 @@ enum SyncStatus {
   @@map("sync_status")
 }
 
+enum ItemStatus {
+  active
+  inactive
+  archived
+
+  @@map("item_status")
+}
+
 model Tenant {
   id                  String               @id @default(cuid())
   name                String
@@ -86,13 +94,13 @@ model InventoryItem {
   updatedAt  DateTime @updatedAt
 
   // SWIS fields (v3.4)
-  title        String?
-  brand        String?
+  title        String           // NOT NULL in DB
+  brand        String           // NOT NULL in DB
   description  String?
   categoryPath String[]         @default([])
-  price        Decimal?         @db.Decimal(12, 2)
-  currency     String?          @default("USD") @db.Char(3)
-  availability AvailabilityStatus? @default(in_stock)
+  price        Decimal          @db.Decimal(12, 2) // NOT NULL in DB
+  currency     String           @default("USD") @db.Char(3) // NOT NULL in DB
+  availability AvailabilityStatus @default(in_stock) // NOT NULL in DB
   quantity     Int?
   condition    ProductCondition?   @default(new)
   gtin         String?
@@ -103,6 +111,13 @@ model InventoryItem {
   syncStatus   SyncStatus?         @default(pending)
   syncedAt     DateTime?
   auditLogId   String?
+
+  // Lifecycle & eligibility (v3.4.1)
+  itemStatus        ItemStatus? @default(active)
+  eligibilityReason String?
+
+  // Full-text search (v3.4.1)
+  searchTsv String? // tsvector, managed by trigger
 
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   photos     PhotoAsset[]
