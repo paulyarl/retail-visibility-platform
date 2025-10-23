@@ -315,10 +315,16 @@ export default function OfferingsPage() {
             Choose the plan that's right for your business, or contact us for a custom solution.
           </p>
           <div className="flex gap-4 justify-center">
-            <button className="bg-white text-primary-600 px-6 py-3 rounded-lg font-semibold hover:bg-neutral-100 transition-colors">
+            <button 
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="bg-white text-primary-600 px-6 py-3 rounded-lg font-semibold hover:bg-neutral-100 transition-colors"
+            >
               View Subscription Plans
             </button>
-            <button className="bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-800 transition-colors border-2 border-white">
+            <button 
+              onClick={() => window.location.href = '/settings/contact'}
+              className="bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-800 transition-colors border-2 border-white"
+            >
               Contact Sales
             </button>
           </div>
