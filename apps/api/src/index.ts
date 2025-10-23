@@ -84,6 +84,16 @@ app.get("/tenants", async (_req, res) => {
   }
 });
 
+app.get("/tenants/:id", async (req, res) => {
+  try {
+    const tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
+    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+    res.json(tenant);
+  } catch (_e) {
+    res.status(500).json({ error: "failed_to_get_tenant" });
+  }
+});
+
 const createTenantSchema = z.object({ name: z.string().min(1) });
 app.post("/tenants", async (req, res) => {
   const parsed = createTenantSchema.safeParse(req.body ?? {});
