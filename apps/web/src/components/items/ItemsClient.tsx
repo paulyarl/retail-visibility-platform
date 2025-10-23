@@ -13,12 +13,15 @@ type Tenant = {
   city?: string;
   state?: string;
   region?: string;
+  subscriptionTier?: string;
+  subscriptionStatus?: string;
   metadata?: {
     city?: string;
     state?: string;
     country_code?: string;
     address_line1?: string;
     postal_code?: string;
+    subscriptionTier?: string;
   };
 };
 
@@ -45,6 +48,10 @@ export default function ItemsClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  
+  // Get current tenant's subscription tier
+  const currentTenant = tenants.find(t => t.id === tenantId);
+  const subscriptionTier = currentTenant?.subscriptionTier || currentTenant?.metadata?.subscriptionTier || 'trial';
 
   // Create form state
   const [sku, setSku] = useState("");
@@ -599,6 +606,7 @@ export default function ItemsClient({
           }}
           productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/products/${qrItem.id}`}
           productName={qrItem.name}
+          tier={subscriptionTier}
         />
       )}
     </div>
