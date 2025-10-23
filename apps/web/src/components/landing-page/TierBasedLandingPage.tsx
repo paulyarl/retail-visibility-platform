@@ -69,18 +69,22 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
   const primaryColor = features.customColors && branding?.primaryColor ? branding.primaryColor : '#3b82f6';
   const secondaryColor = features.customColors && branding?.secondaryColor ? branding.secondaryColor : '#1e40af';
 
+  // Get logo from tenant business profile (Professional+ tier)
+  const businessLogo = tenant.metadata?.logo_url;
+  const showLogo = (tier === 'professional' || tier === 'enterprise') && businessLogo;
+
   return (
     <div className="min-h-screen bg-neutral-50">
-      {/* Header with optional custom logo */}
-      {features.customLogo && branding?.logo && (
+      {/* Header with business logo (Professional+ tier) */}
+      {showLogo && (
         <div className="bg-white border-b border-neutral-200">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <Image
-              src={branding.logo}
+              src={businessLogo}
               alt={tenant.metadata?.businessName || tenant.name}
               width={150}
               height={50}
-              className="h-12 w-auto"
+              className="h-12 w-auto object-contain"
             />
           </div>
         </div>

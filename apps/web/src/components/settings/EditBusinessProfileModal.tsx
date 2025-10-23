@@ -280,6 +280,18 @@ export default function EditBusinessProfileModal({
             error={errors.admin_email}
             helperText="Optional - Email address to receive upgrade requests from tenants"
           />
+
+          {/* Logo URL (Professional+ Tier) */}
+          <Input
+            type="url"
+            label="Business Logo URL"
+            placeholder="https://example.com/logo.png"
+            value={formData.logo_url || ''}
+            onChange={(e) => handleChange('logo_url', e.target.value)}
+            onBlur={() => handleBlur('logo_url')}
+            error={errors.logo_url}
+            helperText="Optional - Professional+ tier: Logo displays on product landing pages"
+          />
         </div>
 
         <ModalFooter>

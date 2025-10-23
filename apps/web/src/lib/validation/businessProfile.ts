@@ -75,6 +75,12 @@ export const businessProfileSchema = z.object({
     .optional()
     .or(z.literal('')),
   
+  logo_url: z.string()
+    .url('Logo must be a valid URL')
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  
   hours: z.record(z.string(), z.string()).optional(),
   social_links: z.record(z.string(), z.string()).optional(),
   seo_tags: z.array(z.string()).optional(),

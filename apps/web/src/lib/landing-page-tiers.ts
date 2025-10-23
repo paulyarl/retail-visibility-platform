@@ -14,6 +14,7 @@ export interface LandingPageFeatures {
   socialLinks: boolean;
   
   // Branding features
+  showBusinessLogo: boolean; // Professional+ tier
   removePlatformBranding: boolean;
   customLogo: boolean;
   customColors: boolean;
@@ -34,6 +35,7 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
     maxGalleryImages: 1,
     customCta: false,
     socialLinks: false,
+    showBusinessLogo: false,
     removePlatformBranding: false,
     customLogo: false,
     customColors: false,
@@ -50,6 +52,7 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
     maxGalleryImages: 1,
     customCta: false,
     socialLinks: false,
+    showBusinessLogo: false,
     removePlatformBranding: false,
     customLogo: false,
     customColors: false,
@@ -66,6 +69,7 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
     maxGalleryImages: 5,
     customCta: true,
     socialLinks: true,
+    showBusinessLogo: true,
     removePlatformBranding: false,
     customLogo: false,
     customColors: false,
@@ -82,6 +86,7 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
     maxGalleryImages: 10,
     customCta: true,
     socialLinks: true,
+    showBusinessLogo: true,
     removePlatformBranding: true,
     customLogo: true,
     customColors: true,
