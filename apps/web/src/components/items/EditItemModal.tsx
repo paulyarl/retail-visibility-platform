@@ -9,6 +9,7 @@ interface Item {
   name: string;
   priceCents?: number;
   stock?: number;
+  description?: string;
 }
 
 interface EditItemModalProps {
@@ -23,6 +24,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
+  const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +35,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setName(item.name || '');
       setPrice(item.priceCents ? (item.priceCents / 100).toFixed(2) : '');
       setStock(item.stock?.toString() || '');
+      setDescription(item.description || '');
     }
   }, [item]);
 
@@ -55,6 +58,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         name: name.trim(),
         priceCents: price ? Math.round(parseFloat(price) * 100) : undefined,
         stock: stock ? parseInt(stock) : undefined,
+        description: description.trim() || undefined,
       };
 
       await onSave(updatedItem);
@@ -152,6 +156,24 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </p>
         </div>
 
+        {/* Description Field */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Description
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g., Premium organic honey sourced from local beekeepers..."
+            disabled={saving}
+            rows={4}
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed"
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            Product description for landing page (optional, not sent to Google Shopping)
+          </p>
+        </div>
+
         {/* Current Values Display */}
         <div className="p-4 bg-neutral-50 rounded-lg">
           <p className="text-sm font-medium text-neutral-700 mb-2">Current Values</p>
@@ -163,6 +185,9 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             )}
             {item.stock !== undefined && (
               <p><span className="font-medium">Stock:</span> {item.stock}</p>
+            )}
+            {item.description && (
+              <p><span className="font-medium">Description:</span> {item.description.substring(0, 100)}{item.description.length > 100 ? '...' : ''}</p>
             )}
           </div>
         </div>
