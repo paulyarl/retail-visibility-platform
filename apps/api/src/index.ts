@@ -38,11 +38,11 @@ import {
   getAggregatedInsights,
 } from "./lib/google/gbp";
 
-// v3.5 imports (TODO: Create Express-compatible route files)
-// import auditRoutes from './routes/audit-express';
-// import policyRoutes from './routes/policy-express';
-// import billingRoutes from './routes/billing-express';
-// import { auditMiddlewareExpress } from './middleware/audit-express';
+// v3.5 imports
+import auditRoutes from './routes/audit';
+import policyRoutes from './routes/policy';
+import billingRoutes from './routes/billing';
+import { auditLogger } from './middleware/audit-logger';
 
 const app = express();
 
@@ -894,14 +894,13 @@ app.get("/google/gbp/insights", async (req, res) => {
 });
 
 /* ------------------------------ v3.5 AUDIT & BILLING APIs ------------------------------ */
-// TODO: Uncomment after creating Express-compatible route files
 // Apply audit middleware globally (logs all write operations)
-// app.use(auditMiddlewareExpress);
+app.use(auditLogger);
 
 // Mount v3.5 routes
-// app.use(auditRoutes);
-// app.use(policyRoutes);
-// app.use(billingRoutes);
+app.use(auditRoutes);
+app.use(policyRoutes);
+app.use(billingRoutes);
 
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);
