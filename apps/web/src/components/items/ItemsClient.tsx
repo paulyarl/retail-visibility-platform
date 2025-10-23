@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Pagination, AdvancedSearchableSelect, type SelectOption } from "@/components/ui";
 import EditItemModal from "./EditItemModal";
+import { QRCodeModal } from "./QRCodeModal";
 import PageHeader, { Icons } from "@/components/PageHeader";
 
 type Tenant = {
@@ -66,6 +67,10 @@ export default function ItemsClient({
       setShowCreateForm(true);
     }
   }, []);
+
+  // QR Code modal state
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrItem, setQRItem] = useState<Item | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -518,6 +523,19 @@ export default function ItemsClient({
                       </Button>
                       <Button 
                         size="sm" 
+                        variant="ghost"
+                        onClick={() => {
+                          setQRItem(i);
+                          setShowQRModal(true);
+                        }}
+                        title="Generate QR code"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                      </Button>
+                      <Button 
+                        size="sm" 
                         variant="secondary"
                         onClick={() => handleEditClick(i)}
                       >
@@ -570,6 +588,19 @@ export default function ItemsClient({
         item={editingItem}
         onSave={onUpdate}
       />
+
+      {/* QR Code Modal */}
+      {qrItem && (
+        <QRCodeModal
+          isOpen={showQRModal}
+          onClose={() => {
+            setShowQRModal(false);
+            setQRItem(null);
+          }}
+          productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/products/${qrItem.id}`}
+          productName={qrItem.name}
+        />
+      )}
     </div>
   );
 }
