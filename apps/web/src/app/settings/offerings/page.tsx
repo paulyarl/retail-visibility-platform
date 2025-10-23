@@ -316,7 +316,7 @@ export default function OfferingsPage() {
           </p>
           <div className="flex gap-4 justify-center">
             <button 
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              onClick={() => window.location.href = '/settings/my-subscription'}
               className="bg-white text-primary-600 px-6 py-3 rounded-lg font-semibold hover:bg-neutral-100 transition-colors"
             >
               View Subscription Plans
