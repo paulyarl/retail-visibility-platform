@@ -45,7 +45,9 @@ import {
 import auditRoutes from './routes/audit';
 import policyRoutes from './routes/policy';
 import billingRoutes from './routes/billing';
+import subscriptionRoutes from './routes/subscriptions';
 import { auditLogger } from './middleware/audit-logger';
+import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
 
 const app = express();
 
@@ -906,6 +908,7 @@ app.use(auditLogger);
 app.use(auditRoutes);
 app.use(policyRoutes);
 app.use(billingRoutes);
+app.use('/subscriptions', subscriptionRoutes);
 
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);

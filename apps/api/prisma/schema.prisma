@@ -96,7 +96,17 @@ model Tenant {
   language            String               @default("en-US")
   currency            String               @default("USD")
   data_policy_accepted Boolean             @default(false)
+  
+  // Subscription management (v3.5.1)
+  subscriptionStatus     String?   @default("trial")  // trial, active, past_due, canceled
+  subscriptionTier       String?   @default("starter") // starter, pro, enterprise
+  trialEndsAt           DateTime?
+  subscriptionEndsAt    DateTime?
+  stripeCustomerId      String?   @unique
+  stripeSubscriptionId  String?   @unique
+  
   @@index([name])
+  @@index([subscriptionStatus])
 }
 
 
