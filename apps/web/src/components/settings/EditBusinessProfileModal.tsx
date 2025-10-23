@@ -292,6 +292,28 @@ export default function EditBusinessProfileModal({
             error={errors.logo_url}
             helperText="Optional - Professional+ tier: Logo displays on product landing pages"
           />
+
+          {/* Business Description */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Business Description
+            </label>
+            <textarea
+              value={formData.business_description || ''}
+              onChange={(e) => handleChange('business_description', e.target.value)}
+              onBlur={() => handleBlur('business_description')}
+              placeholder="Tell customers about your business, your story, and what makes you unique..."
+              rows={5}
+              maxLength={1000}
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            {errors.business_description && (
+              <p className="text-sm text-red-600 mt-1">{errors.business_description}</p>
+            )}
+            <p className="text-xs text-neutral-500 mt-1">
+              Optional - Describe your business (for platform use, not sent to Google Shopping)
+            </p>
+          </div>
         </div>
 
         <ModalFooter>

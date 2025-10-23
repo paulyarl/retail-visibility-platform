@@ -81,6 +81,12 @@ export const businessProfileSchema = z.object({
     .optional()
     .or(z.literal('')),
   
+  business_description: z.string()
+    .max(1000, 'Business description must be less than 1000 characters')
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  
   hours: z.record(z.string(), z.string()).optional(),
   social_links: z.record(z.string(), z.string()).optional(),
   seo_tags: z.array(z.string()).optional(),

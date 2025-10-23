@@ -200,7 +200,17 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
 
         {/* Business Contact Info */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold text-neutral-900 mb-4">Contact {tenant.metadata?.businessName || tenant.name}</h2>
+          <h2 className="text-xl font-semibold text-neutral-900 mb-4">About {tenant.metadata?.businessName || tenant.name}</h2>
+          
+          {/* Business Description */}
+          {tenant.metadata?.business_description && (
+            <div className="mb-6 pb-6 border-b border-neutral-200">
+              <p className="text-neutral-700 leading-relaxed whitespace-pre-wrap">{tenant.metadata.business_description}</p>
+            </div>
+          )}
+
+          {/* Contact Information */}
+          <h3 className="text-lg font-semibold text-neutral-900 mb-3">Contact Us</h3>
           <div className="space-y-2 text-neutral-700">
             {tenant.metadata?.phone && (
               <p className="flex items-center gap-2">
