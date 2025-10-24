@@ -4,8 +4,12 @@ import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, AnimatedCard } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
 import { motion } from "framer-motion";
+import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
+import Image from "next/image";
 
 export default function Home() {
+  const { settings } = usePlatformSettings();
+  
   // Animated counts for metrics (will be replaced with real data later)
   const inventoryCount = useCountUp(0, 1500);
   const listingsCount = useCountUp(0, 1500);
@@ -16,9 +20,21 @@ export default function Home() {
       <header className="bg-white border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-neutral-900">
-              Retail Visibility Platform
-            </h1>
+            {settings?.logoUrl ? (
+              <Link href="/">
+                <Image
+                  src={settings.logoUrl}
+                  alt={settings.platformName || 'Platform Logo'}
+                  width={150}
+                  height={40}
+                  className="h-10 w-auto object-contain cursor-pointer"
+                />
+              </Link>
+            ) : (
+              <h1 className="text-2xl font-bold text-neutral-900">
+                {settings?.platformName || 'Retail Visibility Platform'}
+              </h1>
+            )}
             <div className="flex items-center gap-3">
               <Link href="/settings/tenant">
                 <Button variant="ghost" size="sm">Settings</Button>

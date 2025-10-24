@@ -4,8 +4,12 @@ import AuthPanel from '@/components/AuthPanel';
 import { AnimatedCard } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { motion } from 'framer-motion';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import Image from 'next/image';
 
 export default function LoginPage() {
+  const { settings } = usePlatformSettings();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900">
       <PageHeader
@@ -26,16 +30,28 @@ export default function LoginPage() {
           transition={{ duration: 0.5 }}
           className="text-center mb-8"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-4 shadow-lg">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
+          {settings?.logoUrl ? (
+            <div className="inline-flex items-center justify-center mb-4">
+              <Image
+                src={settings.logoUrl}
+                alt={settings.platformName || 'Platform Logo'}
+                width={200}
+                height={50}
+                className="max-h-16 w-auto object-contain"
+              />
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-4 shadow-lg">
+              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+          )}
           <h1 className="text-3xl font-bold text-neutral-900 mb-2">
-            Retail Visibility Platform
+            {settings?.platformName || 'Retail Visibility Platform'}
           </h1>
           <p className="text-neutral-600 dark:text-neutral-400">
-            Sign in to manage your inventory
+            {settings?.platformDescription || 'Sign in to manage your inventory'}
           </p>
         </motion.div>
 
