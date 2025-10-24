@@ -81,7 +81,8 @@ app.get("/tenants", async (_req, res) => {
   try {
     const tenants = await prisma.tenant.findMany({ orderBy: { createdAt: "desc" } });
     res.json(tenants);
-  } catch (_e) {
+  } catch (e: any) {
+    console.error('[GET /tenants] Error:', e);
     res.status(500).json({ error: "failed_to_list_tenants" });
   }
 });
