@@ -11,27 +11,66 @@ import PublicFooter from "@/components/PublicFooter";
 
 export default function Home() {
   const { settings } = usePlatformSettings();
-  const [stats, setStats] = useState({ total: 0, active: 0 });
+  const [stats, setStats] = useState({ 
+    total: 0, 
+    active: 0, 
+    lowStock: 0,
+    locations: 0,
+    isChain: false,
+    organizationName: null as string | null,
+  });
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // Fetch real inventory stats
+    // Fetch comprehensive dashboard stats
     const fetchStats = async () => {
       try {
-        // Get tenant ID from localStorage
         const tenantId = localStorage.getItem('tenantId');
         if (!tenantId) {
           setLoading(false);
           return;
         }
         
-        const res = await fetch(`/api/tenants/${tenantId}/items`);
-        if (res.ok) {
-          const items = await res.json();
-          const total = Array.isArray(items) ? items.length : 0;
-          const active = Array.isArray(items) ? items.filter((i: any) => i.itemStatus === 'active').length : 0;
-          setStats({ total, active });
+        // Fetch tenant info and items in parallel
+        const [tenantRes, itemsRes, allTenantsRes] = await Promise.all([
+          fetch(`/api/tenants/${tenantId}`),
+          fetch(`/api/tenants/${tenantId}/items`),
+          fetch('/api/tenants'),
+        ]);
+        
+        let total = 0;
+        let active = 0;
+        let lowStock = 0;
+        let locations = 0;
+        let isChain = false;
+        let organizationName = null;
+        
+        // Process items
+        if (itemsRes.ok) {
+          const items = await itemsRes.json();
+          if (Array.isArray(items)) {
+            total = items.length;
+            active = items.filter((i: any) => i.itemStatus === 'active').length;
+            lowStock = items.filter((i: any) => i.stock !== undefined && i.stock < 10).length;
+          }
         }
+        
+        // Process tenant info for chain detection
+        if (tenantRes.ok) {
+          const tenant = await tenantRes.json();
+          if (tenant.organization) {
+            isChain = true;
+            organizationName = tenant.organization.name;
+          }
+        }
+        
+        // Count locations (all tenants for this user)
+        if (allTenantsRes.ok) {
+          const tenants = await allTenantsRes.json();
+          locations = Array.isArray(tenants) ? tenants.length : 0;
+        }
+        
+        setStats({ total, active, lowStock, locations, isChain, organizationName });
       } catch (error) {
         console.error('Failed to fetch stats:', error);
       } finally {
@@ -45,7 +84,8 @@ export default function Home() {
   // Animated counts for metrics
   const inventoryCount = useCountUp(0, stats.total);
   const listingsCount = useCountUp(0, stats.active);
-  const uploadsCount = useCountUp(0, stats.total);
+  const lowStockCount = useCountUp(0, stats.lowStock);
+  const locationsCount = useCountUp(0, stats.locations);
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
       {/* Header */}
@@ -147,55 +187,60 @@ export default function Home() {
             </div>
           </AnimatedCard>
 
+          {/* Low Stock Alerts - Actionable metric */}
           <AnimatedCard delay={0.2} className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-600">Feed Status</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.4, type: "spring" }}
-                  >
-                    <Badge variant="success">Synced</Badge>
-                  </motion.div>
-                </div>
-                <p className="text-sm text-neutral-500 mt-1">Last sync: Never</p>
+                <p className="text-sm font-medium text-neutral-600">Low Stock Alerts</p>
+                <motion.p 
+                  className="text-3xl font-bold text-neutral-900 mt-2"
+                  initial={{ scale: 0.5 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.4, type: "spring" }}
+                >
+                  {lowStockCount}
+                </motion.p>
+                <p className="text-sm text-neutral-500 mt-1">{lowStockCount > 0 ? 'needs attention' : 'all good'}</p>
               </div>
               <motion.div 
-                className="h-12 w-12 bg-info rounded-lg flex items-center justify-center"
-                whileHover={{ scale: 1.1, rotate: 360 }}
-                transition={{ type: "spring", stiffness: 200 }}
+                className={`h-12 w-12 ${lowStockCount > 0 ? 'bg-warning' : 'bg-success'} rounded-lg flex items-center justify-center`}
+                whileHover={{ scale: 1.1, rotate: 5 }}
+                transition={{ type: "spring", stiffness: 400 }}
               >
                 <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </motion.div>
             </div>
           </AnimatedCard>
 
-          <Link href="/items">
+          {/* Locations Count - Context-aware */}
+          <Link href="/tenants">
             <AnimatedCard delay={0.3} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-neutral-600">Photo Uploads</p>
+                  <p className="text-sm font-medium text-neutral-600">
+                    {stats.isChain ? 'Chain Locations' : 'Your Locations'}
+                  </p>
                   <motion.p 
                     className="text-3xl font-bold text-neutral-900 mt-2"
                     initial={{ scale: 0.5 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.5, type: "spring" }}
                   >
-                    {uploadsCount}
+                    {locationsCount}
                   </motion.p>
-                  <p className="text-sm text-neutral-500 mt-1">100% success</p>
+                  <p className="text-sm text-neutral-500 mt-1">
+                    {stats.isChain && stats.organizationName ? stats.organizationName : 'manage stores'}
+                  </p>
                 </div>
                 <motion.div 
-                  className="h-12 w-12 bg-warning rounded-lg flex items-center justify-center"
+                  className="h-12 w-12 bg-info rounded-lg flex items-center justify-center"
                   whileHover={{ scale: 1.1, rotate: 5 }}
                   transition={{ type: "spring", stiffness: 400 }}
                 >
                   <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
                 </motion.div>
               </div>
