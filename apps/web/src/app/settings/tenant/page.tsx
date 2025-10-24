@@ -178,7 +178,7 @@ export default function TenantSettingsPage() {
                   <select
                     value={regionalSettings.region}
                     onChange={(e) => setRegionalSettings({ ...regionalSettings, region: e.target.value })}
-                    className="px-3 py-1.5 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="px-3 py-1.5 border border-neutral-300 rounded-lg text-sm bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="us-east-1">US East (N. Virginia)</option>
                     <option value="us-west-2">US West (Oregon)</option>
@@ -204,7 +204,7 @@ export default function TenantSettingsPage() {
                   <select
                     value={regionalSettings.language}
                     onChange={(e) => setRegionalSettings({ ...regionalSettings, language: e.target.value })}
-                    className="px-3 py-1.5 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="px-3 py-1.5 border border-neutral-300 rounded-lg text-sm bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="en-US">English (US)</option>
                     <option value="es-ES">Español (Spanish)</option>
@@ -232,7 +232,7 @@ export default function TenantSettingsPage() {
                   <select
                     value={regionalSettings.currency}
                     onChange={(e) => setRegionalSettings({ ...regionalSettings, currency: e.target.value })}
-                    className="px-3 py-1.5 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="px-3 py-1.5 border border-neutral-300 rounded-lg text-sm bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="USD">USD ($)</option>
                     <option value="EUR">EUR (€)</option>

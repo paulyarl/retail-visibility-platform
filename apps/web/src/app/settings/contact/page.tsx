@@ -190,7 +190,7 @@ export default function ContactPage() {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="John Doe"
                   />
                 </div>
@@ -204,7 +204,7 @@ export default function ContactPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="john@example.com"
                   />
                   <p className="text-xs text-neutral-500 mt-1">
@@ -221,7 +221,7 @@ export default function ContactPage() {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="(555) 123-4567"
                   />
                   <p className="text-xs text-neutral-500 mt-1">
@@ -238,7 +238,7 @@ export default function ContactPage() {
                     type="text"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="Contact Form: Inquiry"
                   />
                   <p className="text-xs text-neutral-500 mt-1">
@@ -255,7 +255,7 @@ export default function ContactPage() {
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     rows={6}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
                     placeholder={CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.placeholder}
                   />
                 </div>
