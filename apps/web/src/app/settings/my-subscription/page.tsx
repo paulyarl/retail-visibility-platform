@@ -11,6 +11,8 @@ interface Tenant {
   name: string;
   subscriptionTier?: string;
   subscriptionStatus?: string;
+  trialEndsAt?: string;
+  subscriptionEndsAt?: string;
   metadata?: any;
   _count?: {
     items: number;
@@ -176,13 +178,41 @@ export default function MySubscriptionPage() {
               </div>
 
               {/* Status */}
-              <div className="pt-4 border-t border-neutral-200">
+              <div className="pt-4 border-t border-neutral-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-600">Status</span>
                   <Badge variant={tenant.subscriptionStatus === 'active' ? 'success' : 'default'}>
                     {tenant.subscriptionStatus || 'Active'}
                   </Badge>
                 </div>
+                
+                {/* Trial Expiration */}
+                {tenant.subscriptionStatus === 'trial' && tenant.trialEndsAt && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-600">Trial Ends</span>
+                    <span className="text-sm font-medium text-neutral-900">
+                      {new Date(tenant.trialEndsAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Subscription Expiration */}
+                {tenant.subscriptionStatus === 'active' && tenant.subscriptionEndsAt && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-600">Renews On</span>
+                    <span className="text-sm font-medium text-neutral-900">
+                      {new Date(tenant.subscriptionEndsAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
