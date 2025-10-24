@@ -9,20 +9,16 @@ RUN corepack enable
 
 WORKDIR /app
 
-# Copy root package files and lockfile
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Copy package files
+COPY package.json ./
 
-# Copy API package files
-COPY apps/api/package.json ./apps/api/
+# Install dependencies (without frozen lockfile since we're in a subdirectory)
+RUN corepack enable && corepack prepare pnpm@latest --activate && pnpm install --no-frozen-lockfile
 
-# Install dependencies from root
-RUN pnpm install --frozen-lockfile
-
-# Copy API source code and prisma schema
-COPY apps/api ./apps/api
+# Copy all source code
+COPY . .
 
 # Generate Prisma Client
-WORKDIR /app/apps/api
 RUN npx prisma generate
 
 # Build TypeScript
