@@ -35,11 +35,34 @@ export default function AdminTenantsPage() {
         const res = await fetch('/api/tenants');
         if (!res.ok) throw new Error('Failed to load tenants');
         const data = await res.json();
-        setTenants(Array.isArray(data) ? data.map((t: any) => ({
-          ...t,
-          status: 'active',
-          itemCount: 0,
-        })) : []);
+        
+        if (!Array.isArray(data)) {
+          setTenants([]);
+          return;
+        }
+        
+        // Fetch item counts for each tenant in parallel
+        const tenantsWithCounts = await Promise.all(
+          data.map(async (t: any) => {
+            try {
+              const itemsRes = await fetch(`/api/tenants/${t.id}/items`);
+              const items = itemsRes.ok ? await itemsRes.json() : [];
+              return {
+                ...t,
+                status: 'active',
+                itemCount: Array.isArray(items) ? items.length : 0,
+              };
+            } catch {
+              return {
+                ...t,
+                status: 'active',
+                itemCount: 0,
+              };
+            }
+          })
+        );
+        
+        setTenants(tenantsWithCounts);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load tenants');
       } finally {
