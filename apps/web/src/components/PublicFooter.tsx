@@ -54,12 +54,12 @@ export default function PublicFooter() {
             </h4>
             <ul className="space-y-3">
               <li>
-                <Link href="/#features" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                <Link href="/features" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
                   Features
                 </Link>
               </li>
               <li>
-                <Link href="/#pricing" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                <Link href="/features#pricing" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
                   Pricing
                 </Link>
               </li>
