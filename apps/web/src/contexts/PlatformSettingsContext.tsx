@@ -60,7 +60,18 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
 export function usePlatformSettings() {
   const context = useContext(PlatformSettingsContext);
   if (context === undefined) {
-    throw new Error('usePlatformSettings must be used within a PlatformSettingsProvider');
+    // Return default values instead of throwing during SSR/build
+    return {
+      settings: {
+        platformName: 'Retail Visibility Platform',
+        platformDescription: 'Manage your retail operations with ease',
+        logoUrl: null,
+        faviconUrl: null,
+      },
+      loading: false,
+      error: null,
+      refetch: async () => {},
+    };
   }
   return context;
 }
