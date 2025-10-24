@@ -90,8 +90,28 @@ app.get("/tenants", async (_req, res) => {
 
 app.get("/tenants/:id", async (req, res) => {
   try {
-    const tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
+    let tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+    
+    // Check if trial has expired and auto-convert to starter
+    const now = new Date();
+    if (
+      tenant.subscriptionStatus === "trial" &&
+      tenant.trialEndsAt &&
+      tenant.trialEndsAt < now
+    ) {
+      console.log(`[GET /tenants/:id] Trial expired for tenant ${tenant.id}. Auto-converting to starter plan.`);
+      tenant = await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: {
+          subscriptionTier: "starter",
+          subscriptionStatus: "active",
+          subscriptionEndsAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+      console.log(`[GET /tenants/:id] Tenant ${tenant.id} successfully converted to starter plan.`);
+    }
+    
     res.json(tenant);
   } catch (_e) {
     res.status(500).json({ error: "failed_to_get_tenant" });

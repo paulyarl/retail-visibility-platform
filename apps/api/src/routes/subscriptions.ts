@@ -36,8 +36,44 @@ router.get("/status", async (req, res) => {
       return res.status(404).json({ error: "tenant_not_found" });
     }
 
-    // Calculate days remaining
     const now = new Date();
+    
+    // Check if trial has expired and auto-convert to starter
+    if (
+      tenant.subscriptionStatus === "trial" &&
+      tenant.trialEndsAt &&
+      tenant.trialEndsAt < now
+    ) {
+      console.log(`[GET /subscriptions/status] Trial expired for tenant ${tenant.id}. Auto-converting to starter plan.`);
+      const updatedTenant = await prisma.tenant.update({
+        where: { id: tenantId },
+        data: {
+          subscriptionTier: "starter",
+          subscriptionStatus: "active",
+          subscriptionEndsAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        },
+        select: {
+          id: true,
+          name: true,
+          subscriptionStatus: true,
+          subscriptionTier: true,
+          trialEndsAt: true,
+          subscriptionEndsAt: true,
+          stripeCustomerId: true,
+          _count: {
+            select: {
+              items: true,
+              users: true,
+            },
+          },
+        },
+      });
+      console.log(`[GET /subscriptions/status] Tenant ${tenant.id} successfully converted to starter plan.`);
+      // Use updated tenant data
+      Object.assign(tenant, updatedTenant);
+    }
+
+    // Calculate days remaining
     let daysRemaining = null;
     
     if (tenant.subscriptionStatus === "trial" && tenant.trialEndsAt) {

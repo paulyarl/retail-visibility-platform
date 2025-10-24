@@ -54,22 +54,29 @@ export async function requireActiveSubscription(
       });
     }
 
-    // Check if trial has expired
+    // Check if trial has expired - automatically convert to starter
     if (
       tenant.subscriptionStatus === "trial" &&
       tenant.trialEndsAt &&
       tenant.trialEndsAt < now
     ) {
-      return res.status(402).json({
-        error: "trial_expired",
-        message: "Your trial has expired. Please subscribe to continue using the platform.",
-        tenant: {
-          id: tenant.id,
-          name: tenant.name,
-          status: "trial_expired",
-          trialEndsAt: tenant.trialEndsAt,
+      // Automatically downgrade to starter plan
+      console.log(`[Subscription Check] Trial expired for tenant ${tenant.id}. Auto-converting to starter plan.`);
+      
+      await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: {
+          subscriptionTier: "starter",
+          subscriptionStatus: "active",
+          // Set subscription to end in 30 days from now
+          subscriptionEndsAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
         },
       });
+
+      // Continue with the request - tenant is now on starter plan
+      console.log(`[Subscription Check] Tenant ${tenant.id} successfully converted to starter plan.`);
+      next();
+      return;
     }
 
     // Check if subscription has expired
