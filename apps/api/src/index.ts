@@ -254,8 +254,19 @@ function rejectIfOver1MB(bytes: number) {
 const photoUploadHandler = async (req: any, res: any) => {
   try {
     const itemId = req.params.id;
+    console.log(`[Photo Upload] Starting upload for item ${itemId}`, {
+      hasFile: !!req.file,
+      contentType: req.get('content-type'),
+      bodyKeys: req.body ? Object.keys(req.body) : [],
+      supabaseConfigured: !!supabase
+    });
+    
     const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
-    if (!item) return res.status(404).json({ error: "item_not_found" });
+    if (!item) {
+      console.log(`[Photo Upload] Item not found: ${itemId}`);
+      return res.status(404).json({ error: "item_not_found" });
+    }
+    console.log(`[Photo Upload] Item found:`, { id: item.id, tenantId: item.tenantId, sku: item.sku });
 
     // A) JSON { url, ... } → register the asset
     if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.url === "string") {
@@ -288,13 +299,21 @@ const photoUploadHandler = async (req: any, res: any) => {
 
       if (supabase) {
         const pathKey = `${item.tenantId}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
+        console.log(`[Photo Upload] Uploading to Supabase:`, { pathKey, size: f.size, mimetype: f.mimetype });
+        
         const { error, data } = await supabase.storage.from("photos").upload(pathKey, f.buffer, {
           cacheControl: "3600",
           upsert: false,
           contentType: f.mimetype || "application/octet-stream",
         });
-        if (error) return res.status(500).json({ error: error.message });
+        
+        if (error) {
+          console.error(`[Photo Upload] Supabase upload error:`, error);
+          return res.status(500).json({ error: error.message, details: error });
+        }
+        
         publicUrl = supabase.storage.from("photos").getPublicUrl(data.path).data.publicUrl;
+        console.log(`[Photo Upload] Supabase upload successful:`, { publicUrl });
       } else if (DEV) {
         const ext = f.mimetype.includes("png") ? ".png" : f.mimetype.includes("webp") ? ".webp" : ".jpg";
         const filename = `${item.id}-${Date.now()}${ext}`;
@@ -342,16 +361,21 @@ const photoUploadHandler = async (req: any, res: any) => {
       // Prefer Supabase Storage if configured
       if (supabase) {
         const pathKey = `${item.tenantId}/${item.sku || item.id}/${Date.now()}${ext}`;
+        console.log(`[Photo Upload] Uploading dataUrl to Supabase:`, { pathKey, size: buf.length, contentType: parsed.data.contentType });
+        
         const { error, data } = await supabase.storage.from("photos").upload(pathKey, buf, {
           cacheControl: "3600",
           upsert: false,
           contentType: parsed.data.contentType,
         });
+        
         if (error) {
-          console.error("Supabase upload error:", error);
+          console.error("[Photo Upload] Supabase dataUrl upload error:", error);
           return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
         }
+        
         publicUrl = supabase.storage.from("photos").getPublicUrl(data.path).data.publicUrl;
+        console.log(`[Photo Upload] Supabase dataUrl upload successful:`, { publicUrl });
       } else {
         // Fallback to filesystem
         const filename = `${itemId}-${Date.now()}${ext}`;
@@ -381,8 +405,21 @@ const photoUploadHandler = async (req: any, res: any) => {
     if (e?.code === "IMAGE_TOO_LARGE") {
       return res.status(413).json({ error: "image_too_large", bytesKB: e.bytes });
     }
-    console.error("upload_error", e);
-    return res.status(500).json({ error: "failed_to_upload_photo" });
+    console.error("[Photo Upload Error] Full error details:", {
+      message: e?.message,
+      stack: e?.stack,
+      code: e?.code,
+      name: e?.name,
+      itemId: req.params.id,
+      hasFile: !!req.file,
+      hasBody: !!req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : [],
+      contentType: req.get('content-type')
+    });
+    return res.status(500).json({ 
+      error: "failed_to_upload_photo",
+      details: DEV ? e?.message : undefined 
+    });
   }
 };
 
