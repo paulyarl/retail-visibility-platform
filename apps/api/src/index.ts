@@ -50,6 +50,7 @@ import subscriptionRoutes from './routes/subscriptions';
 import categoryRoutes from './routes/categories';
 import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
+import organizationRoutes from './routes/organizations';
 import { auditLogger } from './middleware/audit-logger';
 import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
 import { enforcePolicyCompliance } from './middleware/policy-enforcement';
@@ -1132,6 +1133,7 @@ app.use(billingRoutes);
 app.use('/subscriptions', subscriptionRoutes);
 app.use('/categories', categoryRoutes);
 app.use('/performance', performanceRoutes);
+app.use('/organizations', organizationRoutes);
 app.use(platformSettingsRoutes);
 
 /* ------------------------------ jobs ------------------------------ */
