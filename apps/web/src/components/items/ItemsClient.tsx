@@ -52,6 +52,7 @@ export default function ItemsClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'syncing'>('all');
   
   // Get current tenant's subscription tier
   const currentTenant = tenants.find(t => t.id === tenantId);
@@ -92,13 +93,25 @@ export default function ItemsClient({
 
   const filtered = useMemo(() => {
     // Ensure items is always an array
-    const itemsArray = Array.isArray(items) ? items : [];
+    let itemsArray = Array.isArray(items) ? items : [];
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      itemsArray = itemsArray.filter((i) => {
+        if (statusFilter === 'active') return i.itemStatus === 'active' || !i.itemStatus;
+        if (statusFilter === 'inactive') return i.itemStatus === 'inactive';
+        if (statusFilter === 'syncing') return (i.itemStatus === 'active' || !i.itemStatus) && (i.visibility === 'public' || !i.visibility);
+        return true;
+      });
+    }
+    
+    // Apply search filter
     const term = q.trim().toLowerCase();
     if (!term) return itemsArray;
     return itemsArray.filter((i) =>
-      [i.sku, i.name].some((v) => (v ?? "").toLowerCase().includes(term))
+      i.sku?.toLowerCase().includes(term) || i.name?.toLowerCase().includes(term)
     );
-  }, [items, q]);
+  }, [items, q, statusFilter]);
 
   const paginatedItems = useMemo(() => {
     // Ensure filtered is always an array before slicing
@@ -413,6 +426,42 @@ export default function ItemsClient({
                 placeholder={t('inventory.searchPlaceholder', 'Search by SKU or name')}
                 label="Search"
               />
+              
+              {/* Status Filter Buttons */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={statusFilter === 'all' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('all')}
+                >
+                  All ({items.length})
+                </Button>
+                <Button
+                  variant={statusFilter === 'active' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('active')}
+                >
+                  Active ({items.filter(i => i.itemStatus === 'active' || !i.itemStatus).length})
+                </Button>
+                <Button
+                  variant={statusFilter === 'inactive' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('inactive')}
+                >
+                  Inactive ({items.filter(i => i.itemStatus === 'inactive').length})
+                </Button>
+                <Button
+                  variant={statusFilter === 'syncing' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('syncing')}
+                >
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Syncing to Google ({items.filter(i => (i.itemStatus === 'active' || !i.itemStatus) && (i.visibility === 'public' || !i.visibility)).length})
+                </Button>
+              </div>
+              
               <div className="flex gap-2">
                 <Button
                   variant="secondary"
