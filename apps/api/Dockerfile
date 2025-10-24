@@ -9,17 +9,11 @@ RUN corepack enable
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json ./
+# Copy all source code first (needed for prisma schema in postinstall)
+COPY . .
 
 # Install dependencies (without frozen lockfile since we're in a subdirectory)
 RUN corepack enable && corepack prepare pnpm@latest --activate && pnpm install --no-frozen-lockfile
-
-# Copy all source code
-COPY . .
-
-# Generate Prisma Client
-RUN npx prisma generate
 
 # Build TypeScript
 RUN pnpm build
