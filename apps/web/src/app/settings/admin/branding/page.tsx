@@ -18,7 +18,7 @@ const brandingSchema = z.object({
 type BrandingFormValues = z.infer<typeof brandingSchema>;
 
 export default function BrandingSettings() {
-  const { toast } = useToast();
+  const { toast, success, error: showError } = useToast();
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [faviconPreview, setFaviconPreview] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -49,13 +49,9 @@ export default function BrandingSettings() {
           if (data.logoUrl) setLogoPreview(data.logoUrl);
           if (data.faviconUrl) setFaviconPreview(data.faviconUrl);
         }
-      } catch (error) {
-        console.error('Failed to load branding settings:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load branding settings',
-          variant: 'destructive',
-        });
+      } catch (err) {
+        console.error('Failed to load branding settings:', err);
+        showError('Failed to load branding settings');
       } finally {
         setIsLoading(false);
       }
@@ -102,17 +98,10 @@ export default function BrandingSettings() {
 
       if (!res.ok) throw new Error('Failed to update branding');
 
-      toast({
-        title: 'Success',
-        description: 'Branding settings updated successfully',
-      });
-    } catch (error) {
-      console.error('Failed to update branding:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update branding settings',
-        variant: 'destructive',
-      });
+      success('Branding settings updated successfully');
+    } catch (err) {
+      console.error('Failed to update branding:', err);
+      showError('Failed to update branding settings');
     }
   };
 
