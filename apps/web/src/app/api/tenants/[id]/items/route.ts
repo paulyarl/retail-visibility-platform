@@ -4,10 +4,10 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     
     // Fetch items for this tenant from backend
     const res = await fetch(`${API_BASE_URL}/tenants/${id}/items`);
