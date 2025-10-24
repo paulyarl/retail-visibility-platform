@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 
 interface Product {
   id: string;
@@ -61,6 +62,7 @@ interface TierBasedLandingPageProps {
 }
 
 export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPageProps) {
+  const { settings: platformSettings } = usePlatformSettings();
   const tier = tenant.subscriptionTier || 'trial';
   const features = getLandingPageFeatures(tier);
   const branding = product.customBranding;
@@ -69,10 +71,15 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
   const primaryColor = features.customColors && branding?.primaryColor ? branding.primaryColor : '#3b82f6';
   const secondaryColor = features.customColors && branding?.secondaryColor ? branding.secondaryColor : '#1e40af';
 
-  // Get logo from tenant business profile (Professional+ tier)
+  // Get logo - Priority: 1) Enterprise custom branding, 2) Tenant business logo, 3) Platform logo
   const metadata = tenant.metadata as any;
+  const enterpriseLogo = features.customLogo && branding?.logo;
   const businessLogo = metadata?.logo_url;
-  const showLogo = (tier === 'professional' || tier === 'enterprise') && businessLogo;
+  const platformLogo = platformSettings?.logoUrl;
+  
+  const displayLogo = enterpriseLogo || businessLogo || (tier !== 'trial' && tier !== 'starter' ? platformLogo : null);
+  const displayName = metadata?.businessName || tenant.name || platformSettings?.platformName;
+  const showLogo = !!displayLogo;
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -81,8 +88,8 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
         <div className="bg-white border-b border-neutral-200">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <Image
-              src={businessLogo}
-              alt={tenant.metadata?.businessName || tenant.name}
+              src={displayLogo}
+              alt={displayName}
               width={150}
               height={50}
               className="h-12 w-auto object-contain"
