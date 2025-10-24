@@ -22,35 +22,49 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // Fetch comprehensive dashboard stats
+    // Fetch comprehensive dashboard stats from database
     const fetchStats = async () => {
       try {
-        const tenantId = localStorage.getItem('tenantId');
-        console.log('[Dashboard] TenantId from localStorage:', tenantId);
+        // Fetch all tenants first
+        const allTenantsRes = await fetch('/api/tenants');
         
-        if (!tenantId) {
-          console.log('[Dashboard] No tenant selected, showing zeros');
+        if (!allTenantsRes.ok) {
+          console.log('[Dashboard] Failed to fetch tenants');
           setLoading(false);
           return;
         }
         
-        // Fetch tenant info and items in parallel
-        const [tenantRes, itemsRes, allTenantsRes] = await Promise.all([
-          fetch(`/api/tenants/${tenantId}`),
-          fetch(`/api/tenants/${tenantId}/items`),
-          fetch('/api/tenants'),
+        const tenants = await allTenantsRes.json();
+        console.log('[Dashboard] Tenants fetched:', tenants?.length || 0);
+        
+        if (!Array.isArray(tenants) || tenants.length === 0) {
+          console.log('[Dashboard] No tenants found, showing zeros');
+          setLoading(false);
+          return;
+        }
+        
+        // Use first tenant or get from localStorage as preference
+        const preferredTenantId = localStorage.getItem('tenantId');
+        const selectedTenant = preferredTenantId 
+          ? tenants.find(t => t.id === preferredTenantId) || tenants[0]
+          : tenants[0];
+        
+        console.log('[Dashboard] Selected tenant:', selectedTenant.id, selectedTenant.name);
+        
+        // Fetch tenant details and items
+        const [tenantRes, itemsRes] = await Promise.all([
+          fetch(`/api/tenants/${selectedTenant.id}`),
+          fetch(`/api/tenants/${selectedTenant.id}/items`),
         ]);
         
         console.log('[Dashboard] API responses:', {
           tenant: tenantRes.status,
           items: itemsRes.status,
-          allTenants: allTenantsRes.status,
         });
         
         let total = 0;
         let active = 0;
         let lowStock = 0;
-        let locations = 0;
         let isChain = false;
         let organizationName = null;
         
@@ -74,13 +88,7 @@ export default function Home() {
           }
         }
         
-        // Count locations (all tenants for this user)
-        if (allTenantsRes.ok) {
-          const tenants = await allTenantsRes.json();
-          locations = Array.isArray(tenants) ? tenants.length : 0;
-          console.log('[Dashboard] Locations count:', locations);
-        }
-        
+        const locations = tenants.length;
         console.log('[Dashboard] Final stats:', { total, active, lowStock, locations, isChain });
         setStats({ total, active, lowStock, locations, isChain, organizationName });
       } catch (error) {
