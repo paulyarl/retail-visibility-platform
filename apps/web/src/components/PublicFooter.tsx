@@ -78,6 +78,11 @@ export default function PublicFooter() {
             </h4>
             <ul className="space-y-3">
               <li>
+                <Link href="/faq" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                  FAQ
+                </Link>
+              </li>
+              <li>
                 <Link href="/settings/contact" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
                   Contact
                 </Link>
