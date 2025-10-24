@@ -204,7 +204,10 @@ export const countries = [
 ];
 
 // Helper to format phone number for display
-export function formatPhoneNumber(phone: string): string {
+export function formatPhoneNumber(phone: string | null | undefined): string {
+  // Handle null/undefined
+  if (!phone) return '';
+  
   // Remove all non-digit characters except +
   const cleaned = phone.replace(/[^\d+]/g, '');
   
