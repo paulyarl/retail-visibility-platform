@@ -935,6 +935,66 @@ app.get("/google/gbp/insights", async (req, res) => {
   }
 });
 
+/* ------------------------------ EMAIL CONFIGURATION ------------------------------ */
+/**
+ * Get all email configurations
+ * GET /admin/email-config
+ */
+app.get("/admin/email-config", async (_req, res) => {
+  try {
+    const configs = await prisma.emailConfiguration.findMany({
+      orderBy: { category: 'asc' }
+    });
+    res.json(configs);
+  } catch (error) {
+    console.error('[GET /admin/email-config] Error:', error);
+    res.status(500).json({ error: "failed_to_get_email_config" });
+  }
+});
+
+/**
+ * Update email configurations (bulk update)
+ * PUT /admin/email-config
+ * Body: { configs: [{ category: string, email: string }] }
+ */
+app.put("/admin/email-config", async (req, res) => {
+  try {
+    const schema = z.object({
+      configs: z.array(z.object({
+        category: z.string(),
+        email: z.string().email()
+      }))
+    });
+
+    const { configs } = schema.parse(req.body);
+
+    // Upsert each configuration
+    const results = await Promise.all(
+      configs.map(config =>
+        prisma.emailConfiguration.upsert({
+          where: { category: config.category },
+          update: { 
+            email: config.email,
+            updatedAt: new Date()
+          },
+          create: {
+            category: config.category,
+            email: config.email
+          }
+        })
+      )
+    );
+
+    res.json({ success: true, configs: results });
+  } catch (error) {
+    console.error('[PUT /admin/email-config] Error:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "invalid_request", details: error.errors });
+    }
+    res.status(500).json({ error: "failed_to_update_email_config" });
+  }
+});
+
 /* ------------------------------ v3.5 AUDIT & BILLING APIs ------------------------------ */
 // Apply audit middleware globally (logs all write operations)
 app.use(auditLogger);

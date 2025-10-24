@@ -464,3 +464,15 @@ model SkuBillingPolicyHistory {
   @@index([scope, effectiveFrom(sort: Desc)])
   @@map("sku_billing_policy_history")
 }
+
+// Email configuration for different request types
+model EmailConfiguration {
+  id          String   @id @default(cuid())
+  category    String   @unique // subscription, sales, support, managed_services, partnerships, marketing, compliance, general
+  email       String
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?  // User ID who last updated
+  
+  @@index([category])
+  @@map("email_configuration")
+}

@@ -137,18 +137,45 @@ export default function AdminEmailsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    // Load saved emails from localStorage
-    const savedEmails = localStorage.getItem('admin_emails');
-    if (savedEmails) {
-      setEmails(JSON.parse(savedEmails));
-    } else {
-      // Initialize with defaults
-      const defaults: Record<string, string> = {};
-      EMAIL_CATEGORIES.forEach(cat => {
-        defaults[cat.id] = cat.defaultEmail;
-      });
-      setEmails(defaults);
-    }
+    // Load emails from database via API
+    const loadEmails = async () => {
+      try {
+        const response = await fetch('/api/admin/email-config');
+        if (response.ok) {
+          const configs = await response.json();
+          const emailMap: Record<string, string> = {};
+          configs.forEach((config: { category: string; email: string }) => {
+            emailMap[config.category] = config.email;
+          });
+          
+          // Fill in defaults for any missing categories
+          EMAIL_CATEGORIES.forEach(cat => {
+            if (!emailMap[cat.id]) {
+              emailMap[cat.id] = cat.defaultEmail;
+            }
+          });
+          
+          setEmails(emailMap);
+        } else {
+          // Initialize with defaults if API fails
+          const defaults: Record<string, string> = {};
+          EMAIL_CATEGORIES.forEach(cat => {
+            defaults[cat.id] = cat.defaultEmail;
+          });
+          setEmails(defaults);
+        }
+      } catch (error) {
+        console.error('Failed to load email config:', error);
+        // Initialize with defaults on error
+        const defaults: Record<string, string> = {};
+        EMAIL_CATEGORIES.forEach(cat => {
+          defaults[cat.id] = cat.defaultEmail;
+        });
+        setEmails(defaults);
+      }
+    };
+    
+    loadEmails();
   }, []);
 
   const handleEdit = (categoryId: string) => {
@@ -156,13 +183,31 @@ export default function AdminEmailsPage() {
     setTempEmail(emails[categoryId] || EMAIL_CATEGORIES.find(c => c.id === categoryId)?.defaultEmail || '');
   };
 
-  const handleSave = (categoryId: string) => {
-    const newEmails = { ...emails, [categoryId]: tempEmail };
-    setEmails(newEmails);
-    localStorage.setItem('admin_emails', JSON.stringify(newEmails));
-    setEditingCategory(null);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const handleSave = async (categoryId: string) => {
+    try {
+      const newEmails = { ...emails, [categoryId]: tempEmail };
+      
+      // Save to database via API
+      const response = await fetch('/api/admin/email-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          configs: [{ category: categoryId, email: tempEmail }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save email configuration');
+      }
+
+      setEmails(newEmails);
+      setEditingCategory(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      console.error('Failed to save email:', error);
+      alert('Failed to save email configuration. Please try again.');
+    }
   };
 
   const handleCancel = () => {
@@ -170,27 +215,62 @@ export default function AdminEmailsPage() {
     setTempEmail('');
   };
 
-  const handleReset = (categoryId: string) => {
+  const handleReset = async (categoryId: string) => {
     const category = EMAIL_CATEGORIES.find(c => c.id === categoryId);
     if (category) {
-      const newEmails = { ...emails, [categoryId]: category.defaultEmail };
-      setEmails(newEmails);
-      localStorage.setItem('admin_emails', JSON.stringify(newEmails));
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      try {
+        const newEmails = { ...emails, [categoryId]: category.defaultEmail };
+        
+        // Save to database via API
+        const response = await fetch('/api/admin/email-config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            configs: [{ category: categoryId, email: category.defaultEmail }]
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to reset email configuration');
+        }
+
+        setEmails(newEmails);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      } catch (error) {
+        console.error('Failed to reset email:', error);
+        alert('Failed to reset email configuration. Please try again.');
+      }
     }
   };
 
-  const handleResetAll = () => {
+  const handleResetAll = async () => {
     if (confirm('Reset all email addresses to defaults?')) {
-      const defaults: Record<string, string> = {};
-      EMAIL_CATEGORIES.forEach(cat => {
-        defaults[cat.id] = cat.defaultEmail;
-      });
-      setEmails(defaults);
-      localStorage.setItem('admin_emails', JSON.stringify(defaults));
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      try {
+        const defaults: Record<string, string> = {};
+        const configs = EMAIL_CATEGORIES.map(cat => {
+          defaults[cat.id] = cat.defaultEmail;
+          return { category: cat.id, email: cat.defaultEmail };
+        });
+
+        // Save all to database via API
+        const response = await fetch('/api/admin/email-config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ configs })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to reset all email configurations');
+        }
+
+        setEmails(defaults);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      } catch (error) {
+        console.error('Failed to reset all emails:', error);
+        alert('Failed to reset email configurations. Please try again.');
+      }
     }
   };
 
@@ -232,8 +312,8 @@ export default function AdminEmailsPage() {
                     the request type.
                   </p>
                   <p className="text-sm text-neutral-700">
-                    <strong>Note:</strong> These emails are stored in your browser's local storage. Make sure to 
-                    configure them on all devices where admins access the platform.
+                    <strong>Note:</strong> Email configurations are stored in the database and synchronized across 
+                    all devices. Changes made here will be immediately available to all administrators.
                   </p>
                 </div>
               </div>
@@ -373,18 +453,36 @@ export default function AdminEmailsPage() {
                       const input = document.createElement('input');
                       input.type = 'file';
                       input.accept = 'application/json';
-                      input.onchange = (e: any) => {
+                      input.onchange = async (e: any) => {
                         const file = e.target.files[0];
                         const reader = new FileReader();
-                        reader.onload = (event: any) => {
+                        reader.onload = async (event: any) => {
                           try {
                             const config = JSON.parse(event.target.result);
+                            
+                            // Convert to API format
+                            const configs = Object.entries(config).map(([category, email]) => ({
+                              category,
+                              email: email as string
+                            }));
+
+                            // Save to database via API
+                            const response = await fetch('/api/admin/email-config', {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ configs })
+                            });
+
+                            if (!response.ok) {
+                              throw new Error('Failed to import configuration');
+                            }
+
                             setEmails(config);
-                            localStorage.setItem('admin_emails', JSON.stringify(config));
                             setSaved(true);
                             setTimeout(() => setSaved(false), 3000);
                           } catch (error) {
-                            alert('Invalid configuration file');
+                            console.error('Failed to import config:', error);
+                            alert('Invalid configuration file or failed to save');
                           }
                         };
                         reader.readAsText(file);
