@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button, Alert } from '@/components/ui';
+import PageHeader, { Icons } from '@/components/PageHeader';
+import Protected from '@/components/Protected';
 import { 
   getAllFeatureFlags, 
   enableForAll, 
@@ -77,29 +79,15 @@ export default function FeatureFlagsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 mb-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">Feature Flags</h1>
-              <p className="text-neutral-600 dark:text-neutral-400 mt-1">Control feature rollout and experimentation</p>
-            </div>
-            <Link 
-              href="/settings/admin"
-              className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center gap-1"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back to Admin
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <Protected>
+      <div className="min-h-screen bg-neutral-50">
+        <PageHeader
+          title="Feature Flags"
+          description="Control feature rollout and experimentation"
+          icon={Icons.Settings}
+        />
+        
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {success && (
           <Alert variant="success" title="Feature Flag Updated" onClose={() => setSuccess(null)}>
             {success}
@@ -277,7 +265,8 @@ export default function FeatureFlagsPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
-    </div>
+    </Protected>
   );
 }
