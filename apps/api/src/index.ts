@@ -489,7 +489,6 @@ app.get(["/items", "/inventory"], async (req, res) => {
     const items = await prisma.inventoryItem.findMany({
       where: { tenantId: parsed.data.tenantId },
       orderBy: { updatedAt: "desc" },
-      take: 100,
     });
     res.json(items);
   } catch (e: any) {
