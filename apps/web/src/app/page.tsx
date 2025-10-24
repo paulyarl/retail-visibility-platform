@@ -37,7 +37,7 @@ export default function Home() {
               </h1>
             )}
             <div className="flex items-center gap-3">
-              <Link href="/settings/tenant">
+              <Link href="/settings">
                 <Button variant="ghost" size="sm">Settings</Button>
               </Link>
               <Link href="/login">
