@@ -116,8 +116,8 @@ export default function BrandingSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Branding</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-2xl font-bold text-neutral-900">Branding</h2>
+        <p className="text-neutral-600">
           Customize your platform's branding including logo, name, and favicon
         </p>
       </div>
@@ -166,8 +166,8 @@ export default function BrandingSettings() {
                           className="h-full w-full object-contain"
                         />
                       ) : (
-                        <div className="h-full w-full bg-muted flex items-center justify-center">
-                          <span className="text-muted-foreground text-xs">No logo</span>
+                        <div className="h-full w-full bg-neutral-100 flex items-center justify-center">
+                          <span className="text-neutral-500 text-xs">No logo</span>
                         </div>
                       )}
                     </div>
@@ -181,11 +181,11 @@ export default function BrandingSettings() {
                       />
                       <Label
                         htmlFor="logo"
-                        className="cursor-pointer inline-flex items-center px-4 py-2 border border-input rounded-md text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
+                        className="cursor-pointer inline-flex items-center px-4 py-2 border border-neutral-300 rounded-md text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50"
                       >
                         Change Logo
                       </Label>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-xs text-neutral-500">
                         Recommended size: 200x50px, SVG or PNG
                       </p>
                     </div>
@@ -205,8 +205,8 @@ export default function BrandingSettings() {
                           className="h-full w-full object-contain"
                         />
                       ) : (
-                        <div className="h-full w-full bg-muted flex items-center justify-center">
-                          <span className="text-muted-foreground text-xs">No favicon</span>
+                        <div className="h-full w-full bg-neutral-100 flex items-center justify-center">
+                          <span className="text-neutral-500 text-xs">No favicon</span>
                         </div>
                       )}
                     </div>
@@ -220,11 +220,11 @@ export default function BrandingSettings() {
                       />
                       <Label
                         htmlFor="favicon"
-                        className="cursor-pointer inline-flex items-center px-4 py-2 border border-input rounded-md text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
+                        className="cursor-pointer inline-flex items-center px-4 py-2 border border-neutral-300 rounded-md text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50"
                       >
                         Change Favicon
                       </Label>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-xs text-neutral-500">
                         Recommended size: 32x32px, ICO or PNG
                       </p>
                     </div>

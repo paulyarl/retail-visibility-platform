@@ -187,17 +187,59 @@ select:focus {
   }
 }
 
-/* List items and general text visibility */
+/* Global Text Visibility - Ensure all text has proper contrast */
 li span:not([class*="text-"]) {
-  color: var(--neutral-700);
+  color: var(--neutral-800);
 }
 
 p:not([class*="text-"]) {
-  color: var(--neutral-700);
+  color: var(--neutral-800);
+}
+
+label:not([class*="text-"]) {
+  color: var(--neutral-900);
+  font-weight: 500;
 }
 
 /* Ensure list items in cards are visible */
 .space-y-2 li span:not([class*="text-"]),
 .space-y-3 li span:not([class*="text-"]) {
   color: var(--neutral-800);
+}
+
+/* Override muted foreground globally for better visibility */
+.text-muted-foreground {
+  color: var(--neutral-600) !important;
+}
+
+/* Card content text */
+[class*="card"] p:not([class*="text-"]) {
+  color: var(--neutral-700);
+}
+
+/* Button text visibility */
+button:not([class*="text-"]) {
+  color: var(--neutral-900);
+}
+
+/* Ensure all headings are dark */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--neutral-900);
+}
+
+/* Table text visibility */
+table td:not([class*="text-"]),
+table th:not([class*="text-"]) {
+  color: var(--neutral-800);
+}
+
+/* Form labels */
+form label {
+  color: var(--neutral-900);
+  font-weight: 500;
+}
+
+/* Description text */
+[class*="description"]:not([class*="text-"]) {
+  color: var(--neutral-600);
 }
