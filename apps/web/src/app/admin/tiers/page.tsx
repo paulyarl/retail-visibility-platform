@@ -34,12 +34,15 @@ const STATUSES = [
   { value: 'canceled', label: 'Canceled', color: 'bg-neutral-100 text-neutral-800' },
 ];
 
+const ITEMS_PER_PAGE = 10;
+
 export default function AdminTiersPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadTenants();
@@ -208,7 +211,14 @@ export default function AdminTiersPage() {
         {/* Tenants List */}
         <Card>
           <CardHeader>
-            <CardTitle>Tenants ({tenants.length})</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Tenants ({tenants.length})</CardTitle>
+              {tenants.length > ITEMS_PER_PAGE && (
+                <div className="text-sm text-neutral-600">
+                  Page {currentPage} of {Math.ceil(tenants.length / ITEMS_PER_PAGE)}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {tenants.length === 0 ? (
@@ -216,8 +226,11 @@ export default function AdminTiersPage() {
                 <p className="text-neutral-500">No tenants found</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {tenants.map(tenant => {
+              <>
+                <div className="space-y-4">
+                  {tenants
+                    .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                    .map(tenant => {
                   const tierInfo = getTierInfo(tenant.subscriptionTier);
                   const statusInfo = getStatusInfo(tenant.subscriptionStatus);
                   const isUpdating = updating === tenant.id;
@@ -304,7 +317,48 @@ export default function AdminTiersPage() {
                     </div>
                   );
                 })}
-              </div>
+                </div>
+
+                {/* Pagination Controls */}
+                {tenants.length > ITEMS_PER_PAGE && (
+                  <div className="flex items-center justify-between mt-6 pt-6 border-t border-neutral-200">
+                    <div className="text-sm text-neutral-600">
+                      Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, tenants.length)} of {tenants.length} tenants
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        ← Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(tenants.length / ITEMS_PER_PAGE) }, (_, i) => i + 1).map(page => (
+                          <Button
+                            key={page}
+                            variant={page === currentPage ? 'primary' : 'ghost'}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="min-w-[2.5rem]"
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(tenants.length / ITEMS_PER_PAGE), p + 1))}
+                        disabled={currentPage === Math.ceil(tenants.length / ITEMS_PER_PAGE)}
+                      >
+                        Next →
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
