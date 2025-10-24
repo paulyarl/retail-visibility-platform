@@ -693,9 +693,9 @@ export default function ItemsClient({
             setShowQRModal(false);
             setQRItem(null);
           }}
-          item={qrItem}
-          tenant={tenants.find(t => t.id === tenantId)}
-          subscriptionTier={subscriptionTier}
+          productUrl={`${window.location.origin}/products/${qrItem.id}`}
+          productName={qrItem.name}
+          tier={subscriptionTier}
         />
       )}
 
