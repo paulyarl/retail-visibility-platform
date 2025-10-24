@@ -123,6 +123,7 @@ export async function requireActiveSubscription(
 
 /**
  * Check subscription limits based on tier
+ * Supports both individual tenants and chain organizations
  */
 export async function checkSubscriptionLimits(
   req: Request,
@@ -139,7 +140,26 @@ export async function checkSubscriptionLimits(
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
+        id: true,
         subscriptionTier: true,
+        organizationId: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            maxTotalSKUs: true,
+            subscriptionTier: true,
+            tenants: {
+              select: {
+                _count: {
+                  select: {
+                    items: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         _count: {
           select: {
             items: true,
@@ -152,7 +172,37 @@ export async function checkSubscriptionLimits(
       return next();
     }
 
-    // Define limits per tier
+    // Check if tenant is part of a chain organization
+    if (tenant.organizationId && tenant.organization) {
+      // CHAIN-LEVEL LIMIT ENFORCEMENT
+      const org = tenant.organization;
+      
+      // Calculate total SKUs across all locations in the chain
+      const totalChainSKUs = org.tenants.reduce(
+        (sum, t) => sum + t._count.items,
+        0
+      );
+
+      // Check if adding new item would exceed chain limit
+      if (req.method === "POST" && totalChainSKUs >= org.maxTotalSKUs) {
+        return res.status(402).json({
+          error: "chain_limit_reached",
+          message: `Your organization "${org.name}" has reached the chain limit of ${org.maxTotalSKUs} total SKUs across all locations. Please upgrade or contact support.`,
+          limit: org.maxTotalSKUs,
+          current: totalChainSKUs,
+          organizationId: org.id,
+          organizationName: org.name,
+          tier: org.subscriptionTier,
+        });
+      }
+
+      // Chain limit OK, continue
+      next();
+      return;
+    }
+
+    // INDIVIDUAL TENANT LIMIT ENFORCEMENT
+    // Define limits per tier for standalone tenants
     const limits: Record<string, { items: number }> = {
       trial: { items: 500 },
       starter: { items: 500 },

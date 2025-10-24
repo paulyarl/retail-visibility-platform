@@ -145,4 +145,109 @@ router.post('/admin/billing/override', requireAdmin, async (req, res) => {
   }
 });
 
+// GET /organization/billing/counters - Get SKU counters for entire organization
+router.get('/organization/billing/counters', requireAuth, async (req, res) => {
+  try {
+    const organizationId = req.query.organizationId as string;
+    
+    if (!organizationId) {
+      return res.status(400).json({ error: 'organization_id_required' });
+    }
+
+    // Get organization with all tenants
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        id: true,
+        name: true,
+        maxLocations: true,
+        maxTotalSKUs: true,
+        subscriptionTier: true,
+        subscriptionStatus: true,
+        tenants: {
+          select: {
+            id: true,
+            name: true,
+            _count: {
+              select: {
+                items: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!org) {
+      return res.status(404).json({ error: 'organization_not_found' });
+    }
+
+    // Calculate totals
+    const totalLocations = org.tenants.length;
+    const totalSKUs = org.tenants.reduce((sum, t) => sum + t._count.items, 0);
+    const locationBreakdown = org.tenants.map(t => ({
+      tenantId: t.id,
+      tenantName: t.name,
+      skuCount: t._count.items,
+    }));
+
+    // Calculate status
+    const locationStatus = totalLocations >= org.maxLocations ? 'at_limit' :
+                          totalLocations >= org.maxLocations * 0.9 ? 'warning' : 'ok';
+    
+    const skuStatus = totalSKUs >= org.maxTotalSKUs ? 'at_limit' :
+                     totalSKUs >= org.maxTotalSKUs * 0.9 ? 'warning' : 'ok';
+
+    res.json({
+      organizationId: org.id,
+      organizationName: org.name,
+      subscriptionTier: org.subscriptionTier,
+      subscriptionStatus: org.subscriptionStatus,
+      limits: {
+        maxLocations: org.maxLocations,
+        maxTotalSKUs: org.maxTotalSKUs,
+      },
+      current: {
+        totalLocations,
+        totalSKUs,
+      },
+      status: {
+        locations: locationStatus,
+        skus: skuStatus,
+        overall: locationStatus === 'at_limit' || skuStatus === 'at_limit' ? 'at_limit' :
+                locationStatus === 'warning' || skuStatus === 'warning' ? 'warning' : 'ok',
+      },
+      locationBreakdown,
+    });
+  } catch (error: any) {
+    console.error('[Organization Billing] Counters error:', error);
+    res.status(500).json({ error: 'failed_to_fetch_counters' });
+  }
+});
+
+// POST /admin/organization/override - Set organization limits
+router.post('/admin/organization/override', requireAdmin, async (req, res) => {
+  try {
+    const { organizationId, maxLocations, maxTotalSKUs } = req.body;
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'organization_id_required' });
+    }
+
+    const updateData: any = {};
+    if (maxLocations !== undefined) updateData.maxLocations = maxLocations;
+    if (maxTotalSKUs !== undefined) updateData.maxTotalSKUs = maxTotalSKUs;
+
+    await prisma.organization.update({
+      where: { id: organizationId },
+      data: updateData,
+    });
+
+    res.json({ success: true, organizationId, ...updateData });
+  } catch (error: any) {
+    console.error('[Organization Billing] Override error:', error);
+    res.status(500).json({ error: 'failed_to_set_override' });
+  }
+});
+
 export default router;
