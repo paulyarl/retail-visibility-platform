@@ -25,6 +25,8 @@ export default function AdminTenantsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [chainFilter, setChainFilter] = useState<'all' | 'chain' | 'standalone'>('all');
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -54,11 +56,16 @@ export default function AdminTenantsPage() {
       : <Badge variant="default">Inactive</Badge>;
   };
 
-  // Filter tenants based on search query
-  const filteredTenants = tenants.filter(tenant => 
-    tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tenant.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter tenants based on search query, status, and chain type
+  const filteredTenants = tenants.filter(tenant => {
+    const matchesSearch = tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tenant.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || tenant.status === statusFilter;
+    const matchesChain = chainFilter === 'all' || 
+      (chainFilter === 'chain' && tenant.organization) ||
+      (chainFilter === 'standalone' && !tenant.organization);
+    return matchesSearch && matchesStatus && matchesChain;
+  });
 
   // Pagination
   const totalPages = Math.ceil(filteredTenants.length / itemsPerPage);
@@ -66,10 +73,10 @@ export default function AdminTenantsPage() {
   const endIndex = startIndex + itemsPerPage;
   const paginatedTenants = filteredTenants.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search changes
+  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, statusFilter, chainFilter]);
 
   if (loading) {
     return (
@@ -125,6 +132,97 @@ export default function AdminTenantsPage() {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-orange-600">
+                  {tenants.filter(t => t.organization).length}
+                </p>
+                <p className="text-sm text-neutral-600 mt-1">Chain Locations</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-4">
+              {/* Search */}
+              <div className="flex-1 min-w-[200px]">
+                <input
+                  type="text"
+                  placeholder="Search tenants..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex gap-2">
+                <Button
+                  variant={statusFilter === 'all' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('all')}
+                >
+                  All Status
+                </Button>
+                <Button
+                  variant={statusFilter === 'active' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('active')}
+                >
+                  Active
+                </Button>
+                <Button
+                  variant={statusFilter === 'inactive' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('inactive')}
+                >
+                  Inactive
+                </Button>
+              </div>
+
+              {/* Chain Filter */}
+              <div className="flex gap-2">
+                <Button
+                  variant={chainFilter === 'all' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setChainFilter('all')}
+                >
+                  All Types
+                </Button>
+                <Button
+                  variant={chainFilter === 'chain' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setChainFilter('chain')}
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  Chain
+                </Button>
+                <Button
+                  variant={chainFilter === 'standalone' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setChainFilter('standalone')}
+                >
+                  Standalone
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Results Count */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-neutral-700">
+            Showing {filteredTenants.length} of {tenants.length} tenants
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="text-center">
