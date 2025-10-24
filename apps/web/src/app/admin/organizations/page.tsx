@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, ModalFooter } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 
 interface Organization {
@@ -29,20 +29,81 @@ export default function AdminOrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showManageModal, setShowManageModal] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
+  const [availableTenants, setAvailableTenants] = useState<Array<{id: string; name: string}>>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState('');
 
   useEffect(() => {
     loadOrganizations();
+    loadAvailableTenants();
   }, []);
 
   const loadOrganizations = async () => {
     try {
       const res = await fetch('/api/organizations');
       const data = await res.json();
-      setOrganizations(data);
+      setOrganizations(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load organizations:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAvailableTenants = async () => {
+    try {
+      const res = await fetch('/api/tenants');
+      const data = await res.json();
+      setAvailableTenants(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to load tenants:', error);
+    }
+  };
+
+  const openManageModal = (org: Organization) => {
+    setSelectedOrg(org);
+    setShowManageModal(true);
+  };
+
+  const handleAddTenant = async (orgId: string) => {
+    if (!selectedTenantId) return;
+    
+    try {
+      const res = await fetch(`/api/organizations/${orgId}/tenants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId: selectedTenantId }),
+      });
+      
+      if (res.ok) {
+        await loadOrganizations();
+        await loadAvailableTenants();
+        setSelectedTenantId('');
+        // Update selected org
+        const updated = organizations.find(o => o.id === orgId);
+        if (updated) setSelectedOrg(updated);
+      }
+    } catch (error) {
+      console.error('Failed to add tenant:', error);
+    }
+  };
+
+  const handleRemoveTenant = async (orgId: string, tenantId: string) => {
+    try {
+      const res = await fetch(`/api/organizations/${orgId}/tenants/${tenantId}`, {
+        method: 'DELETE',
+      });
+      
+      if (res.ok) {
+        await loadOrganizations();
+        await loadAvailableTenants();
+        // Update selected org
+        const updated = organizations.find(o => o.id === orgId);
+        if (updated) setSelectedOrg(updated);
+      }
+    } catch (error) {
+      console.error('Failed to remove tenant:', error);
     }
   };
 
@@ -151,6 +212,13 @@ export default function AdminOrganizationsPage() {
                   >
                     View Dashboard
                   </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => openManageModal(org)}
+                  >
+                    Manage Locations
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -182,6 +250,94 @@ export default function AdminOrganizationsPage() {
           </div>
         )}
       </div>
+
+      {/* Manage Locations Modal */}
+      <Modal
+        isOpen={showManageModal}
+        onClose={() => {
+          setShowManageModal(false);
+          setSelectedOrg(null);
+          setSelectedTenantId('');
+        }}
+        title="Manage Locations"
+        description={selectedOrg ? `Add or remove locations for ${selectedOrg.name}` : ''}
+      >
+        {selectedOrg && (
+          <div className="space-y-4">
+            {/* Current Locations */}
+            <div>
+              <h4 className="font-semibold text-sm text-neutral-900 mb-2">
+                Current Locations ({selectedOrg.tenants.length})
+              </h4>
+              {selectedOrg.tenants.length === 0 ? (
+                <p className="text-sm text-neutral-600">No locations yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedOrg.tenants.map((tenant) => (
+                    <div
+                      key={tenant.id}
+                      className="flex items-center justify-between p-3 bg-neutral-50 rounded"
+                    >
+                      <span className="font-medium text-neutral-900">{tenant.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveTenant(selectedOrg.id, tenant.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add Location */}
+            <div>
+              <h4 className="font-semibold text-sm text-neutral-900 mb-2">Add Location</h4>
+              {availableTenants.length === 0 ? (
+                <p className="text-sm text-neutral-600">No available tenants to add</p>
+              ) : (
+                <div className="flex gap-2">
+                  <select
+                    value={selectedTenantId}
+                    onChange={(e) => setSelectedTenantId(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  >
+                    <option value="">Select a tenant...</option>
+                    {availableTenants.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleAddTenant(selectedOrg.id)}
+                    disabled={!selectedTenantId}
+                  >
+                    Add
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        <ModalFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setShowManageModal(false);
+              setSelectedOrg(null);
+              setSelectedTenantId('');
+            }}
+          >
+            Close
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }
