@@ -484,6 +484,45 @@ export default function ItemsClient({
         </Card>
         )}
 
+        {/* Badge Legend */}
+        {filtered.length > 0 && (
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-blue-900 mb-2">Status Badge Guide</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-blue-800">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="success" className="text-xs">Active</Badge>
+                      <span>Item is active and can sync to Google</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="warning" className="text-xs">Inactive</Badge>
+                      <span>Item is paused, won't sync to Google</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="default" className="text-xs bg-amber-100 text-amber-800">Private</Badge>
+                      <span>Not visible publicly, won't sync</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600 text-xs flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        Syncs to Google
+                      </span>
+                      <span>Active + Public items only</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Items List */}
         <Card>
           <CardHeader>
