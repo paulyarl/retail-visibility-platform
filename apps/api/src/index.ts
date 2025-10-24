@@ -552,6 +552,50 @@ app.delete(["/items/:id", "/inventory/:id"], async (req, res) => {
     res.status(500).json({ error: "failed_to_delete_item" });
   }
 });
+
+// Update item status (for Google sync control)
+app.patch(["/items/:id", "/inventory/:id"], async (req, res) => {
+  try {
+    const { itemStatus, visibility, availability } = req.body;
+    const updateData: any = {};
+    
+    if (itemStatus) updateData.itemStatus = itemStatus;
+    if (visibility) updateData.visibility = visibility;
+    if (availability) updateData.availability = availability;
+    
+    const updated = await prisma.inventoryItem.update({
+      where: { id: req.params.id },
+      data: updateData,
+    });
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('[PATCH Item] Error:', error);
+    res.status(500).json({ error: "failed_to_update_item" });
+  }
+});
+
+// Get Google product feed (filtered by status)
+app.get("/google/feed", async (req, res) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenant_required" });
+    }
+
+    const { generateProductFeed, getFeedStats } = await import('./lib/google/feed-generator');
+    const [feed, stats] = await Promise.all([
+      generateProductFeed(tenantId),
+      getFeedStats(tenantId),
+    ]);
+
+    res.json({ feed, stats });
+  } catch (error) {
+    console.error('[Google Feed] Error:', error);
+    res.status(500).json({ error: "failed_to_generate_feed" });
+  }
+});
+
 app.get("/__routes", (_req, res) => {
   const out: any[] = [];
   (app as any)._router?.stack?.forEach((r: any) => {

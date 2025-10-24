@@ -33,6 +33,9 @@ type Item = {
   priceCents?: number;
   stock?: number;
   imageUrl?: string;
+  itemStatus?: 'active' | 'inactive' | 'archived';
+  visibility?: 'public' | 'private';
+  availability?: 'in_stock' | 'out_of_stock' | 'preorder';
 };
 
 export default function ItemsClient({
@@ -243,6 +246,25 @@ export default function ItemsClient({
   const handleEditClose = () => {
     setShowEditModal(false);
     setEditingItem(null);
+  };
+
+  const handleStatusToggle = async (item: Item) => {
+    const newStatus = item.itemStatus === 'active' ? 'inactive' : 'active';
+    try {
+      const res = await fetch(`/api/items/${item.id}?tenantId=${tenantId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemStatus: newStatus })
+      });
+
+      if (!res.ok) throw new Error('Failed to update status');
+
+      // Update local state
+      setItems(items.map(i => i.id === item.id ? { ...i, itemStatus: newStatus } : i));
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      alert('Failed to update item status');
+    }
   };
 
   const compressImage = async (file: File, maxWidth = 1024, quality = 0.8): Promise<string> => {
@@ -500,9 +522,26 @@ export default function ItemsClient({
 
                     {/* Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium text-neutral-900 truncate">{i.name}</p>
                         <Badge variant="default">{i.sku}</Badge>
+                        {/* Status Badges */}
+                        <Badge 
+                          variant={i.itemStatus === 'active' ? 'success' : i.itemStatus === 'inactive' ? 'warning' : 'error'}
+                          className="text-xs"
+                        >
+                          {i.itemStatus || 'active'}
+                        </Badge>
+                        {i.visibility === 'private' && (
+                          <Badge variant="default" className="text-xs bg-amber-100 text-amber-800">
+                            Private
+                          </Badge>
+                        )}
+                        {i.availability === 'out_of_stock' && (
+                          <Badge variant="error" className="text-xs">
+                            Out of Stock
+                          </Badge>
+                        )}
                       </div>
                       <div className="mt-1 flex items-center gap-4 text-sm text-neutral-500">
                         {typeof i.priceCents === "number" && (
@@ -510,6 +549,17 @@ export default function ItemsClient({
                         )}
                         {typeof i.stock === "number" && (
                           <span>Stock: {i.stock}</span>
+                        )}
+                        {/* Google Sync Status */}
+                        {i.itemStatus === 'active' && i.visibility === 'public' ? (
+                          <span className="text-green-600 text-xs flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            Syncs to Google
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400 text-xs">Not syncing</span>
                         )}
                       </div>
                     </div>
@@ -556,6 +606,29 @@ export default function ItemsClient({
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                         </svg>
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant={i.itemStatus === 'active' ? 'secondary' : 'primary'}
+                        onClick={() => handleStatusToggle(i)}
+                        title={i.itemStatus === 'active' ? 'Deactivate (stop Google sync)' : 'Activate (enable Google sync)'}
+                      >
+                        {i.itemStatus === 'active' ? (
+                          <>
+                            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Deactivate
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Activate
+                          </>
+                        )}
                       </Button>
                       <Button 
                         size="sm" 
