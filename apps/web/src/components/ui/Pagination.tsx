@@ -68,13 +68,13 @@ export function Pagination({
     <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-neutral-200">
       {/* Items info and page size selector */}
       <div className="flex items-center gap-4">
-        <div className="text-sm text-neutral-700">
-          Showing <span className="font-medium">{startItem}</span> to{' '}
-          <span className="font-medium">{endItem}</span> of{' '}
-          <span className="font-medium">{totalItems}</span> results
+        <div className="text-sm font-medium text-neutral-900">
+          Showing <span className="font-semibold">{startItem}</span> to{' '}
+          <span className="font-semibold">{endItem}</span> of{' '}
+          <span className="font-semibold">{totalItems}</span> results
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="pageSize" className="text-sm text-neutral-700">
+          <label htmlFor="pageSize" className="text-sm font-medium text-neutral-900">
             Per page:
           </label>
           <select
