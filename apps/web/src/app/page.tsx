@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, AnimatedCard } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
@@ -10,11 +11,41 @@ import PublicFooter from "@/components/PublicFooter";
 
 export default function Home() {
   const { settings } = usePlatformSettings();
+  const [stats, setStats] = useState({ total: 0, active: 0 });
+  const [loading, setLoading] = useState(true);
   
-  // Animated counts for metrics (will be replaced with real data later)
-  const inventoryCount = useCountUp(0, 1500);
-  const listingsCount = useCountUp(0, 1500);
-  const uploadsCount = useCountUp(0, 1500);
+  useEffect(() => {
+    // Fetch real inventory stats
+    const fetchStats = async () => {
+      try {
+        // Get tenant ID from localStorage
+        const tenantId = localStorage.getItem('tenantId');
+        if (!tenantId) {
+          setLoading(false);
+          return;
+        }
+        
+        const res = await fetch(`/api/tenants/${tenantId}/items`);
+        if (res.ok) {
+          const items = await res.json();
+          const total = Array.isArray(items) ? items.length : 0;
+          const active = Array.isArray(items) ? items.filter((i: any) => i.itemStatus === 'active').length : 0;
+          setStats({ total, active });
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchStats();
+  }, []);
+  
+  // Animated counts for metrics
+  const inventoryCount = useCountUp(0, stats.total);
+  const listingsCount = useCountUp(0, stats.active);
+  const uploadsCount = useCountUp(0, stats.total);
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
       {/* Header */}
