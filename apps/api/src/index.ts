@@ -240,6 +240,17 @@ const supabase =
     ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     : null;
 
+// Log Supabase configuration status at startup
+if (supabase) {
+  console.log('✓ Supabase configured for photo storage');
+} else {
+  console.warn('⚠ Supabase NOT configured - photo uploads will fail in production');
+  console.warn('  Missing env vars:', {
+    SUPABASE_URL: !!SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: !!SUPABASE_SERVICE_ROLE_KEY
+  });
+}
+
 // Helper: enforce MVP 1MB limit for base64 uploads
 function rejectIfOver1MB(bytes: number) {
   const LIMIT = 1_000_000;
@@ -342,8 +353,12 @@ const photoUploadHandler = async (req: any, res: any) => {
 
     // C) JSON { dataUrl, contentType } → Supabase Storage or filesystem fallback (enforce <1MB)
     if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
+      console.log(`[Photo Upload] Processing dataUrl upload`);
       const parsed = dataUrlSchema.safeParse(req.body || {});
-      if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+      if (!parsed.success) {
+        console.error(`[Photo Upload] Invalid dataUrl payload:`, parsed.error.flatten());
+        return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+      }
 
       const match = /^data:[^;]+;base64,(.+)$/i.exec(parsed.data.dataUrl);
       if (!match) return res.status(400).json({ error: "invalid_data_url" });
