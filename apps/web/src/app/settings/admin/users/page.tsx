@@ -156,13 +156,18 @@ export default function UsersManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'user' | 'viewer'>('all');
   
-  // Filter users based on search query
+  // Filter users based on search query, status, and role
   const filteredUsers = users.filter(user => {
     const searchLower = searchQuery.toLowerCase();
-    return user.name.toLowerCase().includes(searchLower) ||
+    const matchesSearch = user.name.toLowerCase().includes(searchLower) ||
            user.email.toLowerCase().includes(searchLower) ||
            user.role.toLowerCase().includes(searchLower);
+    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+    return matchesSearch && matchesStatus && matchesRole;
   });
   
   // Paginate filtered users
@@ -314,6 +319,97 @@ export default function UsersManagementPage() {
           </Card>
         </div>
 
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-4">
+              {/* Search */}
+              <div className="flex-1 min-w-[200px]">
+                <Input
+                  type="text"
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex gap-2">
+                <Button
+                  variant={statusFilter === 'all' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('all')}
+                >
+                  All Status
+                </Button>
+                <Button
+                  variant={statusFilter === 'active' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('active')}
+                >
+                  Active
+                </Button>
+                <Button
+                  variant={statusFilter === 'inactive' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('inactive')}
+                >
+                  Inactive
+                </Button>
+                <Button
+                  variant={statusFilter === 'pending' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('pending')}
+                >
+                  Pending
+                </Button>
+              </div>
+
+              {/* Role Filter */}
+              <div className="flex gap-2">
+                <Button
+                  variant={roleFilter === 'all' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setRoleFilter('all')}
+                >
+                  All Roles
+                </Button>
+                <Button
+                  variant={roleFilter === 'admin' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setRoleFilter('admin')}
+                >
+                  Admin
+                </Button>
+                <Button
+                  variant={roleFilter === 'user' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setRoleFilter('user')}
+                >
+                  User
+                </Button>
+                <Button
+                  variant={roleFilter === 'viewer' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setRoleFilter('viewer')}
+                >
+                  Viewer
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Results Count */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-neutral-700">
+            Showing {filteredUsers.length} of {users.length} users
+          </p>
+        </div>
+
         {/* Users List */}
         <Card>
           <CardHeader>
@@ -322,16 +418,6 @@ export default function UsersManagementPage() {
                 <CardTitle>All Users</CardTitle>
                 <CardDescription>Manage user accounts and permissions</CardDescription>
               </div>
-              <Input
-                type="text"
-                placeholder="Search users..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-64"
-              />
             </div>
           </CardHeader>
           <CardContent>
