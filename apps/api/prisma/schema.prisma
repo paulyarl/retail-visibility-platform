@@ -228,12 +228,17 @@ model PhotoAsset {
   url             String
   publicUrl       String?
   signedUrl       String?
+  width           Int?
+  height          Int?
+  contentType     String?
+  capturedAt      DateTime?
   createdAt       DateTime @default(now())
   tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   inventoryItem   InventoryItem  @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([inventoryItemId])
+  @@index([capturedAt])
 }
 
 model ProductPerformance {
@@ -409,6 +414,18 @@ model AuditLog {
   @@index([actorType, actorId])
   @@index([requestId])
   @@map("audit_log")
+}
+
+model PlatformSettings {
+  id                  Int      @id @default(1) @map("id")
+  platformName        String?  @map("platform_name")
+  platformDescription String?  @map("platform_description")
+  logoUrl            String?  @map("logo_url")
+  faviconUrl         String?  @map("favicon_url")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
 }
 
 model SkuBillingPolicy {
