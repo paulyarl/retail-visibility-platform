@@ -18,6 +18,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const body = await req.json();
+    const base = process.env.API_BASE_URL || 'http://localhost:4000';
+    const url = new URL(req.url);
+    const queryString = url.searchParams.toString();
+    const res = await fetch(`${base}/items/${id}${queryString ? `?${queryString}` : ''}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (e) {
+    console.error('[API Proxy] PATCH /items/:id error:', e);
+    return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
