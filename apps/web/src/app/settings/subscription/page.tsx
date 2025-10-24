@@ -1,141 +1,136 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button } from '@/components/ui';
+import { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
-import { getQRFeatures } from '@/lib/qr-tiers';
+import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
+import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 import { getAdminEmail } from '@/lib/admin-emails';
 
-type Tenant = {
+interface Tenant {
   id: string;
   name: string;
   subscriptionTier?: string;
   subscriptionStatus?: string;
   trialEndsAt?: string;
   subscriptionEndsAt?: string;
-  metadata?: {
-    businessName?: string;
+  metadata?: any;
+  _count?: {
+    items: number;
   };
-};
-
-const TIER_INFO = {
-  trial: {
-    name: 'Trial',
-    price: 'Free',
-    color: 'bg-neutral-100 text-neutral-800',
-    description: '30-day trial with full access',
-  },
-  starter: {
-    name: 'Starter',
-    price: '$49/month',
-    color: 'bg-blue-100 text-blue-800',
-    description: 'Perfect for small businesses',
-  },
-  professional: {
-    name: 'Professional',
-    price: '$149/month',
-    color: 'bg-purple-100 text-purple-800',
-    description: 'Advanced features for growing businesses',
-  },
-  enterprise: {
-    name: 'Enterprise',
-    price: '$499/month',
-    color: 'bg-amber-100 text-amber-800',
-    description: 'Full customization and white-label',
-  },
-};
+}
 
 export default function SubscriptionPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [itemCount, setItemCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [selectedTier, setSelectedTier] = useState<SubscriptionTier | ChainTier | null>(null);
+  const [showChangeModal, setShowChangeModal] = useState(false);
 
   useEffect(() => {
-    loadSubscriptionInfo();
-  }, []);
+    const loadTenant = async () => {
+      try {
+        // Get current tenant from localStorage
+        const tenantId = localStorage.getItem('tenantId');
+        if (!tenantId) {
+          setLoading(false);
+          return;
+        }
 
-  const loadSubscriptionInfo = async () => {
-    try {
-      // Get current tenant from localStorage
-      const tenantId = localStorage.getItem('tenantId');
-      if (!tenantId) {
+        // Fetch tenant info
+        const res = await fetch(`/api/tenants/${tenantId}`);
+        if (res.ok) {
+          const data = await res.json();
+          
+          // Get SKU count
+          const itemsRes = await fetch(`/api/items?tenantId=${tenantId}`);
+          const items = await itemsRes.json();
+          const itemCount = Array.isArray(items) ? items.length : 0;
+          
+          setTenant({
+            ...data,
+            _count: {
+              items: itemCount
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load tenant:', error);
+      } finally {
         setLoading(false);
-        return;
       }
-
-      // Fetch tenant info
-      const tenantRes = await fetch(`/api/tenants/${tenantId}`);
-      const tenantData = await tenantRes.json();
-      setTenant(tenantData);
-
-      // Fetch item count
-      const itemsRes = await fetch(`/api/items?tenantId=${tenantId}`);
-      const items = await itemsRes.json();
-      setItemCount(Array.isArray(items) ? items.length : 0);
-    } catch (error) {
-      console.error('Failed to load subscription info:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    loadTenant();
+  }, []);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-neutral-50">
-        <PageHeader
-          title="Subscription"
-          description="Manage your subscription and billing"
-          icon={Icons.Settings}
-        />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center py-12">
-            <Spinner size="lg" />
-          </div>
-        </div>
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="text-neutral-600">Loading subscription details...</div>
       </div>
     );
   }
 
   if (!tenant) {
     return (
-      <div className="min-h-screen bg-neutral-50">
-        <PageHeader
-          title="Subscription"
-          description="Manage your subscription and billing"
-          icon={Icons.Settings}
-        />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-neutral-600">No tenant selected</p>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="text-neutral-600">Unable to load subscription information</div>
       </div>
     );
   }
 
-  const tier = (tenant.subscriptionTier || 'trial') as keyof typeof TIER_INFO;
-  const tierInfo = TIER_INFO[tier] || TIER_INFO.trial;
-  const landingPageFeatures = getLandingPageFeatures(tier);
-  const qrFeatures = getQRFeatures(tier);
+  const currentTier = tenant.subscriptionTier || 'trial';
+  const isChainTier = currentTier.startsWith('chain_');
+  const tierInfo = isChainTier 
+    ? CHAIN_TIERS[currentTier as ChainTier]
+    : TIER_LIMITS[currentTier as SubscriptionTier];
+  const skuUsage = tenant._count?.items || 0;
+  const skuLimit = isChainTier 
+    ? (tierInfo as any).maxTotalSKUs 
+    : (tierInfo as any).maxSKUs;
+  const usagePercent = skuLimit === Infinity ? 0 : Math.round((skuUsage / skuLimit) * 100);
 
-  // SKU limits
-  const skuLimits = {
-    trial: 500,
-    starter: 500,
-    professional: 5000,
-    enterprise: Infinity,
+  const handleRequestChange = (newTier: SubscriptionTier | ChainTier) => {
+    setSelectedTier(newTier);
+    setShowChangeModal(true);
   };
-  const skuLimit = skuLimits[tier] || 500;
-  const skuUsagePercent = skuLimit === Infinity ? 0 : (itemCount / skuLimit) * 100;
+
+  const getTierInfo = (tier: SubscriptionTier | ChainTier) => {
+    if (tier.startsWith('chain_')) {
+      return CHAIN_TIERS[tier as ChainTier];
+    }
+    return TIER_LIMITS[tier as SubscriptionTier];
+  };
+
+  const handleSubmitChange = () => {
+    const metadata = tenant.metadata as any;
+    const requestedTierInfo = getTierInfo(selectedTier!);
+    
+    // Get email from Email Management configuration
+    const adminEmail = getAdminEmail('subscription');
+    const subject = encodeURIComponent(`Subscription Change Request - ${metadata?.businessName || tenant.name}`);
+    const body = encodeURIComponent(
+      `Hello,\n\n` +
+      `I would like to change my subscription plan.\n\n` +
+      `Current Plan: ${tierInfo.name}\n` +
+      `Requested Plan: ${requestedTierInfo.name}\n` +
+      `Business: ${metadata?.businessName || tenant.name}\n` +
+      `Tenant ID: ${tenant.id}\n\n` +
+      `Please process this subscription change at your earliest convenience.\n\n` +
+      `Thank you!`
+    );
+    
+    window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
+    setShowChangeModal(false);
+  };
+
+  const availableTiers: SubscriptionTier[] = ['starter', 'professional', 'enterprise'];
+  const availableChainTiers: ChainTier[] = ['chain_starter', 'chain_professional', 'chain_enterprise'];
 
   return (
     <div className="min-h-screen bg-neutral-50">
       <PageHeader
         title="Subscription"
-        description="Manage your subscription and billing"
+        description="Manage your subscription plan and view features"
         icon={Icons.Settings}
         backLink={{
           href: '/settings',
@@ -143,276 +138,310 @@ export default function SubscriptionPage() {
         }}
       />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
         {/* Current Plan */}
-        <Card>
+        <Card className="border-2 border-primary-500">
           <CardHeader>
-            <CardTitle>Current Plan</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-2xl font-bold text-neutral-900">{tierInfo.name}</h3>
-                  <Badge variant="default" className={tierInfo.color}>
-                    {tenant.subscriptionStatus || 'Active'}
-                  </Badge>
-                </div>
-                <p className="text-neutral-600">{tierInfo.description}</p>
-                <p className="text-3xl font-bold text-neutral-900 mt-4">{tierInfo.price}</p>
-              </div>
-              {tier !== 'enterprise' && (
-                <Button 
-                  variant="primary"
-                  onClick={() => {
-                    const metadata = tenant.metadata as any;
-                    // Get email from Email Management configuration
-                    const adminEmail = getAdminEmail('subscription');
-                    const requestedTier = tier === 'trial' || tier === 'starter' ? 'Professional' : 'Enterprise';
-                    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-                    const adminLink = `${baseUrl}/admin/tiers`;
-                    const subject = encodeURIComponent(`Upgrade Request - ${metadata?.businessName || tenant.name}`);
-                    const body = encodeURIComponent(
-                      `Hello,\n\n` +
-                      `I would like to upgrade my subscription.\n\n` +
-                      `Current Plan: ${tierInfo.name}\n` +
-                      `Requested Plan: ${requestedTier}\n` +
-                      `Business: ${metadata?.businessName || tenant.name}\n` +
-                      `Tenant ID: ${tenant.id}\n\n` +
-                      `To approve this request, click here:\n` +
-                      `${adminLink}\n\n` +
-                      `Then find "${metadata?.businessName || tenant.name}" and click the ${requestedTier} tier button.\n\n` +
-                      `Thank you!`
-                    );
-                    window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
-                  }}
-                >
-                  Upgrade Plan
-                </Button>
-              )}
+            <div className="flex items-center justify-between">
+              <CardTitle>Current Plan</CardTitle>
+              <Badge variant="default" className={tierInfo.color}>
+                {tierInfo.name}
+              </Badge>
             </div>
-
-            {/* Trial/Subscription end date */}
-            {tenant.trialEndsAt && tenant.subscriptionStatus === 'trial' && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900">
-                  <strong>Trial ends:</strong> {new Date(tenant.trialEndsAt).toLocaleDateString()}
-                </p>
-              </div>
-            )}
-            {tenant.subscriptionEndsAt && tenant.subscriptionStatus === 'active' && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-900">
-                  <strong>Next billing date:</strong> {new Date(tenant.subscriptionEndsAt).toLocaleDateString()}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Usage */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Usage</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* Pricing */}
+              <div>
+                <div className="text-3xl font-bold text-neutral-900">{tierInfo.price}</div>
+                <p className="text-neutral-600 mt-1">
+                  {isChainTier 
+                    ? `${(tierInfo as any).maxLocations === Infinity ? 'Unlimited' : (tierInfo as any).maxLocations} locations, ${(tierInfo as any).maxTotalSKUs === Infinity ? 'unlimited' : (tierInfo as any).maxTotalSKUs.toLocaleString()} SKUs`
+                    : (tierInfo as any).description
+                  }
+                </p>
+              </div>
+
               {/* SKU Usage */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-neutral-700">Products (SKUs)</span>
+                  <span className="text-sm font-medium text-neutral-700">SKU Usage</span>
                   <span className="text-sm text-neutral-600">
-                    {itemCount} / {skuLimit === Infinity ? '∞' : skuLimit}
+                    {skuUsage.toLocaleString()} / {skuLimit === Infinity ? '∞' : skuLimit.toLocaleString()}
                   </span>
                 </div>
                 {skuLimit !== Infinity && (
                   <div className="w-full bg-neutral-200 rounded-full h-2">
-                    <div
+                    <div 
                       className={`h-2 rounded-full transition-all ${
-                        skuUsagePercent >= 90 ? 'bg-red-500' : skuUsagePercent >= 70 ? 'bg-yellow-500' : 'bg-green-500'
+                        usagePercent >= 90 ? 'bg-red-500' : 
+                        usagePercent >= 70 ? 'bg-amber-500' : 
+                        'bg-green-500'
                       }`}
-                      style={{ width: `${Math.min(skuUsagePercent, 100)}%` }}
+                      style={{ width: `${Math.min(usagePercent, 100)}%` }}
                     />
                   </div>
                 )}
-                {skuUsagePercent >= 90 && skuLimit !== Infinity && (
-                  <p className="text-xs text-red-600 mt-1">
-                    You're approaching your SKU limit. Consider upgrading to add more products.
-                  </p>
+              </div>
+
+              {/* Features */}
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-900 mb-3">Your Plan Includes:</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {tierInfo.features.map((feature, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <span className="text-green-500 mt-0.5">✓</span>
+                      <span className="text-sm text-neutral-700">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="pt-4 border-t border-neutral-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-600">Status</span>
+                  <Badge variant={tenant.subscriptionStatus === 'active' ? 'success' : 'default'}>
+                    {tenant.subscriptionStatus || 'Active'}
+                  </Badge>
+                </div>
+                
+                {/* Trial Expiration */}
+                {tenant.subscriptionStatus === 'trial' && tenant.trialEndsAt && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-600">Trial Ends</span>
+                    <span className="text-sm font-medium text-neutral-900">
+                      {new Date(tenant.trialEndsAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Subscription Expiration */}
+                {tenant.subscriptionStatus === 'active' && tenant.subscriptionEndsAt && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-600">Renews On</span>
+                    <span className="text-sm font-medium text-neutral-900">
+                      {new Date(tenant.subscriptionEndsAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Features Included */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Features Included</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* SKU Limit */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-1">
-                  <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-medium text-neutral-900">
-                    {skuLimit === Infinity ? 'Unlimited' : skuLimit} Products
-                  </p>
-                  <p className="text-sm text-neutral-600">SKU limit</p>
-                </div>
-              </div>
+        {/* Change Plan Section */}
+        <div>
+          <h2 className="text-xl font-bold text-neutral-900 mb-4">Change Your Plan</h2>
+          <p className="text-neutral-600 mb-6">
+            Select a different plan to request a subscription change. An email will be sent to our team for approval.
+          </p>
 
-              {/* QR Code Resolution */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-1">
-                  <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-medium text-neutral-900">
-                    {qrFeatures.maxResolution}px QR Codes
-                  </p>
-                  <p className="text-sm text-neutral-600">High-resolution downloads</p>
-                </div>
-              </div>
+          {/* Individual Plans */}
+          <h3 className="text-lg font-semibold text-neutral-900 mb-4">Individual Location Plans</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {availableTiers.map((tier) => {
+              const info = TIER_LIMITS[tier];
+              const isCurrent = tier === currentTier;
+              
+              return (
+                <Card 
+                  key={tier}
+                  className={`${isCurrent ? 'border-2 border-primary-500 opacity-60' : 'border-2 border-neutral-200 hover:border-primary-300 transition-colors'}`}
+                >
+                  <CardHeader>
+                    <div className="flex items-center justify-between mb-2">
+                      <CardTitle className="text-lg">{info.name}</CardTitle>
+                      {isCurrent && (
+                        <Badge variant="default" className="bg-primary-500 text-white">Current</Badge>
+                      )}
+                    </div>
+                    <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-neutral-600 mb-4">{info.description}</p>
+                    
+                    <div className="space-y-2 mb-4">
+                      <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                        <span className="font-semibold text-orange-900">SKUs:</span>{' '}
+                        <span className="text-orange-700 font-medium">
+                          {info.maxSKUs === Infinity ? 'Unlimited' : info.maxSKUs.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
 
-              {/* Custom Marketing Description */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-1">
-                  {landingPageFeatures.customMarketingDescription ? (
-                    <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <p className={`font-medium ${landingPageFeatures.customMarketingDescription ? 'text-neutral-900' : 'text-neutral-400'}`}>
-                    Custom Marketing Copy
-                  </p>
-                  <p className="text-sm text-neutral-600">Landing page customization</p>
-                </div>
-              </div>
+                    <ul className="space-y-1.5 text-xs mb-4">
+                      {info.features.slice(0, 4).map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-1.5">
+                          <span className="text-green-500 mt-0.5">✓</span>
+                          <span className="text-neutral-700">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
 
-              {/* Image Gallery */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-1">
-                  {landingPageFeatures.imageGallery ? (
-                    <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <p className={`font-medium ${landingPageFeatures.imageGallery ? 'text-neutral-900' : 'text-neutral-400'}`}>
-                    Image Gallery ({landingPageFeatures.maxGalleryImages} images)
-                  </p>
-                  <p className="text-sm text-neutral-600">Product photo galleries</p>
-                </div>
-              </div>
+                    <Button
+                      variant={isCurrent ? 'secondary' : 'primary'}
+                      className="w-full"
+                      disabled={isCurrent}
+                      onClick={() => handleRequestChange(tier)}
+                    >
+                      {isCurrent ? 'Current Plan' : 'Request Change'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
 
-              {/* Custom Branding */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-1">
-                  {landingPageFeatures.customLogo ? (
-                    <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <p className={`font-medium ${landingPageFeatures.customLogo ? 'text-neutral-900' : 'text-neutral-400'}`}>
-                    Custom Branding
-                  </p>
-                  <p className="text-sm text-neutral-600">Logo and colors</p>
-                </div>
-              </div>
+          {/* Chain Plans */}
+          <h3 className="text-lg font-semibold text-neutral-900 mb-4">Multi-Location Chain Plans</h3>
+          <p className="text-sm text-neutral-600 mb-4">
+            Perfect for businesses with multiple locations. Massive savings compared to individual plans.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {availableChainTiers.map((tier) => {
+              const info = CHAIN_TIERS[tier];
+              const isCurrent = tier === currentTier;
+              
+              return (
+                <Card 
+                  key={tier}
+                  className={`${isCurrent ? 'border-2 border-primary-500 opacity-60' : 'border-2 border-neutral-200 hover:border-primary-300 transition-colors'}`}
+                >
+                  <CardHeader>
+                    <div className="flex items-center justify-between mb-2">
+                      <CardTitle className="text-lg">{info.name}</CardTitle>
+                      {isCurrent && (
+                        <Badge variant="default" className="bg-primary-500 text-white">Current</Badge>
+                      )}
+                    </div>
+                    <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 mb-4">
+                      <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                        <span className="font-semibold text-amber-900">Locations:</span>{' '}
+                        <span className="text-amber-700 font-medium">
+                          {info.maxLocations === Infinity ? 'Unlimited' : info.maxLocations}
+                        </span>
+                      </div>
+                      <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                        <span className="font-semibold text-orange-900">Total SKUs:</span>{' '}
+                        <span className="text-orange-700 font-medium">
+                          {info.maxTotalSKUs === Infinity ? 'Unlimited' : info.maxTotalSKUs.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
 
-              {/* White Label */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-1">
-                  {landingPageFeatures.removePlatformBranding ? (
-                    <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <p className={`font-medium ${landingPageFeatures.removePlatformBranding ? 'text-neutral-900' : 'text-neutral-400'}`}>
-                    White-Label
-                  </p>
-                  <p className="text-sm text-neutral-600">Remove platform branding</p>
-                </div>
+                    <ul className="space-y-1.5 text-xs mb-4">
+                      {info.features.slice(0, 4).map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-1.5">
+                          <span className="text-green-500 mt-0.5">✓</span>
+                          <span className="text-neutral-700">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button
+                      variant={isCurrent ? 'secondary' : 'primary'}
+                      className="w-full"
+                      disabled={isCurrent}
+                      onClick={() => handleRequestChange(tier)}
+                    >
+                      {isCurrent ? 'Current Plan' : 'Request Change'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* View All Offerings */}
+        <Card className="bg-gradient-to-r from-primary-50 to-primary-100 border-primary-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                  Explore All Platform Offerings
+                </h3>
+                <p className="text-neutral-700">
+                  View all subscription tiers, chain pricing, and managed services options
+                </p>
               </div>
+              <Button
+                variant="primary"
+                onClick={() => window.location.href = '/settings/offerings'}
+              >
+                View All Offerings
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Upgrade CTA */}
-        {tier !== 'enterprise' && (
-          <Card className="border-2 border-primary-200 bg-primary-50">
-            <CardContent className="py-6">
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-neutral-900 mb-2">
-                  Want more features?
-                </h3>
-                <p className="text-neutral-700 mb-4">
-                  Upgrade to {tier === 'trial' || tier === 'starter' ? 'Professional' : 'Enterprise'} for advanced customization and unlimited growth
+      </div>
+
+      {/* Change Confirmation Modal */}
+      {showChangeModal && selectedTier && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle>Confirm Subscription Change</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <p className="text-neutral-700">
+                  You are requesting to change your subscription from:
                 </p>
-                <Button 
-                  variant="primary" 
-                  size="lg"
-                  onClick={() => {
-                    const metadata = tenant.metadata as any;
-                    // Get email from Email Management configuration
-                    const adminEmail = getAdminEmail('subscription');
-                    const requestedTier = tier === 'trial' || tier === 'starter' ? 'Professional' : 'Enterprise';
-                    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-                    const adminLink = `${baseUrl}/admin/tiers`;
-                    const subject = encodeURIComponent(`Upgrade Request - ${metadata?.businessName || tenant.name}`);
-                    const body = encodeURIComponent(
-                      `Hello,\n\n` +
-                      `I would like to upgrade my subscription.\n\n` +
-                      `Current Plan: ${tierInfo.name}\n` +
-                      `Requested Plan: ${requestedTier}\n` +
-                      `Business: ${metadata?.businessName || tenant.name}\n` +
-                      `Tenant ID: ${tenant.id}\n\n` +
-                      `To approve this request, click here:\n` +
-                      `${adminLink}\n\n` +
-                      `Then find "${metadata?.businessName || tenant.name}" and click the ${requestedTier} tier button.\n\n` +
-                      `Thank you!`
-                    );
-                    window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
-                  }}
-                >
-                  Request Upgrade
-                </Button>
+                
+                <div className="bg-neutral-50 p-4 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">Current:</span>
+                    <Badge className={`${tierInfo.color} text-white`}>{tierInfo.name}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">Requested:</span>
+                    <Badge className={`${getTierInfo(selectedTier).color} text-white`}>
+                      {getTierInfo(selectedTier).name}
+                    </Badge>
+                  </div>
+                </div>
+
+                <p className="text-sm text-neutral-600">
+                  An email will be sent to our admin team to process this change. 
+                  You will be notified once the change is approved and applied.
+                </p>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={() => setShowChangeModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="flex-1"
+                    onClick={handleSubmitChange}
+                  >
+                    Send Request
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
