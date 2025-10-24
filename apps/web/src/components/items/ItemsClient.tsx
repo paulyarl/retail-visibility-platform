@@ -5,6 +5,7 @@ import { useTranslation } from "@/lib/useTranslation";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Pagination, AdvancedSearchableSelect, type SelectOption } from "@/components/ui";
 import EditItemModal from "./EditItemModal";
 import { QRCodeModal } from "./QRCodeModal";
+import BulkUploadModal from "./BulkUploadModal";
 import PageHeader, { Icons } from "@/components/PageHeader";
 
 type Tenant = {
@@ -78,6 +79,9 @@ export default function ItemsClient({
   // QR Code modal state
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrItem, setQRItem] = useState<Item | null>(null);
+
+  // Bulk upload modal state
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -387,6 +391,18 @@ export default function ItemsClient({
                 placeholder={t('inventory.searchPlaceholder', 'Search by SKU or name')}
                 label="Search"
               />
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowBulkUpload(true)}
+                  disabled={!tenantId}
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Bulk Upload CSV
+                </Button>
+              </div>
             </div>
             {error && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -604,9 +620,28 @@ export default function ItemsClient({
             setShowQRModal(false);
             setQRItem(null);
           }}
-          productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/products/${qrItem.id}`}
-          productName={qrItem.name}
-          tier={subscriptionTier}
+          item={qrItem}
+          tenant={tenants.find(t => t.id === tenantId)}
+          subscriptionTier={subscriptionTier}
+        />
+      )}
+
+      {/* Bulk Upload Modal */}
+      {showBulkUpload && tenantId && (
+        <BulkUploadModal
+          tenantId={tenantId}
+          onClose={() => setShowBulkUpload(false)}
+          onSuccess={async () => {
+            // Reload items after successful upload
+            try {
+              const res = await fetch(`/api/items?tenantId=${tenantId}`);
+              const data = await res.json();
+              setItems(Array.isArray(data) ? data : []);
+            } catch (error) {
+              console.error('Failed to reload items:', error);
+            }
+            setShowBulkUpload(false);
+          }}
         />
       )}
     </div>
