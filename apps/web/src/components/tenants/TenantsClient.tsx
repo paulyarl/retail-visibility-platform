@@ -6,7 +6,15 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Inpu
 import { motion } from "framer-motion";
 import PageHeader, { Icons } from "@/components/PageHeader";
 
-type Tenant = { id: string; name: string; createdAt?: string };
+type Tenant = { 
+  id: string; 
+  name: string; 
+  createdAt?: string;
+  organization?: {
+    id: string;
+    name: string;
+  } | null;
+};
 
 export default function TenantsClient({ initialTenants = [] }: { initialTenants?: Tenant[] }) {
   const router = useRouter();
@@ -19,15 +27,19 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [chainFilter, setChainFilter] = useState<'all' | 'chain' | 'standalone'>('all');
 
   // Filter and paginate tenants
   const filteredTenants = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return tenants;
-    return tenants.filter((t) =>
-      t.name.toLowerCase().includes(query) || t.id.toLowerCase().includes(query)
-    );
-  }, [tenants, searchQuery]);
+    return tenants.filter((t) => {
+      const matchesSearch = !query || t.name.toLowerCase().includes(query) || t.id.toLowerCase().includes(query);
+      const matchesChain = chainFilter === 'all' || 
+        (chainFilter === 'chain' && t.organization) ||
+        (chainFilter === 'standalone' && !t.organization);
+      return matchesSearch && matchesChain;
+    });
+  }, [tenants, searchQuery, chainFilter]);
 
   const paginatedTenants = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -35,10 +47,10 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     return filteredTenants.slice(startIndex, endIndex);
   }, [filteredTenants, currentPage, pageSize]);
 
-  // Reset to page 1 when search changes
+  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, chainFilter]);
 
   const refresh = async () => {
     setLoading(true);
@@ -165,15 +177,47 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                 <CardTitle>Your Tenants</CardTitle>
                 <CardDescription>Manage your store locations</CardDescription>
               </div>
-              <Badge variant="info">{filteredTenants.length} {filteredTenants.length === 1 ? 'tenant' : 'tenants'}</Badge>
+              <Badge variant="info">{filteredTenants.length} of {tenants.length}</Badge>
             </div>
-            {/* Search Input */}
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or ID..."
-              label="Search Tenants"
-            />
+            
+            {/* Filters */}
+            <div className="space-y-4">
+              {/* Search Input */}
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name or ID..."
+                label="Search Tenants"
+              />
+              
+              {/* Chain Filter */}
+              <div className="flex gap-2">
+                <Button
+                  variant={chainFilter === 'all' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setChainFilter('all')}
+                >
+                  All Types
+                </Button>
+                <Button
+                  variant={chainFilter === 'chain' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setChainFilter('chain')}
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  Chain
+                </Button>
+                <Button
+                  variant={chainFilter === 'standalone' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setChainFilter('standalone')}
+                >
+                  Standalone
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {filteredTenants.length === 0 ? (
