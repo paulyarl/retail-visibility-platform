@@ -576,10 +576,16 @@ export default function ItemsClient({
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>{t('inventory.title', 'Items')} ({filtered.length})</CardTitle>
-              {filtered.length > 0 && (
-                <Badge variant="info">{filtered.length} items</Badge>
-              )}
+              <CardTitle>{t('inventory.title', 'Items')}</CardTitle>
+              <div className="flex items-center gap-2">
+                {statusFilter !== 'all' || q ? (
+                  <Badge variant="info">
+                    Showing {filtered.length} of {items.length} items
+                  </Badge>
+                ) : (
+                  <Badge variant="info">{items.length} items</Badge>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
