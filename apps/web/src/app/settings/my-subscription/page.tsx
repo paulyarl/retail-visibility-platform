@@ -271,9 +271,11 @@ export default function MySubscriptionPage() {
                     <p className="text-sm text-neutral-600 mb-4">{info.description}</p>
                     
                     <div className="space-y-2 mb-4">
-                      <div className="text-sm">
-                        <span className="font-semibold">SKUs:</span>{' '}
-                        {info.maxSKUs === Infinity ? 'Unlimited' : info.maxSKUs.toLocaleString()}
+                      <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                        <span className="font-semibold text-orange-900">SKUs:</span>{' '}
+                        <span className="text-orange-700 font-medium">
+                          {info.maxSKUs === Infinity ? 'Unlimited' : info.maxSKUs.toLocaleString()}
+                        </span>
                       </div>
                     </div>
 
@@ -326,13 +328,17 @@ export default function MySubscriptionPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2 mb-4">
-                      <div className="text-sm">
-                        <span className="font-semibold">Locations:</span>{' '}
-                        {info.maxLocations === Infinity ? 'Unlimited' : info.maxLocations}
+                      <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                        <span className="font-semibold text-amber-900">Locations:</span>{' '}
+                        <span className="text-amber-700 font-medium">
+                          {info.maxLocations === Infinity ? 'Unlimited' : info.maxLocations}
+                        </span>
                       </div>
-                      <div className="text-sm">
-                        <span className="font-semibold">Total SKUs:</span>{' '}
-                        {info.maxTotalSKUs === Infinity ? 'Unlimited' : info.maxTotalSKUs.toLocaleString()}
+                      <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                        <span className="font-semibold text-orange-900">Total SKUs:</span>{' '}
+                        <span className="text-orange-700 font-medium">
+                          {info.maxTotalSKUs === Infinity ? 'Unlimited' : info.maxTotalSKUs.toLocaleString()}
+                        </span>
                       </div>
                     </div>
 
