@@ -81,10 +81,19 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 /* ------------------------------ TENANTS ------------------------------ */
 app.get("/tenants", async (_req, res) => {
   try {
-    const tenants = await prisma.tenant.findMany({ orderBy: { createdAt: "desc" } });
+    const tenants = await prisma.tenant.findMany({ 
+      orderBy: { createdAt: "desc" },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
+      }
+    });
     res.json(tenants);
-  } catch (e: any) {
-    console.error('[GET /tenants] Error:', e);
+  } catch (_e) {
     res.status(500).json({ error: "failed_to_list_tenants" });
   }
 });
