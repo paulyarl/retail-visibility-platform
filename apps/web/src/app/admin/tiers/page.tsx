@@ -141,23 +141,66 @@ export default function AdminTiersPage() {
         {/* Tier Legend */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Subscription Tiers</CardTitle>
+            <CardTitle>Subscription Tiers & Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {TIERS.map(tier => (
-                <div key={tier.value} className="p-4 border border-neutral-200 rounded-lg">
-                  <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-2 ${tier.color}`}>
-                    {tier.label}
+            <div className="space-y-6">
+              {/* Tier Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-900 mb-3">Subscription Tiers</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {TIERS.map(tier => (
+                    <div key={tier.value} className="p-4 border border-neutral-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">
+                          {tier.value === 'trial' && '🆓'}
+                          {tier.value === 'starter' && '🥉'}
+                          {tier.value === 'professional' && '🥈'}
+                          {tier.value === 'enterprise' && '🥇'}
+                        </span>
+                        <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${tier.color}`}>
+                          {tier.label}
+                        </div>
+                      </div>
+                      <div className="text-sm text-neutral-600">
+                        {tier.value === 'trial' && '30-day trial, all features'}
+                        {tier.value === 'starter' && '500 SKUs, basic QR codes'}
+                        {tier.value === 'professional' && '5,000 SKUs, branded QR codes'}
+                        {tier.value === 'enterprise' && 'Unlimited SKUs, white-label'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Quick Actions Guide */}
+              <div className="pt-4 border-t border-neutral-200">
+                <h3 className="text-sm font-semibold text-neutral-900 mb-3">Quick Actions Guide</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex gap-1 mt-1">
+                      <span className="text-xl">🆓</span>
+                      <span className="text-xl">🥉</span>
+                      <span className="text-xl">🥈</span>
+                      <span className="text-xl">🥇</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900">Tier Buttons</p>
+                      <p className="text-xs text-neutral-600">Click to change tenant's subscription tier. Hover for tier name.</p>
+                    </div>
                   </div>
-                  <div className="text-sm text-neutral-600">
-                    {tier.value === 'trial' && '30-day trial, all features'}
-                    {tier.value === 'starter' && '500 SKUs, basic QR codes'}
-                    {tier.value === 'professional' && '5,000 SKUs, branded QR codes'}
-                    {tier.value === 'enterprise' && 'Unlimited SKUs, white-label'}
+                  <div className="flex items-start gap-3">
+                    <div className="flex gap-1 mt-1">
+                      <Badge variant="default" className="text-xs bg-neutral-100 text-neutral-800">Trial</Badge>
+                      <Badge variant="default" className="text-xs bg-green-100 text-green-800">Active</Badge>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900">Status Buttons</p>
+                      <p className="text-xs text-neutral-600">Click to change billing status (Trial, Active, Past Due, Canceled).</p>
+                    </div>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -182,20 +225,21 @@ export default function AdminTiersPage() {
                   return (
                     <div
                       key={tenant.id}
-                      className="p-4 border border-neutral-200 rounded-lg hover:border-neutral-300 transition-colors"
+                      className="p-4 border border-neutral-200 rounded-lg hover:border-primary-300 hover:shadow-sm transition-all cursor-pointer relative group"
+                      onClick={(e) => {
+                        // Only navigate if clicking on the card itself, not buttons
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        window.location.href = `/tenants?id=${tenant.id}`;
+                      }}
                     >
                       <div className="flex items-start justify-between gap-4">
                         {/* Tenant Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
-                            <Link 
-                              href={`/tenants?id=${tenant.id}`} 
-                              className="hover:text-primary-600 transition-colors"
-                            >
-                              <h3 className="text-lg font-semibold text-neutral-900 truncate hover:underline">
-                                {tenant.metadata?.businessName || tenant.name}
-                              </h3>
-                            </Link>
+                            <h3 className="text-lg font-semibold text-neutral-900 truncate group-hover:text-primary-600 transition-colors flex items-center gap-2">
+                              {tenant.metadata?.businessName || tenant.name}
+                              <span className="text-neutral-400 group-hover:text-primary-500 transition-colors">→</span>
+                            </h3>
                             <Badge variant="default" className={tierInfo.color}>
                               {tierInfo.label}
                             </Badge>
@@ -229,6 +273,8 @@ export default function AdminTiersPage() {
                                   variant={tenant.subscriptionTier === tier.value ? 'primary' : 'ghost'}
                                   onClick={() => updateTier(tenant.id, tier.value, tier.value === 'trial' ? 'trial' : 'active')}
                                   disabled={isUpdating}
+                                  title={tier.label}
+                                  className="relative group"
                                 >
                                   {tier.value === 'trial' && '🆓'}
                                   {tier.value === 'starter' && '🥉'}
