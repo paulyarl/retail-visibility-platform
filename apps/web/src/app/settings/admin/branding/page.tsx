@@ -7,6 +7,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image';
+import PageHeader, { Icons } from '@/components/PageHeader';
+import Protected from '@/components/Protected';
 
 const brandingSchema = z.object({
   platformName: z.string().min(1, 'Platform name is required'),
@@ -107,22 +109,34 @@ export default function BrandingSettings() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
+      <Protected>
+        <div className="min-h-screen bg-neutral-50">
+          <PageHeader
+            title="Platform Branding"
+            description="Customize your platform's branding"
+            icon={Icons.Settings}
+          />
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          </div>
+        </div>
+      </Protected>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-neutral-900">Branding</h2>
-        <p className="text-neutral-600">
-          Customize your platform's branding including logo, name, and favicon
-        </p>
-      </div>
-
-      <Card>
+    <Protected>
+      <div className="min-h-screen bg-neutral-50">
+        <PageHeader
+          title="Platform Branding"
+          description="Customize your platform's logo, name, and favicon"
+          icon={Icons.Settings}
+        />
+        
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Card>
         <CardHeader>
           <CardTitle>Branding Settings</CardTitle>
         </CardHeader>
@@ -241,6 +255,8 @@ export default function BrandingSettings() {
           </form>
         </CardContent>
       </Card>
-    </div>
+        </div>
+      </div>
+    </Protected>
   );
 }
