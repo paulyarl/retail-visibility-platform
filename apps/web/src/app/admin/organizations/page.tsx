@@ -72,7 +72,7 @@ export default function AdminOrganizationsPage() {
         {/* Pagination Info */}
         {organizations.length > 0 && (
           <div className="flex items-center justify-between">
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm font-medium text-neutral-700">
               Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, organizations.length)} of {organizations.length} organizations
             </p>
           </div>
@@ -98,7 +98,7 @@ export default function AdminOrganizationsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>{org.name}</CardTitle>
-                    <p className="text-sm text-neutral-600 mt-1">ID: {org.id}</p>
+                    <p className="text-sm text-neutral-700 mt-1 font-medium">ID: {org.id}</p>
                   </div>
                   <div className="flex gap-2">
                     <Badge variant="default">{org.subscriptionTier}</Badge>
@@ -111,19 +111,19 @@ export default function AdminOrganizationsPage() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div className="bg-neutral-50 p-4 rounded-lg">
-                    <div className="text-sm text-neutral-600">Locations</div>
+                    <div className="text-sm font-semibold text-neutral-700">Locations</div>
                     <div className="text-2xl font-bold text-neutral-900">
                       {org.stats.totalLocations} / {org.maxLocations}
                     </div>
                   </div>
                   <div className="bg-neutral-50 p-4 rounded-lg">
-                    <div className="text-sm text-neutral-600">Total SKUs</div>
+                    <div className="text-sm font-semibold text-neutral-700">Total SKUs</div>
                     <div className="text-2xl font-bold text-neutral-900">
                       {org.stats.totalSKUs} / {org.maxTotalSKUs}
                     </div>
                   </div>
                   <div className="bg-neutral-50 p-4 rounded-lg">
-                    <div className="text-sm text-neutral-600">Utilization</div>
+                    <div className="text-sm font-semibold text-neutral-700">Utilization</div>
                     <div className="text-2xl font-bold text-neutral-900">
                       {org.stats.utilizationPercent.toFixed(1)}%
                     </div>
@@ -131,13 +131,13 @@ export default function AdminOrganizationsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-sm text-neutral-700">Locations:</h4>
+                  <h4 className="font-bold text-sm text-neutral-900">Locations:</h4>
                   {org.tenants.map((tenant) => (
                     <div
                       key={tenant.id}
                       className="flex items-center justify-between p-3 bg-neutral-50 rounded"
                     >
-                      <span className="font-medium">{tenant.name}</span>
+                      <span className="font-semibold text-neutral-900">{tenant.name}</span>
                       <Badge variant="default">{tenant._count.items} SKUs</Badge>
                     </div>
                   ))}
@@ -168,7 +168,7 @@ export default function AdminOrganizationsPage() {
             >
               Previous
             </Button>
-            <span className="text-sm text-neutral-600">
+            <span className="text-sm font-medium text-neutral-700">
               Page {currentPage} of {Math.ceil(organizations.length / ITEMS_PER_PAGE)}
             </span>
             <Button
