@@ -49,6 +49,7 @@ import billingRoutes from './routes/billing';
 import subscriptionRoutes from './routes/subscriptions';
 import categoryRoutes from './routes/categories';
 import performanceRoutes from './routes/performance';
+import platformSettingsRoutes from './routes/platform-settings';
 import { auditLogger } from './middleware/audit-logger';
 import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
 import { enforcePolicyCompliance } from './middleware/policy-enforcement';
@@ -1078,6 +1079,7 @@ app.use(billingRoutes);
 app.use('/subscriptions', subscriptionRoutes);
 app.use('/categories', categoryRoutes);
 app.use('/performance', performanceRoutes);
+app.use(platformSettingsRoutes);
 
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);

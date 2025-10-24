@@ -1,19 +1,15 @@
 import { NextResponse } from 'next/server';
 
-// Note: This is a placeholder implementation
-// TODO: Implement proper branding settings storage when database is accessible from web app
-// For now, this returns mock data to allow the UI to function
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
 
 export async function GET() {
   try {
-    // Return mock branding settings
-    // In production, this should fetch from a database or API
-    return NextResponse.json({
-      platformName: 'Retail Visibility Platform',
-      platformDescription: 'Manage your retail operations with ease',
-      logoUrl: null,
-      faviconUrl: null,
-    });
+    const res = await fetch(`${API_BASE_URL}/platform-settings`);
+    if (!res.ok) {
+      throw new Error('Failed to fetch platform settings');
+    }
+    const data = await res.json();
+    return NextResponse.json(data);
   } catch (error) {
     console.error('Error fetching branding settings:', error);
     return new NextResponse('Internal server error', { status: 500 });
@@ -23,27 +19,22 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const platformName = formData.get('platformName') as string;
-    const platformDescription = formData.get('platformDescription') as string;
-
-    // TODO: Implement actual file upload and database storage
-    // For now, just return success with the submitted data
-    console.log('Branding settings update requested:', {
-      platformName,
-      platformDescription,
+    
+    // Forward the form data to the backend API
+    const res = await fetch(`${API_BASE_URL}/platform-settings`, {
+      method: 'POST',
+      body: formData,
     });
 
-    return NextResponse.json({
-      platformName,
-      platformDescription,
-      logoUrl: null,
-      faviconUrl: null,
-    });
+    if (!res.ok) {
+      const error = await res.json();
+      return NextResponse.json(error, { status: res.status });
+    }
+
+    const data = await res.json();
+    return NextResponse.json(data);
   } catch (error) {
     console.error('Error updating branding settings:', error);
     return new NextResponse('Internal server error', { status: 500 });
   }
-}
-function getFileExtension(filename: string): string {
-  return filename.slice(((filename.lastIndexOf('.') - 1) >>> 0) + 2);
 }
