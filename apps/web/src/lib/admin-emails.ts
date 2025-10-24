@@ -1,6 +1,6 @@
 /**
  * Admin email management utilities
- * Centralized access to configured admin emails
+ * Centralized access to configured admin emails from database
  */
 
 export type EmailCategory = 
@@ -24,9 +24,38 @@ export const DEFAULT_ADMIN_EMAILS: Record<EmailCategory, string> = {
   general: 'info@yourplatform.com',
 };
 
+// Cache for email configurations
+let emailCache: Record<EmailCategory, string> | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch email configurations from API
+ */
+async function fetchEmailConfigs(): Promise<Record<EmailCategory, string>> {
+  try {
+    const response = await fetch('/api/admin/email-config');
+    if (response.ok) {
+      const configs = await response.json();
+      const emailMap: Record<string, string> = {};
+      configs.forEach((config: { category: string; email: string }) => {
+        emailMap[config.category] = config.email;
+      });
+      
+      // Merge with defaults
+      return { ...DEFAULT_ADMIN_EMAILS, ...emailMap } as Record<EmailCategory, string>;
+    }
+  } catch (error) {
+    console.error('Error fetching admin emails from API:', error);
+  }
+  
+  return DEFAULT_ADMIN_EMAILS;
+}
+
 /**
  * Get the configured admin email for a specific category
  * Falls back to default if not configured
+ * Uses cached values for performance
  */
 export function getAdminEmail(category: EmailCategory): string {
   if (typeof window === 'undefined') {
@@ -34,65 +63,57 @@ export function getAdminEmail(category: EmailCategory): string {
     return DEFAULT_ADMIN_EMAILS[category];
   }
 
-  try {
-    const savedEmails = localStorage.getItem('admin_emails');
-    if (savedEmails) {
-      const emailConfig = JSON.parse(savedEmails);
-      return emailConfig[category] || DEFAULT_ADMIN_EMAILS[category];
-    }
-  } catch (error) {
-    console.error('Error reading admin emails:', error);
+  // Return from cache if valid
+  if (emailCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
+    return emailCache[category] || DEFAULT_ADMIN_EMAILS[category];
   }
 
-  return DEFAULT_ADMIN_EMAILS[category];
+  // Return default immediately, but fetch in background
+  fetchEmailConfigs().then(configs => {
+    emailCache = configs;
+    cacheTimestamp = Date.now();
+  });
+
+  return emailCache?.[category] || DEFAULT_ADMIN_EMAILS[category];
 }
 
 /**
- * Get all configured admin emails
+ * Get all configured admin emails (async version for fresh data)
  */
-export function getAllAdminEmails(): Record<EmailCategory, string> {
+export async function getAllAdminEmails(): Promise<Record<EmailCategory, string>> {
   if (typeof window === 'undefined') {
     return DEFAULT_ADMIN_EMAILS;
   }
 
-  try {
-    const savedEmails = localStorage.getItem('admin_emails');
-    if (savedEmails) {
-      const emailConfig = JSON.parse(savedEmails);
-      // Merge with defaults to ensure all categories exist
-      return { ...DEFAULT_ADMIN_EMAILS, ...emailConfig };
-    }
-  } catch (error) {
-    console.error('Error reading admin emails:', error);
-  }
-
-  return DEFAULT_ADMIN_EMAILS;
+  return await fetchEmailConfigs();
 }
 
 /**
- * Set admin email for a category
+ * Get all configured admin emails (sync version with cache)
  */
-export function setAdminEmail(category: EmailCategory, email: string): void {
-  if (typeof window === 'undefined') return;
-
-  try {
-    const currentEmails = getAllAdminEmails();
-    currentEmails[category] = email;
-    localStorage.setItem('admin_emails', JSON.stringify(currentEmails));
-  } catch (error) {
-    console.error('Error saving admin email:', error);
+export function getAllAdminEmailsSync(): Record<EmailCategory, string> {
+  if (typeof window === 'undefined') {
+    return DEFAULT_ADMIN_EMAILS;
   }
+
+  // Return from cache if valid
+  if (emailCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
+    return emailCache;
+  }
+
+  // Fetch in background
+  fetchEmailConfigs().then(configs => {
+    emailCache = configs;
+    cacheTimestamp = Date.now();
+  });
+
+  return emailCache || DEFAULT_ADMIN_EMAILS;
 }
 
 /**
- * Reset all emails to defaults
+ * Invalidate the email cache (call after updating emails)
  */
-export function resetAdminEmails(): void {
-  if (typeof window === 'undefined') return;
-
-  try {
-    localStorage.setItem('admin_emails', JSON.stringify(DEFAULT_ADMIN_EMAILS));
-  } catch (error) {
-    console.error('Error resetting admin emails:', error);
-  }
+export function invalidateEmailCache(): void {
+  emailCache = null;
+  cacheTimestamp = 0;
 }
