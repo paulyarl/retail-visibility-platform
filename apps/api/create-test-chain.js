@@ -1,14 +1,100 @@
 #!/usr/bin/env node
 /**
  * Create Test Chain Organization
- * Run: node create-test-chain.js
+ * 
+ * Usage:
+ *   node create-test-chain.js                                    # Default chain
+ *   node create-test-chain.js --name="My Chain"                  # Custom name
+ *   node create-test-chain.js --locations=5                      # Custom location count
+ *   node create-test-chain.js --skus=1000                        # Custom SKU count per location
+ *   node create-test-chain.js --size=small                       # Preset: 2 locations, 500 SKUs
+ *   node create-test-chain.js --size=medium                      # Preset: 3 locations, 1500 SKUs
+ *   node create-test-chain.js --size=large                       # Preset: 5 locations, 3000 SKUs
+ *   node create-test-chain.js --count=5                          # Create 5 different chains
+ *   node create-test-chain.js --random                           # Random names and data
+ *   node create-test-chain.js --scenario=restaurant              # Restaurant chain
+ *   node create-test-chain.js --scenario=retail                  # Retail chain
+ *   node create-test-chain.js --scenario=franchise               # Franchise chain
  */
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-async function createTestChain() {
-  console.log('🏗️  Creating test chain organization...\n');
+// Parse command line arguments
+const args = process.argv.slice(2);
+const getArg = (name) => {
+  const arg = args.find(a => a.startsWith(`--${name}=`));
+  return arg ? arg.split('=')[1] : null;
+};
+const hasFlag = (name) => args.includes(`--${name}`);
+
+// Configuration
+const customName = getArg('name');
+const customLocations = parseInt(getArg('locations')) || null;
+const customSkus = parseInt(getArg('skus')) || null;
+const size = getArg('size');
+const count = parseInt(getArg('count')) || 1;
+const random = hasFlag('random');
+const scenario = getArg('scenario');
+
+// Size presets
+const sizePresets = {
+  small: { locations: 2, skus: 500, maxLocations: 3, maxTotalSKUs: 1500 },
+  medium: { locations: 3, skus: 1500, maxTotalSKUs: 2500 },
+  large: { locations: 5, skus: 3000, maxLocations: 10, maxTotalSKUs: 5000 },
+};
+
+// Scenario presets
+const scenarios = {
+  restaurant: {
+    names: ['Burger Palace', 'Pizza Haven', 'Taco Express', 'Sushi Bar', 'Steakhouse'],
+    locationTypes: ['Downtown', 'Uptown', 'Mall', 'Airport', 'Waterfront'],
+    skuRange: [50, 150],
+  },
+  retail: {
+    names: ['Fashion Outlet', 'Electronics Plus', 'Home Goods', 'Sports Store', 'Book Shop'],
+    locationTypes: ['Main Store', 'Outlet', 'Express', 'Superstore', 'Pop-up'],
+    skuRange: [500, 2000],
+  },
+  franchise: {
+    names: ['Quick Mart', 'Coffee Corner', 'Fitness Club', 'Auto Service', 'Pet Store'],
+    locationTypes: ['Location A', 'Location B', 'Location C', 'Location D', 'Location E'],
+    skuRange: [100, 500],
+  },
+};
+
+// Random name generators
+const randomChainNames = [
+  'Metro Retail', 'Urban Stores', 'City Market', 'Prime Shops', 'Elite Outlets',
+  'Global Chain', 'National Stores', 'Regional Markets', 'Local Favorites', 'Express Shops'
+];
+
+const randomCities = [
+  { city: 'New York', state: 'NY', zip: '10001' },
+  { city: 'Los Angeles', state: 'CA', zip: '90001' },
+  { city: 'Chicago', state: 'IL', zip: '60601' },
+  { city: 'Houston', state: 'TX', zip: '77001' },
+  { city: 'Phoenix', state: 'AZ', zip: '85001' },
+  { city: 'Philadelphia', state: 'PA', zip: '19019' },
+  { city: 'San Antonio', state: 'TX', zip: '78201' },
+  { city: 'San Diego', state: 'CA', zip: '92101' },
+  { city: 'Dallas', state: 'TX', zip: '75201' },
+  { city: 'Austin', state: 'TX', zip: '78701' },
+];
+
+function getRandomElement(array) {
+  return array[Math.floor(Math.random() * array.length)];
+}
+
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+async function createTestChain(chainIndex = 0) {
+  const timestamp = Date.now();
+  const uniqueId = chainIndex > 0 ? `_${chainIndex}` : '';
+  
+  console.log(`\n🏗️  Creating test chain organization ${chainIndex > 0 ? `#${chainIndex + 1}` : ''}...\n`);
 
   try {
     // 1. Create organization
