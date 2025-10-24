@@ -30,7 +30,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
       'Product descriptions',
       'Multi-language support',
     ],
-    color: 'bg-neutral-100 text-neutral-800',
+    color: 'bg-neutral-100 text-neutral-900',
   },
   starter: {
     name: 'Starter',
@@ -47,7 +47,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
       'Multi-language support',
       'Email support',
     ],
-    color: 'bg-blue-100 text-blue-800',
+    color: 'bg-blue-100 text-blue-900',
   },
   professional: {
     name: 'Professional',
@@ -67,7 +67,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
       'Multi-language support',
       'Priority email support',
     ],
-    color: 'bg-purple-100 text-purple-800',
+    color: 'bg-purple-100 text-purple-900',
   },
   enterprise: {
     name: 'Enterprise',
@@ -89,7 +89,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
       'SLA guarantee',
       'API access',
     ],
-    color: 'bg-amber-100 text-amber-800',
+    color: 'bg-amber-100 text-amber-900',
   },
 };
 

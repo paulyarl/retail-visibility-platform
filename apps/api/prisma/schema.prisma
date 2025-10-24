@@ -231,6 +231,7 @@ model PhotoAsset {
   width           Int?
   height          Int?
   contentType     String?
+  bytes           Int?
   capturedAt      DateTime?
   createdAt       DateTime @default(now())
   tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)

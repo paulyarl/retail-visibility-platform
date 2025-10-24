@@ -16,3 +16,6 @@ export { Pagination } from './Pagination';
 export { SearchableSelect } from './SearchableSelect';
 export { AdvancedSearchableSelect, type SelectOption } from './AdvancedSearchableSelect';
 export { ThemeToggle } from './ThemeToggle';
+export { Label } from './Label';
+export { Textarea } from './Textarea';
+export { useToast } from './use-toast';

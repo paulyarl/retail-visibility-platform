@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button, Input, Modal, ModalFooter } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button, Input, Modal, ModalFooter, Pagination } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { motion } from 'framer-motion';
 
@@ -36,6 +36,96 @@ export default function UsersManagementPage() {
       lastActive: '1 hour ago',
       tenants: 1,
     },
+    {
+      id: '3',
+      email: 'john.smith@example.com',
+      name: 'John Smith',
+      role: 'user',
+      status: 'active',
+      lastActive: '3 hours ago',
+      tenants: 1,
+    },
+    {
+      id: '4',
+      email: 'sarah.jones@example.com',
+      name: 'Sarah Jones',
+      role: 'viewer',
+      status: 'active',
+      lastActive: '5 hours ago',
+      tenants: 1,
+    },
+    {
+      id: '5',
+      email: 'mike.wilson@example.com',
+      name: 'Mike Wilson',
+      role: 'user',
+      status: 'pending',
+      lastActive: 'Never',
+      tenants: 0,
+    },
+    {
+      id: '6',
+      email: 'emma.brown@example.com',
+      name: 'Emma Brown',
+      role: 'user',
+      status: 'active',
+      lastActive: '1 day ago',
+      tenants: 2,
+    },
+    {
+      id: '7',
+      email: 'david.lee@example.com',
+      name: 'David Lee',
+      role: 'viewer',
+      status: 'inactive',
+      lastActive: '2 weeks ago',
+      tenants: 1,
+    },
+    {
+      id: '8',
+      email: 'lisa.garcia@example.com',
+      name: 'Lisa Garcia',
+      role: 'user',
+      status: 'active',
+      lastActive: '30 minutes ago',
+      tenants: 3,
+    },
+    {
+      id: '9',
+      email: 'tom.anderson@example.com',
+      name: 'Tom Anderson',
+      role: 'admin',
+      status: 'active',
+      lastActive: '2 hours ago',
+      tenants: 1,
+    },
+    {
+      id: '10',
+      email: 'rachel.white@example.com',
+      name: 'Rachel White',
+      role: 'user',
+      status: 'active',
+      lastActive: '4 hours ago',
+      tenants: 2,
+    },
+    {
+      id: '11',
+      email: 'chris.martin@example.com',
+      name: 'Chris Martin',
+      role: 'viewer',
+      status: 'pending',
+      lastActive: 'Never',
+      tenants: 0,
+    },
+    {
+      id: '12',
+      email: 'jennifer.taylor@example.com',
+      name: 'Jennifer Taylor',
+      role: 'user',
+      status: 'active',
+      lastActive: '6 hours ago',
+      tenants: 1,
+    },
   ]);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -61,6 +151,25 @@ export default function UsersManagementPage() {
     canManageInventory: true,
     canAccessAdmin: false,
   });
+  
+  // Pagination and search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
+  // Filter users based on search query
+  const filteredUsers = users.filter(user => {
+    const searchLower = searchQuery.toLowerCase();
+    return user.name.toLowerCase().includes(searchLower) ||
+           user.email.toLowerCase().includes(searchLower) ||
+           user.role.toLowerCase().includes(searchLower);
+  });
+  
+  // Paginate filtered users
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -208,12 +317,34 @@ export default function UsersManagementPage() {
         {/* Users List */}
         <Card>
           <CardHeader>
-            <CardTitle>All Users</CardTitle>
-            <CardDescription>Manage user accounts and permissions</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>All Users</CardTitle>
+                <CardDescription>Manage user accounts and permissions</CardDescription>
+              </div>
+              <Input
+                type="text"
+                placeholder="Search users..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-64"
+              />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="divide-y divide-neutral-200">
-              {users.map((user, index) => (
+            {filteredUsers.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-neutral-500">
+                  {searchQuery ? 'No users match your search' : 'No users found'}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="divide-y divide-neutral-200">
+                  {paginatedUsers.map((user, index) => (
                 <motion.div
                   key={user.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -248,8 +379,26 @@ export default function UsersManagementPage() {
                     </Button>
                   </div>
                 </motion.div>
-              ))}
-            </div>
+                  ))}
+                </div>
+                
+                {/* Pagination */}
+                {filteredUsers.length > 0 && (
+                  <div className="mt-6">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalItems={filteredUsers.length}
+                      pageSize={pageSize}
+                      onPageChange={setCurrentPage}
+                      onPageSizeChange={(newSize) => {
+                        setPageSize(newSize);
+                        setCurrentPage(1);
+                      }}
+                    />
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Alert, Spinner } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 
@@ -74,9 +75,9 @@ export default function AdminTiersPage() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (res.status === 404) {
-          throw new Error(`Tenant not found on production server. This tenant may only exist locally.`);
+          throw new Error(`This tenant only exists locally and cannot be updated on the production server. Create the tenant on production first.`);
         }
         throw new Error(data.message || data.error || 'Failed to update tier');
       }
@@ -187,9 +188,14 @@ export default function AdminTiersPage() {
                         {/* Tenant Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-neutral-900 truncate">
-                              {tenant.metadata?.businessName || tenant.name}
-                            </h3>
+                            <Link 
+                              href={`/tenants?id=${tenant.id}`} 
+                              className="hover:text-primary-600 transition-colors"
+                            >
+                              <h3 className="text-lg font-semibold text-neutral-900 truncate hover:underline">
+                                {tenant.metadata?.businessName || tenant.name}
+                              </h3>
+                            </Link>
                             <Badge variant="default" className={tierInfo.color}>
                               {tierInfo.label}
                             </Badge>
