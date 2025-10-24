@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
+import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 import { getAdminEmail } from '@/lib/admin-emails';
 
 interface Tenant {
@@ -22,7 +23,7 @@ interface Tenant {
 export default function MySubscriptionPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
+  const [selectedTier, setSelectedTier] = useState<SubscriptionTier | ChainTier | null>(null);
   const [showChangeModal, setShowChangeModal] = useState(false);
 
   useEffect(() => {
@@ -77,19 +78,33 @@ export default function MySubscriptionPage() {
     );
   }
 
-  const currentTier = (tenant.subscriptionTier || 'trial') as SubscriptionTier;
-  const tierInfo = TIER_LIMITS[currentTier];
+  const currentTier = tenant.subscriptionTier || 'trial';
+  const isChainTier = currentTier.startsWith('chain_');
+  const tierInfo = isChainTier 
+    ? CHAIN_TIERS[currentTier as ChainTier]
+    : TIER_LIMITS[currentTier as SubscriptionTier];
   const skuUsage = tenant._count?.items || 0;
-  const skuLimit = tierInfo.maxSKUs;
+  const skuLimit = isChainTier 
+    ? (tierInfo as any).maxTotalSKUs 
+    : (tierInfo as any).maxSKUs;
   const usagePercent = skuLimit === Infinity ? 0 : Math.round((skuUsage / skuLimit) * 100);
 
-  const handleRequestChange = (newTier: SubscriptionTier) => {
+  const handleRequestChange = (newTier: SubscriptionTier | ChainTier) => {
     setSelectedTier(newTier);
     setShowChangeModal(true);
   };
 
+  const getTierInfo = (tier: SubscriptionTier | ChainTier) => {
+    if (tier.startsWith('chain_')) {
+      return CHAIN_TIERS[tier as ChainTier];
+    }
+    return TIER_LIMITS[tier as SubscriptionTier];
+  };
+
   const handleSubmitChange = () => {
     const metadata = tenant.metadata as any;
+    const requestedTierInfo = getTierInfo(selectedTier!);
+    
     // Get email from Email Management configuration
     const adminEmail = getAdminEmail('subscription');
     const subject = encodeURIComponent(`Subscription Change Request - ${metadata?.businessName || tenant.name}`);
@@ -97,7 +112,7 @@ export default function MySubscriptionPage() {
       `Hello,\n\n` +
       `I would like to change my subscription plan.\n\n` +
       `Current Plan: ${tierInfo.name}\n` +
-      `Requested Plan: ${TIER_LIMITS[selectedTier!].name}\n` +
+      `Requested Plan: ${requestedTierInfo.name}\n` +
       `Business: ${metadata?.businessName || tenant.name}\n` +
       `Tenant ID: ${tenant.id}\n\n` +
       `Please process this subscription change at your earliest convenience.\n\n` +
@@ -109,6 +124,7 @@ export default function MySubscriptionPage() {
   };
 
   const availableTiers: SubscriptionTier[] = ['starter', 'professional', 'enterprise'];
+  const availableChainTiers: ChainTier[] = ['chain_starter', 'chain_professional', 'chain_enterprise'];
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -139,7 +155,12 @@ export default function MySubscriptionPage() {
               {/* Pricing */}
               <div>
                 <div className="text-3xl font-bold text-neutral-900">{tierInfo.price}</div>
-                <p className="text-neutral-600 mt-1">{tierInfo.description}</p>
+                <p className="text-neutral-600 mt-1">
+                  {isChainTier 
+                    ? `${(tierInfo as any).maxLocations === Infinity ? 'Unlimited' : (tierInfo as any).maxLocations} locations, ${(tierInfo as any).maxTotalSKUs === Infinity ? 'unlimited' : (tierInfo as any).maxTotalSKUs.toLocaleString()} SKUs`
+                    : (tierInfo as any).description
+                  }
+                </p>
               </div>
 
               {/* SKU Usage */}
@@ -225,7 +246,9 @@ export default function MySubscriptionPage() {
             Select a different plan to request a subscription change. An email will be sent to our team for approval.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Individual Plans */}
+          <h3 className="text-lg font-semibold text-neutral-900 mb-4">Individual Location Plans</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {availableTiers.map((tier) => {
               const info = TIER_LIMITS[tier];
               const isCurrent = tier === currentTier;
@@ -251,6 +274,65 @@ export default function MySubscriptionPage() {
                       <div className="text-sm">
                         <span className="font-semibold">SKUs:</span>{' '}
                         {info.maxSKUs === Infinity ? 'Unlimited' : info.maxSKUs.toLocaleString()}
+                      </div>
+                    </div>
+
+                    <ul className="space-y-1.5 text-xs mb-4">
+                      {info.features.slice(0, 4).map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-1.5">
+                          <span className="text-green-500 mt-0.5">✓</span>
+                          <span className="text-neutral-700">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button
+                      variant={isCurrent ? 'secondary' : 'primary'}
+                      className="w-full"
+                      disabled={isCurrent}
+                      onClick={() => handleRequestChange(tier)}
+                    >
+                      {isCurrent ? 'Current Plan' : 'Request Change'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Chain Plans */}
+          <h3 className="text-lg font-semibold text-neutral-900 mb-4">Multi-Location Chain Plans</h3>
+          <p className="text-sm text-neutral-600 mb-4">
+            Perfect for businesses with multiple locations. Massive savings compared to individual plans.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {availableChainTiers.map((tier) => {
+              const info = CHAIN_TIERS[tier];
+              const isCurrent = tier === currentTier;
+              
+              return (
+                <Card 
+                  key={tier}
+                  className={`${isCurrent ? 'border-2 border-primary-500 opacity-60' : 'border-2 border-neutral-200 hover:border-primary-300 transition-colors'}`}
+                >
+                  <CardHeader>
+                    <div className="flex items-center justify-between mb-2">
+                      <CardTitle className="text-lg">{info.name}</CardTitle>
+                      {isCurrent && (
+                        <Badge variant="default" className="bg-primary-500 text-white">Current</Badge>
+                      )}
+                    </div>
+                    <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 mb-4">
+                      <div className="text-sm">
+                        <span className="font-semibold">Locations:</span>{' '}
+                        {info.maxLocations === Infinity ? 'Unlimited' : info.maxLocations}
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-semibold">Total SKUs:</span>{' '}
+                        {info.maxTotalSKUs === Infinity ? 'Unlimited' : info.maxTotalSKUs.toLocaleString()}
                       </div>
                     </div>
 
@@ -322,8 +404,8 @@ export default function MySubscriptionPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold">Requested:</span>
-                    <Badge className={`${TIER_LIMITS[selectedTier].color} text-white`}>
-                      {TIER_LIMITS[selectedTier].name}
+                    <Badge className={`${getTierInfo(selectedTier).color} text-white`}>
+                      {getTierInfo(selectedTier).name}
                     </Badge>
                   </div>
                 </div>
