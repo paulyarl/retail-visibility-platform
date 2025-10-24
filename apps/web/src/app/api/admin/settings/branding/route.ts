@@ -6,13 +6,30 @@ export async function GET() {
   try {
     const res = await fetch(`${API_BASE_URL}/platform-settings`);
     if (!res.ok) {
+      // If backend returns 404, return default settings
+      if (res.status === 404) {
+        return NextResponse.json({
+          platformName: 'Retail Visibility Platform',
+          logoUrl: null,
+          faviconUrl: null,
+          primaryColor: '#3b82f6',
+          secondaryColor: '#8b5cf6',
+        });
+      }
       throw new Error('Failed to fetch platform settings');
     }
     const data = await res.json();
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error fetching branding settings:', error);
-    return new NextResponse('Internal server error', { status: 500 });
+    // Return default settings on error
+    return NextResponse.json({
+      platformName: 'Retail Visibility Platform',
+      logoUrl: null,
+      faviconUrl: null,
+      primaryColor: '#3b82f6',
+      secondaryColor: '#8b5cf6',
+    });
   }
 }
 
