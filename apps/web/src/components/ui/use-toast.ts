@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { ToastProps } from './toast';
+import { ToastProps } from './Toast';
 
 type ToastOptions = Omit<ToastProps, 'id' | 'onClose'>;
 
