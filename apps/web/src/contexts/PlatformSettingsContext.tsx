@@ -28,13 +28,12 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       setLoading(true);
       setError(null);
       const res = await fetch('/api/admin/settings/branding');
-      if (!res.ok) throw new Error('Failed to fetch platform settings');
+      // Always try to parse the response, even if not ok (API returns defaults)
       const data = await res.json();
       setSettings(data);
     } catch (err) {
       console.error('Error fetching platform settings:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      // Set default values on error
+      // Silently set default values on error (no error state)
       setSettings({
         platformName: 'Retail Visibility Platform',
         platformDescription: 'Manage your retail operations with ease',
