@@ -232,6 +232,7 @@ model PhotoAsset {
   height          Int?
   contentType     String?
   bytes           Int?
+  exifRemoved     Boolean  @default(false)
   capturedAt      DateTime?
   createdAt       DateTime @default(now())
   tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)

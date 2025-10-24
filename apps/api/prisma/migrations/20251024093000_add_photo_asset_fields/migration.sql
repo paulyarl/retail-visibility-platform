@@ -3,6 +3,7 @@ ALTER TABLE "PhotoAsset" ADD COLUMN     "width" INTEGER,
 ADD COLUMN     "height" INTEGER,
 ADD COLUMN     "contentType" TEXT,
 ADD COLUMN     "bytes" INTEGER,
+ADD COLUMN     "exifRemoved" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN     "capturedAt" TIMESTAMP(3);
 
 -- CreateIndex
