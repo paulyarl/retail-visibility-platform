@@ -1,19 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 
 interface Tenant {
   id: string;
   name: string;
   subscriptionTier?: string;
+  organization?: {
+    id: string;
+    name: string;
+  } | null;
   metadata?: { city?: string; state?: string };
 }
+
+const ITEMS_PER_PAGE = 25;
 
 export default function AdminBillingPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadTenants();
@@ -109,11 +116,20 @@ export default function AdminBillingPage() {
         {/* Tenant List */}
         <Card>
           <CardHeader>
-            <CardTitle>All Tenants</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>All Tenants</CardTitle>
+              {tenants.length > 0 && (
+                <p className="text-sm text-neutral-600">
+                  Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, tenants.length)} of {tenants.length}
+                </p>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {tenants.map((tenant) => (
+              {tenants
+                .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                .map((tenant) => (
                 <div
                   key={tenant.id}
                   className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
@@ -134,6 +150,31 @@ export default function AdminBillingPage() {
                 </div>
               ))}
             </div>
+
+            {/* Pagination Controls */}
+            {tenants.length > ITEMS_PER_PAGE && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-neutral-600">
+                  Page {currentPage} of {Math.ceil(tenants.length / ITEMS_PER_PAGE)}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(tenants.length / ITEMS_PER_PAGE), p + 1))}
+                  disabled={currentPage >= Math.ceil(tenants.length / ITEMS_PER_PAGE)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

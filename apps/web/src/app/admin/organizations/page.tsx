@@ -23,9 +23,12 @@ interface Organization {
   };
 }
 
+const ITEMS_PER_PAGE = 10;
+
 export default function AdminOrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadOrganizations();
@@ -66,6 +69,15 @@ export default function AdminOrganizationsPage() {
       />
 
       <div className="mt-6 space-y-6">
+        {/* Pagination Info */}
+        {organizations.length > 0 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-neutral-600">
+              Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, organizations.length)} of {organizations.length} organizations
+            </p>
+          </div>
+        )}
+
         {organizations.length === 0 ? (
           <Card>
             <CardContent className="pt-6">
@@ -78,7 +90,9 @@ export default function AdminOrganizationsPage() {
             </CardContent>
           </Card>
         ) : (
-          organizations.map((org) => (
+          organizations
+            .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+            .map((org) => (
             <Card key={org.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -141,6 +155,31 @@ export default function AdminOrganizationsPage() {
               </CardContent>
             </Card>
           ))
+        )}
+
+        {/* Pagination Controls */}
+        {organizations.length > ITEMS_PER_PAGE && (
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-neutral-600">
+              Page {currentPage} of {Math.ceil(organizations.length / ITEMS_PER_PAGE)}
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(Math.ceil(organizations.length / ITEMS_PER_PAGE), p + 1))}
+              disabled={currentPage >= Math.ceil(organizations.length / ITEMS_PER_PAGE)}
+            >
+              Next
+            </Button>
+          </div>
         )}
       </div>
     </div>
