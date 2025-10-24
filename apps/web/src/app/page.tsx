@@ -26,7 +26,10 @@ export default function Home() {
     const fetchStats = async () => {
       try {
         const tenantId = localStorage.getItem('tenantId');
+        console.log('[Dashboard] TenantId from localStorage:', tenantId);
+        
         if (!tenantId) {
+          console.log('[Dashboard] No tenant selected, showing zeros');
           setLoading(false);
           return;
         }
@@ -38,6 +41,12 @@ export default function Home() {
           fetch('/api/tenants'),
         ]);
         
+        console.log('[Dashboard] API responses:', {
+          tenant: tenantRes.status,
+          items: itemsRes.status,
+          allTenants: allTenantsRes.status,
+        });
+        
         let total = 0;
         let active = 0;
         let lowStock = 0;
@@ -48,6 +57,7 @@ export default function Home() {
         // Process items
         if (itemsRes.ok) {
           const items = await itemsRes.json();
+          console.log('[Dashboard] Items fetched:', items?.length || 0);
           if (Array.isArray(items)) {
             total = items.length;
             active = items.filter((i: any) => i.itemStatus === 'active').length;
@@ -68,11 +78,13 @@ export default function Home() {
         if (allTenantsRes.ok) {
           const tenants = await allTenantsRes.json();
           locations = Array.isArray(tenants) ? tenants.length : 0;
+          console.log('[Dashboard] Locations count:', locations);
         }
         
+        console.log('[Dashboard] Final stats:', { total, active, lowStock, locations, isChain });
         setStats({ total, active, lowStock, locations, isChain, organizationName });
       } catch (error) {
-        console.error('Failed to fetch stats:', error);
+        console.error('[Dashboard] Failed to fetch stats:', error);
       } finally {
         setLoading(false);
       }
