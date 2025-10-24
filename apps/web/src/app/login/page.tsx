@@ -6,12 +6,13 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { motion } from 'framer-motion';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
+import PublicFooter from '@/components/PublicFooter';
 
 export default function LoginPage() {
   const { settings } = usePlatformSettings();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-900 flex flex-col">
       <PageHeader
         title="Sign In"
         description="Access your account with a magic link"
@@ -105,6 +106,8 @@ export default function LoginPage() {
         </motion.div>
       </div>
       </div>
+      
+      <PublicFooter />
     </div>
   );
 }

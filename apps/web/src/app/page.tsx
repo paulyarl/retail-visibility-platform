@@ -6,6 +6,7 @@ import { useCountUp } from "@/hooks/useCountUp";
 import { motion } from "framer-motion";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import Image from "next/image";
+import PublicFooter from "@/components/PublicFooter";
 
 export default function Home() {
   const { settings } = usePlatformSettings();
@@ -15,7 +16,7 @@ export default function Home() {
   const listingsCount = useCountUp(0, 1500);
   const uploadsCount = useCountUp(0, 1500);
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -239,6 +240,8 @@ export default function Home() {
           </AnimatedCard>
         </div>
       </main>
+      
+      <PublicFooter />
     </div>
   );
 }
