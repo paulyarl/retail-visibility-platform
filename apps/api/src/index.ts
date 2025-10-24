@@ -989,7 +989,7 @@ app.put("/admin/email-config", async (req, res) => {
   } catch (error) {
     console.error('[PUT /admin/email-config] Error:', error);
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "invalid_request", details: error.errors });
+      return res.status(400).json({ error: "invalid_request", details: error.issues });
     }
     res.status(500).json({ error: "failed_to_update_email_config" });
   }
