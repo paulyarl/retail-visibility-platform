@@ -1,18 +1,18 @@
 @import "tailwindcss";
 
-/* Design System v2.0 Tokens */
+/* Design System v2.0 Tokens - Google Brand Colors */
 :root {
-  /* Colors - Primary */
-  --primary-50: #eff6ff;
-  --primary-100: #dbeafe;
-  --primary-200: #bfdbfe;
-  --primary-300: #93c5fd;
-  --primary-400: #60a5fa;
-  --primary-500: #3b82f6;
-  --primary-600: #2563eb;
-  --primary-700: #1d4ed8;
-  --primary-800: #1e40af;
-  --primary-900: #1e3a8a;
+  /* Colors - Primary (Google Blue) */
+  --primary-50: #e8f0fe;
+  --primary-100: #d2e3fc;
+  --primary-200: #aecbfa;
+  --primary-300: #8ab4f8;
+  --primary-400: #669df6;
+  --primary-500: #4285f4;
+  --primary-600: #1a73e8;
+  --primary-700: #1967d2;
+  --primary-800: #185abc;
+  --primary-900: #174ea6;
 
   /* Colors - Neutral */
   --neutral-50: #fafafa;
@@ -26,17 +26,17 @@
   --neutral-800: #262626;
   --neutral-900: #171717;
 
-  /* Colors - Semantic */
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --info: #3b82f6;
+  /* Colors - Semantic (Google Brand) */
+  --success: #34a853; /* Google Green */
+  --warning: #fbbc04; /* Google Yellow */
+  --error: #ea4335; /* Google Red */
+  --info: #4285f4; /* Google Blue */
 
   /* Base colors */
   --background: #ffffff;
   --foreground: #171717;
   --border: #e5e5e5;
-  --ring: #3b82f6;
+  --ring: #4285f4;
 }
 
 @theme inline {
