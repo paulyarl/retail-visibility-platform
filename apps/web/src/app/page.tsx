@@ -62,31 +62,33 @@ export default function Home() {
 
         {/* Hero Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <AnimatedCard delay={0} className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-neutral-600">Total Inventory</p>
-                <motion.p 
-                  className="text-3xl font-bold text-neutral-900 mt-2"
-                  initial={{ scale: 0.5 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.2, type: "spring" }}
+          <Link href="/items">
+            <AnimatedCard delay={0} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-neutral-600">Total Inventory</p>
+                  <motion.p 
+                    className="text-3xl font-bold text-neutral-900 mt-2"
+                    initial={{ scale: 0.5 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2, type: "spring" }}
+                  >
+                    {inventoryCount}
+                  </motion.p>
+                  <p className="text-sm text-neutral-500 mt-1">items</p>
+                </div>
+                <motion.div 
+                  className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center"
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                  transition={{ type: "spring", stiffness: 400 }}
                 >
-                  {inventoryCount}
-                </motion.p>
-                <p className="text-sm text-neutral-500 mt-1">items</p>
+                  <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                </motion.div>
               </div>
-              <motion.div 
-                className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center"
-                whileHover={{ scale: 1.1, rotate: 5 }}
-                transition={{ type: "spring", stiffness: 400 }}
-              >
-                <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </motion.div>
-            </div>
-          </AnimatedCard>
+            </AnimatedCard>
+          </Link>
 
           <AnimatedCard delay={0.1} className="p-6">
             <div className="flex items-center justify-between">
@@ -141,31 +143,33 @@ export default function Home() {
             </div>
           </AnimatedCard>
 
-          <AnimatedCard delay={0.3} className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-neutral-600">Photo Uploads</p>
-                <motion.p 
-                  className="text-3xl font-bold text-neutral-900 mt-2"
-                  initial={{ scale: 0.5 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.5, type: "spring" }}
+          <Link href="/items">
+            <AnimatedCard delay={0.3} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-neutral-600">Photo Uploads</p>
+                  <motion.p 
+                    className="text-3xl font-bold text-neutral-900 mt-2"
+                    initial={{ scale: 0.5 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.5, type: "spring" }}
+                  >
+                    {uploadsCount}
+                  </motion.p>
+                  <p className="text-sm text-neutral-500 mt-1">100% success</p>
+                </div>
+                <motion.div 
+                  className="h-12 w-12 bg-warning rounded-lg flex items-center justify-center"
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                  transition={{ type: "spring", stiffness: 400 }}
                 >
-                  {uploadsCount}
-                </motion.p>
-                <p className="text-sm text-neutral-500 mt-1">100% success</p>
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </motion.div>
               </div>
-              <motion.div 
-                className="h-12 w-12 bg-warning rounded-lg flex items-center justify-center"
-                whileHover={{ scale: 1.1, rotate: 5 }}
-                transition={{ type: "spring", stiffness: 400 }}
-              >
-                <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </motion.div>
-            </div>
-          </AnimatedCard>
+            </AnimatedCard>
+          </Link>
         </div>
 
         {/* Quick Actions */}
