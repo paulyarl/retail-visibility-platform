@@ -20,6 +20,81 @@ export default function OfferingsPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
         
+        {/* Free Trial */}
+        <section>
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-6">
+            <div className="flex items-start gap-4">
+              <div className="text-5xl">🆓</div>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-neutral-900 mb-2">30-Day Free Trial</h2>
+                <p className="text-neutral-700 mb-4">
+                  Try our platform risk-free with full access to all features. No credit card required.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <h3 className="font-semibold text-neutral-900 mb-2">What's Included:</h3>
+                    <ul className="space-y-1 text-sm">
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>Full access to all Professional features</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>5,000 SKU limit</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>1024px QR codes</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>Enhanced landing pages</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>Google Shopping integration</span>
+                      </li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-semibold text-neutral-900 mb-2">Terms & Conditions:</h3>
+                    <ul className="space-y-1 text-sm text-neutral-700">
+                      <li className="flex items-start gap-2">
+                        <span className="text-neutral-400 mt-0.5">•</span>
+                        <span>30 days from account creation</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-neutral-400 mt-0.5">•</span>
+                        <span>No credit card required to start</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-neutral-400 mt-0.5">•</span>
+                        <span>Automatically converts to Starter plan after trial</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-neutral-400 mt-0.5">•</span>
+                        <span>You can upgrade to any paid plan during trial</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-neutral-400 mt-0.5">•</span>
+                        <span>Cancel anytime with no charges</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                
+                <div className="bg-white border border-green-300 rounded-lg p-3">
+                  <p className="text-sm text-neutral-800">
+                    <strong>💡 Pro Tip:</strong> Use the trial period to upload your inventory, test QR codes, and see how our platform drives traffic to your business before committing to a paid plan.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
         {/* Individual Location Subscriptions */}
         <section>
           <h2 className="text-2xl font-bold text-neutral-900 mb-2">Individual Location Subscriptions</h2>
