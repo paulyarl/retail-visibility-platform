@@ -94,7 +94,7 @@ export default function LanguageSettingsPage() {
 
   return (
     <Protected>
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      <div className="min-h-screen bg-neutral-50">
         <PageHeader
           title="Language & Region"
           description="Choose your preferred language"
@@ -120,25 +120,25 @@ export default function LanguageSettingsPage() {
                     onClick={() => handleLanguageChange(language.code)}
                     className={`relative p-4 border-2 rounded-lg transition-all text-left ${
                       selectedLanguage === language.code
-                        ? 'border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20'
-                        : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
+                        ? 'border-primary-600 bg-primary-50'
+                        : 'border-neutral-200 hover:border-neutral-300'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-3xl">{language.flag}</span>
                       <div className="flex-1">
-                        <p className="font-medium text-neutral-900 dark:text-white">
+                        <p className="font-medium text-neutral-900">
                           {language.nativeName}
                         </p>
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                        <p className="text-sm text-neutral-600">
                           {language.name}
                         </p>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                        <p className="text-xs text-neutral-500 mt-1">
                           {language.countries.join(', ')}
                         </p>
                       </div>
                       {selectedLanguage === language.code && (
-                        <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-5 h-5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
                           <path
                             fillRule="evenodd"
                             d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -152,14 +152,14 @@ export default function LanguageSettingsPage() {
               </div>
 
               {/* Current Selection Info */}
-              <div className="mt-6 p-4 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
+              <div className="mt-6 p-4 bg-neutral-100 rounded-lg">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">
                     {LANGUAGES.find(l => l.code === selectedLanguage)?.flag}
                   </span>
                   <div>
-                    <p className="text-sm font-medium text-neutral-900 dark:text-white">Current Language</p>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
+                    <p className="text-sm font-medium text-neutral-900">Current Language</p>
+                    <p className="text-xs text-neutral-600 mt-1">
                       {LANGUAGES.find(l => l.code === selectedLanguage)?.nativeName} ({selectedLanguage})
                     </p>
                   </div>
@@ -182,22 +182,22 @@ export default function LanguageSettingsPage() {
                     onClick={() => handleRegionChange(region.code)}
                     className={`relative p-4 border-2 rounded-lg transition-all text-left ${
                       selectedRegion === region.code
-                        ? 'border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20'
-                        : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
+                        ? 'border-primary-600 bg-primary-50'
+                        : 'border-neutral-200 hover:border-neutral-300'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-3xl">{region.flag}</span>
                       <div className="flex-1">
-                        <p className="font-medium text-neutral-900 dark:text-white">
+                        <p className="font-medium text-neutral-900">
                           {region.name}
                         </p>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                        <p className="text-xs text-neutral-500 mt-1">
                           {region.code}
                         </p>
                       </div>
                       {selectedRegion === region.code && (
-                        <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-5 h-5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
                           <path
                             fillRule="evenodd"
                             d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -211,14 +211,14 @@ export default function LanguageSettingsPage() {
               </div>
 
               {/* Current Selection Info */}
-              <div className="mt-6 p-4 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
+              <div className="mt-6 p-4 bg-neutral-100 rounded-lg">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">
                     {REGIONS.find(r => r.code === selectedRegion)?.flag}
                   </span>
                   <div>
-                    <p className="text-sm font-medium text-neutral-900 dark:text-white">Current Region</p>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
+                    <p className="text-sm font-medium text-neutral-900">Current Region</p>
+                    <p className="text-xs text-neutral-600 mt-1">
                       {REGIONS.find(r => r.code === selectedRegion)?.name}
                     </p>
                   </div>
@@ -233,17 +233,17 @@ export default function LanguageSettingsPage() {
               <CardTitle>About Translations</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
+              <div className="space-y-3 text-sm text-neutral-700">
                 <p>
                   The platform interface will be displayed in your selected language. This includes menus, buttons, labels, and messages.
                 </p>
-                <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                  <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <p className="font-medium text-blue-900 dark:text-blue-100">Translation Status</p>
-                    <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                    <p className="font-medium text-blue-900">Translation Status</p>
+                    <p className="text-sm text-blue-800 mt-1">
                       Currently, only English (US) is fully supported. Other languages are coming soon.
                     </p>
                   </div>
