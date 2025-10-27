@@ -122,6 +122,21 @@ export default function TenantSettingsPage() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
+        {/* Business Logo */}
+        {tenant.metadata && (tenant.metadata as any).logo_url && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center">
+                <img
+                  src={(tenant.metadata as any).logo_url}
+                  alt="Business Logo"
+                  className="max-h-32 max-w-full object-contain"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tenant Information */}
         <Card>
           <CardHeader>

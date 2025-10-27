@@ -149,6 +149,19 @@ export default function AdminDashboardPage() {
       badge: 'NEW',
     },
     {
+      title: 'Upgrade Requests',
+      description: 'Manage subscription upgrade requests from tenants',
+      href: '/settings/admin/upgrade-requests',
+      icon: (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+        </svg>
+      ),
+      color: 'bg-indigo-500',
+      stats: 'Process requests',
+      badge: 'NEW',
+    },
+    {
       title: 'Feature Flags',
       description: 'Control feature rollout and pilot programs',
       href: '/settings/admin/features',

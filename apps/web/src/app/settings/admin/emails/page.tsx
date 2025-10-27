@@ -360,8 +360,9 @@ export default function AdminEmailsPage() {
                               type="email"
                               value={tempEmail}
                               onChange={(e) => setTempEmail(e.target.value)}
-                              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 !text-neutral-900 !bg-white"
                               placeholder={category.defaultEmail}
+                              autoFocus
                             />
                             <div className="flex gap-2">
                               <Button

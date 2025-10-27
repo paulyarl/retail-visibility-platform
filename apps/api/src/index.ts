@@ -51,6 +51,7 @@ import categoryRoutes from './routes/categories';
 import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
 import organizationRoutes from './routes/organizations';
+import upgradeRequestsRoutes from './routes/upgrade-requests';
 import { auditLogger } from './middleware/audit-logger';
 import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
 import { enforcePolicyCompliance } from './middleware/policy-enforcement';
@@ -220,6 +221,151 @@ app.post("/tenant/profile", async (req, res) => {
   } catch (e: any) {
     console.error("Failed to save tenant profile:", e);
     res.status(500).json({ error: "failed_to_save_profile" });
+  }
+});
+
+// Tenant logo upload endpoint (must be defined before multer middleware below)
+const logoUploadMulter = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit for logos
+
+const logoDataUrlSchema = z.object({
+  tenant_id: z.string().min(1),
+  dataUrl: z.string().min(1),
+  contentType: z.string().min(1),
+});
+
+app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) => {
+  try {
+    const tenantId = req.params.id;
+    console.log(`[Logo Upload] Starting upload for tenant ${tenantId}`, {
+      hasFile: !!req.file,
+      contentType: req.get('content-type'),
+      bodyKeys: req.body ? Object.keys(req.body) : [],
+    });
+
+    // Verify tenant exists
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      console.log(`[Logo Upload] Tenant not found: ${tenantId}`);
+      return res.status(404).json({ error: "tenant_not_found" });
+    }
+
+    // Initialize Supabase client (will be initialized below in photos section)
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseLogo = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+      ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+      : null;
+
+    if (!supabaseLogo) {
+      return res.status(500).json({ error: "supabase_not_configured" });
+    }
+
+    let publicUrl: string;
+    const TENANT_BUCKET_NAME = process.env.TENANT_BUCKET_NAME || "photos"; // Default to photos bucket if not specified
+
+    // A) multipart/form-data "file" upload
+    if (req.file) {
+      const f = req.file as Express.Multer.File;
+      const ext = f.mimetype.includes("png") ? ".png" : f.mimetype.includes("webp") ? ".webp" : ".jpg";
+      const pathKey = `tenants/${tenantId}/logo-${Date.now()}${ext}`;
+      
+      console.log(`[Logo Upload] Uploading to Supabase:`, { 
+        bucket: TENANT_BUCKET_NAME,
+        pathKey, 
+        size: f.size, 
+        mimetype: f.mimetype 
+      });
+
+      const { error, data } = await supabaseLogo.storage
+        .from(TENANT_BUCKET_NAME)
+        .upload(pathKey, f.buffer, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: f.mimetype || "application/octet-stream",
+        });
+
+      if (error) {
+        console.error(`[Logo Upload] Supabase upload error:`, error);
+        return res.status(500).json({ error: error.message, details: error });
+      }
+
+      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET_NAME).getPublicUrl(data.path).data.publicUrl;
+      console.log(`[Logo Upload] Supabase upload successful:`, { publicUrl });
+    }
+    // B) JSON { dataUrl } upload
+    else if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
+      console.log(`[Logo Upload] Processing dataUrl upload`);
+      const parsed = logoDataUrlSchema.safeParse(req.body || {});
+      if (!parsed.success) {
+        console.error(`[Logo Upload] Invalid dataUrl payload:`, parsed.error.flatten());
+        return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+      }
+
+      const match = /^data:[^;]+;base64,(.+)$/i.exec(parsed.data.dataUrl);
+      if (!match) return res.status(400).json({ error: "invalid_data_url" });
+      
+      const buf = Buffer.from(match[1], "base64");
+      
+      // Enforce 5MB limit for logos
+      if (buf.length > 5 * 1024 * 1024) {
+        return res.status(413).json({ error: "logo_too_large", maxSizeMB: 5 });
+      }
+
+      const ext = parsed.data.contentType.includes("png")
+        ? ".png"
+        : parsed.data.contentType.includes("webp")
+        ? ".webp"
+        : ".jpg";
+      
+      const pathKey = `tenants/${tenantId}/logo-${Date.now()}${ext}`;
+      console.log(`[Logo Upload] Uploading dataUrl to Supabase:`, { 
+        bucket: TENANT_BUCKET_NAME,
+        pathKey, 
+        size: buf.length, 
+        contentType: parsed.data.contentType 
+      });
+
+      const { error, data } = await supabaseLogo.storage
+        .from(TENANT_BUCKET_NAME)
+        .upload(pathKey, buf, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: parsed.data.contentType,
+        });
+
+      if (error) {
+        console.error("[Logo Upload] Supabase dataUrl upload error:", error);
+        return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
+      }
+
+      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET_NAME).getPublicUrl(data.path).data.publicUrl;
+      console.log(`[Logo Upload] Supabase dataUrl upload successful:`, { publicUrl });
+    } else {
+      return res.status(400).json({ error: "unsupported_payload" });
+    }
+
+    // Update tenant metadata with logo URL
+    const updatedTenant = await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        metadata: {
+          ...(tenant.metadata as any || {}),
+          logo_url: publicUrl,
+        },
+      },
+    });
+
+    return res.status(200).json({ url: publicUrl, tenant: updatedTenant });
+  } catch (e: any) {
+    console.error("[Logo Upload Error] Full error details:", {
+      message: e?.message,
+      stack: e?.stack,
+      tenantId: req.params.id,
+    });
+    return res.status(500).json({ 
+      error: "failed_to_upload_logo",
+      details: DEV ? e?.message : undefined 
+    });
   }
 });
 
@@ -480,12 +626,24 @@ app.get(["/items/:id/photos", "/inventory/:id/photos"], async (req, res) => {
 
 
 /* --------------------------- ITEMS / INVENTORY --------------------------- */
-const listQuery = z.object({ tenantId: z.string().min(1) });
+const listQuery = z.object({ 
+  tenantId: z.string().min(1),
+  count: z.string().optional() // Add count parameter for optimization
+});
 
 app.get(["/items", "/inventory"], async (req, res) => {
   const parsed = listQuery.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: "tenant_required" });
   try {
+    // If count=true, return only the count for performance
+    if (req.query.count === 'true') {
+      const count = await prisma.inventoryItem.count({
+        where: { tenantId: parsed.data.tenantId },
+      });
+      return res.json({ count });
+    }
+    
+    // Otherwise return full items list
     const items = await prisma.inventoryItem.findMany({
       where: { tenantId: parsed.data.tenantId },
       orderBy: { updatedAt: "desc" },
@@ -1133,6 +1291,7 @@ app.use('/subscriptions', subscriptionRoutes);
 app.use('/categories', categoryRoutes);
 app.use('/performance', performanceRoutes);
 app.use('/organizations', organizationRoutes);
+app.use('/upgrade-requests', upgradeRequestsRoutes);
 app.use(platformSettingsRoutes);
 
 /* ------------------------------ jobs ------------------------------ */

@@ -24,6 +24,8 @@ export default function EditBusinessProfileModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(formData.logo_url || null);
 
   // Reset form when modal opens/closes or profile changes
   useEffect(() => {
@@ -33,8 +35,113 @@ export default function EditBusinessProfileModal({
       setTouched({});
       setError(null);
       setSuccess(false);
+      setLogoPreview(profile?.logo_url || null);
     }
   }, [isOpen, profile]);
+
+  // Image compression helper
+  const compressImage = async (file: File, maxWidth = 800, quality = 0.85): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        
+        // Resize if needed
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("canvas_failed"));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to JPEG with compression
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl);
+      };
+      
+      img.onerror = () => reject(new Error("image_load_failed"));
+      reader.onerror = () => reject(new Error("read_failed"));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle logo file upload
+  const handleLogoUpload = async (file: File) => {
+    try {
+      setUploadingLogo(true);
+      setError(null);
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please select an image file');
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Logo file size must be less than 5MB');
+        return;
+      }
+
+      // Compress image
+      const dataUrl = await compressImage(file);
+      setLogoPreview(dataUrl);
+
+      // Get tenant ID from localStorage
+      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+      if (!tenantId) {
+        setError('No tenant selected');
+        return;
+      }
+
+      // Upload to server
+      const body = JSON.stringify({ 
+        tenant_id: tenantId, 
+        dataUrl, 
+        contentType: "image/jpeg" 
+      });
+
+      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+
+      const payload = await res.json();
+      if (!res.ok) {
+        setError(payload?.error || "Upload failed");
+        return;
+      }
+
+      // Update form data with uploaded URL
+      const uploadedUrl = payload.url;
+      if (uploadedUrl) {
+        handleChange('logo_url', uploadedUrl);
+        setLogoPreview(uploadedUrl);
+      }
+    } catch (err) {
+      console.error('Logo upload error:', err);
+      setError('Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const validateField = (name: string, value: any) => {
     try {
@@ -269,29 +376,66 @@ export default function EditBusinessProfileModal({
             helperText="Optional - Primary contact for this location"
           />
 
-          {/* Admin Email for Upgrade Requests (Optional) */}
-          <Input
-            type="email"
-            label="Admin Email (Upgrade Requests)"
-            placeholder="admin@example.com"
-            value={formData.admin_email || ''}
-            onChange={(e) => handleChange('admin_email', e.target.value)}
-            onBlur={() => handleBlur('admin_email')}
-            error={errors.admin_email}
-            helperText="Optional - Email address to receive upgrade requests from tenants"
-          />
+          {/* Logo URL (Professional+ Tier) - with upload option */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Business Logo
+            </label>
+            
+            {/* Logo Preview */}
+            {logoPreview && (
+              <div className="mb-3 flex items-center gap-3">
+                <img 
+                  src={logoPreview} 
+                  alt="Logo preview" 
+                  className="h-20 w-20 object-contain border border-neutral-200 rounded-lg bg-white p-2"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLogoPreview(null);
+                    handleChange('logo_url', '');
+                  }}
+                  className="text-sm text-red-600 hover:text-red-700"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
 
-          {/* Logo URL (Professional+ Tier) */}
-          <Input
-            type="url"
-            label="Business Logo URL"
-            placeholder="https://example.com/logo.png"
-            value={formData.logo_url || ''}
-            onChange={(e) => handleChange('logo_url', e.target.value)}
-            onBlur={() => handleBlur('logo_url')}
-            error={errors.logo_url}
-            helperText="Optional - Professional+ tier: Logo displays on product landing pages"
-          />
+            {/* Upload Button */}
+            <div className="flex gap-2 mb-2">
+              <label className="flex-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleLogoUpload(file);
+                  }}
+                  disabled={uploadingLogo}
+                  className="hidden"
+                />
+                <div className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium text-center cursor-pointer">
+                  {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                </div>
+              </label>
+            </div>
+
+            {/* Manual URL Input */}
+            <Input
+              type="url"
+              placeholder="Or paste logo URL: https://example.com/logo.png"
+              value={formData.logo_url || ''}
+              onChange={(e) => {
+                handleChange('logo_url', e.target.value);
+                setLogoPreview(e.target.value);
+              }}
+              onBlur={() => handleBlur('logo_url')}
+              error={errors.logo_url}
+              helperText="Optional - Professional+ tier: Logo displays on product landing pages"
+            />
+          </div>
 
           {/* Business Description */}
           <div>

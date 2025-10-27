@@ -8,6 +8,8 @@
     "build": "tsc -p .",
     "start": "prisma migrate deploy && node dist/index.js",
     "db:seed": "prisma db seed",
+    "migrate:data": "node --experimental-json-modules ./scripts/migrate.js",
+    "migrate:storage": "node --experimental-json-modules ./scripts/storage-sync.js",
     "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -17,9 +19,10 @@
   "license": "ISC",
   "packageManager": "pnpm@10.18.3",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.917.0",
     "@prisma/client": "^6.17.1",
-    "@supabase/supabase-js": "^2.75.1",
     "cors": "^2.8.5",
+    "execa": "^9.6.0",
     "express": "^5.1.0",
     "morgan": "^1.10.1",
     "multer": "1.4.5-lts.2",
@@ -28,18 +31,24 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.1.0",
+    "@supabase/supabase-js": "^2.75.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/morgan": "^1.9.10",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.19.22",
     "@types/supertest": "^6.0.2",
+    "dotenv-cli": "^10.0.0",
     "nodemon": "^3.1.10",
     "prisma": "^6.17.1",
+    "supabase": "^2.53.6",
     "supertest": "^7.0.0",
+    "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "zx": "^8.8.5"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -89,6 +89,17 @@ export default function BusinessProfileCard({ profile, loading, onUpdate }: Busi
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Business Logo */}
+          {profile.logo_url && (
+            <div className="flex items-center justify-center pb-4 border-b border-neutral-200">
+              <img
+                src={profile.logo_url}
+                alt="Business Logo"
+                className="max-h-24 max-w-full object-contain"
+              />
+            </div>
+          )}
+
           {/* Business Information */}
           <div className="space-y-4">
             {/* Business Name */}

@@ -36,15 +36,21 @@ export default function SubscriptionPage() {
           return;
         }
 
-        // Fetch tenant info
-        const res = await fetch(`/api/tenants/${tenantId}`);
-        if (res.ok) {
-          const data = await res.json();
+        // Fetch tenant info and SKU count in parallel
+        const [tenantRes, itemsRes] = await Promise.all([
+          fetch(`/api/tenants/${tenantId}`),
+          fetch(`/api/items?tenantId=${tenantId}&count=true`)
+        ]);
+        
+        if (tenantRes.ok) {
+          const data = await tenantRes.json();
           
-          // Get SKU count
-          const itemsRes = await fetch(`/api/items?tenantId=${tenantId}`);
-          const items = await itemsRes.json();
-          const itemCount = Array.isArray(items) ? items.length : 0;
+          // Get SKU count (optimized)
+          let itemCount = 0;
+          if (itemsRes.ok) {
+            const itemsData = await itemsRes.json();
+            itemCount = itemsData.count || (Array.isArray(itemsData) ? itemsData.length : 0);
+          }
           
           setTenant({
             ...data,
@@ -101,26 +107,78 @@ export default function SubscriptionPage() {
     return TIER_LIMITS[tier as SubscriptionTier];
   };
 
-  const handleSubmitChange = () => {
-    const metadata = tenant.metadata as any;
-    const requestedTierInfo = getTierInfo(selectedTier!);
-    
-    // Get email from Email Management configuration
-    const adminEmail = getAdminEmail('subscription');
-    const subject = encodeURIComponent(`Subscription Change Request - ${metadata?.businessName || tenant.name}`);
-    const body = encodeURIComponent(
-      `Hello,\n\n` +
-      `I would like to change my subscription plan.\n\n` +
-      `Current Plan: ${tierInfo.name}\n` +
-      `Requested Plan: ${requestedTierInfo.name}\n` +
-      `Business: ${metadata?.businessName || tenant.name}\n` +
-      `Tenant ID: ${tenant.id}\n\n` +
-      `Please process this subscription change at your earliest convenience.\n\n` +
-      `Thank you!`
-    );
-    
-    window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
-    setShowChangeModal(false);
+  const handleSubmitChange = async () => {
+    try {
+      const metadata = tenant.metadata as any;
+      const requestedTierInfo = getTierInfo(selectedTier!);
+      
+      // Check for existing active requests
+      const checkResponse = await fetch(`/api/upgrade-requests?tenantId=${tenant.id}&status=new,pending`);
+      if (checkResponse.ok) {
+        const existingRequests = await checkResponse.json();
+        if (existingRequests.data && existingRequests.data.length > 0) {
+          alert('You already have a pending subscription change request. Please wait for it to be processed before submitting a new one.');
+          setShowChangeModal(false);
+          return;
+        }
+      }
+      
+      // Create upgrade request in database (queue)
+      const response = await fetch('/api/upgrade-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: tenant.id,
+          businessName: metadata?.businessName || tenant.name,
+          currentTier: tenant.subscriptionTier || 'starter',
+          requestedTier: selectedTier,
+          notes: `Subscription change request from ${metadata?.businessName || tenant.name}`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit upgrade request');
+      }
+
+      // Determine if upgrade or downgrade
+      const tierOrder = ['trial', 'starter', 'professional', 'enterprise'];
+      const chainTierOrder = ['chain_starter', 'chain_professional', 'chain_enterprise'];
+      
+      const currentIndex = isChainTier 
+        ? chainTierOrder.indexOf(currentTier as ChainTier)
+        : tierOrder.indexOf(currentTier as SubscriptionTier);
+      const requestedIndex = selectedTier!.startsWith('chain_')
+        ? chainTierOrder.indexOf(selectedTier as ChainTier)
+        : tierOrder.indexOf(selectedTier as SubscriptionTier);
+      
+      const isUpgrade = requestedIndex > currentIndex;
+      const changeType = isUpgrade ? 'upgrade' : 'downgrade';
+      const actionVerb = isUpgrade ? 'upgrading' : 'downgrading';
+      
+      // Also open email client with pre-filled content
+      const adminEmail = getAdminEmail('subscription');
+      const subject = encodeURIComponent(`Subscription ${isUpgrade ? 'Upgrade' : 'Downgrade'} Request - ${metadata?.businessName || tenant.name}`);
+      const body = encodeURIComponent(
+        `Hello,\n\n` +
+        `I would like to ${changeType} my subscription plan.\n\n` +
+        `Current Plan: ${tierInfo.name}\n` +
+        `Requested Plan: ${requestedTierInfo.name}\n` +
+        `Business: ${metadata?.businessName || tenant.name}\n` +
+        `Tenant ID: ${tenant.id}\n\n` +
+        `I am interested in ${actionVerb} to access ${isUpgrade ? 'additional features and higher limits' : 'a more suitable plan for my current needs'}.\n\n` +
+        `Please process this subscription ${changeType} at your earliest convenience.\n\n` +
+        `Thank you!`
+      );
+      
+      window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
+
+      // Show success message
+      alert('Upgrade request submitted successfully! Our team will review it shortly.');
+      setShowChangeModal(false);
+    } catch (error) {
+      console.error('Failed to submit upgrade request:', error);
+      alert('Failed to submit upgrade request. Please try again.');
+    }
   };
 
   const availableTiers: SubscriptionTier[] = ['starter', 'professional', 'enterprise'];
@@ -405,12 +463,12 @@ export default function SubscriptionPage() {
                 
                 <div className="bg-neutral-50 p-4 rounded-lg space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold">Current:</span>
-                    <Badge className={`${tierInfo.color} text-white`}>{tierInfo.name}</Badge>
+                    <span className="font-semibold text-neutral-900">Current:</span>
+                    <Badge className={`${tierInfo.color} font-semibold border-2 border-neutral-300`}>{tierInfo.name}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold">Requested:</span>
-                    <Badge className={`${getTierInfo(selectedTier).color} text-white`}>
+                    <span className="font-semibold text-neutral-900">Requested:</span>
+                    <Badge className={`${getTierInfo(selectedTier).color} font-semibold border-2 border-neutral-300`}>
                       {getTierInfo(selectedTier).name}
                     </Badge>
                   </div>

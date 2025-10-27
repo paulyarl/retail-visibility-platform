@@ -397,6 +397,19 @@ export default function ItemsClient({
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Tenant Logo */}
+        {currentTenant?.metadata?.logo_url && (
+          <Card>
+            <CardContent className="pt-6 flex justify-center">
+              <img 
+                src={currentTenant.metadata.logo_url} 
+                alt={`${currentTenant.name} logo`}
+                className="max-h-32 object-contain"
+              />
+            </CardContent>
+          </Card>
+        )}
+
         {/* Filters */}
         <Card>
           <CardContent className="pt-6">

@@ -476,3 +476,24 @@ model EmailConfiguration {
   @@index([category])
   @@map("email_configuration")
 }
+
+// Upgrade request tracking
+model UpgradeRequest {
+  id             String    @id @default(cuid())
+  tenantId       String    @map("tenant_id")
+  businessName   String    @map("business_name")
+  currentTier    String    @map("current_tier")
+  requestedTier  String    @map("requested_tier")
+  status         String    @default("new") // new, pending, waiting, complete, denied
+  notes          String?
+  adminNotes     String?   @map("admin_notes")
+  processedBy    String?   @map("processed_by")
+  processedAt    DateTime? @map("processed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  
+  @@index([tenantId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("upgrade_requests")
+}
