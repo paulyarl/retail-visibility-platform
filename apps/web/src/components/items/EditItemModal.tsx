@@ -7,6 +7,7 @@ interface Item {
   id: string;
   sku: string;
   name: string;
+  brand?: string;
   manufacturer?: string;
   priceCents?: number;
   stock?: number;
@@ -23,6 +24,7 @@ interface EditItemModalProps {
 export default function EditItemModal({ isOpen, onClose, item, onSave }: EditItemModalProps) {
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
+  const [brand, setBrand] = useState('');
   const [manufacturer, setManufacturer] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
@@ -35,6 +37,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
     if (item) {
       setSku(item.sku || '');
       setName(item.name || '');
+      setBrand(item.brand || '');
       setManufacturer(item.manufacturer || '');
       setPrice(item.priceCents ? (item.priceCents / 100).toFixed(2) : '');
       setStock(item.stock?.toString() || '');
@@ -59,6 +62,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         ...item,
         sku: sku.trim(),
         name: name.trim(),
+        brand: brand.trim() || undefined,
         manufacturer: manufacturer.trim() || undefined,
         priceCents: price ? Math.round(parseFloat(price) * 100) : undefined,
         stock: stock ? parseInt(stock) : undefined,
@@ -124,6 +128,20 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           />
           <p className="text-xs text-neutral-500 mt-1">
             Display name for the product
+          </p>
+        </div>
+
+        {/* Brand Field */}
+        <div>
+          <Input
+            label="Brand"
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+            placeholder="e.g., Fresh Farms"
+            disabled={saving}
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            Brand name (optional)
           </p>
         </div>
 
@@ -198,6 +216,9 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           <div className="space-y-1 text-sm text-neutral-600">
             <p><span className="font-medium">SKU:</span> {item.sku}</p>
             <p><span className="font-medium">Name:</span> {item.name}</p>
+            {item.brand && (
+              <p><span className="font-medium">Brand:</span> {item.brand}</p>
+            )}
             {item.manufacturer && (
               <p><span className="font-medium">Manufacturer:</span> {item.manufacturer}</p>
             )}

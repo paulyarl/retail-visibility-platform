@@ -667,12 +667,14 @@ const createItemSchema = z.object({
   name: z.string().min(1),
   priceCents: z.number().int().nonnegative().default(0),
   stock: z.number().int().nonnegative().default(0),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z.string().url().nullable().optional(),
   metadata: z.any().optional(),
+  description: z.string().optional(),
   // v3.4 SWIS fields (required by schema)
   title: z.string().min(1).optional(),
   brand: z.string().min(1).optional(),
-  price: z.number().nonnegative().optional(),
+  manufacturer: z.string().optional(),
+  price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
   currency: z.string().length(3).optional(),
 });
 
@@ -701,7 +703,10 @@ app.post(["/items", "/inventory"], checkSubscriptionLimits, enforcePolicyComplia
 const updateItemSchema = createItemSchema.partial().extend({ tenantId: z.string().min(1).optional() });
 app.put(["/items/:id", "/inventory/:id"], enforcePolicyCompliance, async (req, res) => {
   const parsed = updateItemSchema.safeParse(req.body ?? {});
-  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  if (!parsed.success) {
+    console.error('[PUT /items/:id] Validation failed:', JSON.stringify(parsed.error.flatten(), null, 2));
+    return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  }
   try {
     const updated = await prisma.inventoryItem.update({ where: { id: req.params.id }, data: parsed.data });
     await audit({ tenantId: updated.tenantId, actor: null, action: "inventory.update", payload: { id: updated.id } });
