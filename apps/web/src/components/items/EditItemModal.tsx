@@ -7,6 +7,7 @@ interface Item {
   id: string;
   sku: string;
   name: string;
+  manufacturer?: string;
   priceCents?: number;
   stock?: number;
   description?: string;
@@ -22,9 +23,10 @@ interface EditItemModalProps {
 export default function EditItemModal({ isOpen, onClose, item, onSave }: EditItemModalProps) {
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
+  const [manufacturer, setManufacturer] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState('');  
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +35,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
     if (item) {
       setSku(item.sku || '');
       setName(item.name || '');
+      setManufacturer(item.manufacturer || '');
       setPrice(item.priceCents ? (item.priceCents / 100).toFixed(2) : '');
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
@@ -56,6 +59,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         ...item,
         sku: sku.trim(),
         name: name.trim(),
+        manufacturer: manufacturer.trim() || undefined,
         priceCents: price ? Math.round(parseFloat(price) * 100) : undefined,
         stock: stock ? parseInt(stock) : undefined,
         description: description.trim() || undefined,
@@ -123,6 +127,20 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </p>
         </div>
 
+        {/* Manufacturer Field */}
+        <div>
+          <Input
+            label="Manufacturer"
+            value={manufacturer}
+            onChange={(e) => setManufacturer(e.target.value)}
+            placeholder="e.g., Local Beekeepers Co."
+            disabled={saving}
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            Supplier or manufacturer name (optional)
+          </p>
+        </div>
+
         {/* Price Field */}
         <div>
           <Input
@@ -180,6 +198,9 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           <div className="space-y-1 text-sm text-neutral-600">
             <p><span className="font-medium">SKU:</span> {item.sku}</p>
             <p><span className="font-medium">Name:</span> {item.name}</p>
+            {item.manufacturer && (
+              <p><span className="font-medium">Manufacturer:</span> {item.manufacturer}</p>
+            )}
             {item.priceCents !== undefined && (
               <p><span className="font-medium">Price:</span> ${(item.priceCents / 100).toFixed(2)}</p>
             )}

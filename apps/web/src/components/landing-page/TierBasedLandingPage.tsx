@@ -9,6 +9,7 @@ interface Product {
   name: string;
   title: string;
   brand: string;
+  manufacturer?: string;
   description?: string;
   price: number;
   currency: string;
@@ -83,21 +84,6 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      {/* Header with business logo (Professional+ tier) */}
-      {showLogo && (
-        <div className="bg-white border-b border-neutral-200">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <Image
-              src={displayLogo}
-              alt={displayName}
-              width={150}
-              height={50}
-              className="h-12 w-auto object-contain"
-            />
-          </div>
-        </div>
-      )}
-
       <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {/* Product Images */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
@@ -125,7 +111,11 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
         {/* Product Info */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h1 className="text-3xl font-bold text-neutral-900 mb-2">{product.title || product.name}</h1>
-          <p className="text-sm text-neutral-600 mb-4">by {product.brand}</p>
+          <p className="text-sm text-neutral-600 mb-1">by {product.brand}</p>
+          {product.manufacturer && (
+            <p className="text-sm text-neutral-500 mb-4">Manufacturer: {product.manufacturer}</p>
+          )}
+          {!product.manufacturer && <div className="mb-3" />}
           
           <div className="flex items-baseline gap-2 mb-6">
             <span className="text-4xl font-bold" style={{ color: primaryColor }}>
@@ -208,6 +198,20 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
 
         {/* Business Contact Info */}
         <div className="bg-white rounded-lg shadow-sm p-6">
+          {/* Business Logo */}
+          {showLogo && (
+            <div className="mb-6 flex justify-center">
+              <Image
+                src={displayLogo}
+                alt={displayName}
+                width={200}
+                height={80}
+                className="h-20 w-auto object-contain"
+                priority
+              />
+            </div>
+          )}
+          
           <h2 className="text-xl font-semibold text-neutral-900 mb-4">About {tenant.metadata?.businessName || tenant.name}</h2>
           
           {/* Business Description */}

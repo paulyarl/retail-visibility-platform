@@ -12,6 +12,7 @@ interface Product {
   name: string;
   title: string;
   brand: string;
+  manufacturer?: string;
   description?: string;
   price: number;
   currency: string;

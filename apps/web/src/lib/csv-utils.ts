@@ -6,6 +6,7 @@ export interface CSVItem {
   name: string;
   title: string;
   brand: string;
+  manufacturer?: string;
   description?: string;
   price: number;
   currency: string;
@@ -18,6 +19,7 @@ export const CSV_TEMPLATE_HEADERS = [
   'name',
   'title',
   'brand',
+  'manufacturer',
   'description',
   'price',
   'currency',
@@ -31,6 +33,7 @@ export const CSV_EXAMPLE_DATA = [
     name: 'Red Running Shoes',
     title: 'Premium Red Running Shoes - Size 10',
     brand: 'Nike',
+    manufacturer: 'Nike Inc.',
     description: 'Comfortable running shoes with excellent support',
     price: 89.99,
     currency: 'USD',
@@ -42,6 +45,7 @@ export const CSV_EXAMPLE_DATA = [
     name: 'Blue T-Shirt',
     title: 'Cotton Blue T-Shirt - Medium',
     brand: 'Adidas',
+    manufacturer: 'Adidas AG',
     description: 'Soft cotton t-shirt, perfect for casual wear',
     price: 24.99,
     currency: 'USD',
