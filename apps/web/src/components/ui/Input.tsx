@@ -30,7 +30,7 @@ export function Input({
         id={inputId}
         className={`
           w-full px-3 py-2 border rounded-lg
-          bg-white text-neutral-900 placeholder-neutral-400
+          !bg-white !text-neutral-900 placeholder-neutral-400
           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
           disabled:bg-neutral-100 disabled:cursor-not-allowed
           ${error ? 'border-error' : 'border-neutral-300'}
