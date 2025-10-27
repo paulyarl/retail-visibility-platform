@@ -23,6 +23,7 @@ type Tenant = {
     address_line1?: string;
     postal_code?: string;
     subscriptionTier?: string;
+    logo_url?: string;
   };
 };
 
