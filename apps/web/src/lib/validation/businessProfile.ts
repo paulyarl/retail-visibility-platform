@@ -63,10 +63,9 @@ export const businessProfileSchema = z.object({
     .or(z.literal('')),
   
   contact_person: z.string()
+    .min(2, 'Contact person name must be at least 2 characters')
     .max(100, 'Contact person name must be less than 100 characters')
-    .trim()
-    .optional()
-    .or(z.literal('')),
+    .trim(),
   
   admin_email: z.string()
     .regex(emailRegex, 'Please enter a valid admin email address')

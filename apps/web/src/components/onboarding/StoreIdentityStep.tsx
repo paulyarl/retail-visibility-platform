@@ -264,7 +264,7 @@ export default function StoreIdentityStep({
           helperText="Optional - Include https://"
         />
 
-        {/* Contact Person (Optional) */}
+        {/* Contact Person */}
         <Input
           label="Contact Person"
           placeholder="e.g., John Smith"
@@ -272,7 +272,8 @@ export default function StoreIdentityStep({
           onChange={(e) => handleChange('contact_person', e.target.value)}
           onBlur={() => handleBlur('contact_person')}
           error={touched.contact_person ? errors.contact_person : undefined}
-          helperText="Optional - Primary contact for this location"
+          helperText="Primary contact for this location"
+          required
         />
       </motion.div>
     </div>
