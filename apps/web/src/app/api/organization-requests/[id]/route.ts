@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { proxyGet, proxyPatch, proxyDelete } from '@/lib/api-proxy';
 
 // GET /api/organization-requests/[id] - Get a specific request
 export async function GET(
@@ -10,34 +8,9 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-
-    const organizationRequest = await prisma.organizationRequest.findUnique({
-      where: { id },
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            subscriptionTier: true,
-          },
-        },
-      },
-    });
-
-    if (!organizationRequest) {
-      return NextResponse.json(
-        { error: 'Organization request not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(organizationRequest);
+    const res = await proxyGet(request, `/organization-requests/${id}`);
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
   } catch (error) {
     console.error('[Organization Request] GET error:', error);
     return NextResponse.json(
@@ -55,64 +28,9 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status, adminNotes, processedBy, costAgreed, estimatedCost } = body;
-
-    const updateData: any = {};
-
-    if (status) {
-      updateData.status = status;
-      updateData.processedAt = new Date();
-      if (processedBy) {
-        updateData.processedBy = processedBy;
-      }
-    }
-
-    if (adminNotes !== undefined) {
-      updateData.adminNotes = adminNotes;
-    }
-
-    if (estimatedCost !== undefined) {
-      updateData.estimatedCost = estimatedCost;
-    }
-
-    if (costAgreed !== undefined) {
-      updateData.costAgreed = costAgreed;
-      if (costAgreed) {
-        updateData.costAgreedAt = new Date();
-      }
-    }
-
-    const organizationRequest = await prisma.organizationRequest.update({
-      where: { id },
-      data: updateData,
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            subscriptionTier: true,
-          },
-        },
-      },
-    });
-
-    // If approved and cost agreed, assign tenant to organization
-    if (status === 'approved' && organizationRequest.costAgreed) {
-      await prisma.tenant.update({
-        where: { id: organizationRequest.tenantId },
-        data: {
-          organizationId: organizationRequest.organizationId,
-        },
-      });
-    }
-
-    return NextResponse.json(organizationRequest);
+    const res = await proxyPatch(request, `/organization-requests/${id}`, body);
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
   } catch (error) {
     console.error('[Organization Request] PATCH error:', error);
     return NextResponse.json(
@@ -129,12 +47,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-
-    await prisma.organizationRequest.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({ success: true }, { status: 200 });
+    const res = await proxyDelete(request, `/organization-requests/${id}`);
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
   } catch (error) {
     console.error('[Organization Request] DELETE error:', error);
     return NextResponse.json(
