@@ -608,7 +608,7 @@ export default function ItemsClient({
                 <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
-                <h3 className="mt-2 text-sm font-medium text-neutral-900">{t('inventory.noItems', 'No items')}</h3>
+                <h3 className="mt-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('inventory.noItems', 'No items')}</h3>
                 <p className="mt-1 text-sm text-neutral-500">Get started by creating a new item.</p>
               </div>
             ) : (
@@ -631,7 +631,7 @@ export default function ItemsClient({
                     {/* Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-neutral-900 truncate">{i.name}</p>
+                        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{i.name}</p>
                         <Badge variant="default">{i.sku}</Badge>
                         {/* Status Badges */}
                         <Badge 
@@ -653,7 +653,7 @@ export default function ItemsClient({
                       </div>
                       <div className="mt-1 flex items-center gap-4 text-sm text-neutral-500">
                         {typeof i.priceCents === "number" && (
-                          <span className="font-medium text-neutral-900">${(i.priceCents / 100).toFixed(2)}</span>
+                          <span className="font-semibold text-neutral-900 dark:text-neutral-100">${(i.priceCents / 100).toFixed(2)}</span>
                         )}
                         {typeof i.stock === "number" && (
                           <span>Stock: {i.stock}</span>

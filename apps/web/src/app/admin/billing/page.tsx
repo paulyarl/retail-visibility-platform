@@ -84,13 +84,13 @@ export default function AdminBillingPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-sm text-neutral-600">Total Tenants</div>
-              <div className="text-3xl font-bold text-neutral-900">{summary.total}</div>
+              <div className="text-3xl font-bold text-neutral-900 dark:text-neutral-100">{summary.total}</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
               <div className="text-sm text-neutral-600">Trial</div>
-              <div className="text-3xl font-bold text-neutral-900">{summary.trial}</div>
+              <div className="text-3xl font-bold text-neutral-900 dark:text-neutral-100">{summary.trial}</div>
             </CardContent>
           </Card>
           <Card>
@@ -135,7 +135,7 @@ export default function AdminBillingPage() {
                   className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
                 >
                   <div className="flex-1">
-                    <div className="font-semibold text-neutral-900">{tenant.name}</div>
+                    <div className="font-semibold text-neutral-900 dark:text-neutral-100">{tenant.name}</div>
                     {tenant.metadata?.city && tenant.metadata?.state && (
                       <div className="text-sm text-neutral-600">
                         {tenant.metadata.city}, {tenant.metadata.state}

@@ -154,7 +154,7 @@ export default function AdminTiersPage() {
             <div className="space-y-6">
               {/* Tier Information */}
               <div>
-                <h3 className="text-sm font-semibold text-neutral-900 mb-3">Subscription Tiers</h3>
+                <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Subscription Tiers</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   {TIERS.map(tier => (
                     <div key={tier.value} className="p-4 border border-neutral-200 rounded-lg">
@@ -182,7 +182,7 @@ export default function AdminTiersPage() {
               
               {/* Quick Actions Guide */}
               <div className="pt-4 border-t border-neutral-200">
-                <h3 className="text-sm font-semibold text-neutral-900 mb-3">Quick Actions Guide</h3>
+                <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Quick Actions Guide</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-start gap-3">
                     <div className="flex gap-1 mt-1">
@@ -192,7 +192,7 @@ export default function AdminTiersPage() {
                       <span className="text-xl">🥇</span>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-neutral-900">Tier Buttons</p>
+                      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Tier Buttons</p>
                       <p className="text-xs text-neutral-600">Click to change tenant's subscription tier. Hover for tier name.</p>
                     </div>
                   </div>
@@ -202,7 +202,7 @@ export default function AdminTiersPage() {
                       <Badge variant="default" className="text-xs bg-green-100 text-green-800">Active</Badge>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-neutral-900">Status Buttons</p>
+                      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Status Buttons</p>
                       <p className="text-xs text-neutral-600">Click to change billing status (Trial, Active, Past Due, Canceled).</p>
                     </div>
                   </div>
@@ -253,7 +253,7 @@ export default function AdminTiersPage() {
                         {/* Tenant Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-neutral-900 truncate group-hover:text-primary-600 transition-colors flex items-center gap-2">
+                            <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-2">
                               {tenant.metadata?.businessName || tenant.name}
                               <span className="text-neutral-400 group-hover:text-primary-500 transition-colors">→</span>
                             </h3>

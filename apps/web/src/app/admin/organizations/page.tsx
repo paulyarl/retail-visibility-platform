@@ -173,32 +173,32 @@ export default function AdminOrganizationsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div className="bg-neutral-50 p-4 rounded-lg">
                     <div className="text-sm font-semibold text-neutral-700">Locations</div>
-                    <div className="text-2xl font-bold text-neutral-900">
+                    <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
                       {org.stats.totalLocations} / {org.maxLocations}
                     </div>
                   </div>
                   <div className="bg-neutral-50 p-4 rounded-lg">
                     <div className="text-sm font-semibold text-neutral-700">Total SKUs</div>
-                    <div className="text-2xl font-bold text-neutral-900">
+                    <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
                       {org.stats.totalSKUs} / {org.maxTotalSKUs}
                     </div>
                   </div>
                   <div className="bg-neutral-50 p-4 rounded-lg">
                     <div className="text-sm font-semibold text-neutral-700">Utilization</div>
-                    <div className="text-2xl font-bold text-neutral-900">
+                    <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
                       {org.stats.utilizationPercent.toFixed(1)}%
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="font-bold text-sm text-neutral-900">Locations:</h4>
+                  <h4 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">Locations:</h4>
                   {org.tenants.map((tenant) => (
                     <div
                       key={tenant.id}
                       className="flex items-center justify-between p-3 bg-neutral-50 rounded"
                     >
-                      <span className="font-semibold text-neutral-900">{tenant.name}</span>
+                      <span className="font-semibold text-neutral-900 dark:text-neutral-100">{tenant.name}</span>
                       <Badge variant="default">{tenant._count.items} SKUs</Badge>
                     </div>
                   ))}
@@ -266,7 +266,7 @@ export default function AdminOrganizationsPage() {
           <div className="space-y-4">
             {/* Current Locations */}
             <div>
-              <h4 className="font-semibold text-sm text-neutral-900 mb-2">
+              <h4 className="font-semibold text-sm text-neutral-900 dark:text-neutral-100 mb-2">
                 Current Locations ({selectedOrg.tenants.length})
               </h4>
               {selectedOrg.tenants.length === 0 ? (
@@ -278,7 +278,7 @@ export default function AdminOrganizationsPage() {
                       key={tenant.id}
                       className="flex items-center justify-between p-3 bg-neutral-50 rounded"
                     >
-                      <span className="font-medium text-neutral-900">{tenant.name}</span>
+                      <span className="font-semibold text-neutral-900 dark:text-neutral-100">{tenant.name}</span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -295,7 +295,7 @@ export default function AdminOrganizationsPage() {
 
             {/* Add Location */}
             <div>
-              <h4 className="font-semibold text-sm text-neutral-900 mb-2">Add Location</h4>
+              <h4 className="font-semibold text-sm text-neutral-900 dark:text-neutral-100 mb-2">Add Location</h4>
               {availableTenants.length === 0 ? (
                 <p className="text-sm text-neutral-600">No available tenants to add</p>
               ) : (
