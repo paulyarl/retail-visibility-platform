@@ -12,6 +12,9 @@ interface Tenant {
   name: string;
   createdAt?: string;
   userId?: string;
+  subscriptionStatus?: string;
+  subscriptionTier?: string;
+  trialEndsAt?: string;
   status: 'active' | 'inactive';
   itemCount?: number;
   organization?: {
@@ -48,15 +51,19 @@ export default function AdminTenantsPage() {
             try {
               const itemsRes = await api.get(`/api/tenants/${t.id}/items`);
               const items = itemsRes.ok ? await itemsRes.json() : [];
+              
+              // Determine status based on subscriptionStatus
+              const isActive = t.subscriptionStatus === 'active' || t.subscriptionStatus === 'trial';
+              
               return {
                 ...t,
-                status: 'active',
+                status: isActive ? 'active' : 'inactive',
                 itemCount: Array.isArray(items) ? items.length : 0,
               };
             } catch {
               return {
                 ...t,
-                status: 'active',
+                status: t.subscriptionStatus === 'active' || t.subscriptionStatus === 'trial' ? 'active' : 'inactive',
                 itemCount: 0,
               };
             }
