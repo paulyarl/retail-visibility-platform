@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, AnimatedCard } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
 import { motion } from "framer-motion";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import Image from "next/image";
 import PublicFooter from "@/components/PublicFooter";
 
 export default function Home() {
   const { settings } = usePlatformSettings();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState({ 
     total: 0, 
     active: 0, 
@@ -21,12 +26,25 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(true);
   
+  // Redirect to login if not authenticated
   useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [authLoading, isAuthenticated, router]);
+  
+  useEffect(() => {
+    // Only fetch stats if authenticated
+    if (!isAuthenticated || authLoading) {
+      setLoading(false);
+      return;
+    }
+    
     // Fetch comprehensive dashboard stats from database
     const fetchStats = async () => {
       try {
         // Fetch all tenants first
-        const allTenantsRes = await fetch('/api/tenants');
+        const allTenantsRes = await api.get('/api/tenants');
         
         if (!allTenantsRes.ok) {
           console.log('[Dashboard] Failed to fetch tenants');
@@ -53,8 +71,8 @@ export default function Home() {
         
         // Fetch tenant details and items
         const [tenantRes, itemsRes] = await Promise.all([
-          fetch(`/api/tenants/${selectedTenant.id}`),
-          fetch(`/api/items?tenantId=${selectedTenant.id}`),
+          api.get(`/api/tenants/${selectedTenant.id}`),
+          api.get(`/api/items?tenantId=${selectedTenant.id}`),
         ]);
         
         console.log('[Dashboard] API responses:', {
@@ -99,7 +117,7 @@ export default function Home() {
     };
     
     fetchStats();
-  }, []);
+  }, [isAuthenticated, authLoading]);
   
   // Animated counts for metrics
   const inventoryCount = useCountUp(0, stats.total);
