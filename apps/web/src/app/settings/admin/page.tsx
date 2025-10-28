@@ -155,6 +155,19 @@ export default function AdminDashboardPage() {
           stats: 'Process requests',
           badge: 'NEW',
         },
+        {
+          title: 'Organization Requests',
+          description: 'Review and approve tenant requests to join organizations',
+          href: '/settings/admin/organization-requests',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          ),
+          color: 'bg-teal-500',
+          stats: 'Approve requests',
+          badge: 'NEW',
+        },
       ],
     },
     {
