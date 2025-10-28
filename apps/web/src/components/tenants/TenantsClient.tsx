@@ -314,14 +314,16 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete 
           ) : (
             <button
               onClick={onSelect}
-              className="text-left transition-colors group"
+              className="text-left transition-colors group w-full"
             >
-              <div className="flex items-center gap-2">
-                <svg className="h-5 w-5 text-neutral-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="flex items-center gap-3">
+                <svg className="h-5 w-5 text-neutral-400 group-hover:text-primary-600 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                <div>
-                  <p className="font-semibold text-neutral-900 dark:text-neutral-100 group-hover:text-primary-600 dark:group-hover:text-primary-400">{tenant.name}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="inline-block px-3 py-1.5 bg-primary-100 dark:bg-primary-900/30 rounded-lg mb-1 group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 transition-colors">
+                    <p className="font-bold text-primary-900 dark:text-primary-100 text-base">{tenant.name}</p>
+                  </div>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">{tenant.id}</p>
                 </div>
               </div>
