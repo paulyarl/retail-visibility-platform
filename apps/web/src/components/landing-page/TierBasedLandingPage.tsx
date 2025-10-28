@@ -1,8 +1,9 @@
 'use client';
 
-import Image from 'next/image';
+import React from 'react';
 import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import { SafeImage } from '@/components/SafeImage';
 
 interface Product {
   id: string;
@@ -91,7 +92,7 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
             <ImageGallery images={product.imageGallery} productName={product.name} />
           ) : product.imageUrl ? (
             <div className="relative w-full h-96">
-              <Image
+              <SafeImage
                 src={product.imageUrl}
                 alt={product.name}
                 fill
@@ -201,7 +202,7 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
           {/* Business Logo */}
           {showLogo && (
             <div className="mb-6 flex justify-center">
-              <Image
+              <SafeImage
                 src={displayLogo}
                 alt={displayName}
                 width={200}
@@ -278,7 +279,7 @@ function ImageGallery({ images, productName }: { images: string[]; productName: 
   return (
     <div className="relative">
       <div className="relative w-full h-96">
-        <Image
+        <SafeImage
           src={images[currentIndex]}
           alt={`${productName} - Image ${currentIndex + 1}`}
           fill
@@ -322,6 +323,3 @@ function ImageGallery({ images, productName }: { images: string[]; productName: 
     </div>
   );
 }
-
-// Add React import for useState
-import React from 'react';
