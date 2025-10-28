@@ -61,6 +61,7 @@ import {
 import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
 import organizationRoutes from './routes/organizations';
+import organizationRequestRoutes from './routes/organization-requests';
 import upgradeRequestsRoutes from './routes/upgrade-requests';
 import permissionRoutes from './routes/permissions';
 import userRoutes from './routes/users';
@@ -1352,6 +1353,7 @@ app.use('/subscriptions', subscriptionRoutes);
 app.use('/categories', categoryRoutes);
 app.use('/performance', performanceRoutes);
 app.use('/organizations', organizationRoutes);
+app.use('/organization-requests', organizationRequestRoutes);
 app.use('/upgrade-requests', upgradeRequestsRoutes);
 app.use('/permissions', permissionRoutes);
 app.use('/users', userRoutes);
