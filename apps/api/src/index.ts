@@ -147,11 +147,15 @@ const createTenantSchema = z.object({ name: z.string().min(1) });
 app.post("/tenants", authenticateToken, async (req, res) => {
   const parsed = createTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  
   try {
+    console.log('[POST /tenants] Creating tenant for user:', req.user?.userId);
     const tenant = await prisma.tenant.create({ data: { name: parsed.data.name } });
+    console.log('[POST /tenants] Tenant created:', tenant.id);
     
     // Link tenant to the authenticated user as owner
     if (req.user?.userId) {
+      console.log('[POST /tenants] Linking tenant to user...');
       await prisma.userTenant.create({
         data: {
           userId: req.user.userId,
@@ -159,12 +163,16 @@ app.post("/tenants", authenticateToken, async (req, res) => {
           role: 'OWNER',
         },
       });
+      console.log('[POST /tenants] UserTenant link created successfully');
+    } else {
+      console.error('[POST /tenants] No userId in request.user!', req.user);
     }
     
     await audit({ tenantId: tenant.id, actor: null, action: "tenant.create", payload: { name: parsed.data.name } });
     res.status(201).json(tenant);
-  } catch {
-    res.status(500).json({ error: "failed_to_create_tenant" });
+  } catch (error) {
+    console.error('[POST /tenants] Error creating tenant:', error);
+    res.status(500).json({ error: "failed_to_create_tenant", message: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

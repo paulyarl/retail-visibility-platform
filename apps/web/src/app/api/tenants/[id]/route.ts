@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`);
+    
+    // Forward Authorization header
+    const authHeader = req.headers.get('authorization');
+    const headers: HeadersInit = {};
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    
+    const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, { headers });
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (_e) {
@@ -12,14 +20,24 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
   }
 }
 
-export async function PUT(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const body = await _req.json();
+    const body = await req.json();
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
+    
+    // Forward Authorization header
+    const authHeader = req.headers.get('authorization');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    
     const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     });
     const data = await res.json();
@@ -29,17 +47,26 @@ export async function PUT(_req: NextRequest, context: { params: Promise<{ id: st
   }
 }
 
-export async function PATCH(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const body = await _req.json();
+    const body = await req.json();
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
     console.log('[PATCH /api/tenants/:id] Proxying to:', `${base}/tenants/${id}`);
     console.log('[PATCH /api/tenants/:id] Body:', body);
     
+    // Forward Authorization header
+    const authHeader = req.headers.get('authorization');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    
     const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     });
     
@@ -63,12 +90,21 @@ export async function PATCH(_req: NextRequest, context: { params: Promise<{ id: 
   }
 }
 
-export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
+    
+    // Forward Authorization header
+    const authHeader = req.headers.get('authorization');
+    const headers: HeadersInit = {};
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    
     const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, {
       method: 'DELETE',
+      headers,
     });
     if (res.status === 204) return new NextResponse(null, { status: 204 });
     const data = await res.json();
