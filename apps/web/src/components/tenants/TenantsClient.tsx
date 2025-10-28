@@ -49,6 +49,11 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     return filteredTenants.slice(startIndex, endIndex);
   }, [filteredTenants, currentPage, pageSize]);
 
+  // Load tenants on mount
+  useEffect(() => {
+    refresh();
+  }, []);
+
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
