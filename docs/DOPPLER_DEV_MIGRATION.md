@@ -172,6 +172,35 @@ doppler run --config local -- node create-test-chain-enhanced.js --scenario=rest
 
 ## 🔄 **Database Migration: Local → Dev**
 
+### ⚠️ **IMPORTANT: Pre-Migration Checklist**
+
+Before starting the migration, ensure:
+
+1. **Stop all dev servers:**
+   ```bash
+   # Stop pnpm dev if running
+   # Press Ctrl+C in the terminal running the dev server
+   ```
+
+2. **Close Prisma Studio:**
+   ```bash
+   # Close any open Prisma Studio instances (both local and dev)
+   # They lock the database and prevent migrations
+   ```
+
+3. **Commit your code:**
+   ```bash
+   git add .
+   git commit -m "checkpoint before database migration"
+   ```
+
+4. **Backup important data:**
+   ```bash
+   # If you have production data, back it up first!
+   ```
+
+---
+
 ### **Step-by-Step Sequence**
 
 Follow these steps to migrate your database changes from `local` to `dev`:
@@ -247,6 +276,8 @@ pnpm dev
 ---
 
 ### **Quick Migration Command Sequence**
+
+⚠️ **Prerequisites:** Stop dev servers and close Prisma Studio first!
 
 For a clean migration, run these commands in order:
 

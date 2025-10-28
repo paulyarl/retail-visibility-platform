@@ -1,21 +1,3 @@
-/*
-  Warnings:
-
-  - Changed the type of `action` on the `permission_audit_log` table. No cast exists, the column would be dropped and recreated, which cannot be done if there is data, since the column is required.
-
-*/
--- AlterTable
-ALTER TABLE "permission_audit_log" ALTER COLUMN "id" DROP DEFAULT,
-DROP COLUMN "action",
-ADD COLUMN     "action" TEXT NOT NULL,
-ALTER COLUMN "changed_at" SET DATA TYPE TIMESTAMP(3);
-
--- AlterTable
-ALTER TABLE "permission_matrix" ALTER COLUMN "id" DROP DEFAULT,
-ALTER COLUMN "created_at" SET DATA TYPE TIMESTAMP(3),
-ALTER COLUMN "updated_at" DROP DEFAULT,
-ALTER COLUMN "updated_at" SET DATA TYPE TIMESTAMP(3);
-
 -- CreateTable
 CREATE TABLE "organization_requests" (
     "id" TEXT NOT NULL,
@@ -58,18 +40,3 @@ ALTER TABLE "organization_requests" ADD CONSTRAINT "organization_requests_tenant
 
 -- AddForeignKey
 ALTER TABLE "organization_requests" ADD CONSTRAINT "organization_requests_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- RenameIndex
-ALTER INDEX "idx_permission_audit_changed_at" RENAME TO "permission_audit_log_changed_at_idx";
-
--- RenameIndex
-ALTER INDEX "idx_permission_audit_changed_by" RENAME TO "permission_audit_log_changed_by_idx";
-
--- RenameIndex
-ALTER INDEX "idx_permission_audit_role" RENAME TO "permission_audit_log_role_idx";
-
--- RenameIndex
-ALTER INDEX "idx_permission_matrix_action" RENAME TO "permission_matrix_action_idx";
-
--- RenameIndex
-ALTER INDEX "idx_permission_matrix_role" RENAME TO "permission_matrix_role_idx";
