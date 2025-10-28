@@ -54,7 +54,7 @@ export default function Home() {
         // Fetch tenant details and items
         const [tenantRes, itemsRes] = await Promise.all([
           fetch(`/api/tenants/${selectedTenant.id}`),
-          fetch(`/api/tenants/${selectedTenant.id}/items`),
+          fetch(`/api/items?tenantId=${selectedTenant.id}`),
         ]);
         
         console.log('[Dashboard] API responses:', {
