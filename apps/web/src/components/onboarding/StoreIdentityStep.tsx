@@ -26,8 +26,26 @@ export default function StoreIdentityStep({
     if (Object.keys(initialData).length > 0) {
       console.log('[StoreIdentityStep] Updating formData with initialData:', initialData);
       setFormData(initialData);
+      
+      // Validate the pre-populated data but be lenient with phone format
+      // This allows users to proceed with existing data even if format is slightly off
+      try {
+        // Create a lenient schema that accepts pre-populated phone numbers
+        const lenientSchema = businessProfileSchema.extend({
+          phone_number: z.string().min(1, 'Phone number is required').trim(),
+        });
+        lenientSchema.parse(initialData);
+        onValidationChange(true);
+        console.log('[StoreIdentityStep] Pre-populated data is valid (lenient validation)');
+      } catch (error) {
+        console.log('[StoreIdentityStep] Pre-populated data validation failed:', error);
+        if (error instanceof z.ZodError) {
+          console.log('[StoreIdentityStep] Validation errors:', error.issues);
+        }
+        onValidationChange(false);
+      }
     }
-  }, [initialData]);
+  }, [initialData, onValidationChange]);
 
   const validateField = (name: string, value: any) => {
     try {
@@ -58,16 +76,32 @@ export default function StoreIdentityStep({
     setFormData(newData);
     onDataChange(newData);
 
+    // Mark field as touched when user changes it
+    setTouched(prev => ({ ...prev, [name]: true }));
+
     // Validate field if it's been touched
     if (touched[name]) {
       validateField(name, value);
     }
 
-    // Check overall validity
+    // Check overall validity with lenient phone validation if phone hasn't been touched
     try {
-      businessProfileSchema.parse(newData);
+      // Use lenient validation for phone if it hasn't been modified by user
+      if (!touched.phone_number && name !== 'phone_number') {
+        const lenientSchema = businessProfileSchema.extend({
+          phone_number: z.string().min(1, 'Phone number is required').trim(),
+        });
+        lenientSchema.parse(newData);
+      } else {
+        businessProfileSchema.parse(newData);
+      }
       onValidationChange(true);
-    } catch {
+      console.log('[StoreIdentityStep] Form is valid:', newData);
+    } catch (error) {
+      console.log('[StoreIdentityStep] Form validation failed:', error);
+      if (error instanceof z.ZodError) {
+        console.log('[StoreIdentityStep] Validation errors:', error.issues);
+      }
       onValidationChange(false);
     }
   };

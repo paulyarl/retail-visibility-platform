@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button, AnimatedCard, Alert } from '@/components/ui';
 import ProgressSteps, { Step } from './ProgressSteps';
 import StoreIdentityStep from './StoreIdentityStep';
-import { BusinessProfile } from '@/lib/validation/businessProfile';
+import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
 
 interface OnboardingWizardProps {
   tenantId: string;
@@ -90,7 +90,7 @@ export default function OnboardingWizard({
                 apiData.country_code = metadata.country_code;
               }
               if (metadata.phone_number || metadata.phone) {
-                apiData.phone_number = metadata.phone_number || metadata.phone;
+                apiData.phone_number = normalizePhoneInput(metadata.phone_number || metadata.phone);
               }
               if (metadata.email) {
                 apiData.email = metadata.email;

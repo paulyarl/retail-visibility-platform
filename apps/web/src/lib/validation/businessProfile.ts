@@ -227,8 +227,14 @@ export function normalizePhoneInput(input: string): string {
   
   // Ensure it starts with +
   if (!cleaned.startsWith('+')) {
-    cleaned = '+' + cleaned;
+    // If it looks like a US number (10 digits), add +1 prefix
+    if (cleaned.length === 10 && /^[2-9]/.test(cleaned)) {
+      cleaned = '+1' + cleaned;
+    } else {
+      cleaned = '+' + cleaned;
+    }
   }
   
+  console.log('[normalizePhoneInput] Input:', input, '-> Output:', cleaned);
   return cleaned;
 }
