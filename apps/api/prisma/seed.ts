@@ -4,15 +4,29 @@ import bcrypt from "bcryptjs";
 const db = new PrismaClient();
 
 async function main() {
+  // Set trial to expire 30 days from now
+  const trialEndsAt = new Date();
+  trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+
   const t = await db.tenant.upsert({
     where: { id: "demo-tenant" },
-    update: {},
-    create: { id: "demo-tenant", name: "Demo Tenant" },
+    update: {
+      subscriptionTier: "starter",
+      subscriptionStatus: "trial",
+      trialEndsAt: trialEndsAt,
+    },
+    create: {
+      id: "demo-tenant",
+      name: "Demo Tenant",
+      subscriptionTier: "starter",
+      subscriptionStatus: "trial",
+      trialEndsAt: trialEndsAt,
+    },
   });
 
   const hashedPassword = await bcrypt.hash("password123", 10);
 
-  await db.user.upsert({
+  const user = await db.user.upsert({
     where: { email: "owner@demo.local" },
     update: {},
     create: {
@@ -22,6 +36,22 @@ async function main() {
       firstName: "Demo",
       lastName: "Owner",
       emailVerified: true,
+    },
+  });
+
+  // Link user to tenant
+  await db.userTenant.upsert({
+    where: {
+      userId_tenantId: {
+        userId: user.id,
+        tenantId: t.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: user.id,
+      tenantId: t.id,
+      role: UserRole.OWNER,
     },
   });
 

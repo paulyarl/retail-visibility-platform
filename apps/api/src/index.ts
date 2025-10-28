@@ -160,7 +160,19 @@ app.post("/tenants", authenticateToken, checkTenantCreationLimit, async (req, re
   
   try {
     console.log('[POST /tenants] Creating tenant for user:', req.user?.userId);
-    const tenant = await prisma.tenant.create({ data: { name: parsed.data.name } });
+    
+    // Set trial to expire 30 days from now
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+    
+    const tenant = await prisma.tenant.create({
+      data: {
+        name: parsed.data.name,
+        subscriptionTier: 'starter',
+        subscriptionStatus: 'trial',
+        trialEndsAt: trialEndsAt,
+      }
+    });
     console.log('[POST /tenants] Tenant created:', tenant.id);
     
     // Link tenant to the authenticated user as owner
