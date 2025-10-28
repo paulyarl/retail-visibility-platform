@@ -6,6 +6,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 import { getAdminEmail } from '@/lib/admin-emails';
+import { api } from '@/lib/api';
 
 interface Tenant {
   id: string;
@@ -38,8 +39,8 @@ export default function SubscriptionPage() {
 
         // Fetch tenant info and SKU count in parallel
         const [tenantRes, itemsRes] = await Promise.all([
-          fetch(`/api/tenants/${tenantId}`),
-          fetch(`/api/items?tenantId=${tenantId}&count=true`)
+          api.get(`/api/tenants/${tenantId}`),
+          api.get(`/api/items?tenantId=${tenantId}&count=true`)
         ]);
         
         if (tenantRes.ok) {
@@ -113,7 +114,7 @@ export default function SubscriptionPage() {
       const requestedTierInfo = getTierInfo(selectedTier!);
       
       // Check for existing active requests
-      const checkResponse = await fetch(`/api/upgrade-requests?tenantId=${tenant.id}&status=new,pending`);
+      const checkResponse = await api.get(`/api/upgrade-requests?tenantId=${tenant.id}&status=new,pending`);
       if (checkResponse.ok) {
         const existingRequests = await checkResponse.json();
         if (existingRequests.data && existingRequests.data.length > 0) {
@@ -124,16 +125,12 @@ export default function SubscriptionPage() {
       }
       
       // Create upgrade request in database (queue)
-      const response = await fetch('/api/upgrade-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenantId: tenant.id,
-          businessName: metadata?.businessName || tenant.name,
-          currentTier: tenant.subscriptionTier || 'starter',
-          requestedTier: selectedTier,
-          notes: `Subscription change request from ${metadata?.businessName || tenant.name}`,
-        }),
+      const response = await api.post('/api/upgrade-requests', {
+        tenantId: tenant.id,
+        businessName: metadata?.businessName || tenant.name,
+        currentTier: tenant.subscriptionTier || 'starter',
+        requestedTier: selectedTier,
+        notes: `Subscription change request from ${metadata?.businessName || tenant.name}`,
       });
 
       if (!response.ok) {
