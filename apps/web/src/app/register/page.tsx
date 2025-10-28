@@ -10,13 +10,16 @@ import Image from 'next/image';
 import Link from 'next/link';
 import PublicFooter from '@/components/PublicFooter';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const { settings } = usePlatformSettings();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { register, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -30,13 +33,26 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await login(email, password);
+      await register(email, password, firstName, lastName);
       router.push('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -88,16 +104,16 @@ export default function LoginPage() {
               {settings?.platformName || 'Retail Visibility Platform'}
             </h1>
             <p className="text-neutral-600 dark:text-neutral-400">
-              {settings?.platformDescription || 'Sign in to manage your inventory'}
+              Create your account to get started
             </p>
           </motion.div>
 
           {/* Auth Card */}
           <AnimatedCard delay={0.2} hover={false} className="p-8">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">Welcome back</h2>
+              <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">Create Account</h2>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Sign in to your account
+                Sign up to start managing your inventory
               </p>
             </div>
 
@@ -108,6 +124,26 @@ export default function LoginPage() {
             )}
             
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  type="text"
+                  label="First Name"
+                  placeholder="John"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  autoComplete="given-name"
+                />
+                
+                <Input
+                  type="text"
+                  label="Last Name"
+                  placeholder="Doe"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  autoComplete="family-name"
+                />
+              </div>
+
               <Input
                 type="email"
                 label="Email"
@@ -125,7 +161,18 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                autoComplete="current-password"
+                autoComplete="new-password"
+                helperText="Must be at least 8 characters"
+              />
+
+              <Input
+                type="password"
+                label="Confirm Password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                autoComplete="new-password"
               />
 
               <Button
@@ -134,44 +181,17 @@ export default function LoginPage() {
                 className="w-full"
                 disabled={loading}
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? 'Creating Account...' : 'Create Account'}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Don't have an account?{' '}
-                <Link href="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-                  Sign up
+                Already have an account?{' '}
+                <Link href="/login" className="text-primary-600 hover:text-primary-700 font-medium">
+                  Sign in
                 </Link>
               </p>
-            </div>
-            
-            {/* Features */}
-            <div className="mt-8 pt-6 border-t border-neutral-200 dark:border-neutral-700">
-              <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-3">
-                What you get
-              </p>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-                  <svg className="w-4 h-4 text-primary-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Manage inventory across locations</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-                  <svg className="w-4 h-4 text-primary-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Sync with Google Merchant Center</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-                  <svg className="w-4 h-4 text-primary-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Upload and manage product photos</span>
-                </div>
-              </div>
             </div>
           </AnimatedCard>
 

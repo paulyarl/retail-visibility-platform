@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlatformSettingsProvider } from "@/contexts/PlatformSettingsContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import DynamicFavicon from "@/components/DynamicFavicon";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -24,7 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-white text-neutral-900`}
       >
         <PlatformSettingsProvider>
-          <ErrorBoundary>{children}</ErrorBoundary>
+          <AuthProvider>
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </AuthProvider>
         </PlatformSettingsProvider>
         {/* <Analytics /> */}
       </body>
