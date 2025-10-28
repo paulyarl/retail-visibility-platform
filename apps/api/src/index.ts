@@ -128,8 +128,28 @@ app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) =
     let tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
     
-    // Check if trial has expired and auto-convert to starter
     const now = new Date();
+    
+    // Auto-set trial expiration date if missing for trial users
+    if (
+      (tenant.subscriptionStatus === "trial" || tenant.subscriptionTier === "trial") &&
+      !tenant.trialEndsAt
+    ) {
+      console.log(`[GET /tenants/:id] Trial date missing for tenant ${tenant.id}. Setting trial to expire in 30 days.`);
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+      
+      tenant = await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: {
+          trialEndsAt: trialEndsAt,
+          subscriptionStatus: "trial",
+        },
+      });
+      console.log(`[GET /tenants/:id] Trial date set for tenant ${tenant.id}: ${trialEndsAt.toISOString()}`);
+    }
+    
+    // Check if trial has expired and auto-convert to starter
     if (
       tenant.subscriptionStatus === "trial" &&
       tenant.trialEndsAt &&
