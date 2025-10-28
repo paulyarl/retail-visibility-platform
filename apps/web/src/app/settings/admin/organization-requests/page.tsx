@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
+import { getAdminEmail } from '@/lib/admin-emails';
 
 type OrganizationRequest = {
   id: string;
@@ -101,6 +102,9 @@ export default function OrganizationRequestsPage() {
       if (res.ok) {
         await loadRequests();
         setShowDetailModal(false);
+        
+        // Notify tenant owner about cost via email
+        alert(`Cost set successfully! Please notify the tenant owner at their registered email to review and agree to the cost of $${estimatedCost}/month.`);
       }
     } catch (error) {
       console.error('Failed to set cost:', error);
@@ -123,8 +127,26 @@ export default function OrganizationRequestsPage() {
       });
       
       if (res.ok) {
+        const request = requests.find(r => r.id === requestId);
         await loadRequests();
         setShowDetailModal(false);
+        
+        // Open email to notify tenant owner of approval
+        if (request) {
+          const adminEmail = getAdminEmail('organization_requests');
+          const subject = encodeURIComponent(`Organization Request Approved - ${request.tenant.name}`);
+          const body = encodeURIComponent(
+            `Hello,\n\n` +
+            `Great news! Your request to join ${request.organization.name} has been approved.\n\n` +
+            `Tenant: ${request.tenant.name}\n` +
+            `Organization: ${request.organization.name}\n` +
+            `Monthly Cost: $${request.estimatedCost?.toFixed(2)} ${request.costCurrency}\n\n` +
+            `Your tenant has been successfully assigned to the organization.\n\n` +
+            `Best regards,\n` +
+            `Platform Administration Team`
+          );
+          window.location.href = `mailto:?subject=${subject}&body=${body}`;
+        }
       }
     } catch (error) {
       console.error('Failed to approve request:', error);
@@ -147,8 +169,26 @@ export default function OrganizationRequestsPage() {
       });
       
       if (res.ok) {
+        const request = requests.find(r => r.id === requestId);
         await loadRequests();
         setShowDetailModal(false);
+        
+        // Open email to notify tenant owner of rejection
+        if (request) {
+          const adminEmail = getAdminEmail('organization_requests');
+          const subject = encodeURIComponent(`Organization Request Update - ${request.tenant.name}`);
+          const body = encodeURIComponent(
+            `Hello,\n\n` +
+            `We regret to inform you that your request to join ${request.organization.name} has been declined.\n\n` +
+            `Tenant: ${request.tenant.name}\n` +
+            `Organization: ${request.organization.name}\n` +
+            `Reason: ${reason}\n\n` +
+            `If you have any questions or would like to discuss this further, please don't hesitate to reach out.\n\n` +
+            `Best regards,\n` +
+            `Platform Administration Team`
+          );
+          window.location.href = `mailto:?subject=${subject}&body=${body}`;
+        }
       }
     } catch (error) {
       console.error('Failed to reject request:', error);

@@ -12,6 +12,7 @@ import { isFeatureEnabled } from "@/lib/featureFlags";
 import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { getAdminEmail } from "@/lib/admin-emails";
 
 type Tenant = {
   id: string;
@@ -499,6 +500,24 @@ export default function TenantSettingsPage() {
                       setShowRequestModal(false);
                       setSelectedOrgId('');
                       setRequestNotes('');
+                      
+                      // Open email client with pre-filled content for admin notification
+                      const adminEmail = getAdminEmail('organization_requests');
+                      const orgName = organizations.find(o => o.id === selectedOrgId)?.name || 'Organization';
+                      const subject = encodeURIComponent(`Organization Request - ${tenant.name} → ${orgName}`);
+                      const body = encodeURIComponent(
+                        `Hello,\n\n` +
+                        `A new organization request has been submitted:\n\n` +
+                        `Tenant: ${tenant.name}\n` +
+                        `Organization: ${orgName}\n` +
+                        `Requested by: ${user?.email || user?.id}\n` +
+                        `Notes: ${requestNotes || 'None'}\n\n` +
+                        `Please review this request in the admin dashboard:\n` +
+                        `${window.location.origin}/settings/admin/organization-requests\n\n` +
+                        `Best regards,\n` +
+                        `${tenant.name}`
+                      );
+                      window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
                     } else {
                       const error = await res.json();
                       alert(error.error || 'Failed to submit request');

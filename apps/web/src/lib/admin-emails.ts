@@ -6,6 +6,7 @@
 export type EmailCategory = 
   | 'subscription'
   | 'upgrade_requests'
+  | 'organization_requests'
   | 'sales'
   | 'support'
   | 'managed_services'
@@ -17,6 +18,7 @@ export type EmailCategory =
 export const DEFAULT_ADMIN_EMAILS: Record<EmailCategory, string> = {
   subscription: 'subscriptions@yourplatform.com',
   upgrade_requests: 'upgrades@yourplatform.com',
+  organization_requests: 'organizations@yourplatform.com',
   sales: 'sales@yourplatform.com',
   support: 'support@yourplatform.com',
   managed_services: 'services@yourplatform.com',
