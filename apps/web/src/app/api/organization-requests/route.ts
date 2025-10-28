@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
+            subscriptionTier: true,
           },
         },
       },
@@ -107,6 +108,7 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             name: true,
+            subscriptionTier: true,
           },
         },
       },

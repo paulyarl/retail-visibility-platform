@@ -7,6 +7,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 
 type OrganizationRequest = {
   id: string;
@@ -32,6 +33,7 @@ type OrganizationRequest = {
   organization: {
     id: string;
     name: string;
+    subscriptionTier?: string;
   };
 };
 
@@ -68,7 +70,20 @@ export default function OrganizationRequestsPage() {
 
   const openDetailModal = (request: OrganizationRequest) => {
     setSelectedRequest(request);
-    setEstimatedCost(request.estimatedCost?.toString() || '');
+    
+    // Auto-suggest cost based on organization's tier if not already set
+    if (!request.estimatedCost && request.organization.subscriptionTier) {
+      const tier = request.organization.subscriptionTier as ChainTier;
+      const tierInfo = CHAIN_TIERS[tier];
+      if (tierInfo) {
+        setEstimatedCost(tierInfo.pricePerMonth.toString());
+      } else {
+        setEstimatedCost('');
+      }
+    } else {
+      setEstimatedCost(request.estimatedCost?.toString() || '');
+    }
+    
     setAdminNotes(request.adminNotes || '');
     setShowDetailModal(true);
   };
@@ -399,6 +414,16 @@ export default function OrganizationRequestsPage() {
                 <label className="block text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">
                   Estimated Cost (per month)
                 </label>
+                {selectedRequest.organization.subscriptionTier && (
+                  <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      💡 Organization Tier: <strong>{CHAIN_TIERS[selectedRequest.organization.subscriptionTier as ChainTier]?.name || selectedRequest.organization.subscriptionTier}</strong>
+                      {CHAIN_TIERS[selectedRequest.organization.subscriptionTier as ChainTier] && (
+                        <> - Base price: <strong>{CHAIN_TIERS[selectedRequest.organization.subscriptionTier as ChainTier].price}</strong></>
+                      )}
+                    </p>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -413,6 +438,9 @@ export default function OrganizationRequestsPage() {
                     USD
                   </span>
                 </div>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  Cost is auto-suggested based on organization tier but can be adjusted
+                </p>
               </div>
 
               <div>
