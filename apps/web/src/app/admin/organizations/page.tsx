@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, ModalFooter } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, ModalFooter, Input, Select } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { api } from '@/lib/api';
 
 interface Organization {
   id: string;
@@ -33,6 +34,14 @@ export default function AdminOrganizationsPage() {
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [availableTenants, setAvailableTenants] = useState<Array<{id: string; name: string}>>([]);
   const [selectedTenantId, setSelectedTenantId] = useState('');
+  
+  // Create organization state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newOrgName, setNewOrgName] = useState('');
+  const [newOrgTier, setNewOrgTier] = useState('chain_starter');
+  const [newOrgMaxLocations, setNewOrgMaxLocations] = useState('10');
+  const [newOrgMaxSKUs, setNewOrgMaxSKUs] = useState('50000');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     loadOrganizations();
@@ -107,6 +116,43 @@ export default function AdminOrganizationsPage() {
     }
   };
 
+  const handleCreateOrganization = async () => {
+    if (!newOrgName.trim()) {
+      alert('Please enter an organization name');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const res = await api.post('/api/organizations', {
+        name: newOrgName.trim(),
+        subscriptionTier: newOrgTier,
+        maxLocations: parseInt(newOrgMaxLocations) || 10,
+        maxTotalSKUs: parseInt(newOrgMaxSKUs) || 50000,
+        subscriptionStatus: 'active',
+      });
+
+      if (res.ok) {
+        await loadOrganizations();
+        setShowCreateModal(false);
+        // Reset form
+        setNewOrgName('');
+        setNewOrgTier('chain_starter');
+        setNewOrgMaxLocations('10');
+        setNewOrgMaxSKUs('50000');
+        alert('Organization created successfully!');
+      } else {
+        const error = await res.json();
+        alert(`Failed to create organization: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Failed to create organization:', error);
+      alert('Failed to create organization. Please try again.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -130,14 +176,23 @@ export default function AdminOrganizationsPage() {
       />
 
       <div className="mt-6 space-y-6">
-        {/* Pagination Info */}
-        {organizations.length > 0 && (
-          <div className="flex items-center justify-between">
+        {/* Header with Create Button */}
+        <div className="flex items-center justify-between">
+          {organizations.length > 0 ? (
             <p className="text-sm font-medium text-neutral-700">
               Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, organizations.length)} of {organizations.length} organizations
             </p>
-          </div>
-        )}
+          ) : (
+            <div />
+          )}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setShowCreateModal(true)}
+          >
+            + Create New Organization
+          </Button>
+        </div>
 
         {organizations.length === 0 ? (
           <Card>
@@ -339,6 +394,109 @@ export default function AdminOrganizationsPage() {
             }}
           >
             Close
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Create Organization Modal */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => {
+          if (!creating) {
+            setShowCreateModal(false);
+            setNewOrgName('');
+            setNewOrgTier('chain_starter');
+            setNewOrgMaxLocations('10');
+            setNewOrgMaxSKUs('50000');
+          }
+        }}
+        title="Create New Organization"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Organization Name *
+            </label>
+            <Input
+              value={newOrgName}
+              onChange={(e) => setNewOrgName(e.target.value)}
+              placeholder="e.g., Acme Restaurant Chain"
+              disabled={creating}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Subscription Tier *
+            </label>
+            <select
+              value={newOrgTier}
+              onChange={(e) => setNewOrgTier(e.target.value)}
+              disabled={creating}
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="chain_starter">Chain Starter</option>
+              <option value="chain_professional">Chain Professional</option>
+              <option value="chain_enterprise">Chain Enterprise</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Max Locations *
+            </label>
+            <Input
+              type="number"
+              value={newOrgMaxLocations}
+              onChange={(e) => setNewOrgMaxLocations(e.target.value)}
+              placeholder="10"
+              disabled={creating}
+              min="1"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Max Total SKUs *
+            </label>
+            <Input
+              type="number"
+              value={newOrgMaxSKUs}
+              onChange={(e) => setNewOrgMaxSKUs(e.target.value)}
+              placeholder="50000"
+              disabled={creating}
+              min="1"
+            />
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              <strong>Note:</strong> Organizations are for multi-location chains. 
+              Individual tenants can request to join organizations through the tenant settings page.
+            </p>
+          </div>
+        </div>
+
+        <ModalFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setShowCreateModal(false);
+              setNewOrgName('');
+              setNewOrgTier('chain_starter');
+              setNewOrgMaxLocations('10');
+              setNewOrgMaxSKUs('50000');
+            }}
+            disabled={creating}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleCreateOrganization}
+            disabled={creating || !newOrgName.trim()}
+          >
+            {creating ? 'Creating...' : 'Create Organization'}
           </Button>
         </ModalFooter>
       </Modal>
