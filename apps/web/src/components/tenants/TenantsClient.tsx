@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Badge, Alert, AnimatedCard, Modal, ModalFooter, Pagination } from "@/components/ui";
 import { motion } from "framer-motion";
 import PageHeader, { Icons } from "@/components/PageHeader";
+import { api } from "@/lib/api";
 
 type Tenant = { 
   id: string; 
@@ -67,7 +68,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/tenants");
+      const res = await api.get("/api/tenants");
       const data = await res.json();
       
       // TODO: Replace with proper authentication and user-tenant relationship
@@ -97,11 +98,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/tenants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
-      });
+      const res = await api.post("/api/tenants", { name: name.trim() });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "failed");
       

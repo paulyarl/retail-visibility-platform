@@ -1,14 +1,20 @@
 import { NextResponse } from 'next/server';
 
-export async function GET() {
-  // Note: Authentication is handled by the backend API and the Protected component on pages
-  // API routes in Next.js 15 don't reliably have access to Supabase sessions
-  
+export async function GET(req: Request) {
   const base = process.env.API_BASE_URL || 'http://localhost:4000';
   console.log('[API Proxy] Fetching tenants from:', `${base}/tenants`);
   
-  // Backend will handle user filtering based on its own authentication
-  const res = await fetch(`${base}/tenants`);
+  // Forward Authorization header from client to backend
+  const authHeader = req.headers.get('authorization');
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (authHeader) {
+    headers['Authorization'] = authHeader;
+  }
+  
+  const res = await fetch(`${base}/tenants`, { headers });
   
   console.log('[API Proxy] Response status:', res.status);
   
@@ -26,9 +32,20 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
+    
+    // Forward Authorization header from client to backend
+    const authHeader = req.headers.get('authorization');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    
     const res = await fetch(`${base}/tenants`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     });
     const data = await res.json();

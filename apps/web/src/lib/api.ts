@@ -1,6 +1,7 @@
 /**
  * Authenticated API client
  * Automatically includes JWT token in requests
+ * Works with both Next.js API routes (/api/*) and direct backend calls
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -15,6 +16,7 @@ function getAccessToken(): string | null {
 
 /**
  * Make an authenticated API request
+ * Supports both relative URLs (/api/tenants) and absolute URLs (http://...)
  */
 export async function apiRequest(
   endpoint: string,
@@ -22,9 +24,9 @@ export async function apiRequest(
 ): Promise<Response> {
   const token = getAccessToken();
   
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+    ...(options.headers as Record<string, string>),
   };
 
   // Add Authorization header if token exists
@@ -32,7 +34,10 @@ export async function apiRequest(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+  // Handle relative URLs (Next.js API routes) and absolute URLs
+  const url = endpoint.startsWith('http') || endpoint.startsWith('/') 
+    ? endpoint 
+    : `${API_BASE_URL}${endpoint}`;
 
   return fetch(url, {
     ...options,
