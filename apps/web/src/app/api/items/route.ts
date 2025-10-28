@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { proxyGet, proxyPost } from '@/lib/api-proxy';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -6,8 +7,8 @@ export async function GET(req: NextRequest) {
   if (!tenantId) {
     return NextResponse.json({ error: 'tenant_required' }, { status: 400 });
   }
-  const base = process.env.API_BASE_URL || 'http://localhost:4000';
-  const res = await fetch(`${base}/items?tenantId=${encodeURIComponent(tenantId)}`);
+  
+  const res = await proxyGet(req, `/items?tenantId=${encodeURIComponent(tenantId)}`);
   const data = await res.json();
   
   // If backend returns error, ensure we return empty array to client
@@ -22,12 +23,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/items`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const res = await proxyPost(req, '/items', body);
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (e) {

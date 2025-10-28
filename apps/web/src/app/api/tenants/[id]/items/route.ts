@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
+import { proxyGet } from '@/lib/api-proxy';
 
 export async function GET(
   request: Request,
@@ -9,8 +8,8 @@ export async function GET(
   try {
     const { id } = await params;
     
-    // Fetch items for this tenant from backend
-    const res = await fetch(`${API_BASE_URL}/tenants/${id}/items`);
+    // Fetch items for this tenant from backend with auth
+    const res = await proxyGet(request, `/tenants/${id}/items`);
     
     if (!res.ok) {
       if (res.status === 404) {
