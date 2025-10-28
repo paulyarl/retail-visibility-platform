@@ -85,8 +85,6 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       // Backend automatically links tenant to authenticated user
       setName("");
       await refresh();
-      setTenants((prev) => [newTenant, ...prev]);
-      setName("");
       
       // Redirect to onboarding to collect business profile
       router.push(`/onboarding?tenantId=${encodeURIComponent(newTenant.id)}`);
