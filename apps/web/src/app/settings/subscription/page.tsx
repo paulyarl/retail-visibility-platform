@@ -30,8 +30,8 @@ export default function SubscriptionPage() {
   useEffect(() => {
     const loadTenant = async () => {
       try {
-        // Get current tenant from localStorage
-        const tenantId = localStorage.getItem('tenantId');
+        // Get current tenant from localStorage (try both keys for compatibility)
+        const tenantId = localStorage.getItem('current_tenant_id') || localStorage.getItem('tenantId');
         if (!tenantId) {
           setLoading(false);
           return;
