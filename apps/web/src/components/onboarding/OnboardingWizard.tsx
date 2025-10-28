@@ -45,18 +45,88 @@ export default function OnboardingWizard({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Load saved progress from localStorage
+  // Load existing tenant data and saved progress from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem(`onboarding_${tenantId}`);
-    if (saved) {
+    const loadInitialData = async () => {
       try {
-        const data = JSON.parse(saved);
-        setBusinessData(data.businessData || {});
-        setCurrentStep(data.currentStep || initialStep);
-      } catch (e) {
-        console.error('Failed to load onboarding progress:', e);
+        // First, fetch existing tenant data from API
+        let apiData: Partial<BusinessProfile> = {};
+        try {
+          const response = await fetch(`/api/tenants/${tenantId}`);
+          if (response.ok) {
+            const tenant = await response.json();
+            
+            // Extract business data from existing tenant
+            if (tenant.name) {
+              apiData.business_name = tenant.name;
+            }
+            
+            if (tenant.metadata) {
+              const metadata = tenant.metadata as any;
+              if (metadata.business_name) {
+                apiData.business_name = metadata.business_name;
+              }
+              if (metadata.address_line1) {
+                apiData.address_line1 = metadata.address_line1;
+              }
+              if (metadata.address_line2) {
+                apiData.address_line2 = metadata.address_line2;
+              }
+              if (metadata.city) {
+                apiData.city = metadata.city;
+              }
+              if (metadata.state) {
+                apiData.state = metadata.state;
+              }
+              if (metadata.postal_code) {
+                apiData.postal_code = metadata.postal_code;
+              }
+              if (metadata.country_code) {
+                apiData.country_code = metadata.country_code;
+              }
+              if (metadata.phone_number || metadata.phone) {
+                apiData.phone_number = metadata.phone_number || metadata.phone;
+              }
+              if (metadata.email) {
+                apiData.email = metadata.email;
+              }
+              if (metadata.website) {
+                apiData.website = metadata.website;
+              }
+              if (metadata.contact_person) {
+                apiData.contact_person = metadata.contact_person;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch tenant data:', error);
+        }
+
+        // Then load saved progress from localStorage (should override API data if it exists)
+        const saved = localStorage.getItem(`onboarding_${tenantId}`);
+        let localData: Partial<BusinessProfile> = {};
+        let savedStep = initialStep;
+        
+        if (saved) {
+          try {
+            const data = JSON.parse(saved);
+            localData = data.businessData || {};
+            savedStep = data.currentStep || initialStep;
+          } catch (e) {
+            console.error('Failed to load onboarding progress:', e);
+          }
+        }
+
+        // Merge: API data as base, localStorage data overrides (for new/unsaved changes)
+        const mergedData = { ...apiData, ...localData };
+        setBusinessData(mergedData);
+        setCurrentStep(savedStep);
+      } catch (error) {
+        console.error('Failed to load initial data:', error);
       }
-    }
+    };
+
+    loadInitialData();
   }, [tenantId, initialStep]);
 
   // Save progress to localStorage

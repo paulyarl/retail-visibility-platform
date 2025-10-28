@@ -631,7 +631,9 @@ export default function ItemsClient({
                     {/* Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{i.name}</p>
+                        <div className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
+                          <p className="text-sm font-bold text-primary-900 dark:text-primary-100">{i.name}</p>
+                        </div>
                         <Badge variant="default">{i.sku}</Badge>
                         {/* Status Badges */}
                         <Badge 

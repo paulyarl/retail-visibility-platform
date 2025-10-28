@@ -198,7 +198,9 @@ export default function AdminOrganizationsPage() {
                       key={tenant.id}
                       className="flex items-center justify-between p-3 bg-neutral-50 rounded"
                     >
-                      <span className="font-semibold text-neutral-900 dark:text-neutral-100">{tenant.name}</span>
+                      <div className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
+                        <span className="font-bold text-primary-900 dark:text-primary-100">{tenant.name}</span>
+                      </div>
                       <Badge variant="default">{tenant._count.items} SKUs</Badge>
                     </div>
                   ))}
@@ -278,7 +280,9 @@ export default function AdminOrganizationsPage() {
                       key={tenant.id}
                       className="flex items-center justify-between p-3 bg-neutral-50 rounded"
                     >
-                      <span className="font-semibold text-neutral-900 dark:text-neutral-100">{tenant.name}</span>
+                      <div className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
+                        <span className="font-bold text-primary-900 dark:text-primary-100">{tenant.name}</span>
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"

@@ -135,7 +135,9 @@ export default function AdminBillingPage() {
                   className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
                 >
                   <div className="flex-1">
-                    <div className="font-semibold text-neutral-900 dark:text-neutral-100">{tenant.name}</div>
+                    <div className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 rounded-lg mb-1">
+                      <div className="font-bold text-primary-900 dark:text-primary-100">{tenant.name}</div>
+                    </div>
                     {tenant.metadata?.city && tenant.metadata?.state && (
                       <div className="text-sm text-neutral-600">
                         {tenant.metadata.city}, {tenant.metadata.state}

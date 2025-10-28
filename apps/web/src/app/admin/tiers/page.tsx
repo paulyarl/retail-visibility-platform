@@ -253,10 +253,12 @@ export default function AdminTiersPage() {
                         {/* Tenant Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-2">
-                              {tenant.metadata?.businessName || tenant.name}
-                              <span className="text-neutral-400 group-hover:text-primary-500 transition-colors">→</span>
-                            </h3>
+                            <div className="inline-block px-3 py-1.5 bg-primary-100 dark:bg-primary-900/30 rounded-lg group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 transition-colors">
+                              <h3 className="text-lg font-bold text-primary-900 dark:text-primary-100 flex items-center gap-2">
+                                {tenant.metadata?.businessName || tenant.name}
+                                <span className="text-primary-600 dark:text-primary-400">→</span>
+                              </h3>
+                            </div>
                             <Badge variant="default" className={tierInfo.color}>
                               {tierInfo.label}
                             </Badge>

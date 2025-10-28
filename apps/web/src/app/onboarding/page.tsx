@@ -55,8 +55,8 @@ function OnboardingContent() {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
-        title="Onboarding"
-        description="Set up your store in a few steps"
+        title="Edit Business Profile"
+        description="Update your store information"
         icon={Icons.Tenants}
         backLink={{ href: '/tenants', label: 'Back to Tenants' }}
       />
