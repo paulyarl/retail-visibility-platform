@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Input, Select, Alert } from '@/components/ui';
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
@@ -20,6 +20,14 @@ export default function StoreIdentityStep({
   const [formData, setFormData] = useState<Partial<BusinessProfile>>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Update formData when initialData changes (e.g., when API data loads)
+  useEffect(() => {
+    if (Object.keys(initialData).length > 0) {
+      console.log('[StoreIdentityStep] Updating formData with initialData:', initialData);
+      setFormData(initialData);
+    }
+  }, [initialData]);
 
   const validateField = (name: string, value: any) => {
     try {

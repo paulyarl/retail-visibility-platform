@@ -52,13 +52,18 @@ export default function OnboardingWizard({
         // First, fetch existing tenant data from API
         let apiData: Partial<BusinessProfile> = {};
         try {
+          console.log('[OnboardingWizard] Fetching tenant data for:', tenantId);
           const response = await fetch(`/api/tenants/${tenantId}`);
+          console.log('[OnboardingWizard] Response status:', response.status);
+          
           if (response.ok) {
             const tenant = await response.json();
+            console.log('[OnboardingWizard] Tenant data:', tenant);
             
             // Extract business data from existing tenant
             if (tenant.name) {
               apiData.business_name = tenant.name;
+              console.log('[OnboardingWizard] Set business_name from tenant.name:', tenant.name);
             }
             
             if (tenant.metadata) {
@@ -119,6 +124,9 @@ export default function OnboardingWizard({
 
         // Merge: API data as base, localStorage data overrides (for new/unsaved changes)
         const mergedData = { ...apiData, ...localData };
+        console.log('[OnboardingWizard] API data:', apiData);
+        console.log('[OnboardingWizard] localStorage data:', localData);
+        console.log('[OnboardingWizard] Merged data:', mergedData);
         setBusinessData(mergedData);
         setCurrentStep(savedStep);
       } catch (error) {
