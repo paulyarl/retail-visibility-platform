@@ -149,22 +149,21 @@ app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) =
       console.log(`[GET /tenants/:id] Trial date set for tenant ${tenant.id}: ${trialEndsAt.toISOString()}`);
     }
     
-    // Check if trial has expired and auto-convert to starter
+    // Check if trial has expired and mark as expired (do NOT auto-convert)
+    // Admin must manually convert after payment/contract confirmation
     if (
       tenant.subscriptionStatus === "trial" &&
       tenant.trialEndsAt &&
       tenant.trialEndsAt < now
     ) {
-      console.log(`[GET /tenants/:id] Trial expired for tenant ${tenant.id}. Auto-converting to starter plan.`);
+      console.log(`[GET /tenants/:id] Trial expired for tenant ${tenant.id}. Marking as expired.`);
       tenant = await prisma.tenant.update({
         where: { id: tenant.id },
         data: {
-          subscriptionTier: "starter",
-          subscriptionStatus: "active",
-          subscriptionEndsAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+          subscriptionStatus: "expired",
         },
       });
-      console.log(`[GET /tenants/:id] Tenant ${tenant.id} successfully converted to starter plan.`);
+      console.log(`[GET /tenants/:id] Tenant ${tenant.id} marked as expired. Admin action required.`);
     }
     
     res.json(tenant);
