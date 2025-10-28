@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Alert, Spinner } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Alert, Spinner, Modal, ModalFooter, Button } from "@/components/ui";
 import BusinessProfileCard from "@/components/settings/BusinessProfileCard";
 import MapCardSettings from "@/components/tenant/MapCardSettings";
 import SwisPreviewSettings from "@/components/tenant/SwisPreviewSettings";
@@ -222,27 +222,39 @@ export default function TenantSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Organization Assignment - Admin Only */}
-        {user?.role === 'ADMIN' && (
+        {/* Organization Assignment - Different UI for ADMIN vs OWNER */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Organization / Chain Assignment</CardTitle>
-                <CardDescription>Assign this tenant to a chain organization (Admin Only)</CardDescription>
+                <CardDescription>
+                  {user?.role === 'ADMIN' 
+                    ? 'Assign this tenant to a chain organization (Admin Only)' 
+                    : 'Request to join a chain organization'}
+                </CardDescription>
               </div>
-              {!editingOrg && (
+              {user?.role === 'ADMIN' && !editingOrg && (
                 <button
                   onClick={() => setEditingOrg(true)}
-                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
                 >
                   {tenant.organization ? 'Change' : 'Assign'}
                 </button>
+              )}
+              {user?.role === 'OWNER' && !tenant.organization && !pendingRequest && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowRequestModal(true)}
+                >
+                  Request to Join
+                </Button>
               )}
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {/* Current Organization Status */}
               <div className="flex items-center justify-between py-3">
                 <div>
                   <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Organization</p>
@@ -250,7 +262,7 @@ export default function TenantSettingsPage() {
                     {tenant.organization ? 'Part of a chain organization' : 'Standalone location'}
                   </p>
                 </div>
-                {editingOrg ? (
+                {user?.role === 'ADMIN' && editingOrg ? (
                   <select
                     value={selectedOrgId}
                     onChange={(e) => setSelectedOrgId(e.target.value)}
@@ -281,31 +293,27 @@ export default function TenantSettingsPage() {
                 )}
               </div>
 
-              {editingOrg && (
+              {/* Admin Edit Controls */}
+              {user?.role === 'ADMIN' && editingOrg && (
                 <div className="flex items-center gap-2 pt-2">
                   <button
                     onClick={async () => {
                       setSavingOrg(true);
                       try {
                         if (selectedOrgId) {
-                          // Assign to organization
                           const response = await api.post(`/api/organizations/${selectedOrgId}/tenants`, {
                             tenantId: tenant.id
                           });
                           if (!response.ok) throw new Error('Failed to assign to organization');
                         } else if (tenant.organization) {
-                          // Remove from organization
                           const response = await api.delete(`/api/organizations/${tenant.organization.id}/tenants/${tenant.id}`);
                           if (!response.ok) throw new Error('Failed to remove from organization');
                         }
                         
-                        // Reload tenant data
                         const res = await api.get("/api/tenants");
                         const tenants: Tenant[] = await res.json();
                         const updated = tenants.find((t) => t.id === tenant.id);
-                        if (updated) {
-                          setTenant(updated);
-                        }
+                        if (updated) setTenant(updated);
                         
                         setEditingOrg(false);
                       } catch (err) {
@@ -332,7 +340,66 @@ export default function TenantSettingsPage() {
                 </div>
               )}
 
-              {!editingOrg && organizations.length === 0 && (
+              {/* Pending Request Status (for OWNER) */}
+              {user?.role === 'OWNER' && pendingRequest && (
+                <Alert variant="info" title="Request Pending">
+                  <div className="space-y-2">
+                    <p className="text-sm">
+                      Your request to join <strong>{pendingRequest.organization?.name}</strong> is pending admin approval.
+                    </p>
+                    {pendingRequest.estimatedCost && (
+                      <div className="bg-neutral-50 dark:bg-neutral-800 p-3 rounded-lg">
+                        <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                          Estimated Cost: ${pendingRequest.estimatedCost.toFixed(2)} {pendingRequest.costCurrency}/month
+                        </p>
+                        {!pendingRequest.costAgreed && (
+                          <Button
+                            size="sm"
+                            className="mt-2"
+                            onClick={async () => {
+                              try {
+                                const res = await api.patch(`/api/organization-requests/${pendingRequest.id}`, {
+                                  costAgreed: true
+                                });
+                                if (res.ok) {
+                                  const updated = await res.json();
+                                  setPendingRequest(updated);
+                                }
+                              } catch (err) {
+                                console.error('Failed to agree to cost:', err);
+                              }
+                            }}
+                          >
+                            Agree to Cost
+                          </Button>
+                        )}
+                        {pendingRequest.costAgreed && (
+                          <Badge variant="success" className="mt-2">Cost Agreed</Badge>
+                        )}
+                      </div>
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={async () => {
+                        if (confirm('Are you sure you want to cancel this request?')) {
+                          try {
+                            await api.delete(`/api/organization-requests/${pendingRequest.id}`);
+                            setPendingRequest(null);
+                          } catch (err) {
+                            console.error('Failed to cancel request:', err);
+                          }
+                        }
+                      }}
+                    >
+                      Cancel Request
+                    </Button>
+                  </div>
+                </Alert>
+              )}
+
+              {/* No Organizations Alert */}
+              {!editingOrg && organizations.length === 0 && user?.role === 'ADMIN' && (
                 <Alert variant="info" title="No Organizations Available">
                   <p className="text-sm">
                     No chain organizations have been created yet. Create an organization first to assign this tenant to a chain.
@@ -345,6 +412,108 @@ export default function TenantSettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Request Modal (for OWNER) */}
+        {showRequestModal && (
+          <Modal
+            isOpen={showRequestModal}
+            onClose={() => {
+              setShowRequestModal(false);
+              setSelectedOrgId('');
+              setRequestNotes('');
+            }}
+            title="Request to Join Organization"
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  Select Organization
+                </label>
+                <select
+                  value={selectedOrgId}
+                  onChange={(e) => setSelectedOrgId(e.target.value)}
+                  className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Select an organization...</option>
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  Business Justification (Optional)
+                </label>
+                <textarea
+                  value={requestNotes}
+                  onChange={(e) => setRequestNotes(e.target.value)}
+                  rows={4}
+                  placeholder="Explain why you'd like to join this organization..."
+                  className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              <Alert variant="info" title="What happens next?">
+                <ol className="text-sm space-y-1 list-decimal list-inside">
+                  <li>Your request will be sent to platform administrators</li>
+                  <li>Admin will review and provide estimated costs</li>
+                  <li>You'll review and agree to the costs</li>
+                  <li>Admin will approve and your tenant will be assigned</li>
+                </ol>
+              </Alert>
+            </div>
+
+            <ModalFooter>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowRequestModal(false);
+                  setSelectedOrgId('');
+                  setRequestNotes('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!selectedOrgId) {
+                    alert('Please select an organization');
+                    return;
+                  }
+                  
+                  try {
+                    const res = await api.post('/api/organization-requests', {
+                      tenantId: tenant.id,
+                      organizationId: selectedOrgId,
+                      requestedBy: user?.id,
+                      notes: requestNotes,
+                      requestType: 'join'
+                    });
+                    
+                    if (res.ok) {
+                      const newRequest = await res.json();
+                      setPendingRequest(newRequest);
+                      setShowRequestModal(false);
+                      setSelectedOrgId('');
+                      setRequestNotes('');
+                    } else {
+                      const error = await res.json();
+                      alert(error.error || 'Failed to submit request');
+                    }
+                  } catch (err) {
+                    console.error('Failed to submit request:', err);
+                    alert('Failed to submit request. Please try again.');
+                  }
+                }}
+                disabled={!selectedOrgId}
+              >
+                Submit Request
+              </Button>
+            </ModalFooter>
+          </Modal>
         )}
 
         {/* Regional Settings */}
