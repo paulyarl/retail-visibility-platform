@@ -6,10 +6,10 @@ const prisma = new PrismaClient();
 // GET /api/organization-requests/[id] - Get a specific request
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const organizationRequest = await prisma.organizationRequest.findUnique({
       where: { id },
@@ -50,10 +50,10 @@ export async function GET(
 // PATCH /api/organization-requests/[id] - Update request (approve/reject/agree to cost)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { status, adminNotes, processedBy, costAgreed, estimatedCost } = body;
 
@@ -125,10 +125,10 @@ export async function PATCH(
 // DELETE /api/organization-requests/[id] - Cancel/delete a request
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     await prisma.organizationRequest.delete({
       where: { id },
