@@ -50,7 +50,7 @@ export default function AdminOrganizationsPage() {
 
   const loadOrganizations = async () => {
     try {
-      const res = await fetch('/api/organizations');
+      const res = await api.get('/api/organizations');
       const data = await res.json();
       setOrganizations(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -62,7 +62,7 @@ export default function AdminOrganizationsPage() {
 
   const loadAvailableTenants = async () => {
     try {
-      const res = await fetch('/api/tenants');
+      const res = await api.get('/api/tenants');
       const data = await res.json();
       setAvailableTenants(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -79,10 +79,8 @@ export default function AdminOrganizationsPage() {
     if (!selectedTenantId) return;
     
     try {
-      const res = await fetch(`/api/organizations/${orgId}/tenants`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId: selectedTenantId }),
+      const res = await api.post(`/api/organizations/${orgId}/tenants`, {
+        tenantId: selectedTenantId
       });
       
       if (res.ok) {
@@ -100,9 +98,7 @@ export default function AdminOrganizationsPage() {
 
   const handleRemoveTenant = async (orgId: string, tenantId: string) => {
     try {
-      const res = await fetch(`/api/organizations/${orgId}/tenants/${tenantId}`, {
-        method: 'DELETE',
-      });
+      const res = await api.delete(`/api/organizations/${orgId}/tenants/${tenantId}`);
       
       if (res.ok) {
         await loadOrganizations();
