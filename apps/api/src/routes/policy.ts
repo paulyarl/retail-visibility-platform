@@ -88,7 +88,7 @@ router.post('/admin/policy-history', requireAdmin, async (req, res) => {
         requireImage: body.requireImage,
         requireCurrency: body.requireCurrency,
         notes: body.notes,
-        updatedBy: user.id,
+        updatedBy: (user as any).id,
       },
     });
 

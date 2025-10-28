@@ -226,7 +226,7 @@ router.post('/check', async (req, res) => {
       where: {
         role_action: {
           role: parsed.data.role,
-          action: parsed.data.action,
+          action: parsed.data.action as any,
         },
       },
     });

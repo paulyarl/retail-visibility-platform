@@ -67,8 +67,8 @@ async function logAudit(req: Request, res: Response, requestId: string) {
     await prisma.auditLog.create({
       data: {
         actorType: user ? 'user' : 'system',
-        actorId: user?.id || 'anonymous',
-        tenantId: user?.tenantId || 'system',
+        actorId: (user as any)?.id || 'anonymous',
+        tenantId: (user as any)?.tenantId || 'system',
         entityType,
         entityId,
         action,
