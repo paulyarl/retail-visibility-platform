@@ -93,12 +93,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       // Refresh tenant list to get the new tenant
       await refresh();
       
-      // Small delay to ensure state updates
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Redirect to onboarding to collect business profile
-      console.log('[TenantsClient] Redirecting to onboarding for:', newTenant.id);
-      router.push(`/onboarding?tenantId=${encodeURIComponent(newTenant.id)}`);
+      console.log('[TenantsClient] Tenant created successfully:', newTenant.id);
     } catch (err) {
       console.error('[TenantsClient] Create error:', err);
       setError(err instanceof Error ? err.message : "Failed to create tenant");

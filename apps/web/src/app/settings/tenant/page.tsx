@@ -10,6 +10,7 @@ import SwisPreviewSettings from "@/components/tenant/SwisPreviewSettings";
 import GoogleConnectCard from "@/components/google/GoogleConnectCard";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import PageHeader, { Icons } from "@/components/PageHeader";
+import { api } from "@/lib/api";
 
 type Tenant = {
   id: string;
@@ -45,7 +46,7 @@ export default function TenantSettingsPage() {
           return;
         }
 
-        const res = await fetch("/api/tenants");
+        const res = await api.get("/api/tenants");
         const tenants: Tenant[] = await res.json();
         const found = tenants.find((t) => t.id === tenantId);
         
@@ -270,11 +271,7 @@ export default function TenantSettingsPage() {
                     onClick={async () => {
                       setSavingRegional(true);
                       try {
-                        const response = await fetch(`/api/tenants/${tenant.id}`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(regionalSettings),
-                        });
+                        const response = await api.put(`/api/tenants/${tenant.id}`, regionalSettings);
                         if (!response.ok) throw new Error('Failed to update');
                         const updated = await response.json();
                         setTenant(updated);
@@ -350,13 +347,9 @@ export default function TenantSettingsPage() {
             loading={false}
             onUpdate={async (profile) => {
               try {
-                const response = await fetch('/api/tenant/profile', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    tenant_id: tenant.id,
-                    ...profile,
-                  }),
+                const response = await api.post('/api/tenant/profile', {
+                  tenant_id: tenant.id,
+                  ...profile,
                 });
 
                 if (!response.ok) {
