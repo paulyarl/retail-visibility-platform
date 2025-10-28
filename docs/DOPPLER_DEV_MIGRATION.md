@@ -170,6 +170,198 @@ doppler run --config local -- node create-test-chain-enhanced.js --scenario=rest
 
 ---
 
+## 🔄 **Database Migration: Local → Dev**
+
+### **Step-by-Step Sequence**
+
+Follow these steps to migrate your database changes from `local` to `dev`:
+
+#### **Step 1: Verify Local Database State**
+```bash
+cd apps/api
+
+# Check current migrations
+doppler run --config local -- npx prisma migrate status
+
+# View database in Prisma Studio
+pnpm db:studio:local
+```
+
+#### **Step 2: Generate Migration from Local Changes**
+```bash
+# If you have schema changes that aren't migrated yet
+doppler run --config local -- npx prisma migrate dev --name your_migration_name
+
+# This creates a new migration file in prisma/migrations/
+```
+
+#### **Step 3: Export Local Database (Optional - for data preservation)**
+```bash
+# Export data if you need to preserve it
+doppler run --config local -- npx prisma db pull
+
+# Or manually export specific tables if needed
+```
+
+#### **Step 4: Apply Migrations to Dev Database**
+```bash
+# Apply all pending migrations to dev
+pnpm db:migrate
+
+# Or explicitly:
+doppler run --config dev -- npx prisma migrate dev
+```
+
+#### **Step 5: Verify Dev Database**
+```bash
+# Check migration status
+doppler run --config dev -- npx prisma migrate status
+
+# View in Prisma Studio
+pnpm db:studio
+
+# Verify schema is correct
+doppler run --config dev -- npx prisma validate
+```
+
+#### **Step 6: Seed Dev Database**
+```bash
+# Seed with test data
+pnpm db:seed
+
+# Or create specific test data
+doppler run --config dev -- node create-admin-user.js
+doppler run --config dev -- node create-test-tenants.js --count=5
+doppler run --config dev -- node create-test-chain-enhanced.js --scenario=retail
+```
+
+#### **Step 7: Generate Prisma Client**
+```bash
+# Regenerate Prisma Client for dev
+pnpm db:generate
+
+# Restart dev server to use new client
+pnpm dev
+```
+
+---
+
+### **Quick Migration Command Sequence**
+
+For a clean migration, run these commands in order:
+
+```bash
+# 1. Navigate to API directory
+cd apps/api
+
+# 2. Check local migrations are up to date
+doppler run --config local -- npx prisma migrate status
+
+# 3. Apply migrations to dev
+doppler run --config dev -- npx prisma migrate deploy
+
+# 4. Generate Prisma Client
+doppler run --config dev -- npx prisma generate
+
+# 5. Seed dev database
+doppler run --config dev -- npx prisma db seed
+
+# 6. Verify
+doppler run --config dev -- npx prisma studio
+```
+
+---
+
+### **Handling Schema Drift**
+
+If dev database has drift (manual changes):
+
+```bash
+# Option 1: Reset dev database (DESTRUCTIVE)
+doppler run --config dev -- npx prisma migrate reset --force
+
+# Option 2: Create baseline migration
+doppler run --config dev -- npx prisma migrate resolve --applied <migration_name>
+
+# Option 3: Push schema without migrations (for prototyping)
+doppler run --config dev -- npx prisma db push
+```
+
+---
+
+### **Migration Scenarios**
+
+#### **Scenario 1: New Feature with Schema Changes**
+```bash
+# 1. Develop locally
+doppler run --config local -- npx prisma migrate dev --name add_new_feature
+
+# 2. Test locally
+doppler run --config local -- npx prisma studio
+
+# 3. Apply to dev
+doppler run --config dev -- npx prisma migrate dev
+
+# 4. Commit migration files
+git add apps/api/prisma/migrations/
+git commit -m "feat: add new feature schema"
+```
+
+#### **Scenario 2: Syncing Existing Local Database to Dev**
+```bash
+# 1. Ensure all local changes are migrated
+doppler run --config local -- npx prisma migrate dev
+
+# 2. Copy migration files (they're already in git)
+# No action needed - migrations are version controlled
+
+# 3. Apply to dev
+doppler run --config dev -- npx prisma migrate deploy
+
+# 4. Seed dev with fresh data
+doppler run --config dev -- npx prisma db seed
+```
+
+#### **Scenario 3: Fresh Dev Database Setup**
+```bash
+# 1. Reset dev database
+doppler run --config dev -- npx prisma migrate reset --force
+
+# 2. Apply all migrations
+doppler run --config dev -- npx prisma migrate deploy
+
+# 3. Seed database
+doppler run --config dev -- npx prisma db seed
+
+# 4. Create test data
+doppler run --config dev -- node create-admin-user.js
+doppler run --config dev -- node create-test-tenants.js --count=10
+```
+
+---
+
+### **Data Migration Tools**
+
+#### **Export Data from Local**
+```bash
+# Using Prisma
+doppler run --config local -- npx prisma db pull > local-schema.prisma
+
+# Using pg_dump (PostgreSQL)
+doppler run --config local -- pg_dump $DATABASE_URL > local-backup.sql
+```
+
+#### **Import Data to Dev**
+```bash
+# Using psql (PostgreSQL)
+doppler run --config dev -- psql $DATABASE_URL < local-backup.sql
+
+# Or use Prisma seed scripts
+doppler run --config dev -- npx prisma db seed
+```
+
+---
+
 ## 🔄 **Migration Checklist**
 
 - [x] Update root `package.json` scripts
@@ -177,6 +369,7 @@ doppler run --config local -- node create-test-chain-enhanced.js --scenario=rest
 - [x] Create migration documentation
 - [x] Test dev config with database operations
 - [x] Verify all npm scripts work
+- [ ] Migrate database from local to dev
 - [ ] Update team documentation
 - [ ] Notify team members of change
 
