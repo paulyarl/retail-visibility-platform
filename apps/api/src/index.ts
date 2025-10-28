@@ -51,6 +51,7 @@ import categoryRoutes from './routes/categories';
 
 // Authentication
 import authRoutes from './auth/auth.routes';
+import { authenticateToken, checkTenantAccess } from './middleware/auth';
 import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
 import organizationRoutes from './routes/organizations';
@@ -84,9 +85,18 @@ app.use("/uploads", express.static(UPLOAD_DIR));
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 /* ------------------------------ TENANTS ------------------------------ */
-app.get("/tenants", async (_req, res) => {
+app.get("/tenants", authenticateToken, async (req, res) => {
   try {
+    // Admin users see all tenants, regular users see only their tenants
+    const isAdmin = req.user?.role === 'ADMIN';
     const tenants = await prisma.tenant.findMany({ 
+      where: isAdmin ? {} : {
+        users: {
+          some: {
+            userId: req.user?.userId
+          }
+        }
+      },
       orderBy: { createdAt: "desc" },
       include: {
         organization: {
@@ -103,7 +113,7 @@ app.get("/tenants", async (_req, res) => {
   }
 });
 
-app.get("/tenants/:id", async (req, res) => {
+app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     let tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
@@ -134,11 +144,23 @@ app.get("/tenants/:id", async (req, res) => {
 });
 
 const createTenantSchema = z.object({ name: z.string().min(1) });
-app.post("/tenants", async (req, res) => {
+app.post("/tenants", authenticateToken, async (req, res) => {
   const parsed = createTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
     const tenant = await prisma.tenant.create({ data: { name: parsed.data.name } });
+    
+    // Link tenant to the authenticated user as owner
+    if (req.user?.userId) {
+      await prisma.userTenant.create({
+        data: {
+          userId: req.user.userId,
+          tenantId: tenant.id,
+          role: 'OWNER',
+        },
+      });
+    }
+    
     await audit({ tenantId: tenant.id, actor: null, action: "tenant.create", payload: { name: parsed.data.name } });
     res.status(201).json(tenant);
   } catch {
@@ -147,7 +169,7 @@ app.post("/tenants", async (req, res) => {
 });
 
 const updateTenantSchema = z.object({ name: z.string().min(1) });
-app.put("/tenants/:id", async (req, res) => {
+app.put("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   const parsed = updateTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
@@ -634,9 +656,19 @@ const listQuery = z.object({
   count: z.string().optional() // Add count parameter for optimization
 });
 
-app.get(["/items", "/inventory"], async (req, res) => {
+app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
   const parsed = listQuery.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: "tenant_required" });
+  
+  // Check tenant access
+  const tenantId = parsed.data.tenantId;
+  const isAdmin = req.user?.role === 'ADMIN';
+  const hasAccess = isAdmin || req.user?.tenantIds.includes(tenantId);
+  
+  if (!hasAccess) {
+    return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
+  }
+  
   try {
     // If count=true, return only the count for performance
     if (req.query.count === 'true') {
