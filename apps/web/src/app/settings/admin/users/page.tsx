@@ -258,6 +258,35 @@ export default function UsersManagementPage() {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Info Alert */}
+        <Alert variant="info" title="About Platform-Level Roles">
+          <div className="text-sm space-y-2">
+            <p>
+              These are <strong>platform-level roles</strong> that determine a user's global access:
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Platform Admin:</strong> Full system access, can manage all tenants and users</li>
+              <li><strong>Tenant Owner:</strong> Can create and own multiple tenants (10 max)</li>
+              <li><strong>User:</strong> Basic access, can be assigned to tenants (3 tenant limit)</li>
+            </ul>
+            <p className="mt-2">
+              Users also have <strong>tenant-level roles</strong> (Owner, Admin, Member, Viewer) for each tenant they belong to.
+            </p>
+          </div>
+        </Alert>
+
+        {error && (
+          <Alert variant="error" title="Error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
+        {success && (
+          <Alert variant="success" title="Success" onClose={() => setSuccess(null)}>
+            {success}
+          </Alert>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>

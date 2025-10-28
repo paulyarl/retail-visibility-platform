@@ -16,8 +16,9 @@ type Permission = {
 
 type GroupedPermissions = Record<string, Permission[]>;
 
+// Tenant-level roles only (UserTenant.role)
+// Platform Admin always has full access and bypasses these checks
 const ROLE_DISPLAY_NAMES: Record<string, string> = {
-  PLATFORM_ADMIN: 'Platform Admin',
   TENANT_OWNER: 'Tenant Owner',
   TENANT_ADMIN: 'Tenant Admin',
   TENANT_MEMBER: 'Tenant Member',
@@ -181,6 +182,19 @@ export default function PermissionsPage() {
         />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+          {/* Info Alert */}
+          <Alert variant="info" title="About Tenant-Level Permissions">
+            <div className="text-sm space-y-2">
+              <p>
+                This matrix configures permissions for <strong>tenant-level roles</strong> (Owner, Admin, Member, Viewer).
+              </p>
+              <p>
+                <strong>Platform Admins</strong> always have full access to all features and bypass these permission checks.
+                Platform Owners and Users receive permissions through their tenant role assignments.
+              </p>
+            </div>
+          </Alert>
+
           {error && (
             <Alert variant="error" title="Error" onClose={() => setError(null)}>
               {error}
