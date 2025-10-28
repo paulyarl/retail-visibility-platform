@@ -20,6 +20,15 @@ type Tenant = {
   currency?: string;
   data_policy_accepted?: boolean;
   metadata?: any; // Business profile data
+  organization?: {
+    id: string;
+    name: string;
+  } | null;
+};
+
+type Organization = {
+  id: string;
+  name: string;
 };
 
 export default function TenantSettingsPage() {
@@ -34,6 +43,12 @@ export default function TenantSettingsPage() {
     language: '',
     currency: '',
   });
+
+  // Organization assignment state
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [editingOrg, setEditingOrg] = useState(false);
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('');
+  const [savingOrg, setSavingOrg] = useState(false);
 
   useEffect(() => {
     const loadTenant = async () => {
@@ -65,6 +80,7 @@ export default function TenantSettingsPage() {
           language: found.language || 'en-US',
           currency: found.currency || 'USD',
         });
+        setSelectedOrgId(found.organization?.id || '');
       } catch (e) {
         setError("Failed to load tenant settings");
       } finally {
@@ -72,7 +88,18 @@ export default function TenantSettingsPage() {
       }
     };
 
+    const loadOrganizations = async () => {
+      try {
+        const res = await api.get("/api/organizations");
+        const data = await res.json();
+        setOrganizations(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error("Failed to load organizations:", e);
+      }
+    };
+
     loadTenant();
+    loadOrganizations();
   }, []);
 
   if (loading) {
@@ -166,6 +193,129 @@ export default function TenantSettingsPage() {
                 </div>
                 <p className="text-sm font-medium text-neutral-900 dark:text-white">{tenant.name}</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Organization Assignment */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Organization / Chain Assignment</CardTitle>
+                <CardDescription>Assign this tenant to a chain organization</CardDescription>
+              </div>
+              {!editingOrg && (
+                <button
+                  onClick={() => setEditingOrg(true)}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  {tenant.organization ? 'Change' : 'Assign'}
+                </button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-3">
+                <div>
+                  <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Organization</p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+                    {tenant.organization ? 'Part of a chain organization' : 'Standalone location'}
+                  </p>
+                </div>
+                {editingOrg ? (
+                  <select
+                    value={selectedOrgId}
+                    onChange={(e) => setSelectedOrgId(e.target.value)}
+                    className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[200px]"
+                  >
+                    <option value="">None (Standalone)</option>
+                    {organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {tenant.organization ? (
+                      <>
+                        <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <Badge variant="default" className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+                          {tenant.organization.name}
+                        </Badge>
+                      </>
+                    ) : (
+                      <Badge variant="default">Standalone</Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {editingOrg && (
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    onClick={async () => {
+                      setSavingOrg(true);
+                      try {
+                        if (selectedOrgId) {
+                          // Assign to organization
+                          const response = await api.post(`/api/organizations/${selectedOrgId}/tenants`, {
+                            tenantId: tenant.id
+                          });
+                          if (!response.ok) throw new Error('Failed to assign to organization');
+                        } else if (tenant.organization) {
+                          // Remove from organization
+                          const response = await api.delete(`/api/organizations/${tenant.organization.id}/tenants/${tenant.id}`);
+                          if (!response.ok) throw new Error('Failed to remove from organization');
+                        }
+                        
+                        // Reload tenant data
+                        const res = await api.get("/api/tenants");
+                        const tenants: Tenant[] = await res.json();
+                        const updated = tenants.find((t) => t.id === tenant.id);
+                        if (updated) {
+                          setTenant(updated);
+                        }
+                        
+                        setEditingOrg(false);
+                      } catch (err) {
+                        console.error('Failed to update organization:', err);
+                        alert('Failed to save changes. Please try again.');
+                      } finally {
+                        setSavingOrg(false);
+                      }
+                    }}
+                    disabled={savingOrg}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
+                  >
+                    {savingOrg ? 'Saving...' : 'Save Changes'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedOrgId(tenant.organization?.id || '');
+                      setEditingOrg(false);
+                    }}
+                    className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {!editingOrg && organizations.length === 0 && (
+                <Alert variant="info" title="No Organizations Available">
+                  <p className="text-sm">
+                    No chain organizations have been created yet. Create an organization first to assign this tenant to a chain.
+                  </p>
+                  <Link href="/admin/organizations" className="text-sm text-primary-600 hover:text-primary-700 font-medium mt-2 inline-block">
+                    Go to Organizations →
+                  </Link>
+                </Alert>
+              )}
             </div>
           </CardContent>
         </Card>
