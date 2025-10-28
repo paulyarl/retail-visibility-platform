@@ -38,28 +38,33 @@ export default function TenantSettingsPage() {
   useEffect(() => {
     const loadTenant = async () => {
       try {
-        // Get tenantId from localStorage (same pattern as ItemsClient)
-        const tenantId = typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
-        if (!tenantId) {
-          setError("No tenant selected. Please select a tenant first.");
+        const res = await api.get("/api/tenants");
+        const tenants: Tenant[] = await res.json();
+        
+        if (!tenants || tenants.length === 0) {
+          setError("No tenants found. Please create a tenant first.");
           setLoading(false);
           return;
         }
 
-        const res = await api.get("/api/tenants");
-        const tenants: Tenant[] = await res.json();
-        const found = tenants.find((t) => t.id === tenantId);
+        // Get tenantId from localStorage or use first tenant
+        let tenantId = typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
+        let found = tenants.find((t) => t.id === tenantId);
         
-        if (found) {
-          setTenant(found);
-          setRegionalSettings({
-            region: found.region || 'us-east-1',
-            language: found.language || 'en-US',
-            currency: found.currency || 'USD',
-          });
-        } else {
-          setError("Tenant not found");
+        // If no tenant selected or selected tenant not found, use first tenant
+        if (!found) {
+          found = tenants[0];
+          if (typeof window !== "undefined") {
+            localStorage.setItem("tenantId", found.id);
+          }
         }
+        
+        setTenant(found);
+        setRegionalSettings({
+          region: found.region || 'us-east-1',
+          language: found.language || 'en-US',
+          currency: found.currency || 'USD',
+        });
       } catch (e) {
         setError("Failed to load tenant settings");
       } finally {
