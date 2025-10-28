@@ -78,18 +78,30 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     try {
       const res = await api.post("/api/tenants", { name: name.trim() });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "failed");
+      
+      if (!res.ok) {
+        console.error('[TenantsClient] Create failed:', data);
+        throw new Error(data?.message || data?.error || "Failed to create tenant");
+      }
       
       const newTenant = data as Tenant;
+      console.log('[TenantsClient] Tenant created:', newTenant.id);
       
       // Backend automatically links tenant to authenticated user
       setName("");
+      
+      // Refresh tenant list to get the new tenant
       await refresh();
       
+      // Small delay to ensure state updates
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Redirect to onboarding to collect business profile
+      console.log('[TenantsClient] Redirecting to onboarding for:', newTenant.id);
       router.push(`/onboarding?tenantId=${encodeURIComponent(newTenant.id)}`);
-    } catch (_e) {
-      setError("Failed to create tenant");
+    } catch (err) {
+      console.error('[TenantsClient] Create error:', err);
+      setError(err instanceof Error ? err.message : "Failed to create tenant");
     } finally {
       setLoading(false);
     }
