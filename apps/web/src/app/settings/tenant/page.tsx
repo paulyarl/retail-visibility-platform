@@ -51,6 +51,11 @@ export default function TenantSettingsPage() {
   const [editingOrg, setEditingOrg] = useState(false);
   const [selectedOrgId, setSelectedOrgId] = useState<string>('');
   const [savingOrg, setSavingOrg] = useState(false);
+  
+  // Organization request state (for non-admin users)
+  const [pendingRequest, setPendingRequest] = useState<any>(null);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestNotes, setRequestNotes] = useState('');
 
   useEffect(() => {
     const loadTenant = async () => {
@@ -100,8 +105,26 @@ export default function TenantSettingsPage() {
       }
     };
 
+    const loadPendingRequest = async (tenantId: string) => {
+      try {
+        const res = await api.get(`/api/organization-requests?tenantId=${tenantId}&status=pending`);
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setPendingRequest(data[0]);
+        }
+      } catch (e) {
+        console.error("Failed to load pending request:", e);
+      }
+    };
+
     loadTenant();
     loadOrganizations();
+    
+    // Load pending request for non-admin users
+    const tenantId = typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
+    if (tenantId) {
+      loadPendingRequest(tenantId);
+    }
   }, []);
 
   if (loading) {

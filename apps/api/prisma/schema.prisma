@@ -35,6 +35,7 @@ model Tenant {
   organization          Organization?        @relation(fields: [organizationId], references: [id])
   users                 UserTenant[]         // Many-to-many relationship with users
   googleOAuthAccounts   GoogleOAuthAccount[]
+  organizationRequests  OrganizationRequest[] // Requests to join organizations
 
   @@index([name])
   @@index([subscriptionStatus])
@@ -58,6 +59,7 @@ model Organization {
   maxTotalSKUs         Int       @default(2500)
   metadata             Json?
   tenants              Tenant[]
+  organizationRequests OrganizationRequest[] // Requests from tenants to join
 
   @@index([ownerId])
   @@index([subscriptionStatus])
@@ -365,6 +367,36 @@ model UpgradeRequest {
   @@index([status])
   @@index([createdAt])
   @@map("upgrade_requests")
+}
+
+// Organization Assignment Request model
+model OrganizationRequest {
+  id                String    @id @default(cuid())
+  tenantId          String    @map("tenant_id")
+  organizationId    String    @map("organization_id")
+  requestedBy       String    @map("requested_by") // User ID who made the request
+  status            String    @default("pending") // pending, approved, rejected
+  requestType       String    @map("request_type") @default("join") // join, leave
+  estimatedCost     Float?    @map("estimated_cost")
+  costCurrency      String?   @map("cost_currency") @default("USD")
+  notes             String?   // Tenant owner's notes
+  adminNotes        String?   @map("admin_notes") // Admin's notes
+  costAgreed        Boolean   @default(false) @map("cost_agreed")
+  costAgreedAt      DateTime? @map("cost_agreed_at")
+  processedBy       String?   @map("processed_by") // Admin user ID
+  processedAt       DateTime? @map("processed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([requestedBy])
+  @@index([createdAt])
+  @@map("organization_requests")
 }
 
 // Authentication User model
