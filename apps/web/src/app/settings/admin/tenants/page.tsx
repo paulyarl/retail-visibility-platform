@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button, Spinner, Alert } from '@/components/ui';
 import { motion } from 'framer-motion';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { api } from '@/lib/api';
 
 interface Tenant {
   id: string;
@@ -32,7 +33,7 @@ export default function AdminTenantsPage() {
   useEffect(() => {
     const loadTenants = async () => {
       try {
-        const res = await fetch('/api/tenants');
+        const res = await api.get('/api/tenants');
         if (!res.ok) throw new Error('Failed to load tenants');
         const data = await res.json();
         
@@ -45,7 +46,7 @@ export default function AdminTenantsPage() {
         const tenantsWithCounts = await Promise.all(
           data.map(async (t: any) => {
             try {
-              const itemsRes = await fetch(`/api/tenants/${t.id}/items`);
+              const itemsRes = await api.get(`/api/tenants/${t.id}/items`);
               const items = itemsRes.ok ? await itemsRes.json() : [];
               return {
                 ...t,

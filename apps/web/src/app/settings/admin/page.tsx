@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, AnimatedCard, Spinner } from '@/components/ui';
 import { motion } from 'framer-motion';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { api } from '@/lib/api';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
@@ -17,7 +18,7 @@ export default function AdminDashboardPage() {
     const loadStats = async () => {
       try {
         // Fetch real tenant count
-        const tenantsRes = await fetch('/api/tenants');
+        const tenantsRes = await api.get('/api/tenants');
         const tenants = await tenantsRes.json();
         
         setStats({
