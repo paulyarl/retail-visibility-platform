@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Alert, Spinner } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { api } from '@/lib/api';
 
 type Tenant = {
   id: string;
@@ -55,7 +56,7 @@ export default function AdminTiersPage() {
   const loadTenants = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/tenants');
+      const res = await api.get('/api/tenants');
       if (!res.ok) throw new Error('Failed to load tenants');
       const data = await res.json();
       setTenants(Array.isArray(data) ? data : []);
@@ -72,13 +73,9 @@ export default function AdminTiersPage() {
       setError(null);
       setSuccess(null);
 
-      const res = await fetch(`/api/tenants/${tenantId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subscriptionTier: tier,
-          subscriptionStatus: status,
-        }),
+      const res = await api.patch(`/api/tenants/${tenantId}`, {
+        subscriptionTier: tier,
+        subscriptionStatus: status,
       });
 
       if (!res.ok) {

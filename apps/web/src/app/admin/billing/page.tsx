@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { api } from '@/lib/api';
 
 interface Tenant {
   id: string;
@@ -28,7 +29,7 @@ export default function AdminBillingPage() {
 
   const loadTenants = async () => {
     try {
-      const res = await fetch('/api/tenants');
+      const res = await api.get('/api/tenants');
       const data = await res.json();
       setTenants(data);
     } catch (error) {
