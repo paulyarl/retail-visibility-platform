@@ -11,6 +11,7 @@ import GoogleConnectCard from "@/components/google/GoogleConnectCard";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Tenant = {
   id: string;
@@ -33,6 +34,7 @@ type Organization = {
 
 export default function TenantSettingsPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -197,13 +199,14 @@ export default function TenantSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Organization Assignment */}
+        {/* Organization Assignment - Admin Only */}
+        {user?.role === 'ADMIN' && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Organization / Chain Assignment</CardTitle>
-                <CardDescription>Assign this tenant to a chain organization</CardDescription>
+                <CardDescription>Assign this tenant to a chain organization (Admin Only)</CardDescription>
               </div>
               {!editingOrg && (
                 <button
@@ -319,6 +322,7 @@ export default function TenantSettingsPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Regional Settings */}
         <Card>
