@@ -48,6 +48,9 @@ import policyRoutes from './routes/policy';
 import billingRoutes from './routes/billing';
 import subscriptionRoutes from './routes/subscriptions';
 import categoryRoutes from './routes/categories';
+
+// Authentication
+import authRoutes from './auth/auth.routes';
 import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
 import organizationRoutes from './routes/organizations';
@@ -1283,6 +1286,10 @@ app.put("/admin/email-config", async (req, res) => {
     res.status(500).json({ error: "failed_to_update_email_config" });
   }
 });
+
+/* ------------------------------ AUTHENTICATION ------------------------------ */
+// Mount auth routes (no authentication required for these endpoints)
+app.use('/auth', authRoutes);
 
 /* ------------------------------ v3.5 AUDIT & BILLING APIs ------------------------------ */
 // Apply audit middleware globally (logs all write operations)

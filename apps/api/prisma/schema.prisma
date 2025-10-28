@@ -7,10 +7,445 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  STAFF
-  VIEWER
+model Tenant {
+  id                    String               @id @default(cuid())
+  name                  String
+  createdAt             DateTime             @default(now())
+  region                String               @default("us-east-1")
+  language              String               @default("en-US")
+  currency              String               @default("USD")
+  data_policy_accepted  Boolean              @default(false)
+  metadata              Json?
+  subscriptionStatus    String?              @default("trial")
+  subscriptionTier      String?              @default("starter")
+  trialEndsAt           DateTime?
+  subscriptionEndsAt    DateTime?
+  stripeCustomerId      String?              @unique
+  stripeSubscriptionId  String?              @unique
+  organizationId        String?
+  serviceLevel          String?              @default("self_service")
+  managedServicesActive Boolean              @default(false)
+  dedicatedManager      String?
+  monthlySkuQuota       Int?
+  skusAddedThisMonth    Int                  @default(0)
+  items                 InventoryItem[]
+  photos                PhotoAsset[]
+  performance           ProductPerformance[]
+  syncJobs              SyncJob[]
+  organization          Organization?        @relation(fields: [organizationId], references: [id])
+  users                 UserTenant[]         // Many-to-many relationship with users
+  googleOAuthAccounts   GoogleOAuthAccount[]
+
+  @@index([name])
+  @@index([subscriptionStatus])
+  @@index([organizationId])
+  @@index([serviceLevel])
+}
+
+model Organization {
+  id                   String    @id @default(cuid())
+  name                 String
+  ownerId              String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  subscriptionTier     String?   @default("chain_starter")
+  subscriptionStatus   String?   @default("trial")
+  trialEndsAt          DateTime?
+  subscriptionEndsAt   DateTime?
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  maxLocations         Int       @default(5)
+  maxTotalSKUs         Int       @default(2500)
+  metadata             Json?
+  tenants              Tenant[]
+
+  @@index([ownerId])
+  @@index([subscriptionStatus])
+  @@map("organization")
+}
+
+model InventoryItem {
+  id                   String                   @id @default(cuid())
+  tenantId             String
+  sku                  String
+  name                 String
+  priceCents           Int
+  stock                Int                      @default(0)
+  imageUrl             String?
+  metadata             Json?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  marketingDescription String?
+  imageGallery         String[]                 @default([])
+  customCta            Json?
+  socialLinks          Json?
+  customBranding       Json?
+  customSections       Json[]                   @default([])
+  landingPageTheme     String?                  @default("default")
+  auditLogId           String?
+  availability         AvailabilityStatus       @default(in_stock)
+  brand                String
+  categoryPath         String[]                 @default([])
+  condition            ProductCondition?        @default(new)
+  currency             String                   @default("USD") @db.Char(3)
+  description          String?
+  eligibilityReason    String?
+  gtin                 String?
+  itemStatus           ItemStatus?              @default(active)
+  locationId           String?
+  merchantName         String?
+  mpn                  String?
+  price                Decimal                  @db.Decimal(12, 2)
+  quantity             Int?
+  searchTsv            Unsupported("tsvector")?
+  syncStatus           SyncStatus?              @default(pending)
+  syncedAt             DateTime?
+  title                String
+  visibility           ItemVisibility?          @default(public)
+  manufacturer         String?
+  tenant               Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  photos               PhotoAsset[]
+  performance          ProductPerformance[]
+
+  @@unique([tenantId, sku], name: "uq_tenant_sku")
+  @@index([tenantId, updatedAt])
+}
+
+model PhotoAsset {
+  id              String        @id @default(cuid())
+  tenantId        String
+  inventoryItemId String
+  url             String
+  width           Int?
+  height          Int?
+  contentType     String?
+  bytes           Int?
+  exifRemoved     Boolean       @default(false)
+  capturedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  publicUrl       String?
+  signedUrl       String?
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([inventoryItemId])
+  @@index([capturedAt])
+}
+
+model ProductPerformance {
+  id              String        @id @default(cuid())
+  itemId          String
+  tenantId        String
+  date            DateTime      @db.Date
+  approvalStatus  String?
+  rejectionReason String?
+  impressions     Int           @default(0)
+  clicks          Int           @default(0)
+  ctr             Decimal       @default(0) @db.Decimal(5, 2)
+  conversions     Int           @default(0)
+  revenue         Decimal       @default(0) @db.Decimal(12, 2)
+  visibilityScore Int           @default(0)
+  searchRank      Int?
+  lastUpdated     DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+  item            InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, date])
+  @@index([tenantId, date(sort: Desc)])
+  @@index([approvalStatus])
+}
+
+model SyncJob {
+  id        String   @id @default(cuid())
+  tenantId  String
+  target    String
+  status    String   @default("queued")
+  attempt   Int      @default(0)
+  payload   Json
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  source    String   @default("manual")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, updatedAt])
+}
+
+model GoogleOAuthAccount {
+  id                String               @id @default(cuid())
+  tenantId          String               @map("tenant_id")
+  googleAccountId   String               @map("google_account_id")
+  email             String
+  displayName       String?              @map("display_name")
+  profilePictureUrl String?              @map("profile_picture_url")
+  scopes            String[]
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  gbpLocations      GbpLocation[]
+  merchantLinks     GoogleMerchantLink[]
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tokens            GoogleOAuthToken?
+
+  @@unique([tenantId, googleAccountId])
+  @@map("google_oauth_accounts")
+}
+
+model GoogleOAuthToken {
+  id                    String             @id @default(cuid())
+  accountId             String             @unique @map("account_id")
+  accessTokenEncrypted  String             @map("access_token_encrypted")
+  refreshTokenEncrypted String             @map("refresh_token_encrypted")
+  tokenType             String             @default("Bearer") @map("token_type")
+  expiresAt             DateTime           @map("expires_at")
+  scopes                String[]
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  account               GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("google_oauth_tokens")
+}
+
+model GoogleMerchantLink {
+  id           String             @id @default(cuid())
+  accountId    String             @map("account_id")
+  merchantId   String             @map("merchant_id")
+  merchantName String?            @map("merchant_name")
+  websiteUrl   String?            @map("website_url")
+  isActive     Boolean            @default(true) @map("is_active")
+  lastSyncAt   DateTime?          @map("last_sync_at")
+  syncStatus   String?            @default("pending") @map("sync_status")
+  syncError    String?            @map("sync_error")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  account      GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([merchantId])
+  @@map("google_merchant_links")
+}
+
+model GbpLocation {
+  id            String             @id @default(cuid())
+  accountId     String             @map("account_id")
+  locationId    String             @map("location_id")
+  locationName  String             @map("location_name")
+  storeCode     String?            @map("store_code")
+  address       String?
+  phoneNumber   String?            @map("phone_number")
+  websiteUrl    String?            @map("website_url")
+  category      String?
+  isVerified    Boolean?           @default(false) @map("is_verified")
+  isPublished   Boolean?           @default(false) @map("is_published")
+  lastFetchedAt DateTime?          @map("last_fetched_at")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  insights      GbpInsightDaily[]
+  account       GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, locationId])
+  @@map("gbp_locations")
+}
+
+model GbpInsightDaily {
+  id                String      @id @default(cuid())
+  locationId        String      @map("location_id")
+  date              DateTime    @db.Date
+  viewsSearch       Int         @default(0) @map("views_search")
+  viewsMaps         Int         @default(0) @map("views_maps")
+  actionsWebsite    Int         @default(0) @map("actions_website")
+  actionsPhone      Int         @default(0) @map("actions_phone")
+  actionsDirections Int         @default(0) @map("actions_directions")
+  photosCount       Int         @default(0) @map("photos_count")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  location          GbpLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, date])
+  @@index([locationId, date])
+  @@map("gbp_insights_daily")
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  tenantId    String      @map("tenant_id")
+  actorId     String      @map("actor_id")
+  actorType   ActorType   @map("actor_type")
+  diff        Json
+  entityId    String      @map("entity_id")
+  entityType  EntityType  @map("entity_type")
+  ip          String?
+  metadata    Json        @default("{}")
+  occurredAt  DateTime    @default(now()) @map("occurred_at")
+  piiScrubbed Boolean     @default(true) @map("pii_scrubbed")
+  requestId   String?     @map("request_id")
+  userAgent   String?     @map("user_agent")
+  action      AuditAction
+
+  @@index([tenantId, occurredAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([actorType, actorId])
+  @@index([requestId])
+  @@map("audit_log")
+}
+
+model PlatformSettings {
+  id                  Int      @id @default(1) @map("id")
+  platformName        String?  @map("platform_name")
+  platformDescription String?  @map("platform_description")
+  logoUrl             String?  @map("logo_url")
+  faviconUrl          String?  @map("favicon_url")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
+model SkuBillingPolicy {
+  id                 String    @id @default(cuid())
+  scope              String    @default("global")
+  countActivePrivate Boolean   @map("count_active_private")
+  countPreorder      Boolean   @map("count_preorder")
+  countZeroPrice     Boolean   @map("count_zero_price")
+  requireImage       Boolean   @map("require_image")
+  requireCurrency    Boolean   @map("require_currency")
+  note               String?
+  updatedBy          String?   @map("updated_by")
+  effectiveFrom      DateTime? @map("effective_from")
+  effectiveTo        DateTime? @map("effective_to")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("sku_billing_policy")
+}
+
+model SkuBillingPolicyHistory {
+  id                 String    @id @default(cuid())
+  scope              String    @default("global")
+  effectiveFrom      DateTime  @map("effective_from")
+  effectiveTo        DateTime? @map("effective_to")
+  countActivePrivate Boolean   @map("count_active_private")
+  countPreorder      Boolean   @map("count_preorder")
+  countZeroPrice     Boolean   @map("count_zero_price")
+  requireImage       Boolean   @map("require_image")
+  requireCurrency    Boolean   @map("require_currency")
+  notes              String?
+  updatedBy          String    @map("updated_by")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@index([scope, effectiveFrom(sort: Desc)])
+  @@map("sku_billing_policy_history")
+}
+
+model EmailConfiguration {
+  id        String   @id @default(cuid())
+  category  String   @unique
+  email     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@index([category])
+  @@map("email_configuration")
+}
+
+model UpgradeRequest {
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  businessName  String    @map("business_name")
+  currentTier   String    @map("current_tier")
+  requestedTier String    @map("requested_tier")
+  status        String    @default("new")
+  notes         String?
+  adminNotes    String?   @map("admin_notes")
+  processedBy   String?   @map("processed_by")
+  processedAt   DateTime? @map("processed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("upgrade_requests")
+}
+
+// Authentication User model
+model User {
+  id                      String          @id @default(cuid())
+  email                   String          @unique
+  passwordHash            String          @map("password_hash")
+  firstName               String?         @map("first_name")
+  lastName                String?         @map("last_name")
+  role                    UserRole        @default(USER)
+  emailVerified           Boolean         @default(false) @map("email_verified")
+  emailVerificationToken  String?         @map("email_verification_token")
+  passwordResetToken      String?         @map("password_reset_token")
+  passwordResetExpires    DateTime?       @map("password_reset_expires")
+  lastLogin               DateTime?       @map("last_login")
+  isActive                Boolean         @default(true) @map("is_active")
+  createdAt               DateTime        @default(now()) @map("created_at")
+  updatedAt               DateTime        @updatedAt @map("updated_at")
+  
+  // Relations
+  tenants                 UserTenant[]
+  sessions                UserSession[]
+  
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// User roles enum
+enum UserRole {
+  ADMIN    // Platform admin
+  OWNER    // Business owner
+  USER     // Regular user
+  
+  @@map("user_role")
+}
+
+// User-Tenant relationship (many-to-many)
+model UserTenant {
+  id        String            @id @default(cuid())
+  userId    String            @map("user_id")
+  tenantId  String            @map("tenant_id")
+  role      UserTenantRole    @default(MEMBER)
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, tenantId])
+  @@index([userId])
+  @@index([tenantId])
+  @@map("user_tenants")
+}
+
+// User role within a specific tenant
+enum UserTenantRole {
+  OWNER    // Tenant owner
+  ADMIN    // Tenant admin
+  MEMBER   // Regular member
+  VIEWER   // Read-only access
+  
+  @@map("user_tenant_role")
+}
+
+// User sessions for tracking
+model UserSession {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  deviceInfo String?   @map("device_info")
+  ipAddress  String?   @map("ip_address")
+  userAgent  String?   @map("user_agent")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  expiresAt  DateTime  @map("expires_at")
+  
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_sessions")
 }
 
 enum AvailabilityStatus {
@@ -82,419 +517,3 @@ enum AuditAction {
   @@map("action")
 }
 
-model Tenant {
-  id                  String               @id @default(cuid())
-  name                String
-  metadata            Json?                // Business profile data (address, phone, etc.)
-  createdAt           DateTime             @default(now())
-  users               User[]
-  items               InventoryItem[]
-  photos              PhotoAsset[]
-  syncJobs            SyncJob[]
-  googleOAuthAccounts GoogleOAuthAccount[]
-  performance         ProductPerformance[]
-  region              String               @default("us-east-1")
-  language            String               @default("en-US")
-  currency            String               @default("USD")
-  data_policy_accepted Boolean             @default(false)
-  
-  // Subscription management (v3.5.1)
-  subscriptionStatus     String?   @default("trial")  // trial, active, past_due, canceled
-  subscriptionTier       String?   @default("starter") // starter, pro, enterprise
-  trialEndsAt           DateTime?
-  subscriptionEndsAt    DateTime?
-  stripeCustomerId      String?   @unique
-  stripeSubscriptionId  String?   @unique
-  
-  // Organization/Chain support (v3.6)
-  organizationId      String?
-  organization        Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  
-  // Managed Services (v3.7)
-  serviceLevel           String?  @default("self_service") // self_service, managed_bronze, managed_silver, managed_gold, managed_platinum
-  managedServicesActive  Boolean  @default(false)
-  dedicatedManager       String?  // Staff member assigned to this tenant
-  monthlySkuQuota        Int?     // SKUs included per month in managed service
-  skusAddedThisMonth     Int      @default(0) // Track usage
-  
-  @@index([name])
-  @@index([subscriptionStatus])
-  @@index([organizationId])
-  @@index([serviceLevel])
-}
-
-// Organization model for multi-location chains (v3.6)
-model Organization {
-  id                     String    @id @default(cuid())
-  name                   String    // Chain/franchise name
-  ownerId                String    // User who owns the organization
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
-  
-  // Organization-level subscription (for chains)
-  subscriptionTier       String?   @default("chain_starter") // chain_starter, chain_professional, chain_enterprise
-  subscriptionStatus     String?   @default("trial")
-  trialEndsAt            DateTime?
-  subscriptionEndsAt     DateTime?
-  stripeCustomerId       String?   @unique
-  stripeSubscriptionId   String?   @unique
-  
-  // Chain limits
-  maxLocations           Int       @default(5)      // Max number of locations
-  maxTotalSKUs           Int       @default(2500)   // Shared SKU pool across all locations
-  
-  // Metadata
-  metadata               Json?     // Chain-level settings, branding, etc.
-  
-  // Relations
-  tenants                Tenant[]  // All locations in the chain
-  
-  @@index([ownerId])
-  @@index([subscriptionStatus])
-  @@map("organization")
-}
-
-model User {
-  id        String   @id @default(cuid())
-  tenantId  String
-  email     String   @unique
-  role      Role     @default(STAFF)
-  createdAt DateTime @default(now())
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-}
-
-model InventoryItem {
-  id         String   @id @default(cuid())
-  tenantId   String
-  sku        String
-  name       String
-  priceCents Int      // use integer cents for SQLite to avoid float rounding
-  stock      Int      @default(0)
-  imageUrl   String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // SWIS fields (v3.4)
-  title        String           // NOT NULL in DB
-  brand        String           // NOT NULL in DB
-  manufacturer String?          // Supplier/manufacturer name
-  description  String?
-  categoryPath String[]         @default([])
-  price        Decimal          @db.Decimal(12, 2) // NOT NULL in DB
-  currency     String           @default("USD") @db.Char(3) // NOT NULL in DB
-  availability AvailabilityStatus @default(in_stock) // NOT NULL in DB
-  quantity     Int?
-  condition    ProductCondition?   @default(new)
-  gtin         String?
-  mpn          String?
-  merchantName String?
-  locationId   String?
-  visibility   ItemVisibility?     @default(public)
-  syncStatus   SyncStatus?         @default(pending)
-  syncedAt     DateTime?
-  auditLogId   String?
-
-  // Lifecycle & eligibility (v3.4.1)
-  itemStatus        ItemStatus? @default(active)
-  eligibilityReason String?
-
-  // Full-text search (v3.4.1)
-  searchTsv Unsupported("tsvector")? // tsvector, managed by trigger
-
-  // Landing page customization (v3.5.3 - tier-based features)
-  marketingDescription String?      // Professional+ tier: Custom marketing copy
-  imageGallery         String[]     @default([]) // Professional+ tier: Multiple product images
-  customCta            Json?        // Professional+ tier: { text: "Call Now", link: "tel:555...", style: "primary" }
-  socialLinks          Json?        // Professional+ tier: { facebook: "...", instagram: "...", twitter: "..." }
-  customBranding       Json?        // Enterprise tier: { logo: "...", primaryColor: "#...", secondaryColor: "#..." }
-  customSections       Json[]       @default([]) // Enterprise tier: Array of custom content sections
-  landingPageTheme     String?      @default("default") // Enterprise tier: Theme/template selection
-
-  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  photos      PhotoAsset[]
-  performance ProductPerformance[]
-
-  // Each SKU must be unique within a tenant
-  @@unique([tenantId, sku], name: "uq_tenant_sku")
-  @@index([tenantId, updatedAt])
-}
-
-model PhotoAsset {
-  id              String   @id @default(cuid())
-  tenantId        String
-  inventoryItemId String
-  url             String
-  publicUrl       String?
-  signedUrl       String?
-  width           Int?
-  height          Int?
-  contentType     String?
-  bytes           Int?
-  exifRemoved     Boolean  @default(false)
-  capturedAt      DateTime?
-  createdAt       DateTime @default(now())
-  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  inventoryItem   InventoryItem  @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-  @@index([inventoryItemId])
-  @@index([capturedAt])
-}
-
-model ProductPerformance {
-  id              String    @id @default(cuid())
-  itemId          String
-  tenantId        String
-  date            DateTime  @db.Date
-  
-  // Google Merchant Center Status
-  approvalStatus  String?   // 'approved', 'pending', 'rejected', 'not_synced'
-  rejectionReason String?
-  
-  // Performance Metrics
-  impressions     Int       @default(0)
-  clicks          Int       @default(0)
-  ctr             Decimal   @default(0) @db.Decimal(5, 2)
-  conversions     Int       @default(0)
-  revenue         Decimal   @default(0) @db.Decimal(12, 2)
-  
-  // Visibility Metrics
-  visibilityScore Int       @default(0)
-  searchRank      Int?
-  
-  // Metadata
-  lastUpdated     DateTime  @default(now())
-  createdAt       DateTime  @default(now())
-  
-  item            InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  
-  @@unique([itemId, date])
-  @@index([tenantId, date(sort: Desc)])
-  @@index([approvalStatus])
-}
-
-model SyncJob {
-  id         String   @id @default(cuid())
-  tenantId   String
-  target     String
-  status     String   @default("queued")
-  attempt    Int      @default(0)
-  payload    Json
-  lastError  String?
-  source     String   @default("manual") // 'manual', 'google_gmc', 'google_gbp'
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, status, updatedAt])
-}
-
-// Google Connect Suite Models (ENH-2026-043 + ENH-2026-044)
-
-model GoogleOAuthAccount {
-  id                  String   @id @default(cuid())
-  tenantId            String   @map("tenant_id")
-  googleAccountId     String   @map("google_account_id")
-  email               String
-  displayName         String?  @map("display_name")
-  profilePictureUrl   String?  @map("profile_picture_url")
-  scopes              String[]
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-
-  tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  tokens              GoogleOAuthToken?
-  merchantLinks       GoogleMerchantLink[]
-  gbpLocations        GbpLocation[]
-
-  @@unique([tenantId, googleAccountId])
-  @@map("google_oauth_accounts")
-}
-
-model GoogleOAuthToken {
-  id                    String   @id @default(cuid())
-  accountId             String   @unique @map("account_id")
-  accessTokenEncrypted  String   @map("access_token_encrypted")
-  refreshTokenEncrypted String   @map("refresh_token_encrypted")
-  tokenType             String   @default("Bearer") @map("token_type")
-  expiresAt             DateTime @map("expires_at")
-  scopes                String[]
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-
-  account               GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  @@map("google_oauth_tokens")
-}
-
-model GoogleMerchantLink {
-  id           String    @id @default(cuid())
-  accountId    String    @map("account_id")
-  merchantId   String    @map("merchant_id")
-  merchantName String?   @map("merchant_name")
-  websiteUrl   String?   @map("website_url")
-  isActive     Boolean   @default(true) @map("is_active")
-  lastSyncAt   DateTime? @map("last_sync_at")
-  syncStatus   String?   @default("pending") @map("sync_status") // 'pending', 'syncing', 'success', 'error'
-  syncError    String?   @map("sync_error")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-
-  account      GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  @@index([accountId])
-  @@index([merchantId])
-  @@map("google_merchant_links")
-}
-
-model GbpLocation {
-  id             String    @id @default(cuid())
-  accountId      String    @map("account_id")
-  locationId     String    @map("location_id")
-  locationName   String    @map("location_name")
-  storeCode      String?   @map("store_code")
-  address        String?
-  phoneNumber    String?   @map("phone_number")
-  websiteUrl     String?   @map("website_url")
-  category       String?
-  isVerified     Boolean?  @default(false) @map("is_verified")
-  isPublished    Boolean?  @default(false) @map("is_published")
-  lastFetchedAt  DateTime? @map("last_fetched_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-
-  account        GoogleOAuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  insights       GbpInsightDaily[]
-
-  @@unique([accountId, locationId])
-  @@map("gbp_locations")
-}
-
-model GbpInsightDaily {
-  id                String   @id @default(cuid())
-  locationId        String   @map("location_id")
-  date              DateTime @db.Date
-  viewsSearch       Int      @default(0) @map("views_search")
-  viewsMaps         Int      @default(0) @map("views_maps")
-  actionsWebsite    Int      @default(0) @map("actions_website")
-  actionsPhone      Int      @default(0) @map("actions_phone")
-  actionsDirections Int      @default(0) @map("actions_directions")
-  photosCount       Int      @default(0) @map("photos_count")
-  createdAt         DateTime @default(now()) @map("created_at")
-
-  location          GbpLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@unique([locationId, date])
-  @@index([locationId, date])
-  @@map("gbp_insights_daily")
-}
-
-// v3.5 Models
-
-model AuditLog {
-  id          String      @id @default(cuid())
-  occurredAt  DateTime    @default(now()) @map("occurred_at")
-  actorType   ActorType   @map("actor_type")
-  actorId     String      @map("actor_id")
-  tenantId    String      @map("tenant_id")
-  entityType  EntityType  @map("entity_type")
-  entityId    String      @map("entity_id")
-  action      AuditAction
-  requestId   String?     @map("request_id")
-  ip          String?
-  userAgent   String?     @map("user_agent")
-  diff        Json
-  metadata    Json        @default("{}")
-  piiScrubbed Boolean     @default(true) @map("pii_scrubbed")
-
-  @@index([tenantId, occurredAt(sort: Desc)])
-  @@index([entityType, entityId])
-  @@index([actorType, actorId])
-  @@index([requestId])
-  @@map("audit_log")
-}
-
-model PlatformSettings {
-  id                  Int      @id @default(1) @map("id")
-  platformName        String?  @map("platform_name")
-  platformDescription String?  @map("platform_description")
-  logoUrl            String?  @map("logo_url")
-  faviconUrl         String?  @map("favicon_url")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
-
-  @@map("platform_settings")
-}
-
-model SkuBillingPolicy {
-  id                 String    @id @default(cuid())
-  scope              String    @default("global")
-  countActivePrivate Boolean   @map("count_active_private")
-  countPreorder      Boolean   @map("count_preorder")
-  countZeroPrice     Boolean   @map("count_zero_price")
-  requireImage       Boolean   @map("require_image")
-  requireCurrency    Boolean   @map("require_currency")
-  note               String?
-  updatedBy          String?   @map("updated_by")
-  effectiveFrom      DateTime? @map("effective_from")
-  effectiveTo        DateTime? @map("effective_to")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-
-  @@map("sku_billing_policy")
-}
-
-model SkuBillingPolicyHistory {
-  id                 String   @id @default(cuid())
-  scope              String   @default("global")
-  effectiveFrom      DateTime @map("effective_from")
-  effectiveTo        DateTime? @map("effective_to")
-  countActivePrivate Boolean  @map("count_active_private")
-  countPreorder      Boolean  @map("count_preorder")
-  countZeroPrice     Boolean  @map("count_zero_price")
-  requireImage       Boolean  @map("require_image")
-  requireCurrency    Boolean  @map("require_currency")
-  notes              String?
-  updatedBy          String   @map("updated_by")
-  createdAt          DateTime @default(now()) @map("created_at")
-
-  @@index([scope, effectiveFrom(sort: Desc)])
-  @@map("sku_billing_policy_history")
-}
-
-// Email configuration for different request types
-model EmailConfiguration {
-  id          String   @id @default(cuid())
-  category    String   @unique // subscription, sales, support, managed_services, partnerships, marketing, compliance, general
-  email       String
-  updatedAt   DateTime @updatedAt
-  updatedBy   String?  // User ID who last updated
-  
-  @@index([category])
-  @@map("email_configuration")
-}
-
-// Upgrade request tracking
-model UpgradeRequest {
-  id             String    @id @default(cuid())
-  tenantId       String    @map("tenant_id")
-  businessName   String    @map("business_name")
-  currentTier    String    @map("current_tier")
-  requestedTier  String    @map("requested_tier")
-  status         String    @default("new") // new, pending, waiting, complete, denied
-  notes          String?
-  adminNotes     String?   @map("admin_notes")
-  processedBy    String?   @map("processed_by")
-  processedAt    DateTime? @map("processed_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  
-  @@index([tenantId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("upgrade_requests")
-}

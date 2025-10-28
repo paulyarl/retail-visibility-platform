@@ -18,7 +18,18 @@ type Tenant = {
 
 export default function TenantsClient({ initialTenants = [] }: { initialTenants?: Tenant[] }) {
   const router = useRouter();
-  const [tenants, setTenants] = useState<Tenant[]>(initialTenants);
+  
+  // Filter initial tenants based on user ownership (localStorage)
+  const getMyTenants = (allTenants: Tenant[]) => {
+    if (typeof window === 'undefined') return allTenants;
+    const myTenantIds = JSON.parse(localStorage.getItem('myTenantIds') || '[]');
+    // If user has no tenants yet, show all (for initial setup)
+    return myTenantIds.length > 0 
+      ? allTenants.filter(t => myTenantIds.includes(t.id))
+      : allTenants;
+  };
+  
+  const [tenants, setTenants] = useState<Tenant[]>(getMyTenants(initialTenants));
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +69,21 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     try {
       const res = await fetch("/api/tenants");
       const data = await res.json();
-      setTenants(Array.isArray(data) ? data : []);
+      
+      // TODO: Replace with proper authentication and user-tenant relationship
+      // For now, filter tenants based on localStorage ownership
+      const myTenantIds = JSON.parse(localStorage.getItem('myTenantIds') || '[]');
+      
+      // If user has no tenants yet, show all (for initial setup)
+      // Otherwise, only show their tenants
+      const filteredData = myTenantIds.length > 0 
+        ? (Array.isArray(data) ? data : []).filter((t: Tenant) => myTenantIds.includes(t.id))
+        : (Array.isArray(data) ? data : []);
+      
+      console.log('[TenantsClient] My tenant IDs:', myTenantIds);
+      console.log('[TenantsClient] Filtered tenants:', filteredData.length, 'of', data?.length || 0);
+      
+      setTenants(filteredData);
     } catch (_e) {
       setError("Failed to load tenants");
     } finally {
@@ -80,13 +105,22 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "failed");
       
+      const newTenant = data as Tenant;
+      
+      // Add to user's tenant list in localStorage
+      const myTenantIds = JSON.parse(localStorage.getItem('myTenantIds') || '[]');
+      if (!myTenantIds.includes(newTenant.id)) {
+        myTenantIds.push(newTenant.id);
+        localStorage.setItem('myTenantIds', JSON.stringify(myTenantIds));
+        console.log('[TenantsClient] Added tenant to my list:', newTenant.id);
+      }
+      
       // Add to list
-      setTenants((prev) => [data as Tenant, ...prev]);
+      setTenants((prev) => [newTenant, ...prev]);
       setName("");
       
       // Redirect to onboarding to collect business profile
-      const tenantId = (data as Tenant).id;
-      router.push(`/onboarding?tenantId=${encodeURIComponent(tenantId)}`);
+      router.push(`/onboarding?tenantId=${encodeURIComponent(newTenant.id)}`);
     } catch (_e) {
       setError("Failed to create tenant");
     } finally {
@@ -136,6 +170,15 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Security Notice */}
+        <Alert variant="warning" title="Development Mode">
+          <p className="text-sm">
+            <strong>Note:</strong> Tenant filtering is currently using browser storage. 
+            In production, this will be replaced with proper user authentication and authorization.
+            Each user will only see their own tenant(s).
+          </p>
+        </Alert>
+
         {/* Error Alert */}
         {error && (
           <Alert variant="error" title="Error" onClose={() => setError(null)}>

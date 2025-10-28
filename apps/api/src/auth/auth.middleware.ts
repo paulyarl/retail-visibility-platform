@@ -1,17 +1,7 @@
-// Auth middleware for Express
 import { Request, Response, NextFunction } from 'express';
-import { authService } from '../auth/auth.service';
-import { UserRole } from '@prisma/client';
+import { authService, JWTPayload } from './auth.service';
 
-// JWT Payload interface
-export interface JWTPayload {
-  userId: string;
-  email: string;
-  role: UserRole;
-  tenantIds: string[];
-}
-
-// Extend Express Request type to include user
+// Extend Express Request to include user
 declare global {
   namespace Express {
     interface Request {
@@ -23,7 +13,7 @@ declare global {
 /**
  * Middleware to authenticate JWT token
  */
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
@@ -46,17 +36,12 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     }
     return res.status(401).json({ error: 'authentication_failed', message: 'Authentication failed' });
   }
-}
-
-/**
- * Alias for backward compatibility
- */
-export const requireAuth = authenticateToken;
+};
 
 /**
  * Middleware to check if user has required role
  */
-export function authorize(...roles: UserRole[]) {
+export const authorize = (...roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
@@ -71,25 +56,18 @@ export function authorize(...roles: UserRole[]) {
 
     next();
   };
-}
-
-/**
- * Admin-only middleware
- */
-export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  return authorize(UserRole.ADMIN)(req, res, next);
-}
+};
 
 /**
  * Middleware to check if user has access to a specific tenant
  */
-export function checkTenantAccess(req: Request, res: Response, next: NextFunction) {
+export const checkTenantAccess = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) {
     return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
   }
 
   // Admin users have access to all tenants
-  if (req.user.role === UserRole.ADMIN) {
+  if (req.user.role === 'ADMIN') {
     return next();
   }
 
@@ -109,12 +87,12 @@ export function checkTenantAccess(req: Request, res: Response, next: NextFunctio
   }
 
   next();
-}
+};
 
 /**
  * Optional authentication - adds user to request if token is valid, but doesn't require it
  */
-export function optionalAuth(req: Request, res: Response, next: NextFunction) {
+export const optionalAuth = (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -127,11 +105,4 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
     // Silently fail - authentication is optional
   }
   next();
-}
-
-/**
- * Extract tenant ID from query or user context
- */
-export function getTenantId(req: Request): string | null {
-  return (req.query.tenantId as string) || (req.user?.tenantIds && req.user.tenantIds[0]) || null;
-}
+};
