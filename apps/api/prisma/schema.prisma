@@ -517,3 +517,52 @@ enum AuditAction {
   @@map("action")
 }
 
+// Permission Matrix System
+model PermissionMatrix {
+  id          String   @id @default(cuid())
+  role        String   // 'PLATFORM_ADMIN', 'TENANT_OWNER', 'TENANT_ADMIN', 'TENANT_MEMBER', 'TENANT_VIEWER'
+  action      PermissionAction   // permission action enum
+  allowed     Boolean  @default(false)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([role, action])
+  @@index([role])
+  @@index([action])
+  @@map("permission_matrix")
+}
+
+enum PermissionAction {
+  tenant_create           @map("tenant.create")
+  tenant_read             @map("tenant.read")
+  tenant_update           @map("tenant.update")
+  tenant_delete           @map("tenant.delete")
+  tenant_manage_users     @map("tenant.manage_users")
+  inventory_create        @map("inventory.create")
+  inventory_read          @map("inventory.read")
+  inventory_update        @map("inventory.update")
+  inventory_delete        @map("inventory.delete")
+  analytics_view          @map("analytics.view")
+  admin_access_dashboard  @map("admin.access_dashboard")
+  admin_manage_settings   @map("admin.manage_settings")
+
+  @@map("permission_action")
+}
+
+model PermissionAuditLog {
+  id        String   @id @default(cuid())
+  role      String
+  action    String
+  oldValue  Boolean? @map("old_value")
+  newValue  Boolean  @map("new_value")
+  changedBy String   @map("changed_by")
+  changedAt DateTime @default(now()) @map("changed_at")
+  reason    String?
+
+  @@index([role])
+  @@index([changedBy])
+  @@index([changedAt])
+  @@map("permission_audit_log")
+}
+

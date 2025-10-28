@@ -7,6 +7,7 @@ import EditItemModal from "./EditItemModal";
 import { QRCodeModal } from "./QRCodeModal";
 import BulkUploadModal from "./BulkUploadModal";
 import PageHeader, { Icons } from "@/components/PageHeader";
+import { api } from "@/lib/api";
 
 type Tenant = {
   id: string;
@@ -73,11 +74,16 @@ export default function ItemsClient({
   // Create form visibility
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  // Check URL params for create=true
+  // Check URL params for create=true and tenantId
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('create') === 'true') {
       setShowCreateForm(true);
+    }
+    // If URL has tenantId and it's different from current, update it
+    const urlTenantId = params.get('tenantId');
+    if (urlTenantId && urlTenantId !== tenantId) {
+      setTenantId(urlTenantId);
     }
   }, []);
 
@@ -135,7 +141,7 @@ export default function ItemsClient({
         setItems([]);
         return;
       }
-      const res = await fetch(`/api/items?tenantId=${encodeURIComponent(tenantId)}`);
+      const res = await api.get(`/api/items?tenantId=${encodeURIComponent(tenantId)}`);
       const data = await res.json();
       console.log('[ItemsClient] Refresh response:', data);
       // Ensure data is an array before processing
@@ -150,15 +156,17 @@ export default function ItemsClient({
     }
   };
 
-  // Load tenants and initialize tenantId (from localStorage or first tenant)
+  // Load tenants and initialize tenantId (priority: initialTenantId > URL param > localStorage > first tenant)
   useEffect(() => {
     const loadTenants = async () => {
       try {
-        const res = await fetch("/api/tenants");
+        const res = await api.get("/api/tenants");
         const list: Tenant[] = await res.json();
         setTenants(Array.isArray(list) ? list : []);
-        const saved = typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
+        
+        // Only set tenantId if not already set by initialTenantId or URL param
         if (!tenantId) {
+          const saved = typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
           if (saved && list.some(t => t.id === saved)) {
             setTenantId(saved);
           } else if (list.length > 0) {
@@ -181,8 +189,8 @@ export default function ItemsClient({
   }, [tenantId]);
 
   useEffect(() => {
-    // If tenantId changed from initial, refresh list
-    if (tenantId !== initialTenantId) {
+    // Refresh items when tenantId changes
+    if (tenantId) {
       refresh();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,11 +209,7 @@ export default function ItemsClient({
         priceCents,
         stock: stock ? parseInt(stock, 10) : 0,
       };
-      const res = await fetch("/api/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await api.post("/api/items", body);
       const data = await res.json();
       if (!res.ok) {
         // Provide user-friendly error messages
@@ -220,7 +224,7 @@ export default function ItemsClient({
         return;
       }
       // Optimistically prepend
-      setItems((prev) => [data, ...prev]);
+      setItems((prev) => [data, ...(Array.isArray(prev) ? prev : [])]);
       setSku("");
       setName("");
       setPrice("");
@@ -235,18 +239,14 @@ export default function ItemsClient({
   const onUpdate = async (updatedItem: Item) => {
     setError(null);
     try {
-      const res = await fetch(`/api/items/${encodeURIComponent(updatedItem.id)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedItem),
-      });
+      const res = await api.put(`/api/items/${encodeURIComponent(updatedItem.id)}`, updatedItem);
       const data = await res.json();
       if (!res.ok) {
         const msg = data?.error || "Failed to update item";
         throw new Error(msg);
       }
       // Update local state
-      setItems((prev) => prev.map((item) => (item.id === updatedItem.id ? data : item)));
+      setItems((prev) => (Array.isArray(prev) ? prev : []).map((item) => (item.id === updatedItem.id ? data : item)));
     } catch (e) {
       throw e; // Re-throw to be caught by modal
     }
@@ -265,16 +265,12 @@ export default function ItemsClient({
   const handleStatusToggle = async (item: Item) => {
     const newStatus = item.itemStatus === 'active' ? 'inactive' : 'active';
     try {
-      const res = await fetch(`/api/items/${item.id}?tenantId=${tenantId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemStatus: newStatus })
-      });
+      const res = await api.put(`/api/items/${item.id}?tenantId=${tenantId}`, { itemStatus: newStatus });
 
       if (!res.ok) throw new Error('Failed to update status');
 
       // Update local state
-      setItems(items.map(i => i.id === item.id ? { ...i, itemStatus: newStatus } : i));
+      setItems((Array.isArray(items) ? items : []).map(i => i.id === item.id ? { ...i, itemStatus: newStatus } : i));
     } catch (error) {
       console.error('Failed to update status:', error);
       alert('Failed to update item status');
@@ -332,13 +328,7 @@ export default function ItemsClient({
       // Compress image before upload
       const dataUrl = await compressImage(file);
       
-      const body = JSON.stringify({ tenantId, dataUrl, contentType: "image/jpeg" });
-      
-      const res = await fetch(`/api/items/${encodeURIComponent(item.id)}/photos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
+      const res = await api.post(`/api/items/${encodeURIComponent(item.id)}/photos`, { tenantId, dataUrl, contentType: "image/jpeg" });
       const payload = await res.json();
       if (!res.ok) {
         setError(payload?.error || "Upload failed");
@@ -360,7 +350,7 @@ export default function ItemsClient({
       console.log('[ItemsClient] Setting imageUrl to:', uploadedUrl);
       
       // Optimistic update so user sees the image immediately
-      setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, imageUrl: uploadedUrl } : it)));
+      setItems((prev) => (Array.isArray(prev) ? prev : []).map((it) => (it.id === item.id ? { ...it, imageUrl: uploadedUrl } : it)));
       
       // Refresh from API to pick up any server-side persistence (e.g., Supabase signed/public URL)
       console.log('[ItemsClient] Refreshing items after upload...');
@@ -448,21 +438,21 @@ export default function ItemsClient({
                   size="sm"
                   onClick={() => setStatusFilter('all')}
                 >
-                  All ({items.length})
+                  All ({Array.isArray(items) ? items.length : 0})
                 </Button>
                 <Button
                   variant={statusFilter === 'active' ? 'primary' : 'ghost'}
                   size="sm"
                   onClick={() => setStatusFilter('active')}
                 >
-                  Active ({items.filter(i => i.itemStatus === 'active' || !i.itemStatus).length})
+                  Active ({Array.isArray(items) ? items.filter(i => i.itemStatus === 'active' || !i.itemStatus).length : 0})
                 </Button>
                 <Button
                   variant={statusFilter === 'inactive' ? 'primary' : 'ghost'}
                   size="sm"
                   onClick={() => setStatusFilter('inactive')}
                 >
-                  Inactive ({items.filter(i => i.itemStatus === 'inactive').length})
+                  Inactive ({Array.isArray(items) ? items.filter(i => i.itemStatus === 'inactive').length : 0})
                 </Button>
                 <Button
                   variant={statusFilter === 'syncing' ? 'primary' : 'ghost'}
@@ -472,7 +462,7 @@ export default function ItemsClient({
                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
-                  Syncing to Google ({items.filter(i => (i.itemStatus === 'active' || !i.itemStatus) && (i.visibility === 'public' || !i.visibility)).length})
+                  Syncing to Google ({Array.isArray(items) ? items.filter(i => (i.itemStatus === 'active' || !i.itemStatus) && (i.visibility === 'public' || !i.visibility)).length : 0})
                 </Button>
               </div>
               
@@ -817,7 +807,7 @@ export default function ItemsClient({
           onSuccess={async () => {
             // Reload items after successful upload
             try {
-              const res = await fetch(`/api/items?tenantId=${tenantId}`);
+              const res = await api.get(`/api/items?tenantId=${tenantId}`);
               const data = await res.json();
               setItems(Array.isArray(data) ? data : []);
             } catch (error) {

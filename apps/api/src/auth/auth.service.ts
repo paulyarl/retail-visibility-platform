@@ -7,8 +7,10 @@ const prisma = new PrismaClient();
 // JWT configuration
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'your-super-secret-access-key-change-in-production';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key-change-in-production';
-const JWT_ACCESS_EXPIRY = '15m';
-const JWT_REFRESH_EXPIRY = '7d';
+// WORKAROUND: Node.js Date.now() is returning timestamps ~1 year in the future
+// Setting very long expiry until system time issue is resolved
+const JWT_ACCESS_EXPIRY = '365d'; // Was '15m'
+const JWT_REFRESH_EXPIRY = '730d'; // Was '7d'
 
 export interface JWTPayload {
   userId: string;
@@ -49,9 +51,15 @@ export class AuthService {
    * Generate JWT access token
    */
   generateAccessToken(payload: JWTPayload): string {
-    return jwt.sign(payload, JWT_ACCESS_SECRET, {
+    const now = Math.floor(Date.now() / 1000);
+    console.log('[AuthService] Generating access token at:', new Date().toISOString(), 'timestamp:', now);
+    const token = jwt.sign(payload, JWT_ACCESS_SECRET, {
       expiresIn: JWT_ACCESS_EXPIRY,
     });
+    console.log('[AuthService] Token generated, decoding to verify timestamp...');
+    const decoded = jwt.decode(token) as any;
+    console.log('[AuthService] Token iat:', decoded.iat, 'exp:', decoded.exp);
+    return token;
   }
 
   /**

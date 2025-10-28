@@ -1,142 +1,43 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button, Input, Modal, ModalFooter, Pagination } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button, Input, Modal, ModalFooter, Pagination, Alert } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
+import { api } from '@/lib/api';
 
 interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'user' | 'viewer';
+  role: 'ADMIN' | 'OWNER' | 'USER'; // Platform-level roles
   status: 'active' | 'inactive' | 'pending';
   lastActive: string;
   tenants: number;
+  tenantRoles?: Array<{
+    tenantId: string;
+    tenantName: string;
+    role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'; // Tenant-level roles
+  }>;
 }
 
 export default function UsersManagementPage() {
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: '1',
-      email: 'paul.yarl@outlook.com',
-      name: 'Paul Yarl',
-      role: 'admin',
-      status: 'active',
-      lastActive: '2 minutes ago',
-      tenants: 2,
-    },
-    {
-      id: '2',
-      email: 'demo@example.com',
-      name: 'Demo User',
-      role: 'user',
-      status: 'active',
-      lastActive: '1 hour ago',
-      tenants: 1,
-    },
-    {
-      id: '3',
-      email: 'john.smith@example.com',
-      name: 'John Smith',
-      role: 'user',
-      status: 'active',
-      lastActive: '3 hours ago',
-      tenants: 1,
-    },
-    {
-      id: '4',
-      email: 'sarah.jones@example.com',
-      name: 'Sarah Jones',
-      role: 'viewer',
-      status: 'active',
-      lastActive: '5 hours ago',
-      tenants: 1,
-    },
-    {
-      id: '5',
-      email: 'mike.wilson@example.com',
-      name: 'Mike Wilson',
-      role: 'user',
-      status: 'pending',
-      lastActive: 'Never',
-      tenants: 0,
-    },
-    {
-      id: '6',
-      email: 'emma.brown@example.com',
-      name: 'Emma Brown',
-      role: 'user',
-      status: 'active',
-      lastActive: '1 day ago',
-      tenants: 2,
-    },
-    {
-      id: '7',
-      email: 'david.lee@example.com',
-      name: 'David Lee',
-      role: 'viewer',
-      status: 'inactive',
-      lastActive: '2 weeks ago',
-      tenants: 1,
-    },
-    {
-      id: '8',
-      email: 'lisa.garcia@example.com',
-      name: 'Lisa Garcia',
-      role: 'user',
-      status: 'active',
-      lastActive: '30 minutes ago',
-      tenants: 3,
-    },
-    {
-      id: '9',
-      email: 'tom.anderson@example.com',
-      name: 'Tom Anderson',
-      role: 'admin',
-      status: 'active',
-      lastActive: '2 hours ago',
-      tenants: 1,
-    },
-    {
-      id: '10',
-      email: 'rachel.white@example.com',
-      name: 'Rachel White',
-      role: 'user',
-      status: 'active',
-      lastActive: '4 hours ago',
-      tenants: 2,
-    },
-    {
-      id: '11',
-      email: 'chris.martin@example.com',
-      name: 'Chris Martin',
-      role: 'viewer',
-      status: 'pending',
-      lastActive: 'Never',
-      tenants: 0,
-    },
-    {
-      id: '12',
-      email: 'jennifer.taylor@example.com',
-      name: 'Jennifer Taylor',
-      role: 'user',
-      status: 'active',
-      lastActive: '6 hours ago',
-      tenants: 1,
-    },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'admin' | 'user' | 'viewer'>('user');
+  const [inviteRole, setInviteRole] = useState<'ADMIN' | 'OWNER' | 'USER'>('USER');
   
   // Edit user state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const [editRole, setEditRole] = useState<'admin' | 'user' | 'viewer'>('user');
+  const [editRole, setEditRole] = useState<'ADMIN' | 'OWNER' | 'USER'>('USER');
   const [editStatus, setEditStatus] = useState<'active' | 'inactive' | 'pending'>('active');
   
   // Permissions state
@@ -157,7 +58,32 @@ export default function UsersManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'user' | 'viewer'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'ADMIN' | 'OWNER' | 'USER'>('all');
+
+  // Load users on mount
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await api.get('/api/users');
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load users');
+      }
+
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('[Users] Load error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // Filter users based on search query, status, and role
   const filteredUsers = users.filter(user => {
@@ -178,12 +104,12 @@ export default function UsersManagementPage() {
 
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case 'admin':
-        return <Badge variant="error">Admin</Badge>;
-      case 'user':
+      case 'ADMIN':
+        return <Badge variant="error">Platform Admin</Badge>;
+      case 'OWNER':
+        return <Badge variant="warning">Tenant Owner</Badge>;
+      case 'USER':
         return <Badge variant="info">User</Badge>;
-      case 'viewer':
-        return <Badge variant="default">Viewer</Badge>;
       default:
         return <Badge variant="default">{role}</Badge>;
     }
@@ -207,7 +133,7 @@ export default function UsersManagementPage() {
     // TODO: Implement invite API call
     setShowInviteModal(false);
     setInviteEmail('');
-    setInviteRole('user');
+    setInviteRole('USER');
   };
 
   const handleEditClick = (user: User) => {
@@ -219,26 +145,38 @@ export default function UsersManagementPage() {
     setShowEditModal(true);
   };
 
-  const handleEditSave = () => {
+  const handleEditSave = async () => {
     if (!editingUser) return;
     
-    console.log('Updating user:', editingUser.id, {
-      name: editName,
-      email: editEmail,
-      role: editRole,
-      status: editStatus,
-    });
-    
-    // Update local state
-    setUsers(users.map(u => 
-      u.id === editingUser.id 
-        ? { ...u, name: editName, email: editEmail, role: editRole, status: editStatus }
-        : u
-    ));
-    
-    // TODO: Implement API call
-    setShowEditModal(false);
-    setEditingUser(null);
+    try {
+      setError(null);
+      const [firstName, ...lastNameParts] = editName.split(' ');
+      const lastName = lastNameParts.join(' ');
+      
+      const res = await api.put(`/api/users/${editingUser.id}`, {
+        firstName,
+        lastName,
+        email: editEmail,
+        role: editRole,
+        isActive: editStatus === 'active',
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update user');
+      }
+      
+      setSuccess('User updated successfully');
+      setShowEditModal(false);
+      setEditingUser(null);
+      await loadUsers();
+      
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('[Users] Update error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update user');
+    }
   };
 
   const handlePermissionsClick = (user: User) => {
@@ -256,8 +194,51 @@ export default function UsersManagementPage() {
     setPermissionsUser(null);
   };
 
+  const handleDelete = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setError(null);
+      const res = await api.delete(`/api/users/${userId}`);
+      
+      if (res.status === 204 || res.ok) {
+        setSuccess('User deleted successfully');
+        await loadUsers();
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete user');
+      }
+    } catch (err) {
+      console.error('[Users] Delete error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete user');
+    }
+  };
+
+  if (loading) {
+    return (
+      <ProtectedRoute requiredRole="ADMIN">
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+          <PageHeader
+            title="User Management"
+            description="Loading..."
+            icon={Icons.Users}
+          />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+    <ProtectedRoute requiredRole="ADMIN">
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
         title="User Management"
         description="Manage users, permissions, and access"
@@ -311,7 +292,7 @@ export default function UsersManagementPage() {
             <CardContent className="pt-6">
               <div className="text-center">
                 <p className="text-3xl font-bold text-red-600">
-                  {users.filter(u => u.role === 'admin').length}
+                  {users.filter(u => u.role === 'ADMIN').length}
                 </p>
                 <p className="text-sm text-neutral-600 mt-1">Admins</p>
               </div>
@@ -378,25 +359,25 @@ export default function UsersManagementPage() {
                   All Roles
                 </Button>
                 <Button
-                  variant={roleFilter === 'admin' ? 'primary' : 'ghost'}
+                  variant={roleFilter === 'ADMIN' ? 'primary' : 'ghost'}
                   size="sm"
-                  onClick={() => setRoleFilter('admin')}
+                  onClick={() => setRoleFilter('ADMIN')}
                 >
-                  Admin
+                  Platform Admin
                 </Button>
                 <Button
-                  variant={roleFilter === 'user' ? 'primary' : 'ghost'}
+                  variant={roleFilter === 'OWNER' ? 'primary' : 'ghost'}
                   size="sm"
-                  onClick={() => setRoleFilter('user')}
+                  onClick={() => setRoleFilter('OWNER')}
+                >
+                  Tenant Owner
+                </Button>
+                <Button
+                  variant={roleFilter === 'USER' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setRoleFilter('USER')}
                 >
                   User
-                </Button>
-                <Button
-                  variant={roleFilter === 'viewer' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setRoleFilter('viewer')}
-                >
-                  Viewer
                 </Button>
               </div>
             </div>
@@ -463,6 +444,11 @@ export default function UsersManagementPage() {
                     <Button size="sm" variant="secondary" onClick={() => handlePermissionsClick(user)}>
                       Permissions
                     </Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id)}>
+                      <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </Button>
                   </div>
                 </motion.div>
                   ))}
@@ -510,12 +496,12 @@ export default function UsersManagementPage() {
             </label>
             <select 
               value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as 'admin' | 'user' | 'viewer')}
+              onChange={(e) => setInviteRole(e.target.value as 'ADMIN' | 'OWNER' | 'USER')}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-              <option value="viewer">Viewer</option>
+              <option value="USER">User</option>
+              <option value="OWNER">Tenant Owner</option>
+              <option value="ADMIN">Platform Admin</option>
             </select>
           </div>
         </div>
@@ -556,12 +542,12 @@ export default function UsersManagementPage() {
             </label>
             <select 
               value={editRole}
-              onChange={(e) => setEditRole(e.target.value as 'admin' | 'user' | 'viewer')}
+              onChange={(e) => setEditRole(e.target.value as 'ADMIN' | 'OWNER' | 'USER')}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-              <option value="viewer">Viewer</option>
+              <option value="USER">User</option>
+              <option value="OWNER">Tenant Owner</option>
+              <option value="ADMIN">Platform Admin</option>
             </select>
           </div>
           <div>
@@ -723,6 +709,23 @@ export default function UsersManagementPage() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* Error/Success Alerts */}
+      {error && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Alert variant="error" title="Error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        </div>
+      )}
+      {success && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Alert variant="success" title="Success" onClose={() => setSuccess(null)}>
+            {success}
+          </Alert>
+        </div>
+      )}
     </div>
+    </ProtectedRoute>
   );
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import Protected from '@/components/Protected';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 interface EmailCategory {
   id: string;
@@ -275,7 +275,7 @@ export default function AdminEmailsPage() {
   };
 
   return (
-    <Protected>
+    <ProtectedRoute>
       <div className="min-h-screen bg-neutral-50">
         <PageHeader
           title="Email Management"
@@ -500,6 +500,6 @@ export default function AdminEmailsPage() {
 
         </div>
       </div>
-    </Protected>
+    </ProtectedRoute>
   );
 }

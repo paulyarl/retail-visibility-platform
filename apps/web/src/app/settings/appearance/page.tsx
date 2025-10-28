@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui";
-import Protected from "@/components/Protected";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import PageHeader, { Icons } from '@/components/PageHeader';
 
 export default function AppearanceSettingsPage() {
@@ -12,7 +12,7 @@ export default function AppearanceSettingsPage() {
   const actualTheme = 'light';
 
   return (
-    <Protected>
+    <ProtectedRoute>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
         <PageHeader
           title="Appearance"
@@ -246,6 +246,6 @@ export default function AppearanceSettingsPage() {
             </Card>
         </div>
       </div>
-    </Protected>
+    </ProtectedRoute>
   );
 }

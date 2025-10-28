@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, AnimatedCard } from '@/components/ui';
-import Protected from '@/components/Protected';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import PageHeader, { Icons } from '@/components/PageHeader';
 
 export default function SettingsPage() {
@@ -116,6 +116,19 @@ export default function SettingsPage() {
       adminOnly: true,
     },
     {
+      title: 'Permission Matrix',
+      description: 'Configure role-based permissions across the platform',
+      icon: (
+        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      ),
+      href: '/settings/admin/permissions',
+      color: 'bg-red-500',
+      adminOnly: true,
+      badge: 'New',
+    },
+    {
       title: 'Contact Us',
       description: 'Get in touch with our team for help or questions',
       icon: (
@@ -130,7 +143,7 @@ export default function SettingsPage() {
   ];
 
   return (
-    <Protected>
+    <ProtectedRoute>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
         <PageHeader
           title="Settings"
@@ -266,6 +279,6 @@ export default function SettingsPage() {
           </Card>
         </div>
       </div>
-    </Protected>
+    </ProtectedRoute>
   );
 }

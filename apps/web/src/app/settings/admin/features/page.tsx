@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button, Alert } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import Protected from '@/components/Protected';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { 
   getAllFeatureFlags, 
   enableForAll, 
@@ -79,7 +79,7 @@ export default function FeatureFlagsPage() {
   };
 
   return (
-    <Protected>
+    <ProtectedRoute>
       <div className="min-h-screen bg-neutral-50">
         <PageHeader
           title="Feature Flags"
@@ -267,6 +267,6 @@ export default function FeatureFlagsPage() {
         </Card>
         </div>
       </div>
-    </Protected>
+    </ProtectedRoute>
   );
 }

@@ -51,11 +51,19 @@ import categoryRoutes from './routes/categories';
 
 // Authentication
 import authRoutes from './auth/auth.routes';
-import { authenticateToken, checkTenantAccess } from './middleware/auth';
+import { authenticateToken, checkTenantAccess, requireAdmin } from './middleware/auth';
+import { 
+  requireTenantAdmin, 
+  requireInventoryAccess, 
+  requireTenantOwner,
+  checkTenantCreationLimit 
+} from './middleware/permissions';
 import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
 import organizationRoutes from './routes/organizations';
 import upgradeRequestsRoutes from './routes/upgrade-requests';
+import permissionRoutes from './routes/permissions';
+import userRoutes from './routes/users';
 import { auditLogger } from './middleware/audit-logger';
 import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
 import { enforcePolicyCompliance } from './middleware/policy-enforcement';
@@ -144,7 +152,7 @@ app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) =
 });
 
 const createTenantSchema = z.object({ name: z.string().min(1) });
-app.post("/tenants", authenticateToken, async (req, res) => {
+app.post("/tenants", authenticateToken, checkTenantCreationLimit, async (req, res) => {
   const parsed = createTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   
@@ -177,7 +185,7 @@ app.post("/tenants", authenticateToken, async (req, res) => {
 });
 
 const updateTenantSchema = z.object({ name: z.string().min(1) });
-app.put("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
+app.put("/tenants/:id", authenticateToken, checkTenantAccess, requireTenantAdmin, async (req, res) => {
   const parsed = updateTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
@@ -193,7 +201,7 @@ const patchTenantSchema = z.object({
   subscriptionTier: z.enum(['trial', 'starter', 'professional', 'enterprise']).optional(),
   subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled']).optional(),
 });
-app.patch("/tenants/:id", async (req, res) => {
+app.patch("/tenants/:id", authenticateToken, requireAdmin, async (req, res) => {
   const parsed = patchTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
@@ -208,7 +216,7 @@ app.patch("/tenants/:id", async (req, res) => {
   }
 });
 
-app.delete("/tenants/:id", async (req, res) => {
+app.delete("/tenants/:id", authenticateToken, checkTenantAccess, requireTenantOwner, async (req, res) => {
   try {
     await prisma.tenant.delete({ where: { id: req.params.id } });
     res.status(204).end();
@@ -233,7 +241,7 @@ const tenantProfileSchema = z.object({
   contact_person: z.string().optional(),
 });
 
-app.post("/tenant/profile", async (req, res) => {
+app.post("/tenant/profile", authenticateToken, async (req, res) => {
   const parsed = tenantProfileSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   
@@ -759,7 +767,7 @@ app.put(["/items/:id", "/inventory/:id"], enforcePolicyCompliance, async (req, r
   }
 });
 
-app.delete(["/items/:id", "/inventory/:id"], async (req, res) => {
+app.delete(["/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     await prisma.inventoryItem.delete({ where: { id: req.params.id } });
     res.status(204).end();
@@ -769,7 +777,7 @@ app.delete(["/items/:id", "/inventory/:id"], async (req, res) => {
 });
 
 // Update item status (for Google sync control)
-app.patch(["/items/:id", "/inventory/:id"], async (req, res) => {
+app.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, res) => {
   try {
     const { itemStatus, visibility, availability } = req.body;
     const updateData: any = {};
@@ -1344,6 +1352,8 @@ app.use('/categories', categoryRoutes);
 app.use('/performance', performanceRoutes);
 app.use('/organizations', organizationRoutes);
 app.use('/upgrade-requests', upgradeRequestsRoutes);
+app.use('/permissions', permissionRoutes);
+app.use('/users', userRoutes);
 app.use(platformSettingsRoutes);
 
 /* ------------------------------ jobs ------------------------------ */

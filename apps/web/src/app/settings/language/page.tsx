@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
-import Protected from '@/components/Protected';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import PageHeader, { Icons } from '@/components/PageHeader';
 
 const LANGUAGES = [
@@ -93,7 +93,7 @@ export default function LanguageSettingsPage() {
   }
 
   return (
-    <Protected>
+    <ProtectedRoute>
       <div className="min-h-screen bg-neutral-50">
         <PageHeader
           title="Language & Region"
@@ -253,6 +253,6 @@ export default function LanguageSettingsPage() {
           </Card>
         </div>
       </div>
-    </Protected>
+    </ProtectedRoute>
   );
 }

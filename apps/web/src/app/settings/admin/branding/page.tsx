@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import Protected from '@/components/Protected';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 const brandingSchema = z.object({
   platformName: z.string().min(1, 'Platform name is required'),
@@ -109,7 +109,7 @@ export default function BrandingSettings() {
 
   if (isLoading) {
     return (
-      <Protected>
+      <ProtectedRoute>
         <div className="min-h-screen bg-neutral-50">
           <PageHeader
             title="Platform Branding"
@@ -122,12 +122,12 @@ export default function BrandingSettings() {
             </div>
           </div>
         </div>
-      </Protected>
+      </ProtectedRoute>
     );
   }
 
   return (
-    <Protected>
+    <ProtectedRoute>
       <div className="min-h-screen bg-neutral-50">
         <PageHeader
           title="Platform Branding"
@@ -257,6 +257,6 @@ export default function BrandingSettings() {
       </Card>
         </div>
       </div>
-    </Protected>
+    </ProtectedRoute>
   );
 }

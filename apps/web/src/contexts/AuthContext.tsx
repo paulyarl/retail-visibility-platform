@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUser = useCallback(async () => {
     const token = getAccessToken();
     if (!token) {
+      setUser(null);
       setIsLoading(false);
       return;
     }
@@ -157,8 +158,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const data = await response.json();
+      console.log('[AuthContext] Login response:', { 
+        hasAccessToken: !!data.accessToken, 
+        hasRefreshToken: !!data.refreshToken,
+        hasUser: !!data.user 
+      });
+      
       setTokens(data.accessToken, data.refreshToken);
       setUser(data.user);
+      
+      console.log('[AuthContext] Tokens saved to localStorage');
       
       // Set current tenant
       if (data.user.tenants.length > 0) {
