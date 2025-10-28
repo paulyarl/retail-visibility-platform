@@ -67,6 +67,18 @@ export default function SettingsPage() {
       color: 'bg-blue-500',
     },
     {
+      title: 'Tenant Users',
+      description: 'Manage users and roles within your tenant',
+      icon: (
+        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ),
+      href: '/tenants/users',
+      color: 'bg-cyan-500',
+      badge: 'New',
+    },
+    {
       title: 'Organization Dashboard',
       description: 'View chain-wide SKU usage and location breakdown',
       icon: (
@@ -163,11 +175,15 @@ export default function SettingsPage() {
                 key={setting.href}
                 delay={index * 0.1}
                 onClick={() => {
-                  // Special handling for tenant settings
-                  if (setting.href === '/settings/tenant') {
+                  // Special handling for tenant-specific pages
+                  if (setting.href === '/settings/tenant' || setting.href === '/tenants/users') {
                     const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
                     if (tenantId) {
-                      router.push(setting.href);
+                      if (setting.href === '/tenants/users') {
+                        router.push(`/tenants/${tenantId}/users`);
+                      } else {
+                        router.push(setting.href);
+                      }
                     } else {
                       router.push('/tenants');
                     }

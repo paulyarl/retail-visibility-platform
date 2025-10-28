@@ -64,6 +64,7 @@ import organizationRoutes from './routes/organizations';
 import upgradeRequestsRoutes from './routes/upgrade-requests';
 import permissionRoutes from './routes/permissions';
 import userRoutes from './routes/users';
+import tenantUserRoutes from './routes/tenant-users';
 import { auditLogger } from './middleware/audit-logger';
 import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
 import { enforcePolicyCompliance } from './middleware/policy-enforcement';
@@ -1354,6 +1355,7 @@ app.use('/organizations', organizationRoutes);
 app.use('/upgrade-requests', upgradeRequestsRoutes);
 app.use('/permissions', permissionRoutes);
 app.use('/users', userRoutes);
+app.use('/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
 
 /* ------------------------------ jobs ------------------------------ */
