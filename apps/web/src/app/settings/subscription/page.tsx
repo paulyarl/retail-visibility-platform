@@ -263,7 +263,7 @@ export default function SubscriptionPage() {
                 </div>
                 
                 {/* Trial Expiration */}
-                {tenant.subscriptionStatus === 'trial' && tenant.trialEndsAt && (
+                {(tenant.subscriptionTier === 'trial' || tenant.subscriptionStatus === 'trial') && tenant.trialEndsAt && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-neutral-600">Trial Ends</span>
                     <span className="text-sm font-medium text-neutral-900">
