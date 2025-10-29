@@ -9,7 +9,7 @@ Complete implementation of the Tenant Business Profile feature with modern UX De
 
 ---
 
-## Components Created
+## Components Created for testers
 
 ### 1. Validation & Types
 **File:** `apps/web/src/lib/validation/businessProfile.ts`
