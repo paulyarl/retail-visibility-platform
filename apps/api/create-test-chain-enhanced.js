@@ -161,16 +161,19 @@ async function createChain(index) {
     // Add SKUs
     const items = [];
     for (let j = 0; j < locationSkus; j++) {
+      const price = getRandomInt(500, 50000);
       items.push({
         tenantId: tenant.id,
         sku: `SKU-${timestamp}-${i}-${j.toString().padStart(4, '0')}`,
         name: `Product ${j + 1}`,
-        priceCents: getRandomInt(500, 50000),
-        stock: getRandomInt(0, 100),
         title: `Product ${j + 1}`,
         brand: getRandom(['Generic', 'Premium', 'Value', 'Elite']),
-        price: getRandomInt(5, 500),
+        priceCents: price,
+        price: price / 100,
         currency: 'USD',
+        stock: getRandomInt(0, 100),
+        availability: getRandom(['in_stock', 'in_stock', 'in_stock', 'out_of_stock']), // 75% in stock
+        itemStatus: getRandom(['active', 'active', 'active', 'inactive']), // 75% active
       });
     }
 

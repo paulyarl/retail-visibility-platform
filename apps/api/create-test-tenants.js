@@ -166,12 +166,13 @@ async function createTenant(index) {
       tenantId: tenant.id,
       sku: `SKU-${timestamp}-${i.toString().padStart(5, '0')}`,
       name: `${category} Product ${i + 1}`,
-      priceCents: price,
-      stock: getRandomInt(0, 100),
       title: `${category} Product ${i + 1}`,
       brand: getRandom(['Generic', 'Premium', 'Value', 'Elite', 'Standard']),
+      priceCents: price,
       price: price / 100,
       currency: 'USD',
+      stock: getRandomInt(0, 100),
+      availability: getRandom(['in_stock', 'in_stock', 'in_stock', 'out_of_stock']), // 75% in stock
       itemStatus: getRandom(['active', 'active', 'active', 'inactive']), // 75% active
     });
   }
