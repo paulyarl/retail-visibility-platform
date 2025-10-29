@@ -13,6 +13,7 @@ import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAdminEmail } from "@/lib/admin-emails";
+import { BusinessProfile } from "@/lib/validation/businessProfile";
 
 type Tenant = {
   id: string;
@@ -39,6 +40,8 @@ export default function TenantSettingsPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<BusinessProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState<boolean>(true);
   const [editingRegional, setEditingRegional] = useState(false);
   const [savingRegional, setSavingRegional] = useState(false);
   const [regionalSettings, setRegionalSettings] = useState({
@@ -127,6 +130,53 @@ export default function TenantSettingsPage() {
       loadPendingRequest(tenantId);
     }
   }, []);
+
+  // Load business profile once tenant is determined
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!tenant?.id) return;
+      setProfileLoading(true);
+      try {
+        const res = await api.get(`/api/tenant/profile?tenant_id=${encodeURIComponent(tenant.id)}`);
+        if (res.ok) {
+          const data = await res.json();
+          // Normalize potential camelCase payload from API to our BusinessProfile shape
+          const normalized: BusinessProfile = {
+            tenant_id: tenant.id,
+            business_name: data.business_name ?? data.businessName ?? tenant.name,
+            address_line1: data.address_line1 ?? data.addressLine1 ?? '',
+            address_line2: data.address_line2 ?? data.addressLine2 ?? '',
+            city: data.city ?? '',
+            state: data.state ?? '',
+            postal_code: data.postal_code ?? data.postalCode ?? '',
+            country_code: data.country_code ?? data.countryCode ?? 'US',
+            phone_number: data.phone_number ?? data.phoneNumber ?? '',
+            email: data.email ?? '',
+            website: data.website ?? '',
+            contact_person: data.contact_person ?? data.contactPerson ?? '',
+            logo_url: data.logo_url ?? data.logoUrl ?? (tenant.metadata as any)?.logo_url ?? '',
+            business_description: data.business_description ?? '',
+            hours: data.hours ?? undefined,
+            social_links: data.social_links ?? undefined,
+            seo_tags: data.seo_tags ?? undefined,
+            // Map settings
+            // @ts-ignore augmenting shape locally for UI wiring
+            display_map: data.display_map ?? false,
+            // @ts-ignore
+            map_privacy_mode: data.map_privacy_mode ?? 'precise',
+          } as BusinessProfile;
+          setProfile(normalized);
+        } else {
+          setProfile(null);
+        }
+      } catch {
+        setProfile(null);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [tenant?.id]);
 
   if (loading) {
     return (
@@ -713,46 +763,81 @@ export default function TenantSettingsPage() {
         {/* Business Profile - Feature Flag: FF_BUSINESS_PROFILE */}
         {isFeatureEnabled('FF_BUSINESS_PROFILE', tenant.id, tenant.region) && (
           <BusinessProfileCard
-            profile={tenant.metadata || null}
-            loading={false}
-            onUpdate={async (profile) => {
+            profile={profile}
+            loading={profileLoading}
+            onUpdate={async (updated) => {
               try {
-                const response = await api.post('/api/tenant/profile', {
+                const response = await api.patch('/api/tenant/profile', {
                   tenant_id: tenant.id,
-                  ...profile,
+                  ...updated,
                 });
-
                 if (!response.ok) {
-                  throw new Error('Failed to update business profile');
+                  const e = await response.json();
+                  throw new Error(e?.error || 'Failed to update business profile');
                 }
-
-                const updatedTenant = await response.json();
-                setTenant(updatedTenant);
+                const saved = await response.json();
+                // Normalize response back into BusinessProfile shape when possible
+                const next: BusinessProfile = {
+                  tenant_id: tenant.id,
+                  business_name: (saved.businessName ?? updated.business_name) as any,
+                  address_line1: saved.addressLine1 ?? updated.address_line1,
+                  address_line2: saved.addressLine2 ?? updated.address_line2,
+                  city: saved.city ?? updated.city,
+                  state: saved.state ?? updated.state,
+                  postal_code: saved.postalCode ?? updated.postal_code,
+                  country_code: saved.countryCode ?? updated.country_code,
+                  phone_number: saved.phoneNumber ?? updated.phone_number,
+                  email: saved.email ?? updated.email,
+                  website: saved.website ?? updated.website,
+                  contact_person: saved.contactPerson ?? updated.contact_person,
+                  logo_url: (tenant.metadata as any)?.logo_url,
+                } as any;
+                setProfile(next);
               } catch (err) {
                 console.error('Failed to update business profile:', err);
-                throw err;
+                alert('Failed to update business profile');
               }
             }}
           />
         )}
 
-        {/* Map Settings - Feature Flag: FF_MAP_CARD */}
-        {isFeatureEnabled('FF_MAP_CARD', tenant.id, tenant.region) && tenant.metadata && (
+        {/* ... (rest of the code remains the same) */}
+        {isFeatureEnabled('FF_MAP_CARD', tenant.id, tenant.region) && profile && (
           <MapCardSettings
             businessProfile={{
-              business_name: tenant.metadata.business_name || tenant.name,
-              address_line1: tenant.metadata.address_line1 || '',
-              address_line2: tenant.metadata.address_line2,
-              city: tenant.metadata.city || '',
-              state: tenant.metadata.state || '',
-              postal_code: tenant.metadata.postal_code || '',
-              country_code: tenant.metadata.country_code || 'US',
+              business_name: profile.business_name || tenant.name,
+              address_line1: profile.address_line1 || '',
+              address_line2: profile.address_line2,
+              city: profile.city || '',
+              state: profile.state || '',
+              postal_code: profile.postal_code || '',
+              country_code: profile.country_code || 'US',
             }}
-            displayMap={false} // TODO: Fetch from API
-            privacyMode="precise" // TODO: Fetch from API
+            displayMap={(profile as any).display_map ?? false}
+            privacyMode={(profile as any).map_privacy_mode ?? 'precise'}
             onSave={async (settings) => {
-              console.log('Map settings updated:', settings);
-              // TODO: Implement API call
+              try {
+                const response = await api.patch('/api/tenant/profile', {
+                  tenant_id: tenant.id,
+                  display_map: settings.displayMap,
+                  map_privacy_mode: settings.privacyMode,
+                });
+                if (!response.ok) {
+                  const e = await response.json();
+                  throw new Error(e?.error || 'Failed to update map settings');
+                }
+                // Update local state
+                setProfile(prev => prev ? ({
+                  ...prev,
+                  // @ts-ignore
+                  display_map: settings.displayMap,
+                  // @ts-ignore
+                  map_privacy_mode: settings.privacyMode,
+                }) as any : prev);
+              } catch (err) {
+                console.error('Failed to update map settings:', err);
+                alert('Failed to update map settings');
+              }
             }}
           />
         )}

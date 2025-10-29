@@ -36,6 +36,7 @@ model Tenant {
   users                 UserTenant[]         // Many-to-many relationship with users
   googleOAuthAccounts   GoogleOAuthAccount[]
   organizationRequests  OrganizationRequest[] // Requests to join organizations
+  businessProfile       TenantBusinessProfile?
 
   @@index([name])
   @@index([subscriptionStatus])
@@ -127,12 +128,17 @@ model PhotoAsset {
   createdAt       DateTime      @default(now())
   publicUrl       String?
   signedUrl       String?
+  position        Int           @default(0)
+  alt             String?
+  caption         String?
   inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
   tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@unique([inventoryItemId, position])
   @@index([tenantId])
   @@index([inventoryItemId])
   @@index([capturedAt])
+  @@index([inventoryItemId, position])
 }
 
 model ProductPerformance {
@@ -397,6 +403,33 @@ model OrganizationRequest {
   @@index([requestedBy])
   @@index([createdAt])
   @@map("organization_requests")
+}
+
+model TenantBusinessProfile {
+  tenantId       String  @id @map("tenant_id")
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  businessName   String  @map("business_name")
+  addressLine1   String  @map("address_line1")
+  addressLine2   String? @map("address_line2")
+  city           String
+  state          String?
+  postalCode     String  @map("postal_code")
+  countryCode    String  @map("country_code") @db.Char(2)
+  phoneNumber    String? @map("phone_number")
+  email          String?
+  website        String?
+  contactPerson  String? @map("contact_person")
+  hours          Json?
+  socialLinks    Json?   @map("social_links")
+  seoTags        Json?   @map("seo_tags")
+  latitude       Decimal?
+  longitude      Decimal?
+  displayMap     Boolean @default(false) @map("display_map")
+  mapPrivacyMode String  @default("precise") @map("map_privacy_mode")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("tenant_business_profile")
 }
 
 // Authentication User model

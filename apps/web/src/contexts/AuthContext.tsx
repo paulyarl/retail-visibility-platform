@@ -58,12 +58,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setTokens = (accessToken: string, refreshToken: string) => {
     localStorage.setItem(TOKEN_KEY, accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    // Also set a non-HttpOnly cookie for SSR guard
+    try {
+      document.cookie = `access_token=${encodeURIComponent(accessToken)}; path=/; SameSite=Lax`;
+    } catch {}
   };
 
   const clearTokens = () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(TENANT_KEY);
+    try {
+      // Expire cookie
+      document.cookie = `access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    } catch {}
   };
 
   // Fetch current user
@@ -96,12 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Token expired, try to refresh
         await refreshToken();
       } else {
-        clearTokens();
+        // Do not clear tokens on transient/non-401 errors
         setUser(null);
       }
     } catch (error) {
       console.error('[AuthContext] Failed to fetch user:', error);
-      clearTokens();
+      // Keep tokens; treat as unauthenticated view until next successful call
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -129,9 +137,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const data = await response.json();
         localStorage.setItem(TOKEN_KEY, data.accessToken);
+        try { document.cookie = `access_token=${encodeURIComponent(data.accessToken)}; path=/; SameSite=Lax`; } catch {}
         await fetchUser();
       } else {
-        clearTokens();
+        // Only clear tokens if refresh endpoint explicitly says unauthorized
+        if (response.status === 401) {
+          clearTokens();
+        }
         setUser(null);
       }
     } catch (error) {

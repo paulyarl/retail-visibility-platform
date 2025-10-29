@@ -173,6 +173,19 @@ export default function EditBusinessProfileModal({
     // Validate if touched
     if (touched[name]) {
       validateField(name, value);
+    } else {
+      // Live-clear error if the field becomes valid even before blur
+      try {
+        const fieldSchema = (businessProfileSchema.shape as any)[name];
+        if (fieldSchema) {
+          fieldSchema.parse(value);
+          setErrors(prev => {
+            const next = { ...prev };
+            delete next[name as string];
+            return next;
+          });
+        }
+      } catch {/* keep existing error until blur */}
     }
   };
 
@@ -191,7 +204,23 @@ export default function EditBusinessProfileModal({
     
     // Validate all fields
     try {
-      const validatedData = businessProfileSchema.parse(formData);
+      // Clear any stale errors before validating
+      setErrors({});
+      setError(null);
+      // Normalize optional fields: convert empty string to undefined so optional() passes cleanly
+      const normalized: Partial<BusinessProfile> = {
+        ...formData,
+        address_line2: formData.address_line2 ? formData.address_line2 : undefined,
+        state: formData.state ? formData.state : undefined,
+        website: formData.website ? formData.website : undefined,
+        contact_person: formData.contact_person ? formData.contact_person : undefined,
+        admin_email: (formData as any).admin_email ? (formData as any).admin_email : undefined,
+        logo_url: formData.logo_url ? formData.logo_url : undefined,
+        business_description: formData.business_description ? formData.business_description : undefined,
+        phone_number: formData.phone_number ? formData.phone_number : undefined,
+        email: formData.email ? formData.email : undefined,
+      };
+      const validatedData = businessProfileSchema.parse(normalized);
       
       setSaving(true);
       setError(null);
@@ -218,7 +247,15 @@ export default function EditBusinessProfileModal({
           }
         });
         setErrors(newErrors);
-        setError('Please fix the validation errors below');
+        // Mark errored fields as touched so per-field errors show
+        setTouched((prev) => {
+          const next = { ...prev } as Record<string, boolean>;
+          Object.keys(newErrors).forEach((k) => { next[k] = true; });
+          return next;
+        });
+        // Show the first validation message in the banner for clarity
+        const firstMsg = Object.values(newErrors)[0];
+        setError(firstMsg ? `Validation: ${firstMsg}` : 'Please fix the validation errors below');
       } else {
         setError(err instanceof Error ? err.message : 'An error occurred');
       }

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
+import ProductGallery from '@/components/products/ProductGallery';
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
 
 // Force dynamic rendering for product pages
@@ -97,6 +98,35 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
   }
 }
 
+type Photo = {
+  url: string;
+  alt?: string | null;
+  caption?: string | null;
+  position: number;
+};
+
+async function getProductPhotos(id: string): Promise<Photo[]> {
+  try {
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+    const res = await fetch(`${apiBaseUrl}/items/${id}/photos`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    // Expecting array of { url, position, alt, caption } objects
+    const sorted = (data as Array<{ url?: string; position?: number; alt?: string | null; caption?: string | null }>)
+      .filter((p) => typeof p?.url === 'string' && (p.url as string).length > 0)
+      .sort((a, b) => ((a?.position ?? 0) - (b?.position ?? 0)));
+    return sorted.map((p) => ({
+      url: p.url as string,
+      alt: p.alt,
+      caption: p.caption,
+      position: p.position ?? 0,
+    }));
+  } catch (_e) {
+    return [];
+  }
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const data = await getProduct(id);
@@ -133,6 +163,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const { product, tenant } = data;
   const businessName = tenant.metadata?.businessName || tenant.name;
 
+  // Build image gallery: try photos endpoint; fall back to product.imageUrl
+  const photos = await getProductPhotos(product.id);
+  const gallery = photos.length > 0
+    ? photos
+    : (product.imageUrl ? [{ url: product.imageUrl, alt: product.title, caption: null, position: 0 }] : []);
+
   // Structured data for Google
   const structuredData = {
     '@context': 'https://schema.org',
@@ -146,7 +182,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     sku: product.sku,
     gtin: product.gtin,
     mpn: product.mpn,
-    image: product.imageUrl,
+    image: gallery.map(p => p.url),
     offers: {
       '@type': 'Offer',
       url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rvp.vercel.app'}/products/${product.id}`,
@@ -168,8 +204,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
 
-      {/* Tier-Based Landing Page */}
-      <TierBasedLandingPage product={product} tenant={tenant} />
+      {/* Tier-Based Landing Page with Gallery */}
+      <TierBasedLandingPage 
+        product={product} 
+        tenant={tenant}
+        gallery={<ProductGallery gallery={gallery} productTitle={product.title} />}
+      />
     </>
   );
 }

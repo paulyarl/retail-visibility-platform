@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Inpu
 import { motion } from "framer-motion";
 import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Tenant = { 
   id: string; 
@@ -19,6 +20,7 @@ type Tenant = {
 
 export default function TenantsClient({ initialTenants = [] }: { initialTenants?: Tenant[] }) {
   const router = useRouter();
+  const { user } = useAuth();
   
   const [tenants, setTenants] = useState<Tenant[]>(initialTenants);
   const [name, setName] = useState("");
@@ -65,9 +67,12 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     try {
       const res = await api.get("/api/tenants");
       const data = await res.json();
-      
-      // Backend now handles tenant filtering based on authentication
-      setTenants(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      // Belt-and-suspenders: filter to user memberships if not ADMIN
+      const isAdmin = user?.role === 'ADMIN';
+      const memberIds = (user?.tenants || []).map(t => t.id);
+      const filtered = isAdmin ? list : list.filter((t: Tenant) => memberIds.includes(t.id));
+      setTenants(filtered);
     } catch (_e) {
       setError("Failed to load tenants");
     } finally {
@@ -247,7 +252,13 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
               </div>
             ) : (
               <div className="divide-y divide-neutral-200">
-                {paginatedTenants.map((t, index) => (
+                {paginatedTenants.map((t, index) => {
+                  const role = user?.tenants?.find(x => x.id === t.id)?.role;
+                  const isAdmin = user?.role === 'ADMIN';
+                  const canEdit = isAdmin || role === 'OWNER' || role === 'ADMIN';
+                  const canDelete = isAdmin || role === 'OWNER';
+                  const canRename = canEdit;
+                  return (
                   <TenantRow 
                     key={t.id} 
                     tenant={t}
@@ -256,8 +267,11 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     onEditProfile={() => router.push(`/onboarding?tenantId=${encodeURIComponent(t.id)}`)}
                     onRename={onRename}
                     onDelete={() => onDelete(t.id)}
+                    canEdit={!!canEdit}
+                    canDelete={!!canDelete}
+                    canRename={!!canRename}
                   />
-                ))}
+                )})}
               </div>
             )}
           </CardContent>
@@ -279,13 +293,16 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   );
 }
 
-function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete }: {
+function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete, canEdit = false, canRename = false, canDelete = false }: {
   tenant: Tenant;
   index: number;
   onSelect: () => void;
   onEditProfile: () => void;
   onRename: (id: string, newName: string) => void;
   onDelete: () => void;
+  canEdit?: boolean;
+  canRename?: boolean;
+  canDelete?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(tenant.name);
@@ -347,24 +364,30 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete 
         {/* Actions */}
         {!editing && (
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={onEditProfile}>
-              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              Edit Profile
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
-              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              Rename
-            </Button>
-            <Button size="sm" variant="danger" onClick={() => setShowDeleteModal(true)}>
-              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Delete
-            </Button>
+            {canEdit && (
+              <Button size="sm" variant="secondary" onClick={onEditProfile}>
+                <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Edit Profile
+              </Button>
+            )}
+            {canRename && (
+              <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+                <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Rename
+              </Button>
+            )}
+            {canDelete && (
+              <Button size="sm" variant="danger" onClick={() => setShowDeleteModal(true)}>
+                <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </Button>
+            )}
             <Button size="sm" onClick={onSelect}>
               <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />

@@ -1,0 +1,45 @@
+import { cookies } from 'next/headers';
+import { redirect, notFound } from 'next/navigation';
+import RememberTenantRoute from '@/components/client/RememberTenantRoute';
+
+export default async function TenantLayout({ children, params }: { children: React.ReactNode; params: Promise<{ tenantId: string }> | { tenantId: string } }) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('access_token')?.value;
+  const resolvedParams = (params && typeof params === 'object' && 'then' in (params as any)) 
+    ? await (params as Promise<{ tenantId: string }>) 
+    : (params as { tenantId: string });
+  const tenantId = resolvedParams?.tenantId;
+  if (!token) {
+    redirect(`/login?next=/t/${tenantId}`);
+  }
+  if (!tenantId) {
+    notFound();
+  }
+
+  const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+  try {
+    const res = await fetch(`${apiBaseUrl}/tenants`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      redirect('/tenants');
+    }
+    const list: Array<{ id: string; name: string }> = await res.json();
+    const isMember = Array.isArray(list) && list.some(t => t.id === tenantId);
+    if (!isMember) {
+      // Membership guard
+      redirect('/tenants');
+    }
+  } catch {
+    redirect('/tenants');
+  }
+
+  return (
+    <>
+      {/* Persist last visited tenant route for restore-after-login UX */}
+      <RememberTenantRoute tenantId={tenantId} />
+      {children}
+    </>
+  );
+}

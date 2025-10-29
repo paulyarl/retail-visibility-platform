@@ -48,12 +48,16 @@ export const businessProfileSchema = z.object({
   
   phone_number: z.string()
     .regex(phoneRegex, 'Phone must be in E.164 format (e.g., +1 234 567 8900)')
-    .trim(),
+    .trim()
+    .optional()
+    .or(z.literal('')),
   
   email: z.string()
     .regex(emailRegex, 'Please enter a valid email address')
     .toLowerCase()
-    .trim(),
+    .trim()
+    .optional()
+    .or(z.literal('')),
   
   website: z.string()
     .regex(websiteRegex, 'Website must be a valid URL (https://...)')
@@ -65,7 +69,9 @@ export const businessProfileSchema = z.object({
   contact_person: z.string()
     .min(2, 'Contact person name must be at least 2 characters')
     .max(100, 'Contact person name must be less than 100 characters')
-    .trim(),
+    .trim()
+    .optional()
+    .or(z.literal('')),
   
   admin_email: z.string()
     .regex(emailRegex, 'Please enter a valid admin email address')
@@ -86,9 +92,9 @@ export const businessProfileSchema = z.object({
     .optional()
     .or(z.literal('')),
   
-  hours: z.record(z.string(), z.string()).optional(),
-  social_links: z.record(z.string(), z.string()).optional(),
-  seo_tags: z.array(z.string()).optional(),
+  hours: z.record(z.string(), z.string()).optional().nullable(),
+  social_links: z.record(z.string(), z.string()).optional().nullable(),
+  seo_tags: z.array(z.string()).optional().nullable(),
 });
 
 export type BusinessProfile = z.infer<typeof businessProfileSchema>;

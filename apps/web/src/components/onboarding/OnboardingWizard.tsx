@@ -53,7 +53,12 @@ export default function OnboardingWizard({
         let apiData: Partial<BusinessProfile> = {};
         try {
           console.log('[OnboardingWizard] Fetching tenant data for:', tenantId);
-          const response = await fetch(`/api/tenants/${tenantId}`);
+          const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+          const response = await fetch(`/api/tenants/${tenantId}`, {
+            headers: {
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            },
+          });
           console.log('[OnboardingWizard] Response status:', response.status);
           
           if (response.ok) {
@@ -64,7 +69,25 @@ export default function OnboardingWizard({
             if (tenant.name) {
               apiData.business_name = tenant.name;
               console.log('[OnboardingWizard] Set business_name from tenant.name:', tenant.name);
+            } else {
+            // Fallback: try tenant profile to infer business_name
+            try {
+              const resp2 = await fetch(`/api/tenant/profile?tenant_id=${tenantId}`, {
+                headers: {
+                  ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                },
+              });
+              if (resp2.ok) {
+                const prof = await resp2.json();
+                if (prof?.business_name && !apiData.business_name) {
+                  apiData.business_name = prof.business_name;
+                  console.log('[OnboardingWizard] Set business_name from profile:', prof.business_name);
+                }
+              }
+            } catch (e) {
+              console.warn('[OnboardingWizard] Fallback profile fetch failed:', e);
             }
+          }
             
             if (tenant.metadata) {
               const metadata = tenant.metadata as any;
@@ -154,9 +177,13 @@ export default function OnboardingWizard({
       setError(null);
 
       try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
         const response = await fetch('/api/tenant/profile', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             tenant_id: tenantId,
             ...businessData,

@@ -40,6 +40,11 @@ router.get('/', async (req, res) => {
 
     res.json(orgsWithStats);
   } catch (error: any) {
+    // If the database is temporarily unreachable (e.g., Supabase paused), don't break the UI
+    if (error?.code === 'P1001' || (typeof error?.message === 'string' && error.message.includes("Can't reach database server"))) {
+      console.warn('[Organizations] DB unreachable (P1001). Returning empty list.');
+      return res.json([]);
+    }
     console.error('[Organizations] List error:', error);
     res.status(500).json({ error: 'failed_to_list_organizations' });
   }

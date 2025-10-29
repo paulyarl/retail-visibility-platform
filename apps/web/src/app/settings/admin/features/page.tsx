@@ -55,7 +55,7 @@ export default function FeatureFlagsPage() {
     }
   };
 
-  const flagDescriptions: Record<FeatureFlag, { title: string; description: string }> = {
+  const flagDescriptions: Partial<Record<FeatureFlag, { title: string; description: string }>> = {
     FF_MAP_CARD: {
       title: 'Map Card',
       description: 'Google Maps integration for tenant locations with privacy controls',
@@ -75,6 +75,19 @@ export default function FeatureFlagsPage() {
     FF_GOOGLE_CONNECT_SUITE: {
       title: 'Google Connect Suite',
       description: 'Unified Google Merchant Center + Business Profile integration (v1: read-only)',
+    },
+    // New flags
+    FF_APP_SHELL_NAV: {
+      title: 'App Shell Navigation',
+      description: 'Enable the new header and Tenant Switcher (URL-driven tenant context)',
+    },
+    FF_TENANT_URLS: {
+      title: 'Tenant-Scoped URLs',
+      description: 'Enable tenant-scoped routes like /t/{tenantId}/items and /t/{tenantId}/settings',
+    },
+    FF_ITEMS_V2_GRID: {
+      title: 'Items Grid v2',
+      description: 'Enable the new high-performance items grid (virtualized, faster filters)',
     },
   };
 
@@ -98,7 +111,7 @@ export default function FeatureFlagsPage() {
         <div className="space-y-4">
           {Object.entries(flags).map(([flagKey, config]) => {
             const flag = flagKey as FeatureFlag;
-            const info = flagDescriptions[flag];
+            const info = flagDescriptions[flag] || { title: flag, description: 'No description available' };
             
             return (
               <Card key={flag}>
