@@ -162,7 +162,7 @@ export default function FeaturesPage() {
             ) : (
               <Link href="/">
                 <h1 className="text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
-                  {settings?.platformName || 'Retail Visibility Platform'}
+                  {settings?.platformName || 'Visible Shelf'}
                 </h1>
               </Link>
             )}

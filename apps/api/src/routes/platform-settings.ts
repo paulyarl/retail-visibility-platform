@@ -37,7 +37,7 @@ router.get('/platform-settings', async (_req, res) => {
       settings = await prisma.platformSettings.create({
         data: {
           id: 1,
-          platformName: 'Retail Visibility Platform',
+          platformName: 'Visible Shelf',
           platformDescription: 'Manage your retail operations with ease',
         },
       });
@@ -122,7 +122,7 @@ router.post(
         update: updateData,
         create: {
           id: 1,
-          platformName: updateData.platformName || 'Retail Visibility Platform',
+          platformName: updateData.platformName || 'Visible Shelf',
           platformDescription: updateData.platformDescription || 'Manage your retail operations with ease',
           logoUrl: updateData.logoUrl,
           faviconUrl: updateData.faviconUrl,

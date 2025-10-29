@@ -166,7 +166,7 @@ export default function Home() {
               </Link>
             ) : (
               <h1 className="text-2xl font-bold text-neutral-900">
-                {settings?.platformName || 'Retail Visibility Platform'}
+                {settings?.platformName || 'Visible Shelf'}
               </h1>
             )}
             <div className="flex items-center gap-3">
@@ -348,7 +348,7 @@ export default function Home() {
           <AnimatedCard delay={0.5} hover={false}>
             <CardHeader>
               <CardTitle>Getting Started</CardTitle>
-              <CardDescription>Set up your retail visibility platform</CardDescription>
+              <CardDescription>Set up your Visible Shelf</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Link href="/tenants" className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">

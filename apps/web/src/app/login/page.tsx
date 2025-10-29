@@ -98,7 +98,7 @@ export default function LoginPage() {
               </div>
             )}
             <h1 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
-              {settings?.platformName || 'Retail Visibility Platform'}
+              {settings?.platformName || 'Visible Shelf'}
             </h1>
             <p className="text-neutral-600 dark:text-neutral-400">
               {settings?.platformDescription || 'Sign in to manage your inventory'}

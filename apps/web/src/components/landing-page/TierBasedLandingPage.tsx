@@ -268,7 +268,7 @@ export function TierBasedLandingPage({ product, tenant, gallery }: TierBasedLand
         {/* Platform Branding (unless Enterprise with removal) */}
         {!features.removePlatformBranding && (
           <div className="mt-8 text-center text-sm text-neutral-500">
-            <p>Powered by {platformSettings?.platformName || 'Retail Visibility Platform'} ⚡</p>
+            <p>Powered by {platformSettings?.platformName || 'Visible Shelf'} ⚡</p>
           </div>
         )}
       </div>
