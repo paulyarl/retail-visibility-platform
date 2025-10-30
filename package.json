@@ -13,6 +13,7 @@
   "scripts": {
     "dev": "doppler run --config dev -- pnpm -r --parallel dev",
     "dev:local": "doppler run --config local -- pnpm -r --parallel dev",
+    "dev:prod": "doppler run --config prd -- pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck || exit 0",
     "lint": "pnpm -r lint || exit 0"
