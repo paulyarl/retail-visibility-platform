@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, AnimatedCard } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
 import { motion } from "framer-motion";
@@ -16,6 +17,12 @@ export default function Home() {
   const { settings } = usePlatformSettings();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const [scopedLinks, setScopedLinks] = useState<{ items: string; createItem: string; tenants: string; settingsTenant: string }>({
+    items: "/items",
+    createItem: "/items?create=true",
+    tenants: "/tenants",
+    settingsTenant: "/settings/tenant",
+  });
   const [stats, setStats] = useState({ 
     total: 0, 
     active: 0, 
@@ -118,6 +125,23 @@ export default function Home() {
     
     fetchStats();
   }, [isAuthenticated, authLoading]);
+
+  // Compute tenant-scoped quick action links independently for faster UI readiness
+  useLayoutEffect(() => {
+    const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') || undefined : undefined;
+    const override = typeof window !== 'undefined' ? localStorage.getItem('ff_tenant_urls') === 'on' : false;
+    const on = override || isFeatureEnabled('FF_TENANT_URLS', tenantId);
+    if (on && tenantId) {
+      setScopedLinks({
+        items: `/t/${tenantId}/items`,
+        createItem: `/t/${tenantId}/items?create=true`,
+        tenants: `/tenants`,
+        settingsTenant: `/t/${tenantId}/settings/tenant`,
+      });
+    } else {
+      setScopedLinks({ items: "/items", createItem: "/items?create=true", tenants: "/tenants", settingsTenant: "/settings/tenant" });
+    }
+  }, []);
   
   // Animated counts for metrics
   const inventoryCount = useCountUp(0, stats.total);
@@ -142,7 +166,7 @@ export default function Home() {
               </Link>
             ) : (
               <h1 className="text-2xl font-bold text-neutral-900">
-                {settings?.platformName || 'Retail Visibility Platform'}
+                {settings?.platformName || 'Visible Shelf'}
               </h1>
             )}
             <div className="flex items-center gap-3">
@@ -171,7 +195,7 @@ export default function Home() {
 
         {/* Hero Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Link href="/items">
+          <Link href={scopedLinks.items}>
             <AnimatedCard delay={0} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
@@ -253,7 +277,7 @@ export default function Home() {
           </AnimatedCard>
 
           {/* Locations Count - Context-aware */}
-          <Link href="/tenants">
+          <Link href={scopedLinks.tenants}>
             <AnimatedCard delay={0.3} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
@@ -294,7 +318,7 @@ export default function Home() {
               <CardDescription>Get started with common tasks</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Link href="/tenants" className="block">
+              <Link href={scopedLinks.tenants} className="block">
                 <Button variant="secondary" className="w-full justify-start">
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -310,7 +334,7 @@ export default function Home() {
                   View Inventory
                 </Button>
               </Link>
-              <Link href="/items?create=true" className="block">
+              <Link href={scopedLinks.createItem} className="block">
                 <Button variant="primary" className="w-full justify-start">
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -324,7 +348,7 @@ export default function Home() {
           <AnimatedCard delay={0.5} hover={false}>
             <CardHeader>
               <CardTitle>Getting Started</CardTitle>
-              <CardDescription>Set up your retail visibility platform</CardDescription>
+              <CardDescription>Set up your Visible Shelf</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Link href="/tenants" className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
@@ -345,7 +369,7 @@ export default function Home() {
                   <p className="text-sm text-neutral-600">Upload products with photos</p>
                 </div>
               </Link>
-              <Link href="/settings/tenant" className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+              <Link href={scopedLinks.settingsTenant} className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
                 <div className="h-6 w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
                   3
                 </div>

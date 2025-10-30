@@ -8,7 +8,7 @@ export async function GET() {
     if (!res.ok) {
       // Return default settings for any non-OK response (no error logging)
       return NextResponse.json({
-        platformName: 'Retail Visibility Platform',
+        platformName: 'Visible Shelf',
         logoUrl: null,
         faviconUrl: null,
         primaryColor: '#3b82f6',
@@ -22,7 +22,7 @@ export async function GET() {
     console.error('Unexpected error fetching branding settings:', error);
     // Return default settings on error
     return NextResponse.json({
-      platformName: 'Retail Visibility Platform',
+      platformName: 'Visible Shelf',
       logoUrl: null,
       faviconUrl: null,
       primaryColor: '#3b82f6',

@@ -35,7 +35,7 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       console.error('Error fetching platform settings:', err);
       // Silently set default values on error (no error state)
       setSettings({
-        platformName: 'Retail Visibility Platform',
+        platformName: 'Visible Shelf',
         platformDescription: 'Manage your retail operations with ease',
         logoUrl: null,
         faviconUrl: null,
@@ -62,7 +62,7 @@ export function usePlatformSettings() {
     // Return default values instead of throwing during SSR/build
     return {
       settings: {
-        platformName: 'Retail Visibility Platform',
+        platformName: 'Visible Shelf',
         platformDescription: 'Manage your retail operations with ease',
         logoUrl: null,
         faviconUrl: null,

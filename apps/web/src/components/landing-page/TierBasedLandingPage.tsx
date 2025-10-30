@@ -61,9 +61,10 @@ interface Tenant {
 interface TierBasedLandingPageProps {
   product: Product;
   tenant: Tenant;
+  gallery?: React.ReactNode;
 }
 
-export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPageProps) {
+export function TierBasedLandingPage({ product, tenant, gallery }: TierBasedLandingPageProps) {
   const { settings: platformSettings } = usePlatformSettings();
   const tier = tenant.subscriptionTier || 'trial';
   const features = getLandingPageFeatures(tier);
@@ -197,6 +198,9 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
           </div>
         )}
 
+        {/* Product Gallery */}
+        {gallery && gallery}
+
         {/* Business Contact Info */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           {/* Business Logo */}
@@ -264,7 +268,7 @@ export function TierBasedLandingPage({ product, tenant }: TierBasedLandingPagePr
         {/* Platform Branding (unless Enterprise with removal) */}
         {!features.removePlatformBranding && (
           <div className="mt-8 text-center text-sm text-neutral-500">
-            <p>Powered by Retail Visibility Platform ⚡</p>
+            <p>Powered by {platformSettings?.platformName || 'Visible Shelf'} ⚡</p>
           </div>
         )}
       </div>

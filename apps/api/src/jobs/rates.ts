@@ -7,25 +7,23 @@ import type { Request, Response } from "express";
 import { prisma } from "../prisma";
 import { Flags } from "../config";
 
-const SERVICE_TOKEN = process.env.SERVICE_TOKEN || "";
-
 /**
  * POST /jobs/rates/daily
  * Protected by service token
  * Writes mock currency rates to settings.currency_rates table
  */
 export async function dailyRatesJob(req: Request, res: Response) {
-  // Feature flag guard
-  if (!Flags.CURRENCY_RATE_STUB) {
-    return res.status(503).json({ error: "rate_job_disabled", message: "FF_CURRENCY_RATE_STUB is OFF" });
-  }
-
-  // Service token protection
+  // Service token protection (auth first for clearer semantics and tests)
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  
-  if (!token || token !== SERVICE_TOKEN) {
+  const serviceToken = process.env.SERVICE_TOKEN || ""; // read at request time
+  if (!token || token !== serviceToken) {
     return res.status(401).json({ error: "unauthorized", message: "Invalid service token" });
+  }
+
+  // Feature flag guard (only check after auth)
+  if (!Flags.CURRENCY_RATE_STUB) {
+    return res.status(503).json({ error: "rate_job_disabled", message: "FF_CURRENCY_RATE_STUB is OFF" });
   }
 
   try {

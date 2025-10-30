@@ -6,8 +6,11 @@ import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Paginat
 import EditItemModal from "./EditItemModal";
 import { QRCodeModal } from "./QRCodeModal";
 import BulkUploadModal from "./BulkUploadModal";
+import ItemPhotoGallery from "./ItemPhotoGallery";
 import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
+import { isFeatureEnabled } from "@/lib/featureFlags";
+import ItemsGridV2 from "./ItemsGridV2";
 
 type Tenant = {
   id: string;
@@ -94,6 +97,10 @@ export default function ItemsClient({
   // Bulk upload modal state
   const [showBulkUpload, setShowBulkUpload] = useState(false);
 
+  // Photo gallery modal state
+  const [showPhotoGallery, setShowPhotoGallery] = useState(false);
+  const [galleryItem, setGalleryItem] = useState<Item | null>(null);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -127,6 +134,8 @@ export default function ItemsClient({
     const endIndex = startIndex + pageSize;
     return filteredArray.slice(startIndex, endIndex);
   }, [filtered, currentPage, pageSize]);
+
+  const isV2 = isFeatureEnabled('FF_ITEMS_V2_GRID', tenantId);
 
   // Reset to page 1 when search changes
   useEffect(() => {
@@ -577,7 +586,10 @@ export default function ItemsClient({
         )}
 
         {/* Items List */}
-        <Card>
+        {isV2 ? (
+          <ItemsGridV2 items={filtered as any} />
+        ) : (
+          <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>{t('inventory.title', 'Items')}</CardTitle>
@@ -740,22 +752,19 @@ export default function ItemsClient({
                         </svg>
                         Edit
                       </Button>
-                      <label className="cursor-pointer inline-flex items-center justify-center gap-2 font-medium transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 px-3 py-1.5 text-sm bg-neutral-100 text-neutral-900 hover:bg-neutral-200 focus:ring-neutral-500">
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <Button 
+                        size="sm" 
+                        variant="secondary"
+                        onClick={() => {
+                          setGalleryItem(i);
+                          setShowPhotoGallery(true);
+                        }}
+                      >
+                        <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        Photo
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const f = e.currentTarget.files?.[0];
-                            if (f) onUpload(i, f);
-                            e.currentTarget.value = "";
-                          }}
-                          className="hidden"
-                        />
-                      </label>
+                        Gallery
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -774,7 +783,9 @@ export default function ItemsClient({
               }}
             />
           )}
-        </Card>
+          </Card>
+        )}
+
       </div>
 
       {/* Edit Item Modal */}
@@ -816,6 +827,41 @@ export default function ItemsClient({
             setShowBulkUpload(false);
           }}
         />
+      )}
+
+      {/* Photo Gallery Modal */}
+      {showPhotoGallery && galleryItem && tenantId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-neutral-900">Photo Gallery</h2>
+                <p className="text-sm text-neutral-600">{galleryItem.name} ({galleryItem.sku})</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPhotoGallery(false);
+                  setGalleryItem(null);
+                }}
+                className="text-neutral-400 hover:text-neutral-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6">
+              <ItemPhotoGallery
+                item={galleryItem}
+                tenantId={tenantId}
+                onUpdate={() => {
+                  // Refresh items list to update primary image
+                  refresh();
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

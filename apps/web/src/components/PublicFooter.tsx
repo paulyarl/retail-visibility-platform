@@ -24,7 +24,7 @@ export default function PublicFooter() {
               />
             ) : (
               <h3 className="text-lg font-bold text-neutral-900 mb-4">
-                {settings?.platformName || 'Retail Visibility Platform'}
+                {settings?.platformName || 'Visible Shelf'}
               </h3>
             )}
             <p className="text-neutral-600 text-sm mb-4 max-w-md">
@@ -104,7 +104,7 @@ export default function PublicFooter() {
         {/* Bottom Bar */}
         <div className="mt-8 pt-8 border-t border-neutral-200">
           <p className="text-neutral-500 text-sm text-center">
-            © {currentYear} {settings?.platformName || 'Retail Visibility Platform'}. All rights reserved.
+            © {currentYear} {settings?.platformName || 'Visible Shelf'}. All rights reserved.
           </p>
         </div>
       </div>

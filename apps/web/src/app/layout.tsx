@@ -6,6 +6,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlatformSettingsProvider } from "@/contexts/PlatformSettingsContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import DynamicFavicon from "@/components/DynamicFavicon";
+import AppShell from "@/components/app-shell/AppShell";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <PlatformSettingsProvider>
           <AuthProvider>
-            <ErrorBoundary>{children}</ErrorBoundary>
+            <ErrorBoundary>
+              <AppShell>{children}</AppShell>
+            </ErrorBoundary>
           </AuthProvider>
         </PlatformSettingsProvider>
         {/* <Analytics /> */}

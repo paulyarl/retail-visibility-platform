@@ -48,6 +48,7 @@ import policyRoutes from './routes/policy';
 import billingRoutes from './routes/billing';
 import subscriptionRoutes from './routes/subscriptions';
 import categoryRoutes from './routes/categories';
+import photosRouter from './photos';
 
 // Authentication
 import authRoutes from './auth/auth.routes';
@@ -217,14 +218,25 @@ app.post("/tenants", authenticateToken, checkTenantCreationLimit, async (req, re
   }
 });
 
-const updateTenantSchema = z.object({ name: z.string().min(1) });
-app.put("/tenants/:id", authenticateToken, checkTenantAccess, requireTenantAdmin, async (req, res) => {
+const updateTenantSchema = z.object({
+  name: z.string().min(1).optional(),
+  region: z.string().min(1).optional(),
+  language: z.string().min(1).optional(),
+  currency: z.string().min(1).optional(),
+});
+app.put("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   const parsed = updateTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
-    const tenant = await prisma.tenant.update({ where: { id: req.params.id }, data: { name: parsed.data.name } });
+    const data: any = {};
+    if (parsed.data.name !== undefined) data.name = parsed.data.name;
+    if (parsed.data.region !== undefined) data.region = parsed.data.region;
+    if (parsed.data.language !== undefined) data.language = parsed.data.language;
+    if (parsed.data.currency !== undefined) data.currency = parsed.data.currency;
+    const tenant = await prisma.tenant.update({ where: { id: req.params.id }, data });
     res.json(tenant);
-  } catch {
+  } catch (e) {
+    console.error('[PUT /tenants/:id] Error updating tenant:', e);
     res.status(500).json({ error: "failed_to_update_tenant" });
   }
 });
@@ -259,6 +271,9 @@ app.delete("/tenants/:id", authenticateToken, checkTenantAccess, requireTenantOw
 });
 
 // Tenant profile (business information)
+const E164 = /^\+[1-9]\d{1,14}$/; // E.164 phone pattern: MUST start with '+'
+const HTTPS_URL = /^https:\/\//i;
+
 const tenantProfileSchema = z.object({
   tenant_id: z.string().min(1),
   business_name: z.string().min(1).optional(),
@@ -267,11 +282,25 @@ const tenantProfileSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   postal_code: z.string().optional(),
-  country_code: z.string().optional(),
-  phone_number: z.string().optional(),
+  country_code: z.string().length(2).optional(),
+  phone_number: z
+    .string()
+    .refine((v) => !v || E164.test(v), { message: "phone_must_be_e164" })
+    .optional(),
   email: z.string().email().optional(),
-  website: z.string().url().optional(),
+  website: z
+    .string()
+    .url()
+    .refine((v) => !v || HTTPS_URL.test(v), { message: "website_must_be_https" })
+    .optional(),
   contact_person: z.string().optional(),
+  hours: z.any().optional(),
+  social_links: z.any().optional(),
+  seo_tags: z.any().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  display_map: z.boolean().optional(),
+  map_privacy_mode: z.enum(["precise","neighborhood"]).optional(),
 });
 
 app.post("/tenant/profile", authenticateToken, async (req, res) => {
@@ -280,21 +309,166 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
   
   try {
     const { tenant_id, ...profileData } = parsed.data;
-    
-    // Update tenant with business profile data
-    const tenant = await prisma.tenant.update({
-      where: { id: tenant_id },
-      data: {
-        name: profileData.business_name || undefined,
-        // Store additional profile data in metadata JSON field
-        metadata: profileData as any,
+    // Upsert profile into dedicated table
+    const upserted = await prisma.tenantBusinessProfile.upsert({
+      where: { tenantId: tenant_id },
+      create: {
+        tenantId: tenant_id,
+        businessName: profileData.business_name || "",
+        addressLine1: profileData.address_line1 || "",
+        addressLine2: profileData.address_line2 || null,
+        city: profileData.city || "",
+        state: profileData.state || null,
+        postalCode: profileData.postal_code || "",
+        countryCode: (profileData.country_code || "").toUpperCase(),
+        phoneNumber: profileData.phone_number || null,
+        email: profileData.email || null,
+        website: profileData.website || null,
+        contactPerson: profileData.contact_person || null,
+        hours: (profileData as any).hours ?? null,
+        socialLinks: (profileData as any).social_links ?? null,
+        seoTags: (profileData as any).seo_tags ?? null,
+        latitude: (profileData as any).latitude ?? null,
+        longitude: (profileData as any).longitude ?? null,
+        displayMap: (profileData as any).display_map ?? false,
+        mapPrivacyMode: (profileData as any).map_privacy_mode ?? "precise",
+      },
+      update: {
+        businessName: profileData.business_name ?? undefined,
+        addressLine1: profileData.address_line1 ?? undefined,
+        addressLine2: profileData.address_line2 ?? undefined,
+        city: profileData.city ?? undefined,
+        state: profileData.state ?? undefined,
+        postalCode: profileData.postal_code ?? undefined,
+        countryCode: profileData.country_code ? profileData.country_code.toUpperCase() : undefined,
+        phoneNumber: profileData.phone_number ?? undefined,
+        email: profileData.email ?? undefined,
+        website: profileData.website ?? undefined,
+        contactPerson: profileData.contact_person ?? undefined,
+        hours: (profileData as any).hours ?? undefined,
+        socialLinks: (profileData as any).social_links ?? undefined,
+        seoTags: (profileData as any).seo_tags ?? undefined,
+        latitude: (profileData as any).latitude ?? undefined,
+        longitude: (profileData as any).longitude ?? undefined,
+        displayMap: (profileData as any).display_map ?? undefined,
+        mapPrivacyMode: (profileData as any).map_privacy_mode ?? undefined,
       },
     });
-    
-    res.json(tenant);
+
+    // Keep Tenant.name in sync
+    if (profileData.business_name) {
+      await prisma.tenant.update({ where: { id: tenant_id }, data: { name: profileData.business_name } });
+    }
+
+    res.json(upserted);
   } catch (e: any) {
     console.error("Failed to save tenant profile:", e);
     res.status(500).json({ error: "failed_to_save_profile" });
+  }
+});
+
+// GET /tenant/profile - retrieve normalized profile
+app.get("/tenant/profile", authenticateToken, async (req, res) => {
+  try {
+    const tenantId = (req.query.tenant_id as string) || (req.query.tenantId as string);
+    if (!tenantId) return res.status(400).json({ error: "tenant_required" });
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+
+    const bp = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } });
+    const md = (tenant.metadata as any) || {};
+    const profile = {
+      tenant_id: tenant.id,
+      business_name: bp?.businessName || md.business_name || tenant.name || null,
+      address_line1: bp?.addressLine1 || md.address_line1 || null,
+      address_line2: bp?.addressLine2 || md.address_line2 || null,
+      city: bp?.city || md.city || null,
+      state: bp?.state || md.state || null,
+      postal_code: bp?.postalCode || md.postal_code || null,
+      country_code: bp?.countryCode || md.country_code || null,
+      phone_number: bp?.phoneNumber || md.phone_number || null,
+      email: bp?.email || md.email || null,
+      website: bp?.website || md.website || null,
+      contact_person: bp?.contactPerson || md.contact_person || null,
+      hours: bp?.hours || md.hours || null,
+      social_links: bp?.socialLinks || md.social_links || null,
+      seo_tags: bp?.seoTags || md.seo_tags || null,
+      latitude: bp?.latitude ?? md.latitude ?? null,
+      longitude: bp?.longitude ?? md.longitude ?? null,
+      display_map: bp?.displayMap ?? md.display_map ?? false,
+      map_privacy_mode: bp?.mapPrivacyMode || md.map_privacy_mode || 'precise',
+      logo_url: md.logo_url || null,
+    };
+    return res.json(profile);
+  } catch (e: any) {
+    console.error("[GET /tenant/profile] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_profile" });
+  }
+});
+
+// PATCH /tenant/profile - partial update
+const tenantProfileUpdateSchema = tenantProfileSchema.partial().extend({ tenant_id: z.string().min(1) });
+app.patch("/tenant/profile", authenticateToken, async (req, res) => {
+  const parsed = tenantProfileUpdateSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  try {
+    const { tenant_id, ...delta } = parsed.data;
+    const existingTenant = await prisma.tenant.findUnique({ where: { id: tenant_id } });
+    if (!existingTenant) return res.status(404).json({ error: "tenant_not_found" });
+
+    const updated = await prisma.tenantBusinessProfile.upsert({
+      where: { tenantId: tenant_id },
+      create: {
+        tenantId: tenant_id,
+        businessName: delta.business_name || existingTenant.name,
+        addressLine1: delta.address_line1 || "",
+        city: delta.city || "",
+        postalCode: delta.postal_code || "",
+        countryCode: (delta.country_code || "US").toUpperCase(),
+        addressLine2: delta.address_line2 ?? null,
+        state: delta.state ?? null,
+        phoneNumber: delta.phone_number ?? null,
+        email: delta.email ?? null,
+        website: delta.website ?? null,
+        contactPerson: delta.contact_person ?? null,
+        hours: (delta as any).hours ?? null,
+        socialLinks: (delta as any).social_links ?? null,
+        seoTags: (delta as any).seo_tags ?? null,
+        latitude: (delta as any).latitude ?? null,
+        longitude: (delta as any).longitude ?? null,
+        displayMap: (delta as any).display_map ?? false,
+        mapPrivacyMode: (delta as any).map_privacy_mode ?? 'precise',
+      },
+      update: {
+        businessName: delta.business_name ?? undefined,
+        addressLine1: delta.address_line1 ?? undefined,
+        addressLine2: delta.address_line2 ?? undefined,
+        city: delta.city ?? undefined,
+        state: delta.state ?? undefined,
+        postalCode: delta.postal_code ?? undefined,
+        countryCode: delta.country_code ? delta.country_code.toUpperCase() : undefined,
+        phoneNumber: delta.phone_number ?? undefined,
+        email: delta.email ?? undefined,
+        website: delta.website ?? undefined,
+        contactPerson: delta.contact_person ?? undefined,
+        hours: (delta as any).hours ?? undefined,
+        socialLinks: (delta as any).social_links ?? undefined,
+        seoTags: (delta as any).seo_tags ?? undefined,
+        latitude: (delta as any).latitude ?? undefined,
+        longitude: (delta as any).longitude ?? undefined,
+        displayMap: (delta as any).display_map ?? undefined,
+        mapPrivacyMode: (delta as any).map_privacy_mode ?? undefined,
+      },
+    });
+
+    if (delta.business_name) {
+      await prisma.tenant.update({ where: { id: tenant_id }, data: { name: delta.business_name } });
+    }
+
+    return res.json(updated);
+  } catch (e: any) {
+    console.error("[PATCH /tenant/profile] Error:", e);
+    return res.status(500).json({ error: "failed_to_update_profile" });
   }
 });
 
@@ -669,24 +843,18 @@ const photoUploadHandler = async (req: any, res: any) => {
   }
 };
 
-// Mount explicitly (no array form)
-console.log("🔧 Registering photo upload routes...");
-app.post("/items/:id/photos", upload.single("file"), photoUploadHandler);
-app.post("/inventory/:id/photos", upload.single("file"), photoUploadHandler);
-console.log("✓ Photo upload routes registered");
+// Mount photos router (handles all photo endpoints with position support)
+console.log("🔧 Mounting photos router...");
+app.use(photosRouter);
+console.log("✓ Photos router mounted");
 
-
-
-// List photos for an item
-app.get(["/items/:id/photos", "/inventory/:id/photos"], async (req, res) => {
-  const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
-  if (!item) return res.status(404).json({ error: "item_not_found" });
-  const photos = await prisma.photoAsset.findMany({
-    where: { inventoryItemId: item.id },
-    orderBy: { capturedAt: "desc" },
-  });
-  res.json(photos);
-});
+// Legacy photo upload handler removed - now handled by photos router
+// Old routes:
+// - POST /items/:id/photos -> now in photos.ts with position logic
+// - GET /items/:id/photos -> now in photos.ts ordered by position
+// - PUT /items/:id/photos/:photoId -> new endpoint for update
+// - DELETE /items/:id/photos/:photoId -> new endpoint for delete
+// - PUT /items/:id/photos/reorder -> new endpoint for bulk reorder
 
 // Optional: helps spot stray POSTs under /items that aren't handled by routes
 // Only matches POSTs under /items that are NOT .../photos
@@ -854,11 +1022,27 @@ app.get("/google/feed", async (req, res) => {
 
 app.get("/__routes", (_req, res) => {
   const out: any[] = [];
-  (app as any)._router?.stack?.forEach((r: any) => {
-    if (r.route?.path && r.route?.methods) {
-      out.push({ methods: Object.keys(r.route.methods).map(m => m.toUpperCase()), path: r.route.path });
-    }
-  });
+  // Always include known core routes
+  out.push({ methods: ["GET"], path: "/health" });
+  out.push({ methods: ["GET"], path: "/__ping" });
+  function collect(stack: any[], base = "") {
+    stack?.forEach((layer: any) => {
+      if (layer.route && layer.route.path) {
+        const methods = layer.route.methods
+          ? Array.isArray(layer.route.methods)
+            ? layer.route.methods
+            : Object.keys(layer.route.methods)
+          : [];
+        const path = base + layer.route.path;
+        out.push({ methods: methods.map((m: string) => m.toUpperCase()), path });
+      } else if (layer.name === 'router' && layer.handle?.stack) {
+        const match = layer.regexp && layer.regexp.fast_slash ? "" : (layer.regexp?.source || "");
+        collect(layer.handle.stack, base);
+      }
+    });
+  }
+  const stack = (app as any)._router?.stack || [];
+  collect(stack);
   res.json(out);
 });
 app.get("/__ping", (req, res) => {

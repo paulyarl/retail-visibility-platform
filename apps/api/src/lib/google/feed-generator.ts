@@ -16,6 +16,7 @@ export interface FeedItem {
   currency: string;
   availability: string;
   imageUrl?: string;
+  additionalImageLinks?: string[];
   categoryPath?: string[];
 }
 
@@ -43,15 +44,29 @@ export async function generateProductFeed(tenantId: string): Promise<FeedItem[]>
         availability: true,
         imageUrl: true,
         categoryPath: true,
+        photos: {
+          orderBy: { position: 'asc' },
+          select: { url: true, position: true },
+        },
       },
     });
 
-    return items.map(item => ({
-      ...item,
-      price: Number(item.price),
-      description: item.description || undefined,
-      imageUrl: item.imageUrl || undefined,
-    }));
+    return items.map(item => {
+      // Map photos: position 0 = imageLink, positions 1-10 = additionalImageLinks
+      const primaryPhoto = item.photos.find(p => p.position === 0);
+      const additionalPhotos = item.photos
+        .filter(p => p.position > 0 && p.position <= 10)
+        .map(p => p.url);
+
+      return {
+        ...item,
+        price: Number(item.price),
+        description: item.description || undefined,
+        imageUrl: primaryPhoto?.url || item.imageUrl || undefined,
+        additionalImageLinks: additionalPhotos.length > 0 ? additionalPhotos : undefined,
+        photos: undefined, // Remove from output
+      };
+    });
   } catch (error) {
     console.error('[Feed Generator] Error:', error);
     throw error;

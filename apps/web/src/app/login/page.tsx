@@ -23,7 +23,14 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.push('/');
+      const last = typeof window !== 'undefined' ? localStorage.getItem('last_tenant_route') : null;
+      if (typeof window !== 'undefined' && last) localStorage.removeItem('last_tenant_route');
+      if (typeof window !== 'undefined') {
+        const tenantId = localStorage.getItem('tenantId');
+        sessionStorage.setItem('restored_from_login', JSON.stringify({ path: last || '/', tenantId }));
+      }
+      router.push(last || '/');
+      if (typeof window !== 'undefined') localStorage.removeItem('last_tenant_route');
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -34,7 +41,13 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.push('/');
+      const last = typeof window !== 'undefined' ? localStorage.getItem('last_tenant_route') : null;
+      if (typeof window !== 'undefined' && last) localStorage.removeItem('last_tenant_route');
+      if (typeof window !== 'undefined') {
+        const tenantId = localStorage.getItem('tenantId');
+        sessionStorage.setItem('restored_from_login', JSON.stringify({ path: last || '/', tenantId }));
+      }
+      router.push(last || '/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -85,7 +98,7 @@ export default function LoginPage() {
               </div>
             )}
             <h1 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
-              {settings?.platformName || 'Retail Visibility Platform'}
+              {settings?.platformName || 'Visible Shelf'}
             </h1>
             <p className="text-neutral-600 dark:text-neutral-400">
               {settings?.platformDescription || 'Sign in to manage your inventory'}

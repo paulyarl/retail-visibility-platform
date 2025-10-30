@@ -15,12 +15,14 @@ function getAccessToken(): string | null {
 }
 
 /**
- * Make an authenticated API request
+ * Make an authenticated API request with centralized auth handling.
+ * - Injects bearer token from localStorage
+ * - On 401: clears token and redirects to /login?next=
  * Supports both relative URLs (/api/tenants) and absolute URLs (http://...)
  */
 export async function apiRequest(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit & { skipAuthRedirect?: boolean } = {}
 ): Promise<Response> {
   const token = getAccessToken();
   
@@ -39,40 +41,55 @@ export async function apiRequest(
     ? endpoint 
     : `${API_BASE_URL}${endpoint}`;
 
-  return fetch(url, {
+  const resp = await fetch(url, {
     ...options,
     headers,
   });
+  
+  // Centralized 401 handling (non-destructive)
+  if (resp.status === 401 && typeof window !== 'undefined' && !(options as any).skipAuthRedirect) {
+    try {
+      const pathname = window.location.pathname;
+      const alreadyRedirecting = sessionStorage.getItem('auth_redirecting') === '1';
+      if (!alreadyRedirecting && pathname !== '/login') {
+        sessionStorage.setItem('auth_redirecting', '1');
+        const next = encodeURIComponent(pathname + window.location.search);
+        window.location.href = `/login?next=${next}`;
+      }
+    } catch {}
+  }
+
+  return resp;
 }
 
 /**
  * Convenience methods
  */
 export const api = {
-  get: (endpoint: string, options?: RequestInit) =>
+  get: (endpoint: string, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
     apiRequest(endpoint, { ...options, method: 'GET' }),
 
-  post: (endpoint: string, data?: any, options?: RequestInit) =>
+  post: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
     apiRequest(endpoint, {
       ...options,
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
     }),
 
-  put: (endpoint: string, data?: any, options?: RequestInit) =>
+  put: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
     apiRequest(endpoint, {
       ...options,
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
     }),
 
-  patch: (endpoint: string, data?: any, options?: RequestInit) =>
+  patch: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
     apiRequest(endpoint, {
       ...options,
       method: 'PATCH',
       body: data ? JSON.stringify(data) : undefined,
     }),
 
-  delete: (endpoint: string, options?: RequestInit) =>
+  delete: (endpoint: string, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
     apiRequest(endpoint, { ...options, method: 'DELETE' }),
 };
