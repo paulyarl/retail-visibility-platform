@@ -1845,11 +1845,38 @@ app.post("/jobs/rates/daily", dailyRatesJob);
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
 
+// Log startup environment
+console.log('\n🚀 Starting API server...');
+console.log(`   NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+console.log(`   PORT: ${port}`);
+console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? '✓ Set' : '✗ Missing'}`);
+console.log(`   SUPABASE_URL: ${process.env.SUPABASE_URL ? '✓ Set' : '✗ Missing'}`);
+console.log(`   WEB_URL: ${process.env.WEB_URL || 'Not set'}\n`);
+
 // Only start the server when not running tests
 if (process.env.NODE_ENV !== "test") {
-  app.listen(port, () => {
+  const server = app.listen(port, '0.0.0.0', () => {
     console.log(`\n✅ API server running → http://localhost:${port}/health`);
     console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
+  });
+
+  // Handle server errors
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${port} is already in use`);
+    } else {
+      console.error('❌ Server error:', error);
+    }
+    process.exit(1);
+  });
+
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('\n⚠️  SIGTERM received, shutting down gracefully...');
+    server.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
   });
 }
 

@@ -26,4 +26,5 @@ RUN pnpm build
 EXPOSE ${PORT:-8080}
 
 # Start command: run migrations then start server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Add explicit error handling and logging
+CMD ["sh", "-c", "echo 'Running Prisma migrations...' && npx prisma migrate deploy && echo 'Starting Node server...' && node dist/index.js || (echo 'Server failed to start' && exit 1)"]
