@@ -450,8 +450,8 @@ export default function ItemsClient({
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
-        title={t('inventory.title', 'Inventory')}
-        description="Manage your product catalog"
+        title="Inventory"
+        description="Manage your catalog and stock levels"
         icon={Icons.Inventory}
         actions={
           <div className="flex gap-3">
@@ -485,7 +485,7 @@ export default function ItemsClient({
             <Card className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-neutral-600">Total Items</p>
+                  <p className="text-sm text-neutral-600">Total Products</p>
                   <p className="text-2xl font-bold text-neutral-900">{quickStats.total}</p>
                 </div>
                 <div className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center">
@@ -513,7 +513,7 @@ export default function ItemsClient({
             <Card className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-neutral-600">Active Items</p>
+                  <p className="text-sm text-neutral-600">Active</p>
                   <p className="text-2xl font-bold text-neutral-900">{quickStats.active}</p>
                 </div>
                 <div className="h-12 w-12 bg-info rounded-lg flex items-center justify-center">
@@ -527,7 +527,7 @@ export default function ItemsClient({
             <Card className={`p-4 ${quickStats.inactive > 0 ? 'bg-neutral-50 border-neutral-300' : ''}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-neutral-600">Inactive Items</p>
+                  <p className="text-sm text-neutral-600">Inactive</p>
                   <p className={`text-2xl font-bold ${quickStats.inactive > 0 ? 'text-neutral-700' : 'text-neutral-900'}`}>
                     {quickStats.inactive}
                   </p>
@@ -641,7 +641,7 @@ export default function ItemsClient({
                 <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                {creating ? t('common.creating', 'Creating…') : t('common.create', 'Create Item')}
+                {creating ? t('common.creating', 'Creating…') : t('common.create', 'Add Product')}
               </Button>
             </form>
           </CardContent>
@@ -661,11 +661,11 @@ export default function ItemsClient({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-blue-800">
                     <div className="flex items-center gap-2">
                       <Badge variant="success" className="text-xs">Active</Badge>
-                      <span>Item is active and can sync to Google</span>
+                      <span>Product is active and syncs to Google</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="warning" className="text-xs">Inactive</Badge>
-                      <span>Item is paused, won't sync to Google</span>
+                      <span>Product is paused, won't sync</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="default" className="text-xs bg-amber-100 text-amber-800">Private</Badge>
@@ -703,9 +703,9 @@ export default function ItemsClient({
           <Card>
           <CardHeader>
             <div className="flex items-center justify-between mb-4">
-              <CardTitle>{t('inventory.title', 'Items')}</CardTitle>
+              <CardTitle>{t('inventory.title', 'Inventory')}</CardTitle>
               <Badge variant="info">
-                Showing {items.length} of {totalItems} items
+                Showing {items.length} of {totalItems} products
               </Badge>
             </div>
             
@@ -714,7 +714,7 @@ export default function ItemsClient({
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder={t('inventory.searchPlaceholder', 'Search by SKU or name')}
+                placeholder={t('inventory.searchPlaceholder', 'Search products by SKU or name')}
                 label="Search"
               />
               

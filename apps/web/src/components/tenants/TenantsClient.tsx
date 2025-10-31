@@ -137,8 +137,8 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
-        title="Tenants"
-        description="Manage your store locations and businesses"
+        title="Locations"
+        description="Manage your stores and business locations"
         icon={Icons.Tenants}
         actions={
           <div className="flex gap-3">
@@ -234,8 +234,8 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
         {/* Create Tenant Card */}
         <AnimatedCard delay={0} hover={false}>
           <CardHeader>
-            <CardTitle>Create New Tenant</CardTitle>
-            <CardDescription>Add a new store or business location</CardDescription>
+            <CardTitle>Add New Location</CardTitle>
+            <CardDescription>Create a new store or business location</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onCreate} className="flex gap-3">
@@ -243,7 +243,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter tenant name (e.g., Downtown Store)"
+                  placeholder="Enter location name (e.g., Downtown Store)"
                   required
                 />
               </div>
@@ -251,7 +251,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                 <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                {loading ? "Creating…" : "Create Tenant"}
+                {loading ? "Creating…" : "Add Location"}
               </Button>
             </form>
           </CardContent>
