@@ -742,11 +742,46 @@ export default function OfferingsPage() {
           </div>
         </section>
 
+        {/* Flexible Plans Section */}
+        <section className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-8">
+          <div className="max-w-3xl mx-auto text-center">
+            <div className="text-5xl mb-4">🔄</div>
+            <h2 className="text-2xl font-bold text-neutral-900 mb-3">Flexible Plans That Grow With You</h2>
+            <p className="text-neutral-700 mb-6">
+              Your business needs change, and your subscription should too. We make it easy to adjust your plan anytime.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="bg-white rounded-lg p-6 border-2 border-green-200">
+                <div className="text-3xl mb-2">⬆️</div>
+                <h3 className="font-semibold text-neutral-900 mb-2">Upgrade Anytime</h3>
+                <p className="text-sm text-neutral-600">
+                  Need more SKUs or features? Upgrade instantly to unlock more capabilities. No contracts, no hassle.
+                </p>
+              </div>
+              
+              <div className="bg-white rounded-lg p-6 border-2 border-blue-200">
+                <div className="text-3xl mb-2">⬇️</div>
+                <h3 className="font-semibold text-neutral-900 mb-2">Downgrade Anytime</h3>
+                <p className="text-sm text-neutral-600">
+                  Scaling back? Downgrade to a lower tier or even Google-Only to save costs while keeping your presence.
+                </p>
+              </div>
+            </div>
+            
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-sm text-amber-900">
+                💡 <strong>Pro Tip:</strong> Start with Google-Only ($29/mo) to test the platform, then upgrade to Starter when you're ready for a full storefront. Change plans from your subscription page anytime!
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Contact CTA */}
         <section className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-lg p-8 text-center text-white">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-lg mb-6 opacity-90">
-            Choose the plan that's right for your business, or contact us for a custom solution.
+            Choose the plan that's right for your business. Change it anytime as your needs evolve.
           </p>
           <div className="flex gap-4 justify-center">
             <button 
