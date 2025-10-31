@@ -86,7 +86,7 @@ export default function AdminTiersPage() {
         throw new Error(data.message || data.error || 'Failed to update tier');
       }
 
-      setSuccess(`Successfully updated tier for tenant`);
+      setSuccess(`Successfully updated tier for location`);
       await loadTenants();
     } catch (err: any) {
       console.error('Update tier error:', err);
@@ -109,7 +109,7 @@ export default function AdminTiersPage() {
       <div className="min-h-screen bg-neutral-50">
         <PageHeader
           title="Subscription Tier Management"
-          description="Manage tenant subscription tiers and billing status"
+          description="Manage location subscription tiers and billing status"
           icon={Icons.Settings}
         />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -190,7 +190,7 @@ export default function AdminTiersPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Tier Buttons</p>
-                      <p className="text-xs text-neutral-600">Click to change tenant's subscription tier. Hover for tier name.</p>
+                      <p className="text-xs text-neutral-600">Click to change location's subscription tier. Hover for tier name.</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -213,7 +213,7 @@ export default function AdminTiersPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Tenants ({tenants.length})</CardTitle>
+              <CardTitle>Locations ({tenants.length})</CardTitle>
               {tenants.length > ITEMS_PER_PAGE && (
                 <div className="text-sm text-neutral-600">
                   Page {currentPage} of {Math.ceil(tenants.length / ITEMS_PER_PAGE)}
@@ -224,7 +224,7 @@ export default function AdminTiersPage() {
           <CardContent>
             {tenants.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-neutral-500">No tenants found</p>
+                <p className="text-neutral-500">No locations found</p>
               </div>
             ) : (
               <>
