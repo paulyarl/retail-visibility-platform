@@ -63,6 +63,9 @@ importers:
       '@prisma/client':
         specifier: ^6.17.1
         version: 6.17.1(prisma@6.17.1(typescript@5.9.3))(typescript@5.9.3)
+      '@supabase/supabase-js':
+        specifier: ^2.75.1
+        version: 2.75.1
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.2
@@ -97,9 +100,6 @@ importers:
       '@faker-js/faker':
         specifier: ^10.1.0
         version: 10.1.0
-      '@supabase/supabase-js':
-        specifier: ^2.75.1
-        version: 2.75.1
       '@types/bcryptjs':
         specifier: ^3.0.0
         version: 3.0.0
