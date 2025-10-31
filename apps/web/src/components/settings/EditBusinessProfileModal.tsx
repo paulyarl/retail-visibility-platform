@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Modal, ModalFooter, Button, Input, Select, Alert } from '@/components/ui';
-import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
+import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput, geocodeAddress } from '@/lib/validation/businessProfile';
 import { z } from 'zod';
 
 interface EditBusinessProfileModalProps {
@@ -26,6 +26,7 @@ export default function EditBusinessProfileModal({
   const [success, setSuccess] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(formData.logo_url || null);
+  const [geocoding, setGeocoding] = useState(false);
 
   // Reset form when modal opens/closes or profile changes
   useEffect(() => {
@@ -143,6 +144,69 @@ export default function EditBusinessProfileModal({
     }
   };
 
+  // Fetch and optimize pasted logo URL
+  const optimizePastedLogoUrl = async (url: string) => {
+    try {
+      setUploadingLogo(true);
+      setError(null);
+
+      // Fetch the image from the URL
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to fetch image from URL');
+      }
+
+      const blob = await response.blob();
+      
+      // Convert blob to File
+      const file = new File([blob], 'logo.jpg', { type: blob.type || 'image/jpeg' });
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Logo file size must be less than 5MB');
+        return null;
+      }
+
+      // Compress image
+      const dataUrl = await compressImage(file, 400, 0.9); // Smaller size for logos
+
+      // Get tenant ID from localStorage
+      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+      if (!tenantId) {
+        setError('No tenant selected');
+        return null;
+      }
+
+      // Upload to server
+      const body = JSON.stringify({ 
+        tenant_id: tenantId, 
+        dataUrl, 
+        contentType: "image/jpeg" 
+      });
+
+      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+
+      const payload = await res.json();
+      if (!res.ok) {
+        setError(payload?.error || "Upload failed");
+        return null;
+      }
+
+      // Return the optimized URL
+      return payload.url;
+    } catch (err) {
+      console.error('Failed to optimize pasted logo URL:', err);
+      setError('Failed to fetch and optimize logo from URL');
+      return null;
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const validateField = (name: string, value: any) => {
     try {
       const fieldSchema = (businessProfileSchema.shape as any)[name];
@@ -199,6 +263,48 @@ export default function EditBusinessProfileModal({
     handleChange('phone_number', normalized);
   };
 
+  const handleGeocodeAddress = async () => {
+    if (!formData.address_line1 || !formData.city || !formData.postal_code || !formData.country_code) {
+      setError('Please fill in address, city, postal code, and country before geocoding');
+      return;
+    }
+
+    setGeocoding(true);
+    setError(null);
+
+    try {
+      const coordinates = await geocodeAddress({
+        address_line1: formData.address_line1,
+        address_line2: formData.address_line2,
+        city: formData.city,
+        state: formData.state,
+        postal_code: formData.postal_code,
+        country_code: formData.country_code,
+      });
+
+      if (coordinates) {
+        console.log('[Geocoding] Got coordinates:', coordinates);
+        setFormData(prev => {
+          const updated = {
+            ...prev,
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+          };
+          console.log('[Geocoding] Updated formData:', updated);
+          return updated;
+        });
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      } else {
+        setError('Could not find coordinates for this address. Please check the address and try again.');
+      }
+    } catch (err) {
+      setError('Failed to geocode address. Please try again.');
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -207,6 +313,12 @@ export default function EditBusinessProfileModal({
       // Clear any stale errors before validating
       setErrors({});
       setError(null);
+      
+      console.log('[EditBusinessProfile] formData before normalization:', {
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+      });
+      
       // Normalize optional fields: convert empty string to undefined so optional() passes cleanly
       const normalized: Partial<BusinessProfile> = {
         ...formData,
@@ -215,12 +327,21 @@ export default function EditBusinessProfileModal({
         website: formData.website ? formData.website : undefined,
         contact_person: formData.contact_person ? formData.contact_person : undefined,
         admin_email: (formData as any).admin_email ? (formData as any).admin_email : undefined,
-        logo_url: formData.logo_url ? formData.logo_url : undefined,
+        logo_url: formData.logo_url !== undefined ? formData.logo_url : undefined,
         business_description: formData.business_description ? formData.business_description : undefined,
         phone_number: formData.phone_number ? formData.phone_number : undefined,
         email: formData.email ? formData.email : undefined,
+        // Explicitly include coordinates if they exist
+        latitude: formData.latitude !== undefined && formData.latitude !== null ? formData.latitude : undefined,
+        longitude: formData.longitude !== undefined && formData.longitude !== null ? formData.longitude : undefined,
       };
       const validatedData = businessProfileSchema.parse(normalized);
+      
+      console.log('[EditBusinessProfile] Saving profile with data:', {
+        ...validatedData,
+        latitude: validatedData.latitude,
+        longitude: validatedData.longitude,
+      });
       
       setSaving(true);
       setError(null);
@@ -367,6 +488,41 @@ export default function EditBusinessProfileModal({
             ))}
           </Select>
 
+          {/* Geocoding Section */}
+          <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h4 className="text-sm font-medium text-neutral-900 dark:text-white mb-1">
+                  Map Coordinates
+                </h4>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                  Get latitude and longitude for map display
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleGeocodeAddress}
+                disabled={geocoding || !formData.address_line1 || !formData.city || !formData.postal_code || !formData.country_code}
+                loading={geocoding}
+              >
+                {geocoding ? 'Getting...' : 'Get Coordinates'}
+              </Button>
+            </div>
+            
+            {formData.latitude && formData.longitude && (
+              <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>
+                  Coordinates: {Number(formData.latitude).toFixed(6)}, {Number(formData.longitude).toFixed(6)}
+                </span>
+              </div>
+            )}
+          </div>
+
           {/* Phone Number */}
           <Input
             label="Phone Number"
@@ -460,18 +616,38 @@ export default function EditBusinessProfileModal({
             </div>
 
             {/* Manual URL Input */}
-            <Input
-              type="url"
-              placeholder="Or paste logo URL: https://example.com/logo.png"
-              value={formData.logo_url || ''}
-              onChange={(e) => {
-                handleChange('logo_url', e.target.value);
-                setLogoPreview(e.target.value);
-              }}
-              onBlur={() => handleBlur('logo_url')}
-              error={errors.logo_url}
-              helperText="Optional - Professional+ tier: Logo displays on product landing pages"
-            />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  type="url"
+                  placeholder="Or paste logo URL: https://example.com/logo.png"
+                  value={formData.logo_url || ''}
+                  onChange={(e) => {
+                    handleChange('logo_url', e.target.value);
+                    setLogoPreview(e.target.value);
+                  }}
+                  onBlur={() => handleBlur('logo_url')}
+                  error={errors.logo_url}
+                  helperText="Optional - Click 'Optimize' to compress and upload to our servers"
+                />
+              </div>
+              {formData.logo_url && formData.logo_url.startsWith('http') && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const optimizedUrl = await optimizePastedLogoUrl(formData.logo_url!);
+                    if (optimizedUrl) {
+                      handleChange('logo_url', optimizedUrl);
+                      setLogoPreview(optimizedUrl);
+                    }
+                  }}
+                  disabled={uploadingLogo}
+                  className="mt-6 px-4 py-2 bg-secondary-600 text-white rounded-lg hover:bg-secondary-700 disabled:opacity-50 text-sm font-medium whitespace-nowrap"
+                >
+                  {uploadingLogo ? 'Optimizing...' : 'Optimize'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Business Description */}

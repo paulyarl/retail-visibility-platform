@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import ProductGallery from '@/components/products/ProductGallery';
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
+import { BackToInventoryButton } from '@/components/products/BackToInventoryButton';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';
@@ -65,6 +66,7 @@ interface Tenant {
     email?: string;
     website?: string;
     address?: string;
+    logo_url?: string;
   };
 }
 
@@ -90,6 +92,31 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
     });
 
     const tenant: Tenant = tenantRes.ok ? await tenantRes.json() : { id: product.tenantId, name: 'Store' };
+
+    // Fetch business profile using public endpoint (no auth required)
+    try {
+      const profileRes = await fetch(`${apiBaseUrl}/public/tenant/${product.tenantId}/profile`, {
+        cache: 'no-store',
+      });
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        // Merge business profile data into tenant metadata
+        tenant.metadata = {
+          ...tenant.metadata,
+          businessName: profile.business_name,
+          phone: profile.phone_number,
+          email: profile.email,
+          website: profile.website,
+          address: profile.address_line1 
+            ? `${profile.address_line1}${profile.address_line2 ? ', ' + profile.address_line2 : ''}, ${profile.city}, ${profile.state} ${profile.postal_code}`
+            : undefined,
+          logo_url: profile.logo_url,
+        };
+      }
+    } catch (e) {
+      // Profile fetch failed, continue without it
+      console.error('Failed to fetch business profile:', e);
+    }
 
     return { product, tenant };
   } catch (error) {
@@ -204,11 +231,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
 
-      {/* Tier-Based Landing Page with Gallery */}
+      {/* Back to Inventory Button (for authenticated users) */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <BackToInventoryButton tenantId={product.tenantId} />
+      </div>
+
+      {/* Tier-Based Landing Page with Gallery (only if multiple images) */}
       <TierBasedLandingPage 
         product={product} 
         tenant={tenant}
-        gallery={<ProductGallery gallery={gallery} productTitle={product.title} />}
+        gallery={gallery.length > 1 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
       />
     </>
   );

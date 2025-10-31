@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function PublicFooter() {
   const { settings } = usePlatformSettings();
+  const { isAuthenticated } = useAuth();
   const currentYear = new Date().getFullYear();
 
   return (
@@ -83,7 +85,10 @@ export default function PublicFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/settings/contact" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                <Link 
+                  href={isAuthenticated ? "/settings/contact" : "/contact"} 
+                  className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors"
+                >
                   Contact
                 </Link>
               </li>

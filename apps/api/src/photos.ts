@@ -1,9 +1,10 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import multer from "multer";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "./prisma";
 import { createClient } from "@supabase/supabase-js";
+import { StorageBuckets } from "./storage-config";
 
-const prisma = new PrismaClient();
+const prismaClient = prisma;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 const r = Router();
 
@@ -55,14 +56,14 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
       const f = req.file; // buffer + mimetype + originalname
       const path = `${item.tenantId}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
 
-      const { error, data } = await supabase.storage.from("photos").upload(path, f.buffer, {
+      const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(path, f.buffer, {
         cacheControl: "3600",
         contentType: f.mimetype || "application/octet-stream",
         upsert: false,
       });
       if (error) return res.status(500).json({ error: error.message });
 
-      const pub = supabase.storage.from("photos").getPublicUrl(data.path);
+      const pub = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(data.path);
       url = pub.data.publicUrl;
       contentType = f.mimetype;
       bytes = f.size;
@@ -92,7 +93,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
         const path = `${item.tenantId}/${item.sku || item.id}/${filename}`;
         
         const { error: uploadError, data: uploadData } = await supabase.storage
-          .from("photos")
+          .from(StorageBuckets.PHOTOS.name)
           .upload(path, buffer, {
             cacheControl: "3600",
             contentType: mimeType,
@@ -103,7 +104,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
           return res.status(500).json({ error: uploadError.message });
         }
         
-        const pub = supabase.storage.from("photos").getPublicUrl(uploadData.path);
+        const pub = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(uploadData.path);
         url = pub.data.publicUrl;
         contentType = mimeType;
         bytes = buffer.length;
@@ -326,7 +327,7 @@ r.delete("/items/:id/photos/:photoId", async (req, res) => {
         const match = photo.url.match(/\/photos\/(.+)$/);
         if (match) {
           const path = match[1];
-          await supabase.storage.from("photos").remove([path]);
+          await supabase.storage.from(StorageBuckets.PHOTOS.name).remove([path]);
         }
       } catch (storageError) {
         console.error("Failed to delete from storage:", storageError);

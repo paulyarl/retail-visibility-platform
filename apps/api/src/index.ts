@@ -11,7 +11,9 @@ import fs from "fs";
 import path from "path";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
+import { Flags } from "./config";
 import { setRequestContext } from "./context";
+import { StorageBuckets } from "./storage-config";
 import { audit } from "./audit";
 import { dailyRatesJob } from "./jobs/rates";
 import {
@@ -61,6 +63,7 @@ import {
 } from './middleware/permissions';
 import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
+import platformStatsRoutes from './routes/platform-stats';
 import organizationRoutes from './routes/organizations';
 import organizationRequestRoutes from './routes/organization-requests';
 import upgradeRequestsRoutes from './routes/upgrade-requests';
@@ -294,6 +297,7 @@ const tenantProfileSchema = z.object({
     .refine((v) => !v || HTTPS_URL.test(v), { message: "website_must_be_https" })
     .optional(),
   contact_person: z.string().optional(),
+  logo_url: z.string().url().optional().or(z.literal('')),
   hours: z.any().optional(),
   social_links: z.any().optional(),
   seo_tags: z.any().optional(),
@@ -390,19 +394,182 @@ app.get("/tenant/profile", authenticateToken, async (req, res) => {
       email: bp?.email || md.email || null,
       website: bp?.website || md.website || null,
       contact_person: bp?.contactPerson || md.contact_person || null,
+      logo_url: bp?.logoUrl ?? md.logo_url ?? null,
       hours: bp?.hours || md.hours || null,
       social_links: bp?.socialLinks || md.social_links || null,
       seo_tags: bp?.seoTags || md.seo_tags || null,
-      latitude: bp?.latitude ?? md.latitude ?? null,
-      longitude: bp?.longitude ?? md.longitude ?? null,
+      latitude: bp?.latitude ? Number(bp.latitude) : (md.latitude || null),
+      longitude: bp?.longitude ? Number(bp.longitude) : (md.longitude || null),
       display_map: bp?.displayMap ?? md.display_map ?? false,
       map_privacy_mode: bp?.mapPrivacyMode || md.map_privacy_mode || 'precise',
-      logo_url: md.logo_url || null,
     };
     return res.json(profile);
   } catch (e: any) {
     console.error("[GET /tenant/profile] Error:", e);
     return res.status(500).json({ error: "failed_to_get_profile" });
+  }
+});
+
+// Public endpoint to get basic tenant info (no auth required)
+app.get("/public/tenant/:tenantId", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    if (!tenantId) return res.status(400).json({ error: "tenant_required" });
+    
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+
+    // Return basic public tenant information
+    return res.json({
+      id: tenant.id,
+      name: tenant.name,
+      metadata: tenant.metadata,
+    });
+  } catch (e: any) {
+    console.error("[GET /public/tenant/:tenantId] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_tenant" });
+  }
+});
+
+// Public endpoint to get tenant product preview (SWIS - Store Window Inventory Showcase)
+app.get("/tenant/:tenantId/swis/preview", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 12;
+    const sort = (req.query.sort as string) || 'updated_desc';
+    
+    if (!tenantId) return res.status(400).json({ error: "tenant_required" });
+    
+    // Build sort order
+    let orderBy: any = { updatedAt: 'desc' };
+    switch (sort) {
+      case 'updated_desc':
+        orderBy = { updatedAt: 'desc' };
+        break;
+      case 'updated_asc':
+        orderBy = { updatedAt: 'asc' };
+        break;
+      case 'alpha_asc':
+        orderBy = { name: 'asc' };
+        break;
+      case 'alpha_desc':
+        orderBy = { name: 'desc' };
+        break;
+      case 'price_asc':
+        orderBy = { price: 'asc' };
+        break;
+      case 'price_desc':
+        orderBy = { price: 'desc' };
+        break;
+    }
+    
+    // Fetch products
+    const products = await prisma.inventoryItem.findMany({
+      where: { tenantId },
+      orderBy,
+      take: limit,
+    });
+    
+    return res.json({ products, total: products.length });
+  } catch (e: any) {
+    console.error("[GET /tenant/:tenantId/swis/preview] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_preview" });
+  }
+});
+
+// Public endpoint for product pages to get tenant business profile (no auth required)
+app.get("/public/tenant/:tenantId/profile", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    if (!tenantId) return res.status(400).json({ error: "tenant_required" });
+    
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+
+    const bp = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } });
+    const md = (tenant.metadata as any) || {};
+    
+    // Return public business information only
+    const profile = {
+      business_name: bp?.businessName || md.business_name || tenant.name || null,
+      address_line1: bp?.addressLine1 || md.address_line1 || null,
+      address_line2: bp?.addressLine2 || md.address_line2 || null,
+      city: bp?.city || md.city || null,
+      state: bp?.state || md.state || null,
+      postal_code: bp?.postalCode || md.postal_code || null,
+      country_code: bp?.countryCode || md.country_code || null,
+      phone_number: bp?.phoneNumber || md.phone_number || null,
+      email: bp?.email || md.email || null,
+      website: bp?.website || md.website || null,
+      contact_person: bp?.contactPerson || md.contact_person || null,
+      logo_url: bp?.logoUrl ?? md.logo_url ?? null,
+      hours: bp?.hours || md.hours || null,
+      social_links: bp?.socialLinks || md.social_links || null,
+      latitude: bp?.latitude ? Number(bp.latitude) : (md.latitude || null),
+      longitude: bp?.longitude ? Number(bp.longitude) : (md.longitude || null),
+      display_map: bp?.displayMap ?? md.display_map ?? false,
+      map_privacy_mode: bp?.mapPrivacyMode || md.map_privacy_mode || 'precise',
+    };
+    return res.json(profile);
+  } catch (e: any) {
+    console.error("[GET /public/tenant/:tenantId/profile] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_profile" });
+  }
+});
+
+// Public endpoint to get tenant items for storefront (no auth required)
+app.get("/public/tenant/:tenantId/items", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    if (!tenantId) return res.status(400).json({ error: "tenant_required" });
+    
+    // Parse pagination params
+    const page = parseInt(req.query.page as string || '1', 10);
+    const limit = parseInt(req.query.limit as string || '12', 10);
+    const skip = (page - 1) * limit;
+    const search = req.query.search as string;
+    
+    // Build where clause - only show active, public items
+    const where: any = { 
+      tenantId,
+      itemStatus: 'active',
+      visibility: 'public'
+    };
+    
+    // Apply search filter
+    if (search) {
+      const searchTerm = search.toLowerCase();
+      where.OR = [
+        { sku: { contains: searchTerm, mode: 'insensitive' } },
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+    
+    // Fetch items with pagination
+    const [items, totalCount] = await Promise.all([
+      prisma.inventoryItem.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.inventoryItem.count({ where }),
+    ]);
+    
+    // Return paginated response
+    res.json({
+      items,
+      pagination: {
+        page,
+        limit,
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: skip + items.length < totalCount,
+      },
+    });
+  } catch (e: any) {
+    console.error("[GET /public/tenant/:tenantId/items] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_items" });
   }
 });
 
@@ -413,6 +580,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
     const { tenant_id, ...delta } = parsed.data;
+    console.log('[PATCH /tenant/profile] Delta:', JSON.stringify(delta, null, 2));
     const existingTenant = await prisma.tenant.findUnique({ where: { id: tenant_id } });
     if (!existingTenant) return res.status(404).json({ error: "tenant_not_found" });
 
@@ -431,6 +599,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
         email: delta.email ?? null,
         website: delta.website ?? null,
         contactPerson: delta.contact_person ?? null,
+        logoUrl: delta.logo_url ?? null,
         hours: (delta as any).hours ?? null,
         socialLinks: (delta as any).social_links ?? null,
         seoTags: (delta as any).seo_tags ?? null,
@@ -451,6 +620,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
         email: delta.email ?? undefined,
         website: delta.website ?? undefined,
         contactPerson: delta.contact_person ?? undefined,
+        logoUrl: 'logo_url' in delta ? (delta.logo_url === '' ? null : delta.logo_url) : undefined,
         hours: (delta as any).hours ?? undefined,
         socialLinks: (delta as any).social_links ?? undefined,
         seoTags: (delta as any).seo_tags ?? undefined,
@@ -465,6 +635,19 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
       await prisma.tenant.update({ where: { id: tenant_id }, data: { name: delta.business_name } });
     }
 
+    // Also clear logo_url from tenant metadata if it's being removed
+    if ('logo_url' in delta && delta.logo_url === '') {
+      const currentMetadata = (existingTenant.metadata as any) || {};
+      if (currentMetadata.logo_url) {
+        delete currentMetadata.logo_url;
+        await prisma.tenant.update({ 
+          where: { id: tenant_id }, 
+          data: { metadata: currentMetadata } 
+        });
+      }
+    }
+
+    console.log('[PATCH /tenant/profile] Updated logoUrl:', updated.logoUrl);
     return res.json(updated);
   } catch (e: any) {
     console.error("[PATCH /tenant/profile] Error:", e);
@@ -509,7 +692,7 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
     }
 
     let publicUrl: string;
-    const TENANT_BUCKET_NAME = process.env.TENANT_BUCKET_NAME || "photos"; // Default to photos bucket if not specified
+    const TENANT_BUCKET = StorageBuckets.TENANTS;
 
     // A) multipart/form-data "file" upload
     if (req.file) {
@@ -518,14 +701,14 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
       const pathKey = `tenants/${tenantId}/logo-${Date.now()}${ext}`;
       
       console.log(`[Logo Upload] Uploading to Supabase:`, { 
-        bucket: TENANT_BUCKET_NAME,
+        bucket: TENANT_BUCKET.name,
         pathKey, 
         size: f.size, 
         mimetype: f.mimetype 
       });
 
       const { error, data } = await supabaseLogo.storage
-        .from(TENANT_BUCKET_NAME)
+        .from(TENANT_BUCKET.name)
         .upload(pathKey, f.buffer, {
           cacheControl: "3600",
           upsert: false,
@@ -537,7 +720,7 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
         return res.status(500).json({ error: error.message, details: error });
       }
 
-      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET_NAME).getPublicUrl(data.path).data.publicUrl;
+      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET.name).getPublicUrl(data.path).data.publicUrl;
       console.log(`[Logo Upload] Supabase upload successful:`, { publicUrl });
     }
     // B) JSON { dataUrl } upload
@@ -567,14 +750,14 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
       
       const pathKey = `tenants/${tenantId}/logo-${Date.now()}${ext}`;
       console.log(`[Logo Upload] Uploading dataUrl to Supabase:`, { 
-        bucket: TENANT_BUCKET_NAME,
+        bucket: TENANT_BUCKET.name,
         pathKey, 
         size: buf.length, 
         contentType: parsed.data.contentType 
       });
 
       const { error, data } = await supabaseLogo.storage
-        .from(TENANT_BUCKET_NAME)
+        .from(TENANT_BUCKET.name)
         .upload(pathKey, buf, {
           cacheControl: "3600",
           upsert: false,
@@ -586,7 +769,7 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
         return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
       }
 
-      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET_NAME).getPublicUrl(data.path).data.publicUrl;
+      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET.name).getPublicUrl(data.path).data.publicUrl;
       console.log(`[Logo Upload] Supabase dataUrl upload successful:`, { publicUrl });
     } else {
       return res.status(400).json({ error: "unsupported_payload" });
@@ -717,7 +900,7 @@ const photoUploadHandler = async (req: any, res: any) => {
         const pathKey = `${item.tenantId}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
         console.log(`[Photo Upload] Uploading to Supabase:`, { pathKey, size: f.size, mimetype: f.mimetype });
         
-        const { error, data } = await supabase.storage.from("photos").upload(pathKey, f.buffer, {
+        const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(pathKey, f.buffer, {
           cacheControl: "3600",
           upsert: false,
           contentType: f.mimetype || "application/octet-stream",
@@ -728,7 +911,7 @@ const photoUploadHandler = async (req: any, res: any) => {
           return res.status(500).json({ error: error.message, details: error });
         }
         
-        publicUrl = supabase.storage.from("photos").getPublicUrl(data.path).data.publicUrl;
+        publicUrl = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(data.path).data.publicUrl;
         console.log(`[Photo Upload] Supabase upload successful:`, { publicUrl });
       } else if (DEV) {
         const ext = f.mimetype.includes("png") ? ".png" : f.mimetype.includes("webp") ? ".webp" : ".jpg";
@@ -783,7 +966,7 @@ const photoUploadHandler = async (req: any, res: any) => {
         const pathKey = `${item.tenantId}/${item.sku || item.id}/${Date.now()}${ext}`;
         console.log(`[Photo Upload] Uploading dataUrl to Supabase:`, { pathKey, size: buf.length, contentType: parsed.data.contentType });
         
-        const { error, data } = await supabase.storage.from("photos").upload(pathKey, buf, {
+        const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(pathKey, buf, {
           cacheControl: "3600",
           upsert: false,
           contentType: parsed.data.contentType,
@@ -794,7 +977,7 @@ const photoUploadHandler = async (req: any, res: any) => {
           return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
         }
         
-        publicUrl = supabase.storage.from("photos").getPublicUrl(data.path).data.publicUrl;
+        publicUrl = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(data.path).data.publicUrl;
         console.log(`[Photo Upload] Supabase dataUrl upload successful:`, { publicUrl });
       } else {
         // Fallback to filesystem
@@ -868,9 +1051,16 @@ console.log("✓ Photos router mounted");
 
 
 /* --------------------------- ITEMS / INVENTORY --------------------------- */
-const listQuery = z.object({ 
+const listQuery = z.object({
   tenantId: z.string().min(1),
-  count: z.string().optional() // Add count parameter for optimization
+  count: z.string().optional(), // Return only count for performance
+  page: z.string().optional(), // Page number (1-indexed)
+  limit: z.string().optional(), // Items per page
+  search: z.string().optional(), // Search by SKU or name
+  status: z.enum(['all', 'active', 'inactive', 'syncing']).optional(), // Filter by status
+  visibility: z.enum(['all', 'public', 'private']).optional(), // Filter by visibility
+  sortBy: z.enum(['name', 'sku', 'price', 'stock', 'updatedAt', 'createdAt']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 
 app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
@@ -887,20 +1077,85 @@ app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
   }
   
   try {
-    // If count=true, return only the count for performance
+    // Build where clause
+    const where: any = { tenantId };
+    
+    // Apply search filter
+    if (parsed.data.search) {
+      const searchTerm = parsed.data.search.toLowerCase();
+      where.OR = [
+        { sku: { contains: searchTerm, mode: 'insensitive' } },
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+    
+    // Apply status filter
+    if (parsed.data.status && parsed.data.status !== 'all') {
+      if (parsed.data.status === 'active') {
+        where.itemStatus = 'active';
+      } else if (parsed.data.status === 'inactive') {
+        where.itemStatus = 'inactive';
+      } else if (parsed.data.status === 'syncing') {
+        where.AND = [
+          { OR: [{ itemStatus: 'active' }, { itemStatus: null }] },
+          { OR: [{ visibility: 'public' }, { visibility: null }] },
+        ];
+      }
+    }
+    
+    // Apply visibility filter
+    if (parsed.data.visibility && parsed.data.visibility !== 'all') {
+      if (parsed.data.visibility === 'public') {
+        where.visibility = 'public';
+      } else if (parsed.data.visibility === 'private') {
+        where.visibility = 'private';
+      }
+    }
+    
+    // If count=true, return only the count
     if (req.query.count === 'true') {
-      const count = await prisma.inventoryItem.count({
-        where: { tenantId: parsed.data.tenantId },
-      });
+      const count = await prisma.inventoryItem.count({ where });
       return res.json({ count });
     }
     
-    // Otherwise return full items list
-    const items = await prisma.inventoryItem.findMany({
-      where: { tenantId: parsed.data.tenantId },
-      orderBy: { updatedAt: "desc" },
+    // Parse pagination params
+    const page = parseInt(parsed.data.page || '1', 10);
+    const limit = parseInt(parsed.data.limit || '25', 10);
+    const skip = (page - 1) * limit;
+    
+    // Build orderBy clause
+    const sortBy = parsed.data.sortBy || 'updatedAt';
+    const sortOrder = parsed.data.sortOrder || 'desc';
+    const orderBy: any = {};
+    
+    if (sortBy === 'price') {
+      orderBy.priceCents = sortOrder;
+    } else {
+      orderBy[sortBy] = sortOrder;
+    }
+    
+    // Fetch items with pagination
+    const [items, totalCount] = await Promise.all([
+      prisma.inventoryItem.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      prisma.inventoryItem.count({ where }),
+    ]);
+    
+    // Return paginated response
+    res.json({
+      items,
+      pagination: {
+        page,
+        limit,
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: skip + items.length < totalCount,
+      },
     });
-    res.json(items);
   } catch (e: any) {
     console.error('[GET /items] Error listing items:', e);
     res.status(500).json({ error: "failed_to_list_items", message: e?.message });
@@ -1072,8 +1327,16 @@ app.get("/google/auth", async (req, res) => {
     }
 
     // Validate NAP (Name, Address, Phone) is complete
-    const metadata = tenant.metadata as any;
-    if (!metadata?.business_name || !metadata?.city || !metadata?.state) {
+    // Check TenantBusinessProfile table first, fallback to metadata for backwards compatibility
+    const businessProfile = await prisma.tenantBusinessProfile.findUnique({
+      where: { tenantId }
+    });
+    
+    const hasProfile = businessProfile 
+      ? (businessProfile.businessName && businessProfile.city && businessProfile.state)
+      : ((tenant.metadata as any)?.business_name && (tenant.metadata as any)?.city && (tenant.metadata as any)?.state);
+    
+    if (!hasProfile) {
       return res.status(400).json({ 
         error: "incomplete_business_profile",
         message: "Please complete your business profile before connecting to Google",
@@ -1574,6 +1837,7 @@ app.use('/permissions', permissionRoutes);
 app.use('/users', userRoutes);
 app.use('/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
+app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
 
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);
@@ -1581,11 +1845,38 @@ app.post("/jobs/rates/daily", dailyRatesJob);
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
 
+// Log startup environment
+console.log('\n🚀 Starting API server...');
+console.log(`   NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+console.log(`   PORT: ${port}`);
+console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? '✓ Set' : '✗ Missing'}`);
+console.log(`   SUPABASE_URL: ${process.env.SUPABASE_URL ? '✓ Set' : '✗ Missing'}`);
+console.log(`   WEB_URL: ${process.env.WEB_URL || 'Not set'}\n`);
+
 // Only start the server when not running tests
 if (process.env.NODE_ENV !== "test") {
-  app.listen(port, () => {
+  const server = app.listen(port, '0.0.0.0', () => {
     console.log(`\n✅ API server running → http://localhost:${port}/health`);
     console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
+  });
+
+  // Handle server errors
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${port} is already in use`);
+    } else {
+      console.error('❌ Server error:', error);
+    }
+    process.exit(1);
+  });
+
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('\n⚠️  SIGTERM received, shutting down gracefully...');
+    server.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
   });
 }
 

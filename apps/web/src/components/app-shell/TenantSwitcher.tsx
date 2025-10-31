@@ -86,7 +86,7 @@ export default function TenantSwitcher() {
     return (
       <div id="tenant-switcher" className="inline-flex items-center gap-2 text-sm">
         <span className="inline-block h-4 w-24 bg-neutral-200 rounded animate-pulse" />
-        <a href="/tenants" className="text-primary-600 hover:text-primary-700">Select a tenant</a>
+        <a href="/tenants" className="text-primary-600 hover:text-primary-700">Select location</a>
       </div>
     );
   }
@@ -97,7 +97,7 @@ export default function TenantSwitcher() {
     const role = user?.tenants?.find(t => t.id === only.id)?.role;
     return (
       <div className="inline-flex items-center gap-2 text-sm">
-        <span className="text-xs text-neutral-500">Tenant</span>
+        <span className="text-xs text-neutral-500">Location</span>
         <button onClick={() => onChange(only.id)} className="px-2 py-1 rounded-md hover:bg-neutral-50">
           <span className="font-medium text-neutral-900">{only.name}</span>
           {role && (
@@ -112,7 +112,7 @@ export default function TenantSwitcher() {
 
   return (
     <div id="tenant-switcher" className="inline-flex items-center gap-2">
-      <label htmlFor="tenant-switcher" className="text-xs text-neutral-500">Tenant</label>
+      <label htmlFor="tenant-switcher" className="text-xs text-neutral-500">Location</label>
       <select
         id="tenant-switcher"
         className="px-2 py-1 border border-neutral-300 rounded-md text-sm bg-white"

@@ -68,11 +68,8 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       const res = await api.get("/api/tenants");
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
-      // Belt-and-suspenders: filter to user memberships if not ADMIN
-      const isAdmin = user?.role === 'ADMIN';
-      const memberIds = (user?.tenants || []).map(t => t.id);
-      const filtered = isAdmin ? list : list.filter((t: Tenant) => memberIds.includes(t.id));
-      setTenants(filtered);
+      // The API already filters tenants based on user permissions, so we don't need to filter again
+      setTenants(list);
     } catch (_e) {
       setError("Failed to load tenants");
     } finally {
@@ -140,20 +137,93 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
-        title="Tenants"
-        description="Manage your store locations and businesses"
+        title="Locations"
+        description="Manage your stores and business locations"
         icon={Icons.Tenants}
         actions={
-          <Button onClick={refresh} disabled={loading} variant="secondary">
-            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {loading ? "Loading…" : "Refresh"}
-          </Button>
+          <div className="flex gap-3">
+            <Button 
+              onClick={() => router.push('/')} 
+              variant="ghost"
+              title="Back to Dashboard"
+            >
+              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Dashboard
+            </Button>
+            <Button onClick={refresh} disabled={loading} variant="secondary">
+              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {loading ? "Loading…" : "Refresh"}
+            </Button>
+          </div>
         }
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Quick Stats Dashboard */}
+        {tenants.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600">Total Locations</p>
+                  <p className="text-2xl font-bold text-neutral-900">{tenants.length}</p>
+                </div>
+                <div className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                  <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600">Chain Locations</p>
+                  <p className="text-2xl font-bold text-neutral-900">{tenants.filter(t => t.organization).length}</p>
+                </div>
+                <div className="h-12 w-12 bg-info rounded-lg flex items-center justify-center">
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600">Standalone</p>
+                  <p className="text-2xl font-bold text-neutral-900">{tenants.filter(t => !t.organization).length}</p>
+                </div>
+                <div className="h-12 w-12 bg-success rounded-lg flex items-center justify-center">
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600">Filtered</p>
+                  <p className="text-2xl font-bold text-neutral-900">{filteredTenants.length}</p>
+                </div>
+                <div className="h-12 w-12 bg-neutral-200 rounded-lg flex items-center justify-center">
+                  <svg className="h-6 w-6 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* Error Alert */}
         {error && (
           <Alert variant="error" title="Error" onClose={() => setError(null)}>
@@ -164,8 +234,8 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
         {/* Create Tenant Card */}
         <AnimatedCard delay={0} hover={false}>
           <CardHeader>
-            <CardTitle>Create New Tenant</CardTitle>
-            <CardDescription>Add a new store or business location</CardDescription>
+            <CardTitle>Add New Location</CardTitle>
+            <CardDescription>Create a new store or business location</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onCreate} className="flex gap-3">
@@ -173,7 +243,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter tenant name (e.g., Downtown Store)"
+                  placeholder="Enter location name (e.g., Downtown Store)"
                   required
                 />
               </div>
@@ -181,7 +251,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                 <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                {loading ? "Creating…" : "Create Tenant"}
+                {loading ? "Creating…" : "Add Location"}
               </Button>
             </form>
           </CardContent>
@@ -238,7 +308,26 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
             </div>
           </CardHeader>
           <CardContent>
-            {filteredTenants.length === 0 ? (
+            {loading ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="p-4 border border-neutral-200 rounded-lg bg-white animate-pulse">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="h-5 w-5 bg-neutral-200 rounded"></div>
+                      <div className="flex-1">
+                        <div className="h-6 bg-neutral-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-3 bg-neutral-200 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                    <div className="pt-3 border-t border-neutral-100 flex gap-2">
+                      <div className="h-8 bg-neutral-200 rounded w-28"></div>
+                      <div className="h-8 bg-neutral-200 rounded w-20"></div>
+                      <div className="h-8 bg-neutral-200 rounded w-24"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredTenants.length === 0 ? (
               <div className="text-center py-12">
                 <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -251,7 +340,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-neutral-200">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {paginatedTenants.map((t, index) => {
                   const role = user?.tenants?.find(x => x.id === t.id)?.role;
                   const isAdmin = user?.role === 'ADMIN';
@@ -326,7 +415,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: index * 0.05 }}
-        className="py-4 flex items-center gap-4"
+        className="p-4 border border-neutral-200 rounded-lg hover:shadow-md transition-shadow bg-white"
       >
         {/* Tenant Info */}
         <div className="flex-1 min-w-0">
@@ -363,7 +452,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
 
         {/* Actions */}
         {!editing && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-neutral-100 mt-3">
             {canEdit && (
               <Button size="sm" variant="secondary" onClick={onEditProfile}>
                 <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -388,9 +477,16 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
                 Delete
               </Button>
             )}
+            <Button size="sm" variant="secondary" onClick={() => window.open(`/tenant/${tenant.id}`, '_blank')} title="Preview storefront">
+              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              View Storefront
+            </Button>
             <Button size="sm" onClick={onSelect}>
               <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>
               View Items
             </Button>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Pagination, AdvancedSearchableSelect, type SelectOption } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Badge, Pagination, AdvancedSearchableSelect, type SelectOption } from "@/components/ui";
 import EditItemModal from "./EditItemModal";
 import { QRCodeModal } from "./QRCodeModal";
 import BulkUploadModal from "./BulkUploadModal";
@@ -58,6 +58,26 @@ export default function ItemsClient({
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'syncing'>('all');
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
+  const [totalItems, setTotalItems] = useState(initialItems?.length || 0);
+  const [totalPages, setTotalPages] = useState(1);
+  
+  // Calculate quick stats
+  const quickStats = useMemo(() => {
+    const allItems = Array.isArray(items) ? items : [];
+    const activeCount = allItems.filter(i => i.itemStatus === 'active').length;
+    const inactiveCount = allItems.filter(i => i.itemStatus === 'inactive').length;
+    const lowStockCount = allItems.filter(i => i.stock !== undefined && i.stock < 10).length;
+    const totalValue = allItems.reduce((sum, i) => sum + (i.priceCents || 0), 0) / 100;
+    
+    return {
+      total: totalItems,
+      active: activeCount,
+      inactive: inactiveCount,
+      lowStock: lowStockCount,
+      totalValue,
+    };
+  }, [items, totalItems]);
   
   // Get current tenant's subscription tier
   const currentTenant = tenants.find(t => t.id === tenantId);
@@ -105,37 +125,16 @@ export default function ItemsClient({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  const filtered = useMemo(() => {
-    // Ensure items is always an array
-    let itemsArray = Array.isArray(items) ? items : [];
-    
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      itemsArray = itemsArray.filter((i) => {
-        if (statusFilter === 'active') return i.itemStatus === 'active' || !i.itemStatus;
-        if (statusFilter === 'inactive') return i.itemStatus === 'inactive';
-        if (statusFilter === 'syncing') return (i.itemStatus === 'active' || !i.itemStatus) && (i.visibility === 'public' || !i.visibility);
-        return true;
-      });
-    }
-    
-    // Apply search filter
-    const term = q.trim().toLowerCase();
-    if (!term) return itemsArray;
-    return itemsArray.filter((i) =>
-      i.sku?.toLowerCase().includes(term) || i.name?.toLowerCase().includes(term)
-    );
-  }, [items, q, statusFilter]);
+  // No need for client-side filtering anymore - it's done server-side!
+  // Items are already filtered and paginated from the API
+  const paginatedItems = Array.isArray(items) ? items : [];
 
-  const paginatedItems = useMemo(() => {
-    // Ensure filtered is always an array before slicing
-    const filteredArray = Array.isArray(filtered) ? filtered : [];
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return filteredArray.slice(startIndex, endIndex);
-  }, [filtered, currentPage, pageSize]);
-
-  const isV2 = isFeatureEnabled('FF_ITEMS_V2_GRID', tenantId);
+  const [isV2, setIsV2] = useState(false);
+  
+  useEffect(() => {
+    // Evaluate feature flag on client only to avoid hydration mismatch
+    setIsV2(isFeatureEnabled('FF_ITEMS_V2_GRID', tenantId));
+  }, [tenantId]);
 
   // Reset to page 1 when search changes
   useEffect(() => {
@@ -150,13 +149,50 @@ export default function ItemsClient({
         setItems([]);
         return;
       }
-      const res = await api.get(`/api/items?tenantId=${encodeURIComponent(tenantId)}`);
+      
+      // Build query params for paginated API
+      const params = new URLSearchParams({
+        tenantId: encodeURIComponent(tenantId),
+        page: currentPage.toString(),
+        limit: pageSize.toString(),
+      });
+      
+      // Add search if present
+      if (q.trim()) {
+        params.append('search', q.trim());
+      }
+      
+      // Add status filter if not 'all'
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+      
+      // Add visibility filter if not 'all'
+      if (visibilityFilter !== 'all') {
+        params.append('visibility', visibilityFilter);
+      }
+      
+      const res = await api.get(`/api/items?${params.toString()}`);
       const data = await res.json();
       console.log('[ItemsClient] Refresh response:', data);
-      // Ensure data is an array before processing
-      const itemsArray = Array.isArray(data) ? data : [];
-      console.log('[ItemsClient] Image URLs in response:', itemsArray.map((item: any) => ({ id: item.id, imageUrl: item.imageUrl })));
-      setItems(itemsArray);
+      console.log('[ItemsClient] data.items:', data.items);
+      console.log('[ItemsClient] data.pagination:', data.pagination);
+      
+      // Handle paginated response
+      if (data.items && data.pagination) {
+        console.log('[ItemsClient] Using paginated format, setting items:', data.items.length);
+        setItems(data.items);
+        setTotalItems(data.pagination.totalItems);
+        setTotalPages(data.pagination.totalPages);
+      } else {
+        // Fallback for old API format (backward compatibility)
+        console.log('[ItemsClient] Using fallback format');
+        const itemsArray = Array.isArray(data) ? data : [];
+        setItems(itemsArray);
+        setTotalItems(itemsArray.length);
+        setTotalPages(1);
+      }
+      console.log('[ItemsClient] After setting, items state:', items.length);
     } catch (e) {
       console.error('[ItemsClient] Refresh error:', e);
       setError("Failed to load items");
@@ -198,12 +234,12 @@ export default function ItemsClient({
   }, [tenantId]);
 
   useEffect(() => {
-    // Refresh items when tenantId changes
+    // Refresh items when tenantId, page, search, or filter changes
     if (tenantId) {
       refresh();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId]);
+  }, [tenantId, currentPage, q, statusFilter, visibilityFilter]);
 
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,15 +310,54 @@ export default function ItemsClient({
   const handleStatusToggle = async (item: Item) => {
     const newStatus = item.itemStatus === 'active' ? 'inactive' : 'active';
     try {
-      const res = await api.put(`/api/items/${item.id}?tenantId=${tenantId}`, { itemStatus: newStatus });
+      // Use PATCH for partial updates (only itemStatus)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/items/${item.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+        body: JSON.stringify({ itemStatus: newStatus }),
+      });
 
-      if (!res.ok) throw new Error('Failed to update status');
+      if (!res.ok) {
+        const error = await res.json();
+        console.error('Failed to update status:', error);
+        throw new Error('Failed to update status');
+      }
 
-      // Update local state
-      setItems((Array.isArray(items) ? items : []).map(i => i.id === item.id ? { ...i, itemStatus: newStatus } : i));
+      // Refresh from server to get correct filtered results
+      await refresh();
     } catch (error) {
       console.error('Failed to update status:', error);
       alert('Failed to update item status');
+    }
+  };
+
+  const handleVisibilityToggle = async (item: Item) => {
+    const newVisibility = item.visibility === 'public' ? 'private' : 'public';
+    try {
+      // Use PATCH for partial updates (only visibility)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/items/${item.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+        body: JSON.stringify({ visibility: newVisibility }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        console.error('Failed to update visibility:', error);
+        throw new Error('Failed to update visibility');
+      }
+
+      // Refresh from server to get correct filtered results
+      await refresh();
+    } catch (error) {
+      console.error('Failed to update visibility:', error);
+      alert('Failed to update item visibility');
     }
   };
 
@@ -375,17 +450,24 @@ export default function ItemsClient({
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
-        title={t('inventory.title', 'Inventory')}
-        description="Manage your product catalog"
+        title="Inventory"
+        description="Manage your catalog and stock levels"
         icon={Icons.Inventory}
         actions={
           <div className="flex gap-3">
-            <Button onClick={() => setShowCreateForm(!showCreateForm)} variant="primary">
-              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              {showCreateForm ? 'Hide Form' : 'Add New Product'}
-            </Button>
+            {tenantId && (
+              <Button 
+                onClick={() => window.open(`/tenant/${tenantId}`, '_blank')} 
+                variant="secondary"
+                title="Preview your storefront in a new tab"
+              >
+                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Preview Storefront
+              </Button>
+            )}
             <Button onClick={refresh} disabled={loading} variant="secondary">
               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -397,6 +479,85 @@ export default function ItemsClient({
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Quick Stats Dashboard */}
+        {!loading && totalItems > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600">Total Products</p>
+                  <p className="text-2xl font-bold text-neutral-900">{quickStats.total}</p>
+                </div>
+                <div className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                  <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600">Total Value</p>
+                  <p className="text-2xl font-bold text-neutral-900">${quickStats.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                </div>
+                <div className="h-12 w-12 bg-success rounded-lg flex items-center justify-center">
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600">Active</p>
+                  <p className="text-2xl font-bold text-neutral-900">{quickStats.active}</p>
+                </div>
+                <div className="h-12 w-12 bg-info rounded-lg flex items-center justify-center">
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className={`p-4 ${quickStats.inactive > 0 ? 'bg-neutral-50 border-neutral-300' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600">Inactive</p>
+                  <p className={`text-2xl font-bold ${quickStats.inactive > 0 ? 'text-neutral-700' : 'text-neutral-900'}`}>
+                    {quickStats.inactive}
+                  </p>
+                </div>
+                <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${quickStats.inactive > 0 ? 'bg-neutral-400' : 'bg-neutral-200'}`}>
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className={`p-4 ${quickStats.lowStock > 0 ? 'bg-warning-50 border-warning-200' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600">Low Stock</p>
+                  <p className={`text-2xl font-bold ${quickStats.lowStock > 0 ? 'text-warning' : 'text-neutral-900'}`}>
+                    {quickStats.lowStock}
+                  </p>
+                </div>
+                <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${quickStats.lowStock > 0 ? 'bg-warning' : 'bg-neutral-200'}`}>
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* Tenant Logo */}
         {currentTenant?.metadata?.logo_url && (
           <Card>
@@ -410,10 +571,10 @@ export default function ItemsClient({
           </Card>
         )}
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Tenant Selector (if not in URL) */}
+        {!initialTenantId && (
+          <Card>
+            <CardContent className="pt-6">
               <AdvancedSearchableSelect
                 label="Tenant"
                 value={tenantId}
@@ -433,68 +594,9 @@ export default function ItemsClient({
                 groupBy="state"
                 storageKey="tenant-selector"
               />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t('inventory.searchPlaceholder', 'Search by SKU or name')}
-                label="Search"
-              />
-              
-              {/* Status Filter Buttons */}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={statusFilter === 'all' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('all')}
-                >
-                  All ({Array.isArray(items) ? items.length : 0})
-                </Button>
-                <Button
-                  variant={statusFilter === 'active' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('active')}
-                >
-                  Active ({Array.isArray(items) ? items.filter(i => i.itemStatus === 'active' || !i.itemStatus).length : 0})
-                </Button>
-                <Button
-                  variant={statusFilter === 'inactive' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('inactive')}
-                >
-                  Inactive ({Array.isArray(items) ? items.filter(i => i.itemStatus === 'inactive').length : 0})
-                </Button>
-                <Button
-                  variant={statusFilter === 'syncing' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('syncing')}
-                >
-                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  Syncing to Google ({Array.isArray(items) ? items.filter(i => (i.itemStatus === 'active' || !i.itemStatus) && (i.visibility === 'public' || !i.visibility)).length : 0})
-                </Button>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowBulkUpload(true)}
-                  disabled={!tenantId}
-                >
-                  <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  Bulk Upload CSV
-                </Button>
-              </div>
-            </div>
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Create Item Form */}
         {showCreateForm && (
@@ -539,7 +641,7 @@ export default function ItemsClient({
                 <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                {creating ? t('common.creating', 'Creating…') : t('common.create', 'Create Item')}
+                {creating ? t('common.creating', 'Creating…') : t('common.create', 'Add Product')}
               </Button>
             </form>
           </CardContent>
@@ -547,7 +649,7 @@ export default function ItemsClient({
         )}
 
         {/* Badge Legend */}
-        {filtered.length > 0 && (
+        {items.length > 0 && (
           <Card className="bg-blue-50 border-blue-200">
             <CardContent className="pt-4">
               <div className="flex items-start gap-3">
@@ -559,11 +661,11 @@ export default function ItemsClient({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-blue-800">
                     <div className="flex items-center gap-2">
                       <Badge variant="success" className="text-xs">Active</Badge>
-                      <span>Item is active and can sync to Google</span>
+                      <span>Product is active and syncs to Google</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="warning" className="text-xs">Inactive</Badge>
-                      <span>Item is paused, won't sync to Google</span>
+                      <span>Product is paused, won't sync</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="default" className="text-xs bg-amber-100 text-amber-800">Private</Badge>
@@ -587,25 +689,126 @@ export default function ItemsClient({
 
         {/* Items List */}
         {isV2 ? (
-          <ItemsGridV2 items={filtered as any} />
+          <ItemsGridV2 
+            items={items as any}
+            onEdit={handleEditClick}
+            onStatusToggle={handleStatusToggle}
+            onVisibilityToggle={handleVisibilityToggle}
+            onViewPhotos={(item) => {
+              setGalleryItem(item);
+              setShowPhotoGallery(true);
+            }}
+          />
         ) : (
           <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>{t('inventory.title', 'Items')}</CardTitle>
-              <div className="flex items-center gap-2">
-                {statusFilter !== 'all' || q ? (
-                  <Badge variant="info">
-                    Showing {filtered.length} of {items.length} items
-                  </Badge>
-                ) : (
-                  <Badge variant="info">{items.length} items</Badge>
-                )}
+            <div className="flex items-center justify-between mb-4">
+              <CardTitle>{t('inventory.title', 'Inventory')}</CardTitle>
+              <Badge variant="info">
+                Showing {items.length} of {totalItems} products
+              </Badge>
+            </div>
+            
+            {/* Search and Filters */}
+            <div className="space-y-4">
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t('inventory.searchPlaceholder', 'Search products by SKU or name')}
+                label="Search"
+              />
+              
+              {/* Status Filter Buttons */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={statusFilter === 'all' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('all')}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={statusFilter === 'active' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('active')}
+                >
+                  Active
+                </Button>
+                <Button
+                  variant={statusFilter === 'inactive' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('inactive')}
+                >
+                  Inactive
+                </Button>
+                <Button
+                  variant={statusFilter === 'syncing' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setStatusFilter('syncing')}
+                >
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Syncing to Google
+                </Button>
+              </div>
+              
+              {/* Visibility Filter */}
+              <div className="flex flex-wrap gap-2">
+                <span className="text-sm text-neutral-600 self-center mr-2">Visibility:</span>
+                <Button
+                  variant={visibilityFilter === 'all' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setVisibilityFilter('all')}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={visibilityFilter === 'public' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setVisibilityFilter('public')}
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Public
+                </Button>
+                <Button
+                  variant={visibilityFilter === 'private' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setVisibilityFilter('private')}
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                  Private
+                </Button>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="p-4 border border-neutral-200 rounded-lg bg-white animate-pulse">
+                    <div className="flex items-start gap-4 mb-3">
+                      <div className="h-20 w-20 bg-neutral-200 rounded-lg"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-neutral-200 rounded w-3/4"></div>
+                        <div className="h-3 bg-neutral-200 rounded w-1/2"></div>
+                        <div className="h-3 bg-neutral-200 rounded w-2/3"></div>
+                      </div>
+                    </div>
+                    <div className="pt-3 border-t border-neutral-100 flex gap-2">
+                      <div className="h-8 bg-neutral-200 rounded w-20"></div>
+                      <div className="h-8 bg-neutral-200 rounded w-20"></div>
+                      <div className="h-8 bg-neutral-200 rounded w-20"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : items.length === 0 ? (
               <div className="text-center py-12">
                 <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -614,24 +817,25 @@ export default function ItemsClient({
                 <p className="mt-1 text-sm text-neutral-500">Get started by creating a new item.</p>
               </div>
             ) : (
-              <div className="divide-y divide-neutral-200">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {paginatedItems.map((i) => (
-                  <div key={i.id} className="py-4 flex items-center gap-4">
-                    {/* Image */}
-                    <div className="flex-shrink-0">
-                      {i.imageUrl ? (
-                        <img src={i.imageUrl} alt={i.name} className="h-16 w-16 object-cover rounded-lg border border-neutral-200" />
-                      ) : (
-                        <div className="h-16 w-16 bg-neutral-100 rounded-lg flex items-center justify-center">
-                          <svg className="h-8 w-8 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
+                  <div key={i.id} className="p-4 border border-neutral-200 rounded-lg hover:shadow-md transition-shadow bg-white">
+                    <div className="flex items-start gap-4 mb-3">
+                      {/* Image */}
+                      <div className="flex-shrink-0">
+                        {i.imageUrl ? (
+                          <img src={i.imageUrl} alt={i.name} className="h-20 w-20 object-cover rounded-lg border border-neutral-200" />
+                        ) : (
+                          <div className="h-20 w-20 bg-neutral-100 rounded-lg flex items-center justify-center">
+                            <svg className="h-10 w-10 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Details */}
-                    <div className="flex-1 min-w-0">
+                      {/* Details */}
+                      <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
                           <p className="text-sm font-bold text-primary-900 dark:text-primary-100">{i.name}</p>
@@ -674,10 +878,11 @@ export default function ItemsClient({
                           <span className="text-neutral-400 text-xs">Not syncing</span>
                         )}
                       </div>
+                      </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex-shrink-0 flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1 pt-3 border-t border-neutral-100">
                       <Button 
                         size="sm" 
                         variant="ghost"
@@ -723,14 +928,14 @@ export default function ItemsClient({
                         size="sm" 
                         variant={i.itemStatus === 'active' ? 'secondary' : 'primary'}
                         onClick={() => handleStatusToggle(i)}
-                        title={i.itemStatus === 'active' ? 'Deactivate (stop Google sync)' : 'Activate (enable Google sync)'}
+                        title={i.itemStatus === 'active' ? 'Pause (stop Google sync)' : 'Resume (enable Google sync)'}
                       >
                         {i.itemStatus === 'active' ? (
                           <>
                             <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            Deactivate
+                            Pause
                           </>
                         ) : (
                           <>
@@ -738,7 +943,30 @@ export default function ItemsClient({
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            Activate
+                            Resume
+                          </>
+                        )}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant={i.visibility === 'public' ? 'secondary' : 'ghost'}
+                        onClick={() => handleVisibilityToggle(i)}
+                        title={i.visibility === 'public' ? 'Make Private (hide from storefront)' : 'Make Public (show on storefront)'}
+                      >
+                        {i.visibility === 'public' ? (
+                          <>
+                            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            Public
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                            </svg>
+                            Private
                           </>
                         )}
                       </Button>
@@ -771,10 +999,10 @@ export default function ItemsClient({
               </div>
             )}
           </CardContent>
-          {filtered.length > 0 && (
+          {items.length > 0 && (
             <Pagination
               currentPage={currentPage}
-              totalItems={filtered.length}
+              totalItems={totalItems}
               pageSize={pageSize}
               onPageChange={setCurrentPage}
               onPageSizeChange={(size) => {
@@ -783,6 +1011,50 @@ export default function ItemsClient({
               }}
             />
           )}
+          </Card>
+        )}
+
+        {/* Quick Actions Area */}
+        {!loading && tenantId && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>Add products individually or in bulk</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="primary"
+                  onClick={() => setShowCreateForm(!showCreateForm)}
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  {showCreateForm ? 'Hide Form' : 'Add New Product'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowBulkUpload(true)}
+                  disabled={!tenantId}
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Bulk Upload CSV
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={true}
+                  title="Coming soon: Scan barcodes to add items"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                  </svg>
+                  Scan Barcodes
+                  <span className="ml-2 text-xs bg-neutral-200 px-2 py-0.5 rounded">Coming Soon</span>
+                </Button>
+              </div>
+            </CardContent>
           </Card>
         )}
 
