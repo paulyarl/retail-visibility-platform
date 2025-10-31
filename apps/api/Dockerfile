@@ -9,15 +9,15 @@ RUN corepack enable
 
 WORKDIR /app
 
-# Copy package files first (Railway builds from repo root)
-COPY apps/api/package.json apps/api/pnpm-lock.yaml* ./
-COPY apps/api/prisma ./prisma/
+# Copy package files first for better layer caching
+COPY package.json pnpm-lock.yaml* ./
+COPY prisma ./prisma/
 
-# Install dependencies
+# Install dependencies (includes @supabase/supabase-js in dependencies now)
 RUN corepack enable && corepack prepare pnpm@latest --activate && pnpm install --no-frozen-lockfile
 
 # Copy source code
-COPY apps/api/ ./
+COPY . .
 
 # Build TypeScript
 RUN pnpm build
