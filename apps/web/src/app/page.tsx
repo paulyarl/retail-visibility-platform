@@ -254,7 +254,7 @@ export default function Home() {
                     >
                       {platformStats.storefrontsLiveFormatted}
                     </motion.p>
-                    <p className="text-sm text-neutral-500 mt-1">online stores</p>
+                    <p className="text-sm text-neutral-500 mt-1">total products</p>
                   </div>
                   <div className="h-12 w-12 bg-info rounded-lg flex items-center justify-center">
                     <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -407,7 +407,7 @@ export default function Home() {
               <AnimatedCard delay={0} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-neutral-600">Total Inventory</p>
+                    <p className="text-sm font-medium text-neutral-600">Catalog Size</p>
                     <motion.p 
                       className="text-3xl font-bold text-neutral-900 mt-2"
                       initial={{ scale: 0.5 }}
@@ -416,8 +416,8 @@ export default function Home() {
                     >
                       {inventoryCount}
                     </motion.p>
-                  <p className="text-sm text-neutral-500 mt-1">items</p>
-                </div>
+                    <p className="text-sm text-neutral-500 mt-1">total products</p>
+                  </div>
                 <motion.div 
                   className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center"
                   whileHover={{ scale: 1.1, rotate: 5 }}
@@ -434,7 +434,7 @@ export default function Home() {
           <AnimatedCard delay={0.1} className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-600">Active Listings</p>
+                <p className="text-sm font-medium text-neutral-600">Live Products</p>
                 <motion.p 
                   className="text-3xl font-bold text-neutral-900 mt-2"
                   initial={{ scale: 0.5 }}
@@ -443,7 +443,7 @@ export default function Home() {
                 >
                   {listingsCount}
                 </motion.p>
-                <p className="text-sm text-neutral-500 mt-1">on Google</p>
+                <p className="text-sm text-neutral-500 mt-1">synced to Google</p>
               </div>
               <motion.div 
                 className="h-12 w-12 bg-success rounded-lg flex items-center justify-center"
@@ -461,7 +461,7 @@ export default function Home() {
           <AnimatedCard delay={0.2} className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-600">Sync Status</p>
+                <p className="text-sm font-medium text-neutral-600">Sync Health</p>
                 <motion.p 
                   className="text-3xl font-bold text-neutral-900 mt-2"
                   initial={{ scale: 0.5 }}
@@ -470,7 +470,7 @@ export default function Home() {
                 >
                   {syncIssuesCount}
                 </motion.p>
-                <p className="text-sm text-neutral-500 mt-1">{syncIssuesCount > 0 ? 'needs attention' : 'all synced'}</p>
+                <p className="text-sm text-neutral-500 mt-1">{syncIssuesCount > 0 ? 'items need sync' : 'everything synced'}</p>
               </div>
               <motion.div 
                 className={`h-12 w-12 ${syncIssuesCount > 0 ? 'bg-warning' : 'bg-success'} rounded-lg flex items-center justify-center`}
