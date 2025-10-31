@@ -33,16 +33,12 @@ export async function GET(request: NextRequest) {
     
     // Get preferred tenant or use first
     const preferredTenantId = request.cookies.get('tenantId')?.value;
-    const selectedTenant = preferredTenantId 
+    let selectedTenant = preferredTenantId 
       ? tenants.find((t: any) => t.id === preferredTenantId) || tenants[0]
       : tenants[0];
     
-    // Fetch tenant details and items in parallel
-    const [tenantRes, itemsRes] = await Promise.all([
-      proxyGet(request, `/api/tenants/${selectedTenant.id}`),
-      proxyGet(request, `/api/items?tenantId=${selectedTenant.id}`),
-    ]);
-    
+    // Fetch items for selected tenant
+    let itemsRes = await proxyGet(request, `/api/items?tenantId=${selectedTenant.id}`);
     let totalItems = 0;
     let activeItems = 0;
     let lowStockItems = 0;
@@ -55,6 +51,29 @@ export async function GET(request: NextRequest) {
         lowStockItems = items.filter((i: any) => i.stock !== undefined && i.stock < 10).length;
       }
     }
+    
+    // If selected tenant has no items but other tenants exist, try to find one with items
+    if (totalItems === 0 && tenants.length > 1) {
+      for (const tenant of tenants) {
+        if (tenant.id === selectedTenant.id) continue; // Skip the one we already checked
+        
+        const testItemsRes = await proxyGet(request, `/api/items?tenantId=${tenant.id}`);
+        if (testItemsRes.ok) {
+          const testItems = await testItemsRes.json();
+          if (Array.isArray(testItems) && testItems.length > 0) {
+            // Found a tenant with items, use it instead
+            selectedTenant = tenant;
+            totalItems = testItems.length;
+            activeItems = testItems.filter((i: any) => i.itemStatus === 'active').length;
+            lowStockItems = testItems.filter((i: any) => i.stock !== undefined && i.stock < 10).length;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Fetch tenant details
+    const tenantRes = await proxyGet(request, `/api/tenants/${selectedTenant.id}`);
     
     let isChain = false;
     let organizationName = null;
