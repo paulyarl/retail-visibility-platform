@@ -26,7 +26,7 @@ export default function Home() {
   const [stats, setStats] = useState({ 
     total: 0, 
     active: 0, 
-    lowStock: 0,
+    syncIssues: 0,
     locations: 0,
     isChain: false,
     organizationName: null as string | null,
@@ -90,7 +90,7 @@ export default function Home() {
         setStats({
           total: data.stats.totalItems,
           active: data.stats.activeItems,
-          lowStock: data.stats.lowStockItems,
+          syncIssues: data.stats.syncIssues,
           locations: data.stats.locations,
           isChain: data.isChain,
           organizationName: data.organizationName,
@@ -125,7 +125,7 @@ export default function Home() {
   // Animated counts for metrics
   const inventoryCount = useCountUp(stats.total);
   const listingsCount = useCountUp(stats.active);
-  const lowStockCount = useCountUp(stats.lowStock);
+  const syncIssuesCount = useCountUp(stats.syncIssues);
   const locationsCount = useCountUp(stats.locations);
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
@@ -457,28 +457,28 @@ export default function Home() {
             </div>
           </AnimatedCard>
 
-          {/* Low Stock Alerts - Actionable metric */}
+          {/* Google Sync Status - Actionable metric */}
           <AnimatedCard delay={0.2} className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-600">Low Stock Alerts</p>
+                <p className="text-sm font-medium text-neutral-600">Sync Status</p>
                 <motion.p 
                   className="text-3xl font-bold text-neutral-900 mt-2"
                   initial={{ scale: 0.5 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.4, type: "spring" }}
                 >
-                  {lowStockCount}
+                  {syncIssuesCount}
                 </motion.p>
-                <p className="text-sm text-neutral-500 mt-1">{lowStockCount > 0 ? 'needs attention' : 'all good'}</p>
+                <p className="text-sm text-neutral-500 mt-1">{syncIssuesCount > 0 ? 'needs attention' : 'all synced'}</p>
               </div>
               <motion.div 
-                className={`h-12 w-12 ${lowStockCount > 0 ? 'bg-warning' : 'bg-success'} rounded-lg flex items-center justify-center`}
+                className={`h-12 w-12 ${syncIssuesCount > 0 ? 'bg-warning' : 'bg-success'} rounded-lg flex items-center justify-center`}
                 whileHover={{ scale: 1.1, rotate: 5 }}
                 transition={{ type: "spring", stiffness: 400 }}
               >
                 <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </motion.div>
             </div>
@@ -670,15 +670,15 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {stats.lowStock > 0 && (
+                  {stats.syncIssues > 0 && (
                     <div className="flex items-start gap-2 p-2 bg-warning-50 rounded-lg">
                       <svg className="h-5 w-5 text-warning mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                       <div>
-                        <p className="text-sm font-medium text-neutral-900">{stats.lowStock} items low on stock</p>
+                        <p className="text-sm font-medium text-neutral-900">{stats.syncIssues} items need Google sync</p>
                         <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline">
-                          Review inventory →
+                          Review sync status →
                         </Link>
                       </div>
                     </div>
@@ -696,7 +696,7 @@ export default function Home() {
                       </div>
                     </div>
                   )}
-                  {stats.lowStock === 0 && stats.total === stats.active && (
+                  {stats.syncIssues === 0 && stats.total === stats.active && (
                     <div className="flex items-start gap-2 p-2 bg-success-50 rounded-lg">
                       <svg className="h-5 w-5 text-success mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />

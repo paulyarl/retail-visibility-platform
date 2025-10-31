@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
         stats: {
           totalItems: 0,
           activeItems: 0,
-          lowStockItems: 0,
+          syncIssues: 0,
           locations: 0,
         },
         isChain: false,
@@ -49,14 +49,14 @@ export async function GET(request: NextRequest) {
       if (Array.isArray(items)) {
         totalItems = items.length;
         activeItems = items.filter((i: any) => i.itemStatus === 'active').length;
-        lowStockItems = items.filter((i: any) => i.stock !== undefined && i.stock < 10).length;
+        lowStockItems = items.filter((i: any) => i.googleSyncStatus === 'error' || i.googleSyncStatus === 'pending').length;
       } else if (items && typeof items === 'object' && 'items' in items) {
         // Handle paginated response
         const itemsArray = items.items;
         if (Array.isArray(itemsArray)) {
           totalItems = itemsArray.length;
           activeItems = itemsArray.filter((i: any) => i.itemStatus === 'active').length;
-          lowStockItems = itemsArray.filter((i: any) => i.stock !== undefined && i.stock < 10).length;
+          lowStockItems = itemsArray.filter((i: any) => i.googleSyncStatus === 'error' || i.googleSyncStatus === 'pending').length;
         }
       }
     }
@@ -76,8 +76,8 @@ export async function GET(request: NextRequest) {
             selectedTenant = tenant;
             totalItems = testItems.length;
             activeItems = testItems.filter((i: any) => i.itemStatus === 'active').length;
-            lowStockItems = testItems.filter((i: any) => i.stock !== undefined && i.stock < 10).length;
-            console.log(`[Dashboard] Stats: total=${totalItems}, active=${activeItems}, lowStock=${lowStockItems}`);
+            lowStockItems = testItems.filter((i: any) => i.googleSyncStatus === 'error' || i.googleSyncStatus === 'pending').length;
+            console.log(`[Dashboard] Stats: total=${totalItems}, active=${activeItems}, syncIssues=${lowStockItems}`);
             break;
           }
         }
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
       stats: {
         totalItems,
         activeItems,
-        lowStockItems,
+        syncIssues: lowStockItems, // Renamed: items with Google sync errors/pending
         locations,
       },
       platformStats,
