@@ -30,6 +30,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.917.0",
     "@prisma/client": "^6.17.1",
+    "@supabase/supabase-js": "^2.75.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "execa": "^9.6.0",
@@ -43,7 +44,6 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^10.1.0",
-    "@supabase/supabase-js": "^2.75.1",
     "@types/bcryptjs": "^3.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
