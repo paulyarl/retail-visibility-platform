@@ -1,8 +1,8 @@
 # Row Level Security (RLS) Implementation Guide
 ## Multi-Tenant Data Isolation for VisibleShelf
 
-**Status**: ⚠️ **CRITICAL - RLS NOT YET ENABLED**  
-**Priority**: HIGH  
+**Status**: ✅ **RLS ENABLED - POLICIES PENDING**  
+**Priority**: MEDIUM  
 **Last Updated**: October 31, 2025
 
 ---
@@ -11,7 +11,7 @@
 
 ### **Risk Level: HIGH** ⚠️
 
-**RLS is currently DISABLED on all tables.**
+**RLS is ENABLED on all tables. No policies created yet (service role bypasses RLS).**
 
 **What this means:**
 - Any authenticated user can access ANY tenant's data
@@ -25,8 +25,8 @@
 - ✅ Service role key used in Railway API (bypasses RLS)
 
 **What's needed:**
-- ❌ Enable RLS on all tables
-- ❌ Create RLS policies for tenant isolation
+- ✅ Enable RLS on all tables (DONE)
+- ❌ Create RLS policies for tenant isolation (optional)
 - ❌ Audit all API routes for proper tenant checks
 
 ---
@@ -87,7 +87,7 @@ app.get('/items', async (req, res) => {
 CREATE POLICY "tenant_isolation" ON "InventoryItem"
 FOR SELECT USING (
   "tenantId" IN (
-    SELECT tenant_id FROM "UserTenant" WHERE user_id = auth.uid()
+    SELECT tenant_id FROM user_tenants WHERE user_id = auth.uid()
   )
 );
 ```
@@ -111,25 +111,25 @@ Run in Supabase SQL Editor:
 ```sql
 -- Core tables
 ALTER TABLE "Tenant" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "User" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "UserTenant" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_tenants ENABLE ROW LEVEL SECURITY;
 
 -- Business data
 ALTER TABLE "InventoryItem" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "PhotoAsset" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "ProductPerformance" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "SyncJob" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "TenantBusinessProfile" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_business_profile ENABLE ROW LEVEL SECURITY;
 
 -- Organization/chain features
-ALTER TABLE "Organization" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "OrganizationRequest" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organization ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organization_requests ENABLE ROW LEVEL SECURITY;
 
 -- Integrations
-ALTER TABLE "GoogleOAuthAccount" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE google_oauth_accounts ENABLE ROW LEVEL SECURITY;
 
 -- Platform settings (admin only)
-ALTER TABLE "PlatformSettings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
 ```
 
 **⚠️ WARNING**: Enabling RLS without policies will **block all access**!
@@ -146,7 +146,7 @@ FOR SELECT
 USING (
   id IN (
     SELECT tenant_id 
-    FROM "UserTenant" 
+    FROM user_tenants 
     WHERE user_id = auth.uid()
   )
 );
@@ -158,7 +158,7 @@ FOR UPDATE
 USING (
   id IN (
     SELECT tenant_id 
-    FROM "UserTenant" 
+    FROM user_tenants 
     WHERE user_id = auth.uid()
   )
 );
@@ -283,7 +283,7 @@ USING (
 
 -- Only organization owners can update
 CREATE POLICY "owners_update_organizations"
-ON "Organization"
+ON organization
 FOR UPDATE
 USING ("ownerId" = auth.uid());
 ```
@@ -293,11 +293,11 @@ USING ("ownerId" = auth.uid());
 ```sql
 -- Only admins can access platform settings
 CREATE POLICY "admins_access_platform_settings"
-ON "PlatformSettings"
+ON platform_settings
 FOR ALL
 USING (
   EXISTS (
-    SELECT 1 FROM "User" 
+    SELECT 1 FROM users 
     WHERE id = auth.uid() 
     AND role = 'ADMIN'
   )
@@ -471,7 +471,7 @@ RLS helps with:
 SELECT auth.uid();
 
 -- Verify user has tenant access
-SELECT * FROM "UserTenant" WHERE user_id = auth.uid();
+SELECT * FROM user_tenants WHERE user_id = auth.uid();
 ```
 
 ### **Problem: Service role queries fail**
