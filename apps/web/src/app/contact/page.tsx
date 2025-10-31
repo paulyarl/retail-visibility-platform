@@ -25,9 +25,7 @@ export default function ContactPage() {
     try {
       // TODO: Implement email sending via platform email destination
       // Will use platform settings email when email service is configured
-      // For now, log the inquiry (could save to database for admin review)
-      console.log('[Contact Form] Inquiry submitted:', formData);
-      
+      // For now, just simulate success (could save to database for admin review)
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setSuccess(true);

@@ -77,13 +77,11 @@ export default function Home() {
         const dashboardRes = await api.get('/api/dashboard');
         
         if (!dashboardRes.ok) {
-          console.log('[Dashboard] Failed to fetch dashboard data');
           setLoading(false);
           return;
         }
         
         const data = await dashboardRes.json();
-        console.log('[Dashboard] Data fetched:', data);
         
         if (data.tenant) {
           setSelectedTenantId(data.tenant.id);

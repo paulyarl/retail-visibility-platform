@@ -45,7 +45,6 @@ export async function GET(request: NextRequest) {
     
     if (itemsRes.ok) {
       const items = await itemsRes.json();
-      console.log('[Dashboard] Items response:', { isArray: Array.isArray(items), type: typeof items, length: items?.length, keys: Object.keys(items || {}) });
       if (Array.isArray(items)) {
         totalItems = items.length;
         activeItems = items.filter((i: any) => i.itemStatus === 'active').length;
@@ -63,7 +62,6 @@ export async function GET(request: NextRequest) {
     
     // If selected tenant has no items but other tenants exist, try to find one with items
     if (totalItems === 0 && tenants.length > 1) {
-      console.log('[Dashboard] Searching for tenant with items...');
       for (const tenant of tenants) {
         if (tenant.id === selectedTenant.id) continue; // Skip the one we already checked
         
@@ -72,19 +70,15 @@ export async function GET(request: NextRequest) {
           const testItems = await testItemsRes.json();
           if (Array.isArray(testItems) && testItems.length > 0) {
             // Found a tenant with items, use it instead
-            console.log(`[Dashboard] Found tenant with ${testItems.length} items:`, tenant.name);
             selectedTenant = tenant;
             totalItems = testItems.length;
             activeItems = testItems.filter((i: any) => i.itemStatus === 'active').length;
             lowStockItems = testItems.filter((i: any) => i.googleSyncStatus === 'error' || i.googleSyncStatus === 'pending').length;
-            console.log(`[Dashboard] Stats: total=${totalItems}, active=${activeItems}, syncIssues=${lowStockItems}`);
             break;
           }
         }
       }
     }
-    
-    console.log('[Dashboard] Final stats before return:', { totalItems, activeItems, lowStockItems, tenantId: selectedTenant.id });
     
     // Fetch tenant details
     const tenantRes = await proxyGet(request, `/tenants/${selectedTenant.id}`);
