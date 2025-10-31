@@ -420,6 +420,7 @@ model TenantBusinessProfile {
   email          String?
   website        String?
   contactPerson  String? @map("contact_person")
+  logoUrl        String? @map("logo_url")
   hours          Json?
   socialLinks    Json?   @map("social_links")
   seoTags        Json?   @map("seo_tags")

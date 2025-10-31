@@ -95,9 +95,59 @@ export const businessProfileSchema = z.object({
   hours: z.record(z.string(), z.string()).optional().nullable(),
   social_links: z.record(z.string(), z.string()).optional().nullable(),
   seo_tags: z.array(z.string()).optional().nullable(),
+  
+  // Geocoding fields for map display
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
 });
 
 export type BusinessProfile = z.infer<typeof businessProfileSchema>;
+
+// Helper to geocode an address using Google Geocoding API
+export async function geocodeAddress(address: {
+  address_line1: string;
+  address_line2?: string;
+  city: string;
+  state?: string;
+  postal_code: string;
+  country_code: string;
+}): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    const fullAddress = [
+      address.address_line1,
+      address.address_line2,
+      address.city,
+      address.state,
+      address.postal_code,
+      address.country_code,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+    );
+
+    if (!response.ok) {
+      throw new Error('Geocoding API request failed');
+    }
+
+    const data = await response.json();
+
+    if (data.status === 'OK' && data.results && data.results.length > 0) {
+      const location = data.results[0].geometry.location;
+      return {
+        latitude: location.lat,
+        longitude: location.lng,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    return null;
+  }
+}
 
 // Partial schema for updates (all fields optional)
 export const businessProfileUpdateSchema = businessProfileSchema.partial();

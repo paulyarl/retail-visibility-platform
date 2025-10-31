@@ -65,6 +65,7 @@ interface Tenant {
     email?: string;
     website?: string;
     address?: string;
+    logo_url?: string;
   };
 }
 
@@ -90,6 +91,31 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
     });
 
     const tenant: Tenant = tenantRes.ok ? await tenantRes.json() : { id: product.tenantId, name: 'Store' };
+
+    // Fetch business profile using public endpoint (no auth required)
+    try {
+      const profileRes = await fetch(`${apiBaseUrl}/public/tenant/${product.tenantId}/profile`, {
+        cache: 'no-store',
+      });
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        // Merge business profile data into tenant metadata
+        tenant.metadata = {
+          ...tenant.metadata,
+          businessName: profile.business_name,
+          phone: profile.phone_number,
+          email: profile.email,
+          website: profile.website,
+          address: profile.address_line1 
+            ? `${profile.address_line1}${profile.address_line2 ? ', ' + profile.address_line2 : ''}, ${profile.city}, ${profile.state} ${profile.postal_code}`
+            : undefined,
+          logo_url: profile.logo_url,
+        };
+      }
+    } catch (e) {
+      // Profile fetch failed, continue without it
+      console.error('Failed to fetch business profile:', e);
+    }
 
     return { product, tenant };
   } catch (error) {

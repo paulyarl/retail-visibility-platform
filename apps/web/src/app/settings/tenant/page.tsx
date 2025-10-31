@@ -13,7 +13,7 @@ import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAdminEmail } from "@/lib/admin-emails";
-import { BusinessProfile } from "@/lib/validation/businessProfile";
+import { BusinessProfile, geocodeAddress } from "@/lib/validation/businessProfile";
 
 type Tenant = {
   id: string;
@@ -159,12 +159,48 @@ export default function TenantSettingsPage() {
             hours: data.hours ?? undefined,
             social_links: data.social_links ?? undefined,
             seo_tags: data.seo_tags ?? undefined,
+            latitude: data.latitude,
+            longitude: data.longitude,
             // Map settings
             // @ts-ignore augmenting shape locally for UI wiring
             display_map: data.display_map ?? false,
             // @ts-ignore
             map_privacy_mode: data.map_privacy_mode ?? 'precise',
           } as BusinessProfile;
+          
+          // Auto-geocode if coordinates are missing but address is complete
+          if (!normalized.latitude && !normalized.longitude && 
+              normalized.address_line1 && normalized.city && 
+              normalized.postal_code && normalized.country_code) {
+            console.log('[TenantSettings] Auto-geocoding address...');
+            try {
+              const coords = await geocodeAddress({
+                address_line1: normalized.address_line1,
+                address_line2: normalized.address_line2,
+                city: normalized.city,
+                state: normalized.state,
+                postal_code: normalized.postal_code,
+                country_code: normalized.country_code,
+              });
+              
+              if (coords) {
+                console.log('[TenantSettings] Got coordinates:', coords);
+                normalized.latitude = coords.latitude;
+                normalized.longitude = coords.longitude;
+                
+                // Save coordinates to database
+                await api.patch('/api/tenant/profile', {
+                  tenant_id: tenant.id,
+                  latitude: coords.latitude,
+                  longitude: coords.longitude,
+                });
+                console.log('[TenantSettings] Coordinates saved to database');
+              }
+            } catch (err) {
+              console.error('[TenantSettings] Auto-geocoding failed:', err);
+            }
+          }
+          
           setProfile(normalized);
         } else {
           setProfile(null);
@@ -229,24 +265,135 @@ export default function TenantSettingsPage() {
         }}
       />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-
-        {/* Business Logo */}
-        {tenant.metadata && (tenant.metadata as any).logo_url && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-center">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Sticky Summary Bar */}
+        <div className="sticky top-0 z-10 bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-700 mb-6 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 py-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              {tenant.metadata && (tenant.metadata as any).logo_url && (
                 <img
                   src={(tenant.metadata as any).logo_url}
                   alt="Business Logo"
-                  className="max-h-32 max-w-full object-contain"
+                  className="h-12 w-12 object-contain rounded-lg border border-neutral-200"
                 />
+              )}
+              <div>
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">{tenant.name}</h2>
+                <p className="text-sm text-neutral-500">Profile Completion: {Math.round(((profile?.business_name ? 1 : 0) + (profile?.address_line1 ? 1 : 0) + (profile?.phone_number ? 1 : 0) + (profile?.email ? 1 : 0) + ((tenant.metadata as any)?.logo_url ? 1 : 0)) / 5 * 100)}%</p>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+            <a
+              href={`/tenant/${tenant.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 border border-primary-600 rounded-lg hover:bg-primary-50 transition-colors"
+            >
+              View Public Storefront
+            </a>
+          </div>
+        </div>
 
-        {/* Tenant Information */}
+        {/* 2-Column Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Primary Content */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* Business Profile moved to top */}
+            {isFeatureEnabled('FF_BUSINESS_PROFILE', tenant.id, tenant.region) && (
+              <BusinessProfileCard
+                profile={profile}
+                loading={profileLoading}
+                onUpdate={async (updated) => {
+                  try {
+                    console.log('[TenantSettings] Updating profile with:', updated);
+                    const response = await api.patch('/api/tenant/profile', {
+                      tenant_id: tenant.id,
+                      ...updated,
+                    });
+                    if (!response.ok) {
+                      const e = await response.json();
+                      throw new Error(e?.error || 'Failed to update business profile');
+                    }
+                    const saved = await response.json();
+                    const next: BusinessProfile = {
+                      tenant_id: tenant.id,
+                      business_name: (saved.businessName ?? updated.business_name) as any,
+                      address_line1: saved.addressLine1 ?? updated.address_line1,
+                      address_line2: saved.addressLine2 ?? updated.address_line2,
+                      city: saved.city ?? updated.city,
+                      state: saved.state ?? updated.state,
+                      postal_code: saved.postalCode ?? updated.postal_code,
+                      country_code: saved.countryCode ?? updated.country_code,
+                      phone_number: saved.phoneNumber ?? updated.phone_number,
+                      email: saved.email ?? updated.email,
+                      website: saved.website ?? updated.website,
+                      contact_person: saved.contactPerson ?? updated.contact_person,
+                      logo_url: saved.logoUrl ?? saved.logo_url ?? updated.logo_url ?? '',
+                      latitude: saved.latitude ?? updated.latitude,
+                      longitude: saved.longitude ?? updated.longitude,
+                    } as any;
+                    setProfile(next);
+                    setTenant((prev) => {
+                      if (!prev) return prev;
+                      return {
+                        ...prev,
+                        metadata: {
+                          ...(prev.metadata || {}),
+                          logo_url: next.logo_url || undefined,
+                        },
+                      };
+                    });
+                  } catch (err) {
+                    console.error('Failed to update business profile:', err);
+                    alert('Failed to update business profile');
+                  }
+                }}
+              />
+            )}
+
+            {/* Map Card Settings - Feature Flag: FF_MAP_CARD */}
+            {isFeatureEnabled('FF_MAP_CARD', tenant.id, tenant.region) && profile && (
+              <MapCardSettings
+                businessProfile={{
+                  business_name: profile.business_name || tenant.name,
+                  address_line1: profile.address_line1 || '',
+                  address_line2: profile.address_line2,
+                  city: profile.city || '',
+                  state: profile.state || '',
+                  postal_code: profile.postal_code || '',
+                  country_code: profile.country_code || 'US',
+                  latitude: (profile as any).latitude,
+                  longitude: (profile as any).longitude,
+                }}
+                displayMap={(profile as any).display_map ?? false}
+                privacyMode={(profile as any).map_privacy_mode ?? 'precise'}
+                onSave={async (settings) => {
+                  try {
+                    const response = await api.patch('/api/tenant/profile', {
+                      tenant_id: tenant.id,
+                      display_map: settings.displayMap,
+                      map_privacy_mode: settings.privacyMode,
+                    });
+                    if (!response.ok) {
+                      const e = await response.json();
+                      throw new Error(e?.error || 'Failed to update map settings');
+                    }
+                    setProfile(prev => prev ? ({
+                      ...prev,
+                      display_map: settings.displayMap,
+                      map_privacy_mode: settings.privacyMode,
+                    }) as any : prev);
+                  } catch (err) {
+                    console.error('Failed to update map settings:', err);
+                    alert('Failed to update map settings');
+                  }
+                }}
+              />
+            )}
+          </div>
+
+          {/* Right Column - Secondary Content */}
+          <div className="space-y-6">
+            {/* Tenant Information */}
         <Card>
           <CardHeader>
             <CardTitle>Tenant Information</CardTitle>
@@ -760,87 +907,9 @@ export default function TenantSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Business Profile - Feature Flag: FF_BUSINESS_PROFILE */}
-        {isFeatureEnabled('FF_BUSINESS_PROFILE', tenant.id, tenant.region) && (
-          <BusinessProfileCard
-            profile={profile}
-            loading={profileLoading}
-            onUpdate={async (updated) => {
-              try {
-                const response = await api.patch('/api/tenant/profile', {
-                  tenant_id: tenant.id,
-                  ...updated,
-                });
-                if (!response.ok) {
-                  const e = await response.json();
-                  throw new Error(e?.error || 'Failed to update business profile');
-                }
-                const saved = await response.json();
-                // Normalize response back into BusinessProfile shape when possible
-                const next: BusinessProfile = {
-                  tenant_id: tenant.id,
-                  business_name: (saved.businessName ?? updated.business_name) as any,
-                  address_line1: saved.addressLine1 ?? updated.address_line1,
-                  address_line2: saved.addressLine2 ?? updated.address_line2,
-                  city: saved.city ?? updated.city,
-                  state: saved.state ?? updated.state,
-                  postal_code: saved.postalCode ?? updated.postal_code,
-                  country_code: saved.countryCode ?? updated.country_code,
-                  phone_number: saved.phoneNumber ?? updated.phone_number,
-                  email: saved.email ?? updated.email,
-                  website: saved.website ?? updated.website,
-                  contact_person: saved.contactPerson ?? updated.contact_person,
-                  logo_url: (tenant.metadata as any)?.logo_url,
-                } as any;
-                setProfile(next);
-              } catch (err) {
-                console.error('Failed to update business profile:', err);
-                alert('Failed to update business profile');
-              }
-            }}
-          />
-        )}
-
-        {/* ... (rest of the code remains the same) */}
-        {isFeatureEnabled('FF_MAP_CARD', tenant.id, tenant.region) && profile && (
-          <MapCardSettings
-            businessProfile={{
-              business_name: profile.business_name || tenant.name,
-              address_line1: profile.address_line1 || '',
-              address_line2: profile.address_line2,
-              city: profile.city || '',
-              state: profile.state || '',
-              postal_code: profile.postal_code || '',
-              country_code: profile.country_code || 'US',
-            }}
-            displayMap={(profile as any).display_map ?? false}
-            privacyMode={(profile as any).map_privacy_mode ?? 'precise'}
-            onSave={async (settings) => {
-              try {
-                const response = await api.patch('/api/tenant/profile', {
-                  tenant_id: tenant.id,
-                  display_map: settings.displayMap,
-                  map_privacy_mode: settings.privacyMode,
-                });
-                if (!response.ok) {
-                  const e = await response.json();
-                  throw new Error(e?.error || 'Failed to update map settings');
-                }
-                // Update local state
-                setProfile(prev => prev ? ({
-                  ...prev,
-                  // @ts-ignore
-                  display_map: settings.displayMap,
-                  // @ts-ignore
-                  map_privacy_mode: settings.privacyMode,
-                }) as any : prev);
-              } catch (err) {
-                console.error('Failed to update map settings:', err);
-                alert('Failed to update map settings');
-              }
-            }}
-          />
-        )}
+          </div>
+        </div>
+        {/* Business Profile and Map Card moved to left column */}
 
         {/* SWIS Preview Settings - Feature Flag: FF_SWIS_PREVIEW */}
         {isFeatureEnabled('FF_SWIS_PREVIEW', tenant.id, tenant.region) && (

@@ -37,6 +37,17 @@ const nextConfig: NextConfig = {
         port: '4000',
         pathname: '/uploads/**',
       },
+      // Allow any external logo URLs (for business logos)
+      {
+        protocol: 'https',
+        hostname: '**',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '**',
+        pathname: '/**',
+      },
     ],
   },
 };

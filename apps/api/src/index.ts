@@ -294,6 +294,7 @@ const tenantProfileSchema = z.object({
     .refine((v) => !v || HTTPS_URL.test(v), { message: "website_must_be_https" })
     .optional(),
   contact_person: z.string().optional(),
+  logo_url: z.string().url().optional().or(z.literal('')),
   hours: z.any().optional(),
   social_links: z.any().optional(),
   seo_tags: z.any().optional(),
@@ -390,18 +391,125 @@ app.get("/tenant/profile", authenticateToken, async (req, res) => {
       email: bp?.email || md.email || null,
       website: bp?.website || md.website || null,
       contact_person: bp?.contactPerson || md.contact_person || null,
+      logo_url: bp?.logoUrl ?? md.logo_url ?? null,
       hours: bp?.hours || md.hours || null,
       social_links: bp?.socialLinks || md.social_links || null,
       seo_tags: bp?.seoTags || md.seo_tags || null,
-      latitude: bp?.latitude ?? md.latitude ?? null,
-      longitude: bp?.longitude ?? md.longitude ?? null,
+      latitude: bp?.latitude ? Number(bp.latitude) : (md.latitude || null),
+      longitude: bp?.longitude ? Number(bp.longitude) : (md.longitude || null),
       display_map: bp?.displayMap ?? md.display_map ?? false,
       map_privacy_mode: bp?.mapPrivacyMode || md.map_privacy_mode || 'precise',
-      logo_url: md.logo_url || null,
     };
     return res.json(profile);
   } catch (e: any) {
     console.error("[GET /tenant/profile] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_profile" });
+  }
+});
+
+// Public endpoint to get basic tenant info (no auth required)
+app.get("/public/tenant/:tenantId", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    if (!tenantId) return res.status(400).json({ error: "tenant_required" });
+    
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+
+    // Return basic public tenant information
+    return res.json({
+      id: tenant.id,
+      name: tenant.name,
+      metadata: tenant.metadata,
+    });
+  } catch (e: any) {
+    console.error("[GET /public/tenant/:tenantId] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_tenant" });
+  }
+});
+
+// Public endpoint to get tenant product preview (SWIS - Store Window Inventory Showcase)
+app.get("/tenant/:tenantId/swis/preview", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 12;
+    const sort = (req.query.sort as string) || 'updated_desc';
+    
+    if (!tenantId) return res.status(400).json({ error: "tenant_required" });
+    
+    // Build sort order
+    let orderBy: any = { updatedAt: 'desc' };
+    switch (sort) {
+      case 'updated_desc':
+        orderBy = { updatedAt: 'desc' };
+        break;
+      case 'updated_asc':
+        orderBy = { updatedAt: 'asc' };
+        break;
+      case 'alpha_asc':
+        orderBy = { name: 'asc' };
+        break;
+      case 'alpha_desc':
+        orderBy = { name: 'desc' };
+        break;
+      case 'price_asc':
+        orderBy = { price: 'asc' };
+        break;
+      case 'price_desc':
+        orderBy = { price: 'desc' };
+        break;
+    }
+    
+    // Fetch products
+    const products = await prisma.inventoryItem.findMany({
+      where: { tenantId },
+      orderBy,
+      take: limit,
+    });
+    
+    return res.json({ products, total: products.length });
+  } catch (e: any) {
+    console.error("[GET /tenant/:tenantId/swis/preview] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_preview" });
+  }
+});
+
+// Public endpoint for product pages to get tenant business profile (no auth required)
+app.get("/public/tenant/:tenantId/profile", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    if (!tenantId) return res.status(400).json({ error: "tenant_required" });
+    
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+
+    const bp = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } });
+    const md = (tenant.metadata as any) || {};
+    
+    // Return public business information only
+    const profile = {
+      business_name: bp?.businessName || md.business_name || tenant.name || null,
+      address_line1: bp?.addressLine1 || md.address_line1 || null,
+      address_line2: bp?.addressLine2 || md.address_line2 || null,
+      city: bp?.city || md.city || null,
+      state: bp?.state || md.state || null,
+      postal_code: bp?.postalCode || md.postal_code || null,
+      country_code: bp?.countryCode || md.country_code || null,
+      phone_number: bp?.phoneNumber || md.phone_number || null,
+      email: bp?.email || md.email || null,
+      website: bp?.website || md.website || null,
+      contact_person: bp?.contactPerson || md.contact_person || null,
+      logo_url: bp?.logoUrl ?? md.logo_url ?? null,
+      hours: bp?.hours || md.hours || null,
+      social_links: bp?.socialLinks || md.social_links || null,
+      latitude: bp?.latitude ? Number(bp.latitude) : (md.latitude || null),
+      longitude: bp?.longitude ? Number(bp.longitude) : (md.longitude || null),
+      display_map: bp?.displayMap ?? md.display_map ?? false,
+      map_privacy_mode: bp?.mapPrivacyMode || md.map_privacy_mode || 'precise',
+    };
+    return res.json(profile);
+  } catch (e: any) {
+    console.error("[GET /public/tenant/:tenantId/profile] Error:", e);
     return res.status(500).json({ error: "failed_to_get_profile" });
   }
 });
@@ -413,6 +521,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
     const { tenant_id, ...delta } = parsed.data;
+    console.log('[PATCH /tenant/profile] Delta:', JSON.stringify(delta, null, 2));
     const existingTenant = await prisma.tenant.findUnique({ where: { id: tenant_id } });
     if (!existingTenant) return res.status(404).json({ error: "tenant_not_found" });
 
@@ -431,6 +540,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
         email: delta.email ?? null,
         website: delta.website ?? null,
         contactPerson: delta.contact_person ?? null,
+        logoUrl: delta.logo_url ?? null,
         hours: (delta as any).hours ?? null,
         socialLinks: (delta as any).social_links ?? null,
         seoTags: (delta as any).seo_tags ?? null,
@@ -451,6 +561,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
         email: delta.email ?? undefined,
         website: delta.website ?? undefined,
         contactPerson: delta.contact_person ?? undefined,
+        logoUrl: 'logo_url' in delta ? (delta.logo_url === '' ? null : delta.logo_url) : undefined,
         hours: (delta as any).hours ?? undefined,
         socialLinks: (delta as any).social_links ?? undefined,
         seoTags: (delta as any).seo_tags ?? undefined,
@@ -465,6 +576,19 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
       await prisma.tenant.update({ where: { id: tenant_id }, data: { name: delta.business_name } });
     }
 
+    // Also clear logo_url from tenant metadata if it's being removed
+    if ('logo_url' in delta && delta.logo_url === '') {
+      const currentMetadata = (existingTenant.metadata as any) || {};
+      if (currentMetadata.logo_url) {
+        delete currentMetadata.logo_url;
+        await prisma.tenant.update({ 
+          where: { id: tenant_id }, 
+          data: { metadata: currentMetadata } 
+        });
+      }
+    }
+
+    console.log('[PATCH /tenant/profile] Updated logoUrl:', updated.logoUrl);
     return res.json(updated);
   } catch (e: any) {
     console.error("[PATCH /tenant/profile] Error:", e);
@@ -1072,8 +1196,16 @@ app.get("/google/auth", async (req, res) => {
     }
 
     // Validate NAP (Name, Address, Phone) is complete
-    const metadata = tenant.metadata as any;
-    if (!metadata?.business_name || !metadata?.city || !metadata?.state) {
+    // Check TenantBusinessProfile table first, fallback to metadata for backwards compatibility
+    const businessProfile = await prisma.tenantBusinessProfile.findUnique({
+      where: { tenantId }
+    });
+    
+    const hasProfile = businessProfile 
+      ? (businessProfile.businessName && businessProfile.city && businessProfile.state)
+      : ((tenant.metadata as any)?.business_name && (tenant.metadata as any)?.city && (tenant.metadata as any)?.state);
+    
+    if (!hasProfile) {
       return res.status(400).json({ 
         error: "incomplete_business_profile",
         message: "Please complete your business profile before connecting to Google",

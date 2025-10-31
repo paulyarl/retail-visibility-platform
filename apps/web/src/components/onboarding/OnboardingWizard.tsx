@@ -393,7 +393,15 @@ export default function OnboardingWizard({
           transition={{ delay: 0.5 }}
           className="text-center mt-6 text-sm text-neutral-600"
         >
-          <p>Need help? Contact support@retailvisibility.com</p>
+          <p>
+            Need help?{' '}
+            <a 
+              href="/settings/contact" 
+              className="text-primary-600 hover:text-primary-700 font-medium underline"
+            >
+              Contact support
+            </a>
+          </p>
         </motion.div>
       </div>
     </div>

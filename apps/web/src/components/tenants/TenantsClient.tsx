@@ -68,11 +68,8 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       const res = await api.get("/api/tenants");
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
-      // Belt-and-suspenders: filter to user memberships if not ADMIN
-      const isAdmin = user?.role === 'ADMIN';
-      const memberIds = (user?.tenants || []).map(t => t.id);
-      const filtered = isAdmin ? list : list.filter((t: Tenant) => memberIds.includes(t.id));
-      setTenants(filtered);
+      // The API already filters tenants based on user permissions, so we don't need to filter again
+      setTenants(list);
     } catch (_e) {
       setError("Failed to load tenants");
     } finally {
