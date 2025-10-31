@@ -3,20 +3,20 @@ import { proxyGet, proxyPost } from '@/lib/api-proxy';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const tenantId = searchParams.get('tenantId');
-  if (!tenantId) {
-    return NextResponse.json({ error: 'tenant_required' }, { status: 400 });
-  }
   
-  const res = await proxyGet(req, `/items?tenantId=${encodeURIComponent(tenantId)}`);
+  // Forward all query params to backend
+  const queryString = searchParams.toString();
+  
+  const res = await proxyGet(req, `/items?${queryString}`);
   const data = await res.json();
   
-  // If backend returns error, ensure we return empty array to client
-  if (!res.ok || !Array.isArray(data)) {
+  // Handle both old (array) and new (paginated object) response formats
+  if (!res.ok) {
     console.error('[items API] Backend error:', data);
-    return NextResponse.json([], { status: res.ok ? 200 : res.status });
+    return NextResponse.json({ error: data.error || 'failed_to_fetch' }, { status: res.status });
   }
   
+  // Return the data as-is (supports both formats)
   return NextResponse.json(data);
 }
 

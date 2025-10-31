@@ -15,7 +15,7 @@ import PublicFooter from "@/components/PublicFooter";
 
 export default function Home() {
   const { settings } = usePlatformSettings();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
   const [scopedLinks, setScopedLinks] = useState<{ items: string; createItem: string; tenants: string; settingsTenant: string }>({
     items: "/items",
@@ -31,14 +31,36 @@ export default function Home() {
     isChain: false,
     organizationName: null as string | null,
   });
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [platformStats, setPlatformStats] = useState({
+    activeRetailers: 0,
+    activeRetailersFormatted: '0',
+    productsListed: 0,
+    productsListedFormatted: '0',
+    storefrontsLive: 0,
+    storefrontsLiveFormatted: '0',
+    platformUptime: 99.9,
+    platformUptimeFormatted: '99.9%',
+  });
   
-  // Redirect to login if not authenticated
+  // Fetch public platform stats for visitors
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/login');
+    if (!isAuthenticated && !authLoading) {
+      const fetchPlatformStats = async () => {
+        try {
+          const response = await api.get('/api/platform-stats');
+          if (response.ok) {
+            const data = await response.json();
+            setPlatformStats(data);
+          }
+        } catch (error) {
+          console.error('[Home] Failed to fetch platform stats:', error);
+        }
+      };
+      fetchPlatformStats();
     }
-  }, [authLoading, isAuthenticated, router]);
+  }, [isAuthenticated, authLoading]);
   
   useEffect(() => {
     // Only fetch stats if authenticated
@@ -47,75 +69,32 @@ export default function Home() {
       return;
     }
     
-    // Fetch comprehensive dashboard stats from database
+    // Fetch comprehensive dashboard stats from optimized endpoint
     const fetchStats = async () => {
       try {
-        // Fetch all tenants first
-        const allTenantsRes = await api.get('/api/tenants');
+        const dashboardRes = await api.get('/api/dashboard');
         
-        if (!allTenantsRes.ok) {
-          console.log('[Dashboard] Failed to fetch tenants');
+        if (!dashboardRes.ok) {
+          console.log('[Dashboard] Failed to fetch dashboard data');
           setLoading(false);
           return;
         }
         
-        const tenants = await allTenantsRes.json();
-        console.log('[Dashboard] Tenants fetched:', tenants?.length || 0);
+        const data = await dashboardRes.json();
+        console.log('[Dashboard] Data fetched:', data);
         
-        if (!Array.isArray(tenants) || tenants.length === 0) {
-          console.log('[Dashboard] No tenants found, showing zeros');
-          setLoading(false);
-          return;
+        if (data.tenant) {
+          setSelectedTenantId(data.tenant.id);
         }
         
-        // Use first tenant or get from localStorage as preference
-        const preferredTenantId = localStorage.getItem('tenantId');
-        const selectedTenant = preferredTenantId 
-          ? tenants.find(t => t.id === preferredTenantId) || tenants[0]
-          : tenants[0];
-        
-        console.log('[Dashboard] Selected tenant:', selectedTenant.id, selectedTenant.name);
-        
-        // Fetch tenant details and items
-        const [tenantRes, itemsRes] = await Promise.all([
-          api.get(`/api/tenants/${selectedTenant.id}`),
-          api.get(`/api/items?tenantId=${selectedTenant.id}`),
-        ]);
-        
-        console.log('[Dashboard] API responses:', {
-          tenant: tenantRes.status,
-          items: itemsRes.status,
+        setStats({
+          total: data.stats.totalItems,
+          active: data.stats.activeItems,
+          lowStock: data.stats.lowStockItems,
+          locations: data.stats.locations,
+          isChain: data.isChain,
+          organizationName: data.organizationName,
         });
-        
-        let total = 0;
-        let active = 0;
-        let lowStock = 0;
-        let isChain = false;
-        let organizationName = null;
-        
-        // Process items
-        if (itemsRes.ok) {
-          const items = await itemsRes.json();
-          console.log('[Dashboard] Items fetched:', items?.length || 0);
-          if (Array.isArray(items)) {
-            total = items.length;
-            active = items.filter((i: any) => i.itemStatus === 'active').length;
-            lowStock = items.filter((i: any) => i.stock !== undefined && i.stock < 10).length;
-          }
-        }
-        
-        // Process tenant info for chain detection
-        if (tenantRes.ok) {
-          const tenant = await tenantRes.json();
-          if (tenant.organization) {
-            isChain = true;
-            organizationName = tenant.organization.name;
-          }
-        }
-        
-        const locations = tenants.length;
-        console.log('[Dashboard] Final stats:', { total, active, lowStock, locations, isChain });
-        setStats({ total, active, lowStock, locations, isChain, organizationName });
       } catch (error) {
         console.error('[Dashboard] Failed to fetch stats:', error);
       } finally {
@@ -165,17 +144,33 @@ export default function Home() {
                 />
               </Link>
             ) : (
-              <h1 className="text-2xl font-bold text-neutral-900">
-                {settings?.platformName || 'Visible Shelf'}
-              </h1>
+              <Link href="/">
+                <h1 className="text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
+                  {settings?.platformName || 'Visible Shelf'}
+                </h1>
+              </Link>
             )}
             <div className="flex items-center gap-3">
               <Link href="/settings">
                 <Button variant="ghost" size="sm">Settings</Button>
               </Link>
-              <Link href="/login">
-                <Button variant="secondary" size="sm">Sign In</Button>
-              </Link>
+              {isAuthenticated ? (
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={async () => {
+                    await logout();
+                    // Navigate to clean home page to show public platform metrics
+                    router.push('/');
+                  }}
+                >
+                  Sign Out
+                </Button>
+              ) : (
+                <Link href="/login">
+                  <Button variant="secondary" size="sm">Sign In</Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -186,28 +181,241 @@ export default function Home() {
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-neutral-900 mb-2">
-            Welcome to Your Dashboard
+            {isAuthenticated ? 'Welcome to Your Dashboard' : 'Platform Overview'}
           </h2>
           <p className="text-neutral-600">
-            Manage your retail inventory and visibility across platforms
+            {isAuthenticated 
+              ? (stats.isChain 
+                  ? `Managing ${stats.locations} locations across ${stats.organizationName || 'your organization'}`
+                  : 'Manage your retail inventory and visibility across platforms'
+                )
+              : 'Empowering retailers with complete online visibility'
+            }
           </p>
         </div>
 
+        {/* Public Platform Health - For visitors/non-authenticated users */}
+        {!isAuthenticated && !authLoading && (
+          <div className="mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <AnimatedCard delay={0} className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-600">Active Retailers</p>
+                    <motion.p 
+                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.2, type: "spring" }}
+                    >
+                      {platformStats.activeRetailersFormatted}
+                    </motion.p>
+                    <p className="text-sm text-neutral-500 mt-1">using the platform</p>
+                  </div>
+                  <div className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                    <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                </div>
+              </AnimatedCard>
+
+              <AnimatedCard delay={0.1} className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-600">Products Listed</p>
+                    <motion.p 
+                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.3, type: "spring" }}
+                    >
+                      {platformStats.productsListedFormatted}
+                    </motion.p>
+                    <p className="text-sm text-neutral-500 mt-1">on Google Shopping</p>
+                  </div>
+                  <div className="h-12 w-12 bg-success rounded-lg flex items-center justify-center">
+                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                  </div>
+                </div>
+              </AnimatedCard>
+
+              <AnimatedCard delay={0.2} className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-600">Storefronts Live</p>
+                    <motion.p 
+                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.4, type: "spring" }}
+                    >
+                      {platformStats.storefrontsLiveFormatted}
+                    </motion.p>
+                    <p className="text-sm text-neutral-500 mt-1">online stores</p>
+                  </div>
+                  <div className="h-12 w-12 bg-info rounded-lg flex items-center justify-center">
+                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                    </svg>
+                  </div>
+                </div>
+              </AnimatedCard>
+
+              <AnimatedCard delay={0.3} className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-600">Platform Uptime</p>
+                    <motion.p 
+                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.5, type: "spring" }}
+                    >
+                      {platformStats.platformUptimeFormatted}
+                    </motion.p>
+                    <p className="text-sm text-neutral-500 mt-1">last 30 days</p>
+                  </div>
+                  <div className="h-12 w-12 bg-success rounded-lg flex items-center justify-center">
+                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </AnimatedCard>
+            </div>
+
+            {/* CTA for visitors */}
+            <Card className="p-8 text-center bg-gradient-to-br from-primary-50 to-primary-100 border-2 border-primary-200">
+              <h3 className="text-2xl font-bold text-neutral-900 mb-2">
+                Join Thousands of Retailers
+              </h3>
+              <p className="text-neutral-600 mb-6 max-w-2xl mx-auto">
+                Get your products on Google Shopping, create a beautiful storefront, and reach more customers - all in one platform.
+              </p>
+              <div className="flex gap-4 justify-center">
+                <Link href="/register">
+                  <Button variant="primary" size="lg">
+                    Start Free Trial →
+                  </Button>
+                </Link>
+                <Link href="/features">
+                  <Button variant="secondary" size="lg">
+                    Learn More
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Platform Overview - Only for chains with multiple locations */}
+        {!loading && stats.isChain && stats.locations > 1 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-neutral-900">
+                {stats.organizationName} - Platform Overview
+              </h3>
+              <Badge variant="default" className="bg-primary-600 text-white">
+                {stats.locations} Locations
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card className="p-4">
+                <p className="text-sm text-neutral-600 mb-1">Total Locations</p>
+                <p className="text-2xl font-bold text-neutral-900">{stats.locations}</p>
+                <p className="text-xs text-neutral-500 mt-1">Across organization</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-sm text-neutral-600 mb-1">Organization Type</p>
+                <p className="text-2xl font-bold text-neutral-900">Chain</p>
+                <p className="text-xs text-neutral-500 mt-1">Multi-location</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-sm text-neutral-600 mb-1">Current View</p>
+                <p className="text-lg font-bold text-neutral-900 truncate" title={selectedTenantId || ''}>
+                  {selectedTenantId ? 'Single Location' : 'All'}
+                </p>
+                <Link href="/tenants" className="text-xs text-primary-600 hover:underline mt-1 block">
+                  Switch location →
+                </Link>
+              </Card>
+              <Card className="p-4">
+                <p className="text-sm text-neutral-600 mb-1">Quick Access</p>
+                <Link href="/tenants">
+                  <Button variant="secondary" size="sm" className="w-full mt-1">
+                    View All Locations
+                  </Button>
+                </Link>
+              </Card>
+            </div>
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900">
+                <strong>Note:</strong> Metrics below show data for the currently selected location. 
+                <Link href="/tenants" className="text-blue-600 hover:underline ml-1">
+                  Switch locations
+                </Link> to view different store data.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && stats.total === 0 && (
+          <Card className="col-span-full text-center p-12 mb-8">
+            <div className="max-w-md mx-auto">
+              <div className="text-6xl mb-4">🏪</div>
+              <h3 className="text-2xl font-bold text-neutral-900 mb-2">Welcome to Your Dashboard!</h3>
+              <p className="text-neutral-600 mb-6">
+                Let's get your storefront up and running. Start by adding your first product.
+              </p>
+              <Link href={scopedLinks.createItem}>
+                <Button variant="primary" size="lg">
+                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Your First Product
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        )}
+
         {/* Hero Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Link href={scopedLinks.items}>
-            <AnimatedCard delay={0} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-neutral-600">Total Inventory</p>
-                  <motion.p 
-                    className="text-3xl font-bold text-neutral-900 mt-2"
-                    initial={{ scale: 0.5 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.2, type: "spring" }}
-                  >
-                    {inventoryCount}
-                  </motion.p>
+        {!loading && stats.total > 0 && stats.isChain && stats.locations > 1 && (
+          <h3 className="text-lg font-semibold text-neutral-900 mb-4">
+            Current Location Metrics
+          </h3>
+        )}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="p-6">
+                <div className="animate-pulse">
+                  <div className="h-4 bg-neutral-200 rounded w-24 mb-3"></div>
+                  <div className="h-10 bg-neutral-200 rounded w-16 mb-2"></div>
+                  <div className="h-3 bg-neutral-200 rounded w-20"></div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : stats.total > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Link href={scopedLinks.items}>
+              <AnimatedCard delay={0} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-600">Total Inventory</p>
+                    <motion.p 
+                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.2, type: "spring" }}
+                    >
+                      {inventoryCount}
+                    </motion.p>
                   <p className="text-sm text-neutral-500 mt-1">items</p>
                 </div>
                 <motion.div 
@@ -309,6 +517,7 @@ export default function Home() {
             </AnimatedCard>
           </Link>
         </div>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -318,6 +527,16 @@ export default function Home() {
               <CardDescription>Get started with common tasks</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {selectedTenantId && (
+                <Link href={`/tenant/${selectedTenantId}`} className="block" target="_blank">
+                  <Button variant="primary" className="w-full justify-start">
+                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                    </svg>
+                    View Your Storefront
+                  </Button>
+                </Link>
+              )}
               <Link href={scopedLinks.tenants} className="block">
                 <Button variant="secondary" className="w-full justify-start">
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -335,7 +554,7 @@ export default function Home() {
                 </Button>
               </Link>
               <Link href={scopedLinks.createItem} className="block">
-                <Button variant="primary" className="w-full justify-start">
+                <Button variant="secondary" className="w-full justify-start">
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
@@ -381,6 +600,115 @@ export default function Home() {
             </CardContent>
           </AnimatedCard>
         </div>
+
+        {/* Value Showcase - Only show when user has products */}
+        {!loading && stats.total > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+            {/* Storefront Status */}
+            <AnimatedCard delay={0.6} hover={false}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Your Storefront</CardTitle>
+                  <Badge variant="success">Live</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-neutral-900">{stats.active} Products Live</p>
+                      <p className="text-sm text-neutral-600">Visible to customers</p>
+                    </div>
+                  </div>
+                  {selectedTenantId && (
+                    <Link href={`/tenant/${selectedTenantId}`} target="_blank">
+                      <Button variant="secondary" className="w-full">
+                        View Storefront →
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </CardContent>
+            </AnimatedCard>
+
+            {/* Google Integration Status */}
+            <AnimatedCard delay={0.7} hover={false}>
+              <CardHeader>
+                <CardTitle className="text-lg">Google Integration</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-success rounded-lg flex items-center justify-center">
+                      <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-neutral-900">Google Shopping</p>
+                      <p className="text-sm text-neutral-600">{stats.active} products synced</p>
+                    </div>
+                  </div>
+                  <Link href={scopedLinks.settingsTenant}>
+                    <Button variant="secondary" className="w-full">
+                      Manage Integration →
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </AnimatedCard>
+
+            {/* Actionable Insights */}
+            <AnimatedCard delay={0.8} hover={false}>
+              <CardHeader>
+                <CardTitle className="text-lg">Action Items</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {stats.lowStock > 0 && (
+                    <div className="flex items-start gap-2 p-2 bg-warning-50 rounded-lg">
+                      <svg className="h-5 w-5 text-warning mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900">{stats.lowStock} items low on stock</p>
+                        <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline">
+                          Review inventory →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                  {stats.total - stats.active > 0 && (
+                    <div className="flex items-start gap-2 p-2 bg-info-50 rounded-lg">
+                      <svg className="h-5 w-5 text-info mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900">{stats.total - stats.active} inactive products</p>
+                        <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline">
+                          Activate products →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                  {stats.lowStock === 0 && stats.total === stats.active && (
+                    <div className="flex items-start gap-2 p-2 bg-success-50 rounded-lg">
+                      <svg className="h-5 w-5 text-success mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-sm font-medium text-neutral-900">Everything looks great! 🎉</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </AnimatedCard>
+          </div>
+        )}
       </main>
       
       <PublicFooter />

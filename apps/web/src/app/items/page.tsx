@@ -24,6 +24,10 @@ export default async function ItemsPage({
   
   const res = await fetch(`${apiBaseUrl}/items?tenantId=${encodeURIComponent(tenantId as string)}`, { cache: 'no-store' });
   const data = await res.json();
-  const items: Array<{ id: string; sku: string; name: string; priceCents?: number; stock?: number }> = data ?? [];
+  
+  // Handle new paginated API response format
+  const items: Array<{ id: string; sku: string; name: string; priceCents?: number; stock?: number }> = 
+    data.items ? data.items : (Array.isArray(data) ? data : []);
+  
   return <ItemsClient initialItems={items} initialTenantId={tenantId} />;
 }

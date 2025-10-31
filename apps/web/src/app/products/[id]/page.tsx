@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import ProductGallery from '@/components/products/ProductGallery';
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
+import { BackToInventoryButton } from '@/components/products/BackToInventoryButton';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';
@@ -230,11 +231,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
 
-      {/* Tier-Based Landing Page with Gallery */}
+      {/* Back to Inventory Button (for authenticated users) */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <BackToInventoryButton tenantId={product.tenantId} />
+      </div>
+
+      {/* Tier-Based Landing Page with Gallery (only if multiple images) */}
       <TierBasedLandingPage 
         product={product} 
         tenant={tenant}
-        gallery={<ProductGallery gallery={gallery} productTitle={product.title} />}
+        gallery={gallery.length > 1 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
       />
     </>
   );

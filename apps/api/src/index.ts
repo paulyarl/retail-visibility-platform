@@ -12,7 +12,7 @@ import path from "path";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import { Flags } from "./config";
-import { setRequestContext } from "./middleware/request-context";
+import { setRequestContext } from "./context";
 import { StorageBuckets } from "./storage-config";
 import { audit } from "./audit";
 import { dailyRatesJob } from "./jobs/rates";
@@ -63,6 +63,7 @@ import {
 } from './middleware/permissions';
 import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
+import platformStatsRoutes from './routes/platform-stats';
 import organizationRoutes from './routes/organizations';
 import organizationRequestRoutes from './routes/organization-requests';
 import upgradeRequestsRoutes from './routes/upgrade-requests';
@@ -994,9 +995,15 @@ console.log("✓ Photos router mounted");
 
 
 /* --------------------------- ITEMS / INVENTORY --------------------------- */
-const listQuery = z.object({ 
+const listQuery = z.object({
   tenantId: z.string().min(1),
-  count: z.string().optional() // Add count parameter for optimization
+  count: z.string().optional(), // Return only count for performance
+  page: z.string().optional(), // Page number (1-indexed)
+  limit: z.string().optional(), // Items per page
+  search: z.string().optional(), // Search by SKU or name
+  status: z.enum(['all', 'active', 'inactive', 'syncing']).optional(), // Filter by status
+  sortBy: z.enum(['name', 'sku', 'price', 'stock', 'updatedAt', 'createdAt']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 
 app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
@@ -1013,20 +1020,76 @@ app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
   }
   
   try {
-    // If count=true, return only the count for performance
+    // Build where clause
+    const where: any = { tenantId };
+    
+    // Apply search filter
+    if (parsed.data.search) {
+      const searchTerm = parsed.data.search.toLowerCase();
+      where.OR = [
+        { sku: { contains: searchTerm, mode: 'insensitive' } },
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+    
+    // Apply status filter
+    if (parsed.data.status && parsed.data.status !== 'all') {
+      if (parsed.data.status === 'active') {
+        where.itemStatus = 'active';
+      } else if (parsed.data.status === 'inactive') {
+        where.itemStatus = 'inactive';
+      } else if (parsed.data.status === 'syncing') {
+        where.AND = [
+          { OR: [{ itemStatus: 'active' }, { itemStatus: null }] },
+          { OR: [{ visibility: 'public' }, { visibility: null }] },
+        ];
+      }
+    }
+    
+    // If count=true, return only the count
     if (req.query.count === 'true') {
-      const count = await prisma.inventoryItem.count({
-        where: { tenantId: parsed.data.tenantId },
-      });
+      const count = await prisma.inventoryItem.count({ where });
       return res.json({ count });
     }
     
-    // Otherwise return full items list
-    const items = await prisma.inventoryItem.findMany({
-      where: { tenantId: parsed.data.tenantId },
-      orderBy: { updatedAt: "desc" },
+    // Parse pagination params
+    const page = parseInt(parsed.data.page || '1', 10);
+    const limit = parseInt(parsed.data.limit || '25', 10);
+    const skip = (page - 1) * limit;
+    
+    // Build orderBy clause
+    const sortBy = parsed.data.sortBy || 'updatedAt';
+    const sortOrder = parsed.data.sortOrder || 'desc';
+    const orderBy: any = {};
+    
+    if (sortBy === 'price') {
+      orderBy.priceCents = sortOrder;
+    } else {
+      orderBy[sortBy] = sortOrder;
+    }
+    
+    // Fetch items with pagination
+    const [items, totalCount] = await Promise.all([
+      prisma.inventoryItem.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      prisma.inventoryItem.count({ where }),
+    ]);
+    
+    // Return paginated response
+    res.json({
+      items,
+      pagination: {
+        page,
+        limit,
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: skip + items.length < totalCount,
+      },
     });
-    res.json(items);
   } catch (e: any) {
     console.error('[GET /items] Error listing items:', e);
     res.status(500).json({ error: "failed_to_list_items", message: e?.message });
@@ -1708,6 +1771,7 @@ app.use('/permissions', permissionRoutes);
 app.use('/users', userRoutes);
 app.use('/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
+app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
 
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);
