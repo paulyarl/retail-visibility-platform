@@ -27,9 +27,10 @@ type Tenant = {
 
 const TIERS = [
   { value: 'trial', label: 'Trial', color: 'bg-neutral-100 text-neutral-800' },
+  { value: 'google_only', label: 'Google-Only ($29/mo)', color: 'bg-green-100 text-green-800' },
   { value: 'starter', label: 'Starter ($49/mo)', color: 'bg-blue-100 text-blue-800' },
   { value: 'professional', label: 'Professional ($149/mo)', color: 'bg-purple-100 text-purple-800' },
-  { value: 'enterprise', label: 'Enterprise ($499/mo)', color: 'bg-amber-100 text-amber-800' },
+  { value: 'enterprise', label: 'Enterprise ($299/mo)', color: 'bg-amber-100 text-amber-800' },
 ];
 
 const STATUSES = [

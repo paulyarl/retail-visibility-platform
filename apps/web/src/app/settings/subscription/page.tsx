@@ -138,7 +138,7 @@ export default function SubscriptionPage() {
       }
 
       // Determine if upgrade or downgrade
-      const tierOrder = ['trial', 'starter', 'professional', 'enterprise'];
+      const tierOrder = ['trial', 'google_only', 'starter', 'professional', 'enterprise'];
       const chainTierOrder = ['chain_starter', 'chain_professional', 'chain_enterprise'];
       
       const currentIndex = isChainTier 
@@ -178,7 +178,7 @@ export default function SubscriptionPage() {
     }
   };
 
-  const availableTiers: SubscriptionTier[] = ['starter', 'professional', 'enterprise'];
+  const availableTiers: SubscriptionTier[] = ['google_only', 'starter', 'professional', 'enterprise'];
   const availableChainTiers: ChainTier[] = ['chain_starter', 'chain_professional', 'chain_enterprise'];
 
   return (
