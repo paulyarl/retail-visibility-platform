@@ -19,15 +19,7 @@ export default async function ItemsPage({
     redirect("/tenants");
   }
   
-  // Fetch directly from Railway API in SSR to avoid Vercel deployment protection
-  const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
-  
-  const res = await fetch(`${apiBaseUrl}/items?tenantId=${encodeURIComponent(tenantId as string)}`, { cache: 'no-store' });
-  const data = await res.json();
-  
-  // Handle new paginated API response format
-  const items: Array<{ id: string; sku: string; name: string; priceCents?: number; stock?: number }> = 
-    data.items ? data.items : (Array.isArray(data) ? data : []);
-  
-  return <ItemsClient initialItems={items} initialTenantId={tenantId} />;
+  // Skip SSR fetch - let client handle it with proper auth
+  // This avoids double-fetching and auth issues
+  return <ItemsClient initialItems={[]} initialTenantId={tenantId} />;
 }

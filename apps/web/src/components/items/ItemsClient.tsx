@@ -700,7 +700,27 @@ export default function ItemsClient({
             </div>
           </CardHeader>
           <CardContent>
-            {items.length === 0 ? (
+            {loading ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="p-4 border border-neutral-200 rounded-lg bg-white animate-pulse">
+                    <div className="flex items-start gap-4 mb-3">
+                      <div className="h-20 w-20 bg-neutral-200 rounded-lg"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-neutral-200 rounded w-3/4"></div>
+                        <div className="h-3 bg-neutral-200 rounded w-1/2"></div>
+                        <div className="h-3 bg-neutral-200 rounded w-2/3"></div>
+                      </div>
+                    </div>
+                    <div className="pt-3 border-t border-neutral-100 flex gap-2">
+                      <div className="h-8 bg-neutral-200 rounded w-20"></div>
+                      <div className="h-8 bg-neutral-200 rounded w-20"></div>
+                      <div className="h-8 bg-neutral-200 rounded w-20"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : items.length === 0 ? (
               <div className="text-center py-12">
                 <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />

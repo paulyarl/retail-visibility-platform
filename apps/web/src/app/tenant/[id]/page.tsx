@@ -89,15 +89,27 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch map location using utility
     const mapLocation = await getTenantMapLocation(tenantId);
 
-    // Fetch products for this tenant with optional search
+    // Fetch products for this tenant with optional search (using public endpoint)
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-    const productsRes = await fetch(`${apiBaseUrl}/items?tenantId=${tenantId}&page=${page}&limit=${limit}${searchParam}`, {
+    const productsRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/items?page=${page}&limit=${limit}${searchParam}`, {
       cache: 'no-store',
     });
 
-    const productsData = productsRes.ok ? await productsRes.json() : { items: [], total: 0 };
-    const products: Product[] = Array.isArray(productsData.items) ? productsData.items : [];
-    const total = productsData.total || 0;
+    const productsData = productsRes.ok ? await productsRes.json() : { items: [], pagination: { totalItems: 0 } };
+    // Handle both old (array) and new (paginated object) response formats
+    const rawProducts = productsData.items 
+      ? (Array.isArray(productsData.items) ? productsData.items : [])
+      : (Array.isArray(productsData) ? productsData : []);
+    
+    // Transform products: convert priceCents to price
+    const products: Product[] = rawProducts.map((p: any) => ({
+      ...p,
+      price: typeof p.price === 'number' ? p.price : (typeof p.priceCents === 'number' ? p.priceCents / 100 : 0),
+      title: p.title || p.name,
+      currency: p.currency || 'USD',
+    }));
+    
+    const total = productsData.pagination?.totalItems || productsData.total || products.length;
 
     // Fetch platform settings for footer
     let platformSettings: PlatformSettings = {};
@@ -298,7 +310,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                     )}
                     <div className="flex items-center justify-between">
                       <p className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                        {product.currency} {product.price.toFixed(2)}
+                        {product.currency} {typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
                       </p>
                       <p className="text-xs text-neutral-500">
                         SKU: {product.sku}

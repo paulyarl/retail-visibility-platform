@@ -517,6 +517,62 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
   }
 });
 
+// Public endpoint to get tenant items for storefront (no auth required)
+app.get("/public/tenant/:tenantId/items", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    if (!tenantId) return res.status(400).json({ error: "tenant_required" });
+    
+    // Parse pagination params
+    const page = parseInt(req.query.page as string || '1', 10);
+    const limit = parseInt(req.query.limit as string || '12', 10);
+    const skip = (page - 1) * limit;
+    const search = req.query.search as string;
+    
+    // Build where clause - only show active, public items
+    const where: any = { 
+      tenantId,
+      itemStatus: 'active',
+      visibility: 'public'
+    };
+    
+    // Apply search filter
+    if (search) {
+      const searchTerm = search.toLowerCase();
+      where.OR = [
+        { sku: { contains: searchTerm, mode: 'insensitive' } },
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+    
+    // Fetch items with pagination
+    const [items, totalCount] = await Promise.all([
+      prisma.inventoryItem.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.inventoryItem.count({ where }),
+    ]);
+    
+    // Return paginated response
+    res.json({
+      items,
+      pagination: {
+        page,
+        limit,
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: skip + items.length < totalCount,
+      },
+    });
+  } catch (e: any) {
+    console.error("[GET /public/tenant/:tenantId/items] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_items" });
+  }
+});
+
 // PATCH /tenant/profile - partial update
 const tenantProfileUpdateSchema = tenantProfileSchema.partial().extend({ tenant_id: z.string().min(1) });
 app.patch("/tenant/profile", authenticateToken, async (req, res) => {
