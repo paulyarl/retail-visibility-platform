@@ -21,7 +21,7 @@ USING (
   id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -33,7 +33,7 @@ USING (
   id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -51,7 +51,7 @@ USING (
   id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid() 
+    WHERE user_id = auth.uid()::text 
     AND role = 'OWNER'
   )
 );
@@ -68,7 +68,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -80,7 +80,7 @@ WITH CHECK (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -92,7 +92,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -104,7 +104,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -120,7 +120,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -132,7 +132,7 @@ WITH CHECK (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -144,7 +144,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -156,7 +156,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -172,7 +172,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -184,7 +184,7 @@ WITH CHECK (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -196,7 +196,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -208,7 +208,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -224,7 +224,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -236,7 +236,7 @@ WITH CHECK (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -248,7 +248,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -260,7 +260,7 @@ USING (
   "tenantId" IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -276,7 +276,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -288,7 +288,7 @@ WITH CHECK (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -300,7 +300,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -312,7 +312,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -328,7 +328,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -340,7 +340,7 @@ WITH CHECK (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -352,7 +352,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -364,7 +364,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -383,7 +383,7 @@ USING (
     WHERE id IN (
       SELECT tenant_id 
       FROM user_tenants 
-      WHERE user_id = auth.uid()
+      WHERE user_id = auth.uid()::text
     )
   )
 );
@@ -392,19 +392,19 @@ USING (
 CREATE POLICY "owners_update_organizations"
 ON organization
 FOR UPDATE
-USING ("ownerId" = auth.uid());
+USING ("ownerId" = auth.uid()::text);
 
 -- Only organization owners can delete
 CREATE POLICY "owners_delete_organizations"
 ON organization
 FOR DELETE
-USING ("ownerId" = auth.uid());
+USING ("ownerId" = auth.uid()::text);
 
 -- Users can create organizations
 CREATE POLICY "users_create_organizations"
 ON organization
 FOR INSERT
-WITH CHECK ("ownerId" = auth.uid());
+WITH CHECK ("ownerId" = auth.uid()::text);
 
 -- ============================================================================
 -- ORGANIZATION REQUESTS TABLE POLICIES
@@ -418,7 +418,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -430,7 +430,7 @@ WITH CHECK (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -442,7 +442,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -454,7 +454,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid()
+    WHERE user_id = auth.uid()::text
   )
 );
 
@@ -466,13 +466,13 @@ USING (
 CREATE POLICY "users_view_own_profile"
 ON users
 FOR SELECT
-USING (id = auth.uid());
+USING (id = auth.uid()::text);
 
 -- Users can update their own profile
 CREATE POLICY "users_update_own_profile"
 ON users
 FOR UPDATE
-USING (id = auth.uid());
+USING (id = auth.uid()::text);
 
 -- Admins can view all users
 CREATE POLICY "admins_view_all_users"
@@ -481,7 +481,7 @@ FOR SELECT
 USING (
   EXISTS (
     SELECT 1 FROM users 
-    WHERE id = auth.uid() 
+    WHERE id = auth.uid()::text 
     AND role = 'ADMIN'
   )
 );
@@ -500,7 +500,7 @@ WITH CHECK (true);  -- Supabase Auth handles validation
 CREATE POLICY "users_view_own_memberships"
 ON user_tenants
 FOR SELECT
-USING (user_id = auth.uid());
+USING (user_id = auth.uid()::text);
 
 -- Tenant owners can view all memberships for their tenants
 CREATE POLICY "owners_view_tenant_memberships"
@@ -510,7 +510,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid() 
+    WHERE user_id = auth.uid()::text 
     AND role = 'OWNER'
   )
 );
@@ -523,7 +523,7 @@ WITH CHECK (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid() 
+    WHERE user_id = auth.uid()::text 
     AND role = 'OWNER'
   )
 );
@@ -536,7 +536,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid() 
+    WHERE user_id = auth.uid()::text 
     AND role = 'OWNER'
   )
 );
@@ -549,7 +549,7 @@ USING (
   tenant_id IN (
     SELECT tenant_id 
     FROM user_tenants 
-    WHERE user_id = auth.uid() 
+    WHERE user_id = auth.uid()::text 
     AND role = 'OWNER'
   )
 );
@@ -558,7 +558,7 @@ USING (
 CREATE POLICY "users_leave_tenants"
 ON user_tenants
 FOR DELETE
-USING (user_id = auth.uid());
+USING (user_id = auth.uid()::text);
 
 -- ============================================================================
 -- PLATFORM SETTINGS TABLE POLICIES (Admin Only)
@@ -571,7 +571,7 @@ FOR SELECT
 USING (
   EXISTS (
     SELECT 1 FROM users 
-    WHERE id = auth.uid() 
+    WHERE id = auth.uid()::text 
     AND role = 'ADMIN'
   )
 );
@@ -583,7 +583,7 @@ FOR UPDATE
 USING (
   EXISTS (
     SELECT 1 FROM users 
-    WHERE id = auth.uid() 
+    WHERE id = auth.uid()::text 
     AND role = 'ADMIN'
   )
 );
@@ -595,7 +595,7 @@ FOR INSERT
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users 
-    WHERE id = auth.uid() 
+    WHERE id = auth.uid()::text 
     AND role = 'ADMIN'
   )
 );
@@ -607,7 +607,7 @@ FOR DELETE
 USING (
   EXISTS (
     SELECT 1 FROM users 
-    WHERE id = auth.uid() 
+    WHERE id = auth.uid()::text 
     AND role = 'ADMIN'
   )
 );
@@ -634,7 +634,7 @@ USING (
 -- ============================================================================
 -- 1. Service role key bypasses ALL RLS policies (used by Railway API)
 -- 2. These policies only apply when using anon key or user JWT
--- 3. All policies use auth.uid() which comes from Supabase Auth JWT
+-- 3. All policies use auth.uid()::text which comes from Supabase Auth JWT
 -- 4. Policies are permissive (OR logic) - if any policy allows, access granted
 -- 5. Test thoroughly before relying on RLS for security
 
