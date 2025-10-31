@@ -308,7 +308,26 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
             </div>
           </CardHeader>
           <CardContent>
-            {filteredTenants.length === 0 ? (
+            {loading ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="p-4 border border-neutral-200 rounded-lg bg-white animate-pulse">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="h-5 w-5 bg-neutral-200 rounded"></div>
+                      <div className="flex-1">
+                        <div className="h-6 bg-neutral-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-3 bg-neutral-200 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                    <div className="pt-3 border-t border-neutral-100 flex gap-2">
+                      <div className="h-8 bg-neutral-200 rounded w-28"></div>
+                      <div className="h-8 bg-neutral-200 rounded w-20"></div>
+                      <div className="h-8 bg-neutral-200 rounded w-24"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredTenants.length === 0 ? (
               <div className="text-center py-12">
                 <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />

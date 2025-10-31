@@ -1058,6 +1058,7 @@ const listQuery = z.object({
   limit: z.string().optional(), // Items per page
   search: z.string().optional(), // Search by SKU or name
   status: z.enum(['all', 'active', 'inactive', 'syncing']).optional(), // Filter by status
+  visibility: z.enum(['all', 'public', 'private']).optional(), // Filter by visibility
   sortBy: z.enum(['name', 'sku', 'price', 'stock', 'updatedAt', 'createdAt']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });
@@ -1099,6 +1100,15 @@ app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
           { OR: [{ itemStatus: 'active' }, { itemStatus: null }] },
           { OR: [{ visibility: 'public' }, { visibility: null }] },
         ];
+      }
+    }
+    
+    // Apply visibility filter
+    if (parsed.data.visibility && parsed.data.visibility !== 'all') {
+      if (parsed.data.visibility === 'public') {
+        where.visibility = 'public';
+      } else if (parsed.data.visibility === 'private') {
+        where.visibility = 'private';
       }
     }
     
