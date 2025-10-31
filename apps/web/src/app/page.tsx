@@ -123,10 +123,10 @@ export default function Home() {
   }, []);
   
   // Animated counts for metrics
-  const inventoryCount = useCountUp(0, stats.total);
-  const listingsCount = useCountUp(0, stats.active);
-  const lowStockCount = useCountUp(0, stats.lowStock);
-  const locationsCount = useCountUp(0, stats.locations);
+  const inventoryCount = useCountUp(stats.total);
+  const listingsCount = useCountUp(stats.active);
+  const lowStockCount = useCountUp(stats.lowStock);
+  const locationsCount = useCountUp(stats.locations);
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
       {/* Header */}

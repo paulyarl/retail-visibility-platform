@@ -8,7 +8,7 @@ import { proxyGet } from '@/lib/api-proxy';
 export async function GET(request: NextRequest) {
   try {
     // Get user's tenants
-    const tenantsRes = await proxyGet(request, '/api/tenants');
+    const tenantsRes = await proxyGet(request, '/tenants');
     
     if (!tenantsRes.ok) {
       return NextResponse.json({ error: 'Failed to fetch tenants' }, { status: tenantsRes.status });
@@ -38,42 +38,56 @@ export async function GET(request: NextRequest) {
       : tenants[0];
     
     // Fetch items for selected tenant
-    let itemsRes = await proxyGet(request, `/api/items?tenantId=${selectedTenant.id}`);
+    let itemsRes = await proxyGet(request, `/items?tenantId=${selectedTenant.id}`);
     let totalItems = 0;
     let activeItems = 0;
     let lowStockItems = 0;
     
     if (itemsRes.ok) {
       const items = await itemsRes.json();
+      console.log('[Dashboard] Items response:', { isArray: Array.isArray(items), type: typeof items, length: items?.length, keys: Object.keys(items || {}) });
       if (Array.isArray(items)) {
         totalItems = items.length;
         activeItems = items.filter((i: any) => i.itemStatus === 'active').length;
         lowStockItems = items.filter((i: any) => i.stock !== undefined && i.stock < 10).length;
+      } else if (items && typeof items === 'object' && 'items' in items) {
+        // Handle paginated response
+        const itemsArray = items.items;
+        if (Array.isArray(itemsArray)) {
+          totalItems = itemsArray.length;
+          activeItems = itemsArray.filter((i: any) => i.itemStatus === 'active').length;
+          lowStockItems = itemsArray.filter((i: any) => i.stock !== undefined && i.stock < 10).length;
+        }
       }
     }
     
     // If selected tenant has no items but other tenants exist, try to find one with items
     if (totalItems === 0 && tenants.length > 1) {
+      console.log('[Dashboard] Searching for tenant with items...');
       for (const tenant of tenants) {
         if (tenant.id === selectedTenant.id) continue; // Skip the one we already checked
         
-        const testItemsRes = await proxyGet(request, `/api/items?tenantId=${tenant.id}`);
+        const testItemsRes = await proxyGet(request, `/items?tenantId=${tenant.id}`);
         if (testItemsRes.ok) {
           const testItems = await testItemsRes.json();
           if (Array.isArray(testItems) && testItems.length > 0) {
             // Found a tenant with items, use it instead
+            console.log(`[Dashboard] Found tenant with ${testItems.length} items:`, tenant.name);
             selectedTenant = tenant;
             totalItems = testItems.length;
             activeItems = testItems.filter((i: any) => i.itemStatus === 'active').length;
             lowStockItems = testItems.filter((i: any) => i.stock !== undefined && i.stock < 10).length;
+            console.log(`[Dashboard] Stats: total=${totalItems}, active=${activeItems}, lowStock=${lowStockItems}`);
             break;
           }
         }
       }
     }
     
+    console.log('[Dashboard] Final stats before return:', { totalItems, activeItems, lowStockItems, tenantId: selectedTenant.id });
+    
     // Fetch tenant details
-    const tenantRes = await proxyGet(request, `/api/tenants/${selectedTenant.id}`);
+    const tenantRes = await proxyGet(request, `/tenants/${selectedTenant.id}`);
     
     let isChain = false;
     let organizationName = null;
