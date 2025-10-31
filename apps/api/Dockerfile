@@ -9,17 +9,21 @@ RUN corepack enable
 
 WORKDIR /app
 
-# Copy all source code first (needed for prisma schema in postinstall)
-COPY . .
+# Copy package files first (Railway builds from repo root)
+COPY apps/api/package.json apps/api/pnpm-lock.yaml* ./
+COPY apps/api/prisma ./prisma/
 
-# Install dependencies (without frozen lockfile since we're in a subdirectory)
+# Install dependencies
 RUN corepack enable && corepack prepare pnpm@latest --activate && pnpm install --no-frozen-lockfile
+
+# Copy source code
+COPY apps/api/ ./
 
 # Build TypeScript
 RUN pnpm build
 
-# Expose port
-EXPOSE 8080
+# Expose port (Railway uses PORT env var)
+EXPOSE ${PORT:-8080}
 
 # Start command: run migrations then start server
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
