@@ -11,7 +11,9 @@ import fs from "fs";
 import path from "path";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
-import { setRequestContext } from "./context";
+import { Flags } from "./config";
+import { setRequestContext } from "./middleware/request-context";
+import { StorageBuckets } from "./storage-config";
 import { audit } from "./audit";
 import { dailyRatesJob } from "./jobs/rates";
 import {
@@ -633,7 +635,7 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
     }
 
     let publicUrl: string;
-    const TENANT_BUCKET_NAME = process.env.TENANT_BUCKET_NAME || "photos"; // Default to photos bucket if not specified
+    const TENANT_BUCKET = StorageBuckets.TENANTS;
 
     // A) multipart/form-data "file" upload
     if (req.file) {
@@ -642,14 +644,14 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
       const pathKey = `tenants/${tenantId}/logo-${Date.now()}${ext}`;
       
       console.log(`[Logo Upload] Uploading to Supabase:`, { 
-        bucket: TENANT_BUCKET_NAME,
+        bucket: TENANT_BUCKET.name,
         pathKey, 
         size: f.size, 
         mimetype: f.mimetype 
       });
 
       const { error, data } = await supabaseLogo.storage
-        .from(TENANT_BUCKET_NAME)
+        .from(TENANT_BUCKET.name)
         .upload(pathKey, f.buffer, {
           cacheControl: "3600",
           upsert: false,
@@ -661,7 +663,7 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
         return res.status(500).json({ error: error.message, details: error });
       }
 
-      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET_NAME).getPublicUrl(data.path).data.publicUrl;
+      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET.name).getPublicUrl(data.path).data.publicUrl;
       console.log(`[Logo Upload] Supabase upload successful:`, { publicUrl });
     }
     // B) JSON { dataUrl } upload
@@ -691,14 +693,14 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
       
       const pathKey = `tenants/${tenantId}/logo-${Date.now()}${ext}`;
       console.log(`[Logo Upload] Uploading dataUrl to Supabase:`, { 
-        bucket: TENANT_BUCKET_NAME,
+        bucket: TENANT_BUCKET.name,
         pathKey, 
         size: buf.length, 
         contentType: parsed.data.contentType 
       });
 
       const { error, data } = await supabaseLogo.storage
-        .from(TENANT_BUCKET_NAME)
+        .from(TENANT_BUCKET.name)
         .upload(pathKey, buf, {
           cacheControl: "3600",
           upsert: false,
@@ -710,7 +712,7 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
         return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
       }
 
-      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET_NAME).getPublicUrl(data.path).data.publicUrl;
+      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET.name).getPublicUrl(data.path).data.publicUrl;
       console.log(`[Logo Upload] Supabase dataUrl upload successful:`, { publicUrl });
     } else {
       return res.status(400).json({ error: "unsupported_payload" });
@@ -841,7 +843,7 @@ const photoUploadHandler = async (req: any, res: any) => {
         const pathKey = `${item.tenantId}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
         console.log(`[Photo Upload] Uploading to Supabase:`, { pathKey, size: f.size, mimetype: f.mimetype });
         
-        const { error, data } = await supabase.storage.from("photos").upload(pathKey, f.buffer, {
+        const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(pathKey, f.buffer, {
           cacheControl: "3600",
           upsert: false,
           contentType: f.mimetype || "application/octet-stream",
@@ -852,7 +854,7 @@ const photoUploadHandler = async (req: any, res: any) => {
           return res.status(500).json({ error: error.message, details: error });
         }
         
-        publicUrl = supabase.storage.from("photos").getPublicUrl(data.path).data.publicUrl;
+        publicUrl = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(data.path).data.publicUrl;
         console.log(`[Photo Upload] Supabase upload successful:`, { publicUrl });
       } else if (DEV) {
         const ext = f.mimetype.includes("png") ? ".png" : f.mimetype.includes("webp") ? ".webp" : ".jpg";
@@ -907,7 +909,7 @@ const photoUploadHandler = async (req: any, res: any) => {
         const pathKey = `${item.tenantId}/${item.sku || item.id}/${Date.now()}${ext}`;
         console.log(`[Photo Upload] Uploading dataUrl to Supabase:`, { pathKey, size: buf.length, contentType: parsed.data.contentType });
         
-        const { error, data } = await supabase.storage.from("photos").upload(pathKey, buf, {
+        const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(pathKey, buf, {
           cacheControl: "3600",
           upsert: false,
           contentType: parsed.data.contentType,
@@ -918,7 +920,7 @@ const photoUploadHandler = async (req: any, res: any) => {
           return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
         }
         
-        publicUrl = supabase.storage.from("photos").getPublicUrl(data.path).data.publicUrl;
+        publicUrl = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(data.path).data.publicUrl;
         console.log(`[Photo Upload] Supabase dataUrl upload successful:`, { publicUrl });
       } else {
         // Fallback to filesystem

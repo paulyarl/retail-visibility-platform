@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { z } from 'zod';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
+import { StorageBuckets } from '../storage-config';
 
 const router = Router();
 
@@ -74,7 +75,7 @@ router.post(
         if (supabase) {
           const pathKey = `platform/logo-${Date.now()}.${logoFile.originalname.split('.').pop()}`;
           const { error, data } = await supabase.storage
-            .from('photos')
+            .from(StorageBuckets.BRANDS.name)
             .upload(pathKey, logoFile.buffer, {
               cacheControl: '3600',
               upsert: false,
@@ -86,7 +87,7 @@ router.post(
             return res.status(500).json({ error: 'logo_upload_failed' });
           }
 
-          updateData.logoUrl = supabase.storage.from('photos').getPublicUrl(data.path).data.publicUrl;
+          updateData.logoUrl = supabase.storage.from(StorageBuckets.BRANDS.name).getPublicUrl(data.path).data.publicUrl;
         } else {
           return res.status(500).json({ error: 'storage_not_configured' });
         }
@@ -98,7 +99,7 @@ router.post(
         if (supabase) {
           const pathKey = `platform/favicon-${Date.now()}.${faviconFile.originalname.split('.').pop()}`;
           const { error, data } = await supabase.storage
-            .from('photos')
+            .from(StorageBuckets.BRANDS.name)
             .upload(pathKey, faviconFile.buffer, {
               cacheControl: '3600',
               upsert: false,
@@ -110,7 +111,7 @@ router.post(
             return res.status(500).json({ error: 'favicon_upload_failed' });
           }
 
-          updateData.faviconUrl = supabase.storage.from('photos').getPublicUrl(data.path).data.publicUrl;
+          updateData.faviconUrl = supabase.storage.from(StorageBuckets.BRANDS.name).getPublicUrl(data.path).data.publicUrl;
         } else {
           return res.status(500).json({ error: 'storage_not_configured' });
         }
