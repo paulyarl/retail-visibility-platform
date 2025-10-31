@@ -89,16 +89,36 @@ const features = [
 
 const tiers = [
   {
+    name: 'Google-Only',
+    price: '$29',
+    period: '/month',
+    description: 'Get discovered on Google instantly',
+    features: [
+      'Up to 250 SKUs',
+      'Google Shopping feeds',
+      'Google Merchant Center sync',
+      'Automatic product updates',
+      'QR code generation (512px)',
+      'Basic product pages',
+      'Performance analytics',
+    ],
+    cta: 'Start Free Trial',
+    popular: false,
+    badge: 'Entry Tier',
+  },
+  {
     name: 'Starter',
     price: '$49',
     period: '/month',
     description: 'Perfect for single-location retailers',
     features: [
       'Up to 500 SKUs',
-      'Basic photo management',
-      'Google Merchant Center sync',
-      'Email support',
-      'Basic analytics',
+      'Complete storefront with catalog',
+      'Product search functionality',
+      'Mobile-responsive design',
+      'Google Shopping feeds',
+      '512px QR codes',
+      'Enhanced SEO optimization',
     ],
     cta: 'Start Free Trial',
     popular: false,
@@ -109,13 +129,15 @@ const tiers = [
     period: '/month',
     description: 'Ideal for growing retail businesses',
     features: [
-      'Up to 2,500 SKUs',
-      'Advanced photo tools',
-      'Google Business Profile',
-      'Priority support',
-      'Advanced analytics',
-      'Custom landing pages',
-      'Multi-location support',
+      'Up to 5,000 SKUs',
+      'Enhanced storefront with branding',
+      'Google Business Profile integration',
+      'Interactive store location maps',
+      'Privacy mode for location',
+      '1024px QR codes',
+      'Business logo display',
+      'Product image galleries (5 photos)',
+      'Custom marketing copy',
     ],
     cta: 'Start Free Trial',
     popular: true,
@@ -127,13 +149,13 @@ const tiers = [
     description: 'For large retail operations',
     features: [
       'Unlimited SKUs',
-      'White-label branding',
-      'Dedicated account manager',
-      '24/7 phone support',
-      'Custom integrations',
-      'API access',
-      'Advanced security',
-      'SLA guarantee',
+      'White-label storefront',
+      'Custom domain for storefront',
+      'Advanced map customization',
+      '2048px QR codes',
+      'Product image galleries (10 photos)',
+      'Custom branding & colors',
+      'Priority support',
     ],
     cta: 'Contact Sales',
     popular: false,
@@ -188,11 +210,11 @@ export default function FeaturesPage() {
           >
             <Badge className="mb-4">Trusted by 1,500+ Retailers</Badge>
             <h1 className="text-5xl md:text-6xl font-bold text-neutral-900 mb-6">
-              Everything You Need to<br />
-              <span className="text-primary-600">Grow Your Retail Business</span>
+              Complete Online Presence<br />
+              <span className="text-primary-600">In Minutes, Not Months</span>
             </h1>
             <p className="text-xl text-neutral-600 mb-8 max-w-3xl mx-auto">
-              Streamline inventory management, boost online visibility, and increase sales with our all-in-one retail platform.
+              Everything you need to dominate local search and drive customers to your store. No website developer needed.
             </p>
             <div className="flex items-center justify-center gap-4">
               <Link href="/login">
@@ -203,6 +225,78 @@ export default function FeaturesPage() {
               </Link>
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* What You Get Overview */}
+      <section className="py-16 bg-white border-b border-neutral-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold text-neutral-900 mb-4 text-center">Complete Online Presence Solution</h2>
+          <p className="text-lg text-neutral-600 mb-8 text-center max-w-3xl mx-auto">
+            Everything you need to dominate local search and drive customers to your store
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Storefront */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-lg p-6">
+              <div className="text-4xl mb-3">🏪</div>
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">Complete Storefront</h3>
+              <ul className="space-y-1 text-sm text-neutral-700">
+                <li>• Product catalog with search</li>
+                <li>• Mobile-responsive design</li>
+                <li>• Interactive store maps</li>
+                <li>• Automatic SEO optimization</li>
+              </ul>
+              <div className="mt-3 pt-3 border-t border-blue-300">
+                <span className="text-xs font-semibold text-blue-800">No website developer needed!</span>
+              </div>
+            </div>
+
+            {/* Google Integration */}
+            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-lg p-6">
+              <div className="text-4xl mb-3">🔍</div>
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">Google Integration Suite</h3>
+              <ul className="space-y-1 text-sm text-neutral-700">
+                <li>• Google Shopping feeds</li>
+                <li>• Business Profile sync</li>
+                <li>• Google Maps integration</li>
+                <li>• Local SEO optimization</li>
+              </ul>
+              <div className="mt-3 pt-3 border-t border-green-300">
+                <span className="text-xs font-semibold text-green-800">Dominate local search!</span>
+              </div>
+            </div>
+
+            {/* QR Marketing */}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-lg p-6">
+              <div className="text-4xl mb-3">📱</div>
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">QR Code Marketing</h3>
+              <ul className="space-y-1 text-sm text-neutral-700">
+                <li>• High-res QR codes</li>
+                <li>• Print-ready formats</li>
+                <li>• Product-specific codes</li>
+                <li>• Trackable campaigns</li>
+              </ul>
+              <div className="mt-3 pt-3 border-t border-purple-300">
+                <span className="text-xs font-semibold text-purple-800">Bridge print to digital!</span>
+              </div>
+            </div>
+
+            {/* Analytics */}
+            <div className="bg-gradient-to-br from-amber-50 to-amber-100 border-2 border-amber-200 rounded-lg p-6">
+              <div className="text-4xl mb-3">📊</div>
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">Performance Analytics</h3>
+              <ul className="space-y-1 text-sm text-neutral-700">
+                <li>• Impression tracking</li>
+                <li>• Click analytics</li>
+                <li>• Product performance</li>
+                <li>• ROI measurement</li>
+              </ul>
+              <div className="mt-3 pt-3 border-t border-amber-300">
+                <span className="text-xs font-semibold text-amber-800">Data-driven decisions!</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -245,6 +339,87 @@ export default function FeaturesPage() {
                 </ul>
               </motion.div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 30-Day Trial Section */}
+      <section className="py-16 bg-gradient-to-r from-green-50 to-emerald-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white border-2 border-green-200 rounded-xl p-8 shadow-lg">
+            <div className="flex items-start gap-6">
+              <div className="text-6xl">🆓</div>
+              <div className="flex-1">
+                <h2 className="text-3xl font-bold text-neutral-900 mb-3">30-Day Free Trial</h2>
+                <p className="text-lg text-neutral-700 mb-6">
+                  Try our platform risk-free with full access to all Professional features. No credit card required.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <h3 className="font-semibold text-neutral-900 mb-3">What's Included:</h3>
+                    <ul className="space-y-2 text-sm">
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>Full access to all Professional features</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>5,000 SKU limit</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>1024px QR codes</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>Enhanced landing pages</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>Google Shopping integration</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">✓</span>
+                        <span>Google Business Profile sync</span>
+                      </li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-semibold text-neutral-900 mb-3">Terms & Conditions:</h3>
+                    <ul className="space-y-2 text-sm text-neutral-700">
+                      <li className="flex items-start gap-2">
+                        <span className="text-neutral-400 mt-0.5">•</span>
+                        <span>30 days from account creation</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-neutral-400 mt-0.5">•</span>
+                        <span>No credit card required to start</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-neutral-400 mt-0.5">•</span>
+                        <span>Automatically converts to Starter plan after trial</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-neutral-400 mt-0.5">•</span>
+                        <span>You can upgrade to any paid plan during trial</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-neutral-400 mt-0.5">•</span>
+                        <span>Cancel anytime with no charges</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                
+                <div className="bg-green-50 border border-green-300 rounded-lg p-4">
+                  <p className="text-sm text-neutral-800">
+                    <strong>💡 Pro Tip:</strong> Use the trial period to upload your inventory, test QR codes, and see how our platform drives traffic to your business before committing to a paid plan.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -295,7 +470,7 @@ export default function FeaturesPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {tiers.map((tier, index) => (
               <motion.div
                 key={tier.name}
@@ -335,19 +510,140 @@ export default function FeaturesPage() {
             ))}
           </div>
 
-          {/* Chain Pricing Note */}
-          <div className="mt-12 text-center">
-            <div className="inline-flex items-start gap-3 bg-white border border-neutral-200 rounded-lg p-6 max-w-2xl">
-              <svg className="w-6 h-6 text-primary-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              <div className="text-left">
-                <p className="font-semibold text-neutral-900 mb-1">Multi-Location Chains</p>
-                <p className="text-sm text-neutral-600">
-                  Running multiple locations? We offer special pricing for retail chains with centralized management, 
-                  shared SKU pools, and organization-wide analytics. <Link href="/settings/contact" className="text-primary-600 hover:text-primary-700 font-medium">Contact sales</Link> for custom pricing.
-                </p>
+          {/* Chain Pricing Section */}
+          <div className="mt-16">
+            <div className="text-center mb-8">
+              <h3 className="text-3xl font-bold text-neutral-900 mb-3">
+                Multi-Location Chain Pricing
+              </h3>
+              <p className="text-lg text-neutral-600 max-w-2xl mx-auto">
+                Massive savings for chains and franchises. Same great features, better pricing.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Chain Starter */}
+              <div className="bg-white border-2 border-neutral-200 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xl font-bold text-neutral-900">Chain Starter</h4>
+                  <Badge className="bg-blue-100 text-blue-800">$149/mo</Badge>
+                </div>
+                <p className="text-sm text-neutral-600 mb-4">Up to 5 locations • 2,500 total SKUs</p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>All Starter features per location</span>
+                  </li>
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Centralized management</span>
+                  </li>
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Shared SKU pool</span>
+                  </li>
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Organization-wide analytics</span>
+                  </li>
+                </ul>
+                <div className="mt-4 pt-4 border-t border-neutral-200">
+                  <p className="text-xs text-green-700 font-semibold">Save 39% vs individual plans</p>
+                </div>
               </div>
+
+              {/* Chain Professional */}
+              <div className="bg-white border-2 border-primary-500 rounded-xl p-6 shadow-lg relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-green-500 text-white">BEST VALUE</Badge>
+                </div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xl font-bold text-neutral-900">Chain Professional</h4>
+                  <Badge className="bg-purple-100 text-purple-800">$499/mo</Badge>
+                </div>
+                <p className="text-sm text-neutral-600 mb-4">Up to 10 locations • 50,000 total SKUs</p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>All Professional features per location</span>
+                  </li>
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Google Business Profile for all</span>
+                  </li>
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Interactive maps for each location</span>
+                  </li>
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Consistent branding across all stores</span>
+                  </li>
+                </ul>
+                <div className="mt-4 pt-4 border-t border-neutral-200">
+                  <p className="text-xs text-green-700 font-semibold">Save 66% vs individual plans ($1,490 → $499)</p>
+                </div>
+              </div>
+
+              {/* Chain Enterprise */}
+              <div className="bg-white border-2 border-neutral-200 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xl font-bold text-neutral-900">Chain Enterprise</h4>
+                  <Badge className="bg-amber-100 text-amber-800">$1,499/mo</Badge>
+                </div>
+                <p className="text-sm text-neutral-600 mb-4">Unlimited locations • Unlimited SKUs</p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>All Enterprise features per location</span>
+                  </li>
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>White-label for all locations</span>
+                  </li>
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Custom domains for each store</span>
+                  </li>
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Dedicated account manager</span>
+                  </li>
+                </ul>
+                <div className="mt-4 pt-4 border-t border-neutral-200">
+                  <p className="text-xs text-neutral-600 font-semibold">Perfect for large chains</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+              <p className="text-sm text-green-900">
+                <strong>Example Savings:</strong> 10-location chain saves 66% ($1,490/mo → $499/mo with Chain Professional)
+              </p>
             </div>
           </div>
         </div>
