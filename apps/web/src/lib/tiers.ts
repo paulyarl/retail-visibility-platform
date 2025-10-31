@@ -3,7 +3,7 @@
  * Centralized tier configuration for the platform
  */
 
-export type SubscriptionTier = 'trial' | 'starter' | 'professional' | 'enterprise';
+export type SubscriptionTier = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise';
 
 export interface TierLimits {
   name: string;
@@ -26,26 +26,42 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
       '500 SKUs',
       'Google Shopping integration',
       '512px QR codes',
-      'Basic landing pages',
-      'Product descriptions',
-      'Multi-language support',
+      'Basic product pages',
+      'Performance analytics',
     ],
     color: 'bg-neutral-100 text-neutral-900',
+  },
+  google_only: {
+    name: 'Google-Only',
+    price: '$29/month',
+    pricePerMonth: 29,
+    maxSKUs: 250,
+    description: 'Get discovered on Google',
+    features: [
+      '250 SKUs',
+      'Google Shopping feeds',
+      'Google Merchant Center sync',
+      '512px QR codes',
+      'Basic product pages',
+      'Performance analytics',
+      'No storefront',
+    ],
+    color: 'bg-green-100 text-green-900',
   },
   starter: {
     name: 'Starter',
     price: '$49/month',
     pricePerMonth: 49,
     maxSKUs: 500,
-    description: 'Perfect for small stores getting started',
+    description: 'Get started with the basics',
     features: [
       '500 SKUs',
-      'Google Shopping integration',
+      'Public storefront with product catalog',
+      'Product search functionality',
       '512px QR codes',
-      'Basic landing pages',
-      'Product descriptions',
-      'Multi-language support',
-      'Email support',
+      'Google Shopping feeds',
+      'Basic product pages',
+      'Platform branding',
     ],
     color: 'bg-blue-100 text-blue-900',
   },
@@ -53,41 +69,40 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     name: 'Professional',
     price: '$149/month',
     pricePerMonth: 149,
-    maxSKUs: 5000,
-    description: 'Enhanced features for growing businesses',
+    maxSKUs: 2000,
+    description: 'Everything you need to grow',
     features: [
-      '5,000 SKUs',
-      'Google Shopping integration',
-      '1024px QR codes',
-      'Enhanced landing pages',
-      'Business logo display',
+      '2,000 SKUs',
+      'Everything in Starter',
+      '1024px QR codes (print-ready)',
+      'Custom branding & logo',
       'Custom marketing copy',
       'Image galleries (5 photos)',
+      'Interactive store location maps',
+      'Privacy mode for location display',
       'Custom CTAs & social links',
-      'Multi-language support',
-      'Priority email support',
+      'Priority support',
     ],
     color: 'bg-purple-100 text-purple-900',
   },
   enterprise: {
     name: 'Enterprise',
-    price: '$499/month',
-    pricePerMonth: 499,
-    maxSKUs: Infinity,
-    description: 'Full customization and white-label options',
+    price: '$299/month',
+    pricePerMonth: 299,
+    maxSKUs: 10000,
+    description: 'Maximum features and customization',
     features: [
-      'Unlimited SKUs',
-      'Google Shopping integration',
-      '2048px QR codes',
-      'Fully custom landing pages',
-      'Custom branding & colors',
+      '10,000 SKUs',
+      'Everything in Professional',
+      '2048px QR codes (billboard-ready)',
       'Remove platform branding',
+      'White-label storefront',
       'Image galleries (10 photos)',
-      'Custom sections & themes',
-      'Multi-language support',
+      'Advanced analytics',
+      'Custom domain support',
+      'API access',
       'Dedicated account manager',
       'SLA guarantee',
-      'API access',
     ],
     color: 'bg-amber-100 text-amber-900',
   },
@@ -130,7 +145,8 @@ export function needsUpgrade(tier: SubscriptionTier | string | null | undefined,
  * Get recommended tier based on SKU count
  */
 export function getRecommendedTier(skuCount: number): SubscriptionTier {
+  if (skuCount <= 250) return 'google_only';
   if (skuCount <= 500) return 'starter';
-  if (skuCount <= 5000) return 'professional';
+  if (skuCount <= 2000) return 'professional';
   return 'enterprise';
 }

@@ -52,8 +52,8 @@ export const CHAIN_TIERS: Record<ChainTier, ChainTierLimits> = {
   },
   chain_enterprise: {
     name: 'Chain Enterprise',
-    price: '$999/month',
-    pricePerMonth: 999,
+    price: '$899/month',
+    pricePerMonth: 899,
     maxLocations: Infinity,
     maxTotalSKUs: Infinity,
     features: [
@@ -125,7 +125,7 @@ export function calculateSavings(numLocations: number, individualTier: 'starter'
   const individualPrices = {
     starter: 49,
     professional: 149,
-    enterprise: 499,
+    enterprise: 299, // updated price
   };
 
   const individualCost = numLocations * individualPrices[individualTier];
