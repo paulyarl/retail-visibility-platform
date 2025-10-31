@@ -49,7 +49,9 @@ export default function Home() {
     if (!isAuthenticated && !authLoading) {
       const fetchPlatformStats = async () => {
         try {
-          const response = await api.get('/api/platform-stats');
+          // Call backend API directly (public endpoint, no auth needed)
+          const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+          const response = await fetch(`${API_BASE_URL}/api/platform-stats`);
           if (response.ok) {
             const data = await response.json();
             setPlatformStats(data);
@@ -362,8 +364,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* Empty State */}
-        {!loading && stats.total === 0 && (
+        {/* Empty State - Only show for authenticated users */}
+        {!loading && isAuthenticated && stats.total === 0 && (
           <Card className="col-span-full text-center p-12 mb-8">
             <div className="max-w-md mx-auto">
               <div className="text-6xl mb-4">🏪</div>
@@ -519,13 +521,15 @@ export default function Home() {
         </div>
         )}
 
-        {/* Quick Actions */}
+        {/* Quick Actions - Different for authenticated vs visitors */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <AnimatedCard delay={0.4} hover={false}>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Get started with common tasks</CardDescription>
-            </CardHeader>
+          {isAuthenticated ? (
+            <>
+            <AnimatedCard delay={0.4} hover={false}>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+                <CardDescription>Get started with common tasks</CardDescription>
+              </CardHeader>
             <CardContent className="space-y-3">
               {selectedTenantId && (
                 <Link href={`/tenant/${selectedTenantId}`} className="block" target="_blank">
@@ -599,6 +603,84 @@ export default function Home() {
               </Link>
             </CardContent>
           </AnimatedCard>
+          </>
+          ) : (
+            // Visitor Quick Actions
+            <>
+              <AnimatedCard delay={0.4} hover={false}>
+                <CardHeader>
+                  <CardTitle>Why Choose Us?</CardTitle>
+                  <CardDescription>Everything you need to succeed online</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-neutral-900">Instant Google Visibility</p>
+                      <p className="text-sm text-neutral-600">Get your products on Google Shopping automatically</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-neutral-900">Beautiful Storefront</p>
+                      <p className="text-sm text-neutral-600">Professional online store, no coding required</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-info flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-neutral-900">Easy Management</p>
+                      <p className="text-sm text-neutral-600">Update inventory from one simple dashboard</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </AnimatedCard>
+
+              <AnimatedCard delay={0.5} hover={false}>
+                <CardHeader>
+                  <CardTitle>Get Started Today</CardTitle>
+                  <CardDescription>Join retailers already using our platform</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Link href="/register" className="block">
+                    <Button variant="primary" className="w-full justify-start" size="lg">
+                      <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                      </svg>
+                      Create Free Account
+                    </Button>
+                  </Link>
+                  <Link href="/login" className="block">
+                    <Button variant="secondary" className="w-full justify-start">
+                      <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                      </svg>
+                      Sign In
+                    </Button>
+                  </Link>
+                  <div className="pt-4 border-t border-neutral-200">
+                    <p className="text-sm text-neutral-600 mb-2">Questions?</p>
+                    <Link href="/contact" className="text-sm text-primary-600 hover:underline">
+                      Contact our team →
+                    </Link>
+                  </div>
+                </CardContent>
+              </AnimatedCard>
+            </>
+          )}
         </div>
 
         {/* Value Showcase - Only show when user has products */}

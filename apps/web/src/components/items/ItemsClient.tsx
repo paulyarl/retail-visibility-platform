@@ -129,7 +129,12 @@ export default function ItemsClient({
   // Items are already filtered and paginated from the API
   const paginatedItems = Array.isArray(items) ? items : [];
 
-  const isV2 = isFeatureEnabled('FF_ITEMS_V2_GRID', tenantId);
+  const [isV2, setIsV2] = useState(false);
+  
+  useEffect(() => {
+    // Evaluate feature flag on client only to avoid hydration mismatch
+    setIsV2(isFeatureEnabled('FF_ITEMS_V2_GRID', tenantId));
+  }, [tenantId]);
 
   // Reset to page 1 when search changes
   useEffect(() => {
@@ -684,7 +689,16 @@ export default function ItemsClient({
 
         {/* Items List */}
         {isV2 ? (
-          <ItemsGridV2 items={items as any} />
+          <ItemsGridV2 
+            items={items as any}
+            onEdit={handleEditClick}
+            onStatusToggle={handleStatusToggle}
+            onVisibilityToggle={handleVisibilityToggle}
+            onViewPhotos={(item) => {
+              setGalleryItem(item);
+              setShowPhotoGallery(true);
+            }}
+          />
         ) : (
           <Card>
           <CardHeader>

@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import TenantSwitcher from "./TenantSwitcher";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  const { settings } = usePlatformSettings();
   const [enabled, setEnabled] = useState<boolean>(false);
   const [links, setLinks] = useState<{ dashboard: string; inventory: string; tenants: string; settings: string }>({
     dashboard: "/",
@@ -66,7 +68,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [tenantName]);
 
-  if (!enabled) {
+  // Don't show AppShell if feature flag is disabled OR user is not authenticated
+  if (!enabled || !user) {
     return <>{children}</>;
   }
 
@@ -75,7 +78,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-neutral-900">RVP</span>
+            <span className="text-sm font-semibold text-neutral-900">
+              {settings?.platformName || 'RVP'}
+            </span>
             {hydrated ? (
               tenantName ? (
                 <span className="text-sm text-neutral-500">· {tenantName}</span>
