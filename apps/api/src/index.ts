@@ -18,6 +18,7 @@ import { StorageBuckets } from "./storage-config";
 import { audit, ensureAuditTable } from "./audit";
 import { dailyRatesJob } from "./jobs/rates";
 import { ensureFeedCategoryView } from "./views";
+import { triggerRevalidate } from "./utils/revalidate";
 import {
   getAuthorizationUrl,
   decodeState,
@@ -1911,6 +1912,8 @@ app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) =
       });
     } catch {}
 
+    // ISR revalidation (best-effort)
+    triggerRevalidate(tenantId).catch(() => {})
     return res.json({ success: true, data: updated });
   } catch (e) {
     console.error('[PATCH /api/v1/tenants/:tenantId/items/:itemId/category] Error:', e);

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { audit } from '../audit';
+import { triggerRevalidate } from '../utils/revalidate';
 
 const router = Router();
 
@@ -260,6 +261,8 @@ router.post('/:tenantId/categories', async (req, res) => {
       success: true,
       data: category,
     });
+    // ISR revalidation (best-effort)
+    triggerRevalidate(tenantId).catch(() => {})
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -364,6 +367,8 @@ router.put('/:tenantId/categories/:id', async (req, res) => {
       success: true,
       data: category,
     });
+    // ISR revalidation (best-effort)
+    triggerRevalidate(tenantId).catch(() => {})
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -459,6 +464,8 @@ router.delete('/:tenantId/categories/:id', async (req, res) => {
       success: true,
       message: 'Category deleted successfully',
     });
+    // ISR revalidation (best-effort)
+    triggerRevalidate(tenantId).catch(() => {})
   } catch (error) {
     console.error('Error deleting category:', error);
     res.status(500).json({
@@ -531,6 +538,8 @@ router.post('/:tenantId/categories/:id/align', async (req, res) => {
       },
       message: 'Category aligned successfully',
     });
+    // ISR revalidation (best-effort)
+    triggerRevalidate(tenantId).catch(() => {})
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
