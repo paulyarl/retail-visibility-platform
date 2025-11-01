@@ -2,6 +2,69 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model PlatformFeatureFlag {
+  id                  String   @id @default(cuid())
+  flag                String   @unique
+  enabled             Boolean  @default(false)
+  rollout             String?
+  allowTenantOverride Boolean  @default(false) @map("allow_tenant_override")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_feature_flags")
+}
+
+model TenantFeatureFlag {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  flag      String
+  enabled   Boolean  @default(false)
+  rollout   String?  // optional notes like cohort/bucket
+  updatedAt DateTime @updatedAt @map("updated_at")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, flag])
+  @@index([tenantId])
+  @@map("tenant_feature_flags")
+}
+
+// Business Hours (platform is source of truth)
+model BusinessHours {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  timezone      String   @default("America/New_York")
+  periods       Json     @default("[]")
+  sourceHash    String?  @map("source_hash")
+  lastSyncedAt  DateTime? @map("last_synced_at")
+  syncAttempts  Int      @default(0) @map("sync_attempts")
+  lastError     String?  @map("last_error")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId])
+  @@index([tenantId])
+  @@map("business_hours")
+}
+
+model BusinessHoursSpecial {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  date         DateTime @db.Date
+  isClosed     Boolean  @default(false) @map("is_closed")
+  open         String?  // HH:mm
+  close        String?  // HH:mm
+  note         String?
+  sourceHash   String?  @map("source_hash")
+  lastSyncedAt DateTime? @map("last_synced_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, date], name: "tenantId_date")
+  @@index([tenantId, date])
+  @@map("business_hours_special")
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -37,6 +100,9 @@ model Tenant {
   googleOAuthAccounts   GoogleOAuthAccount[]
   organizationRequests  OrganizationRequest[] // Requests to join organizations
   businessProfile       TenantBusinessProfile?
+  businessHours         BusinessHours?
+  businessHoursSpecials BusinessHoursSpecial[]
+  featureFlags          TenantFeatureFlag[]
 
   @@index([name])
   @@index([subscriptionStatus])

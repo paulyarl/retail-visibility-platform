@@ -1,3 +1,13 @@
+  // Redirect to canonical tenant-scoped settings if a tenant is selected
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const id = localStorage.getItem('tenantId');
+    const override = localStorage.getItem('ff_tenant_urls') === 'on';
+    if (id && (override || true)) {
+      // Prefer canonical route; this avoids duplicate settings variants
+      window.location.replace(`/t/${encodeURIComponent(id)}/settings`);
+    }
+  }, []);
 "use client";
 
 import { useEffect, useState } from "react";

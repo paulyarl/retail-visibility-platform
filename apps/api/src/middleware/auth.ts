@@ -135,3 +135,59 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
 export function getTenantId(req: Request): string | null {
   return (req.query.tenantId as string) || (req.user?.tenantIds && req.user.tenantIds[0]) || null;
 }
+
+/**
+ * Middleware to check if user is a tenant owner/admin or platform admin
+ * Used for sensitive tenant operations like managing feature flags
+ * Allows: Platform ADMIN (global), or users with OWNER/ADMIN role within the specific tenant
+ */
+export async function requireTenantOwner(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
+  }
+
+  // Platform admins can manage any tenant
+  if (req.user.role === UserRole.ADMIN) {
+    return next();
+  }
+
+  // Get tenant ID from request
+  const tenantId = req.params.tenantId || req.params.id || req.query.tenantId || req.body.tenantId;
+
+  if (!tenantId) {
+    return res.status(400).json({ error: 'tenant_id_required', message: 'Tenant ID is required' });
+  }
+
+  // Check if user has access to this tenant and their role within it
+  try {
+    const { prisma } = await import('../prisma');
+    const userTenant = await prisma.userTenant.findUnique({
+      where: {
+        userId_tenantId: {
+          userId: req.user.userId,
+          tenantId: tenantId as string,
+        },
+      },
+    });
+
+    if (!userTenant) {
+      return res.status(403).json({ 
+        error: 'tenant_access_denied', 
+        message: 'You do not have access to this tenant' 
+      });
+    }
+
+    // Must be OWNER or ADMIN role within the tenant to manage settings
+    if (userTenant.role !== 'OWNER' && userTenant.role !== 'ADMIN') {
+      return res.status(403).json({ 
+        error: 'owner_or_admin_required', 
+        message: 'Only tenant owners/admins can manage feature flags' 
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('[requireTenantOwner] Error checking tenant access:', error);
+    return res.status(500).json({ error: 'authorization_check_failed' });
+  }
+}

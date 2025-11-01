@@ -378,9 +378,9 @@ export default function AdminTenantsPage() {
                         size="sm" 
                         variant="secondary"
                         onClick={() => {
-                          // Store tenant ID and navigate to tenant settings
+                          // Store tenant ID and navigate to tenant-scoped settings
                           localStorage.setItem('tenantId', tenant.id);
-                          window.location.href = '/settings/tenant';
+                          window.location.href = `/t/${tenant.id}/settings`;
                         }}
                       >
                         View Details

@@ -60,7 +60,7 @@ export default async function TenantLayout({ children, params }: { children: Rea
     ...(ffCategoryMgmt ? [{ label: 'Categories', href: `/t/${tenantId}/categories` }] as const : []),
     { label: 'Feed Validation', href: `/t/${tenantId}/feed-validation` },
     { label: 'Profile Completeness', href: `/t/${tenantId}/profile-completeness` },
-    { label: 'Settings', href: `/t/${tenantId}/settings/tenant` },
+    { label: 'Settings', href: `/t/${tenantId}/settings` },
   ];
 
   return (

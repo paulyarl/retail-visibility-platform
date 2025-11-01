@@ -22,7 +22,7 @@ type SettingsGroup = {
   cards: SettingCard[];
 };
 
-export default function SettingsPage() {
+export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmin?: boolean; tenantId?: string } = {}) {
   const router = useRouter();
 
   const settingsGroups: SettingsGroup[] = [
@@ -120,7 +120,7 @@ export default function SettingsPage() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
       ),
-      href: '/settings/tenant',
+      href: '/tenants',
       color: 'bg-blue-500',
     },
         {
@@ -147,6 +147,33 @@ export default function SettingsPage() {
           color: 'bg-orange-500',
           badge: 'Chain',
         },
+        // Tenant Administration cards (only when tenantId is provided)
+        ...(tenantId ? [
+          {
+            title: 'Feature Flags',
+            description: 'Control per-tenant features',
+            icon: (
+              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+              </svg>
+            ),
+            href: `/admin/tenants/${tenantId}/flags`,
+            color: 'bg-purple-500',
+            adminOnly: true,
+            badge: 'Admin',
+          },
+          {
+            title: 'Business Hours',
+            description: 'Manage hours and special days',
+            icon: (
+              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ),
+            href: `/t/${tenantId}/settings/hours`,
+            color: 'bg-green-500',
+          },
+        ] : []) as SettingCard[],
       ],
     },
     {
@@ -226,6 +253,8 @@ export default function SettingsPage() {
     },
   ];
 
+  const displayGroups = hideAdmin ? settingsGroups.filter(g => !g.adminOnly) : settingsGroups;
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
@@ -241,7 +270,7 @@ export default function SettingsPage() {
 
         {/* Settings Groups */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
-          {settingsGroups.map((group, groupIndex) => (
+          {displayGroups.map((group, groupIndex) => (
             <div key={group.title}>
               {/* Group Header */}
               <div className="mb-6">
@@ -274,7 +303,7 @@ export default function SettingsPage() {
                           if (setting.href === '/tenants/users') {
                             router.push(`/tenants/${tenantId}/users`);
                           } else {
-                            router.push(setting.href);
+                            router.push(`/t/${tenantId}/settings`);
                           }
                         } else {
                           router.push('/tenants');
@@ -337,7 +366,7 @@ export default function SettingsPage() {
                     // Check if tenant is selected
                     const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
                     if (tenantId) {
-                      router.push('/settings/tenant');
+                      router.push(`/t/${tenantId}/settings`);
                     } else {
                       // Redirect to tenants page to select one first
                       router.push('/tenants');

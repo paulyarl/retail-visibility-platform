@@ -36,7 +36,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         dashboard: `/t/${tenantId}/dashboard`,
         inventory: `/t/${tenantId}/items`,
         tenants: "/tenants",
-        settings: `/t/${tenantId}/settings/tenant`,
+        settings: `/t/${tenantId}/settings`,
       });
     } else {
       setLinks({ dashboard: "/", inventory: "/items", tenants: "/tenants", settings: "/settings" });

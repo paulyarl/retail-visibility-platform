@@ -37,8 +37,13 @@ function OnboardingContent() {
       localStorage.setItem('tenantId', tenantId!);
     }
     
-    // Redirect to tenant settings page
-    router.push('/settings/tenant');
+    // Redirect to canonical tenant-scoped settings page
+    const id = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+    if (id) {
+      router.push(`/t/${id}/settings`);
+    } else {
+      router.push('/tenants');
+    }
   };
 
   if (loading) {

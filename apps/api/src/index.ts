@@ -21,6 +21,10 @@ import { ensureFeedCategoryView } from "./views";
 import { triggerRevalidate } from "./utils/revalidate";
 import { categoryService } from "./services/CategoryService";
 import businessHoursRoutes from './routes/business-hours';
+import { runGbpHoursSync } from './jobs/gbpHoursSync';
+import tenantFlagsRoutes from './routes/tenant-flags';
+import platformFlagsRoutes from './routes/platform-flags';
+import { authenticateToken, requireAdmin } from './middleware/auth';
 import {
   getAuthorizationUrl,
   decodeState,
@@ -1867,6 +1871,11 @@ app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
 app.use('/api', feedValidationRoutes);
 app.use('/api', businessProfileValidationRoutes);
 app.use('/api', businessHoursRoutes);
+// Tenant flags: accessible by platform admins OR store owners of that specific tenant
+app.use('/admin', authenticateToken, tenantFlagsRoutes);
+app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
+app.use('/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
+app.use('/api/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
 
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenantId/items/:itemId/category
@@ -1929,4 +1938,39 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 // Export the app for testing
-export { app };
+export default app;
+
+/* ------------------------------ GBP Hours runner (flag-gated) ------------------------------ */
+
+(async function startGbpHoursRunner(){
+  const enabled = String(process.env.FF_TENANT_GBP_HOURS_SYNC || '').toLowerCase() === 'true'
+  if (!enabled) return
+  let running = false
+  setInterval(async () => {
+    if (running) return
+    running = true
+    try {
+      // pick one queued job
+      const job = await prisma.syncJob.findFirst({
+        where: { target: 'gbp_hours', status: 'queued' },
+        orderBy: { createdAt: 'asc' },
+      })
+      if (!job) return
+
+      // mark processing
+      await prisma.syncJob.update({ where: { id: job.id }, data: { status: 'processing', attempt: (job.attempt || 0) + 1, lastError: null } })
+
+      const result = await runGbpHoursSync({ tenantId: job.tenantId })
+      if ((result as any)?.ok) {
+        await prisma.syncJob.update({ where: { id: job.id }, data: { status: 'success' } })
+      } else {
+        const attempt = (job.attempt || 0) + 1
+        await prisma.syncJob.update({ where: { id: job.id }, data: { status: 'queued', attempt, lastError: String((result as any)?.error || 'unknown') } })
+      }
+    } catch (e) {
+      // swallow
+    } finally {
+      running = false
+    }
+  }, 5000)
+})()

@@ -1,76 +1,98 @@
 import { Router } from 'express'
+import { prisma } from '../prisma'
+import { requireFlag } from '../middleware/flags'
 
 const router = Router()
 
-const FF = String(process.env.FF_TENANT_GBP_HOURS_SYNC || '').toLowerCase() === 'true'
-
-// In-memory store for dev stub (persists per-process)
-const hoursStore = new Map<string, { timezone: string; periods: any[]; special: any[] }>()
-const mirrorStatus = new Map<string, { in_sync: boolean; last_synced_at?: string; attempts: number; last_error?: string }>()
-
-function requireFlag(res: any) {
-  if (!FF) {
-    res.status(404).json({ error: 'not_enabled' })
-    return false
-  }
-  return true
-}
+// Mirror status (attempt counter). Persistence is reflected in BusinessHours rows.
+const mirrorAttempts = new Map<string, number>()
 
 // GET /api/tenant/:tenantId/business-hours
-router.get('/tenant/:tenantId/business-hours', async (req, res) => {
-  if (!requireFlag(res)) return
+router.get('/tenant/:tenantId/business-hours',
+  requireFlag({ flag: 'gbp_hours', scope: 'tenant', tenantParam: 'tenantId', platformEnvVar: 'FF_TENANT_GBP_HOURS_SYNC' }),
+  async (req, res) => {
   const { tenantId } = req.params
-  const data = hoursStore.get(tenantId) || { timezone: 'America/New_York', periods: [], special: [] }
-  res.json({ success: true, data: { timezone: data.timezone, periods: data.periods } })
+  const row = await prisma.businessHours.findUnique({ where: { tenantId } })
+  const timezone = row?.timezone || 'America/New_York'
+  const periods: any[] = (row?.periods as any) || []
+  res.json({ success: true, data: { timezone, periods } })
 })
 
 // PUT /api/tenant/:tenantId/business-hours
-router.put('/tenant/:tenantId/business-hours', async (req, res) => {
-  if (!requireFlag(res)) return
+router.put('/tenant/:tenantId/business-hours',
+  requireFlag({ flag: 'gbp_hours', scope: 'tenant', tenantParam: 'tenantId', platformEnvVar: 'FF_TENANT_GBP_HOURS_SYNC' }),
+  async (req, res) => {
   const { tenantId } = req.params
   const { timezone, periods } = req.body || {}
-  const cur = hoursStore.get(tenantId) || { timezone: 'America/New_York', periods: [], special: [] }
-  hoursStore.set(tenantId, { timezone: timezone || cur.timezone, periods: Array.isArray(periods) ? periods : cur.periods, special: cur.special })
+  const nextTz = timezone || 'America/New_York'
+  const nextPeriods = Array.isArray(periods) ? periods : []
+  await prisma.businessHours.upsert({
+    where: { tenantId },
+    update: { timezone: nextTz, periods: nextPeriods as any },
+    create: { tenantId, timezone: nextTz, periods: nextPeriods as any },
+  })
   res.json({ success: true })
 })
 
 // GET /api/tenant/:tenantId/business-hours/special
-router.get('/tenant/:tenantId/business-hours/special', async (req, res) => {
-  if (!requireFlag(res)) return
+router.get('/tenant/:tenantId/business-hours/special',
+  requireFlag({ flag: 'gbp_hours', scope: 'tenant', tenantParam: 'tenantId', platformEnvVar: 'FF_TENANT_GBP_HOURS_SYNC' }),
+  async (req, res) => {
   const { tenantId } = req.params
-  const data = hoursStore.get(tenantId) || { timezone: 'America/New_York', periods: [], special: [] }
-  res.json({ success: true, data: { overrides: data.special } })
+  const rows = await prisma.businessHoursSpecial.findMany({ where: { tenantId }, orderBy: { date: 'asc' } })
+  const overrides = rows.map((r: any) => ({ date: r.date.toISOString().slice(0,10), isClosed: r.isClosed, open: r.open, close: r.close, note: r.note }))
+  res.json({ success: true, data: { overrides } })
 })
 
 // PUT /api/tenant/:tenantId/business-hours/special
-router.put('/tenant/:tenantId/business-hours/special', async (req, res) => {
-  if (!requireFlag(res)) return
+router.put('/tenant/:tenantId/business-hours/special',
+  requireFlag({ flag: 'gbp_hours', scope: 'tenant', tenantParam: 'tenantId', platformEnvVar: 'FF_TENANT_GBP_HOURS_SYNC' }),
+  async (req, res) => {
   const { tenantId } = req.params
   const { overrides } = req.body || {}
-  const cur = hoursStore.get(tenantId) || { timezone: 'America/New_York', periods: [], special: [] }
-  hoursStore.set(tenantId, { timezone: cur.timezone, periods: cur.periods, special: Array.isArray(overrides) ? overrides : cur.special })
+  if (!Array.isArray(overrides)) return res.status(400).json({ success: false, error: 'invalid_overrides' })
+  // Upsert per date
+  for (const o of overrides) {
+    const dateStr = o?.date
+    if (!dateStr) continue
+    const date = new Date(`${dateStr}T00:00:00.000Z`)
+    await prisma.businessHoursSpecial.upsert({
+      where: { tenantId_date: { tenantId, date } },
+      update: { isClosed: !!o.isClosed, open: o.open || null, close: o.close || null, note: o.note || null },
+      create: { tenantId, date, isClosed: !!o.isClosed, open: o.open || null, close: o.close || null, note: o.note || null },
+    })
+  }
   res.json({ success: true })
 })
 
 // POST /api/tenant/:tenantId/gbp/hours/mirror
-router.post('/tenant/:tenantId/gbp/hours/mirror', async (req, res) => {
-  if (!requireFlag(res)) return
+router.post('/tenant/:tenantId/gbp/hours/mirror',
+  requireFlag({ flag: 'gbp_hours', scope: 'tenant', tenantParam: 'tenantId', platformEnvVar: 'FF_TENANT_GBP_HOURS_SYNC' }),
+  async (req, res) => {
   const { tenantId } = req.params
-  // enqueue a fake job with retry attempt info
-  const attempts = (mirrorStatus.get(tenantId)?.attempts || 0) + 1
-  mirrorStatus.set(tenantId, { in_sync: false, attempts })
-  setTimeout(() => {
-    mirrorStatus.set(tenantId, { in_sync: true, last_synced_at: new Date().toISOString(), attempts })
-  }, 300)
+  // Enqueue sync job; runner loop will process it
+  await prisma.syncJob.create({
+    data: {
+      tenantId,
+      target: 'gbp_hours',
+      status: 'queued',
+      attempt: 0,
+      payload: { tenantId },
+      source: 'manual',
+    },
+  })
   res.status(202).json({ success: true })
 })
 
 // GET /api/tenant/:tenantId/gbp/hours/status
-router.get('/tenant/:tenantId/gbp/hours/status', async (req, res) => {
-  if (!requireFlag(res)) return
+router.get('/tenant/:tenantId/gbp/hours/status',
+  requireFlag({ flag: 'gbp_hours', scope: 'tenant', tenantParam: 'tenantId', platformEnvVar: 'FF_TENANT_GBP_HOURS_SYNC' }),
+  async (req, res) => {
   const { tenantId } = req.params
-  const status = mirrorStatus.get(tenantId) || { in_sync: false, attempts: 0 }
-  res.json({ success: true, data: status })
+  const row = await prisma.businessHours.findUnique({ where: { tenantId } })
+  const attempts = mirrorAttempts.get(tenantId) || row?.syncAttempts || 0
+  const in_sync = !!row?.lastSyncedAt
+  res.json({ success: true, data: { in_sync, last_synced_at: row?.lastSyncedAt?.toISOString(), attempts } })
 })
 
 export default router

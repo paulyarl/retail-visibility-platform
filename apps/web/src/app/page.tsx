@@ -21,7 +21,7 @@ export default function Home() {
     items: "/items",
     createItem: "/items?create=true",
     tenants: "/tenants",
-    settingsTenant: "/settings/tenant",
+    settingsTenant: "/settings",
   });
   const [stats, setStats] = useState({ 
     total: 0, 
@@ -115,10 +115,10 @@ export default function Home() {
         items: `/t/${tenantId}/items`,
         createItem: `/t/${tenantId}/items?create=true`,
         tenants: `/tenants`,
-        settingsTenant: `/t/${tenantId}/settings/tenant`,
+        settingsTenant: `/t/${tenantId}/settings`,
       });
     } else {
-      setScopedLinks({ items: "/items", createItem: "/items?create=true", tenants: "/tenants", settingsTenant: "/settings/tenant" });
+      setScopedLinks({ items: "/items", createItem: "/items?create=true", tenants: "/tenants", settingsTenant: "/settings" });
     }
   }, []);
   

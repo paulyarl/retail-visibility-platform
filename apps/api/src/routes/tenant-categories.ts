@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { audit } from '../audit';
 import { triggerRevalidate } from '../utils/revalidate';
+import { categoryService } from '../services/CategoryService';
 
 const router = Router();
 
@@ -229,40 +230,18 @@ router.post('/:tenantId/categories', async (req, res) => {
       }
     }
 
-    const category = await prisma.tenantCategory.create({
-      data: {
-        tenantId: body.tenantId,
-        name: body.name,
-        slug: body.slug,
-        parentId: body.parentId,
-        googleCategoryId: body.googleCategoryId,
-        sortOrder: body.sortOrder || 0,
-      },
+    const category = await categoryService.createTenantCategory(tenantId, {
+      name: body.name,
+      slug: body.slug,
+      parentId: body.parentId ?? null,
+      googleCategoryId: body.googleCategoryId ?? null,
+      sortOrder: body.sortOrder || 0,
     });
-
-    // Audit: category.create
-    try {
-      await audit({
-        tenantId,
-        actor: (req as any)?.user?.userId ?? null,
-        action: 'category.create',
-        payload: {
-          id: category.id,
-          name: category.name,
-          slug: category.slug,
-          parentId: category.parentId,
-          googleCategoryId: category.googleCategoryId,
-          requestId: req.headers['x-request-id'] || null,
-        },
-      });
-    } catch {}
 
     res.status(201).json({
       success: true,
       data: category,
     });
-    // ISR revalidation (best-effort)
-    triggerRevalidate(tenantId).catch(() => {})
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -344,31 +323,12 @@ router.put('/:tenantId/categories/:id', async (req, res) => {
       }
     }
 
-    const category = await prisma.tenantCategory.update({
-      where: { id },
-      data: body,
-    });
-
-    // Audit: category.update (include changed fields)
-    try {
-      await audit({
-        tenantId,
-        actor: (req as any)?.user?.userId ?? null,
-        action: 'category.update',
-        payload: {
-          id,
-          delta: body,
-          requestId: req.headers['x-request-id'] || null,
-        },
-      });
-    } catch {}
+    const category = await categoryService.updateTenantCategory(tenantId, id, body);
 
     res.json({
       success: true,
       data: category,
     });
-    // ISR revalidation (best-effort)
-    triggerRevalidate(tenantId).catch(() => {})
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -441,31 +401,12 @@ router.delete('/:tenantId/categories/:id', async (req, res) => {
       });
     }
 
-    // Soft delete
-    await prisma.tenantCategory.update({
-      where: { id },
-      data: { isActive: false },
-    });
-
-    // Audit: category.delete (soft)
-    try {
-      await audit({
-        tenantId,
-        actor: (req as any)?.user?.userId ?? null,
-        action: 'category.delete',
-        payload: {
-          id,
-          requestId: req.headers['x-request-id'] || null,
-        },
-      });
-    } catch {}
+    await categoryService.softDeleteTenantCategory(tenantId, id);
 
     res.json({
       success: true,
       message: 'Category deleted successfully',
     });
-    // ISR revalidation (best-effort)
-    triggerRevalidate(tenantId).catch(() => {})
   } catch (error) {
     console.error('Error deleting category:', error);
     res.status(500).json({
@@ -508,27 +449,7 @@ router.post('/:tenantId/categories/:id/align', async (req, res) => {
       });
     }
 
-    // Update category with Google mapping
-    const updated = await prisma.tenantCategory.update({
-      where: { id },
-      data: {
-        googleCategoryId: body.googleCategoryId,
-      },
-    });
-
-    // Audit: category.align
-    try {
-      await audit({
-        tenantId,
-        actor: (req as any)?.user?.userId ?? null,
-        action: 'category.align',
-        payload: {
-          id,
-          googleCategoryId: body.googleCategoryId,
-          requestId: req.headers['x-request-id'] || null,
-        },
-      });
-    } catch {}
+    const updated = await categoryService.alignCategory(tenantId, id, body.googleCategoryId);
 
     res.json({
       success: true,
@@ -538,8 +459,6 @@ router.post('/:tenantId/categories/:id/align', async (req, res) => {
       },
       message: 'Category aligned successfully',
     });
-    // ISR revalidation (best-effort)
-    triggerRevalidate(tenantId).catch(() => {})
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
