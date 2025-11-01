@@ -1,0 +1,208 @@
+### Test v3.6.2-prep API Endpoints
+### Make sure the API server is running on http://localhost:4000
+
+### Health Check
+GET http://localhost:4000/health
+
+###
+
+### 1. Create a Feed Push Job
+POST http://localhost:4000/api/feed-jobs
+Content-Type: application/json
+
+{
+  "tenantId": "cmhe0edxg0002g8s8bba4j2s0",
+  "sku": "TEST-SKU-001",
+  "payload": {
+    "feedType": "full",
+    "itemCount": 50
+  }
+}
+
+###
+
+### 2. List Feed Jobs
+GET http://localhost:4000/api/feed-jobs?limit=10
+
+###
+
+### 3. Get Feed Jobs by Tenant
+GET http://localhost:4000/api/feed-jobs?tenantId=cmhe0edxg0002g8s8bba4j2s0
+
+###
+
+### 4. Get Feed Jobs by Status
+GET http://localhost:4000/api/feed-jobs?status=queued
+
+###
+
+### 5. Get Ready Jobs (for job processor)
+GET http://localhost:4000/api/feed-jobs/queue/ready?limit=5
+
+###
+
+### 6. Get Feed Job Statistics
+GET http://localhost:4000/api/feed-jobs/stats/summary
+
+###
+
+### 7. Get Feed Job Statistics by Tenant
+GET http://localhost:4000/api/feed-jobs/stats/summary?tenantId=cmhe0edxg0002g8s8bba4j2s0
+
+###
+
+### 8. Update Job Status to Processing
+# Replace {jobId} with actual job ID from create response
+PATCH http://localhost:4000/api/feed-jobs/{jobId}/status
+Content-Type: application/json
+
+{
+  "jobStatus": "processing"
+}
+
+###
+
+### 9. Mark Job as Success
+# Replace {jobId} with actual job ID
+PATCH http://localhost:4000/api/feed-jobs/{jobId}/status
+Content-Type: application/json
+
+{
+  "jobStatus": "success",
+  "result": {
+    "itemsProcessed": 50,
+    "successCount": 48,
+    "errorCount": 2
+  }
+}
+
+###
+
+### 10. Mark Job as Failed (will retry)
+# Replace {jobId} with actual job ID
+PATCH http://localhost:4000/api/feed-jobs/{jobId}/status
+Content-Type: application/json
+
+{
+  "jobStatus": "failed",
+  "errorMessage": "Connection timeout",
+  "errorCode": "TIMEOUT"
+}
+
+###
+
+### 11. Submit Feedback
+POST http://localhost:4000/api/feedback
+Content-Type: application/json
+
+{
+  "tenantId": "cmhe0edxg0002g8s8bba4j2s0",
+  "userId": "test-user-123",
+  "feedback": {
+    "comment": "Great feature! Very intuitive.",
+    "features_used": ["category_alignment", "feed_push"],
+    "pain_points": [],
+    "suggestions": ["Add bulk import"]
+  },
+  "score": 5,
+  "category": "usability",
+  "context": "category_alignment"
+}
+
+###
+
+### 12. List All Feedback
+GET http://localhost:4000/api/feedback?limit=20
+
+###
+
+### 13. Get Feedback by Tenant
+GET http://localhost:4000/api/feedback?tenantId=cmhe0edxg0002g8s8bba4j2s0
+
+###
+
+### 14. Get Feedback by Category
+GET http://localhost:4000/api/feedback?category=usability
+
+###
+
+### 15. Get Feedback by Score Range
+GET http://localhost:4000/api/feedback?minScore=4&maxScore=5
+
+###
+
+### 16. Get Feedback Analytics
+GET http://localhost:4000/api/feedback/analytics/summary?days=30
+
+###
+
+### 17. Get Feedback Analytics by Tenant
+GET http://localhost:4000/api/feedback/analytics/summary?tenantId=cmhe0edxg0002g8s8bba4j2s0&days=30
+
+###
+
+### 18. Get Pilot Program KPIs
+GET http://localhost:4000/api/feedback/pilot/kpis
+
+###
+
+### 19. Get Pilot KPIs by Tenant
+GET http://localhost:4000/api/feedback/pilot/kpis?tenantId=cmhe0edxg0002g8s8bba4j2s0
+
+###
+
+### 20. Submit More Feedback (Different Scores)
+POST http://localhost:4000/api/feedback
+Content-Type: application/json
+
+{
+  "tenantId": "cmhe0edxg0002g8s8bba4j2s0",
+  "feedback": {
+    "comment": "Performance could be better"
+  },
+  "score": 3,
+  "category": "performance",
+  "context": "feed_push"
+}
+
+###
+
+### 21. Submit Positive Feedback
+POST http://localhost:4000/api/feedback
+Content-Type: application/json
+
+{
+  "tenantId": "cmhe0edxg0002g8s8bba4j2s0",
+  "feedback": {
+    "comment": "Excellent support team!"
+  },
+  "score": 5,
+  "category": "support",
+  "context": "onboarding"
+}
+
+###
+
+### 22. Get Specific Job by ID
+# Replace {jobId} with actual job ID
+GET http://localhost:4000/api/feed-jobs/{jobId}
+
+###
+
+### 23. Get Specific Feedback by ID
+# Replace {feedbackId} with actual feedback ID
+GET http://localhost:4000/api/feedback/{feedbackId}
+
+###
+
+### 24. Delete Job (Admin Only)
+# Replace {jobId} with actual job ID
+DELETE http://localhost:4000/api/feed-jobs/{jobId}
+
+###
+
+### 25. Delete Feedback (Admin Only)
+# Replace {feedbackId} with actual feedback ID
+DELETE http://localhost:4000/api/feedback/{feedbackId}
+
+###
