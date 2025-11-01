@@ -632,3 +632,60 @@ model PermissionAuditLog {
   @@map("permission_audit_log")
 }
 
+// ===== v3.6.2-prep Retrofit Models =====
+
+// Feed Push Jobs - Async job processing with retry logic
+model FeedPushJob {
+  id            String      @id @default(cuid())
+  tenantId      String      @map("tenant_id")
+  sku           String?     // NULL for full feed, specific SKU for single item
+  jobStatus     JobStatus   @default(queued) @map("job_status")
+  retryCount    Int         @default(0) @map("retry_count")
+  maxRetries    Int         @default(5) @map("max_retries")
+  lastAttempt   DateTime?   @map("last_attempt")
+  nextRetry     DateTime?   @map("next_retry")
+  errorMessage  String?     @map("error_message")
+  errorCode     String?     @map("error_code")
+  payload       Json?       // Job-specific data
+  result        Json?       // Result from successful job
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  completedAt   DateTime?   @map("completed_at")
+
+  @@index([tenantId, jobStatus])
+  @@index([jobStatus])
+  @@index([nextRetry])
+  @@index([createdAt])
+  @@index([tenantId, sku])
+  @@map("feed_push_jobs")
+}
+
+// Job status enum
+enum JobStatus {
+  queued
+  processing
+  success
+  failed
+
+  @@map("job_status")
+}
+
+// Outreach Feedback - Pilot program feedback collection
+model OutreachFeedback {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  userId    String?  @map("user_id")
+  feedback  Json     // Structured feedback object
+  score     Int      // 1-5 rating
+  category  String?  // usability, performance, features, support
+  context   String?  // onboarding, category_alignment, feed_push, etc.
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([score])
+  @@index([category])
+  @@index([context])
+  @@index([createdAt])
+  @@map("outreach_feedback")
+}
+
