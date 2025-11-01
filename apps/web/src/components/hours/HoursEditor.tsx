@@ -43,9 +43,10 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <label className="w-32">Timezone</label>
-        <input className="border px-2 py-1 rounded w-64" value={timezone} onChange={(e) => setTimezone(e.target.value)} />
+      <div className="flex items-center gap-2 text-sm text-gray-600">
+        <span className="w-32">Timezone</span>
+        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">{timezone}</span>
+        <span className="ml-2">Manage timezone above.</span>
       </div>
       <div className="space-y-2">
         {periods.map((p, i) => (

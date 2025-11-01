@@ -3,15 +3,25 @@
 import { useState } from 'react'
 import TenantSidebar from './TenantSidebar'
 import TenantSwitcher, { TenantOption } from './TenantSwitcher'
+import Link from 'next/link'
+import Image from 'next/image'
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext'
 
 export default function TenantShell({ tenantId, tenantName, nav, tenants, children }: { tenantId: string; tenantName?: string; nav: { label: string; href: string }[]; tenants: TenantOption[]; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
+  const { settings } = usePlatformSettings()
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top header (desktop) */}
       <div className="hidden md:flex sticky top-0 z-40 bg-white border-b border-gray-200 items-center justify-between px-6 h-14">
-        <div className="font-semibold text-gray-900">Retail Visibility Platform</div>
+        <Link href="/" className="flex items-center gap-3" aria-label="Platform Dashboard">
+          {settings?.logoUrl ? (
+            <Image src={settings.logoUrl} alt={settings.platformName || 'Platform Logo'} width={140} height={32} className="h-8 w-auto object-contain" />
+          ) : (
+            <span className="font-semibold text-gray-900 hover:text-blue-600">{settings?.platformName || 'Visible Shelf'}</span>
+          )}
+        </Link>
         <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
       </div>
 
@@ -24,6 +34,9 @@ export default function TenantShell({ tenantId, tenantName, nav, tenants, childr
         >
           ☰ Menu
         </button>
+        <Link href="/" aria-label="Platform Dashboard" className="text-sm text-gray-700 hover:text-blue-600">
+          {settings?.platformName || 'Platform'}
+        </Link>
         <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
       </div>
 

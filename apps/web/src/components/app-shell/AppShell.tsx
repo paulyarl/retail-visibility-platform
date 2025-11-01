@@ -5,6 +5,8 @@ import TenantSwitcher from "./TenantSwitcher";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
+import Link from "next/link";
+import { Button } from "@/components/ui";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { settings } = usePlatformSettings();
@@ -15,10 +17,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     tenants: "/tenants",
     settings: "/settings",
   });
+  const [tenantScopedLinksOn, setTenantScopedLinksOn] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [tenantName, setTenantName] = useState<string | null>(null);
   const [restoreToast, setRestoreToast] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
 
   useEffect(() => {
     // Evaluate FF on client, using tenantId hint from localStorage
@@ -38,8 +41,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         tenants: "/tenants",
         settings: `/t/${tenantId}/settings`,
       });
+      setTenantScopedLinksOn(true);
     } else {
       setLinks({ dashboard: "/", inventory: "/items", tenants: "/tenants", settings: "/settings" });
+      setTenantScopedLinksOn(false);
     }
 
     // Resolve current tenant name from user context
@@ -92,11 +97,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <a className="hover:text-neutral-900" href={links.dashboard}>Dashboard</a>
               <a className="hover:text-neutral-900" href={links.inventory}>Inventory</a>
               <a className="hover:text-neutral-900" href={links.tenants}>Tenants</a>
-              <a className="hover:text-neutral-900" href={links.settings}>Settings</a>
+              <a className="hover:text-neutral-900" href={links.settings}>{tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}</a>
             </nav>
           </div>
           <div className="flex items-center gap-4">
             <TenantSwitcher />
+            {user ? (
+              <>
+                <Link href="/settings">
+                  <Button variant="ghost" size="sm">Account</Button>
+                </Link>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    try { await logout(); } catch {}
+                    if (typeof window !== 'undefined') window.location.href = '/';
+                  }}
+                >
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <Link href="/login">
+                <Button variant="secondary" size="sm">Sign In</Button>
+              </Link>
+            )}
           </div>
         </div>
       </header>

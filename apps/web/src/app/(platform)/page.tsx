@@ -13,9 +13,13 @@ import { api } from "@/lib/api";
 import Image from "next/image";
 import PublicFooter from "@/components/PublicFooter";
 
-export default function Home() {
+export default function PlatformHomePage() {
+  return <Home embedded />;
+}
+
+function Home({ embedded = false }: { embedded?: boolean } = {}) {
   const { settings } = usePlatformSettings();
-  const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, logout, user } = useAuth();
   const router = useRouter();
   const [scopedLinks, setScopedLinks] = useState<{ items: string; createItem: string; tenants: string; settingsTenant: string }>({
     items: "/items",
@@ -23,6 +27,7 @@ export default function Home() {
     tenants: "/tenants",
     settingsTenant: "/settings",
   });
+  const [hoursInfo, setHoursInfo] = useState<{ hasHours: boolean; today?: string } | null>(null);
   const [stats, setStats] = useState({ 
     total: 0, 
     active: 0, 
@@ -63,6 +68,38 @@ export default function Home() {
       fetchPlatformStats();
     }
   }, [isAuthenticated, authLoading]);
+
+  // Fetch tenant business hours when a tenant is selected
+  useEffect(() => {
+    const fetchHours = async () => {
+      try {
+        if (!selectedTenantId) { setHoursInfo(null); return; }
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const res = await fetch(`${API_BASE_URL}/public/tenant/${selectedTenantId}/profile`, { cache: 'no-store' });
+        if (!res.ok) { setHoursInfo(null); return; }
+        const prof = await res.json();
+        const hours = prof?.hours;
+        let hasHours = false;
+        if (Array.isArray(hours)) hasHours = hours.length > 0;
+        else if (hours && typeof hours === 'object') hasHours = Object.keys(hours).length > 0;
+
+        // Try to compute a simple "today" label if possible
+        let today: string | undefined;
+        try {
+          const day = new Date().toLocaleDateString(undefined, { weekday: 'long' });
+          if (hours && typeof hours === 'object' && hours[day]) {
+            const h = hours[day];
+            if (h?.open && h?.close) today = `${day}: ${h.open} - ${h.close}`;
+          }
+        } catch {}
+
+        setHoursInfo({ hasHours, today });
+      } catch {
+        setHoursInfo(null);
+      }
+    };
+    fetchHours();
+  }, [selectedTenantId]);
   
   useEffect(() => {
     // Only fetch stats if authenticated
@@ -129,52 +166,52 @@ export default function Home() {
   const locationsCount = useCountUp(stats.locations);
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            {settings?.logoUrl ? (
-              <Link href="/">
-                <Image
-                  src={settings.logoUrl}
-                  alt={settings.platformName || 'Platform Logo'}
-                  width={150}
-                  height={40}
-                  className="h-10 w-auto object-contain cursor-pointer"
-                />
-              </Link>
-            ) : (
-              <Link href="/">
-                <h1 className="text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
-                  {settings?.platformName || 'Visible Shelf'}
-                </h1>
-              </Link>
-            )}
-            <div className="flex items-center gap-3">
-              <Link href="/settings">
-                <Button variant="ghost" size="sm">Settings</Button>
-              </Link>
-              {isAuthenticated ? (
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={async () => {
-                    await logout();
-                    // Navigate to clean home page to show public platform metrics
-                    router.push('/');
-                  }}
-                >
-                  Sign Out
-                </Button>
+      {!embedded && (
+        <header className="bg-white border-b border-neutral-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              {settings?.logoUrl ? (
+                <Link href="/">
+                  <Image
+                    src={settings.logoUrl}
+                    alt={settings.platformName || 'Platform Logo'}
+                    width={150}
+                    height={40}
+                    className="h-10 w-auto object-contain cursor-pointer"
+                  />
+                </Link>
               ) : (
-                <Link href="/login">
-                  <Button variant="secondary" size="sm">Sign In</Button>
+                <Link href="/">
+                  <h1 className="text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
+                    {settings?.platformName || 'Visible Shelf'}
+                  </h1>
                 </Link>
               )}
+              <div className="flex items-center gap-3">
+                <Link href="/settings">
+                  <Button variant="ghost" size="sm">Settings</Button>
+                </Link>
+                {isAuthenticated ? (
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    onClick={async () => {
+                      await logout();
+                      router.push('/');
+                    }}
+                  >
+                    Sign Out
+                  </Button>
+                ) : (
+                  <Link href="/login">
+                    <Button variant="secondary" size="sm">Sign In</Button>
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -519,6 +556,40 @@ export default function Home() {
         </div>
         )}
 
+        {/* Business Hours Card (tenant-scoped) */}
+        {isAuthenticated && selectedTenantId && (
+          <div className="mb-6">
+            <AnimatedCard delay={0.35} className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-neutral-600">Business Hours</p>
+                  {hoursInfo?.hasHours ? (
+                    <p className="text-base text-neutral-900 mt-1">
+                      {hoursInfo.today || 'Hours configured'}
+                    </p>
+                  ) : (
+                    <p className="text-base text-neutral-900 mt-1">
+                      Set your store hours to display them here.
+                    </p>
+                  )}
+                </div>
+                {(() => {
+                  const tenantRole = user?.tenants.find(t => t.id === selectedTenantId)?.role;
+                  const canManage = user?.role === 'ADMIN' || tenantRole === 'OWNER' || tenantRole === 'ADMIN';
+                  if (!canManage) return null;
+                  return (
+                    <Link href={`/t/${selectedTenantId}/settings/hours`}>
+                      <Button variant="secondary" size="sm" className="whitespace-nowrap">
+                        {hoursInfo?.hasHours ? 'Manage Hours' : 'Set Hours'}
+                      </Button>
+                    </Link>
+                  );
+                })()}
+              </div>
+            </AnimatedCard>
+          </div>
+        )}
+
         {/* Quick Actions - Different for authenticated vs visitors */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {isAuthenticated ? (
@@ -547,7 +618,7 @@ export default function Home() {
                   Manage Locations
                 </Button>
               </Link>
-              <Link href="/items" className="block">
+              <Link href={scopedLinks.items} className="block">
                 <Button variant="secondary" className="w-full justify-start">
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -572,16 +643,16 @@ export default function Home() {
               <CardDescription>Set up your Visible Shelf</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Link href="/tenants" className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+              <Link href={selectedTenantId ? `/t/${selectedTenantId}/onboarding` : "/tenants"} className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
                 <div className="h-6 w-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:scale-110 transition-transform">
                   1
                 </div>
                 <div>
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors">Add your first location</p>
-                  <p className="text-sm text-neutral-600">Set up your store or business</p>
+                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors">Complete Business Profile</p>
+                  <p className="text-sm text-neutral-600">Set up your store identity and details</p>
                 </div>
               </Link>
-              <Link href="/items?create=true" className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+              <Link href={scopedLinks.createItem} className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
                 <div className="h-6 w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
                   2
                 </div>

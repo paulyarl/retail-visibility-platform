@@ -353,7 +353,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     tenant={t}
                     index={index}
                     onSelect={() => router.push(`/items?tenantId=${encodeURIComponent(t.id)}`)}
-                    onEditProfile={() => router.push(`/onboarding?tenantId=${encodeURIComponent(t.id)}`)}
+                    onEditProfile={() => router.push(`/t/${encodeURIComponent(t.id)}/onboarding`)}
                     onRename={onRename}
                     onDelete={() => onDelete(t.id)}
                     canEdit={!!canEdit}

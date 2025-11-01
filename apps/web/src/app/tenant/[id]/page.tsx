@@ -43,6 +43,88 @@ interface PlatformSettings {
   logoUrl?: string;
 }
 
+// Helpers to compute open/closed status from hours object
+function parseTimeToMinutes(t: string): number | null {
+  if (!t || typeof t !== 'string') return null;
+  const s = t.trim();
+  // HH:mm
+  const m24 = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(s);
+  if (m24) {
+    const hh = parseInt(m24[1], 10);
+    const mm = parseInt(m24[2], 10);
+    return hh * 60 + mm;
+  }
+  // h:mm AM/PM
+  const m12 = /^(\d{1,2}):([0-5]\d)\s*([AP]M)$/i.exec(s);
+  if (m12) {
+    let hh = parseInt(m12[1], 10) % 12;
+    const mm = parseInt(m12[2], 10);
+    const ampm = m12[3].toUpperCase();
+    if (ampm === 'PM') hh += 12;
+    return hh * 60 + mm;
+  }
+  return null;
+}
+
+function minutesToLabel(mins: number, timeZone?: string): string {
+  const hh = Math.floor(mins / 60);
+  const mm = mins % 60;
+  const date = new Date();
+  date.setHours(hh, mm, 0, 0);
+  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
+}
+
+function computeStoreStatus(hours: any): { isOpen: boolean; label: string } | null {
+  if (!hours || typeof hours !== 'object') return null;
+  const now = new Date();
+  const locale = 'en-US';
+  const timeZone: string | undefined = typeof hours.timezone === 'string' ? hours.timezone : undefined;
+  const weekday = (d: Date) => d.toLocaleDateString(locale, { weekday: 'long', timeZone });
+  const todayName = weekday(now);
+  const today = (hours as any)[todayName];
+  // Compute "now" in target timezone
+  const fmt = new Intl.DateTimeFormat('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: timeZone });
+  const parts = fmt.formatToParts(now);
+  const hh = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+  const mm = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+  const currentMins = hh * 60 + mm;
+
+  const parseRange = (entry: any): { openM: number; closeM: number } | null => {
+    if (!entry) return null;
+    const openStr = entry.open || entry.start || entry.from;
+    const closeStr = entry.close || entry.end || entry.to;
+    const o = parseTimeToMinutes(openStr);
+    const c = parseTimeToMinutes(closeStr);
+    if (o == null || c == null) return null;
+    return { openM: o, closeM: c };
+  };
+
+  const todayRange = parseRange(today);
+  if (todayRange) {
+    const { openM, closeM } = todayRange;
+    if (currentMins >= openM && currentMins < closeM) {
+      return { isOpen: true, label: `Open now • Closes at ${minutesToLabel(closeM, timeZone)}` };
+    }
+    if (currentMins < openM) {
+      return { isOpen: false, label: `Closed • Opens today at ${minutesToLabel(openM, timeZone)}` };
+    }
+    // After close today, find next open day
+  }
+
+  // Find next open day within next 7 days
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    const name = weekday(d);
+    const r = parseRange((hours as any)[name]);
+    if (r) {
+      const dayLabel = i === 1 ? 'tomorrow' : name;
+      return { isOpen: false, label: `Closed • Opens ${dayLabel} at ${minutesToLabel(r.openM, timeZone)}` };
+    }
+  }
+  return { isOpen: false, label: 'Closed' };
+}
+
 interface PageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ page?: string; search?: string }>;
@@ -64,6 +146,8 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     const tenant: Tenant = await tenantRes.json();
 
     // Fetch business profile
+    let hasHours = false;
+    let businessHours: any = null;
     try {
       const profileRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/profile`, {
         cache: 'no-store',
@@ -81,6 +165,16 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
             : undefined,
           logo_url: businessProfile.logo_url,
         };
+        // Detect hours presence for branding evaluation
+        const hours = (businessProfile as any)?.hours;
+        businessHours = hours ?? null;
+        if (hours) {
+          if (Array.isArray(hours)) {
+            hasHours = hours.length > 0;
+          } else if (typeof hours === 'object') {
+            hasHours = Object.keys(hours).length > 0;
+          }
+        }
       }
     } catch (e) {
       console.error('Failed to fetch business profile:', e);
@@ -124,7 +218,10 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       console.error('Failed to fetch platform settings:', e);
     }
 
-    return { tenant, products, total, page, limit, platformSettings, mapLocation };
+    const hasLogo = !!tenant.metadata?.logo_url;
+    const hasBranding = hasLogo || hasHours;
+    const storeStatus = computeStoreStatus(businessHours);
+    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -167,7 +264,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     notFound();
   }
 
-  const { tenant, products, total, limit, platformSettings, mapLocation } = data;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
   const totalPages = Math.ceil(total / limit);
   
@@ -249,18 +346,34 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         </div>
 
         {products.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12 space-y-6">
             <p className="text-neutral-600 dark:text-neutral-400 text-lg">
               {search 
                 ? `No products found matching "${search}". Try a different search term.`
                 : 'No products available at this time.'}
             </p>
+            {!hasBranding && (
+              <div className="mx-auto max-w-2xl p-5 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
+                <div className="flex items-start gap-3">
+                  <svg className="h-6 w-6 flex-shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+                  </svg>
+                  <div className="text-left">
+                    <p className="font-medium">Set your store branding and add products to populate this page automatically.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a href={`/t/${id}/onboarding`} className="inline-flex items-center px-3 py-1.5 rounded bg-primary-600 text-white text-sm hover:bg-primary-700">Edit Branding</a>
+                      <a href={`/t/${id}/items`} className="inline-flex items-center px-3 py-1.5 rounded border border-neutral-300 text-neutral-700 text-sm hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-700">Add Products</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <>
             {/* Product Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {products.map((product) => (
+              {products.map((product: Product) => (
                 <Link
                   key={product.id}
                   href={`/products/${product.id}`}
@@ -418,18 +531,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                   </p>
                 )}
 
-                {/* Website */}
-                {tenant.metadata?.website && (
-                  <p className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                    </svg>
-                    <a href={tenant.metadata.website} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                      {tenant.metadata.website}
-                    </a>
-                  </p>
-                )}
-
                 {/* Address - Required for NAP */}
                 {tenant.metadata?.address && (
                   <p className="flex items-center gap-2">
@@ -438,6 +539,16 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                     <span>{tenant.metadata.address}</span>
+                  </p>
+                )}
+
+                {/* Hours (public) */}
+                {businessHours && (
+                  <p className="flex items-center gap-2">
+                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{storeStatus?.label || 'Hours available'}</span>
                   </p>
                 )}
               </div>

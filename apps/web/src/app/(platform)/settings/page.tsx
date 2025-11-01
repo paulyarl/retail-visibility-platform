@@ -123,6 +123,17 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
       href: '/tenants',
       color: 'bg-blue-500',
     },
+        ...(tenantId ? [{
+          title: 'Business Profile',
+          description: 'Edit store identity and contact details',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/onboarding`,
+          color: 'bg-teal-500',
+        }] as SettingCard[] : []),
         {
           title: 'Tenant Users',
           description: 'Manage users and roles within your tenant',
@@ -351,12 +362,10 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button
                   onClick={() => {
-                    // Check if tenant is selected
                     const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
                     if (tenantId) {
                       router.push(`/t/${tenantId}/settings`);
                     } else {
-                      // Redirect to tenants page to select one first
                       router.push('/tenants');
                     }
                   }}
@@ -370,6 +379,28 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
                   <div>
                     <div className="font-medium text-neutral-900">Tenant Settings</div>
                     <div className="text-sm text-neutral-500">Update business profile</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+                    if (tenantId) {
+                      router.push(`/t/${tenantId}/onboarding`);
+                    } else {
+                      router.push('/tenants');
+                    }
+                  }}
+                  className="flex items-center gap-3 p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors text-left"
+                >
+                  <div className="h-10 w-10 bg-teal-100 rounded-lg flex items-center justify-center">
+                    <svg className="h-5 w-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="font-medium text-neutral-900">Business Profile</div>
+                    <div className="text-sm text-neutral-500">Edit store identity</div>
                   </div>
                 </button>
 
