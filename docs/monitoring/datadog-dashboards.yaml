@@ -1,0 +1,472 @@
+# Datadog Dashboards Configuration
+# Version: v3.6.2-prep
+# Date: 2025-11-01
+
+dashboards:
+  # Dashboard 1: Category Alignment
+  - name: "RVP - Category Alignment"
+    description: "Monitors category mapping coverage and feed approval rates"
+    widgets:
+      - type: timeseries
+        title: "Feed Approval Rate"
+        metric: "rvp.feed.approval_rate"
+        target: 95
+        unit: "%"
+        visualization: line
+        alert_threshold: 95
+        
+      - type: query_value
+        title: "Category Mapping Coverage"
+        metric: "rvp.category.mapping_coverage_pct"
+        target: 100
+        unit: "%"
+        alert_threshold: 100
+        
+      - type: timeseries
+        title: "Quick Actions Footer Engagement"
+        metric: "rvp.qa_footer.engagement_rate"
+        target: 60
+        unit: "%"
+        
+      - type: timeseries
+        title: "Time to Alignment (Median)"
+        metric: "rvp.category.time_to_alignment_median_ms"
+        target: 90000
+        unit: "ms"
+        alert_threshold: 90000
+        
+      - type: query_value
+        title: "Taxonomy Version Age"
+        metric: "rvp.taxonomy.version_active_age_days"
+        target: 30
+        unit: "days"
+        alert_threshold: 30
+        
+      - type: toplist
+        title: "Top Unmapped Categories"
+        metric: "rvp.category.unmapped_count"
+        group_by: "category_name"
+        limit: 10
+        
+      - type: heatmap
+        title: "Alignment Activity Heatmap"
+        metric: "rvp.category.alignment_events"
+        group_by: ["hour", "day_of_week"]
+
+  # Dashboard 2: Feed Push Jobs
+  - name: "RVP - Feed Push Jobs"
+    description: "Monitors async feed job processing and retry logic"
+    widgets:
+      - type: query_value
+        title: "Feed Push Success Rate"
+        metric: "rvp.feed_jobs.success_rate"
+        target: 95
+        unit: "%"
+        alert_threshold: 95
+        
+      - type: timeseries
+        title: "Job Queue Depth"
+        metric: "rvp.feed_jobs.queue_depth"
+        visualization: area
+        alert_threshold: 1000
+        
+      - type: distribution
+        title: "Retry Distribution"
+        metric: "rvp.feed_jobs.retry_count"
+        bins: [0, 1, 2, 3, 4, 5]
+        
+      - type: timeseries
+        title: "Average Processing Time"
+        metric: "rvp.feed_jobs.processing_time_avg"
+        unit: "ms"
+        visualization: line
+        
+      - type: query_value
+        title: "Jobs in Queue"
+        metric: "rvp.feed_jobs.status.queued"
+        
+      - type: query_value
+        title: "Jobs Processing"
+        metric: "rvp.feed_jobs.status.processing"
+        
+      - type: query_value
+        title: "Jobs Succeeded (24h)"
+        metric: "rvp.feed_jobs.status.success"
+        timeframe: "24h"
+        
+      - type: query_value
+        title: "Jobs Failed (24h)"
+        metric: "rvp.feed_jobs.status.failed"
+        timeframe: "24h"
+        
+      - type: timeseries
+        title: "Job Status Over Time"
+        metrics:
+          - "rvp.feed_jobs.status.queued"
+          - "rvp.feed_jobs.status.processing"
+          - "rvp.feed_jobs.status.success"
+          - "rvp.feed_jobs.status.failed"
+        visualization: stacked_area
+        
+      - type: toplist
+        title: "Top Error Codes"
+        metric: "rvp.feed_jobs.errors"
+        group_by: "error_code"
+        limit: 10
+
+  # Dashboard 3: API Performance
+  - name: "RVP - API Performance"
+    description: "Monitors API latency, error rates, and throughput"
+    widgets:
+      - type: timeseries
+        title: "SWIS Preview Latency (p95)"
+        metric: "rvp.api.swis_preview.latency.p95"
+        target: 300
+        unit: "ms"
+        alert_threshold: 300
+        
+      - type: heatmap
+        title: "API Response Times by Endpoint"
+        metric: "rvp.api.latency"
+        group_by: "endpoint"
+        
+      - type: timeseries
+        title: "Error Rate by Service"
+        metric: "rvp.api.error_rate"
+        group_by: "service"
+        unit: "%"
+        alert_threshold: 5
+        
+      - type: timeseries
+        title: "Rate Limit Hits"
+        metric: "rvp.api.rate_limit_hits"
+        group_by: "endpoint"
+        
+      - type: query_value
+        title: "Requests per Minute"
+        metric: "rvp.api.requests.rate"
+        unit: "req/min"
+        
+      - type: timeseries
+        title: "Cache Hit Rate"
+        metric: "rvp.cache.hit_rate"
+        unit: "%"
+        target: 80
+        
+      - type: toplist
+        title: "Slowest Endpoints"
+        metric: "rvp.api.latency.p95"
+        group_by: "endpoint"
+        limit: 10
+        order: "desc"
+        
+      - type: timeseries
+        title: "Database Connection Pool"
+        metrics:
+          - "rvp.db.connections.active"
+          - "rvp.db.connections.idle"
+          - "rvp.db.connections.waiting"
+        visualization: stacked_area
+
+  # Dashboard 4: Pilot Program KPIs
+  - name: "RVP - Pilot Program"
+    description: "Tracks pilot program success metrics and feedback"
+    widgets:
+      - type: query_value
+        title: "Satisfaction Rate"
+        metric: "rvp.feedback.satisfaction_rate"
+        target: 80
+        unit: "%"
+        alert_threshold: 80
+        
+      - type: query_value
+        title: "Average Feedback Score"
+        metric: "rvp.feedback.avg_score"
+        target: 4.0
+        unit: "/5.0"
+        alert_threshold: 4.0
+        
+      - type: query_value
+        title: "Total Feedback Entries"
+        metric: "rvp.feedback.total_count"
+        target: 10
+        
+      - type: distribution
+        title: "Score Distribution"
+        metric: "rvp.feedback.score"
+        bins: [1, 2, 3, 4, 5]
+        
+      - type: toplist
+        title: "Feedback by Category"
+        metric: "rvp.feedback.count"
+        group_by: "category"
+        
+      - type: toplist
+        title: "Feedback by Context"
+        metric: "rvp.feedback.count"
+        group_by: "context"
+        
+      - type: timeseries
+        title: "Feedback Trend"
+        metrics:
+          - "rvp.feedback.positive_count"
+          - "rvp.feedback.negative_count"
+        visualization: stacked_bar
+        
+      - type: query_value
+        title: "Feed Accuracy"
+        metric: "rvp.pilot.feed_accuracy_pct"
+        target: 90
+        unit: "%"
+
+# Monitors (Alerts)
+monitors:
+  # Business Metrics
+  - name: "Feed Approval Rate Below Target"
+    type: metric alert
+    query: "avg(last_1h):avg:rvp.feed.approval_rate < 95"
+    message: |
+      Feed approval rate has dropped below 95%.
+      Current: {{value}}%
+      Target: 95%
+      
+      @slack-alerts
+    tags:
+      - "service:inventory"
+      - "priority:high"
+      - "team:api"
+    
+  - name: "Category Mapping Coverage Not 100%"
+    type: metric alert
+    query: "avg(last_1h):avg:rvp.category.mapping_coverage_pct < 100"
+    message: |
+      Category mapping coverage is not 100%.
+      Current: {{value}}%
+      
+      Some categories are unmapped. Check the Category Alignment dashboard.
+      
+      @slack-alerts
+    tags:
+      - "service:inventory"
+      - "priority:high"
+      - "team:api"
+    
+  - name: "OAuth Error Rate High"
+    type: metric alert
+    query: "avg(last_15m):avg:rvp.oauth.error_rate > 10"
+    message: |
+      OAuth error rate is above 10%.
+      Current: {{value}}%
+      
+      Check Google OAuth integration.
+      
+      @slack-critical
+    tags:
+      - "service:integrations"
+      - "priority:critical"
+      - "team:integrations"
+  
+  # Technical Metrics
+  - name: "Service Error Rate High"
+    type: metric alert
+    query: "avg(last_5m):avg:rvp.api.error_rate{*} by {service} > 5"
+    message: |
+      Error rate for {{service.name}} is above 5%.
+      Current: {{value}}%
+      
+      @pagerduty
+    tags:
+      - "priority:critical"
+      - "team:devops"
+    
+  - name: "API Latency High"
+    type: metric alert
+    query: "avg(last_10m):avg:rvp.api.latency.p95 > 1000"
+    message: |
+      API latency p95 is above 1 second.
+      Current: {{value}}ms
+      
+      @slack-alerts
+    tags:
+      - "priority:medium"
+      - "team:api"
+    
+  - name: "Job Queue Depth High"
+    type: metric alert
+    query: "avg(last_5m):avg:rvp.feed_jobs.queue_depth > 1000"
+    message: |
+      Feed job queue depth is above 1000.
+      Current: {{value}} jobs
+      
+      Job processor may be falling behind.
+      
+      @slack-alerts
+    tags:
+      - "service:inventory"
+      - "priority:medium"
+      - "team:api"
+    
+  - name: "Service Uptime Below SLA"
+    type: service check
+    query: "\"datadog.agent.up\".over(\"service:rvp\").by(\"service\").last(2).count_by_status()"
+    message: |
+      Service uptime is below 99.9% SLA.
+      
+      @pagerduty
+    tags:
+      - "priority:critical"
+      - "team:devops"
+
+# Synthetic Monitoring
+synthetic_tests:
+  # Journey 1: Align Category
+  - name: "Align Category Journey"
+    type: browser
+    locations:
+      - "aws:us-east-1"
+      - "aws:eu-west-1"
+    frequency: 300  # 5 minutes
+    steps:
+      - action: navigate
+        url: "https://app.retailvisibility.com/login"
+      - action: type
+        selector: "#email"
+        value: "{{SYNTHETIC_USER_EMAIL}}"
+      - action: type
+        selector: "#password"
+        value: "{{SYNTHETIC_USER_PASSWORD}}"
+      - action: click
+        selector: "#login-button"
+      - action: wait
+        selector: "#dashboard"
+      - action: navigate
+        url: "https://app.retailvisibility.com/t/{{TENANT_ID}}/categories"
+      - action: wait
+        selector: "#categories-list"
+      - action: click
+        selector: ".unmapped-category:first"
+      - action: wait
+        selector: "#alignment-drawer"
+      - action: type
+        selector: "#taxonomy-search"
+        value: "Electronics"
+      - action: wait
+        selector: ".taxonomy-results"
+      - action: click
+        selector: ".taxonomy-result:first"
+      - action: click
+        selector: "#save-mapping"
+      - action: wait
+        selector: ".success-toast"
+    assertions:
+      - type: statusCode
+        target: 200
+      - type: responseTime
+        target: 400
+        comparator: lessThan
+    alert_conditions:
+      - type: test_failure
+        threshold: 2
+        timeframe: 5
+
+  # Journey 2: Save Profile
+  - name: "Save Profile Journey"
+    type: browser
+    locations:
+      - "aws:us-east-1"
+    frequency: 600  # 10 minutes
+    steps:
+      - action: navigate
+        url: "https://app.retailvisibility.com/login"
+      - action: type
+        selector: "#email"
+        value: "{{SYNTHETIC_USER_EMAIL}}"
+      - action: type
+        selector: "#password"
+        value: "{{SYNTHETIC_USER_PASSWORD}}"
+      - action: click
+        selector: "#login-button"
+      - action: navigate
+        url: "https://app.retailvisibility.com/t/{{TENANT_ID}}/settings/profile"
+      - action: wait
+        selector: "#profile-form"
+      - action: type
+        selector: "#business-name"
+        value: "Test Business"
+      - action: type
+        selector: "#address"
+        value: "123 Main St"
+      - action: click
+        selector: "#save-profile"
+      - action: wait
+        selector: ".success-toast"
+    assertions:
+      - type: statusCode
+        target: 200
+      - type: responseTime
+        target: 400
+        comparator: lessThan
+
+  # Journey 3: Feed Push
+  - name: "Feed Push Journey"
+    type: api
+    locations:
+      - "aws:us-east-1"
+    frequency: 300  # 5 minutes
+    request:
+      method: POST
+      url: "https://api.retailvisibility.com/api/feed-jobs"
+      headers:
+        Content-Type: "application/json"
+        Authorization: "Bearer {{API_TOKEN}}"
+      body: |
+        {
+          "tenantId": "{{TENANT_ID}}",
+          "sku": "SYNTHETIC-TEST",
+          "payload": {
+            "feedType": "test",
+            "itemCount": 1
+          }
+        }
+    assertions:
+      - type: statusCode
+        target: 201
+      - type: responseTime
+        target: 400
+        comparator: lessThan
+      - type: body
+        property: "success"
+        target: true
+
+# SLO (Service Level Objectives)
+slos:
+  - name: "API Uptime"
+    type: metric
+    description: "API should be available 99.9% of the time"
+    target: 99.9
+    timeframe: "30d"
+    metric: "rvp.api.uptime"
+    
+  - name: "Synthetic Test Success Rate"
+    type: monitor
+    description: "Synthetic tests should pass 95% of the time"
+    target: 95
+    timeframe: "7d"
+    monitor_ids:
+      - "synthetic_align_category"
+      - "synthetic_save_profile"
+      - "synthetic_feed_push"
+    
+  - name: "Feed Push Success Rate"
+    type: metric
+    description: "Feed pushes should succeed 95% of the time"
+    target: 95
+    timeframe: "7d"
+    metric: "rvp.feed_jobs.success_rate"
+
+# Tags
+tags:
+  - "env:production"
+  - "project:rvp"
+  - "version:v3.6.2-prep"
+  - "team:platform"
