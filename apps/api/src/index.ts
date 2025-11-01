@@ -52,6 +52,10 @@ import subscriptionRoutes from './routes/subscriptions';
 import categoryRoutes from './routes/categories';
 import photosRouter from './photos';
 
+// v3.6.2-prep imports
+import feedJobsRoutes from './routes/feed-jobs';
+import feedbackRoutes from './routes/feedback';
+
 // Authentication
 import authRoutes from './auth/auth.routes';
 import { authenticateToken, checkTenantAccess, requireAdmin } from './middleware/auth';
@@ -1838,6 +1842,10 @@ app.use('/users', userRoutes);
 app.use('/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
 app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
+
+/* ------------------------------ v3.6.2-prep APIs ------------------------------ */
+app.use('/api/feed-jobs', feedJobsRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);
