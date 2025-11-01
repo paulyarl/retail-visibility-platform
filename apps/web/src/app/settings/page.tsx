@@ -220,13 +220,26 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           badge: 'New',
         },
         {
-          title: 'Feature Flags',
-      description: 'Control feature rollout and experimentation',
-      icon: (
-        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-        </svg>
-      ),
+          title: 'Feature Flags (DB)',
+          description: 'Database-backed flags with tenant override support',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+            </svg>
+          ),
+          href: '/settings/admin/platform-flags',
+          color: 'bg-indigo-500',
+          adminOnly: true,
+          badge: 'New',
+        },
+        {
+          title: 'Feature Flags (Legacy)',
+          description: 'localStorage-based flags (backward compatibility)',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+            </svg>
+          ),
           href: '/settings/admin/features',
           color: 'bg-green-500',
           adminOnly: true,

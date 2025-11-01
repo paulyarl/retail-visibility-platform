@@ -234,34 +234,50 @@ export default function FeatureFlagsPage() {
           </div>
 
           {/* Migration Notice */}
-          <Card className="mt-8 border-amber-200 bg-amber-50">
+          <Card className="mt-8 border-green-200 bg-green-50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <CardTitle className="flex items-center gap-2 text-green-900">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Migration Required
+                New System Available!
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <p className="text-sm text-neutral-700">
-                  <strong>Current:</strong> These flags are stored in localStorage (browser-only, no persistence).
+                <p className="text-sm text-green-800 font-medium">
+                  ✅ Database-backed flags with tenant override support are now ready!
                 </p>
-                <p className="text-sm text-neutral-700">
-                  <strong>New System:</strong> Database-backed flags with tenant override support are ready but not yet migrated.
-                </p>
-                <div className="bg-white border border-amber-200 rounded p-3 text-sm">
-                  <p className="font-medium text-neutral-900 mb-2">To enable tenant override functionality:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-neutral-700 ml-2">
-                    <li>Migrate existing flags to database</li>
-                    <li>Update this page to use DB-backed API</li>
-                    <li>Enable "Allow tenants to override" checkbox</li>
-                  </ol>
+                <div className="bg-white border border-green-200 rounded p-4 text-sm space-y-2">
+                  <p className="font-medium text-neutral-900">New Features:</p>
+                  <ul className="list-disc list-inside space-y-1 text-neutral-700 ml-2">
+                    <li>Persistent storage across sessions and users</li>
+                    <li>Tenant override permissions (allow tenants to enable flags)</li>
+                    <li>Real-time updates without browser refresh</li>
+                    <li>Rollout notes and documentation</li>
+                  </ul>
                 </div>
-                <Link href="/admin/platform/flags" className="inline-flex items-center text-sm text-primary-600 hover:underline font-medium">
-                  Preview new DB-backed flags system →
-                </Link>
+                <div className="flex gap-3">
+                  <Link 
+                    href="/settings/admin/platform-flags" 
+                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium text-sm"
+                  >
+                    Switch to New System →
+                  </Link>
+                  <button
+                    onClick={() => {
+                      if (confirm('This will open the migration guide. Continue?')) {
+                        window.open('https://github.com/paulyarl/retail-visibility-platform/blob/main/docs/FEATURE_FLAGS_SYSTEM.md#migration-guide', '_blank');
+                      }
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-green-600 text-green-700 rounded hover:bg-green-50 font-medium text-sm"
+                  >
+                    View Migration Guide
+                  </button>
+                </div>
+                <p className="text-xs text-green-700">
+                  <strong>Note:</strong> This localStorage-based system will remain available for backward compatibility.
+                </p>
               </div>
             </CardContent>
           </Card>
