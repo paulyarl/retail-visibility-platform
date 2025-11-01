@@ -38,9 +38,13 @@ export async function apiRequest(
   const token = getAccessToken();
   const tenantId = getLastTenantId();
   const csrf = getCookie('csrf');
+  const requestId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? (crypto as any).randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'x-request-id': requestId,
     ...(options.headers as Record<string, string>),
   };
 
@@ -65,10 +69,24 @@ export async function apiRequest(
     ? endpoint 
     : `${API_BASE_URL}${endpoint}`;
 
-  const resp = await fetch(url, {
-    ...options,
-    headers,
-  });
+  // Simple retry/backoff for 429/5xx (max 2 retries)
+  const maxRetries = 2;
+  let attempt = 0;
+  let resp: Response;
+  while (true) {
+    resp = await fetch(url, {
+      ...options,
+      headers,
+    });
+    if (attempt >= maxRetries) break;
+    if (resp.status === 429 || (resp.status >= 500 && resp.status <= 599)) {
+      const delay = Math.pow(2, attempt) * 300; // 300ms, 600ms
+      await new Promise((r) => setTimeout(r, delay));
+      attempt++;
+      continue;
+    }
+    break;
+  }
   
   // Centralized 401 handling (non-destructive)
   if (resp.status === 401 && typeof window !== 'undefined' && !(options as any).skipAuthRedirect) {

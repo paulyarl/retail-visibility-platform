@@ -133,4 +133,40 @@ router.post('/:tenantId/feed/serialize', async (req, res) => {
   }
 })
 
+// Coverage endpoint (no view dependency): resolve by joining item leaf slug to tenant_category.slug
+router.get('/:tenantId/categories/coverage', async (req, res) => {
+  try {
+    const tenantId = req.params.tenantId
+    // Total active, public items for tenant
+    const total = await prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'active', visibility: 'public' } })
+
+    // Mapped items: join inventory_item to tenant_category by leaf slug of category_path
+    const rows = await prisma.$queryRawUnsafe<{ count: string }[]>(
+      `SELECT COUNT(*)::text AS count
+       FROM inventory_item ii
+       JOIN tenant_category tc
+         ON tc.tenant_id = ii.tenant_id
+        AND tc.is_active = TRUE
+        AND (
+          CASE WHEN ii.category_path IS NOT NULL AND array_length(ii.category_path, 1) > 0
+               THEN ii.category_path[array_length(ii.category_path, 1)]
+               ELSE NULL
+          END
+        ) = tc.slug
+       WHERE ii.tenant_id = $1
+         AND ii.item_status = 'active'
+         AND ii.visibility = 'public'
+         AND tc.google_category_id IS NOT NULL`,
+      tenantId
+    )
+    const mapped = parseInt(rows?.[0]?.count || '0', 10)
+    const unmapped = Math.max(total - mapped, 0)
+    const coverage = total > 0 ? parseFloat(((mapped / total) * 100).toFixed(2)) : 0
+
+    res.json({ success: true, data: { total, mapped, unmapped, coverage } })
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'coverage_failed' })
+  }
+})
+
 export default router

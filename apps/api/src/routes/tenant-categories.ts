@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { audit } from '../audit';
 
 const router = Router();
 
@@ -238,6 +239,23 @@ router.post('/:tenantId/categories', async (req, res) => {
       },
     });
 
+    // Audit: category.create
+    try {
+      await audit({
+        tenantId,
+        actor: (req as any)?.user?.userId ?? null,
+        action: 'category.create',
+        payload: {
+          id: category.id,
+          name: category.name,
+          slug: category.slug,
+          parentId: category.parentId,
+          googleCategoryId: category.googleCategoryId,
+          requestId: req.headers['x-request-id'] || null,
+        },
+      });
+    } catch {}
+
     res.status(201).json({
       success: true,
       data: category,
@@ -328,6 +346,20 @@ router.put('/:tenantId/categories/:id', async (req, res) => {
       data: body,
     });
 
+    // Audit: category.update (include changed fields)
+    try {
+      await audit({
+        tenantId,
+        actor: (req as any)?.user?.userId ?? null,
+        action: 'category.update',
+        payload: {
+          id,
+          delta: body,
+          requestId: req.headers['x-request-id'] || null,
+        },
+      });
+    } catch {}
+
     res.json({
       success: true,
       data: category,
@@ -410,6 +442,19 @@ router.delete('/:tenantId/categories/:id', async (req, res) => {
       data: { isActive: false },
     });
 
+    // Audit: category.delete (soft)
+    try {
+      await audit({
+        tenantId,
+        actor: (req as any)?.user?.userId ?? null,
+        action: 'category.delete',
+        payload: {
+          id,
+          requestId: req.headers['x-request-id'] || null,
+        },
+      });
+    } catch {}
+
     res.json({
       success: true,
       message: 'Category deleted successfully',
@@ -463,6 +508,20 @@ router.post('/:tenantId/categories/:id/align', async (req, res) => {
         googleCategoryId: body.googleCategoryId,
       },
     });
+
+    // Audit: category.align
+    try {
+      await audit({
+        tenantId,
+        actor: (req as any)?.user?.userId ?? null,
+        action: 'category.align',
+        payload: {
+          id,
+          googleCategoryId: body.googleCategoryId,
+          requestId: req.headers['x-request-id'] || null,
+        },
+      });
+    } catch {}
 
     res.json({
       success: true,

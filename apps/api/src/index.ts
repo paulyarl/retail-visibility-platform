@@ -3,6 +3,7 @@ import cors from "cors";
 import morgan from "morgan";
 import { prisma } from "./prisma";
 import { z } from "zod";
+import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
 
 // Debug: Log DATABASE_URL to verify it's correct
 // Migration fix applied: 20251024093000_add_photo_asset_fields marked as rolled back
@@ -14,8 +15,9 @@ import { createClient } from "@supabase/supabase-js";
 import { Flags } from "./config";
 import { setRequestContext } from "./context";
 import { StorageBuckets } from "./storage-config";
-import { audit } from "./audit";
+import { audit, ensureAuditTable } from "./audit";
 import { dailyRatesJob } from "./jobs/rates";
+import { ensureFeedCategoryView } from "./views";
 import {
   getAuthorizationUrl,
   decodeState,
@@ -90,6 +92,14 @@ app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(setRequestContext);
+// CSRF: issue cookie and enforce on write operations when FF_ENFORCE_CSRF=true
+app.use(setCsrfCookie);
+app.use(csrfProtect);
+
+// Ensure audit table exists if auditing is enabled
+ensureAuditTable().catch(() => {});
+// Ensure helper view exists for feed category resolution
+ensureFeedCategoryView().catch(() => {});
 
 console.log("✓ Express configured with 50mb body limit");
 
@@ -1885,6 +1895,21 @@ app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) =
       where: { id: itemId },
       data: { categoryPath: [category.slug] as any },
     });
+
+    // Audit log
+    try {
+      await audit({
+        tenantId,
+        actor: (req as any)?.user?.userId ?? null,
+        action: 'item.category.assign',
+        payload: {
+          itemId,
+          tenantCategoryId: tenantCategoryId ?? null,
+          categorySlug: categorySlug ?? null,
+          requestId: req.headers['x-request-id'] || null,
+        },
+      });
+    } catch {}
 
     return res.json({ success: true, data: updated });
   } catch (e) {

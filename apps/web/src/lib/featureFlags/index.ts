@@ -13,6 +13,8 @@ export type FeatureFlag =
   | 'FF_GOOGLE_CONNECT_SUITE'
   | 'FF_APP_SHELL_NAV'
   | 'FF_TENANT_URLS'
+  | 'FF_CATEGORY_MANAGEMENT_PAGE'
+  | 'FF_CATEGORY_QUICK_ACTIONS'
   | 'FF_ITEMS_V2_GRID';
 
 export type RolloutStrategy = 
@@ -74,6 +76,16 @@ let FEATURE_FLAGS: Record<FeatureFlag, FeatureFlagConfig> = {
   },
   FF_TENANT_URLS: {
     flag: 'FF_TENANT_URLS',
+    strategy: 'off',
+    percentage: 0,
+  },
+  FF_CATEGORY_MANAGEMENT_PAGE: {
+    flag: 'FF_CATEGORY_MANAGEMENT_PAGE',
+    strategy: 'on',
+    percentage: 100,
+  },
+  FF_CATEGORY_QUICK_ACTIONS: {
+    flag: 'FF_CATEGORY_QUICK_ACTIONS',
     strategy: 'off',
     percentage: 0,
   },

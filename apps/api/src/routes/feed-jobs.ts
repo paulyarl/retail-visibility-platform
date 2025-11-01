@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { Flags } from '../config';
 
 const router = Router();
 
@@ -25,6 +26,87 @@ const updateJobStatusSchema = z.object({
 router.post('/', async (req, res) => {
   try {
     const body = createFeedJobSchema.parse(req.body);
+
+    // Optional enforcement: block feed pushes when categories are missing/unmapped
+    if (Flags.FEED_ALIGNMENT_ENFORCE === true) {
+      const tenantId = body.tenantId;
+
+      // Build item filter: active + public items
+      const baseWhere: any = {
+        tenantId,
+        itemStatus: 'active',
+        visibility: 'public',
+      };
+      if (body.sku) {
+        baseWhere.OR = [
+          { sku: { equals: body.sku } },
+          { id: { equals: body.sku } },
+        ];
+      }
+
+      const items = await prisma.inventoryItem.findMany({
+        where: baseWhere,
+        select: { id: true, sku: true, categoryPath: true },
+        take: body.sku ? 1 : 2000, // cap to avoid huge scans; job processor can chunk
+      });
+
+      const missingCategory: Array<{ id: string; sku: string | null } > = [];
+      const unmapped: Array<{ id: string; sku: string | null; categoryPath: string[] } > = [];
+
+      // Pre-load mapped slugs → googleCategoryId for efficiency
+      // Collect slugs from items
+      const slugs = new Set<string>();
+      for (const it of items) {
+        const path = (it as any).categoryPath as string[] | null;
+        if (!path || path.length === 0) continue;
+        const leaf = path[path.length - 1];
+        if (leaf) slugs.add(leaf);
+      }
+      const slugList = Array.from(slugs);
+      const catMap: Record<string, string | null> = {};
+      if (slugList.length > 0) {
+        const cats = await prisma.tenantCategory.findMany({
+          where: { tenantId, slug: { in: slugList }, isActive: true },
+          select: { slug: true, googleCategoryId: true },
+        });
+        for (const c of cats) catMap[c.slug] = c.googleCategoryId;
+      }
+
+      for (const it of items) {
+        const path = (it as any).categoryPath as string[] | null;
+        const sku = typeof (it as any).sku === 'string' ? (it as any).sku : null;
+        if (!path || path.length === 0) {
+          missingCategory.push({ id: it.id, sku });
+          continue;
+        }
+        const leaf = path[path.length - 1];
+        const gId = leaf ? catMap[leaf] ?? null : null;
+        if (!gId) {
+          unmapped.push({ id: it.id, sku, categoryPath: path });
+        }
+      }
+
+      if (missingCategory.length > 0 || unmapped.length > 0) {
+        return res.status(422).json({
+          success: false,
+          error: 'alignment_required',
+          message: 'Some products are missing categories or use categories not aligned to Google taxonomy.',
+          details: {
+            missingCategoryCount: missingCategory.length,
+            unmappedCount: unmapped.length,
+            examples: {
+              missingCategory: missingCategory.slice(0, 10),
+              unmapped: unmapped.slice(0, 10),
+            },
+            nextSteps: [
+              'Open Categories: align unmapped categories to Google taxonomy',
+              'Assign categories to uncategorized products',
+              'Re-run Precheck before pushing feed',
+            ],
+          },
+        });
+      }
+    }
 
     const job = await prisma.feedPushJob.create({
       data: {

@@ -2,6 +2,9 @@ import { cookies } from 'next/headers';
 import { redirect, notFound } from 'next/navigation';
 import RememberTenantRoute from '@/components/client/RememberTenantRoute';
 import TenantShell from '@/components/tenant/TenantShell';
+import { getTenantContext } from '@/lib/tenantContext';
+import TenantContextProvider from '@/components/tenant/TenantContextProvider';
+import { isFeatureEnabled } from '@/lib/featureFlags';
 
 export default async function TenantLayout({ children, params }: { children: React.ReactNode; params: Promise<{ tenantId: string }> | { tenantId: string } }) {
   const cookieStore = await cookies();
@@ -16,6 +19,9 @@ export default async function TenantLayout({ children, params }: { children: Rea
   if (!tenantId) {
     notFound();
   }
+
+  // Resolve server tenant context (from tcx cookie or headers)
+  const tenantCtx = await getTenantContext();
 
   const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
   let tenantList: Array<{ id: string; name: string }> = [];
@@ -42,10 +48,16 @@ export default async function TenantLayout({ children, params }: { children: Rea
   const current = tenantList.find(t => t.id === tenantId);
   const tenantName = current?.name || tenantId;
 
+  // Feature flags (server-side) for gating nav items/variants
+  const ffTenantUrls = isFeatureEnabled('FF_TENANT_URLS', tenantId);
+  const ffAppShellNav = isFeatureEnabled('FF_APP_SHELL_NAV', tenantId);
+  const ffCategoryMgmt = isFeatureEnabled('FF_CATEGORY_MANAGEMENT_PAGE' as any, tenantId as any);
+
   const nav = [
     { label: 'Dashboard', href: `/t/${tenantId}/dashboard` },
     { label: 'Items', href: `/t/${tenantId}/items` },
-    { label: 'Categories', href: `/t/${tenantId}/categories` },
+    // Categories link gated by FF_CATEGORY_MANAGEMENT_PAGE; default show when flag off is false? Keep conservative: show only when enabled
+    ...(ffCategoryMgmt ? [{ label: 'Categories', href: `/t/${tenantId}/categories` }] as const : []),
     { label: 'Feed Validation', href: `/t/${tenantId}/feed-validation` },
     { label: 'Profile Completeness', href: `/t/${tenantId}/profile-completeness` },
     { label: 'Settings', href: `/t/${tenantId}/settings/tenant` },
@@ -55,9 +67,19 @@ export default async function TenantLayout({ children, params }: { children: Rea
     <>
       {/* Persist last visited tenant route for restore-after-login UX */}
       <RememberTenantRoute tenantId={tenantId} />
-      <TenantShell tenantId={tenantId} tenantName={tenantName} nav={nav} tenants={tenantList}>
-        {children}
-      </TenantShell>
+      <TenantContextProvider value={{ tenantId: tenantCtx.tenantId ?? tenantId, tenantSlug: tenantCtx.tenantSlug, aud: tenantCtx.aud }}>
+        <TenantShell 
+          tenantId={tenantId} 
+          tenantName={tenantName} 
+          nav={nav} 
+          tenants={tenantList}
+          // Pass a hint for shell variant; component may ignore if it doesn't support it yet
+          // @ts-ignore optional prop for future variant gating
+          appShellVariant={ffAppShellNav ? 'v2' : 'default'}
+        >
+          {children}
+        </TenantShell>
+      </TenantContextProvider>
     </>
   );
 }
