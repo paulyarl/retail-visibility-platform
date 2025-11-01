@@ -53,7 +53,7 @@ export default function AdminDashboardPage() {
   const adminGroups: AdminGroup[] = [
     {
       title: 'Platform Configuration',
-      description: 'Customize platform appearance, communications, and features',
+      description: 'Customize platform appearance and communications',
       sections: [
         {
           title: 'Branding',
@@ -81,6 +81,12 @@ export default function AdminDashboardPage() {
           stats: '8 categories',
           badge: 'NEW',
         },
+      ],
+    },
+    {
+      title: 'Feature Flags',
+      description: 'Control feature rollout and tenant override permissions',
+      sections: [
         {
           title: 'Feature Flags (DB)',
           description: 'Database-backed flags with tenant override support',
@@ -128,7 +134,7 @@ export default function AdminDashboardPage() {
     },
     {
       title: 'Tenant & Organization Management',
-      description: 'Manage tenants, organizations, and subscription requests',
+      description: 'Manage tenants and chain organizations',
       sections: [
         {
           title: 'Tenant Management',
@@ -155,6 +161,12 @@ export default function AdminDashboardPage() {
           stats: 'Chain management',
           badge: 'NEW',
         },
+      ],
+    },
+    {
+      title: 'Requests & Approvals',
+      description: 'Review and process tenant requests',
+      sections: [
         {
           title: 'Upgrade Requests',
           description: 'Manage subscription upgrade requests from tenants',
