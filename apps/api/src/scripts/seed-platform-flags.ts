@@ -8,63 +8,63 @@ import { prisma } from '../prisma';
 const DEFAULT_FLAGS = [
   {
     flag: 'FF_MAP_CARD',
-    enabled: false,
-    rollout: 'Google Maps integration for tenant locations',
+    enabled: false, // strategy: 'off' in localStorage
+    rollout: 'Google Maps integration for tenant locations with privacy controls',
     allowTenantOverride: true,
   },
   {
     flag: 'FF_SWIS_PREVIEW',
-    enabled: false,
+    enabled: false, // strategy: 'off' in localStorage
     rollout: 'Product preview widget showing live inventory feed',
     allowTenantOverride: true,
   },
   {
     flag: 'FF_BUSINESS_PROFILE',
-    enabled: true,
-    rollout: 'Complete business profile management - fully deployed',
-    allowTenantOverride: false,
+    enabled: true, // strategy: 'on' in localStorage - ALREADY DEPLOYED
+    rollout: 'Complete business profile management and onboarding',
+    allowTenantOverride: false, // Critical feature, no override
   },
   {
     flag: 'FF_DARK_MODE',
-    enabled: false,
-    rollout: 'Dark theme support (coming soon)',
+    enabled: false, // strategy: 'off' in localStorage - Future feature
+    rollout: 'Dark theme support across the platform (coming soon)',
     allowTenantOverride: true,
   },
   {
     flag: 'FF_GOOGLE_CONNECT_SUITE',
-    enabled: false,
-    rollout: 'Pilot: Google Merchant Center + Business Profile integration',
-    allowTenantOverride: false,
+    enabled: false, // strategy: 'pilot' in localStorage - Pilot phase
+    rollout: 'Pilot: Google Merchant Center + Business Profile integration (v1: read-only)',
+    allowTenantOverride: false, // Controlled rollout, no tenant override
   },
   {
     flag: 'FF_APP_SHELL_NAV',
-    enabled: false,
-    rollout: 'New header and Tenant Switcher',
-    allowTenantOverride: false,
+    enabled: false, // strategy: 'off' in localStorage
+    rollout: 'Enable the new header and Tenant Switcher (URL-driven tenant context)',
+    allowTenantOverride: false, // Core navigation, no override
   },
   {
     flag: 'FF_TENANT_URLS',
-    enabled: false,
-    rollout: 'Tenant-scoped routes like /t/{tenantId}/items',
-    allowTenantOverride: false,
+    enabled: false, // strategy: 'off' in localStorage
+    rollout: 'Enable tenant-scoped routes like /t/{tenantId}/items and /t/{tenantId}/settings',
+    allowTenantOverride: false, // Core routing, no override
   },
   {
     flag: 'FF_ITEMS_V2_GRID',
-    enabled: false,
-    rollout: 'High-performance items grid (virtualized)',
-    allowTenantOverride: true,
+    enabled: false, // strategy: 'off' in localStorage
+    rollout: 'Enable the new high-performance items grid (virtualized, faster filters)',
+    allowTenantOverride: true, // Performance feature, safe to override
   },
   {
     flag: 'FF_CATEGORY_MANAGEMENT_PAGE',
-    enabled: true,
-    rollout: 'Category management page - fully deployed',
-    allowTenantOverride: false,
+    enabled: true, // strategy: 'on' in localStorage - ALREADY DEPLOYED
+    rollout: 'Enable category management page and features',
+    allowTenantOverride: false, // Core feature, no override
   },
   {
     flag: 'FF_CATEGORY_QUICK_ACTIONS',
-    enabled: false,
-    rollout: 'Quick actions for category management',
-    allowTenantOverride: true,
+    enabled: false, // strategy: 'off' in localStorage
+    rollout: 'Enable quick actions for category management',
+    allowTenantOverride: true, // UX enhancement, safe to override
   },
 ];
 

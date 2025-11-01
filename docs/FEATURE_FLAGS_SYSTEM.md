@@ -285,16 +285,45 @@ The current platform flags UI (`/settings/admin/features`) uses localStorage. To
 
 ### 1. Use Descriptive Flag Names
 ```typescript
-// Good
+// Platform flags (start with FF_)
 FF_TENANT_GBP_HOURS_SYNC
 FF_ITEMS_V2_GRID
 FF_BUSINESS_PROFILE
+
+// Custom tenant flags (start with TENANT_)
+TENANT_CUSTOM_CHECKOUT
+TENANT_BETA_FEATURE
+TENANT_SPECIAL_PRICING
 
 // Bad
 FEATURE_1
 NEW_THING
 TEST
 ```
+
+### 2. Custom Tenant Flags (Advanced)
+
+**Naming Convention:**
+- Custom tenant flags MUST start with `TENANT_` prefix
+- Example: `TENANT_CUSTOM_FEATURE`, `TENANT_BETA_TEST`
+
+**Important Notes:**
+- Custom flags do NOT affect functionality until code is deployed
+- Requires developer to add middleware or UI checks
+- Used for tenant-specific customizations
+- Not recommended for common platform usage
+
+**When to Use:**
+- Tenant-specific feature development
+- A/B testing with specific tenants
+- Beta testing with volunteer tenants
+- Unique requirements for individual tenants
+
+**UI Validation:**
+The tenant flags UI enforces:
+- Custom flags must start with `TENANT_` prefix
+- Warning dialog explains advanced nature
+- "Custom Flag" badge for visual distinction
 
 ### 2. Set Override Permissions Carefully
 - **Don't allow override** for critical features or security-sensitive flags

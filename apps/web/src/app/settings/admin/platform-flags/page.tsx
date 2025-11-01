@@ -115,14 +115,6 @@ export default function PlatformFlagsPage() {
             href: '/settings',
             label: 'Back to Settings'
           }}
-          actions={
-            <button 
-              onClick={addFlag}
-              className="bg-black text-white px-4 py-2 rounded hover:bg-neutral-800"
-            >
-              Add Flag
-            </button>
-          }
         />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -185,6 +177,38 @@ export default function PlatformFlagsPage() {
                           )}
                         </div>
                         
+                        {/* Rollout Buttons */}
+                        <div className="flex items-center gap-2 flex-wrap mb-3">
+                          <button
+                            onClick={() => updateFlag(flag.flag, { enabled: true, rollout: '20% rollout' })}
+                            disabled={saving === flag.flag}
+                            className="px-3 py-1 text-sm border border-neutral-300 rounded hover:bg-neutral-50 disabled:opacity-50"
+                          >
+                            20% Rollout
+                          </button>
+                          <button
+                            onClick={() => updateFlag(flag.flag, { enabled: true, rollout: '50% rollout' })}
+                            disabled={saving === flag.flag}
+                            className="px-3 py-1 text-sm border border-neutral-300 rounded hover:bg-neutral-50 disabled:opacity-50"
+                          >
+                            50% Rollout
+                          </button>
+                          <button
+                            onClick={() => updateFlag(flag.flag, { enabled: true, rollout: '100% - Fully deployed' })}
+                            disabled={saving === flag.flag}
+                            className="px-3 py-1 text-sm border border-neutral-300 rounded hover:bg-neutral-50 disabled:opacity-50"
+                          >
+                            Enable All
+                          </button>
+                          <button
+                            onClick={() => updateFlag(flag.flag, { enabled: false })}
+                            disabled={saving === flag.flag}
+                            className="px-3 py-1 text-sm border border-neutral-300 rounded hover:bg-neutral-50 text-red-600 disabled:opacity-50"
+                          >
+                            Disable
+                          </button>
+                        </div>
+
                         {/* Rollout Notes */}
                         <div className="mb-3">
                           <input
@@ -235,6 +259,29 @@ export default function PlatformFlagsPage() {
                 </Card>
               ))}
             </div>
+          )}
+
+          {/* Quick Actions - Bottom */}
+          {flags.length > 0 && (
+            <Card className="mt-8">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-neutral-900">Advanced Actions</h3>
+                    <p className="text-sm text-neutral-600">Add new platform flags (rarely needed)</p>
+                  </div>
+                  <button 
+                    onClick={addFlag}
+                    className="bg-neutral-800 text-white px-4 py-2 rounded hover:bg-black text-sm font-medium"
+                  >
+                    <svg className="w-4 h-4 inline-block mr-2 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add New Flag
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Legacy System Notice */}

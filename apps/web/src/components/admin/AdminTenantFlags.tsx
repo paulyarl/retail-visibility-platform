@@ -69,8 +69,29 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
   };
 
   const addFlag = async () => {
-    const flag = prompt("Enter flag key (e.g., gbp_hours)")?.trim();
+    const flag = prompt("Enter flag key (must start with TENANT_ for custom flags, e.g., TENANT_CUSTOM_FEATURE)")?.trim();
     if (!flag) return;
+    
+    // Validate flag naming
+    if (!flag.startsWith('TENANT_') && !flag.startsWith('FF_')) {
+      setError('Custom flags must start with TENANT_ prefix (e.g., TENANT_MY_FEATURE)');
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
+    
+    // Warn about custom flags
+    if (flag.startsWith('TENANT_')) {
+      const confirmed = confirm(
+        '⚠️ Custom Flag Warning\n\n' +
+        'This custom flag will NOT affect any functionality until:\n' +
+        '1. A developer adds code to check this flag\n' +
+        '2. The code is deployed to production\n\n' +
+        'Custom flags are an advanced feature for tenant-specific customizations.\n\n' +
+        'Continue creating this flag?'
+      );
+      if (!confirmed) return;
+    }
+    
     await upsert(flag, { enabled: true });
   };
 
@@ -85,6 +106,26 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-4">
+      {/* Educational Alert */}
+      <Alert variant="info" title="About Feature Flags">
+        <div className="text-sm space-y-2">
+          <p>
+            This page shows feature flags that control functionality for this tenant:
+          </p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li><strong>Platform Flags:</strong> Flags with "Platform Override Allowed" badge can be toggled here even if disabled platform-wide</li>
+            <li><strong>Custom Flags:</strong> Advanced feature for tenant-specific customizations (requires developer implementation)</li>
+          </ul>
+          <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
+            <p className="font-medium text-blue-900 mb-1">⚠️ Advanced Feature</p>
+            <p className="text-blue-800">
+              Creating custom flags (TENANT_*) is an advanced feature that may not apply to common platform usage. 
+              Custom flags require code deployment to function and are typically used for specialized tenant requirements.
+            </p>
+          </div>
+        </div>
+      </Alert>
+
       {success && (
         <Alert variant="success" onClose={() => setSuccess(null)}>
           {success}
@@ -94,7 +135,7 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Tenant Feature Flags</h2>
         <button className="bg-black text-white px-4 py-2 rounded hover:bg-neutral-800" onClick={addFlag}>
-          Add Flag
+          Add Custom Flag
         </button>
       </div>
 
@@ -122,6 +163,11 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
                     {r._isPlatformInherited && (
                       <Badge variant="info">
                         Platform Override Allowed
+                      </Badge>
+                    )}
+                    {r.flag.startsWith('TENANT_') && (
+                      <Badge variant="warning">
+                        Custom Flag
                       </Badge>
                     )}
                   </div>

@@ -25,22 +25,28 @@ npx ts-node src/scripts/seed-platform-flags.ts
    - `rollout` - Description/notes about the flag
    - `allowTenantOverride` - Whether tenants can override platform settings
 
-### Default Flags
+### Default Flags (State Preservation)
 
-The script seeds these flags:
+The script seeds these flags **matching current localStorage state**:
 
-| Flag | Enabled | Override Allowed | Description |
-|------|---------|------------------|-------------|
-| `FF_MAP_CARD` | No | Yes | Google Maps integration |
-| `FF_SWIS_PREVIEW` | No | Yes | Product preview widget |
-| `FF_BUSINESS_PROFILE` | Yes | No | Business profile management (deployed) |
-| `FF_DARK_MODE` | No | Yes | Dark theme support |
-| `FF_GOOGLE_CONNECT_SUITE` | No | No | Google integrations (pilot) |
-| `FF_APP_SHELL_NAV` | No | No | New header and tenant switcher |
-| `FF_TENANT_URLS` | No | No | Tenant-scoped routes |
-| `FF_ITEMS_V2_GRID` | No | Yes | High-performance items grid |
-| `FF_CATEGORY_MANAGEMENT_PAGE` | Yes | No | Category management (deployed) |
-| `FF_CATEGORY_QUICK_ACTIONS` | No | Yes | Category quick actions |
+| Flag | Enabled | Override Allowed | Description | localStorage |
+|------|---------|------------------|-------------|--------------|
+| `FF_MAP_CARD` | ❌ No | ✅ Yes | Google Maps integration | `strategy: 'off'` |
+| `FF_SWIS_PREVIEW` | ❌ No | ✅ Yes | Product preview widget | `strategy: 'off'` |
+| `FF_BUSINESS_PROFILE` | **✅ YES** | ❌ No | Business profile (deployed) | `strategy: 'on'` ✅ |
+| `FF_DARK_MODE` | ❌ No | ✅ Yes | Dark theme support | `strategy: 'off'` |
+| `FF_GOOGLE_CONNECT_SUITE` | ❌ No | ❌ No | Google integrations (pilot) | `strategy: 'pilot'` |
+| `FF_APP_SHELL_NAV` | ❌ No | ❌ No | New header and tenant switcher | `strategy: 'off'` |
+| `FF_TENANT_URLS` | ❌ No | ❌ No | Tenant-scoped routes | `strategy: 'off'` |
+| `FF_ITEMS_V2_GRID` | ❌ No | ✅ Yes | High-performance items grid | `strategy: 'off'` |
+| `FF_CATEGORY_MANAGEMENT_PAGE` | **✅ YES** | ❌ No | Category management (deployed) | `strategy: 'on'` ✅ |
+| `FF_CATEGORY_QUICK_ACTIONS` | ❌ No | ✅ Yes | Category quick actions | `strategy: 'off'` |
+
+**⚠️ Important:** Only 2 flags are enabled by default:
+- `FF_BUSINESS_PROFILE` - Already deployed in production
+- `FF_CATEGORY_MANAGEMENT_PAGE` - Already deployed in production
+
+All other flags remain disabled to match current behavior.
 
 ### After Seeding
 

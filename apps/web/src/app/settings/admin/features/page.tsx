@@ -260,7 +260,8 @@ export default function FeatureFlagsPage() {
                 <div className="flex gap-3">
                   <Link 
                     href="/settings/admin/platform-flags" 
-                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium text-sm"
+                    className="inline-flex items-center px-4 py-2 bg-green-600 rounded hover:bg-green-700 font-medium text-sm shadow-sm"
+                    style={{ color: '#ffffff' }}
                   >
                     Switch to New System →
                   </Link>
