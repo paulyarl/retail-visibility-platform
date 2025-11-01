@@ -689,3 +689,41 @@ model OutreachFeedback {
   @@map("outreach_feedback")
 }
 
+// Tenant Category - Vendor-owned categories
+model TenantCategory {
+  id                String   @id @default(cuid())
+  tenantId          String   @map("tenant_id")
+  name              String
+  slug              String
+  parentId          String?  @map("parent_id")
+  googleCategoryId  String?  @map("google_category_id")
+  isActive          Boolean  @default(true) @map("is_active")
+  sortOrder         Int      @default(0) @map("sort_order")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, isActive])
+  @@index([googleCategoryId])
+  @@index([parentId])
+  @@map("tenant_category")
+}
+
+// Google Taxonomy - Google Product Taxonomy reference
+model GoogleTaxonomy {
+  id           String   @id @default(cuid())
+  categoryId   String   @unique @map("category_id")
+  categoryPath String   @map("category_path")
+  parentId     String?  @map("parent_id")
+  level        Int
+  isActive     Boolean  @default(true) @map("is_active")
+  version      String   @default("2024-09") @map("version")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([categoryId])
+  @@index([parentId])
+  @@index([version, isActive])
+  @@map("google_taxonomy")
+}
+
