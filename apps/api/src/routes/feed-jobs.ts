@@ -8,14 +8,14 @@ const router = Router();
 const createFeedJobSchema = z.object({
   tenantId: z.string().cuid(),
   sku: z.string().optional(),
-  payload: z.record(z.any()).optional(),
+  payload: z.record(z.string(), z.any()).optional(),
 });
 
 const updateJobStatusSchema = z.object({
   jobStatus: z.enum(['queued', 'processing', 'success', 'failed']),
   errorMessage: z.string().optional(),
   errorCode: z.string().optional(),
-  result: z.record(z.any()).optional(),
+  result: z.record(z.string(), z.any()).optional(),
 });
 
 /**
