@@ -30,7 +30,13 @@ const alignCategorySchema = z.object({
 
 /**
  * GET /api/v1/tenants/:tenantId/categories
- * List all categories for a tenant
+ * List categories for a tenant with optional search, mapped filter, and cursor pagination
+ * Query:
+ *  - search: string (name/slug contains)
+ *  - mapped: 'true' | 'false' | undefined
+ *  - includeInactive: 'true' | 'false'
+ *  - limit: number (max 50, default 50)
+ *  - cursor: string (id of last item from previous page)
  */
 router.get('/:tenantId/categories', async (req, res) => {
   try {
@@ -39,6 +45,9 @@ router.get('/:tenantId/categories', async (req, res) => {
       includeInactive = 'false',
       parentId,
       search,
+      mapped,
+      limit,
+      cursor,
     } = req.query;
 
     const where: any = { tenantId };
@@ -60,13 +69,28 @@ router.get('/:tenantId/categories', async (req, res) => {
       ];
     }
 
-    const categories = await prisma.tenantCategory.findMany({
+    if (mapped === 'true') {
+      where.googleCategoryId = { not: null };
+    } else if (mapped === 'false') {
+      where.googleCategoryId = null;
+    }
+
+    const take = Math.min(Math.max(parseInt(String(limit || '50'), 10) || 50, 1), 50);
+
+    const findArgs: any = {
       where,
-      orderBy: [
-        { sortOrder: 'asc' },
-        { name: 'asc' },
-      ],
-    });
+      orderBy: { id: 'asc' as const },
+      take: take + 1, // fetch one extra to determine nextCursor
+    };
+    if (cursor && typeof cursor === 'string') {
+      findArgs.cursor = { id: cursor };
+      findArgs.skip = 1; // skip the cursor item itself
+    }
+
+    const result = await prisma.tenantCategory.findMany(findArgs);
+    const hasMore = result.length > take;
+    const categories = hasMore ? result.slice(0, take) : result;
+    const nextCursor = hasMore ? categories[categories.length - 1]?.id : undefined;
 
     // Calculate mapping stats
     const totalCategories = categories.length;
@@ -78,6 +102,7 @@ router.get('/:tenantId/categories', async (req, res) => {
     res.json({
       success: true,
       data: categories,
+      nextCursor,
       stats: {
         total: totalCategories,
         mapped: mappedCategories,

@@ -11,6 +11,7 @@ import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import ItemsGridV2 from "./ItemsGridV2";
+import AssignCategoryModal from "./AssignCategoryModal";
 
 type Tenant = {
   id: string;
@@ -41,6 +42,7 @@ type Item = {
   itemStatus?: 'active' | 'inactive' | 'archived';
   visibility?: 'public' | 'private';
   availability?: 'in_stock' | 'out_of_stock' | 'preorder';
+  categoryPath?: string[];
 };
 
 export default function ItemsClient({
@@ -59,6 +61,7 @@ export default function ItemsClient({
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'syncing'>('all');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [totalItems, setTotalItems] = useState(initialItems?.length || 0);
   const [totalPages, setTotalPages] = useState(1);
   
@@ -121,13 +124,26 @@ export default function ItemsClient({
   const [showPhotoGallery, setShowPhotoGallery] = useState(false);
   const [galleryItem, setGalleryItem] = useState<Item | null>(null);
 
+  // Category assignment modal state
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryItem, setCategoryItem] = useState<Item | null>(null);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // No need for client-side filtering anymore - it's done server-side!
-  // Items are already filtered and paginated from the API
-  const paginatedItems = Array.isArray(items) ? items : [];
+  // Apply client-side category filter (since API doesn't support it yet)
+  const paginatedItems = useMemo(() => {
+    const itemsArray = Array.isArray(items) ? items : [];
+    if (categoryFilter === 'all') return itemsArray;
+    if (categoryFilter === 'assigned') {
+      return itemsArray.filter(item => item.categoryPath && item.categoryPath.length > 0);
+    }
+    if (categoryFilter === 'unassigned') {
+      return itemsArray.filter(item => !item.categoryPath || item.categoryPath.length === 0);
+    }
+    return itemsArray;
+  }, [items, categoryFilter]);
 
   const [isV2, setIsV2] = useState(false);
   
@@ -558,6 +574,40 @@ export default function ItemsClient({
           </div>
         )}
 
+        {/* Category Organization CTA */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Category Organization</CardTitle>
+            <CardDescription>Organize your products with categories for better feed quality and search performance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <div className="text-sm text-neutral-600">
+                  Create and align categories, then assign them to your products
+                </div>
+              </div>
+              {tenantId && (
+                <Button
+                  variant="primary"
+                  onClick={() => window.location.href = `/t/${tenantId}/categories`}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Manage Categories
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Tenant Logo */}
         {currentTenant?.metadata?.logo_url && (
           <Card>
@@ -648,43 +698,78 @@ export default function ItemsClient({
         </Card>
         )}
 
-        {/* Badge Legend */}
+        {/* Badge Legends */}
         {items.length > 0 && (
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="pt-4">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-blue-900 mb-2">Status Badge Guide</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-blue-800">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="success" className="text-xs">Active</Badge>
-                      <span>Product is active and syncs to Google</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="warning" className="text-xs">Inactive</Badge>
-                      <span>Product is paused, won't sync</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="default" className="text-xs bg-amber-100 text-amber-800">Private</Badge>
-                      <span>Not visible publicly, won't sync</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-600 text-xs flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        Syncs to Google
-                      </span>
-                      <span>Active + Public items only</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Status Badge Guide */}
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="pt-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-blue-900 mb-2">Status Badge Guide</h4>
+                    <div className="grid grid-cols-1 gap-2 text-xs text-blue-800">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="success" className="text-xs">Active</Badge>
+                        <span>Product is active and syncs to Google</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="warning" className="text-xs">Inactive</Badge>
+                        <span>Product is paused, won't sync</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="default" className="text-xs bg-amber-100 text-amber-800">Private</Badge>
+                        <span>Not visible publicly, won't sync</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-600 text-xs flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Syncs to Google
+                        </span>
+                        <span>Active + Public items only</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* Category Guide */}
+            <Card className="bg-purple-50 border-purple-200">
+              <CardContent className="pt-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-purple-900 mb-2">Category Guide</h4>
+                    <div className="grid grid-cols-1 gap-2 text-xs text-purple-800">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="default" className="text-xs bg-blue-100 text-blue-800 border-blue-200">Electronics</Badge>
+                        <span>Product has a category assigned</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="warning" className="text-xs">Unassigned</Badge>
+                        <span>Product needs a category</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-purple-700 text-xs font-medium">💡 Tip:</span>
+                        <span>Use filters to find unassigned products</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-purple-700 text-xs font-medium">⚡ Quick:</span>
+                        <span>Click "Assign" or "Change" on any product</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Items List */}
@@ -750,6 +835,35 @@ export default function ItemsClient({
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                   Syncing to Google
+                </Button>
+              </div>
+              
+              {/* Category Filter */}
+              <div className="flex flex-wrap gap-2">
+                <span className="text-sm text-neutral-600 self-center mr-2">Category:</span>
+                <Button
+                  variant={categoryFilter === 'all' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setCategoryFilter('all')}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={categoryFilter === 'assigned' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setCategoryFilter('assigned')}
+                >
+                  Assigned
+                </Button>
+                <Button
+                  variant={categoryFilter === 'unassigned' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setCategoryFilter('unassigned')}
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  Unassigned
                 </Button>
               </div>
               
@@ -878,6 +992,37 @@ export default function ItemsClient({
                           <span className="text-neutral-400 text-xs">Not syncing</span>
                         )}
                       </div>
+                      </div>
+                    </div>
+
+                    {/* Category Badge */}
+                    <div className="mt-2 p-2 bg-gray-50 rounded-md border border-gray-200">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                          <span className="text-xs font-medium text-gray-600">Category:</span>
+                          {i.categoryPath && i.categoryPath.length > 0 ? (
+                            <Badge variant="default" className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+                              {i.categoryPath.join(' > ')}
+                            </Badge>
+                          ) : (
+                            <Badge variant="warning" className="text-xs">Unassigned</Badge>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setCategoryItem(i);
+                            setShowCategoryModal(true);
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          {i.categoryPath && i.categoryPath.length > 0 ? 'Change' : 'Assign'}
+                        </button>
                       </div>
                     </div>
 
@@ -1134,6 +1279,23 @@ export default function ItemsClient({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Category Assignment Modal */}
+      {showCategoryModal && categoryItem && (
+        <AssignCategoryModal
+          tenantId={tenantId}
+          itemId={categoryItem.id}
+          itemName={categoryItem.name}
+          currentCategory={categoryItem.categoryPath?.[0]}
+          onClose={() => {
+            setShowCategoryModal(false);
+            setCategoryItem(null);
+          }}
+          onSave={() => {
+            refresh();
+          }}
+        />
       )}
     </div>
   );

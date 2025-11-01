@@ -1854,6 +1854,45 @@ app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
 app.use('/api', feedValidationRoutes);
 app.use('/api', businessProfileValidationRoutes);
 
+/* ------------------------------ item category assignment ------------------------------ */
+// PATCH /api/v1/tenants/:tenantId/items/:itemId/category
+// Body: { tenantCategoryId?: string, categorySlug?: string }
+app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) => {
+  try {
+    const { tenantId, itemId } = req.params as { tenantId: string; itemId: string };
+    const { tenantCategoryId, categorySlug } = (req.body || {}) as { tenantCategoryId?: string; categorySlug?: string };
+    if (!tenantCategoryId && !categorySlug) {
+      return res.status(400).json({ success: false, error: 'tenantCategoryId_or_categorySlug_required' });
+    }
+
+    // Verify item exists and belongs to tenant
+    const item = await prisma.inventoryItem.findFirst({ where: { id: itemId, tenantId } });
+    if (!item) return res.status(404).json({ success: false, error: 'item_not_found' });
+
+    // Resolve tenant category
+    const category = await prisma.tenantCategory.findFirst({
+      where: {
+        tenantId,
+        isActive: true,
+        ...(tenantCategoryId ? { id: tenantCategoryId } : {}),
+        ...(categorySlug ? { slug: categorySlug } : {}),
+      },
+    });
+    if (!category) return res.status(404).json({ success: false, error: 'tenant_category_not_found' });
+
+    // For now, store the leaf slug as the categoryPath array; can be expanded to include full hierarchy later
+    const updated = await prisma.inventoryItem.update({
+      where: { id: itemId },
+      data: { categoryPath: [category.slug] as any },
+    });
+
+    return res.json({ success: true, data: updated });
+  } catch (e) {
+    console.error('[PATCH /api/v1/tenants/:tenantId/items/:itemId/category] Error:', e);
+    return res.status(500).json({ success: false, error: 'failed_to_assign_category' });
+  }
+});
+
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);
 

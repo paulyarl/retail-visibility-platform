@@ -4,7 +4,7 @@
  * Works with both Next.js API routes (/api/*) and direct backend calls
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
 /**
  * Get access token from localStorage
@@ -12,6 +12,17 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4
 function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('access_token');
+}
+
+function getLastTenantId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('lastTenantId');
+}
+
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 /**
@@ -25,6 +36,8 @@ export async function apiRequest(
   options: RequestInit & { skipAuthRedirect?: boolean } = {}
 ): Promise<Response> {
   const token = getAccessToken();
+  const tenantId = getLastTenantId();
+  const csrf = getCookie('csrf');
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -36,7 +49,18 @@ export async function apiRequest(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  // Attach tenant and CSRF headers on write operations
+  const method = (options.method || 'GET').toString().toUpperCase();
+  const isWrite = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+  if (isWrite) {
+    if (tenantId) headers['x-tenant-id'] = tenantId;
+    if (csrf) headers['x-csrf-token'] = csrf;
+  }
+
   // Handle relative URLs (Next.js API routes) and absolute URLs
+  // - Absolute http(s): use as-is
+  // - Leading '/': use as-is (hit Next.js API/proxy routes)
+  // - Bare path: prefix with API_BASE_URL
   const url = endpoint.startsWith('http') || endpoint.startsWith('/') 
     ? endpoint 
     : `${API_BASE_URL}${endpoint}`;

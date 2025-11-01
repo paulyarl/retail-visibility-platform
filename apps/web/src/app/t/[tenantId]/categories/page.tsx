@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 interface Category {
   id: string
@@ -32,6 +32,28 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Edit modal state
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selected, setSelected] = useState<Category | null>(null)
+  const [formName, setFormName] = useState('')
+  const [formSort, setFormSort] = useState<number>(0)
+  const [formGoogleId, setFormGoogleId] = useState<string>('')
+  const [saving, setSaving] = useState(false)
+  const [isCreate, setIsCreate] = useState(false)
+
+  // Taxonomy search state
+  const [taxQuery, setTaxQuery] = useState('')
+  const [taxResults, setTaxResults] = useState<Array<{ id: string; name: string; path: string[] }>>([])
+  const [taxLoading, setTaxLoading] = useState(false)
+  const [showTaxResults, setShowTaxResults] = useState(false)
+
+  // Toasts
+  const [toast, setToast] = useState<{ type: 'success'|'error'|'info'; message: string } | null>(null)
+  const showToast = (type: 'success'|'error'|'info', message: string) => {
+    setToast({ type, message })
+    setTimeout(() => setToast(null), 3000)
+  }
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -61,6 +83,131 @@ export default function CategoriesPage() {
       fetchData()
     }
   }, [tenantId])
+
+  function openEdit(cat: Category) {
+    setSelected(cat)
+    setFormName(cat.name)
+    setFormSort(cat.sortOrder)
+    setFormGoogleId(cat.googleCategoryId || '')
+    setTaxQuery('')
+    setTaxResults([])
+    setIsCreate(false)
+    setIsModalOpen(true)
+  }
+
+  function openCreate() {
+    setSelected(null)
+    setFormName('')
+    setFormSort(0)
+    setFormGoogleId('')
+    setTaxQuery('')
+    setTaxResults([])
+    setIsCreate(true)
+    setIsModalOpen(true)
+  }
+
+  async function saveEdit() {
+    try {
+      setSaving(true)
+      if (isCreate || !selected) {
+        // Create
+        const postRes = await fetch(`http://localhost:4000/api/v1/tenants/${tenantId}/categories`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: formName, slug: formName.toLowerCase().replace(/\s+/g, '-'), sortOrder: formSort })
+        })
+        if (!postRes.ok) throw new Error('Failed to create category')
+        const created = await postRes.json()
+        // Align if provided
+        if (formGoogleId) {
+          const alignRes = await fetch(`http://localhost:4000/api/v1/tenants/${tenantId}/categories/${created.data.id}/align`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ googleCategoryId: formGoogleId })
+          })
+          if (!alignRes.ok) throw new Error('Failed to align category')
+        }
+        showToast('success', 'Category created')
+      } else {
+        // Update core fields
+        const putRes = await fetch(`http://localhost:4000/api/v1/tenants/${tenantId}/categories/${selected.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: formName, sortOrder: formSort })
+        })
+        if (!putRes.ok) throw new Error('Failed to update category')
+
+        // Align if a googleCategoryId is provided
+        if (formGoogleId && formGoogleId !== (selected.googleCategoryId || '')) {
+          const alignRes = await fetch(`http://localhost:4000/api/v1/tenants/${tenantId}/categories/${selected.id}/align`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ googleCategoryId: formGoogleId })
+          })
+          if (!alignRes.ok) throw new Error('Failed to align category')
+        }
+        showToast('success', 'Changes saved')
+      }
+
+      // Refresh data
+      const [catRes, statusRes] = await Promise.all([
+        fetch(`http://localhost:4000/api/v1/tenants/${tenantId}/categories`),
+        fetch(`http://localhost:4000/api/v1/tenants/${tenantId}/categories-alignment-status`)
+      ])
+      const catData = await catRes.json()
+      const statusData = await statusRes.json()
+      setCategories(catData.data || [])
+      setAlignmentStatus(statusData.data)
+
+      setIsModalOpen(false)
+      setSelected(null)
+    } catch (e: any) {
+      setError(e?.message || 'Failed to save changes')
+      showToast('error', e?.message || 'Failed to save changes')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteCategory(cat: Category) {
+    if (!confirm(`Delete category "${cat.name}"? This is a soft delete and may be blocked if it has dependencies.`)) return
+    try {
+      const res = await fetch(`http://localhost:4000/api/v1/tenants/${tenantId}/categories/${cat.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(body || 'Failed to delete category')
+      }
+      // Refresh
+      const [catRes, statusRes] = await Promise.all([
+        fetch(`http://localhost:4000/api/v1/tenants/${tenantId}/categories`),
+        fetch(`http://localhost:4000/api/v1/tenants/${tenantId}/categories-alignment-status`)
+      ])
+      const catData = await catRes.json()
+      const statusData = await statusRes.json()
+      setCategories(catData.data || [])
+      setAlignmentStatus(statusData.data)
+      showToast('success', 'Category deleted')
+    } catch (err: any) {
+      showToast('error', err?.message || 'Failed to delete category')
+    }
+  }
+
+  // Debounced taxonomy search
+  useEffect(() => {
+    if (!taxQuery || taxQuery.trim().length < 2) { setTaxResults([]); return }
+    let active = true
+    const t = setTimeout(async () => {
+      try {
+        setTaxLoading(true)
+        const res = await fetch(`http://localhost:4000/categories/search?q=${encodeURIComponent(taxQuery)}&limit=8`)
+        if (res.ok) {
+          const data = await res.json()
+          if (active) setTaxResults(data.results || [])
+        }
+      } finally {
+        setTaxLoading(false)
+      }
+    }, 300)
+    return () => { active = false; clearTimeout(t) }
+  }, [taxQuery])
 
   if (loading) {
     return (
@@ -94,6 +241,26 @@ export default function CategoriesPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Category Management</h1>
         <p className="text-gray-600">Manage your product categories and align them with Google taxonomy</p>
+      </div>
+
+      {/* Helpful Reminder */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="flex items-start gap-3">
+          <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <div className="flex-1">
+            <h4 className="text-sm font-semibold text-blue-900 mb-1">💡 Why create categories here?</h4>
+            <p className="text-sm text-blue-800">
+              Categories help organize your products and improve feed quality for Google Merchant Center. 
+              Create categories here, align them to Google's taxonomy, then assign them to your products on the{' '}
+              <a href={`/t/${tenantId}/items`} className="underline font-medium hover:text-blue-900">
+                Items page
+              </a>
+              . Well-categorized products perform better in search results and shopping ads.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Alignment Status Card */}
@@ -130,8 +297,14 @@ export default function CategoriesPage() {
 
       {/* Categories List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Categories</h2>
+          <button
+            onClick={openCreate}
+            className="px-3 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700"
+          >
+            + Create Category
+          </button>
         </div>
         <div className="divide-y divide-gray-200">
           {categories.length === 0 ? (
@@ -169,8 +342,17 @@ export default function CategoriesPage() {
                       )}
                     </div>
                   </div>
-                  <button className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors">
+                  <button
+                    onClick={() => openEdit(cat)}
+                    className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                  >
                     Edit
+                  </button>
+                  <button
+                    onClick={() => deleteCategory(cat)}
+                    className="ml-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                  >
+                    Delete
                   </button>
                 </div>
               </div>
@@ -178,6 +360,127 @@ export default function CategoriesPage() {
           )}
         </div>
       </div>
+
+      {/* Quick Actions */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mt-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">What's Next?</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <a
+            href={`/t/${tenantId}/items`}
+            className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all group"
+          >
+            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+              <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-gray-900 mb-1">Assign to Products</h4>
+              <p className="text-sm text-gray-600">Go to the Items page to assign these categories to your products.</p>
+            </div>
+          </a>
+          
+          <a
+            href={`/tenant/${tenantId}`}
+            target="_blank"
+            className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all group"
+          >
+            <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
+              <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-gray-900 mb-1">Preview Storefront</h4>
+              <p className="text-sm text-gray-600">See how your categorized products appear to customers.</p>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      {/* Edit Modal */}
+      {isModalOpen && (selected || isCreate) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">{isCreate ? 'Create Category' : 'Edit Category'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
+                <input
+                  type="number"
+                  value={formSort}
+                  onChange={(e) => setFormSort(Number(e.target.value))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Google Category</label>
+                <div className="relative">
+                  <input
+                    placeholder="Search taxonomy by name (e.g. Electronics)"
+                    value={taxQuery}
+                    onChange={(e) => { setTaxQuery(e.target.value); setShowTaxResults(true) }}
+                    onFocus={() => setShowTaxResults(true)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {showTaxResults && (taxResults.length > 0 || taxLoading) && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-auto">
+                      {taxLoading && <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>}
+                      {taxResults.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => { setFormGoogleId(r.id); setTaxQuery(r.path.join(' > ')); setShowTaxResults(false) }}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                        >
+                          <div className="text-sm font-medium text-gray-900">{r.name}</div>
+                          <div className="text-xs text-gray-600">{r.path.join(' > ')}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Selected ID: {formGoogleId || 'none'}</p>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEdit}
+                className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-md shadow-lg text-white ${toast.type === 'success' ? 'bg-green-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-gray-800'}`}>
+          {toast.message}
+        </div>
+      )}
     </div>
   )
 }
