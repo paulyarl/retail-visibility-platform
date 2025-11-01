@@ -55,6 +55,10 @@ import photosRouter from './photos';
 // v3.6.2-prep imports
 import feedJobsRoutes from './routes/feed-jobs';
 import feedbackRoutes from './routes/feedback';
+import tenantCategoriesRoutes from './routes/tenant-categories';
+import taxonomyAdminRoutes from './routes/taxonomy-admin';
+import feedValidationRoutes from './routes/feed-validation';
+import businessProfileValidationRoutes from './routes/business-profile-validation';
 
 // Authentication
 import authRoutes from './auth/auth.routes';
@@ -727,9 +731,8 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
       publicUrl = supabaseLogo.storage.from(TENANT_BUCKET.name).getPublicUrl(data.path).data.publicUrl;
       console.log(`[Logo Upload] Supabase upload successful:`, { publicUrl });
     }
-    // B) JSON { dataUrl } upload
+    // B) JSON { url } upload
     else if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
-      console.log(`[Logo Upload] Processing dataUrl upload`);
       const parsed = logoDataUrlSchema.safeParse(req.body || {});
       if (!parsed.success) {
         console.error(`[Logo Upload] Invalid dataUrl payload:`, parsed.error.flatten());
@@ -975,7 +978,7 @@ const photoUploadHandler = async (req: any, res: any) => {
           upsert: false,
           contentType: parsed.data.contentType,
         });
-        
+
         if (error) {
           console.error("[Photo Upload] Supabase dataUrl upload error:", error);
           return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
@@ -1290,7 +1293,7 @@ app.get("/__routes", (_req, res) => {
         const methods = layer.route.methods
           ? Array.isArray(layer.route.methods)
             ? layer.route.methods
-            : Object.keys(layer.route.methods)
+          : Object.keys(layer.route.methods)
           : [];
         const path = base + layer.route.path;
         out.push({ methods: methods.map((m: string) => m.toUpperCase()), path });
@@ -1846,6 +1849,10 @@ app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no aut
 /* ------------------------------ v3.6.2-prep APIs ------------------------------ */
 app.use('/api/feed-jobs', feedJobsRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/v1/tenants', tenantCategoriesRoutes);
+app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
+app.use('/api', feedValidationRoutes);
+app.use('/api', businessProfileValidationRoutes);
 
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);
