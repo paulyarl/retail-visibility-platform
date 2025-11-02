@@ -902,4 +902,3 @@ model BarcodeLookupLog {
   @@index([barcode])
   @@map("barcode_lookup_log")
 }
->>>>>>> staging
