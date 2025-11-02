@@ -2,6 +2,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
 model PlatformFeatureFlag {
   id                  String   @id @default(cuid())
   flag                String   @unique
@@ -63,11 +68,6 @@ model BusinessHoursSpecial {
   @@unique([tenantId, date], name: "tenantId_date")
   @@index([tenantId, date])
   @@map("business_hours_special")
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Tenant {
