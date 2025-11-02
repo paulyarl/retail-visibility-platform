@@ -7,6 +7,69 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model PlatformFeatureFlag {
+  id                  String   @id @default(cuid())
+  flag                String   @unique
+  enabled             Boolean  @default(false)
+  rollout             String?
+  allowTenantOverride Boolean  @default(false) @map("allow_tenant_override")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_feature_flags")
+}
+
+model TenantFeatureFlag {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  flag      String
+  enabled   Boolean  @default(false)
+  rollout   String? // optional notes like cohort/bucket
+  updatedAt DateTime @updatedAt @map("updated_at")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, flag])
+  @@index([tenantId])
+  @@map("tenant_feature_flags")
+}
+
+// Business Hours (platform is source of truth)
+model BusinessHours {
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  timezone     String    @default("America/New_York")
+  periods      Json      @default("[]")
+  sourceHash   String?   @map("source_hash")
+  lastSyncedAt DateTime? @map("last_synced_at")
+  syncAttempts Int       @default(0) @map("sync_attempts")
+  lastError    String?   @map("last_error")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId])
+  @@index([tenantId])
+  @@map("business_hours")
+}
+
+model BusinessHoursSpecial {
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  date         DateTime  @db.Date
+  isClosed     Boolean   @default(false) @map("is_closed")
+  open         String? // HH:mm
+  close        String? // HH:mm
+  note         String?
+  sourceHash   String?   @map("source_hash")
+  lastSyncedAt DateTime? @map("last_synced_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, date], name: "tenantId_date")
+  @@index([tenantId, date])
+  @@map("business_hours_special")
+}
+
 model Tenant {
   id                    String                 @id @default(cuid())
   name                  String
@@ -37,6 +100,14 @@ model Tenant {
   googleOAuthAccounts   GoogleOAuthAccount[]
   organizationRequests  OrganizationRequest[] // Requests to join organizations
   businessProfile       TenantBusinessProfile?
+  businessHours         BusinessHours?
+  businessHoursSpecials BusinessHoursSpecial[]
+  featureFlags          TenantFeatureFlag[]
+  scanTemplates         ScanTemplate[]
+  scanSessions          ScanSession[]
+  scanResults           ScanResult[]
+  barcodeLookupLogs     BarcodeLookupLog[]
+  categoryMirrorRuns    CategoryMirrorRun[]
 
   @@index([name])
   @@index([subscriptionStatus])
@@ -179,6 +250,27 @@ model SyncJob {
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status, updatedAt])
+}
+
+// Category Mirror Run summaries (per-tenant/per-strategy)
+model CategoryMirrorRun {
+  id          String    @id @default(cuid())
+  tenantId    String?   @map("tenant_id")
+  strategy    String
+  dryRun      Boolean   @default(true) @map("dry_run")
+  created     Int       @default(0)
+  updated     Int       @default(0)
+  deleted     Int       @default(0)
+  skipped     Boolean   @default(false)
+  reason      String?
+  error       String?
+  jobId       String?   @map("job_id")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, strategy, startedAt(sort: Desc)])
+  @@map("category_mirror_runs")
 }
 
 model GoogleOAuthAccount {
@@ -419,8 +511,8 @@ model TenantBusinessProfile {
   phoneNumber    String?  @map("phone_number")
   email          String?
   website        String?
-  contactPerson  String? @map("contact_person")
-  logoUrl        String? @map("logo_url")
+  contactPerson  String?  @map("contact_person")
+  logoUrl        String?  @map("logo_url")
   hours          Json?
   socialLinks    Json?    @map("social_links")
   seoTags        Json?    @map("seo_tags")
@@ -451,8 +543,9 @@ model User {
   updatedAt              DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  tenants  UserTenant[]
-  sessions UserSession[]
+  tenants      UserTenant[]
+  sessions     UserSession[]
+  scanSessions ScanSession[]
 
   @@index([email])
   @@index([role])
@@ -631,3 +724,182 @@ model PermissionAuditLog {
   @@index([changedAt])
   @@map("permission_audit_log")
 }
+
+// ===== v3.6.2-prep Retrofit Models =====
+
+// Feed Push Jobs - Async job processing with retry logic
+model FeedPushJob {
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  sku          String? // NULL for full feed, specific SKU for single item
+  jobStatus    JobStatus @default(queued) @map("job_status")
+  retryCount   Int       @default(0) @map("retry_count")
+  maxRetries   Int       @default(5) @map("max_retries")
+  lastAttempt  DateTime? @map("last_attempt")
+  nextRetry    DateTime? @map("next_retry")
+  errorMessage String?   @map("error_message")
+  errorCode    String?   @map("error_code")
+  payload      Json? // Job-specific data
+  result       Json? // Result from successful job
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  completedAt  DateTime? @map("completed_at")
+
+  @@index([tenantId, jobStatus])
+  @@index([jobStatus])
+  @@index([nextRetry])
+  @@index([createdAt])
+  @@index([tenantId, sku])
+  @@map("feed_push_jobs")
+}
+
+// Job status enum
+enum JobStatus {
+  queued
+  processing
+  success
+  failed
+
+  @@map("job_status")
+}
+
+// Outreach Feedback - Pilot program feedback collection
+model OutreachFeedback {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  userId    String?  @map("user_id")
+  feedback  Json // Structured feedback object
+  score     Int // 1-5 rating
+  category  String? // usability, performance, features, support
+  context   String? // onboarding, category_alignment, feed_push, etc.
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([score])
+  @@index([category])
+  @@index([context])
+  @@index([createdAt])
+  @@map("outreach_feedback")
+}
+
+// Tenant Category - Vendor-owned categories
+model TenantCategory {
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  name             String
+  slug             String
+  parentId         String?  @map("parent_id")
+  googleCategoryId String?  @map("google_category_id")
+  isActive         Boolean  @default(true) @map("is_active")
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, isActive])
+  @@index([googleCategoryId])
+  @@index([parentId])
+  @@map("tenant_category")
+}
+
+// Google Taxonomy - Google Product Taxonomy reference
+model GoogleTaxonomy {
+  id           String   @id @default(cuid())
+  categoryId   String   @unique @map("category_id")
+  categoryPath String   @map("category_path")
+  parentId     String?  @map("parent_id")
+  level        Int
+  isActive     Boolean  @default(true) @map("is_active")
+  version      String   @default("2024-09") @map("version")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([categoryId])
+  @@index([parentId])
+  @@index([version, isActive])
+  @@map("google_taxonomy")
+}
+
+model ScanTemplate {
+  id                String        @id @default(cuid())
+  tenantId          String        @map("tenant_id")
+  name              String
+  defaultCategory   String?
+  defaultPriceCents Int?
+  defaultCurrency   String        @default("USD") @db.Char(3)
+  defaultVisibility String        @default("private")
+  enrichmentRules   Json?
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions          ScanSession[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("scan_templates")
+}
+
+model ScanSession {
+  id             String        @id @default(cuid())
+  tenantId       String        @map("tenant_id")
+  userId         String?       @map("user_id")
+  templateId     String?       @map("template_id")
+  status         String        @default("active")
+  deviceType     String?       @map("device_type")
+  scannedCount   Int           @default(0) @map("scanned_count")
+  committedCount Int           @default(0) @map("committed_count")
+  duplicateCount Int           @default(0) @map("duplicate_count")
+  metadata       Json?
+  startedAt      DateTime      @default(now()) @map("started_at")
+  completedAt    DateTime?     @map("completed_at")
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  template       ScanTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  results        ScanResult[]
+
+  @@index([tenantId, status])
+  @@index([startedAt])
+  @@map("scan_sessions")
+}
+
+model ScanResult {
+  id          String      @id @default(cuid())
+  tenantId    String      @map("tenant_id")
+  sessionId   String      @map("session_id")
+  barcode     String
+  sku         String?
+  rawPayload  Json?       @map("raw_payload")
+  status      String      @default("new")
+  enrichment  Json?
+  validation  Json?
+  duplicateOf String?     @map("duplicate_of")
+  error       String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  session     ScanSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sessionId, barcode], name: "uq_scan_result_tenant_session_barcode")
+  @@index([tenantId, status, createdAt])
+  @@index([sessionId])
+  @@index([barcode])
+  @@map("scan_results")
+}
+
+model BarcodeLookupLog {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  barcode   String
+  provider  String?
+  status    String   @default("success")
+  response  Json?
+  latencyMs Int?     @map("latency_ms")
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([barcode])
+  @@map("barcode_lookup_log")
+}
+>>>>>>> staging

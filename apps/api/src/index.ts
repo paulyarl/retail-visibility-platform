@@ -3,6 +3,7 @@ import cors from "cors";
 import morgan from "morgan";
 import { prisma } from "./prisma";
 import { z } from "zod";
+import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
 
 // Debug: Log DATABASE_URL to verify it's correct
 // Migration fix applied: 20251024093000_add_photo_asset_fields marked as rolled back
@@ -14,8 +15,16 @@ import { createClient } from "@supabase/supabase-js";
 import { Flags } from "./config";
 import { setRequestContext } from "./context";
 import { StorageBuckets } from "./storage-config";
-import { audit } from "./audit";
+import { audit, ensureAuditTable } from "./audit";
 import { dailyRatesJob } from "./jobs/rates";
+import { ensureFeedCategoryView } from "./views";
+import { triggerRevalidate } from "./utils/revalidate";
+import { categoryService } from "./services/CategoryService";
+import businessHoursRoutes from './routes/business-hours';
+import { runGbpHoursSync } from './jobs/gbpHoursSync';
+import tenantFlagsRoutes from './routes/tenant-flags';
+import platformFlagsRoutes from './routes/platform-flags';
+import effectiveFlagsRoutes from './routes/effective-flags';
 import {
   getAuthorizationUrl,
   decodeState,
@@ -52,6 +61,14 @@ import subscriptionRoutes from './routes/subscriptions';
 import categoryRoutes from './routes/categories';
 import photosRouter from './photos';
 
+// v3.6.2-prep imports
+import feedJobsRoutes from './routes/feed-jobs';
+import feedbackRoutes from './routes/feedback';
+import tenantCategoriesRoutes from './routes/tenant-categories';
+import taxonomyAdminRoutes from './routes/taxonomy-admin';
+import feedValidationRoutes from './routes/feed-validation';
+import businessProfileValidationRoutes from './routes/business-profile-validation';
+
 // Authentication
 import authRoutes from './auth/auth.routes';
 import { authenticateToken, checkTenantAccess, requireAdmin } from './middleware/auth';
@@ -73,15 +90,32 @@ import tenantUserRoutes from './routes/tenant-users';
 import { auditLogger } from './middleware/audit-logger';
 import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
 import { enforcePolicyCompliance } from './middleware/policy-enforcement';
+import categoriesPlatformRoutes from './routes/categories.platform';
+import categoriesTenantRoutes from './routes/categories.tenant';
+import categoriesMirrorRoutes from './routes/categories.mirror';
+import mirrorAdminRoutes from './routes/mirror.admin';
 
 const app = express();
 
 /* ------------------------- middleware ------------------------- */
-app.use(cors({ origin: [/localhost:\d+$/, /\.vercel\.app$/], credentials: false }));
+app.use(cors({
+  origin: [/localhost:\d+$/, /\.vercel\.app$/],
+  credentials: true,
+  methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
+  allowedHeaders: ['content-type','authorization','x-csrf-token'],
+}));
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(setRequestContext);
+// CSRF: issue cookie and enforce on write operations when FF_ENFORCE_CSRF=true
+app.use(setCsrfCookie);
+app.use(csrfProtect);
+
+// Ensure audit table exists if auditing is enabled
+ensureAuditTable().catch(() => {});
+// Ensure helper view exists for feed category resolution
+ensureFeedCategoryView().catch(() => {});
 
 console.log("✓ Express configured with 50mb body limit");
 
@@ -723,9 +757,8 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
       publicUrl = supabaseLogo.storage.from(TENANT_BUCKET.name).getPublicUrl(data.path).data.publicUrl;
       console.log(`[Logo Upload] Supabase upload successful:`, { publicUrl });
     }
-    // B) JSON { dataUrl } upload
+    // B) JSON { url } upload
     else if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
-      console.log(`[Logo Upload] Processing dataUrl upload`);
       const parsed = logoDataUrlSchema.safeParse(req.body || {});
       if (!parsed.success) {
         console.error(`[Logo Upload] Invalid dataUrl payload:`, parsed.error.flatten());
@@ -971,7 +1004,7 @@ const photoUploadHandler = async (req: any, res: any) => {
           upsert: false,
           contentType: parsed.data.contentType,
         });
-        
+
         if (error) {
           console.error("[Photo Upload] Supabase dataUrl upload error:", error);
           return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
@@ -1286,7 +1319,7 @@ app.get("/__routes", (_req, res) => {
         const methods = layer.route.methods
           ? Array.isArray(layer.route.methods)
             ? layer.route.methods
-            : Object.keys(layer.route.methods)
+          : Object.keys(layer.route.methods)
           : [];
         const path = base + layer.route.path;
         out.push({ methods: methods.map((m: string) => m.toUpperCase()), path });
@@ -1839,6 +1872,47 @@ app.use('/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
 app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
 
+/* ------------------------------ v3.6.2-prep APIs ------------------------------ */
+app.use('/api/feed-jobs', feedJobsRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/v1/tenants', tenantCategoriesRoutes);
+app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
+app.use('/api', feedValidationRoutes);
+app.use('/api', businessProfileValidationRoutes);
+app.use('/api', businessHoursRoutes);
+// Tenant flags: accessible by platform admins OR store owners of that specific tenant
+app.use('/admin', authenticateToken, tenantFlagsRoutes);
+app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
+app.use('/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
+app.use('/api/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
+// Effective flags: middleware applied per-route (admin for platform, tenant access for tenant)
+app.use('/admin', authenticateToken, effectiveFlagsRoutes);
+app.use('/api/admin', authenticateToken, effectiveFlagsRoutes);
+// Category scaffolds (M3 start)
+app.use(categoriesPlatformRoutes);
+app.use(categoriesTenantRoutes);
+app.use(categoriesMirrorRoutes);
+app.use(mirrorAdminRoutes);
+
+/* ------------------------------ item category assignment ------------------------------ */
+// PATCH /api/v1/tenants/:tenantId/items/:itemId/category
+// Body: { tenantCategoryId?: string, categorySlug?: string }
+app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) => {
+  try {
+    const { tenantId, itemId } = req.params as { tenantId: string; itemId: string };
+    const { tenantCategoryId, categorySlug } = (req.body || {}) as { tenantCategoryId?: string; categorySlug?: string };
+
+    const updated = await categoryService.assignItemCategory(tenantId, itemId, { tenantCategoryId, categorySlug });
+    // ISR revalidation (best-effort) already triggered inside service
+    return res.json({ success: true, data: updated });
+  } catch (e: any) {
+    const code = typeof e?.statusCode === 'number' ? e.statusCode : 500;
+    const msg = e?.message || 'failed_to_assign_category';
+    console.error('[PATCH /api/v1/tenants/:tenantId/items/:itemId/category] Error:', msg);
+    return res.status(code).json({ success: false, error: msg });
+  }
+});
+
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);
 
@@ -1881,4 +1955,40 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 // Export the app for testing
+export default app;
 export { app };
+
+/* ------------------------------ GBP Hours runner (flag-gated) ------------------------------ */
+
+(async function startGbpHoursRunner(){
+  const enabled = String(process.env.FF_TENANT_GBP_HOURS_SYNC || '').toLowerCase() === 'true'
+  if (!enabled) return
+  let running = false
+  setInterval(async () => {
+    if (running) return
+    running = true
+    try {
+      // pick one queued job
+      const job = await prisma.syncJob.findFirst({
+        where: { target: 'gbp_hours', status: 'queued' },
+        orderBy: { createdAt: 'asc' },
+      })
+      if (!job) return
+
+      // mark processing
+      await prisma.syncJob.update({ where: { id: job.id }, data: { status: 'processing', attempt: (job.attempt || 0) + 1, lastError: null } })
+
+      const result = await runGbpHoursSync({ tenantId: job.tenantId })
+      if ((result as any)?.ok) {
+        await prisma.syncJob.update({ where: { id: job.id }, data: { status: 'success' } })
+      } else {
+        const attempt = (job.attempt || 0) + 1
+        await prisma.syncJob.update({ where: { id: job.id }, data: { status: 'queued', attempt, lastError: String((result as any)?.error || 'unknown') } })
+      }
+    } catch (e) {
+      // swallow
+    } finally {
+      running = false
+    }
+  }, 5000)
+})()

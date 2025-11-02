@@ -1,0 +1,558 @@
+# API Gateway Configuration
+# Version: v3.6.2-prep
+# Date: 2025-11-01
+# Provider: Kong Gateway (can be adapted for Nginx/Traefik)
+
+_format_version: "3.0"
+
+# Services Definition
+services:
+  # Auth Service
+  - name: auth-service
+    url: http://auth-service:3001
+    protocol: http
+    connect_timeout: 5000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    tags:
+      - auth
+      - v3.6.2
+    
+    routes:
+      - name: auth-routes
+        paths:
+          - /auth
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+        tags:
+          - public
+    
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 500
+          policy: local
+          fault_tolerant: true
+      
+      - name: cors
+        config:
+          origins:
+            - "https://app.retailvisibility.com"
+            - "https://www.retailvisibility.com"
+            - "http://localhost:3000"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Authorization
+            - Content-Type
+            - X-CSRF-Token
+          exposed_headers:
+            - X-RateLimit-Limit
+            - X-RateLimit-Remaining
+            - X-RateLimit-Reset
+          credentials: true
+          max_age: 3600
+
+  # Inventory Service
+  - name: inventory-service
+    url: http://inventory-service:3002
+    protocol: http
+    connect_timeout: 5000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    tags:
+      - inventory
+      - v3.6.2
+    
+    routes:
+      - name: inventory-routes
+        paths:
+          - /api/v1/tenants/~/inventory
+          - /api/v1/tenants/~/categories
+          - /api/v1/tenants/~/feed
+          - /api/v1/google-taxonomy
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+        tags:
+          - authenticated
+      
+      - name: feed-jobs-routes
+        paths:
+          - /api/feed-jobs
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PATCH
+          - DELETE
+        tags:
+          - authenticated
+    
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: kid
+          secret_is_base64: false
+          claims_to_verify:
+            - exp
+      
+      - name: rate-limiting
+        config:
+          minute: 1000
+          policy: local
+          fault_tolerant: true
+      
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 50
+          size_unit: megabytes
+      
+      - name: response-transformer
+        config:
+          add:
+            headers:
+              - "X-RateLimit-Limit:1000"
+              - "X-RateLimit-Remaining:$(ratelimit.remaining)"
+              - "X-RateLimit-Reset:$(ratelimit.reset)"
+
+  # Business Profile Service
+  - name: business-profile-service
+    url: http://business-profile-service:3003
+    protocol: http
+    connect_timeout: 5000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    tags:
+      - profile
+      - v3.6.2
+    
+    routes:
+      - name: profile-routes
+        paths:
+          - /tenant/profile
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PATCH
+        tags:
+          - authenticated
+    
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: kid
+      
+      - name: rate-limiting
+        config:
+          minute: 300
+          policy: local
+
+  # Integrations Service
+  - name: integrations-service
+    url: http://integrations-service:3004
+    protocol: http
+    connect_timeout: 10000
+    write_timeout: 120000
+    read_timeout: 120000
+    retries: 2
+    tags:
+      - integrations
+      - v3.6.2
+    
+    routes:
+      - name: google-routes
+        paths:
+          - /google
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - DELETE
+        tags:
+          - authenticated
+      
+      - name: stripe-routes
+        paths:
+          - /stripe
+        strip_path: true
+        methods:
+          - GET
+          - POST
+        tags:
+          - authenticated
+    
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: kid
+      
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      
+      - name: request-termination
+        config:
+          status_code: 503
+          message: "Service temporarily unavailable"
+        enabled: false  # Enable during maintenance
+
+  # Observability Service
+  - name: observability-service
+    url: http://observability-service:3005
+    protocol: http
+    connect_timeout: 5000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    tags:
+      - observability
+      - v3.6.2
+    
+    routes:
+      - name: feedback-routes
+        paths:
+          - /api/feedback
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - DELETE
+        tags:
+          - authenticated
+      
+      - name: metrics-routes
+        paths:
+          - /metrics
+        strip_path: false
+        methods:
+          - GET
+          - POST
+        tags:
+          - admin
+      
+      - name: audit-routes
+        paths:
+          - /audit
+        strip_path: false
+        methods:
+          - GET
+        tags:
+          - admin
+    
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: kid
+      
+      - name: rate-limiting
+        config:
+          minute: 500
+          policy: local
+
+# Global Plugins
+plugins:
+  # Request ID for tracing
+  - name: correlation-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid
+      echo_downstream: true
+  
+  # Logging
+  - name: file-log
+    config:
+      path: /var/log/kong/access.log
+      reopen: true
+  
+  # Prometheus metrics
+  - name: prometheus
+    config:
+      per_consumer: true
+  
+  # IP Restriction (for admin routes)
+  - name: ip-restriction
+    route: metrics-routes
+    config:
+      allow:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+  
+  # Bot Detection
+  - name: bot-detection
+    config:
+      allow:
+        - googlebot
+        - bingbot
+      deny:
+        - curl
+        - wget
+        - scrapy
+
+# Upstreams (Load Balancing)
+upstreams:
+  - name: auth-upstream
+    algorithm: round-robin
+    hash_on: none
+    hash_fallback: none
+    healthchecks:
+      active:
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          http_failures: 3
+      passive:
+        healthy:
+          successes: 5
+        unhealthy:
+          tcp_failures: 3
+          http_failures: 5
+    targets:
+      - target: auth-service-1:3001
+        weight: 100
+      - target: auth-service-2:3001
+        weight: 100
+
+  - name: inventory-upstream
+    algorithm: round-robin
+    targets:
+      - target: inventory-service-1:3002
+        weight: 100
+      - target: inventory-service-2:3002
+        weight: 100
+      - target: inventory-service-3:3002
+        weight: 100
+
+# Rate Limiting Configuration
+rate_limiting:
+  # Global limits
+  global:
+    requests_per_minute: 1000
+    burst: 100
+  
+  # Per-service limits
+  per_service:
+    auth: 500
+    inventory: 1000
+    business_profile: 300
+    integrations: 200
+    observability: 500
+  
+  # Per-tenant limits
+  per_tenant:
+    requests_per_minute: 100
+    burst: 20
+  
+  # Per-user limits (authenticated)
+  per_user:
+    requests_per_minute: 60
+    burst: 10
+  
+  # Response headers
+  headers:
+    - X-RateLimit-Limit
+    - X-RateLimit-Remaining
+    - X-RateLimit-Reset
+    - Retry-After  # On 429 responses
+
+# Circuit Breaker Configuration
+circuit_breaker:
+  enabled: true
+  threshold: 50  # % of failed requests
+  window: 60  # seconds
+  recovery_timeout: 30  # seconds
+  half_open_requests: 3
+
+# Caching Configuration
+caching:
+  enabled: true
+  cache_ttl: 300  # 5 minutes
+  cache_control: true
+  vary_headers:
+    - Accept
+    - Accept-Language
+  vary_query_params:
+    - page
+    - limit
+  
+  # Cache by route
+  routes:
+    - path: /api/v1/google-taxonomy
+      ttl: 3600  # 1 hour
+    - path: /api/feedback/analytics/summary
+      ttl: 300  # 5 minutes
+    - path: /tenant/profile
+      ttl: 600  # 10 minutes
+
+# Security Configuration
+security:
+  # CORS
+  cors:
+    enabled: true
+    origins:
+      - https://app.retailvisibility.com
+      - https://www.retailvisibility.com
+      - http://localhost:3000
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    headers:
+      - Authorization
+      - Content-Type
+      - X-CSRF-Token
+    credentials: true
+    max_age: 3600
+  
+  # CSRF Protection
+  csrf:
+    enabled: true
+    cookie_name: csrf
+    header_name: X-CSRF-Token
+    cookie_same_site: Lax
+    cookie_http_only: true
+    cookie_secure: true
+  
+  # Request Size Limits
+  request_limits:
+    max_body_size: 50mb
+    max_header_size: 8kb
+  
+  # SSL/TLS
+  ssl:
+    enabled: true
+    protocols:
+      - TLSv1.2
+      - TLSv1.3
+    ciphers: ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256
+    prefer_server_ciphers: true
+
+# Retry Configuration
+retry:
+  enabled: true
+  attempts: 3
+  timeout: 5000
+  backoff:
+    type: exponential
+    base_delay: 100
+    max_delay: 2000
+
+# Timeout Configuration
+timeouts:
+  connect: 5000
+  send: 60000
+  read: 60000
+
+# Logging Configuration
+logging:
+  level: info
+  format: json
+  outputs:
+    - file: /var/log/kong/access.log
+    - file: /var/log/kong/error.log
+    - stdout
+  
+  # Access log format
+  access_log_format: |
+    {
+      "timestamp": "$time_iso8601",
+      "request_id": "$request_id",
+      "client_ip": "$remote_addr",
+      "method": "$request_method",
+      "path": "$request_uri",
+      "status": $status,
+      "latency": $request_time,
+      "bytes_sent": $bytes_sent,
+      "user_agent": "$http_user_agent",
+      "service": "$upstream_addr"
+    }
+
+# Monitoring Configuration
+monitoring:
+  prometheus:
+    enabled: true
+    port: 9090
+    path: /metrics
+  
+  health_check:
+    enabled: true
+    port: 8100
+    path: /health
+    interval: 10
+  
+  status_api:
+    enabled: true
+    port: 8001
+    path: /status
+
+# Admin API Configuration
+admin_api:
+  listen: 127.0.0.1:8001
+  ssl: false
+  access_log: /var/log/kong/admin_access.log
+  error_log: /var/log/kong/admin_error.log
+
+# Deployment Configuration
+deployment:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  autoscaling:
+    enabled: true
+    min_replicas: 2
+    max_replicas: 10
+    target_cpu_utilization: 70
+    target_memory_utilization: 80
+
+# Environment Variables
+env:
+  - name: KONG_DATABASE
+    value: postgres
+  - name: KONG_PG_HOST
+    value: postgres-service
+  - name: KONG_PG_PORT
+    value: "5432"
+  - name: KONG_PG_DATABASE
+    value: kong
+  - name: KONG_PROXY_ACCESS_LOG
+    value: /dev/stdout
+  - name: KONG_ADMIN_ACCESS_LOG
+    value: /dev/stdout
+  - name: KONG_PROXY_ERROR_LOG
+    value: /dev/stderr
+  - name: KONG_ADMIN_ERROR_LOG
+    value: /dev/stderr
+  - name: KONG_ADMIN_LISTEN
+    value: 0.0.0.0:8001

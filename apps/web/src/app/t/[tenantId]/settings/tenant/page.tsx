@@ -1,19 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useEffect } from "react";
-import { useParams } from "next/navigation";
-import TenantSettingsPage from "@/app/settings/tenant/page";
-
-export default function TenantScopedSettingsPage() {
-  const params = useParams<{ tenantId: string }>();
-
-  useEffect(() => {
-    const id = params?.tenantId;
-    if (typeof window !== "undefined" && id) {
-      localStorage.setItem("tenantId", id);
-    }
-  }, [params]);
-
-  // Render the existing settings page component directly
-  return <TenantSettingsPage />;
+export default async function LegacyTenantSettingsRedirect({ params }: { params: Promise<{ tenantId: string }> }) {
+  const { tenantId } = await params;
+  redirect(`/t/${encodeURIComponent(tenantId)}/settings`);
 }

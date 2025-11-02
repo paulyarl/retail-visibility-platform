@@ -1,4 +1,4 @@
-import OfferingsSettingsPage from '@/app/settings/offerings/page';
+import OfferingsSettingsPage from '@/app/(platform)/settings/offerings/page';
 import SetTenantId from '@/components/client/SetTenantId';
 
 export default async function TenantScopedOfferingsSettings({ params }: { params: Promise<{ tenantId: string }> }) {

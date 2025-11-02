@@ -7,6 +7,7 @@ import { Button, AnimatedCard, Alert } from '@/components/ui';
 import ProgressSteps, { Step } from './ProgressSteps';
 import StoreIdentityStep from './StoreIdentityStep';
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
+import { isFeatureEnabled } from '@/lib/featureFlags';
 
 interface OnboardingWizardProps {
   tenantId: string;
@@ -44,6 +45,17 @@ export default function OnboardingWizard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [ffCategory, setFfCategory] = useState(false);
+
+  // Evaluate feature flag for Categories (client-side)
+  useEffect(() => {
+    try {
+      const on = isFeatureEnabled('FF_CATEGORY_MANAGEMENT_PAGE' as any, tenantId as any);
+      setFfCategory(!!on);
+    } catch {
+      setFfCategory(false);
+    }
+  }, [tenantId]);
 
   // Load existing tenant data and saved progress from localStorage
   useEffect(() => {
@@ -210,7 +222,8 @@ export default function OnboardingWizard({
       if (onComplete) {
         onComplete(businessData);
       } else {
-        router.push('/tenants');
+        // Default to tenant-scoped dashboard
+        router.push(`/t/${tenantId}/dashboard`);
       }
     }
   };
@@ -384,6 +397,39 @@ export default function OnboardingWizard({
               )}
             </div>
           </div>
+          {currentStep === 2 && (
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button onClick={() => router.push(`/t/${tenantId}/dashboard`)}>
+                Go to Tenant Dashboard
+                <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </Button>
+              <Button variant="secondary" onClick={() => router.push('/') }>
+                Platform Dashboard
+              </Button>
+              <Button variant="secondary" onClick={() => router.push(`/t/${tenantId}/profile-completeness`)}>
+                Profile Completeness
+              </Button>
+              {ffCategory && (
+                <Button variant="secondary" onClick={() => router.push(`/t/${tenantId}/categories`)}>
+                  Categories
+                </Button>
+              )}
+              <Button variant="secondary" onClick={() => router.push(`/t/${tenantId}/items`)}>
+                Products
+              </Button>
+              <Button variant="secondary" onClick={() => router.push(`/t/${tenantId}/settings/hours`)}>
+                Hours
+              </Button>
+              <Button variant="secondary" onClick={() => router.push(`/t/${tenantId}/settings`)}>
+                Settings
+              </Button>
+              <Button variant="secondary" onClick={() => router.push(`/tenant/${tenantId}`)}>
+                Storefront
+              </Button>
+            </div>
+          )}
         </AnimatedCard>
 
         {/* Footer */}

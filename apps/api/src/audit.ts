@@ -23,3 +23,27 @@ export async function audit(opts: {
     // optionally add sampling/logging later under observability work
   }
 }
+
+export async function ensureAuditTable() {
+  if (!Flags.AUDIT_LOG) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        occurred_at timestamptz NOT NULL DEFAULT now(),
+        actor text,
+        tenant_id uuid NOT NULL,
+        action text NOT NULL,
+        request_id text,
+        ip inet,
+        user_agent text,
+        diff jsonb,
+        payload jsonb,
+        pii_scrubbed boolean NOT NULL DEFAULT true
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_log_tenant_time ON audit_log(tenant_id, occurred_at DESC);
+    `);
+  } catch (e) {
+    // do not throw at startup
+  }
+}

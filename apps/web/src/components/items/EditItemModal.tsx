@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
+import { useFeatureFlag } from '@/lib/featureFlags';
 
 interface Item {
   id: string;
@@ -32,6 +33,25 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Feature flag: sticky quick actions footer
+  const ffQuick = useFeatureFlag('FF_CATEGORY_QUICK_ACTIONS');
+
+  // Simple analytics logger
+  function logQa(event: string, payload?: Record<string, any>) {
+    try {
+      console.debug(`[qa_footer_${event}]`, { itemId: item?.id, sku: item?.sku, ...payload });
+    } catch {}
+  }
+
+  function getTenantIdFromUrl(): string | null {
+    try {
+      const m = window.location.pathname.match(/\/t\/([^/]+)/);
+      return m ? m[1] : null;
+    } catch {
+      return null;
+    }
+  }
+
   // Initialize form when item changes
   useEffect(() => {
     if (item) {
@@ -44,6 +64,35 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setDescription(item.description || '');
     }
   }, [item]);
+
+  // Keyboard shortcuts when modal open and flag enabled
+  useEffect(() => {
+    if (!isOpen || !ffQuick) return;
+    const handler = (e: KeyboardEvent) => {
+      if (!e.altKey) return;
+      const tid = getTenantIdFromUrl();
+      // Alt+G → Align Category (navigate to Categories)
+      if (e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        logQa('shortcut_align_category');
+        if (tid) window.location.href = `/t/${tid}/categories`;
+      }
+      // Alt+V → Validate Feed
+      if (e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        logQa('shortcut_validate_feed');
+        if (tid) window.location.href = `/t/${tid}/feed-validation`;
+      }
+      // Alt+S → Save & Return
+      if (e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        logQa('shortcut_save_return');
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, ffQuick, item, sku, name, brand, manufacturer, price, stock, description]);
 
   const handleSave = async () => {
     if (!item) return;
@@ -234,6 +283,59 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </div>
         </div>
       </div>
+
+      {/* Sticky Quick Actions Footer (gated) */}
+      {ffQuick && (
+        <div className="mt-4 border-t pt-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs text-neutral-600">
+              <span className="font-medium">Quick Actions</span>
+              <span className="ml-2">Alt+G: Align • Alt+V: Validate • Alt+S: Save & Return</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  logQa('click_align_category');
+                  const tid = getTenantIdFromUrl();
+                  if (tid) window.location.href = `/t/${tid}/categories`;
+                }}
+              >
+                Align Category
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  logQa('click_preview_skus');
+                  const tid = getTenantIdFromUrl();
+                  if (tid) window.location.href = `/t/${tid}/items`;
+                }}
+              >
+                Preview SKUs
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  logQa('click_validate_feed');
+                  const tid = getTenantIdFromUrl();
+                  if (tid) window.location.href = `/t/${tid}/feed-validation`;
+                }}
+              >
+                Validate Feed
+              </Button>
+              <Button
+                onClick={() => {
+                  logQa('click_save_return');
+                  handleSave();
+                }}
+                disabled={saving}
+              >
+                Save & Return
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ModalFooter>
         <Button variant="ghost" onClick={handleClose} disabled={saving}>

@@ -5,28 +5,29 @@ import TenantSwitcher from "./TenantSwitcher";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
+import Link from "next/link";
+import { Button } from "@/components/ui";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { settings } = usePlatformSettings();
-  const [enabled, setEnabled] = useState<boolean>(false);
+  const [enabled, setEnabled] = useState<boolean>(true);
   const [links, setLinks] = useState<{ dashboard: string; inventory: string; tenants: string; settings: string }>({
     dashboard: "/",
     inventory: "/items",
     tenants: "/tenants",
     settings: "/settings",
   });
+  const [tenantScopedLinksOn, setTenantScopedLinksOn] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [tenantName, setTenantName] = useState<string | null>(null);
   const [restoreToast, setRestoreToast] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
 
   useEffect(() => {
     // Evaluate FF on client, using tenantId hint from localStorage
     const tenantId = typeof window !== "undefined" ? localStorage.getItem("tenantId") || undefined : undefined;
-    // Dev/test override: localStorage.ff_app_shell_nav = 'on'
-    const override = typeof window !== 'undefined' ? localStorage.getItem('ff_app_shell_nav') === 'on' : false;
-    const shellOn = override || isFeatureEnabled("FF_APP_SHELL_NAV", tenantId);
-    setEnabled(shellOn);
+    // AppShell is always visible on platform routes, including logged-out visitors
+    setEnabled(true);
 
     // Compute tenant-scoped links when FF_TENANT_URLS is enabled
     const tenantUrlsOverride = typeof window !== 'undefined' ? localStorage.getItem('ff_tenant_urls') === 'on' : false;
@@ -36,10 +37,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         dashboard: `/t/${tenantId}/dashboard`,
         inventory: `/t/${tenantId}/items`,
         tenants: "/tenants",
-        settings: `/t/${tenantId}/settings/tenant`,
+        settings: `/t/${tenantId}/settings`,
       });
+      setTenantScopedLinksOn(true);
     } else {
       setLinks({ dashboard: "/", inventory: "/items", tenants: "/tenants", settings: "/settings" });
+      setTenantScopedLinksOn(false);
     }
 
     // Resolve current tenant name from user context
@@ -68,8 +71,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [tenantName]);
 
-  // Don't show AppShell if feature flag is disabled OR user is not authenticated
-  if (!enabled || !user) {
+  // Don't show AppShell if explicitly disabled
+  if (!enabled) {
     return <>{children}</>;
   }
 
@@ -92,11 +95,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <a className="hover:text-neutral-900" href={links.dashboard}>Dashboard</a>
               <a className="hover:text-neutral-900" href={links.inventory}>Inventory</a>
               <a className="hover:text-neutral-900" href={links.tenants}>Tenants</a>
-              <a className="hover:text-neutral-900" href={links.settings}>Settings</a>
+              <a className="hover:text-neutral-900" href={links.settings}>{tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}</a>
             </nav>
           </div>
           <div className="flex items-center gap-4">
-            <TenantSwitcher />
+            {user && <TenantSwitcher />}
+            {user ? (
+              <>
+                <Link href="/settings">
+                  <Button variant="ghost" size="sm">Account</Button>
+                </Link>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    try { await logout(); } catch {}
+                    if (typeof window !== 'undefined') window.location.href = '/';
+                  }}
+                >
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <Link href="/login">
+                <Button variant="secondary" size="sm">Sign In</Button>
+              </Link>
+            )}
           </div>
         </div>
       </header>

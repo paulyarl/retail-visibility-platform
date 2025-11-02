@@ -1,0 +1,197 @@
+openapi: 3.0.3
+info:
+  title: RVP API — v3.7/3.8 Category + Scanning + Hours
+  version: 0.1.0
+servers:
+  - url: http://localhost:4000
+paths:
+  /category/validate:
+    post:
+      summary: Validate a category mapping
+      description: Unified validation for tenant or product context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                context:
+                  type: string
+                  enum: [tenant, product]
+                id:
+                  type: string
+                version:
+                  type: string
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: { type: boolean }
+                  errors: { type: array, items: { type: string } }
+                  stale: { type: boolean }
+
+  /tenant/{tenant_id}/gbp/category/mirror:
+    post:
+      summary: Mirror platform tenant categories to GBP
+      description: Requires feature flag; enqueues sync with retries/backoff
+      parameters:
+        - in: path
+          name: tenant_id
+          schema: { type: string }
+          required: true
+      responses:
+        '202': { description: Mirror enqueued }
+        '409': { description: Out-of-sync or policy conflict }
+
+  /tenant/{tenant_id}/business-hours:
+    get:
+      summary: Get business hours (platform SoT)
+      parameters:
+        - in: path
+          name: tenant_id
+          schema: { type: string }
+          required: true
+      responses:
+        '200': { description: OK }
+    put:
+      summary: Update business hours (platform is source of truth)
+      parameters:
+        - in: path
+          name: tenant_id
+          schema: { type: string }
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timezone: { type: string }
+                periods:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200': { description: Updated }
+
+  /tenant/{tenant_id}/business-hours/special:
+    get:
+      summary: Get special/holiday hours
+      parameters:
+        - in: path
+          name: tenant_id
+          schema: { type: string }
+          required: true
+      responses:
+        '200': { description: OK }
+    put:
+      summary: Update special/holiday hours
+      parameters:
+        - in: path
+          name: tenant_id
+          schema: { type: string }
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                overrides:
+                  type: array
+                  items: { type: object }
+      responses:
+        '200': { description: Updated }
+
+  /tenant/{tenant_id}/gbp/hours/mirror:
+    post:
+      summary: Mirror platform hours to GBP (flag-gated)
+      parameters:
+        - in: path
+          name: tenant_id
+          schema: { type: string }
+          required: true
+      responses:
+        '202': { description: Mirror enqueued }
+
+  /tenant/{tenant_id}/gbp/hours/status:
+    get:
+      summary: Retrieve last hours mirror status
+      parameters:
+        - in: path
+          name: tenant_id
+          schema: { type: string }
+          required: true
+      responses:
+        '200': { description: Status payload }
+
+  /tenant/{tenant_id}/sku/scan:
+    post:
+      summary: Start or submit a scan (camera/upload/manual)
+      parameters:
+        - in: path
+          name: tenant_id
+          schema: { type: string }
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image_base64: { type: string }
+                barcode: { type: string }
+                source_device: { type: string }
+      responses:
+        '202': { description: Scan accepted }
+
+  /tenant/{tenant_id}/sku/scan/{session_id}/results:
+    get:
+      summary: Retrieve results for a scan session
+      parameters:
+        - in: path
+          name: tenant_id
+          schema: { type: string }
+          required: true
+        - in: path
+          name: session_id
+          schema: { type: string }
+          required: true
+      responses:
+        '200': { description: Results payload }
+
+  /tenant/{tenant_id}/sku/scan/{session_id}/commit:
+    post:
+      summary: Commit valid scan results into inventory
+      parameters:
+        - in: path
+          name: tenant_id
+          schema: { type: string }
+          required: true
+        - in: path
+          name: session_id
+          schema: { type: string }
+          required: true
+      responses:
+        '200': { description: Commit summary }
+
+  /products/lookup-barcode/{barcode}:
+    get:
+      summary: Enrichment lookup with cache-first strategy
+      parameters:
+        - in: path
+          name: barcode
+          schema: { type: string }
+          required: true
+      responses:
+        '200': { description: Product template }
+        '404': { description: Not found }
+        '429': { description: Rate limited }

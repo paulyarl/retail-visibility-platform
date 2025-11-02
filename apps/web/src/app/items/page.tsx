@@ -1,5 +1,6 @@
 import ItemsClient from "@/components/items/ItemsClient";
 import { headers } from 'next/headers';
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +16,9 @@ export default async function ItemsPage({
   const tenantId = resolvedParams?.tenantId;
   if (!tenantId) {
     // Redirect to tenants page if no tenant selected
-    const { redirect } = await import("next/navigation");
     redirect("/tenants");
   }
-  
-  // Skip SSR fetch - let client handle it with proper auth
-  // This avoids double-fetching and auth issues
-  return <ItemsClient initialItems={[]} initialTenantId={tenantId} />;
+
+  // Canonicalize to /t/{tenantId}/items so the tenant app shell (sidebar) is applied
+  redirect(`/t/${tenantId}/items`);
 }

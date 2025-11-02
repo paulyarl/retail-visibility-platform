@@ -1,0 +1,198 @@
+openapi: 3.0.3
+info:
+  title: RVP Categories and Mirror API
+  version: 0.1.0
+servers:
+  - url: https://visibleshelfstaging.up.railway.app
+paths:
+  /api/platform/categories:
+    get:
+      summary: List platform categories (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+    post:
+      summary: Create a platform category (admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+  /api/tenant/{tenantId}/categories:
+    get:
+      summary: List tenant categories
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tenantId
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+  /api/categories/mirror:
+    post:
+      summary: Trigger category mirror job (flag-gated)
+      description: Returns 202 with jobId. If dryRun=true, perform a dry run.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [strategy]
+              properties:
+                strategy:
+                  type: string
+                  enum: [platform_to_gbp, gbp_to_platform]
+                tenantId:
+                  type: string
+                dryRun:
+                  type: boolean
+                  default: true
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  accepted:
+                    type: boolean
+                  jobId:
+                    type: string
+                  strategy:
+                    type: string
+                  tenantId:
+                    type: string
+        '400':
+          description: Bad Request (invalid strategy)
+        '409':
+          description: Feature disabled (FF_CATEGORY_MIRRORING off)
+  /api/admin/mirror/last-run:
+    get:
+      summary: Get latest mirror run summary (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+        - in: query
+          name: strategy
+          schema:
+            type: string
+            enum: [platform_to_gbp, gbp_to_platform]
+          required: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    oneOf:
+                      - type: 'null'
+                      - type: object
+                        properties:
+                          id:
+                            type: string
+                          tenantId:
+                            type: string
+                          strategy:
+                            type: string
+                          dryRun:
+                            type: boolean
+                          created:
+                            type: integer
+                          updated:
+                            type: integer
+                          deleted:
+                            type: integer
+                          skipped:
+                            type: boolean
+                          reason:
+                            type: string
+                          error:
+                            type: string
+                          jobId:
+                            type: string
+                          startedAt:
+                            type: string
+                            format: date-time
+                          completedAt:
+                            type: string
+                            format: date-time
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

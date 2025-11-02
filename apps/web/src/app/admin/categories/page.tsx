@@ -18,6 +18,24 @@ export default function AdminCategoriesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
+  const [dryRun, setDryRun] = useState(true);
+  const [mirrorLoading, setMirrorLoading] = useState(false);
+  const [tenantIdInput, setTenantIdInput] = useState('');
+  const [lastJobId, setLastJobId] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<any>(null);
+  const [lastSummary, setLastSummary] = useState<any>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [confirmWriteOpen, setConfirmWriteOpen] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
+  const apiUrl = (path: string) => `${API_BASE}${path}`;
+  const API_BEARER = (process.env.NEXT_PUBLIC_API_BEARER || (typeof window !== 'undefined' ? (window.localStorage?.getItem('API_BEARER') || '') : ''));
+  const authHeader = API_BEARER ? { Authorization: `Bearer ${API_BEARER}` } : ({} as Record<string, string>);
+  const getCookie = (name: string) => {
+    if (typeof document === 'undefined') return '';
+    const match = document.cookie.split(';').map(s => s.trim()).find(c => c.startsWith(name + '='));
+    return match ? decodeURIComponent(match.split('=')[1] || '') : '';
+  };
 
   useEffect(() => {
     loadCategories();
@@ -34,6 +52,44 @@ export default function AdminCategoriesPage() {
       setLoading(false);
     }
   };
+
+  const pollUntilCompleted = async (jobId: string, maxMs = 8000, intervalMs = 500) => {
+    setPolling(true);
+    const start = Date.now();
+    while (Date.now() - start < maxMs) {
+      await loadLastSummary();
+      const done = (lastSummary && lastSummary.jobId === jobId && lastSummary.completedAt) ? true : false;
+      if (done) break;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    setPolling(false);
+  };
+
+  const loadLastSummary = async () => {
+    setSummaryLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (tenantIdInput.trim()) qs.set('tenantId', tenantIdInput.trim());
+      qs.set('strategy', 'platform_to_gbp');
+      const res = await fetch(apiUrl(`/api/admin/mirror/last-run?${qs.toString()}`), {
+        method: 'GET',
+        headers: { ...authHeader },
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      setLastSummary(data?.data ?? null);
+    } catch (e) {
+      setLastSummary(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Auto-load summary when tenantId input changes
+    loadLastSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantIdInput]);
 
   const handleCreate = async () => {
     if (!categoryName.trim()) return;
@@ -94,6 +150,43 @@ export default function AdminCategoriesPage() {
     }
   };
 
+  const actuallyRunMirror = async () => {
+    if (mirrorLoading) return;
+    setMirrorLoading(true);
+    setLastResult(null);
+    try {
+      const body: any = { strategy: 'platform_to_gbp', dryRun };
+      if (tenantIdInput.trim()) body.tenantId = tenantIdInput.trim();
+      const csrf = getCookie('csrf');
+      const res = await fetch(apiUrl('/api/categories/mirror'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}), ...authHeader },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 202 && data && data.jobId) {
+        setLastJobId(String(data.jobId));
+        setLastResult(data);
+        // brief poll for completion
+        pollUntilCompleted(String(data.jobId)).catch(() => {});
+      } else {
+        setLastResult({ error: true, status: res.status, data });
+      }
+    } catch (e: any) {
+      setLastResult({ error: true, message: e?.message || 'request_failed' });
+    } finally {
+      setMirrorLoading(false);
+    }
+  };
+
+  const handleMirror = async () => {
+    if (dryRun) {
+      return actuallyRunMirror();
+    }
+    setConfirmWriteOpen(true);
+  };
+
   const openEditModal = (category: Category) => {
     setSelectedCategory(category);
     setCategoryName(category.name);
@@ -128,7 +221,78 @@ export default function AdminCategoriesPage() {
       />
 
       <div className="mt-6 space-y-6">
-        {/* Header with Create Button */}
+        <Card>
+          <CardHeader>
+            <CardTitle>GBP Category Mirror</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+              <div className="w-full sm:w-64">
+                <Input
+                  label="Tenant ID (optional)"
+                  placeholder="tenant_..."
+                  value={tenantIdInput}
+                  onChange={(e) => setTenantIdInput(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="dryRunToggle"
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={dryRun}
+                  onChange={(e) => setDryRun(e.target.checked)}
+                />
+                <label htmlFor="dryRunToggle" className="text-sm">Dry Run</label>
+              </div>
+              <Button
+                variant="primary"
+                onClick={handleMirror}
+                disabled={mirrorLoading}
+              >
+                {mirrorLoading ? 'Running…' : 'Mirror now'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={loadLastSummary}
+                disabled={summaryLoading}
+              >
+                {summaryLoading ? 'Refreshing…' : 'Refresh summary'}
+              </Button>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              {lastJobId && (
+                <Badge variant="success">jobId: {lastJobId}</Badge>
+              )}
+              {lastResult?.error && (
+                <Badge variant="error">error</Badge>
+              )}
+              {polling && (
+                <Badge variant="info">updating…</Badge>
+              )}
+            </div>
+            {lastSummary && (
+              <div className="mt-3 text-sm text-neutral-700 space-y-1">
+                <div>
+                  <span className="font-semibold">Last run:</span>
+                  {' '}{new Date(lastSummary.startedAt).toLocaleString()} {lastSummary.dryRun ? '(dryRun)' : ''}
+                </div>
+                <div className="flex gap-3">
+                  <span>created: <strong>{lastSummary.created}</strong></span>
+                  <span>updated: <strong>{lastSummary.updated}</strong></span>
+                  <span>deleted: <strong>{lastSummary.deleted}</strong></span>
+                </div>
+                {lastSummary.skipped && (
+                  <div className="text-amber-700">skipped: {lastSummary.reason || 'cooldown'}</div>
+                )}
+                {lastSummary.error && (
+                  <div className="text-red-600">error: {lastSummary.error}</div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-neutral-700">
             {categories.length} {categories.length === 1 ? 'category' : 'categories'}
@@ -191,45 +355,6 @@ export default function AdminCategoriesPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Create Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setCategoryName('');
-        }}
-        title="Create Category"
-        description="Add a new product category"
-      >
-        <div className="space-y-4">
-          <Input
-            label="Category Name"
-            placeholder="Enter category name"
-            value={categoryName}
-            onChange={(e) => setCategoryName(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleCreate()}
-          />
-        </div>
-        <ModalFooter>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setShowCreateModal(false);
-              setCategoryName('');
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleCreate}
-            disabled={!categoryName.trim()}
-          >
-            Create
-          </Button>
-        </ModalFooter>
-      </Modal>
 
       {/* Edit Modal */}
       <Modal

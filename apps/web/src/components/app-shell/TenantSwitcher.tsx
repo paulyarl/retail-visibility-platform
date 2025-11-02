@@ -78,7 +78,7 @@ export default function TenantSwitcher() {
     }
 
     // Default destination: tenant-scoped settings
-    window.location.href = `/t/${encodeURIComponent(tenantId)}/settings/tenant`;
+    window.location.href = `/t/${encodeURIComponent(tenantId)}/settings`;
   };
 
   // Render container consistently for tests and UX

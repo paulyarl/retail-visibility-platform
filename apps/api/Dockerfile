@@ -19,7 +19,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate && pnpm install -
 # Copy source code
 COPY . .
 
-# Build TypeScript
+# Build TypeScript (exclude test files in production)
 RUN pnpm build
 
 # Expose port (Railway uses PORT env var)
@@ -27,4 +27,4 @@ EXPOSE ${PORT:-8080}
 
 # Start command: run migrations then start server
 # Add explicit error handling and logging
-CMD ["sh", "-c", "echo 'Running Prisma migrations...' && npx prisma migrate deploy && echo 'Starting Node server...' && node dist/index.js || (echo 'Server failed to start' && exit 1)"]
+CMD ["sh", "-c", "echo 'Running Prisma migrations...' && npx prisma migrate deploy 2>&1 && echo 'Migrations complete!' && echo 'Starting Node server...' && node dist/index.js 2>&1 || (echo 'ERROR: Server failed to start' && exit 1)"]

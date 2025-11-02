@@ -1,0 +1,427 @@
+# Feature Flag Registry
+# Version: v3.6.2-prep (Retrofit R4)
+# Date: 2025-10-31
+# Description: Central registry for all feature flags with ownership and lifecycle
+
+version: "1.0"
+platform: retail-visibility-platform
+
+# Flag Governance Policy
+governance:
+  max_lifetime: 6_months
+  review_cadence: quarterly
+  expiry_notification_days: 30
+  auto_cleanup_after_expiry: 30_days
+  required_fields:
+    - key
+    - owner
+    - created
+    - expires
+    - status
+    - description
+
+# Flag Lifecycle States
+lifecycle_states:
+  pilot: "Testing with select tenants (10-20%)"
+  ab_test: "A/B testing with percentage rollout"
+  active: "Enabled in production for all tenants"
+  deprecated: "Scheduled for removal, use discouraged"
+  removed: "Cleaned up from codebase"
+
+# Feature Flags
+flags:
+  # Schema & Data Layer
+  - key: FF_SCHEMA_V34_READY
+    owner: api_team
+    created: 2025-08-01
+    expires: 2026-02-01
+    status: active
+    default: false
+    pilot: true
+    production: true
+    description: "Enables SWIS-ready inventory_item schema with all v3.4 fields"
+    rollout_percentage: 100
+    environments:
+      staging: true
+      pilot: true
+      production: true
+    dependencies: []
+    metrics:
+      - schema_migration_success_rate
+      - data_integrity_checks
+    documentation: /docs/migrations/v3.4-schema.md
+    
+  # Business Profile Module
+  - key: FF_BUSINESS_PROFILE
+    owner: ux_team
+    created: 2025-09-01
+    expires: 2026-03-01
+    status: pilot
+    default: false
+    pilot: true
+    production: staged
+    description: "Enables Business Profile module (REQ-2026-010) with NAP, hours, and SEO"
+    rollout_percentage: 20
+    environments:
+      staging: true
+      pilot: true
+      production: false
+    dependencies:
+      - FF_SCHEMA_V34_READY
+    metrics:
+      - profile_completion_rate
+      - profile_save_success_rate
+      - map_preview_engagement
+    documentation: /docs/features/business-profile.md
+    pilot_cohort:
+      - tenant_id: "cmhe0edxg0002g8s8bba4j2s0"
+      - tenant_id: "tenant_002"
+      - tenant_id: "tenant_003"
+  
+  # Google Connect Suite
+  - key: FF_GOOGLE_CONNECT_SUITE
+    owner: integrations_team
+    created: 2025-09-10
+    expires: 2026-03-01
+    status: pilot
+    default: false
+    pilot: true
+    production: staged
+    description: "Enables Google OAuth, Merchant Center, and GBP integration (ENH-2026-044)"
+    rollout_percentage: 15
+    environments:
+      staging: true
+      pilot: true
+      production: false
+    dependencies:
+      - FF_BUSINESS_PROFILE
+    metrics:
+      - oauth_success_rate
+      - oauth_error_rate
+      - merchant_sync_success_rate
+      - token_refresh_success_rate
+    documentation: /docs/integrations/google-connect.md
+    pilot_cohort:
+      - tenant_id: "cmhe0edxg0002g8s8bba4j2s0"
+      - tenant_id: "tenant_002"
+  
+  # Map Card
+  - key: FF_MAP_CARD
+    owner: ux_team
+    created: 2025-09-15
+    expires: 2026-03-15
+    status: pilot
+    default: false
+    pilot: true
+    production: staged
+    description: "Enables map preview card on business profile with privacy mode"
+    rollout_percentage: 25
+    environments:
+      staging: true
+      pilot: true
+      production: false
+    dependencies:
+      - FF_BUSINESS_PROFILE
+    metrics:
+      - map_card_view_rate
+      - privacy_mode_toggle_rate
+    documentation: /docs/features/map-card.md
+  
+  # SWIS Preview
+  - key: FF_SWIS_PREVIEW
+    owner: ux_team
+    created: 2025-09-20
+    expires: 2026-03-20
+    status: ab_test
+    default: false
+    pilot: 20
+    production: ab_test
+    description: "Enables SWIS preview pane on SKU editor and public pages"
+    rollout_percentage: 20
+    environments:
+      staging: true
+      pilot: true
+      production: true
+    dependencies:
+      - FF_SCHEMA_V34_READY
+    metrics:
+      - swis_preview_render_time_p95
+      - swis_preview_engagement_rate
+      - conversion_rate_with_preview
+    documentation: /docs/features/swis-preview.md
+    ab_test:
+      variant_a: false  # Control (no preview)
+      variant_b: true   # Treatment (with preview)
+      allocation: 50_50
+      success_metric: conversion_rate
+  
+  # Category Management Page
+  - key: FF_CATEGORY_MANAGEMENT_PAGE
+    owner: ux_team
+    created: 2025-09-01
+    expires: 2026-02-01
+    status: active
+    default: false
+    pilot: true
+    production: true
+    description: "Enables Category Management UI (ENH-2026-045) at /t/{tenant}/categories"
+    rollout_percentage: 100
+    environments:
+      staging: true
+      pilot: true
+      production: true
+    dependencies:
+      - FF_SCHEMA_V34_READY
+    metrics:
+      - category_page_load_time
+      - category_crud_success_rate
+      - alignment_drawer_open_rate
+    documentation: /docs/features/category-management.md
+  
+  # Tenant Category Override
+  - key: FF_TENANT_CATEGORY_OVERRIDE
+    owner: api_team
+    created: 2025-09-05
+    expires: 2026-02-05
+    status: pilot
+    default: false
+    pilot: false
+    production: false
+    description: "Allows tenant-level category mapping writes (admin override)"
+    rollout_percentage: 0
+    environments:
+      staging: true
+      pilot: false
+      production: false
+    dependencies:
+      - FF_CATEGORY_MANAGEMENT_PAGE
+    metrics:
+      - override_usage_count
+      - override_error_rate
+    documentation: /docs/features/category-override.md
+    warning: "Use with caution - allows bypassing standard validation"
+  
+  # Feed Alignment Enforcement
+  - key: FF_FEED_ALIGNMENT_ENFORCE
+    owner: api_team
+    created: 2025-08-15
+    expires: 2026-01-15
+    status: active
+    default: warn
+    pilot: warn
+    production: true
+    description: "Blocks feed submission when categories unmapped (REQ-2025-911)"
+    rollout_percentage: 100
+    environments:
+      staging: true
+      pilot: true
+      production: true
+    dependencies:
+      - FF_CATEGORY_MANAGEMENT_PAGE
+    metrics:
+      - feed_blocked_count
+      - category_mapping_coverage_pct
+      - feed_approval_rate
+    documentation: /docs/features/feed-alignment.md
+    values:
+      warn: "Log warning but allow feed"
+      block: "Block feed submission"
+    current_value: warn  # Will change to 'block' when coverage = 100%
+  
+  # Category Quick Actions Footer
+  - key: FF_CATEGORY_QUICK_ACTIONS
+    owner: ux_team
+    created: 2025-09-20
+    expires: 2026-03-20
+    status: pilot
+    default: false
+    pilot: true
+    production: staged
+    description: "Enables sticky Quick Actions footer on product edit (REQ-2025-912A)"
+    rollout_percentage: 30
+    environments:
+      staging: true
+      pilot: true
+      production: false
+    dependencies:
+      - FF_CATEGORY_MANAGEMENT_PAGE
+    metrics:
+      - qa_footer_shown_count
+      - qa_footer_engagement_rate
+      - qa_footer_align_clicked
+      - qa_footer_validate_clicked
+      - qa_footer_save_clicked
+    documentation: /docs/features/quick-actions-footer.md
+    pilot_cohort:
+      - tenant_id: "cmhe0edxg0002g8s8bba4j2s0"
+      - tenant_id: "tenant_002"
+      - tenant_id: "tenant_003"
+  
+  # Tenant URLs
+  - key: FF_TENANT_URLS
+    owner: ux_team
+    created: 2025-09-25
+    expires: 2026-03-25
+    status: pilot
+    default: false
+    pilot: true
+    production: staged
+    description: "Enables tenant-specific URLs /t/{tenantId}/* routing (TR-905)"
+    rollout_percentage: 25
+    environments:
+      staging: true
+      pilot: true
+      production: false
+    dependencies: []
+    metrics:
+      - tenant_routing_success_rate
+      - tenant_404_rate
+    documentation: /docs/features/tenant-routing.md
+  
+  # App Shell Navigation
+  - key: FF_APP_SHELL_NAV
+    owner: ux_team
+    created: 2025-09-28
+    expires: 2026-03-28
+    status: pilot
+    default: false
+    pilot: true
+    production: staged
+    description: "Enables new app shell navigation with improved UX"
+    rollout_percentage: 20
+    environments:
+      staging: true
+      pilot: true
+      production: false
+    dependencies:
+      - FF_TENANT_URLS
+    metrics:
+      - navigation_engagement_rate
+      - time_to_navigate
+    documentation: /docs/features/app-shell-nav.md
+  
+  # Audit Log (Retrofit)
+  - key: FF_AUDIT_LOG
+    owner: devops_team
+    created: 2025-10-31
+    expires: 2026-04-30
+    status: active
+    default: false
+    pilot: true
+    production: true
+    description: "Enables audit log collection for all entity changes (Retrofit R2)"
+    rollout_percentage: 100
+    environments:
+      staging: true
+      pilot: true
+      production: true
+    dependencies: []
+    metrics:
+      - audit_log_write_rate
+      - audit_log_query_performance
+    documentation: /docs/features/audit-log.md
+  
+  # Async Feed Push Jobs (Retrofit)
+  - key: FF_ASYNC_FEED_JOBS
+    owner: api_team
+    created: 2025-10-31
+    expires: 2026-04-30
+    status: pilot
+    default: false
+    pilot: true
+    production: staged
+    description: "Enables async feed push job processing with retry logic (Retrofit R2)"
+    rollout_percentage: 30
+    environments:
+      staging: true
+      pilot: true
+      production: false
+    dependencies:
+      - FF_AUDIT_LOG
+    metrics:
+      - feed_push_success_rate
+      - job_queue_depth
+      - retry_distribution
+      - avg_processing_time
+    documentation: /docs/features/async-feed-jobs.md
+  
+  # Synthetic Monitoring (Retrofit)
+  - key: FF_SYNTHETIC_MONITORING
+    owner: devops_team
+    created: 2025-10-31
+    expires: 2026-04-30
+    status: active
+    default: false
+    pilot: true
+    production: true
+    description: "Enables synthetic monitoring journeys for SLA tracking (Retrofit R3)"
+    rollout_percentage: 100
+    environments:
+      staging: true
+      pilot: true
+      production: true
+    dependencies: []
+    metrics:
+      - synthetic_latency_p95
+      - synthetic_success_rate
+      - uptime_pct
+    documentation: /docs/observability/synthetic-monitoring.md
+
+# Cleanup Schedule
+cleanup_schedule:
+  next_review: 2026-01-01
+  flags_to_remove:
+    - key: FF_OLD_FEATURE_EXAMPLE
+      expired: 2025-10-01
+      status: removed
+      removed_date: 2025-11-01
+      removal_pr: "#1234"
+
+# Notification Settings
+notifications:
+  expiry_warning:
+    enabled: true
+    days_before: 30
+    channels:
+      - email
+      - slack
+  
+  cleanup_reminder:
+    enabled: true
+    cadence: monthly
+    channel: slack
+    channel_id: "#feature-flags"
+
+# Metrics & Monitoring
+monitoring:
+  dashboard: "Feature Flags Overview"
+  metrics:
+    - flag_evaluation_rate
+    - flag_evaluation_latency
+    - flag_override_count
+    - flag_error_rate
+  
+  alerts:
+    - name: Flag Evaluation Error
+      condition: flag_error_rate > 1%
+      severity: high
+      channel: slack_alerts
+    
+    - name: Expired Flag Still Active
+      condition: flag_expired AND flag_active
+      severity: medium
+      channel: slack_alerts
+
+# Documentation
+documentation:
+  guidelines: /docs/feature-flags/guidelines.md
+  best_practices: /docs/feature-flags/best-practices.md
+  rollout_strategy: /docs/feature-flags/rollout-strategy.md
+  
+  examples:
+    - name: "Adding a New Flag"
+      file: /docs/feature-flags/examples/add-flag.md
+    - name: "Removing a Flag"
+      file: /docs/feature-flags/examples/remove-flag.md
+    - name: "A/B Testing"
+      file: /docs/feature-flags/examples/ab-test.md
