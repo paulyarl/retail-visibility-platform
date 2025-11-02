@@ -19,8 +19,8 @@ RUN corepack enable && corepack prepare pnpm@latest --activate && pnpm install -
 # Copy source code
 COPY . .
 
-# Build TypeScript (skip type checking in production)
-RUN pnpm build --no-type-check
+# Build TypeScript (exclude test files in production)
+RUN pnpm build
 
 # Expose port (Railway uses PORT env var)
 EXPOSE ${PORT:-8080}
