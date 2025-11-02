@@ -17,11 +17,10 @@ Dates: target vs. actual
 ## 1) Milestones
 | ID | Name | Target | Owner | Status | Notes |
 |---|---|---|---|---|---|
-| M1 | Data model + RLS + audit (v3.7) | | | [~] | Core tables, RLS, audit hooks |
-| M2 | Unified validation API + feed enforcement | | | [~] | OpenAPI docs, enforcement on push |
-| M3 | UI shell integration (sidebar + drawer) | | | [ ] | Chips, drawer, flags |
-| M4 | GBP sync engine + jobs + retries | | | [ ] | Backoff, out-of-sync detection |
-| M5 | SKU Scanning core (session/results/cache) | | | [ ] | Tables + APIs + components |
+| M1 | Data model + RLS + audit (v3.7) | | | [~] | Core tables, RLS, audit hooks; add CategoryService abstraction |
+| M2 | Unified validation API + feed enforcement | | | [~] | OpenAPI docs, enforcement on push; include scanning precheck |
+| M3 | Tenant Categories + GBP (elevated) | | | [ ] | Mirror endpoint + strategy switch; sync worker + retries/backoff; out-of-sync detection + telemetry; admin dashboard tiles |
+| M4 | SKU Scanning core (elevated) | | | [ ] | Tables (session/result/template/lookup_log + RLS); APIs (start, results, lookup-barcode, commit); components (BarcodeScanner, BatchReview, EnrichmentPreview); validation hook |
 | M6 | Observability dashboards + alerts | | | [ ] | Category + scanning KPIs |
 | M7 | CI schema drift + release gate | | | [ ] | Nightly diff, PR gate |
 | M8 | Business Hours + GBP sync (spec + impl) | | | [ ] | Hours model/APIs/UI + sync job |
@@ -43,6 +42,7 @@ Dates: target vs. actual
 - [ ] GBP sync worker with retries/backoff
 - [ ] Out-of-sync detection + telemetry `gbp.sync.out_of_sync_detected`
 - [ ] Admin dashboard tiles (sync status, errors, retry CTA)
+  - Notes: Elevated to Milestone M3; gated by `FF_CATEGORY_MIRRORING` and `FF_TENANT_PLATFORM_CATEGORY`.
 
 ### 2.3 Product Feed Alignment
 - [x] Precheck/validate UI surfacing (422 handler + modal)
@@ -61,6 +61,7 @@ Dates: target vs. actual
 - [ ] Validation + precheck hook (category suggestion + enforcement)
 - [ ] Duplicate detection (bloom/DB) + badges
 - [ ] Tiered feature flags + rate limits
+  - Notes: Elevated to Milestone M4; initial enrichment can be stubbed; camera and USB gated via flags.
 
 ### 2.6 Observability & CI
 - [ ] Dashboards: `gbp_sync_success_rate`, `taxonomy_stale_count`, `mapping_latency_p95`
@@ -83,14 +84,14 @@ Dates: target vs. actual
 | Flag | Default | Rollout | Owner | Notes |
 |---|---|---|---|---|
 | FF_CATEGORY_UNIFICATION | off | staged v3.7 | | |
-| FF_TENANT_PLATFORM_CATEGORY | pilot | per-tenant | | |
-| FF_TENANT_GBP_CATEGORY_SYNC | pilot | cohort | | |
-| FF_CATEGORY_MIRRORING | off | per-tenant | | |
+| FF_TENANT_PLATFORM_CATEGORY | pilot | per-tenant | | Enables tenant category UI/API; required for M3 |
+| FF_TENANT_GBP_CATEGORY_SYNC | pilot | cohort | | Worker + tiles visible when on |
+| FF_CATEGORY_MIRRORING | off | per-tenant | | Controls mirror endpoint + strategy switch |
 | FF_PRODUCT_CATEGORY_ALIGNMENT | on | global | | |
 | FEED_ALIGNMENT_ENFORCE (API) | true | global | | |
-| FF_SKU_SCANNING | off | Starter+ staged | | |
-| FF_CAMERA_SCANNER | off | Starter+ | | |
-| FF_USB_SCANNER | off | Pro+ | | |
+| FF_SKU_SCANNING | off | Starter+ staged | | Gate for scanning UI/API (M4) |
+| FF_CAMERA_SCANNER | off | Starter+ | | Enable camera-based scanner |
+| FF_USB_SCANNER | off | Pro+ | | Enable USB/HID scanner support |
 | FF_SKU_ENRICHMENT_ENGINE | off | tiered | | |
 | FF_SKU_BATCH_MODE | off | Pro+ | | |
 | FF_TENANT_GBP_HOURS_SYNC | off | pilot | | Controls optional GBP hours mirror endpoint and job |
