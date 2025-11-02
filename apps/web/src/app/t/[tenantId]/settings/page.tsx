@@ -1,4 +1,4 @@
-import SettingsPage from '@/app/settings/page';
+import SettingsPage from '@/app/(platform)/settings/page';
 import SetTenantId from '@/components/client/SetTenantId';
 import Link from 'next/link';
 

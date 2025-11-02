@@ -24,7 +24,7 @@ import businessHoursRoutes from './routes/business-hours';
 import { runGbpHoursSync } from './jobs/gbpHoursSync';
 import tenantFlagsRoutes from './routes/tenant-flags';
 import platformFlagsRoutes from './routes/platform-flags';
-import { authenticateToken, requireAdmin } from './middleware/auth';
+import effectiveFlagsRoutes from './routes/effective-flags';
 import {
   getAuthorizationUrl,
   decodeState,
@@ -1876,6 +1876,9 @@ app.use('/admin', authenticateToken, tenantFlagsRoutes);
 app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
 app.use('/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
 app.use('/api/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
+// Effective flags: middleware applied per-route (admin for platform, tenant access for tenant)
+app.use('/admin', authenticateToken, effectiveFlagsRoutes);
+app.use('/api/admin', authenticateToken, effectiveFlagsRoutes);
 
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenantId/items/:itemId/category

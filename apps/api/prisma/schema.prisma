@@ -18,7 +18,7 @@ model TenantFeatureFlag {
   tenantId  String   @map("tenant_id")
   flag      String
   enabled   Boolean  @default(false)
-  rollout   String?  // optional notes like cohort/bucket
+  rollout   String? // optional notes like cohort/bucket
   updatedAt DateTime @updatedAt @map("updated_at")
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -29,17 +29,17 @@ model TenantFeatureFlag {
 
 // Business Hours (platform is source of truth)
 model BusinessHours {
-  id            String   @id @default(cuid())
-  tenantId      String   @map("tenant_id")
-  timezone      String   @default("America/New_York")
-  periods       Json     @default("[]")
-  sourceHash    String?  @map("source_hash")
-  lastSyncedAt  DateTime? @map("last_synced_at")
-  syncAttempts  Int      @default(0) @map("sync_attempts")
-  lastError     String?  @map("last_error")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  timezone     String    @default("America/New_York")
+  periods      Json      @default("[]")
+  sourceHash   String?   @map("source_hash")
+  lastSyncedAt DateTime? @map("last_synced_at")
+  syncAttempts Int       @default(0) @map("sync_attempts")
+  lastError    String?   @map("last_error")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId])
   @@index([tenantId])
@@ -47,18 +47,18 @@ model BusinessHours {
 }
 
 model BusinessHoursSpecial {
-  id           String   @id @default(cuid())
-  tenantId     String   @map("tenant_id")
-  date         DateTime @db.Date
-  isClosed     Boolean  @default(false) @map("is_closed")
-  open         String?  // HH:mm
-  close        String?  // HH:mm
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  date         DateTime  @db.Date
+  isClosed     Boolean   @default(false) @map("is_closed")
+  open         String? // HH:mm
+  close        String? // HH:mm
   note         String?
-  sourceHash   String?  @map("source_hash")
+  sourceHash   String?   @map("source_hash")
   lastSyncedAt DateTime? @map("last_synced_at")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, date], name: "tenantId_date")
   @@index([tenantId, date])
@@ -71,38 +71,42 @@ datasource db {
 }
 
 model Tenant {
-  id                    String               @id @default(cuid())
+  id                    String                 @id @default(cuid())
   name                  String
-  createdAt             DateTime             @default(now())
-  region                String               @default("us-east-1")
-  language              String               @default("en-US")
-  currency              String               @default("USD")
-  data_policy_accepted  Boolean              @default(false)
+  createdAt             DateTime               @default(now())
+  region                String                 @default("us-east-1")
+  language              String                 @default("en-US")
+  currency              String                 @default("USD")
+  data_policy_accepted  Boolean                @default(false)
   metadata              Json?
-  subscriptionStatus    String?              @default("trial")
-  subscriptionTier      String?              @default("starter")
+  subscriptionStatus    String?                @default("trial")
+  subscriptionTier      String?                @default("starter")
   trialEndsAt           DateTime?
   subscriptionEndsAt    DateTime?
-  stripeCustomerId      String?              @unique
-  stripeSubscriptionId  String?              @unique
+  stripeCustomerId      String?                @unique
+  stripeSubscriptionId  String?                @unique
   organizationId        String?
-  serviceLevel          String?              @default("self_service")
-  managedServicesActive Boolean              @default(false)
+  serviceLevel          String?                @default("self_service")
+  managedServicesActive Boolean                @default(false)
   dedicatedManager      String?
   monthlySkuQuota       Int?
-  skusAddedThisMonth    Int                  @default(0)
+  skusAddedThisMonth    Int                    @default(0)
   items                 InventoryItem[]
   photos                PhotoAsset[]
   performance           ProductPerformance[]
   syncJobs              SyncJob[]
-  organization          Organization?        @relation(fields: [organizationId], references: [id])
-  users                 UserTenant[]         // Many-to-many relationship with users
+  organization          Organization?          @relation(fields: [organizationId], references: [id])
+  users                 UserTenant[] // Many-to-many relationship with users
   googleOAuthAccounts   GoogleOAuthAccount[]
   organizationRequests  OrganizationRequest[] // Requests to join organizations
   businessProfile       TenantBusinessProfile?
   businessHours         BusinessHours?
   businessHoursSpecials BusinessHoursSpecial[]
   featureFlags          TenantFeatureFlag[]
+  scanTemplates         ScanTemplate[]
+  scanSessions          ScanSession[]
+  scanResults           ScanResult[]
+  barcodeLookupLogs     BarcodeLookupLog[]
 
   @@index([name])
   @@index([subscriptionStatus])
@@ -111,19 +115,19 @@ model Tenant {
 }
 
 model Organization {
-  id                   String    @id @default(cuid())
+  id                   String                @id @default(cuid())
   name                 String
   ownerId              String
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  subscriptionTier     String?   @default("chain_starter")
-  subscriptionStatus   String?   @default("trial")
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  subscriptionTier     String?               @default("chain_starter")
+  subscriptionStatus   String?               @default("trial")
   trialEndsAt          DateTime?
   subscriptionEndsAt   DateTime?
-  stripeCustomerId     String?   @unique
-  stripeSubscriptionId String?   @unique
-  maxLocations         Int       @default(5)
-  maxTotalSKUs         Int       @default(2500)
+  stripeCustomerId     String?               @unique
+  stripeSubscriptionId String?               @unique
+  maxLocations         Int                   @default(5)
+  maxTotalSKUs         Int                   @default(2500)
   metadata             Json?
   tenants              Tenant[]
   organizationRequests OrganizationRequest[] // Requests from tenants to join
@@ -443,25 +447,25 @@ model UpgradeRequest {
 
 // Organization Assignment Request model
 model OrganizationRequest {
-  id                String    @id @default(cuid())
-  tenantId          String    @map("tenant_id")
-  organizationId    String    @map("organization_id")
-  requestedBy       String    @map("requested_by") // User ID who made the request
-  status            String    @default("pending") // pending, approved, rejected
-  requestType       String    @map("request_type") @default("join") // join, leave
-  estimatedCost     Float?    @map("estimated_cost")
-  costCurrency      String?   @map("cost_currency") @default("USD")
-  notes             String?   // Tenant owner's notes
-  adminNotes        String?   @map("admin_notes") // Admin's notes
-  costAgreed        Boolean   @default(false) @map("cost_agreed")
-  costAgreedAt      DateTime? @map("cost_agreed_at")
-  processedBy       String?   @map("processed_by") // Admin user ID
-  processedAt       DateTime? @map("processed_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id             String    @id @default(cuid())
+  tenantId       String    @map("tenant_id")
+  organizationId String    @map("organization_id")
+  requestedBy    String    @map("requested_by") // User ID who made the request
+  status         String    @default("pending") // pending, approved, rejected
+  requestType    String    @default("join") @map("request_type") // join, leave
+  estimatedCost  Float?    @map("estimated_cost")
+  costCurrency   String?   @default("USD") @map("cost_currency")
+  notes          String? // Tenant owner's notes
+  adminNotes     String?   @map("admin_notes") // Admin's notes
+  costAgreed     Boolean   @default(false) @map("cost_agreed")
+  costAgreedAt   DateTime? @map("cost_agreed_at")
+  processedBy    String?   @map("processed_by") // Admin user ID
+  processedAt    DateTime? @map("processed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([organizationId])
@@ -472,28 +476,28 @@ model OrganizationRequest {
 }
 
 model TenantBusinessProfile {
-  tenantId       String  @id @map("tenant_id")
-  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String @id @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  businessName   String  @map("business_name")
-  addressLine1   String  @map("address_line1")
-  addressLine2   String? @map("address_line2")
+  businessName   String   @map("business_name")
+  addressLine1   String   @map("address_line1")
+  addressLine2   String?  @map("address_line2")
   city           String
   state          String?
-  postalCode     String  @map("postal_code")
-  countryCode    String  @map("country_code") @db.Char(2)
-  phoneNumber    String? @map("phone_number")
+  postalCode     String   @map("postal_code")
+  countryCode    String   @map("country_code") @db.Char(2)
+  phoneNumber    String?  @map("phone_number")
   email          String?
   website        String?
-  contactPerson  String? @map("contact_person")
-  logoUrl        String? @map("logo_url")
+  contactPerson  String?  @map("contact_person")
+  logoUrl        String?  @map("logo_url")
   hours          Json?
-  socialLinks    Json?   @map("social_links")
-  seoTags        Json?   @map("seo_tags")
+  socialLinks    Json?    @map("social_links")
+  seoTags        Json?    @map("seo_tags")
   latitude       Decimal?
   longitude      Decimal?
-  displayMap     Boolean @default(false) @map("display_map")
-  mapPrivacyMode String  @default("precise") @map("map_privacy_mode")
+  displayMap     Boolean  @default(false) @map("display_map")
+  mapPrivacyMode String   @default("precise") @map("map_privacy_mode")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@map("tenant_business_profile")
@@ -501,25 +505,26 @@ model TenantBusinessProfile {
 
 // Authentication User model
 model User {
-  id                      String          @id @default(cuid())
-  email                   String          @unique
-  passwordHash            String          @map("password_hash")
-  firstName               String?         @map("first_name")
-  lastName                String?         @map("last_name")
-  role                    UserRole        @default(USER)
-  emailVerified           Boolean         @default(false) @map("email_verified")
-  emailVerificationToken  String?         @map("email_verification_token")
-  passwordResetToken      String?         @map("password_reset_token")
-  passwordResetExpires    DateTime?       @map("password_reset_expires")
-  lastLogin               DateTime?       @map("last_login")
-  isActive                Boolean         @default(true) @map("is_active")
-  createdAt               DateTime        @default(now()) @map("created_at")
-  updatedAt               DateTime        @updatedAt @map("updated_at")
-  
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  passwordHash           String    @map("password_hash")
+  firstName              String?   @map("first_name")
+  lastName               String?   @map("last_name")
+  role                   UserRole  @default(USER)
+  emailVerified          Boolean   @default(false) @map("email_verified")
+  emailVerificationToken String?   @map("email_verification_token")
+  passwordResetToken     String?   @map("password_reset_token")
+  passwordResetExpires   DateTime? @map("password_reset_expires")
+  lastLogin              DateTime? @map("last_login")
+  isActive               Boolean   @default(true) @map("is_active")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
   // Relations
-  tenants                 UserTenant[]
-  sessions                UserSession[]
-  
+  tenants      UserTenant[]
+  sessions     UserSession[]
+  scanSessions ScanSession[]
+
   @@index([email])
   @@index([role])
   @@map("users")
@@ -527,25 +532,25 @@ model User {
 
 // User roles enum
 enum UserRole {
-  ADMIN    // Platform admin
-  OWNER    // Business owner
-  USER     // Regular user
-  
+  ADMIN // Platform admin
+  OWNER // Business owner
+  USER // Regular user
+
   @@map("user_role")
 }
 
 // User-Tenant relationship (many-to-many)
 model UserTenant {
-  id        String            @id @default(cuid())
-  userId    String            @map("user_id")
-  tenantId  String            @map("tenant_id")
-  role      UserTenantRole    @default(MEMBER)
-  createdAt DateTime          @default(now()) @map("created_at")
-  updatedAt DateTime          @updatedAt @map("updated_at")
-  
-  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  
+  id        String         @id @default(cuid())
+  userId    String         @map("user_id")
+  tenantId  String         @map("tenant_id")
+  role      UserTenantRole @default(MEMBER)
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@unique([userId, tenantId])
   @@index([userId])
   @@index([tenantId])
@@ -554,27 +559,27 @@ model UserTenant {
 
 // User role within a specific tenant
 enum UserTenantRole {
-  OWNER    // Tenant owner
-  ADMIN    // Tenant admin
-  MEMBER   // Regular member
-  VIEWER   // Read-only access
-  
+  OWNER // Tenant owner
+  ADMIN // Tenant admin
+  MEMBER // Regular member
+  VIEWER // Read-only access
+
   @@map("user_tenant_role")
 }
 
 // User sessions for tracking
 model UserSession {
-  id         String    @id @default(cuid())
-  userId     String    @map("user_id")
-  deviceInfo String?   @map("device_info")
-  ipAddress  String?   @map("ip_address")
-  userAgent  String?   @map("user_agent")
-  isActive   Boolean   @default(true) @map("is_active")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  expiresAt  DateTime  @map("expires_at")
-  
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  deviceInfo String?  @map("device_info")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  expiresAt  DateTime @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([expiresAt])
   @@map("user_sessions")
@@ -651,13 +656,13 @@ enum AuditAction {
 
 // Permission Matrix System
 model PermissionMatrix {
-  id          String   @id @default(cuid())
-  role        String   // 'PLATFORM_ADMIN', 'TENANT_OWNER', 'TENANT_ADMIN', 'TENANT_MEMBER', 'TENANT_VIEWER'
-  action      PermissionAction   // permission action enum
-  allowed     Boolean  @default(false)
+  id          String           @id @default(cuid())
+  role        String // 'PLATFORM_ADMIN', 'TENANT_OWNER', 'TENANT_ADMIN', 'TENANT_MEMBER', 'TENANT_VIEWER'
+  action      PermissionAction // permission action enum
+  allowed     Boolean          @default(false)
   description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
 
   @@unique([role, action])
   @@index([role])
@@ -666,18 +671,18 @@ model PermissionMatrix {
 }
 
 enum PermissionAction {
-  tenant_create           @map("tenant.create")
-  tenant_read             @map("tenant.read")
-  tenant_update           @map("tenant.update")
-  tenant_delete           @map("tenant.delete")
-  tenant_manage_users     @map("tenant.manage_users")
-  inventory_create        @map("inventory.create")
-  inventory_read          @map("inventory.read")
-  inventory_update        @map("inventory.update")
-  inventory_delete        @map("inventory.delete")
-  analytics_view          @map("analytics.view")
-  admin_access_dashboard  @map("admin.access_dashboard")
-  admin_manage_settings   @map("admin.manage_settings")
+  tenant_create          @map("tenant.create")
+  tenant_read            @map("tenant.read")
+  tenant_update          @map("tenant.update")
+  tenant_delete          @map("tenant.delete")
+  tenant_manage_users    @map("tenant.manage_users")
+  inventory_create       @map("inventory.create")
+  inventory_read         @map("inventory.read")
+  inventory_update       @map("inventory.update")
+  inventory_delete       @map("inventory.delete")
+  analytics_view         @map("analytics.view")
+  admin_access_dashboard @map("admin.access_dashboard")
+  admin_manage_settings  @map("admin.manage_settings")
 
   @@map("permission_action")
 }
@@ -702,21 +707,21 @@ model PermissionAuditLog {
 
 // Feed Push Jobs - Async job processing with retry logic
 model FeedPushJob {
-  id            String      @id @default(cuid())
-  tenantId      String      @map("tenant_id")
-  sku           String?     // NULL for full feed, specific SKU for single item
-  jobStatus     JobStatus   @default(queued) @map("job_status")
-  retryCount    Int         @default(0) @map("retry_count")
-  maxRetries    Int         @default(5) @map("max_retries")
-  lastAttempt   DateTime?   @map("last_attempt")
-  nextRetry     DateTime?   @map("next_retry")
-  errorMessage  String?     @map("error_message")
-  errorCode     String?     @map("error_code")
-  payload       Json?       // Job-specific data
-  result        Json?       // Result from successful job
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  completedAt   DateTime?   @map("completed_at")
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  sku          String? // NULL for full feed, specific SKU for single item
+  jobStatus    JobStatus @default(queued) @map("job_status")
+  retryCount   Int       @default(0) @map("retry_count")
+  maxRetries   Int       @default(5) @map("max_retries")
+  lastAttempt  DateTime? @map("last_attempt")
+  nextRetry    DateTime? @map("next_retry")
+  errorMessage String?   @map("error_message")
+  errorCode    String?   @map("error_code")
+  payload      Json? // Job-specific data
+  result       Json? // Result from successful job
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  completedAt  DateTime? @map("completed_at")
 
   @@index([tenantId, jobStatus])
   @@index([jobStatus])
@@ -741,10 +746,10 @@ model OutreachFeedback {
   id        String   @id @default(cuid())
   tenantId  String?  @map("tenant_id")
   userId    String?  @map("user_id")
-  feedback  Json     // Structured feedback object
-  score     Int      // 1-5 rating
-  category  String?  // usability, performance, features, support
-  context   String?  // onboarding, category_alignment, feed_push, etc.
+  feedback  Json // Structured feedback object
+  score     Int // 1-5 rating
+  category  String? // usability, performance, features, support
+  context   String? // onboarding, category_alignment, feed_push, etc.
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([tenantId, createdAt])
@@ -757,16 +762,16 @@ model OutreachFeedback {
 
 // Tenant Category - Vendor-owned categories
 model TenantCategory {
-  id                String   @id @default(cuid())
-  tenantId          String   @map("tenant_id")
-  name              String
-  slug              String
-  parentId          String?  @map("parent_id")
-  googleCategoryId  String?  @map("google_category_id")
-  isActive          Boolean  @default(true) @map("is_active")
-  sortOrder         Int      @default(0) @map("sort_order")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  name             String
+  slug             String
+  parentId         String?  @map("parent_id")
+  googleCategoryId String?  @map("google_category_id")
+  isActive         Boolean  @default(true) @map("is_active")
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   @@unique([tenantId, slug])
   @@index([tenantId, isActive])
@@ -793,3 +798,85 @@ model GoogleTaxonomy {
   @@map("google_taxonomy")
 }
 
+model ScanTemplate {
+  id                String        @id @default(cuid())
+  tenantId          String        @map("tenant_id")
+  name              String
+  defaultCategory   String?
+  defaultPriceCents Int?
+  defaultCurrency   String        @default("USD") @db.Char(3)
+  defaultVisibility String        @default("private")
+  enrichmentRules   Json?
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions          ScanSession[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("scan_templates")
+}
+
+model ScanSession {
+  id             String        @id @default(cuid())
+  tenantId       String        @map("tenant_id")
+  userId         String?       @map("user_id")
+  templateId     String?       @map("template_id")
+  status         String        @default("active")
+  deviceType     String?       @map("device_type")
+  scannedCount   Int           @default(0) @map("scanned_count")
+  committedCount Int           @default(0) @map("committed_count")
+  duplicateCount Int           @default(0) @map("duplicate_count")
+  metadata       Json?
+  startedAt      DateTime      @default(now()) @map("started_at")
+  completedAt    DateTime?     @map("completed_at")
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  template       ScanTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  results        ScanResult[]
+
+  @@index([tenantId, status])
+  @@index([startedAt])
+  @@map("scan_sessions")
+}
+
+model ScanResult {
+  id          String      @id @default(cuid())
+  tenantId    String      @map("tenant_id")
+  sessionId   String      @map("session_id")
+  barcode     String
+  sku         String?
+  rawPayload  Json?       @map("raw_payload")
+  status      String      @default("new")
+  enrichment  Json?
+  validation  Json?
+  duplicateOf String?     @map("duplicate_of")
+  error       String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  session     ScanSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sessionId, barcode], name: "uq_scan_result_tenant_session_barcode")
+  @@index([tenantId, status, createdAt])
+  @@index([sessionId])
+  @@index([barcode])
+  @@map("scan_results")
+}
+
+model BarcodeLookupLog {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  barcode   String
+  provider  String?
+  status    String   @default("success")
+  response  Json?
+  latencyMs Int?     @map("latency_ms")
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([barcode])
+  @@map("barcode_lookup_log")
+}

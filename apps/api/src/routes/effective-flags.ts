@@ -1,0 +1,67 @@
+import { Router } from 'express'
+import { prisma } from '../prisma'
+import { getEffectivePlatform, getEffectiveTenant, setPlatformOverride, setTenantOverride } from '../utils/effectiveFlags'
+import { checkTenantAccess, requireAdmin } from '../middleware/auth'
+
+const router = Router()
+
+console.log('[Effective Flags Router] Initializing routes...')
+
+// GET /api/admin/effective-flags - list effective platform flags (admin only)
+router.get('/effective-flags', requireAdmin, async (_req, res) => {
+  try {
+    const rows = await prisma.platformFeatureFlag.findMany({ orderBy: { flag: 'asc' } })
+    const flags = [...new Set(rows.map(r => r.flag))]
+    const effective = await Promise.all(flags.map(f => getEffectivePlatform(f)))
+    res.json({ success: true, data: effective })
+  } catch (e: any) {
+    console.error('[GET /effective-flags] Error:', e)
+    res.status(500).json({ success: false, error: 'failed_to_get_effective_flags' })
+  }
+})
+
+// GET /api/admin/effective-flags/:tenantId - list effective tenant flags (tenant access check)
+router.get('/effective-flags/:tenantId', checkTenantAccess, async (req, res) => {
+  try {
+    console.log('[GET /effective-flags/:tenantId] Request received for tenant:', req.params.tenantId)
+    const { tenantId } = req.params
+    if (!tenantId) return res.status(400).json({ success: false, error: 'tenant_id_required' })
+
+    // Collect flags from platform and tenant scopes
+    const [platform, tenant] = await Promise.all([
+      prisma.platformFeatureFlag.findMany({ orderBy: { flag: 'asc' } }),
+      prisma.tenantFeatureFlag.findMany({ where: { tenantId }, orderBy: { flag: 'asc' } }),
+    ])
+    const allFlags = new Set<string>([...platform.map(p => p.flag), ...tenant.map(t => t.flag)])
+    const effective = await Promise.all(Array.from(allFlags).sort().map(f => getEffectiveTenant(f, tenantId)))
+    res.json({ success: true, data: effective })
+  } catch (e: any) {
+    console.error('[GET /effective-flags/:tenantId] Error:', e)
+    res.status(500).json({ success: false, error: 'failed_to_get_effective_flags' })
+  }
+})
+
+// POST /api/admin/flags/override/platform/:flag - set/clear platform runtime override (kill switch)
+// Body: { value: true | false | null }
+router.post('/flags/override/platform/:flag', async (req, res) => {
+  const { flag } = req.params
+  const { value } = (req.body || {}) as { value?: boolean | null }
+  if (value === undefined) return res.status(400).json({ error: 'value_required' })
+  setPlatformOverride(flag, value === null ? null : !!value)
+  const eff = await getEffectivePlatform(flag)
+  res.json({ success: true, data: eff })
+})
+
+// POST /api/admin/flags/override/tenant/:tenantId/:flag - set/clear tenant runtime override
+// Body: { value: true | false | null }
+router.post('/flags/override/tenant/:tenantId/:flag', async (req, res) => {
+  const { tenantId, flag } = req.params
+  const { value } = (req.body || {}) as { value?: boolean | null }
+  if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' })
+  if (value === undefined) return res.status(400).json({ error: 'value_required' })
+  setTenantOverride(flag, tenantId, value === null ? null : !!value)
+  const eff = await getEffectiveTenant(flag, tenantId)
+  res.json({ success: true, data: eff })
+})
+
+export default router

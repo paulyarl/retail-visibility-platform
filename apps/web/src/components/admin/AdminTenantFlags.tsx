@@ -1,6 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { Card, CardContent, Badge, Alert } from "@/components/ui";
+import React, { useEffect, useRef, useState } from "react";
 
 type FlagRow = { 
   id: string; 
@@ -10,12 +9,24 @@ type FlagRow = {
   _isPlatformInherited?: boolean;
 };
 
+type EffectiveRow = {
+  flag: string;
+  tenantId: string;
+  effectiveOn: boolean; // platform effective
+  effectiveSource: 'env' | 'override' | 'platform_db' | 'off';
+  sources: { platform_env: boolean; platform_db: boolean; allow_override: boolean; platform_override?: boolean };
+  tenantEffectiveOn: boolean;
+  tenantEffectiveSource: 'tenant_override' | 'tenant_db' | 'blocked';
+  tenantSources: { tenant_db: boolean; tenant_override?: boolean };
+};
+
 export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
   const [rows, setRows] = useState<FlagRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [effective, setEffective] = useState<Record<string, EffectiveRow>>({});
+  const [openInfo, setOpenInfo] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -31,6 +42,17 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
         const text = await r.text();
         if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
         throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
+      }
+
+      // Load effective statuses
+      const e = await fetch(`/api/admin/effective-flags/${encodeURIComponent(tenantId)}`, { cache: 'no-store', credentials: 'include' });
+      const ect = e.headers.get('content-type') || '';
+      if (ect.includes('application/json')) {
+        const ej = await e.json();
+        if (!e.ok || !ej?.success) throw new Error(ej?.error || `HTTP ${e.status}`);
+        const map: Record<string, EffectiveRow> = {};
+        for (const it of (ej.data || [])) map[it.flag] = it;
+        setEffective(map);
       }
     } catch (e: any) {
       setError(e?.message || String(e));
@@ -58,8 +80,6 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
         if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
         throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
       }
-      setSuccess(`${flag} updated successfully`);
-      setTimeout(() => setSuccess(null), 3000);
       await load();
     } catch (e: any) {
       setError(e?.message || String(e));
@@ -95,118 +115,166 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
     await upsert(flag, { enabled: true });
   };
 
-  const handleToggle = (flag: string, currentEnabled: boolean) => {
-    upsert(flag, { enabled: !currentEnabled });
+  const setTenantOverride = async (flag: string, value: boolean | null) => {
+    try {
+      setSaving(flag);
+      const r = await fetch(`/api/admin/flags/override/tenant/${encodeURIComponent(tenantId)}/${encodeURIComponent(flag)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value }),
+        credentials: 'include',
+      });
+      const ct = r.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        const j = await r.json();
+        if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
+      } else {
+        const text = await r.text();
+        if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
+        throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
+      }
+      await load();
+    } catch (e: any) {
+      setError(e?.message || String(e));
+    } finally {
+      setSaving(null);
+    }
   };
 
-  useEffect(() => { load(); }, [tenantId]);
+  const ranForTenant = useRef(new Set<string>());
+  useEffect(() => {
+    if (!tenantId) return;
+    if (ranForTenant.current.has(tenantId)) return;
+    ranForTenant.current.add(tenantId);
+    load();
+  }, [tenantId]);
 
-  if (loading) return <div className="text-sm text-neutral-500">Loading flags…</div>;
-  if (error) return <Alert variant="error">{error}</Alert>;
+  if (loading) return <div className="text-sm text-gray-500">Loading flags…</div>;
+  if (error) return <div className="text-sm text-red-600">{error}</div>;
 
   return (
     <div className="space-y-4">
-      {/* Educational Alert */}
-      <Alert variant="info" title="About Feature Flags">
-        <div className="text-sm space-y-2">
-          <p>
-            This page shows feature flags that control functionality for this tenant:
-          </p>
-          <ul className="list-disc list-inside space-y-1 ml-2">
-            <li><strong>Platform Flags:</strong> Flags with "Platform Override Allowed" badge can be toggled here even if disabled platform-wide</li>
-            <li><strong>Custom Flags:</strong> Advanced feature for tenant-specific customizations (requires developer implementation)</li>
-          </ul>
-          <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
-            <p className="font-medium text-blue-900 mb-1">⚠️ Advanced Feature</p>
-            <p className="text-blue-800">
-              Creating custom flags (TENANT_*) is an advanced feature that may not apply to common platform usage. 
-              Custom flags require code deployment to function and are typically used for specialized tenant requirements.
-            </p>
-          </div>
-        </div>
-      </Alert>
-
-      {success && (
-        <Alert variant="success" onClose={() => setSuccess(null)}>
-          {success}
-        </Alert>
-      )}
-
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Tenant Feature Flags</h2>
-        <button className="bg-black text-white px-4 py-2 rounded hover:bg-neutral-800" onClick={addFlag}>
-          Add Custom Flag
-        </button>
+        <button className="bg-black text-white px-3 py-1 rounded" onClick={addFlag}>Add Custom Flag</button>
       </div>
-
-      {rows.length === 0 && (
-        <Card>
-          <CardContent className="p-6 text-center text-neutral-500">
-            No flags yet.
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 gap-4">
-        {rows.map((r) => (
-          <Card key={r.id}>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-neutral-900">
-                      {r.flag}
-                    </h3>
-                    <Badge variant={r.enabled ? "success" : "default"}>
-                      {r.enabled ? "Enabled" : "Disabled"}
-                    </Badge>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-gray-500">
+            <th className="py-2">Flag</th>
+            <th className="py-2">Enabled</th>
+            <th className="py-2">Rollout</th>
+            <th className="py-2">Live Status</th>
+            <th className="py-2">Override</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className="border-t">
+              <td className="py-2 pr-4">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono">{r.flag}</span>
                     {r._isPlatformInherited && (
-                      <Badge variant="info">
-                        Platform Override Allowed
-                      </Badge>
+                      <span className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">Platform Override Allowed</span>
                     )}
                     {r.flag.startsWith('TENANT_') && (
-                      <Badge variant="warning">
-                        Custom Flag
-                      </Badge>
+                      <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-700">Tenant-Only Flag</span>
                     )}
                   </div>
-                  {r.rollout && (
-                    <p className="text-sm text-neutral-600 mb-3">
-                      Rollout: {r.rollout}
-                    </p>
+                  {r._isPlatformInherited && (
+                    <span className="text-xs text-neutral-500">Can override platform setting</span>
                   )}
+                  {r.flag.startsWith('TENANT_') && (
+                    <span className="text-xs text-neutral-500">Custom flag for this tenant only</span>
+                  )}
+                </div>
+              </td>
+              <td className="py-2 pr-4">
+                <input type="checkbox" checked={r.enabled} onChange={(e) => upsert(r.flag, { enabled: e.target.checked })} disabled={saving === r.flag} />
+              </td>
+              <td className="py-2 pr-4">
+                <input className="border px-2 py-1 rounded w-64" defaultValue={r.rollout || ''} onBlur={(e) => upsert(r.flag, { rollout: e.target.value })} disabled={saving === r.flag} />
+              </td>
+              <td className="py-2 pr-4">
+                {effective[r.flag] ? (
                   <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="Rollout notes (optional)"
-                      defaultValue={r.rollout || ''}
-                      onBlur={(e) => upsert(r.flag, { rollout: e.target.value })}
-                      disabled={saving === r.flag}
-                      className="px-3 py-1 text-sm border border-neutral-300 rounded w-64"
-                    />
-                    {saving === r.flag && <span className="text-sm text-neutral-500">Saving…</span>}
+                      <span className="inline-flex items-center gap-1" title={`Live: ${effective[r.flag].tenantEffectiveOn ? 'On' : 'Off'}`}>
+                        <svg className="w-3 h-3" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="4" cy="4" r="4" fill={effective[r.flag].tenantEffectiveOn ? '#16a34a' : '#9ca3af'} />
+                        </svg>
+                        <span>Live: {effective[r.flag].tenantEffectiveOn ? 'On' : 'Off'}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700">
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="16" x2="12" y2="12" />
+                          <line x1="12" y1="8" x2="12" y2="8" />
+                        </svg>
+                        <span>{effective[r.flag].tenantEffectiveSource}</span>
+                      </span>
+                      {r.enabled !== effective[r.flag].tenantEffectiveOn && (
+                        <span className="inline-flex items-center gap-1 text-amber-700" title="Database setting differs from effective value">
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          <span>Conflict</span>
+                        </span>
+                      )}
+                      <span className="relative inline-flex">
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center w-5 h-5 rounded hover:bg-neutral-100 text-neutral-600"
+                          aria-label="View source details"
+                          aria-expanded={openInfo === r.flag}
+                          onClick={() => setOpenInfo(openInfo === r.flag ? null : r.flag)}
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="16" x2="12" y2="12" />
+                            <line x1="12" y1="8" x2="12" y2="8" />
+                          </svg>
+                        </button>
+                        {(effective[r.flag].sources.platform_override !== undefined || effective[r.flag].tenantSources.tenant_override !== undefined) && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full"></span>
+                        )}
+                        {openInfo === r.flag && (
+                          <div className="absolute z-50 right-0 top-6 w-64 bg-white border border-neutral-200 rounded shadow-lg p-2 space-y-1">
+                            <div className="text-[10px] uppercase text-neutral-500">Sources</div>
+                            <div className="flex justify-between text-xs"><span>platform_env</span><span className={effective[r.flag].sources.platform_env ? 'text-green-700' : 'text-neutral-600'}>{effective[r.flag].sources.platform_env ? 'on' : 'off'}</span></div>
+                            <div className="flex justify-between text-xs"><span>platform_db</span><span className={effective[r.flag].sources.platform_db ? 'text-green-700' : 'text-neutral-600'}>{effective[r.flag].sources.platform_db ? 'on' : 'off'}</span></div>
+                            <div className="flex justify-between text-xs"><span>allow_override</span><span className={effective[r.flag].sources.allow_override ? 'text-blue-700' : 'text-neutral-600'}>{effective[r.flag].sources.allow_override ? 'yes' : 'no'}</span></div>
+                            {effective[r.flag].sources.platform_override !== undefined && (
+                              <div className="flex justify-between text-xs"><span>platform_override</span><span className="text-purple-700">{String(effective[r.flag].sources.platform_override)}</span></div>
+                            )}
+                            <div className="flex justify-between text-xs"><span>tenant_db</span><span className={effective[r.flag].tenantSources.tenant_db ? 'text-green-700' : 'text-neutral-600'}>{effective[r.flag].tenantSources.tenant_db ? 'on' : 'off'}</span></div>
+                            {effective[r.flag].tenantSources.tenant_override !== undefined && (
+                              <div className="flex justify-between text-xs"><span>tenant_override</span><span className="text-purple-700">{String(effective[r.flag].tenantSources.tenant_override)}</span></div>
+                            )}
+                          </div>
+                        )}
+                      </span>
                   </div>
+                ) : (
+                  <span className="text-neutral-400">—</span>
+                )}
+              </td>
+              <td className="py-2 pr-4">
+                <div className="flex items-center gap-2">
+                  <button className="px-2 py-1 text-xs rounded bg-red-600 text-white" disabled={saving === r.flag} onClick={() => setTenantOverride(r.flag, false)}>Kill</button>
+                  <button className="px-2 py-1 text-xs rounded bg-green-600 text-white" disabled={saving === r.flag} onClick={() => setTenantOverride(r.flag, true)}>Force On</button>
+                  <button className="px-2 py-1 text-xs rounded bg-neutral-200" disabled={saving === r.flag} onClick={() => setTenantOverride(r.flag, null)}>Clear</button>
                 </div>
-
-                {/* Toggle Switch */}
-                <div className="flex items-center gap-4 ml-4">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={r.enabled}
-                      onChange={() => handleToggle(r.flag, r.enabled)}
-                      disabled={saving === r.flag}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                  </label>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colSpan={5} className="py-4 text-gray-500">No flags yet.</td></tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
