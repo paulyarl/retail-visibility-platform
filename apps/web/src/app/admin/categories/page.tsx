@@ -23,6 +23,8 @@ export default function AdminCategoriesPage() {
   const [tenantIdInput, setTenantIdInput] = useState('');
   const [lastJobId, setLastJobId] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<any>(null);
+  const [lastSummary, setLastSummary] = useState<any>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   useEffect(() => {
     loadCategories();
@@ -39,6 +41,28 @@ export default function AdminCategoriesPage() {
       setLoading(false);
     }
   };
+
+  const loadLastSummary = async () => {
+    setSummaryLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (tenantIdInput.trim()) qs.set('tenantId', tenantIdInput.trim());
+      qs.set('strategy', 'platform_to_gbp');
+      const res = await fetch(`/api/admin/mirror/last-run?${qs.toString()}`);
+      const data = await res.json().catch(() => ({}));
+      setLastSummary(data?.data ?? null);
+    } catch (e) {
+      setLastSummary(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Auto-load summary when tenantId input changes
+    loadLastSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantIdInput]);
 
   const handleCreate = async () => {
     if (!categoryName.trim()) return;
@@ -190,6 +214,13 @@ export default function AdminCategoriesPage() {
               >
                 {mirrorLoading ? 'Running…' : 'Mirror now'}
               </Button>
+              <Button
+                variant="secondary"
+                onClick={loadLastSummary}
+                disabled={summaryLoading}
+              >
+                {summaryLoading ? 'Refreshing…' : 'Refresh summary'}
+              </Button>
             </div>
             <div className="mt-4 flex items-center gap-3">
               {lastJobId && (
@@ -199,6 +230,25 @@ export default function AdminCategoriesPage() {
                 <Badge variant="error">error</Badge>
               )}
             </div>
+            {lastSummary && (
+              <div className="mt-3 text-sm text-neutral-700 space-y-1">
+                <div>
+                  <span className="font-semibold">Last run:</span>
+                  {' '}{new Date(lastSummary.startedAt).toLocaleString()} {lastSummary.dryRun ? '(dryRun)' : ''}
+                </div>
+                <div className="flex gap-3">
+                  <span>created: <strong>{lastSummary.created}</strong></span>
+                  <span>updated: <strong>{lastSummary.updated}</strong></span>
+                  <span>deleted: <strong>{lastSummary.deleted}</strong></span>
+                </div>
+                {lastSummary.skipped && (
+                  <div className="text-amber-700">skipped: {lastSummary.reason || 'cooldown'}</div>
+                )}
+                {lastSummary.error && (
+                  <div className="text-red-600">error: {lastSummary.error}</div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

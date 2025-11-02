@@ -107,6 +107,7 @@ model Tenant {
   scanSessions          ScanSession[]
   scanResults           ScanResult[]
   barcodeLookupLogs     BarcodeLookupLog[]
+  categoryMirrorRuns    CategoryMirrorRun[]
 
   @@index([name])
   @@index([subscriptionStatus])
@@ -249,6 +250,27 @@ model SyncJob {
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status, updatedAt])
+}
+
+// Category Mirror Run summaries (per-tenant/per-strategy)
+model CategoryMirrorRun {
+  id          String    @id @default(cuid())
+  tenantId    String?   @map("tenant_id")
+  strategy    String
+  dryRun      Boolean   @default(true) @map("dry_run")
+  created     Int       @default(0)
+  updated     Int       @default(0)
+  deleted     Int       @default(0)
+  skipped     Boolean   @default(false)
+  reason      String?
+  error       String?
+  jobId       String?   @map("job_id")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, strategy, startedAt(sort: Desc)])
+  @@map("category_mirror_runs")
 }
 
 model GoogleOAuthAccount {
