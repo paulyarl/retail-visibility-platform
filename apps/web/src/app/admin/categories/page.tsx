@@ -27,6 +27,8 @@ export default function AdminCategoriesPage() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [confirmWriteOpen, setConfirmWriteOpen] = useState(false);
   const [polling, setPolling] = useState(false);
+  const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
+  const apiUrl = (path: string) => `${API_BASE}${path}`;
 
   useEffect(() => {
     loadCategories();
@@ -62,7 +64,7 @@ export default function AdminCategoriesPage() {
       const qs = new URLSearchParams();
       if (tenantIdInput.trim()) qs.set('tenantId', tenantIdInput.trim());
       qs.set('strategy', 'platform_to_gbp');
-      const res = await fetch(`/api/admin/mirror/last-run?${qs.toString()}`);
+      const res = await fetch(apiUrl(`/api/admin/mirror/last-run?${qs.toString()}`));
       const data = await res.json().catch(() => ({}));
       setLastSummary(data?.data ?? null);
     } catch (e) {
@@ -144,7 +146,7 @@ export default function AdminCategoriesPage() {
     try {
       const body: any = { strategy: 'platform_to_gbp', dryRun };
       if (tenantIdInput.trim()) body.tenantId = tenantIdInput.trim();
-      const res = await fetch('/api/categories/mirror', {
+      const res = await fetch(apiUrl('/api/categories/mirror'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
