@@ -1,4 +1,4 @@
-import Home from "@/app/(platform)/page";
+import PlatformHomePage from "@/app/(platform)/page";
 import SetTenantId from "@/components/client/SetTenantId";
 
 export default async function TenantScopedDashboard({ params }: { params: Promise<{ tenantId: string }> }) {
@@ -6,7 +6,7 @@ export default async function TenantScopedDashboard({ params }: { params: Promis
   return (
     <>
       {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
-      <Home embedded />
+      <PlatformHomePage />
     </>
   );
 }
