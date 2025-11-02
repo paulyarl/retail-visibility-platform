@@ -90,6 +90,9 @@ import tenantUserRoutes from './routes/tenant-users';
 import { auditLogger } from './middleware/audit-logger';
 import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
 import { enforcePolicyCompliance } from './middleware/policy-enforcement';
+import categoriesPlatformRoutes from './routes/categories.platform';
+import categoriesTenantRoutes from './routes/categories.tenant';
+import categoriesMirrorRoutes from './routes/categories.mirror';
 
 const app = express();
 
@@ -1879,6 +1882,10 @@ app.use('/api/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
 // Effective flags: middleware applied per-route (admin for platform, tenant access for tenant)
 app.use('/admin', authenticateToken, effectiveFlagsRoutes);
 app.use('/api/admin', authenticateToken, effectiveFlagsRoutes);
+// Category scaffolds (M3 start)
+app.use(categoriesPlatformRoutes);
+app.use(categoriesTenantRoutes);
+app.use(categoriesMirrorRoutes);
 
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenantId/items/:itemId/category
