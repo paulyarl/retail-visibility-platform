@@ -93,6 +93,7 @@ import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 import categoriesPlatformRoutes from './routes/categories.platform';
 import categoriesTenantRoutes from './routes/categories.tenant';
 import categoriesMirrorRoutes from './routes/categories.mirror';
+import mirrorAdminRoutes from './routes/mirror.admin';
 
 const app = express();
 
@@ -1886,6 +1887,7 @@ app.use('/api/admin', authenticateToken, effectiveFlagsRoutes);
 app.use(categoriesPlatformRoutes);
 app.use(categoriesTenantRoutes);
 app.use(categoriesMirrorRoutes);
+app.use(mirrorAdminRoutes);
 
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenantId/items/:itemId/category
