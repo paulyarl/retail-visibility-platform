@@ -1,4 +1,7 @@
 import { setTimeout as wait } from 'timers/promises';
+import { categoryMirrorSuccess, categoryMirrorFail, categoryMirrorDurationMs } from '../metrics';
+import { prisma } from '../prisma';
+import { gbpClient } from '../clients/gbp';
 
 export type MirrorStrategy = 'platform_to_gbp' | 'gbp_to_platform';
 
@@ -6,11 +9,14 @@ export interface MirrorJobPayload {
   strategy: MirrorStrategy;
   tenantId?: string | null;
   requestedBy?: string | null;
+  dryRun?: boolean;
 }
 
 // Very simple in-memory queue placeholder so we have a call site to evolve later.
 // In production we should use a durable queue (e.g., PG-based table, Redis, or provider).
 const queue: MirrorJobPayload[] = [];
+const lastRunAt: Record<string, number> = {};
+const COOLDOWN_MS = 60_000; // 1 minute basic cooldown per key
 
 export function queueGbpCategoryMirrorJob(payload: MirrorJobPayload): { jobId: string } {
   const jobId = `gbp-mirror-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -24,20 +30,101 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
   const maxAttempts = 5;
   let attempt = 0;
   let backoffMs = 500; // start small, exponential backoff with jitter
-
+  const startedAt = Date.now();
+  const key = `${payload.strategy}:${payload.tenantId ?? 'all'}`;
+  // Create run record (pending)
+  let runId: string | null = null;
+  try {
+    const run = await prisma.categoryMirrorRun.create({
+      data: {
+        tenantId: payload.tenantId ?? null,
+        strategy: payload.strategy,
+        dryRun: !!(payload as any).dryRun,
+        jobId,
+        startedAt: new Date(startedAt),
+      },
+      select: { id: true },
+    });
+    runId = run.id;
+  } catch {}
   while (attempt < maxAttempts) {
     attempt++;
     try {
-      console.log(`[GBP_SYNC][${jobId}] attempt ${attempt} strategy=${payload.strategy} tenant=${payload.tenantId ?? 'all'}`);
-      // TODO: implement actual sync:
-      // - Fetch source categories (platform or GBP)
-      // - Compute diff
-      // - Apply changes to target with safety checks
-      // - Emit telemetry counters and audit events
-      // For now, simulate work
-      await wait(250);
-      console.log(`[GBP_SYNC][${jobId}] completed`);
-      return;
+      const dryRun = !!(payload as any).dryRun;
+      // Cooldown guard
+      const last = lastRunAt[key] || 0;
+      if (Date.now() - last < COOLDOWN_MS) {
+        console.log(`[GBP_SYNC][${jobId}] skipped due to cooldown for ${key}`);
+        const summary = { created: 0, updated: 0, deleted: 0, skipped: true, reason: 'cooldown', dryRun } as const;
+        try {
+          await prisma.categoryMirrorRun.create({
+            data: {
+              tenantId: payload.tenantId ?? null,
+              strategy: payload.strategy,
+              dryRun,
+              created: 0,
+              updated: 0,
+              deleted: 0,
+              skipped: true,
+              reason: 'cooldown',
+              jobId,
+              startedAt: new Date(startedAt),
+              completedAt: new Date(),
+            },
+          });
+        } catch {}
+        categoryMirrorSuccess.inc({ strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all'), dryRun: String(dryRun), reason: 'cooldown' });
+        categoryMirrorDurationMs.observe(Date.now() - startedAt, { strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all') });
+        return summary;
+      }
+
+      console.log(`[GBP_SYNC][${jobId}] attempt ${attempt} strategy=${payload.strategy} tenant=${payload.tenantId ?? 'all'} dryRun=${dryRun}`);
+      // Fetch and diff
+      const platformCats = await fetchPlatformCategories(payload.tenantId ?? null);
+      const gbpCats = await fetchGbpCategories(payload.tenantId ?? null);
+      const diff = computeDiff(platformCats, gbpCats);
+
+      if (!dryRun) {
+        await applyDiffToGbp(diff, payload.tenantId ?? null);
+      }
+
+      const summary = { ...diff.counts, dryRun };
+      lastRunAt[key] = Date.now();
+      categoryMirrorSuccess.inc({ strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all'), dryRun: String(dryRun) });
+      categoryMirrorDurationMs.observe(Date.now() - startedAt, { strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all') });
+      // Update run row
+      try {
+        if (runId) {
+          await prisma.categoryMirrorRun.update({
+            where: { id: runId },
+            data: {
+              created: diff.counts.created,
+              updated: diff.counts.updated,
+              deleted: diff.counts.deleted,
+              skipped: false,
+              reason: null,
+              completedAt: new Date(),
+            },
+          });
+        } else {
+          await prisma.categoryMirrorRun.create({
+            data: {
+              tenantId: payload.tenantId ?? null,
+              strategy: payload.strategy,
+              dryRun,
+              created: diff.counts.created,
+              updated: diff.counts.updated,
+              deleted: diff.counts.deleted,
+              skipped: false,
+              jobId,
+              startedAt: new Date(startedAt),
+              completedAt: new Date(),
+            },
+          });
+        }
+      } catch {}
+      console.log(`[GBP_SYNC][${jobId}] completed summary=${JSON.stringify(summary)}`);
+      return summary;
     } catch (e) {
       const jitter = Math.floor(Math.random() * 250);
       console.warn(`[GBP_SYNC][${jobId}] error on attempt ${attempt}:`, e);
@@ -46,5 +133,92 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
     }
   }
 
+  categoryMirrorFail.inc({ strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all') });
+  categoryMirrorDurationMs.observe(Date.now() - startedAt, { strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all') });
   console.error(`[GBP_SYNC][${jobId}] failed after ${maxAttempts} attempts`);
+  // Record failure
+  try {
+    if (runId) {
+      await prisma.categoryMirrorRun.update({ where: { id: runId }, data: { error: 'failed', completedAt: new Date() } });
+    } else {
+      await prisma.categoryMirrorRun.create({
+        data: {
+          tenantId: payload.tenantId ?? null,
+          strategy: payload.strategy,
+          dryRun: !!(payload as any).dryRun,
+          created: 0,
+          updated: 0,
+          deleted: 0,
+          skipped: false,
+          reason: null,
+          error: 'failed',
+          jobId,
+          startedAt: new Date(startedAt),
+          completedAt: new Date(),
+        },
+      });
+    }
+  } catch {}
+}
+
+// Types and helper functions
+type Cat = { id?: string | null; slug?: string | null; name: string };
+
+async function fetchPlatformCategories(tenantId: string | null): Promise<Cat[]> {
+  if (!tenantId) return [];
+  try {
+    const rows = await prisma.tenantCategory.findMany({
+      where: { tenantId, isActive: true },
+      select: { slug: true, name: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return rows.map(r => ({ slug: r.slug || null, name: r.name }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchGbpCategories(tenantId: string | null): Promise<Cat[]> {
+  const rows = await gbpClient.listCategories(tenantId);
+  return rows.map(r => ({ id: r.id ?? null, slug: r.slug ?? null, name: r.name }));
+}
+
+function computeDiff(source: Cat[], target: Cat[]) {
+  const bySlug = (arr: Cat[]) => new Map(arr.map(c => [String(c.slug ?? c.name).toLowerCase(), c]));
+  const s = bySlug(source);
+  const t = bySlug(target);
+  const toCreate: Cat[] = [];
+  const toUpdate: { from: Cat; to: Cat }[] = [];
+  const toDelete: Cat[] = [];
+
+  for (const [slug, sc] of s) {
+    const tc = t.get(slug);
+    if (!tc) {
+      toCreate.push(sc);
+    } else if ((sc.name || '').trim() !== (tc.name || '').trim()) {
+      toUpdate.push({ from: tc, to: sc });
+    }
+  }
+  for (const [slug, tc] of t) {
+    if (!s.has(slug)) toDelete.push(tc);
+  }
+
+  return {
+    toCreate,
+    toUpdate,
+    toDelete,
+    counts: { created: toCreate.length, updated: toUpdate.length, deleted: toDelete.length },
+  };
+}
+
+async function applyDiffToGbp(diff: ReturnType<typeof computeDiff>, tenantId: string | null) {
+  for (const c of diff.toCreate) {
+    await gbpClient.createCategory(tenantId, { slug: c.slug ?? null, name: c.name });
+  }
+  for (const u of diff.toUpdate) {
+    await gbpClient.updateCategory(tenantId, { id: u.from.id ?? null, slug: u.from.slug ?? null, name: u.from.name }, { slug: u.to.slug ?? null, name: u.to.name });
+  }
+  for (const d of diff.toDelete) {
+    await gbpClient.deleteCategory(tenantId, { id: d.id ?? null, slug: d.slug ?? null, name: d.name });
+  }
 }
