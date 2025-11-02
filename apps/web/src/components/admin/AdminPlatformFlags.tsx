@@ -9,6 +9,57 @@ type EffectiveRow = {
   sources: { platform_env: boolean; platform_db: boolean; allow_override: boolean; platform_override?: boolean };
 };
 
+const FLAG_DESCRIPTIONS: Record<string, { title: string; description: string }> = {
+  FF_MAP_CARD: {
+    title: 'Map Card',
+    description: 'Google Maps integration for tenant locations with privacy controls',
+  },
+  FF_SWIS_PREVIEW: {
+    title: 'SWIS Preview',
+    description: 'Product preview widget showing live inventory feed',
+  },
+  FF_BUSINESS_PROFILE: {
+    title: 'Business Profile',
+    description: 'Complete business profile management and onboarding',
+  },
+  FF_DARK_MODE: {
+    title: 'Dark Mode',
+    description: 'Dark theme support across the platform (coming soon)',
+  },
+  FF_GOOGLE_CONNECT_SUITE: {
+    title: 'Google Connect Suite',
+    description: 'Unified Google Merchant Center + Business Profile integration (v1: read-only)',
+  },
+  FF_APP_SHELL_NAV: {
+    title: 'App Shell Navigation',
+    description: 'Enable the new header and Tenant Switcher (URL-driven tenant context)',
+  },
+  FF_TENANT_URLS: {
+    title: 'Tenant-Scoped URLs',
+    description: 'Enable tenant-scoped routes like /t/{tenantId}/items and /t/{tenantId}/settings',
+  },
+  FF_ITEMS_V2_GRID: {
+    title: 'Items Grid v2',
+    description: 'Enable the new high-performance items grid (virtualized, faster filters)',
+  },
+  FF_CATEGORY_MANAGEMENT_PAGE: {
+    title: 'Category Management',
+    description: 'Enable category management page and features',
+  },
+  FF_CATEGORY_QUICK_ACTIONS: {
+    title: 'Category Quick Actions',
+    description: 'Enable quick actions for category management',
+  },
+  FF_GLOBAL_TENANT_META: {
+    title: 'Global Tenant Metadata',
+    description: 'Enable global tenant metadata management',
+  },
+  FF_ENFORCE_CSRF: {
+    title: 'CSRF Protection',
+    description: 'Enforce CSRF token validation on write operations',
+  },
+};
+
 export default function AdminPlatformFlags() {
   const [rows, setRows] = useState<FlagRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,9 +187,19 @@ export default function AdminPlatformFlags() {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {rows.map((r) => {
+            const desc = FLAG_DESCRIPTIONS[r.flag];
+            return (
             <tr key={r.id} className="border-t">
-              <td className="py-2 pr-4 font-mono">{r.flag}</td>
+              <td className="py-2 pr-4">
+                <div className="font-mono text-sm">{r.flag}</div>
+                {desc && (
+                  <div className="mt-1">
+                    <div className="text-xs font-semibold text-gray-700">{desc.title}</div>
+                    <div className="text-xs text-gray-500">{desc.description}</div>
+                  </div>
+                )}
+              </td>
               <td className="py-2 pr-4">
                 <input type="checkbox" checked={r.enabled} onChange={(e) => upsert(r.flag, { enabled: e.target.checked })} disabled={saving === r.flag} />
               </td>
@@ -170,7 +231,8 @@ export default function AdminPlatformFlags() {
                 </div>
               </td>
             </tr>
-          ))}
+          );
+          })}
           {rows.length === 0 && (
             <tr><td colSpan={6} className="py-4 text-gray-500">No flags yet.</td></tr>
           )}
