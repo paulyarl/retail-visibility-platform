@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -24,7 +24,30 @@ interface ProductDisplayProps {
 }
 
 export default function ProductDisplay({ products, tenantId }: ProductDisplayProps) {
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const getInitialView = (): 'grid' | 'list' => {
+    if (typeof window === 'undefined') return 'grid';
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      const q = qs.get('view');
+      if (q === 'grid' || q === 'list') return q;
+      const saved = localStorage.getItem('storefront_view_mode');
+      if (saved === 'grid' || saved === 'list') return saved as 'grid' | 'list';
+    } catch {}
+    return 'grid';
+  };
+
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(getInitialView);
+
+  // Persist on change and sync URL without navigation
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('storefront_view_mode', viewMode);
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', viewMode);
+      window.history.replaceState({}, '', url.toString());
+    } catch {}
+  }, [viewMode]);
 
   return (
     <div>
