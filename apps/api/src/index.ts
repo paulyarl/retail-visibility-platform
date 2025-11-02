@@ -1956,6 +1956,7 @@ if (process.env.NODE_ENV !== "test") {
 
 // Export the app for testing
 export default app;
+export { app };
 
 /* ------------------------------ GBP Hours runner (flag-gated) ------------------------------ */
 
