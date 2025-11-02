@@ -196,7 +196,7 @@ export default function AdminCategoriesPage() {
                 <Badge variant="success">jobId: {lastJobId}</Badge>
               )}
               {lastResult?.error && (
-                <Badge variant="danger">error</Badge>
+                <Badge variant="error">error</Badge>
               )}
             </div>
           </CardContent>
