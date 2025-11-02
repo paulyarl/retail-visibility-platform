@@ -18,6 +18,11 @@ export default function AdminCategoriesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
+  const [dryRun, setDryRun] = useState(true);
+  const [mirrorLoading, setMirrorLoading] = useState(false);
+  const [tenantIdInput, setTenantIdInput] = useState('');
+  const [lastJobId, setLastJobId] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<any>(null);
 
   useEffect(() => {
     loadCategories();
@@ -94,6 +99,32 @@ export default function AdminCategoriesPage() {
     }
   };
 
+  const handleMirror = async () => {
+    if (mirrorLoading) return;
+    setMirrorLoading(true);
+    setLastResult(null);
+    try {
+      const body: any = { strategy: 'platform_to_gbp', dryRun };
+      if (tenantIdInput.trim()) body.tenantId = tenantIdInput.trim();
+      const res = await fetch('/api/categories/mirror', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 202 && data && data.jobId) {
+        setLastJobId(String(data.jobId));
+        setLastResult(data);
+      } else {
+        setLastResult({ error: true, status: res.status, data });
+      }
+    } catch (e: any) {
+      setLastResult({ error: true, message: e?.message || 'request_failed' });
+    } finally {
+      setMirrorLoading(false);
+    }
+  };
+
   const openEditModal = (category: Category) => {
     setSelectedCategory(category);
     setCategoryName(category.name);
@@ -128,7 +159,49 @@ export default function AdminCategoriesPage() {
       />
 
       <div className="mt-6 space-y-6">
-        {/* Header with Create Button */}
+        <Card>
+          <CardHeader>
+            <CardTitle>GBP Category Mirror</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+              <div className="w-full sm:w-64">
+                <Input
+                  label="Tenant ID (optional)"
+                  placeholder="tenant_..."
+                  value={tenantIdInput}
+                  onChange={(e) => setTenantIdInput(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="dryRunToggle"
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={dryRun}
+                  onChange={(e) => setDryRun(e.target.checked)}
+                />
+                <label htmlFor="dryRunToggle" className="text-sm">Dry Run</label>
+              </div>
+              <Button
+                variant="primary"
+                onClick={handleMirror}
+                disabled={mirrorLoading}
+              >
+                {mirrorLoading ? 'Running…' : 'Mirror now'}
+              </Button>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              {lastJobId && (
+                <Badge variant="success">jobId: {lastJobId}</Badge>
+              )}
+              {lastResult?.error && (
+                <Badge variant="danger">error</Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-neutral-700">
             {categories.length} {categories.length === 1 ? 'category' : 'categories'}
