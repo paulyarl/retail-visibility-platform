@@ -107,7 +107,7 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
             },
           });
         } else {
-          await (prisma as any).categoryMirrorRun.create({
+          await prisma.categoryMirrorRun.create({
             data: {
               tenantId: payload.tenantId ?? null,
               strategy: payload.strategy,
@@ -141,7 +141,7 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
     if (runId) {
       await prisma.categoryMirrorRun.update({ where: { id: runId }, data: { error: 'failed', completedAt: new Date() } });
     } else {
-      await (prisma as any).categoryMirrorRun.create({
+      await prisma.categoryMirrorRun.create({
         data: {
           tenantId: payload.tenantId ?? null,
           strategy: payload.strategy,
