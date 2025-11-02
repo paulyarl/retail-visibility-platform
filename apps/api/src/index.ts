@@ -98,7 +98,12 @@ import mirrorAdminRoutes from './routes/mirror.admin';
 const app = express();
 
 /* ------------------------- middleware ------------------------- */
-app.use(cors({ origin: [/localhost:\d+$/, /\.vercel\.app$/], credentials: true }));
+app.use(cors({
+  origin: [/localhost:\d+$/, /\.vercel\.app$/],
+  credentials: true,
+  methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
+  allowedHeaders: ['content-type','authorization','x-csrf-token'],
+}));
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
