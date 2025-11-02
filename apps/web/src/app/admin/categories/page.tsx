@@ -253,7 +253,7 @@ export default function AdminCategoriesPage() {
                 <Badge variant="error">error</Badge>
               )}
               {polling && (
-                <Badge variant="secondary">updating…</Badge>
+                <Badge variant="info">updating…</Badge>
               )}
             </div>
             {lastSummary && (
@@ -336,46 +336,10 @@ export default function AdminCategoriesPage() {
                   </div>
                 ))}
               </div>
-
-return (
-  <div className="container mx-auto p-6">
-    <PageHeader
-      title="Category Management"
-      description="Manage product categories and hierarchies"
-      icon={Icons.Settings}
-      backLink={{ href: '/settings/admin', label: 'Back to Admin' }}
-    />
-        title="Create Category"
-        description="Add a new product category"
-      >
-        <div className="space-y-4">
-          <Input
-            label="Category Name"
-            placeholder="Enter category name"
-            value={categoryName}
-            onChange={(e) => setCategoryName(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleCreate()}
-          />
-        </div>
-        <ModalFooter>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setShowCreateModal(false);
-              setCategoryName('');
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleCreate}
-            disabled={!categoryName.trim()}
-          >
-            Create
-          </Button>
-        </ModalFooter>
-      </Modal>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Edit Modal */}
       <Modal
