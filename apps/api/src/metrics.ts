@@ -31,3 +31,8 @@ export const metrics = {
 export const gbpHoursSuccess = metrics.counter('gbp_hours_sync_success_total')
 export const gbpHoursFail = metrics.counter('gbp_hours_sync_fail_total')
 export const gbpHoursDurationMs = metrics.histogram('gbp_hours_sync_last_duration_ms')
+
+// Category mirror telemetry
+export const categoryMirrorSuccess = metrics.counter('category_mirror_success_total')
+export const categoryMirrorFail = metrics.counter('category_mirror_fail_total')
+export const categoryMirrorDurationMs = metrics.histogram('category_mirror_last_duration_ms')
