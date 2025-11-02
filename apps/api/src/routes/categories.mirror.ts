@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { Flags } from '../config';
+import { queueGbpCategoryMirrorJob } from '../jobs/gbpCategorySync';
 
 const router = Router();
 
@@ -18,9 +19,9 @@ router.post('/api/categories/mirror', authenticateToken, requireAdmin, async (re
     return res.status(400).json({ success: false, error: 'invalid_strategy' });
   }
 
-  // For now, just acknowledge and return 202 while worker handles execution
-  // Future: enqueue a job for the worker with retry/backoff
-  return res.status(202).json({ success: true, accepted: true, strategy, tenantId: tenantId ?? null });
+  // Enqueue a background job (skeleton worker with retry/backoff)
+  const { jobId } = queueGbpCategoryMirrorJob({ strategy: strategy as any, tenantId: tenantId ?? null, requestedBy: (req.user as any)?.userId ?? null });
+  return res.status(202).json({ success: true, accepted: true, jobId, strategy, tenantId: tenantId ?? null });
 });
 
 export default router;
