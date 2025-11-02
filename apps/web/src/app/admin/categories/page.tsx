@@ -29,6 +29,13 @@ export default function AdminCategoriesPage() {
   const [polling, setPolling] = useState(false);
   const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
   const apiUrl = (path: string) => `${API_BASE}${path}`;
+  const API_BEARER = (process.env.NEXT_PUBLIC_API_BEARER || (typeof window !== 'undefined' ? (window.localStorage?.getItem('API_BEARER') || '') : ''));
+  const authHeader = API_BEARER ? { Authorization: `Bearer ${API_BEARER}` } : ({} as Record<string, string>);
+  const getCookie = (name: string) => {
+    if (typeof document === 'undefined') return '';
+    const match = document.cookie.split(';').map(s => s.trim()).find(c => c.startsWith(name + '='));
+    return match ? decodeURIComponent(match.split('=')[1] || '') : '';
+  };
 
   useEffect(() => {
     loadCategories();
@@ -64,7 +71,11 @@ export default function AdminCategoriesPage() {
       const qs = new URLSearchParams();
       if (tenantIdInput.trim()) qs.set('tenantId', tenantIdInput.trim());
       qs.set('strategy', 'platform_to_gbp');
-      const res = await fetch(apiUrl(`/api/admin/mirror/last-run?${qs.toString()}`));
+      const res = await fetch(apiUrl(`/api/admin/mirror/last-run?${qs.toString()}`), {
+        method: 'GET',
+        headers: { ...authHeader },
+        credentials: 'include',
+      });
       const data = await res.json().catch(() => ({}));
       setLastSummary(data?.data ?? null);
     } catch (e) {
@@ -146,9 +157,11 @@ export default function AdminCategoriesPage() {
     try {
       const body: any = { strategy: 'platform_to_gbp', dryRun };
       if (tenantIdInput.trim()) body.tenantId = tenantIdInput.trim();
+      const csrf = getCookie('csrf');
       const res = await fetch(apiUrl('/api/categories/mirror'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}), ...authHeader },
+        credentials: 'include',
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
