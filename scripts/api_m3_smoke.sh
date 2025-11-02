@@ -50,6 +50,9 @@ if [[ -n "${TENANT_ID}" ]]; then
   curl_json POST "${BASE_URL}/api/categories/mirror" "{\"strategy\":\"platform_to_gbp\",\"tenantId\":\"${TENANT_ID}\",\"dryRun\":true}" | pp
 
   echo "Note: Mirror endpoint has a 60s cooldown per {strategy,tenant}. Running again immediately may be skipped."
+  
+  step "GET admin last-run summary"
+  curl_json GET "${BASE_URL}/api/admin/mirror/last-run?tenantId=${TENANT_ID}&strategy=platform_to_gbp" | pp
 else
   echo "TENANT_ID not set; skipping tenant list and mirror tests"
 fi

@@ -10,7 +10,7 @@ router.get('/api/admin/mirror/last-run', authenticateToken, requireAdmin, async 
     const tenantId = (req.query.tenantId ? String(req.query.tenantId) : null) as string | null;
     const strategy = req.query.strategy ? String(req.query.strategy) : 'platform_to_gbp';
 
-    const row = await prisma.categoryMirrorRun.findFirst({
+    const row = await (prisma as any).categoryMirrorRun.findFirst({
       where: { tenantId: tenantId ?? null, strategy },
       orderBy: { startedAt: 'desc' },
     });
