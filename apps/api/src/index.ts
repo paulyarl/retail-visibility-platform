@@ -94,7 +94,7 @@ import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 const app = express();
 
 /* ------------------------- middleware ------------------------- */
-app.use(cors({ origin: [/localhost:\d+$/, /\.vercel\.app$/], credentials: false }));
+app.use(cors({ origin: [/localhost:\d+$/, /\.vercel\.app$/], credentials: true }));
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
