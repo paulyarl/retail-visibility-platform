@@ -50,9 +50,22 @@ if [[ -n "${TENANT_ID}" ]]; then
   curl_json POST "${BASE_URL}/api/categories/mirror" "{\"strategy\":\"platform_to_gbp\",\"tenantId\":\"${TENANT_ID}\",\"dryRun\":true}" | pp
 
   echo "Note: Mirror endpoint has a 60s cooldown per {strategy,tenant}. Running again immediately may be skipped."
+  # Allow the worker a moment to update the run summary
+  sleep 2
   
   step "GET admin last-run summary"
   curl_json GET "${BASE_URL}/api/admin/mirror/last-run?tenantId=${TENANT_ID}&strategy=platform_to_gbp" | pp
+
+  # Optional: run a write-mode mirror to populate GBP state
+  if [[ "${RUN_WRITE:-0}" == "1" ]]; then
+    step "POST mirror (dryRun=false) platform_to_gbp [WRITE MODE]"
+    curl_json POST "${BASE_URL}/api/categories/mirror" "{\"strategy\":\"platform_to_gbp\",\"tenantId\":\"${TENANT_ID}\",\"dryRun\":false}" | pp
+    echo "Note: Cooldown applies per {strategy,tenant}; this may be skipped if run within 60s."
+    sleep 2
+
+    step "GET admin last-run summary (after write)"
+    curl_json GET "${BASE_URL}/api/admin/mirror/last-run?tenantId=${TENANT_ID}&strategy=platform_to_gbp" | pp
+  fi
 else
   echo "TENANT_ID not set; skipping tenant list and mirror tests"
 fi

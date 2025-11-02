@@ -25,6 +25,8 @@ export default function AdminCategoriesPage() {
   const [lastResult, setLastResult] = useState<any>(null);
   const [lastSummary, setLastSummary] = useState<any>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [confirmWriteOpen, setConfirmWriteOpen] = useState(false);
+  const [polling, setPolling] = useState(false);
 
   useEffect(() => {
     loadCategories();
@@ -40,6 +42,18 @@ export default function AdminCategoriesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const pollUntilCompleted = async (jobId: string, maxMs = 8000, intervalMs = 500) => {
+    setPolling(true);
+    const start = Date.now();
+    while (Date.now() - start < maxMs) {
+      await loadLastSummary();
+      const done = (lastSummary && lastSummary.jobId === jobId && lastSummary.completedAt) ? true : false;
+      if (done) break;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    setPolling(false);
   };
 
   const loadLastSummary = async () => {
@@ -123,7 +137,7 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  const handleMirror = async () => {
+  const actuallyRunMirror = async () => {
     if (mirrorLoading) return;
     setMirrorLoading(true);
     setLastResult(null);
@@ -139,6 +153,8 @@ export default function AdminCategoriesPage() {
       if (res.status === 202 && data && data.jobId) {
         setLastJobId(String(data.jobId));
         setLastResult(data);
+        // brief poll for completion
+        pollUntilCompleted(String(data.jobId)).catch(() => {});
       } else {
         setLastResult({ error: true, status: res.status, data });
       }
@@ -147,6 +163,13 @@ export default function AdminCategoriesPage() {
     } finally {
       setMirrorLoading(false);
     }
+  };
+
+  const handleMirror = async () => {
+    if (dryRun) {
+      return actuallyRunMirror();
+    }
+    setConfirmWriteOpen(true);
   };
 
   const openEditModal = (category: Category) => {
@@ -229,6 +252,9 @@ export default function AdminCategoriesPage() {
               {lastResult?.error && (
                 <Badge variant="error">error</Badge>
               )}
+              {polling && (
+                <Badge variant="secondary">updating…</Badge>
+              )}
             </div>
             {lastSummary && (
               <div className="mt-3 text-sm text-neutral-700 space-y-1">
@@ -310,18 +336,15 @@ export default function AdminCategoriesPage() {
                   </div>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Create Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setCategoryName('');
-        }}
+return (
+  <div className="container mx-auto p-6">
+    <PageHeader
+      title="Category Management"
+      description="Manage product categories and hierarchies"
+      icon={Icons.Settings}
+      backLink={{ href: '/settings/admin', label: 'Back to Admin' }}
+    />
         title="Create Category"
         description="Add a new product category"
       >
