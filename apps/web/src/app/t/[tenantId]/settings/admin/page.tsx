@@ -1,4 +1,4 @@
-import AdminSettingsPage from '@/app/settings/admin/page';
+import AdminSettingsPage from '@/app/(platform)/settings/admin/page';
 import SetTenantId from '@/components/client/SetTenantId';
 
 export default async function TenantScopedAdminSettings({ params }: { params: Promise<{ tenantId: string }> }) {
