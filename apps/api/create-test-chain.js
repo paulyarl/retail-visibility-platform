@@ -164,6 +164,7 @@ async function createTestChain(chainIndex = 0) {
         },
       });
       console.log(`   ✅ Location created: ${tenant.name}`);
+      console.log(`      Tenant ID: ${tenant.id}`);
 
       // Create items for this location
       console.log(`      Adding ${loc.skuCount} SKUs...`);

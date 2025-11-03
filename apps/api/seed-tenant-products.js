@@ -37,7 +37,7 @@ const hasFlag = (name) => args.includes(`--${name}`);
 
 const config = {
   tenantId: getArg('tenant'),
-  productCount: parseInt(getArg('products')) || 100,
+  productCount: parseInt(getArg('products')) || (hasFlag('clear') ? 0 : 100), // Default 0 if only clearing
   scenario: getArg('scenario') || 'general',
   withCategories: hasFlag('with-categories'),
   assignAll: hasFlag('assign-all'),
@@ -238,15 +238,17 @@ async function main() {
     console.log('');
   }
   
-  // Generate products
-  console.log('📦 Creating products...');
-  const baseProducts = scenario.products;
-  const allProducts = generateProductVariations(baseProducts, config.productCount);
-  
+  // Generate products (skip if productCount is 0)
   let createdCount = 0;
-  const batchSize = 100;
   
-  for (let i = 0; i < allProducts.length; i += batchSize) {
+  if (config.productCount > 0) {
+    console.log('📦 Creating products...');
+    const baseProducts = scenario.products;
+    const allProducts = generateProductVariations(baseProducts, config.productCount);
+    
+    const batchSize = 100;
+    
+    for (let i = 0; i < allProducts.length; i += batchSize) {
     const batch = allProducts.slice(i, i + batchSize);
     const items = batch.map((product, idx) => {
       const availability = getRandom(['in_stock', 'in_stock', 'in_stock', 'out_of_stock']);
@@ -291,8 +293,11 @@ async function main() {
       process.stdout.write(`\r   ✅ Created ${createdCount}/${allProducts.length} products`);
     }
   }
-  
-  console.log('\n');
+    
+    console.log('\n');
+  } else {
+    console.log('📦 No products to create (productCount = 0)\n');
+  }
   
   // Calculate stats
   const totalProducts = await prisma.inventoryItem.count({
