@@ -25,7 +25,7 @@ export async function audit(opts: {
 export async function ensureAuditTable() {
   if (!Flags.AUDIT_LOG) return;
   try {
-    await prisma.$executeRaw`
+    await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS audit_log (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         occurred_at timestamptz NOT NULL DEFAULT now(),
@@ -40,7 +40,7 @@ export async function ensureAuditTable() {
         pii_scrubbed boolean NOT NULL DEFAULT true
       );
       CREATE INDEX IF NOT EXISTS idx_audit_log_tenant_time ON audit_log(tenant_id, occurred_at DESC);
-    `;
+    `);
   } catch (e) {
     // do not throw at startup
   }
