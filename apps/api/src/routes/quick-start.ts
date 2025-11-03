@@ -78,8 +78,11 @@ router.post('/tenants/:tenantId/quick-start', async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    // TODO: Add authentication check
-    // Verify user has permission to manage this tenant
+    // TODO: Add proper authentication middleware
+    // For now, this endpoint is accessible but should verify:
+    // 1. User is authenticated
+    // 2. User has permission to manage this tenant (owner/admin)
+    // SECURITY: This is a critical gap that must be fixed before production!
 
     // Validate request body
     const parsed = quickStartSchema.safeParse(req.body);
