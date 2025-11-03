@@ -48,10 +48,20 @@ export default function CategoryQuickStartPage() {
   const tenantId = params?.tenantId as string;
 
   const [selectedType, setSelectedType] = useState<BusinessType | null>(null);
+  const [categoryCount, setCategoryCount] = useState<number>(15);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [generatedCount, setGeneratedCount] = useState(0);
+
+  // Update category count when business type changes
+  const handleTypeChange = (typeId: BusinessType) => {
+    setSelectedType(typeId);
+    const type = businessTypes.find(t => t.id === typeId);
+    if (type) {
+      setCategoryCount(type.categoryCount);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!selectedType) return;
@@ -77,6 +87,7 @@ export default function CategoryQuickStartPage() {
         credentials: 'include',
         body: JSON.stringify({
           businessType: selectedType,
+          categoryCount,
         }),
       });
 
@@ -230,7 +241,7 @@ export default function CategoryQuickStartPage() {
             >
               <div
                 className="cursor-pointer"
-                onClick={() => setSelectedType(type.id)}
+                onClick={() => handleTypeChange(type.id)}
               >
                 <Card
                   className={`p-6 transition-all ${
@@ -274,6 +285,43 @@ export default function CategoryQuickStartPage() {
             </motion.div>
           ))}
         </div>
+
+        {/* Category Count Slider */}
+        {selectedType && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 max-w-md mx-auto"
+          >
+            <Card className="p-6">
+              <label className="block mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-neutral-700">
+                    Number of Categories
+                  </span>
+                  <span className="text-2xl font-bold text-primary-600">
+                    {categoryCount}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="30"
+                  value={categoryCount}
+                  onChange={(e) => setCategoryCount(parseInt(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
+                />
+                <div className="flex justify-between text-xs text-neutral-500 mt-1">
+                  <span>5 min</span>
+                  <span>30 max</span>
+                </div>
+              </label>
+              <p className="text-xs text-neutral-600 text-center">
+                We'll generate {categoryCount} categories based on your {businessTypes.find(t => t.id === selectedType)?.name.toLowerCase()} selection
+              </p>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Error Message */}
         {error && (

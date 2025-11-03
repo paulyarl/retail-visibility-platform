@@ -242,6 +242,7 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
  */
 const categoryQuickStartSchema = z.object({
   businessType: z.enum(['grocery', 'fashion', 'electronics', 'general']),
+  categoryCount: z.number().int().min(5).max(30).optional().default(15),
 });
 
 router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, async (req, res) => {
@@ -301,7 +302,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
       });
     }
 
-    const { businessType } = parsed.data;
+    const { businessType, categoryCount } = parsed.data;
 
     // Check if tenant already has categories (optional warning, not blocking)
     const existingCategoryCount = await prisma.tenantCategory.count({
@@ -338,7 +339,10 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
       ],
     };
 
-    const categories = categoryTemplates[businessType] || categoryTemplates.general;
+    const allCategories = categoryTemplates[businessType] || categoryTemplates.general;
+    
+    // Limit to requested count
+    const categories = allCategories.slice(0, categoryCount);
 
     // Create categories
     const createdCategories = await Promise.all(
