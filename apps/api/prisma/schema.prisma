@@ -521,7 +521,7 @@ model TenantBusinessProfile {
   displayMap     Boolean  @default(false) @map("display_map")
   mapPrivacyMode String   @default("precise") @map("map_privacy_mode")
   updatedAt      DateTime @updatedAt @map("updated_at")
-
+  @@unique([tenantId])
   @@map("tenant_business_profile")
 }
 
