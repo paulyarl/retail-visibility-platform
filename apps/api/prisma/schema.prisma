@@ -369,6 +369,23 @@ model GbpInsightDaily {
   @@map("gbp_insights_daily")
 }
 
+// GBP Category - Local cache of Google Business Profile categories
+model GBPCategory {
+  id          String   @id // Google's category ID (e.g., "gcid:restaurant")
+  name        String   // Category name (e.g., "Restaurant")
+  displayName String   @map("display_name") // Localized display name
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Reverse relation to tenant profiles
+  tenantProfiles TenantBusinessProfile[]
+  
+  @@unique([name])
+  @@index([isActive])
+  @@map("gbp_categories")
+}
+
 model AuditLog {
   id          String      @id @default(cuid())
   tenantId    String      @map("tenant_id")
@@ -524,14 +541,16 @@ model TenantBusinessProfile {
   displayMap     Boolean  @default(false) @map("display_map")
   mapPrivacyMode String   @default("precise") @map("map_privacy_mode")
   
-  // GBP business category (M3)
-  gbpCategoryId           String?   @map("gbp_category_id")
-  gbpCategoryName         String?   @map("gbp_category_name")
-  gbpCategoryLastMirrored DateTime? @map("gbp_category_last_mirrored")
-  gbpCategorySyncStatus   String?   @map("gbp_category_sync_status")
+  // GBP business category (M3) - FK relation to GBPCategory
+  gbpCategoryId           String?      @map("gbp_category_id")
+  gbpCategory             GBPCategory? @relation(fields: [gbpCategoryId], references: [id], onDelete: SetNull)
+  gbpCategoryName         String?      @map("gbp_category_name") // Deprecated: use gbpCategory.name
+  gbpCategoryLastMirrored DateTime?    @map("gbp_category_last_mirrored")
+  gbpCategorySyncStatus   String?      @map("gbp_category_sync_status")
   
   updatedAt      DateTime @updatedAt @map("updated_at")
   @@unique([tenantId])
+  @@index([gbpCategoryId])
   @@map("tenant_business_profile")
 }
 
