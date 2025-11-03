@@ -115,7 +115,8 @@ app.use(csrfProtect);
 // Ensure audit table exists if auditing is enabled
 ensureAuditTable().catch(() => {});
 // Ensure helper view exists for feed category resolution
-ensureFeedCategoryView().catch(() => {});
+// TEMP: Commented out due to Prisma JsonBody error in Railway
+// ensureFeedCategoryView().catch(() => {});
 
 console.log("✓ Express configured with 50mb body limit");
 
