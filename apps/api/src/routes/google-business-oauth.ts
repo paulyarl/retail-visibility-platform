@@ -6,9 +6,9 @@ const router = Router();
 
 /**
  * Initiate Google Business Profile OAuth flow
- * GET /auth/google/business
+ * GET /google/business
  */
-router.get('/auth/google/business', async (req, res) => {
+router.get('/google/business', async (req, res) => {
   try {
     const { tenantId } = req.query;
 
@@ -61,9 +61,9 @@ router.get('/auth/google/business', async (req, res) => {
 
 /**
  * Handle Google Business Profile OAuth callback
- * GET /auth/google/business/callback
+ * GET /google/business/callback
  */
-router.get('/auth/google/business/callback', async (req, res) => {
+router.get('/google/business/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query;
 
@@ -142,9 +142,9 @@ router.get('/auth/google/business/callback', async (req, res) => {
 
 /**
  * Disconnect Google Business Profile
- * POST /auth/google/business/disconnect
+ * POST /google/business/disconnect
  */
-router.post('/auth/google/business/disconnect', async (req, res) => {
+router.post('/google/business/disconnect', async (req, res) => {
   try {
     const { tenantId } = req.body;
 
