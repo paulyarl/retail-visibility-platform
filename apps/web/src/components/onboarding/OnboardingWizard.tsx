@@ -393,6 +393,9 @@ export default function OnboardingWizard({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </Button>
+              <Button variant="primary" onClick={() => router.push(`/t/${tenantId}/quick-start`)}>
+                🚀 Quick Start - Generate Products (Recommended)
+              </Button>
               <Button variant="secondary" onClick={() => router.push('/') }>
                 Platform Dashboard
               </Button>
