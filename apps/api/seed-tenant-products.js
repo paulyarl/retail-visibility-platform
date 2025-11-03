@@ -196,14 +196,26 @@ async function main() {
     console.log('   ✅ Cleared\n');
   }
   
-  // Create categories
+  // Create or fetch categories
   let categories = [];
   if (config.withCategories || config.assignAll) {
     console.log('📁 Creating categories...');
     
     for (const cat of scenario.categories) {
-      const category = await prisma.tenantCategory.create({
-        data: {
+      // Use upsert to handle existing categories
+      const category = await prisma.tenantCategory.upsert({
+        where: {
+          tenantId_slug: {
+            tenantId: config.tenantId,
+            slug: cat.slug,
+          },
+        },
+        update: {
+          name: cat.name,
+          googleCategoryId: cat.googleCategoryId,
+          isActive: true,
+        },
+        create: {
           tenantId: config.tenantId,
           name: cat.name,
           slug: cat.slug,
