@@ -28,9 +28,17 @@ const STUB_GBP_CATEGORIES = [
  */
 export async function GET(request: NextRequest) {
   try {
-    // Feature gate
-    const tenantId = request.headers.get('x-tenant-id') || undefined;
-    if (!isFeatureEnabled('FF_TENANT_GBP_CATEGORY_SYNC', tenantId)) {
+    // Feature gate - check with tenant ID from header or query param
+    const tenantId = request.headers.get('x-tenant-id') || 
+                     new URL(request.url).searchParams.get('tenantId') || 
+                     undefined;
+    
+    // For now, allow if feature is enabled globally or for specific tenant
+    // In production, this would check user permissions
+    const featureEnabled = isFeatureEnabled('FF_TENANT_GBP_CATEGORY_SYNC', tenantId);
+    
+    if (!featureEnabled) {
+      console.log('[GBP Categories API] Feature not enabled for tenant:', tenantId);
       return NextResponse.json(
         { error: 'GBP category sync not enabled' },
         { status: 403 }

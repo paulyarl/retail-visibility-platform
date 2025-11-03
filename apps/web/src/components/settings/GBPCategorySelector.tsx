@@ -38,10 +38,13 @@ export default function GBPCategorySelector({
     const timer = setTimeout(async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/api/gbp/categories?query=${encodeURIComponent(query)}&limit=10`);
+        const response = await api.get(`/api/gbp/categories?query=${encodeURIComponent(query)}&limit=10&tenantId=${encodeURIComponent(tenantId)}`);
         if (response.ok && active) {
           const data = await response.json();
           setResults(data.items || []);
+        } else {
+          const errorData = await response.json();
+          console.error('[GBPCategorySelector] API error:', errorData);
         }
       } catch (error) {
         console.error('[GBPCategorySelector] Search error:', error);
