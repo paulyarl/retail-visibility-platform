@@ -335,20 +335,47 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-purple-200 dark:border-purple-700">
-          <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-            Best Practices
-          </h4>
-          <ul className="space-y-1 text-sm text-neutral-700 dark:text-neutral-300">
-            <li>• <strong>Keep it simple:</strong> Use clear, customer-friendly category names</li>
-            <li>• <strong>Map to Google:</strong> Always align categories to Google's taxonomy for better feed quality</li>
-            <li>• <strong>Organize logically:</strong> Group similar products together (e.g., all dairy in one category)</li>
-            <li>• <strong>Start broad:</strong> Create 5-10 main categories, then add subcategories as needed</li>
-            <li>• <strong>Check coverage:</strong> Aim for 100% mapping coverage for optimal performance</li>
-          </ul>
+        <div className="space-y-3">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-purple-200 dark:border-purple-700">
+            <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              Best Practices
+            </h4>
+            <ul className="space-y-1 text-sm text-neutral-700 dark:text-neutral-300">
+              <li>• <strong>Keep it simple:</strong> Use clear, customer-friendly category names</li>
+              <li>• <strong>Map to Google:</strong> Always align categories to Google's taxonomy for better feed quality</li>
+              <li>• <strong>Organize logically:</strong> Group similar products together (e.g., all dairy in one category)</li>
+              <li>• <strong>Start broad:</strong> Create 5-10 main categories, then add subcategories as needed</li>
+              <li>• <strong>Check coverage:</strong> Aim for 100% mapping coverage for optimal performance</li>
+            </ul>
+          </div>
+
+          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-700">
+            <h4 className="font-medium text-red-900 dark:text-red-100 mb-2 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              Google Merchant Center Restrictions
+            </h4>
+            <p className="text-sm text-red-800 dark:text-red-200 mb-2">
+              <strong>Important:</strong> Google Shopping prohibits or restricts certain product categories. Do not create categories for:
+            </p>
+            <ul className="space-y-1 text-sm text-red-700 dark:text-red-300">
+              <li>• <strong>Weapons:</strong> Guns, ammunition, explosives, knives (with exceptions)</li>
+              <li>• <strong>Tobacco & Drugs:</strong> Cigarettes, e-cigarettes, recreational drugs, drug paraphernalia</li>
+              <li>• <strong>Adult Content:</strong> Sexually suggestive or explicit products</li>
+              <li>• <strong>Healthcare:</strong> Prescription drugs, unapproved supplements (restrictions vary by country)</li>
+              <li>• <strong>Counterfeit Goods:</strong> Replicas, knock-offs, unauthorized merchandise</li>
+              <li>• <strong>Dangerous Products:</strong> Recalled items, hazardous materials</li>
+            </ul>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+              📖 <a href="https://support.google.com/merchants/answer/6149970" target="_blank" rel="noopener noreferrer" className="underline hover:text-red-800 dark:hover:text-red-200">
+                View full Google Merchant Center prohibited content policy
+              </a>
+            </p>
+          </div>
         </div>
       </div>
 
