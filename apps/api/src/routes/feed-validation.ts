@@ -142,24 +142,23 @@ router.get('/:tenantId/categories/coverage', async (req, res) => {
     const total = await prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'active', visibility: 'public' } })
 
     // Mapped items: join inventory_item to tenant_category by leaf slug of category_path
-    const rows = await prisma.$queryRaw<{ count: bigint }[]>(
-      Prisma.sql`
-        SELECT COUNT(*) AS count
-         FROM inventory_item ii
-         JOIN tenant_category tc
-           ON tc.tenant_id = ii.tenant_id
-          AND tc.is_active = TRUE
-          AND (
-            CASE WHEN ii.category_path IS NOT NULL AND array_length(ii.category_path, 1) > 0
-                 THEN ii.category_path[array_length(ii.category_path, 1)]
-                 ELSE NULL
-            END
-          ) = tc.slug
-         WHERE ii.tenant_id = ${Prisma.raw(`'${tenantId}'`)}
-           AND ii.item_status = 'active'
-           AND ii.visibility = 'public'
-           AND tc.google_category_id IS NOT NULL
-      `
+    const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
+      `SELECT COUNT(*) AS count
+       FROM inventory_item ii
+       JOIN tenant_category tc
+         ON tc.tenant_id = ii.tenant_id
+        AND tc.is_active = TRUE
+        AND (
+          CASE WHEN ii.category_path IS NOT NULL AND array_length(ii.category_path, 1) > 0
+               THEN ii.category_path[array_length(ii.category_path, 1)]
+               ELSE NULL
+          END
+        ) = tc.slug
+       WHERE ii.tenant_id = $1
+         AND ii.item_status = 'active'
+         AND ii.visibility = 'public'
+         AND tc.google_category_id IS NOT NULL`,
+      tenantId
     )
     const mapped = Number(rows?.[0]?.count || 0)
     const unmapped = Math.max(total - mapped, 0)
