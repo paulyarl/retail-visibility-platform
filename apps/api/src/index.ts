@@ -115,7 +115,8 @@ app.use(setCsrfCookie);
 app.use(csrfProtect);
 
 // Ensure audit table exists if auditing is enabled
-ensureAuditTable().catch(() => {});
+// TEMP: Commented out due to Prisma JsonBody error in Railway
+// ensureAuditTable().catch(() => {});
 // Ensure helper view exists for feed category resolution
 // TEMP: Commented out due to Prisma JsonBody error in Railway
 // ensureFeedCategoryView().catch(() => {});
