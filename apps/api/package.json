@@ -52,6 +52,7 @@
     "cors": "^2.8.5",
     "execa": "^9.6.0",
     "express": "^5.1.0",
+    "googleapis": "^144.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
     "multer": "1.4.5-lts.2",
