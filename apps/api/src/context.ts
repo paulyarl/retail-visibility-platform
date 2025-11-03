@@ -21,10 +21,9 @@ export async function setRequestContext(req: Request, _res: Response, next: Next
   // Only resolve region from DB when the flag is ON and we have a tenantId
   if (Flags.GLOBAL_TENANT_META && tenantId) {
     try {
-      const rows = await prisma.$queryRawUnsafe<{ region: string }[]>(
-        `SELECT region FROM "Tenant" WHERE id = $1 LIMIT 1`,
-        tenantId
-      );
+      const rows = await prisma.$queryRaw<{ region: string }[]>`
+        SELECT region FROM "Tenant" WHERE id = ${tenantId} LIMIT 1
+      `;
       if (rows && rows[0]?.region) ctx.region = rows[0].region;
     } catch {
       // ignore lookup errors to avoid request impact

@@ -141,8 +141,8 @@ router.get('/:tenantId/categories/coverage', async (req, res) => {
     const total = await prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'active', visibility: 'public' } })
 
     // Mapped items: join inventory_item to tenant_category by leaf slug of category_path
-    const rows = await prisma.$queryRawUnsafe<{ count: string }[]>(
-      `SELECT COUNT(*)::text AS count
+    const rows = await prisma.$queryRaw<{ count: string }[]>`
+      SELECT COUNT(*)::text AS count
        FROM inventory_item ii
        JOIN tenant_category tc
          ON tc.tenant_id = ii.tenant_id
@@ -153,12 +153,11 @@ router.get('/:tenantId/categories/coverage', async (req, res) => {
                ELSE NULL
           END
         ) = tc.slug
-       WHERE ii.tenant_id = $1
+       WHERE ii.tenant_id = ${tenantId}
          AND ii.item_status = 'active'
          AND ii.visibility = 'public'
-         AND tc.google_category_id IS NOT NULL`,
-      tenantId
-    )
+         AND tc.google_category_id IS NOT NULL
+    `
     const mapped = parseInt(rows?.[0]?.count || '0', 10)
     const unmapped = Math.max(total - mapped, 0)
     const coverage = total > 0 ? parseFloat(((mapped / total) * 100).toFixed(2)) : 0
