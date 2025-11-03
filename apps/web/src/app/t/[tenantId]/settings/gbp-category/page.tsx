@@ -48,7 +48,7 @@ export default function GBPCategoryPage() {
         description="Manage your primary business category for Google Business Profile"
       />
 
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
         <GBPCategoryCard
           tenantId={tenantId}
           initialCategory={
@@ -59,6 +59,73 @@ export default function GBPCategoryPage() {
           syncStatus={profile?.gbpCategorySyncStatus}
           lastMirrored={profile?.gbpCategoryLastMirrored}
         />
+
+        {/* Quick Start Guide */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-4">
+            🚀 Quick Start: Popular Retail Categories
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Food & Beverage</h4>
+              <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
+                <li>• Grocery store</li>
+                <li>• Convenience store</li>
+                <li>• Supermarket</li>
+                <li>• Liquor store</li>
+                <li>• Specialty food store</li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">General Retail</h4>
+              <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
+                <li>• Clothing store</li>
+                <li>• Shoe store</li>
+                <li>• Electronics store</li>
+                <li>• Furniture store</li>
+                <li>• Hardware store</li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Health & Beauty</h4>
+              <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
+                <li>• Pharmacy</li>
+                <li>• Beauty supply store</li>
+                <li>• Cosmetics store</li>
+                <li>• Health and beauty shop</li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Specialty Stores</h4>
+              <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
+                <li>• Book store</li>
+                <li>• Pet store</li>
+                <li>• Toy store</li>
+                <li>• Sporting goods store</li>
+                <li>• Gift shop</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-blue-200 dark:border-blue-700">
+            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Search Tips
+            </h4>
+            <ul className="space-y-1 text-sm text-neutral-700 dark:text-neutral-300">
+              <li>• <strong>Be specific:</strong> "Grocery store" is better than just "store"</li>
+              <li>• <strong>Use common terms:</strong> Search for how customers would describe your business</li>
+              <li>• <strong>Primary activity:</strong> Choose the category that best represents your main business</li>
+              <li>• <strong>Type at least 2 characters</strong> to see search results</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
