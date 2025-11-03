@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../prisma'
 import { Prisma } from '@prisma/client'
+import { Flags } from '../config'
 
 const router = Router()
 
@@ -136,6 +137,11 @@ router.post('/:tenantId/feed/serialize', async (req, res) => {
 
 // Coverage endpoint (no view dependency): resolve by joining item leaf slug to tenant_category.slug
 router.get('/:tenantId/categories/coverage', async (req, res) => {
+  // Feature flag gate
+  if (!Flags.FEED_COVERAGE) {
+    return res.status(404).json({ success: false, error: 'feature_disabled' })
+  }
+
   try {
     const tenantId = req.params.tenantId
     // Total active, public items for tenant

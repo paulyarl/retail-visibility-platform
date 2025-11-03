@@ -74,8 +74,7 @@ export default function FeedValidationPage() {
 
     if (tenantId) {
       fetchValidation()
-      // TEMP: Disabled due to Prisma JsonBody error on backend
-      // fetchCoverage()
+      fetchCoverage() // Gated by FF_FEED_COVERAGE on backend
     }
   }, [tenantId])
 
@@ -143,8 +142,7 @@ export default function FeedValidationPage() {
                 setValidationData({ total: data?.data?.total || 0, errors, warnings: [] })
                 setError(null)
                 // refresh coverage
-                // TEMP: Disabled due to Prisma JsonBody error
-                // try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
+                try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Failed to run precheck')
               } finally {
