@@ -61,11 +61,21 @@ export default function QuickStartPage() {
   const checkEligibility = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start/eligibility`);
+      const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start/eligibility`, {
+        credentials: 'include',
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.message || 'Unable to check eligibility');
+        return;
+      }
+      
       const data = await res.json();
       setEligibility(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to check eligibility:', err);
+      setError('Unable to connect to server');
     }
   };
 
@@ -78,6 +88,7 @@ export default function QuickStartPage() {
       const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           scenario: selectedScenario,
           productCount,
@@ -104,6 +115,79 @@ export default function QuickStartPage() {
   const handleViewProducts = () => {
     router.push(`/t/${tenantId}/items?filter=inactive`);
   };
+
+  // Show blocked state if there's an error from eligibility check
+  if (error && !loading && !success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="max-w-2xl mx-auto px-4 py-12">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border-2 border-red-200 dark:border-red-800">
+            {/* Blocked Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-12 h-12 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+
+            {/* Blocked Message */}
+            <h1 className="text-3xl font-bold text-center mb-4 text-red-600 dark:text-red-400">
+              Quick Start Unavailable
+            </h1>
+
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6 mb-6">
+              <p className="text-center text-gray-700 dark:text-gray-300 mb-2">
+                <strong>Reason:</strong>
+              </p>
+              <p className="text-center text-gray-600 dark:text-gray-400">
+                {error}
+              </p>
+            </div>
+
+            {/* Common Reasons */}
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Common reasons:
+              </h3>
+              <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Authentication:</strong> You must be logged in to use Quick Start</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Permissions:</strong> Only the organization owner or platform admins can use Quick Start</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Rate Limit:</strong> Quick Start can only be used once per 24 hours</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Product Limit:</strong> You already have 100+ products</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => router.push(`/t/${tenantId}/items`)}
+                className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Go to Products
+              </button>
+              <button
+                onClick={() => router.push(`/t/${tenantId}/dashboard`)}
+                className="px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show success state
   if (success && result) {

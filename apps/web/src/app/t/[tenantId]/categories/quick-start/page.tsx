@@ -71,6 +71,12 @@ export default function CategoryQuickStartPage() {
 
       if (!response.ok) {
         const data = await response.json();
+        // Check if it's an auth/permission error
+        if (response.status === 401 || response.status === 403) {
+          setError(data.message || 'You do not have permission to use Category Quick Start');
+          setIsGenerating(false);
+          return;
+        }
         throw new Error(data.message || 'Failed to generate categories');
       }
 
@@ -83,6 +89,70 @@ export default function CategoryQuickStartPage() {
       setIsGenerating(false);
     }
   };
+
+  // Show blocked state if there's an error
+  if (error && !isGenerating && !success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="max-w-2xl w-full"
+        >
+          <Card className="p-8 border-2 border-red-200">
+            <div className="text-6xl mb-4 text-center">🚫</div>
+            <h1 className="text-3xl font-bold text-center mb-4 text-red-600">
+              Category Quick Start Unavailable
+            </h1>
+            
+            <div className="bg-red-50 rounded-lg p-6 mb-6">
+              <p className="text-center text-gray-700 mb-2">
+                <strong>Reason:</strong>
+              </p>
+              <p className="text-center text-gray-600">
+                {error}
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3">
+                Common reasons:
+              </h3>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Authentication:</strong> You must be logged in to use Category Quick Start</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Permissions:</strong> Only the organization owner or platform admins can use this feature</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Server Error:</strong> Unable to connect to the server</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <Button 
+                variant="secondary"
+                onClick={() => router.push(`/t/${tenantId}/categories`)}
+              >
+                Go to Categories
+              </Button>
+              <Button 
+                variant="primary"
+                onClick={() => router.push(`/t/${tenantId}/dashboard`)}
+              >
+                Go to Dashboard
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (success) {
     return (
