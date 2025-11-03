@@ -38,15 +38,17 @@ export async function apiRequest(
   const token = getAccessToken();
   const tenantId = getLastTenantId();
   const csrf = getCookie('csrf');
-  const requestId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? (crypto as any).randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   
+  const method = (options.method || 'GET').toString().toUpperCase();
+  const isWrite = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+  // Start with any provided headers, but avoid adding headers that trigger CORS preflight unnecessarily
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'x-request-id': requestId,
     ...(options.headers as Record<string, string>),
   };
+  // Only set Content-Type when sending a body on non-GET methods
+  if (isWrite && options.body && !('Content-Type' in headers)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   // Add Authorization header if token exists
   if (token) {
@@ -54,8 +56,6 @@ export async function apiRequest(
   }
 
   // Attach tenant and CSRF headers on write operations
-  const method = (options.method || 'GET').toString().toUpperCase();
-  const isWrite = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
   if (isWrite) {
     if (tenantId) headers['x-tenant-id'] = tenantId;
     if (csrf) headers['x-csrf-token'] = csrf;
