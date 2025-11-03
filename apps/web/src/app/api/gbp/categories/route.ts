@@ -3,6 +3,15 @@ import { isFeatureEnabled } from '@/lib/featureFlags';
 
 // Stub GBP category data until real GBP API is wired
 // Note: Real GBP has 4,000+ categories that are mostly universal (not region-specific)
+// 
+// TODO: Replace with real Google My Business API integration
+// Real API endpoint: https://mybusinessbusinessinformation.googleapis.com/v1/categories
+// Documentation: https://developers.google.com/my-business/reference/rest/v4/categories
+// 
+// PILOT TESTING LIMITATION:
+// - Category IDs are stubs (gcid:*) and will NOT sync to actual GBP until real API is connected
+// - UI and database schema are ready for real integration
+// - Category selection and storage will work, but sync status will remain "pending"
 const STUB_GBP_CATEGORIES = [
   // Food & Drink
   { id: 'gcid:grocery_store', name: 'Grocery store', path: ['Food & Drink', 'Grocery store'] },
