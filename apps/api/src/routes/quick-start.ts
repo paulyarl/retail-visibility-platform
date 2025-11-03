@@ -236,4 +236,127 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
   }
 });
 
+/**
+ * POST /api/v1/tenants/:tenantId/categories/quick-start
+ * Generate starter categories for a tenant
+ */
+const categoryQuickStartSchema = z.object({
+  businessType: z.enum(['grocery', 'fashion', 'electronics', 'general']),
+});
+
+router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const userId = (req as any).user?.userId;
+
+    // Verify user is authenticated
+    if (!userId) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'You must be logged in to use Category Quick Start',
+      });
+    }
+
+    // Check if user is a platform admin (admins can use Quick Start on any tenant)
+    const user = (req as any).user;
+    const isPlatformAdmin = user?.role === 'platform_admin' || user?.isPlatformAdmin === true;
+
+    // Verify tenant exists and user has access
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { 
+        id: true,
+        organizationId: true,
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'Tenant not found',
+      });
+    }
+
+    // Check if user has access to this tenant's organization
+    // Platform admins bypass this check
+    if (!isPlatformAdmin && tenant.organizationId) {
+      const organization = await prisma.organization.findUnique({
+        where: { id: tenant.organizationId },
+        select: { ownerId: true },
+      });
+
+      if (!organization || organization.ownerId !== userId) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'You do not have permission to manage this tenant. Only the organization owner or platform admins can use Category Quick Start.',
+        });
+      }
+    }
+
+    // Validate request body
+    const parsed = categoryQuickStartSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        details: parsed.error.issues,
+      });
+    }
+
+    const { businessType } = parsed.data;
+
+    // Generate categories based on business type
+    const categoryTemplates: Record<string, string[]> = {
+      grocery: [
+        'Fresh Produce', 'Dairy & Eggs', 'Meat & Seafood', 'Bakery', 'Frozen Foods',
+        'Beverages', 'Snacks & Candy', 'Canned Goods', 'Pasta & Grains', 'Condiments & Sauces',
+        'Health & Beauty', 'Household Supplies', 'Pet Food', 'Baby Products', 'Deli'
+      ],
+      fashion: [
+        'Women\'s Clothing', 'Men\'s Clothing', 'Kids\' Clothing', 'Shoes', 'Accessories',
+        'Jewelry', 'Handbags', 'Watches', 'Sunglasses', 'Belts', 'Hats', 'Scarves'
+      ],
+      electronics: [
+        'Mobile Phones', 'Computers & Laptops', 'Tablets', 'Audio & Headphones', 'Cameras',
+        'Gaming', 'Smart Home', 'Wearables', 'Accessories', 'Cables & Chargers'
+      ],
+      general: [
+        'Home & Garden', 'Health & Beauty', 'Sports & Outdoors', 'Toys & Games', 'Books',
+        'Office Supplies', 'Pet Supplies', 'Automotive', 'Tools & Hardware', 'Arts & Crafts',
+        'Party Supplies', 'Seasonal', 'Gifts', 'Electronics', 'Clothing', 'Food & Beverage',
+        'Home Improvement', 'Baby & Kids', 'Jewelry & Accessories', 'Furniture'
+      ],
+    };
+
+    const categories = categoryTemplates[businessType] || categoryTemplates.general;
+
+    // Create categories
+    const createdCategories = await Promise.all(
+      categories.map((name, index) =>
+        prisma.tenantCategory.create({
+          data: {
+            tenantId,
+            name,
+            slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            sortOrder: index,
+            isActive: true,
+          },
+        })
+      )
+    );
+
+    console.log(`[Category Quick Start] Created ${createdCategories.length} categories for tenant ${tenantId}`);
+
+    res.json({
+      success: true,
+      categoriesCreated: createdCategories.length,
+      categories: createdCategories.map(c => ({ id: c.id, name: c.name })),
+    });
+  } catch (error: any) {
+    console.error('[Category Quick Start] Error:', error);
+    res.status(500).json({
+      error: 'Failed to generate categories',
+      message: error.message,
+    });
+  }
+});
+
 export default router;
