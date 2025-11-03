@@ -92,15 +92,19 @@ export default function AdminToolsPage() {
         </div>
 
         {/* Tools Grid */}
-        {categories.map((category) => (
-          <div key={category.id} className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              {category.title}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tools
-                .filter((tool) => tool.category === category.id)
-                .map((tool) => {
+        {categories.map((category) => {
+          const categoryTools = tools.filter((tool) => tool.category === category.id);
+          const gridCols = categoryTools.length === 1 
+            ? 'grid-cols-1 md:grid-cols-1 lg:grid-cols-1 max-w-md' 
+            : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
+          
+          return (
+            <div key={category.id} className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                {category.title}
+              </h2>
+              <div className={`grid ${gridCols} gap-6`}>
+                {categoryTools.map((tool) => {
                   const Icon = tool.icon;
                   return (
                     <button
@@ -132,9 +136,10 @@ export default function AdminToolsPage() {
                     </button>
                   );
                 })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Info Banner */}
         <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
