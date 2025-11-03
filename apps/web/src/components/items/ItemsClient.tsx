@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import ItemsGridV2 from "./ItemsGridV2";
 import AssignCategoryModal from "./AssignCategoryModal";
+import QuickStartEmptyState from "./QuickStartEmptyState";
 
 type Tenant = {
   id: string;
@@ -908,13 +909,11 @@ export default function ItemsClient({
                   </div>
                 ))}
               </div>
+            ) : items.length === 0 && totalItems === 0 ? (
+              <QuickStartEmptyState tenantId={tenantId} />
             ) : items.length === 0 ? (
               <div className="text-center py-12">
-                <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('inventory.noItems', 'No items')}</h3>
-                <p className="mt-1 text-sm text-neutral-500">Get started by creating a new item.</p>
+                <p className="text-sm text-neutral-500">No items match your filters.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
