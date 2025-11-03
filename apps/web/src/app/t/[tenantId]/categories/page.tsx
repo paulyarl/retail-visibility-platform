@@ -300,11 +300,50 @@ export default function CategoriesPage() {
         </div>
       )}
 
+      {/* Category Quick Start Wizard CTA */}
+      {categories.length === 0 && (
+        <div className="bg-gradient-to-br from-blue-500 to-purple-600 border-2 border-blue-400 rounded-xl p-8 mb-6 text-white shadow-xl">
+          <div className="flex items-start gap-6">
+            <div className="text-6xl">⚡</div>
+            <div className="flex-1">
+              <h3 className="text-2xl font-bold mb-2">
+                Generate Categories in 1 Second!
+              </h3>
+              <p className="text-blue-100 mb-4">
+                No categories yet? Use our Category Quick Start wizard to generate a complete category structure instantly.
+              </p>
+              <div className="flex gap-3">
+                <Link href={`/t/${tenantId}/categories/quick-start`}>
+                  <button className="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+                    🚀 Launch Category Quick Start
+                  </button>
+                </Link>
+                <button 
+                  onClick={() => setIsCreate(true)}
+                  className="bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-800 transition-colors"
+                >
+                  Or Create Manually
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick Start Guide */}
       <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6 mb-6">
-        <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100 mb-4">
-          🚀 Quick Start: Common Product Categories
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100">
+            🚀 Quick Start: Common Product Categories
+          </h3>
+          {categories.length > 0 && (
+            <Link href={`/t/${tenantId}/categories/quick-start`}>
+              <button className="text-sm bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg transition-all">
+                ⚡ Generate More Categories
+              </button>
+            </Link>
+          )}
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
