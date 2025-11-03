@@ -8,6 +8,7 @@ import ProgressSteps, { Step } from './ProgressSteps';
 import StoreIdentityStep from './StoreIdentityStep';
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
 import { isFeatureEnabled } from '@/lib/featureFlags';
+import { api } from '@/lib/api';
 
 interface OnboardingWizardProps {
   tenantId: string;
@@ -70,18 +71,9 @@ export default function OnboardingWizard({
         // First, fetch existing tenant data from API
         let apiData: Partial<BusinessProfile> = {};
         try {
-          console.log('[OnboardingWizard] Fetching tenant data for:', tenantId);
-          const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-          const response = await fetch(`/api/tenants/${tenantId}`, {
-            headers: {
-              ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-            },
-          });
-          console.log('[OnboardingWizard] Response status:', response.status);
-          
+          const response = await api.get(`/tenants/${tenantId}`);
           if (response.ok) {
             const tenant = await response.json();
-            console.log('[OnboardingWizard] Tenant data:', tenant);
             
             // Extract business data from existing tenant
             if (tenant.name) {
@@ -90,20 +82,24 @@ export default function OnboardingWizard({
             } else {
             // Fallback: try tenant profile to infer business_name
             try {
-              const resp2 = await fetch(`/api/tenant/profile?tenant_id=${tenantId}`, {
-                headers: {
-                  ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-                },
-              });
+              const resp2 = await api.get(`/tenant/profile?tenant_id=${tenantId}`);
               if (resp2.ok) {
                 const prof = await resp2.json();
-                if (prof?.business_name && !apiData.business_name) {
-                  apiData.business_name = prof.business_name;
-                  console.log('[OnboardingWizard] Set business_name from profile:', prof.business_name);
-                }
+                const p = prof?.data || prof || {};
+                if (p.business_name && !apiData.business_name) apiData.business_name = p.business_name;
+                if (p.address_line1) apiData.address_line1 = p.address_line1;
+                if (p.address_line2) apiData.address_line2 = p.address_line2;
+                if (p.city) apiData.city = p.city;
+                if (p.state) apiData.state = p.state;
+                if (p.postal_code) apiData.postal_code = p.postal_code;
+                if (p.country_code) apiData.country_code = p.country_code;
+                if (p.phone_number || p.phone) apiData.phone_number = normalizePhoneInput(p.phone_number || p.phone);
+                if (p.email) apiData.email = p.email;
+                if (p.website) apiData.website = p.website;
+                if (p.contact_person) apiData.contact_person = p.contact_person;
               }
             } catch (e) {
-              console.warn('[OnboardingWizard] Fallback profile fetch failed:', e);
+              // ignore
             }
           }
             
@@ -195,22 +191,13 @@ export default function OnboardingWizard({
       setError(null);
 
       try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-        const response = await fetch('/api/tenant/profile', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            tenant_id: tenantId,
-            ...businessData,
-          }),
+        const response = await api.post('/tenant/profile', {
+          tenant_id: tenantId,
+          ...businessData,
         });
-
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to save business profile');
+          const errorData = await response.json().catch(() => ({} as any));
+          throw new Error((errorData as any)?.error || 'Failed to save business profile');
         }
 
         setSuccess(true);
