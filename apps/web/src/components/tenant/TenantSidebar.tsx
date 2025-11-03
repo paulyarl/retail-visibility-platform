@@ -37,6 +37,18 @@ export default function TenantSidebar({ tenantId, tenantName, nav }: { tenantId:
             </Link>
           )
         })}
+        {/* Page-specific quick links */}
+        {pathname && pathname.startsWith(`/t/${tenantId}/profile-completeness`) && (
+          <>
+            <div className="border-t border-gray-200 my-2" />
+            <Link
+              href={`/t/${tenantId}/onboarding?step=hours`}
+              className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+            >
+              Business Hours
+            </Link>
+          </>
+        )}
       </nav>
     </aside>
   )
