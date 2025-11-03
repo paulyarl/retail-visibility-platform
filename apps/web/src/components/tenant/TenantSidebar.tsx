@@ -1,12 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 
 type NavItem = { label: string; href: string }
 
 export default function TenantSidebar({ tenantId, tenantName, nav }: { tenantId: string; tenantName?: string; nav: NavItem[] }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { logout } = useAuth()
 
   const isActive = (href: string) => {
     if (!pathname) return false
@@ -49,6 +52,19 @@ export default function TenantSidebar({ tenantId, tenantName, nav }: { tenantId:
             </Link>
           </>
         )}
+        <div className="border-t border-gray-200 my-2" />
+        <Link
+          href="/"
+          className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+        >
+          Platform Dashboard
+        </Link>
+        <button
+          onClick={async () => { await logout(); router.push('/'); }}
+          className="w-full text-left block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+        >
+          Sign Out
+        </button>
       </nav>
     </aside>
   )
