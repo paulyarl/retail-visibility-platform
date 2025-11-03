@@ -580,13 +580,23 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
       ];
     }
     
-    // Fetch items with pagination
+    // Fetch items with pagination (includes category for public display)
     const [items, totalCount] = await Promise.all([
       prisma.inventoryItem.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
         skip,
         take: limit,
+        include: {
+          tenantCategory: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              googleCategoryId: true,
+            },
+          },
+        },
       }),
       prisma.inventoryItem.count({ where }),
     ]);
@@ -1168,13 +1178,23 @@ app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
       orderBy[sortBy] = sortOrder;
     }
     
-    // Fetch items with pagination
+    // Fetch items with pagination (includes category relation for better UX)
     const [items, totalCount] = await Promise.all([
       prisma.inventoryItem.findMany({
         where,
         orderBy,
         skip,
         take: limit,
+        include: {
+          tenantCategory: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              googleCategoryId: true,
+            },
+          },
+        },
       }),
       prisma.inventoryItem.count({ where }),
     ]);
