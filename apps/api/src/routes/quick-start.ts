@@ -87,6 +87,10 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, async (req, res
       });
     }
 
+    // Check if user is a platform admin (admins can use Quick Start on any tenant)
+    const user = (req as any).user;
+    const isPlatformAdmin = user?.role === 'platform_admin' || user?.isPlatformAdmin === true;
+
     // Verify tenant exists and user has access
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -103,7 +107,8 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, async (req, res
     }
 
     // Check if user has access to this tenant's organization
-    if (tenant.organizationId) {
+    // Platform admins bypass this check
+    if (!isPlatformAdmin && tenant.organizationId) {
       const organization = await prisma.organization.findUnique({
         where: { id: tenant.organizationId },
         select: { ownerId: true },
@@ -112,7 +117,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, async (req, res
       if (!organization || organization.ownerId !== userId) {
         return res.status(403).json({
           error: 'Forbidden',
-          message: 'You do not have permission to manage this tenant. Only the organization owner can use Quick Start.',
+          message: 'You do not have permission to manage this tenant. Only the organization owner or platform admins can use Quick Start.',
         });
       }
     }
