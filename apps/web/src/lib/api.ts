@@ -77,6 +77,7 @@ export async function apiRequest(
     resp = await fetch(url, {
       ...options,
       headers,
+      credentials: 'include', // Include cookies for cross-origin requests
     });
     if (attempt >= maxRetries) break;
     if (resp.status === 429 || (resp.status >= 500 && resp.status <= 599)) {
