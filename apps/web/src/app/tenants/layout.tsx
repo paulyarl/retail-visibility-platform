@@ -5,7 +5,7 @@ import Link from 'next/link';
 export default function TenantsLayout({ children }: { children: React.ReactNode }) {
   const nav = [
     { label: 'Your Tenants', href: '/tenants' },
-    { label: 'Onboarding', href: '/onboarding' },
+    { label: 'Onboarding', href: '/onboarding?force=1' },
     { label: 'Manage Categories', href: '/tenants/categories' },
     { label: 'Feed Validation', href: '/tenants/feed-validation' },
     { label: 'Settings', href: '/settings' },

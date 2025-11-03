@@ -42,7 +42,7 @@ export default function TenantSidebar({ tenantId, tenantName, nav }: { tenantId:
           <>
             <div className="border-t border-gray-200 my-2" />
             <Link
-              href={`/t/${tenantId}/onboarding?force=1&step=hours`}
+              href={`/t/${tenantId}/settings/hours`}
               className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
             >
               Business Hours
