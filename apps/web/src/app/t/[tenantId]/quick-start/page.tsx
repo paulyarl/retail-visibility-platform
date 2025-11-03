@@ -26,10 +26,10 @@ export default function QuickStartPage() {
 
   // Fallback scenarios in case API fails
   const fallbackScenarios: Scenario[] = [
-    { id: 'grocery', name: 'Grocery Store', categoryCount: 8, sampleProductCount: 30 },
-    { id: 'fashion', name: 'Fashion Boutique', categoryCount: 7, sampleProductCount: 16 },
-    { id: 'electronics', name: 'Electronics Store', categoryCount: 6, sampleProductCount: 13 },
-    { id: 'general', name: 'General Store', categoryCount: 5, sampleProductCount: 10 },
+    { id: 'grocery', name: 'Grocery Store', categoryCount: 8, sampleProductCount: 50 },
+    { id: 'fashion', name: 'Fashion Boutique', categoryCount: 7, sampleProductCount: 40 },
+    { id: 'electronics', name: 'Electronics Store', categoryCount: 6, sampleProductCount: 30 },
+    { id: 'general', name: 'General Store', categoryCount: 5, sampleProductCount: 35 },
   ];
 
   const [scenarios, setScenarios] = useState<Scenario[]>(fallbackScenarios);
@@ -40,6 +40,15 @@ export default function QuickStartPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
+
+  // Update product count when scenario changes
+  const handleScenarioChange = (scenarioId: string) => {
+    setSelectedScenario(scenarioId);
+    const scenario = scenarios.find(s => s.id === scenarioId);
+    if (scenario) {
+      setProductCount(scenario.sampleProductCount);
+    }
+  };
 
   // Fetch scenarios and eligibility on mount
   useEffect(() => {
@@ -350,7 +359,7 @@ export default function QuickStartPage() {
               {scenarios.map((scenario) => (
                 <button
                   key={scenario.id}
-                  onClick={() => setSelectedScenario(scenario.id)}
+                  onClick={() => handleScenarioChange(scenario.id)}
                   className={`p-4 rounded-lg border-2 transition-all duration-200 text-left ${
                     selectedScenario === scenario.id
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
