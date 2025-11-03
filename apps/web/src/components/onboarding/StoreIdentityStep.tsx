@@ -38,9 +38,11 @@ export default function StoreIdentityStep({
         onValidationChange(true);
         console.log('[StoreIdentityStep] Pre-populated data is valid (lenient validation)');
       } catch (error) {
-        console.log('[StoreIdentityStep] Pre-populated data validation failed:', error);
+        // Pre-populated data is incomplete - this is expected for new tenants
+        // User will be prompted to fill in missing fields
         if (error instanceof z.ZodError) {
-          console.log('[StoreIdentityStep] Validation errors:', error.issues);
+          const missingFields = error.issues.map(i => i.path.join('.')).join(', ');
+          console.log('[StoreIdentityStep] Pre-populated data incomplete. Missing fields:', missingFields);
         }
         onValidationChange(false);
       }
