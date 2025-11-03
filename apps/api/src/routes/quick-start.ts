@@ -303,6 +303,18 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
 
     const { businessType } = parsed.data;
 
+    // Check if tenant already has categories (optional warning, not blocking)
+    const existingCategoryCount = await prisma.tenantCategory.count({
+      where: { tenantId },
+    });
+
+    if (existingCategoryCount > 50) {
+      return res.status(400).json({
+        error: 'Too many categories',
+        message: 'You already have 50+ categories. Category Quick Start is designed for new stores.',
+      });
+    }
+
     // Generate categories based on business type
     const categoryTemplates: Record<string, string[]> = {
       grocery: [
