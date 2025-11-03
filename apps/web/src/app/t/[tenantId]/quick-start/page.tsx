@@ -59,7 +59,17 @@ export default function QuickStartPage() {
   const fetchScenarios = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const res = await fetch(`${apiUrl}/api/v1/quick-start/scenarios`);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const res = await fetch(`${apiUrl}/api/v1/quick-start/scenarios`, {
+        headers,
+        credentials: 'include',
+      });
       const data = await res.json();
       setScenarios(data.scenarios);
     } catch (err) {
