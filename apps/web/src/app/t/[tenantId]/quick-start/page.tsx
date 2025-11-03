@@ -24,7 +24,15 @@ export default function QuickStartPage() {
   const router = useRouter();
   const tenantId = params.tenantId as string;
 
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  // Fallback scenarios in case API fails
+  const fallbackScenarios: Scenario[] = [
+    { id: 'grocery', name: 'Grocery Store', categoryCount: 8, sampleProductCount: 30 },
+    { id: 'fashion', name: 'Fashion Boutique', categoryCount: 7, sampleProductCount: 16 },
+    { id: 'electronics', name: 'Electronics Store', categoryCount: 6, sampleProductCount: 13 },
+    { id: 'general', name: 'General Store', categoryCount: 5, sampleProductCount: 10 },
+  ];
+
+  const [scenarios, setScenarios] = useState<Scenario[]>(fallbackScenarios);
   const [eligibility, setEligibility] = useState<EligibilityResponse | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<string>('grocery');
   const [productCount, setProductCount] = useState<number>(50);
