@@ -87,10 +87,13 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, async (req, res
       });
     }
 
-    // Verify tenant exists
+    // Verify tenant exists and user has access
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { id: true },
+      select: { 
+        id: true,
+        organizationId: true,
+      },
     });
 
     if (!tenant) {
@@ -99,13 +102,22 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, async (req, res
       });
     }
 
-    // TODO: Add proper tenant permission check
-    // For now, we verify user is authenticated but don't check tenant ownership
-    // SECURITY: Need to implement tenant ownership/permission system
-    // Options:
-    // 1. Add ownerId field to Tenant model
-    // 2. Create TenantUser junction table with roles
-    // 3. Check user's organization membership
+    // Check if user has access to this tenant's organization
+    if (tenant.organizationId) {
+      const organization = await prisma.organization.findUnique({
+        where: { id: tenant.organizationId },
+        select: { ownerId: true },
+      });
+
+      if (!organization || organization.ownerId !== userId) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'You do not have permission to manage this tenant. Only the organization owner can use Quick Start.',
+        });
+      }
+    }
+    // If tenant has no organization, allow any authenticated user (for backwards compatibility)
+    // TODO: In production, all tenants should belong to an organization
 
     // Validate request body
     const parsed = quickStartSchema.safeParse(req.body);
