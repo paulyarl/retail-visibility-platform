@@ -1,149 +1,52 @@
 /**
  * Google Product Taxonomy
  * Source: https://support.google.com/merchants/answer/6324436
+ * Full taxonomy: https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt
  * 
- * This is a simplified version. Full taxonomy has 6000+ categories.
- * For production, download the full taxonomy from Google.
+ * Updated: 2021-09-21
+ * Total categories: 5,595
+ * 
+ * To update: Run `npx tsx scripts/download-google-taxonomy.ts`
  */
+
+import taxonomyData from './taxonomy-data.json';
 
 export interface CategoryNode {
   id: string;
   name: string;
   path: string[];
-  children?: CategoryNode[];
+}
+
+interface TaxonomyData {
+  version: string;
+  downloadedAt: string;
+  totalCategories: number;
+  categories: CategoryNode[];
 }
 
 /**
- * Top-level Google Product Categories
- * Full taxonomy: https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt
+ * Full Google Product Taxonomy (5,595 categories)
+ * Loaded from taxonomy-data.json
  */
-export const GOOGLE_PRODUCT_TAXONOMY: CategoryNode[] = [
-  {
-    id: "1",
-    name: "Animals & Pet Supplies",
-    path: ["Animals & Pet Supplies"],
-    children: [
-      { id: "2", name: "Live Animals", path: ["Animals & Pet Supplies", "Live Animals"] },
-      { id: "3", name: "Pet Supplies", path: ["Animals & Pet Supplies", "Pet Supplies"] },
-    ]
-  },
-  {
-    id: "166",
-    name: "Apparel & Accessories",
-    path: ["Apparel & Accessories"],
-    children: [
-      {
-        id: "1604",
-        name: "Clothing",
-        path: ["Apparel & Accessories", "Clothing"],
-        children: [
-          { id: "212", name: "Activewear", path: ["Apparel & Accessories", "Clothing", "Activewear"] },
-          { id: "5322", name: "Dresses", path: ["Apparel & Accessories", "Clothing", "Dresses"] },
-          { id: "213", name: "Outerwear", path: ["Apparel & Accessories", "Clothing", "Outerwear"] },
-        ]
-      },
-      {
-        id: "1581",
-        name: "Shoes",
-        path: ["Apparel & Accessories", "Shoes"],
-        children: [
-          { id: "3130", name: "Athletic Shoes", path: ["Apparel & Accessories", "Shoes", "Athletic Shoes"] },
-          { id: "187", name: "Boots", path: ["Apparel & Accessories", "Shoes", "Boots"] },
-          { id: "188", name: "Sandals", path: ["Apparel & Accessories", "Shoes", "Sandals"] },
-        ]
-      },
-      {
-        id: "167",
-        name: "Clothing Accessories",
-        path: ["Apparel & Accessories", "Clothing Accessories"],
-      }
-    ]
-  },
-  {
-    id: "632",
-    name: "Electronics",
-    path: ["Electronics"],
-    children: [
-      {
-        id: "222",
-        name: "Computers",
-        path: ["Electronics", "Computers"],
-        children: [
-          { id: "298", name: "Desktop Computers", path: ["Electronics", "Computers", "Desktop Computers"] },
-          { id: "328", name: "Laptops", path: ["Electronics", "Computers", "Laptops"] },
-        ]
-      },
-      {
-        id: "249",
-        name: "Electronics Accessories",
-        path: ["Electronics", "Electronics Accessories"],
-      }
-    ]
-  },
-  {
-    id: "436",
-    name: "Food, Beverages & Tobacco",
-    path: ["Food, Beverages & Tobacco"],
-  },
-  {
-    id: "469",
-    name: "Furniture",
-    path: ["Furniture"],
-  },
-  {
-    id: "536",
-    name: "Health & Beauty",
-    path: ["Health & Beauty"],
-    children: [
-      { id: "567", name: "Health Care", path: ["Health & Beauty", "Health Care"] },
-      { id: "2915", name: "Personal Care", path: ["Health & Beauty", "Personal Care"] },
-    ]
-  },
-  {
-    id: "536",
-    name: "Home & Garden",
-    path: ["Home & Garden"],
-    children: [
-      { id: "696", name: "Home Decor", path: ["Home & Garden", "Home Decor"] },
-      { id: "2962", name: "Kitchen & Dining", path: ["Home & Garden", "Kitchen & Dining"] },
-    ]
-  },
-  {
-    id: "888",
-    name: "Sporting Goods",
-    path: ["Sporting Goods"],
-  },
-  {
-    id: "1279",
-    name: "Toys & Games",
-    path: ["Toys & Games"],
-  },
-];
+export const GOOGLE_PRODUCT_TAXONOMY: CategoryNode[] = (taxonomyData as TaxonomyData).categories;
 
 /**
- * Flatten taxonomy for easy searching
+ * Taxonomy metadata
  */
-export function flattenTaxonomy(nodes: CategoryNode[], result: CategoryNode[] = []): CategoryNode[] {
-  for (const node of nodes) {
-    result.push(node);
-    if (node.children) {
-      flattenTaxonomy(node.children, result);
-    }
-  }
-  return result;
-}
+export const TAXONOMY_VERSION = (taxonomyData as TaxonomyData).version;
+export const TAXONOMY_TOTAL = (taxonomyData as TaxonomyData).totalCategories;
 
 /**
  * Search taxonomy by keyword
+ * Data is already flat (no need to flatten)
  */
 export function searchCategories(query: string, limit = 10): CategoryNode[] {
-  const flat = flattenTaxonomy(GOOGLE_PRODUCT_TAXONOMY);
   const lowerQuery = query.toLowerCase();
   
-  return flat
-    .filter(node => 
+  return GOOGLE_PRODUCT_TAXONOMY
+    .filter((node: CategoryNode) => 
       node.name.toLowerCase().includes(lowerQuery) ||
-      node.path.some(p => p.toLowerCase().includes(lowerQuery))
+      node.path.some((p: string) => p.toLowerCase().includes(lowerQuery))
     )
     .slice(0, limit);
 }
@@ -152,18 +55,16 @@ export function searchCategories(query: string, limit = 10): CategoryNode[] {
  * Get category by ID
  */
 export function getCategoryById(id: string): CategoryNode | null {
-  const flat = flattenTaxonomy(GOOGLE_PRODUCT_TAXONOMY);
-  return flat.find(node => node.id === id) || null;
+  return GOOGLE_PRODUCT_TAXONOMY.find((node: CategoryNode) => node.id === id) || null;
 }
 
 /**
  * Validate category path against Google taxonomy
  */
 export function validateCategoryPath(path: string[]): boolean {
-  const flat = flattenTaxonomy(GOOGLE_PRODUCT_TAXONOMY);
   const pathString = path.join(' > ');
   
-  return flat.some(node => 
+  return GOOGLE_PRODUCT_TAXONOMY.some((node: CategoryNode) => 
     node.path.join(' > ') === pathString
   );
 }
@@ -173,10 +74,9 @@ export function validateCategoryPath(path: string[]): boolean {
  */
 export function suggestCategories(text: string, limit = 5): CategoryNode[] {
   const lowerText = text.toLowerCase();
-  const flat = flattenTaxonomy(GOOGLE_PRODUCT_TAXONOMY);
   
   // Simple keyword matching (can be enhanced with ML)
-  const scored = flat.map(node => {
+  const scored = GOOGLE_PRODUCT_TAXONOMY.map((node: CategoryNode) => {
     let score = 0;
     const keywords = node.path.join(' ').toLowerCase().split(' ');
     
@@ -190,8 +90,8 @@ export function suggestCategories(text: string, limit = 5): CategoryNode[] {
   });
   
   return scored
-    .filter(item => item.score > 0)
-    .sort((a, b) => b.score - a.score)
+    .filter((item: { node: CategoryNode; score: number }) => item.score > 0)
+    .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
     .slice(0, limit)
-    .map(item => item.node);
+    .map((item: { node: CategoryNode }) => item.node);
 }
