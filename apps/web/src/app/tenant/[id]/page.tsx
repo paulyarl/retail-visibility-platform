@@ -362,8 +362,18 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                   <div className="text-left">
                     <p className="font-medium">Set your store branding and add products to populate this page automatically.</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <a href={`/t/${id}/onboarding`} className="inline-flex items-center px-3 py-1.5 rounded bg-primary-600 text-white text-sm hover:bg-primary-700">Edit Branding</a>
-                      <a href={`/t/${id}/items`} className="inline-flex items-center px-3 py-1.5 rounded border border-neutral-300 text-neutral-700 text-sm hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-700">Add Products</a>
+                      <a
+                        href={`/t/${id}/onboarding`}
+                        className="inline-flex items-center px-3 py-1.5 rounded bg-primary-600 text-white text-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-1"
+                      >
+                        Edit Branding
+                      </a>
+                      <a
+                        href={`/t/${id}/items`}
+                        className="inline-flex items-center px-3 py-1.5 rounded border border-primary-300 bg-white text-primary-700 text-sm hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-1 dark:bg-neutral-900 dark:text-primary-300 dark:border-primary-700 dark:hover:bg-neutral-800"
+                      >
+                        Add Products
+                      </a>
                     </div>
                   </div>
                 </div>

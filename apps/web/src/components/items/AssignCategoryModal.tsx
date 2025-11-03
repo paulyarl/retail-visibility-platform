@@ -81,7 +81,7 @@ export default function AssignCategoryModal({
     const t = setTimeout(async () => {
       try {
         setTaxLoading(true)
-        const res = await fetch(`http://localhost:4000/categories/search?q=${encodeURIComponent(taxQuery)}&limit=8`)
+        const res = await api.get(`categories/search?q=${encodeURIComponent(taxQuery)}&limit=8`)
         if (res.ok) {
           const data = await res.json()
           if (active) setTaxResults(data.results || [])

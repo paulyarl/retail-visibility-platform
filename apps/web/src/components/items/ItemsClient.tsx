@@ -327,14 +327,7 @@ export default function ItemsClient({
     const newStatus = item.itemStatus === 'active' ? 'inactive' : 'active';
     try {
       // Use PATCH for partial updates (only itemStatus)
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/items/${item.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-        body: JSON.stringify({ itemStatus: newStatus }),
-      });
+      const res = await api.patch(`/api/items/${encodeURIComponent(item.id)}`, { itemStatus: newStatus });
 
       if (!res.ok) {
         const error = await res.json();
@@ -354,14 +347,7 @@ export default function ItemsClient({
     const newVisibility = item.visibility === 'public' ? 'private' : 'public';
     try {
       // Use PATCH for partial updates (only visibility)
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/items/${item.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-        body: JSON.stringify({ visibility: newVisibility }),
-      });
+      const res = await api.patch(`/api/items/${encodeURIComponent(item.id)}`, { visibility: newVisibility });
 
       if (!res.ok) {
         const error = await res.json();
