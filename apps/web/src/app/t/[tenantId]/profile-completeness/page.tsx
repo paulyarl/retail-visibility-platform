@@ -1,7 +1,8 @@
 'use client'
 
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { API_BASE_URL } from '@/lib/api'
 
 interface CompletenessData {
   score: number
@@ -11,6 +12,7 @@ interface CompletenessData {
 export default function ProfileCompletenessPage() {
   const params = useParams()
   const tenantId = params.tenantId as string
+  const router = useRouter()
 
   const [completeness, setCompleteness] = useState<CompletenessData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -20,7 +22,7 @@ export default function ProfileCompletenessPage() {
     async function fetchCompleteness() {
       try {
         setLoading(true)
-        const res = await fetch(`http://localhost:4000/api/tenant/${tenantId}/profile/completeness`)
+        const res = await fetch(`${API_BASE_URL}/api/tenant/${tenantId}/profile/completeness`)
         if (!res.ok) {
           if (res.status === 404) {
             setError('Profile not found. Please create your business profile first.')
@@ -71,7 +73,10 @@ export default function ProfileCompletenessPage() {
             <div>
               <h3 className="text-yellow-900 font-semibold mb-1">Profile Not Found</h3>
               <p className="text-yellow-800">{error}</p>
-              <button className="mt-4 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors">
+              <button
+                className="mt-4 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                onClick={() => router.push(`/t/${tenantId}/onboarding`)}
+              >
                 Create Profile
               </button>
             </div>
