@@ -22,7 +22,17 @@ export default function ProfileCompletenessPage() {
     async function fetchCompleteness() {
       try {
         setLoading(true)
-        const res = await fetch(`${API_BASE_URL}/api/tenant/${tenantId}/profile/completeness`)
+        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+        
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const res = await fetch(`${API_BASE_URL}/api/tenant/${tenantId}/profile/completeness`, {
+          headers,
+          credentials: 'include',
+        })
         if (!res.ok) {
           if (res.status === 404) {
             setError('Profile not found. Please create your business profile first.')
