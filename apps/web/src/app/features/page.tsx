@@ -14,11 +14,18 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
     ),
-    title: 'Quick Start Wizard',
-    description: '🚀 Generate 50-100 products in 1 second! Our AI-powered wizard creates realistic product data instantly - 360x faster than manual entry.',
-    benefits: ['4 business scenarios', '1-second generation', 'Auto-categorized', 'Draft mode for review'],
+    title: 'Quick Start Wizard - The Game Changer',
+    description: '🚀 Forget scanning barcodes one-by-one or cleaning CSV files! Generate 50-100 realistic products in 1 SECOND. No manual data entry, no spreadsheets, no scanning equipment needed. Just click and you\'re live.',
+    benefits: [
+      '360x faster than manual entry',
+      'Beats barcode scanning (no equipment!)',
+      'Beats CSV import (no data cleanup!)',
+      '4 ready-to-go business scenarios',
+      'Auto-categorized with real prices',
+      'Created as drafts for easy customization'
+    ],
     color: 'bg-gradient-to-br from-blue-500 to-purple-600 text-white',
-    badge: 'NEW!',
+    badge: 'GAME CHANGER',
   },
   {
     icon: (
@@ -329,6 +336,122 @@ export default function FeaturesPage() {
               </ul>
               <div className="mt-3 pt-3 border-t border-amber-300">
                 <span className="text-xs font-semibold text-amber-800">Data-driven decisions!</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Start Comparison */}
+      <section className="py-16 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-neutral-900 mb-4">
+              Why Quick Start Beats Everything Else
+            </h2>
+            <p className="text-xl text-neutral-600">
+              The fastest way to get your products online. Period.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Barcode Scanning */}
+            <div className="bg-white rounded-xl p-6 border-2 border-red-200">
+              <div className="text-center mb-4">
+                <div className="text-4xl mb-2">📱</div>
+                <h3 className="font-bold text-lg text-neutral-900">Barcode Scanning</h3>
+                <div className="text-red-600 font-semibold text-sm mt-1">Old Way ❌</div>
+              </div>
+              <ul className="space-y-2 text-sm text-neutral-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">✗</span>
+                  <span>Scan each product manually</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">✗</span>
+                  <span>Need expensive equipment</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">✗</span>
+                  <span>3+ hours for 50 products</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">✗</span>
+                  <span>Tedious and error-prone</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* CSV Import */}
+            <div className="bg-white rounded-xl p-6 border-2 border-orange-200">
+              <div className="text-center mb-4">
+                <div className="text-4xl mb-2">📊</div>
+                <h3 className="font-bold text-lg text-neutral-900">CSV Import</h3>
+                <div className="text-orange-600 font-semibold text-sm mt-1">Better, But... ⚠️</div>
+              </div>
+              <ul className="space-y-2 text-sm text-neutral-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-orange-500 mt-0.5">✗</span>
+                  <span>Requires data cleanup</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-orange-500 mt-0.5">✗</span>
+                  <span>Need spreadsheet skills</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-orange-500 mt-0.5">✗</span>
+                  <span>Format must be perfect</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-orange-500 mt-0.5">✗</span>
+                  <span>Still takes 1-2 hours</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Quick Start */}
+            <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-6 border-2 border-blue-400 shadow-xl scale-105">
+              <div className="text-center mb-4">
+                <div className="text-4xl mb-2">⚡</div>
+                <h3 className="font-bold text-lg text-white">Quick Start Wizard</h3>
+                <div className="text-yellow-300 font-semibold text-sm mt-1">GAME CHANGER! 🚀</div>
+              </div>
+              <ul className="space-y-2 text-sm text-white">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-300 mt-0.5">✓</span>
+                  <span className="font-medium">1 SECOND for 50 products!</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-300 mt-0.5">✓</span>
+                  <span className="font-medium">Zero equipment needed</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-300 mt-0.5">✓</span>
+                  <span className="font-medium">No spreadsheets required</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-300 mt-0.5">✓</span>
+                  <span className="font-medium">360x faster than manual</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <div className="inline-block bg-white rounded-lg px-6 py-4 shadow-lg border-2 border-green-200">
+              <p className="text-lg font-bold text-neutral-900 mb-1">
+                ⏱️ Time Comparison: 50 Products
+              </p>
+              <div className="flex items-center justify-center gap-6 text-sm">
+                <div>
+                  <span className="text-red-600 font-semibold">Scanning:</span> 3 hours
+                </div>
+                <div>
+                  <span className="text-orange-600 font-semibold">CSV:</span> 1-2 hours
+                </div>
+                <div>
+                  <span className="text-green-600 font-bold">Quick Start:</span> 1 second ⚡
+                </div>
               </div>
             </div>
           </div>
