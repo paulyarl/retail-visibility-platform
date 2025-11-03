@@ -56,6 +56,29 @@ const features = [
   {
     icon: (
       <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+      </svg>
+    ),
+    title: 'Smart Product Categories',
+    description: 'Organize products with Google Product Taxonomy (5,595 categories). Auto-categorization and custom tenant categories for perfect organization.',
+    benefits: ['Google taxonomy sync', 'Custom categories', 'Auto-categorization', 'Hierarchical structure'],
+    color: 'bg-indigo-100 text-indigo-600',
+    badge: 'NEW!',
+  },
+  {
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    title: 'Business Hours Sync',
+    description: 'Automatic synchronization of business hours across Google Business Profile, storefront, and all marketing channels. Set once, update everywhere.',
+    benefits: ['Google sync', 'Holiday hours', 'Special events', 'Real-time updates'],
+    color: 'bg-cyan-100 text-cyan-600',
+  },
+  {
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
       </svg>
     ),
