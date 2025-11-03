@@ -79,8 +79,9 @@ export default function OnboardingWizard({
             if (tenant.name) {
               apiData.business_name = tenant.name;
               console.log('[OnboardingWizard] Set business_name from tenant.name:', tenant.name);
-            } else {
-            // Fallback: try tenant profile to infer business_name
+            }
+
+            // Always attempt to enrich from tenant profile for remaining fields
             try {
               const resp2 = await api.get(`/api/tenant/profile?tenant_id=${tenantId}`);
               if (resp2.ok) {
@@ -161,10 +162,25 @@ export default function OnboardingWizard({
 
         // Merge: API data as base, localStorage data overrides (for new/unsaved changes)
         const mergedData = { ...apiData, ...localData };
+        // Provide defaults so validation schema receives strings instead of undefined
+        const normalizedMerged = {
+          business_name: '',
+          address_line1: '',
+          address_line2: '',
+          city: '',
+          state: '',
+          postal_code: '',
+          country_code: 'US',
+          phone_number: '',
+          email: '',
+          website: '',
+          contact_person: '',
+          ...mergedData,
+        } as Partial<BusinessProfile>;
         console.log('[OnboardingWizard] API data:', apiData);
         console.log('[OnboardingWizard] localStorage data:', localData);
-        console.log('[OnboardingWizard] Merged data:', mergedData);
-        setBusinessData(mergedData);
+        console.log('[OnboardingWizard] Merged data:', normalizedMerged);
+        setBusinessData(normalizedMerged);
         setCurrentStep(savedStep);
       } catch (error) {
         console.error('Failed to load initial data:', error);

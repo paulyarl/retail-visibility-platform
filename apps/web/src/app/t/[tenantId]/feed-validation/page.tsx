@@ -178,7 +178,7 @@ export default function FeedValidationPage() {
                 // Auto-dismiss after 3s
                 setTimeout(() => setToast({ open: false, message: '' }), 3000)
                 // also refresh coverage
-                try { const r = await fetch(`http://localhost:4000/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
+                try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Failed to push feed')
               } finally {
