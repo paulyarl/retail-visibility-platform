@@ -28,6 +28,24 @@ export default function OfferingsPage() {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Quick Start - NEW! */}
+            <div className="bg-gradient-to-br from-blue-500 to-purple-600 border-2 border-blue-400 rounded-lg p-6 text-white relative shadow-xl">
+              <div className="absolute -top-2 -right-2 bg-yellow-400 text-purple-900 text-xs px-3 py-1 rounded-full font-bold">
+                NEW!
+              </div>
+              <div className="text-4xl mb-3">⚡</div>
+              <h3 className="text-lg font-bold mb-2">Quick Start Wizard</h3>
+              <ul className="space-y-1 text-sm">
+                <li>• 50 products in 1 second!</li>
+                <li>• 360x faster than manual</li>
+                <li>• No scanning, no CSV</li>
+                <li>• Auto-categorized</li>
+              </ul>
+              <div className="mt-3 pt-3 border-t border-blue-300">
+                <span className="text-xs font-semibold">GAME CHANGER!</span>
+              </div>
+            </div>
+
             {/* Storefront */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-lg p-6">
               <div className="text-4xl mb-3">🏪</div>
@@ -85,6 +103,57 @@ export default function OfferingsPage() {
               </ul>
               <div className="mt-3 pt-3 border-t border-amber-300">
                 <span className="text-xs font-semibold text-amber-800">Data-driven decisions!</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Second row of features */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            {/* Smart Categories */}
+            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-lg p-6 relative">
+              <div className="absolute -top-2 -right-2 bg-yellow-400 text-indigo-900 text-xs px-3 py-1 rounded-full font-bold">
+                NEW!
+              </div>
+              <div className="text-4xl mb-3">🏷️</div>
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">Smart Product Categories</h3>
+              <ul className="space-y-1 text-sm text-neutral-700">
+                <li>• 5,595 Google categories</li>
+                <li>• Auto-categorization</li>
+                <li>• Custom tenant categories</li>
+                <li>• Hierarchical structure</li>
+              </ul>
+              <div className="mt-3 pt-3 border-t border-indigo-300">
+                <span className="text-xs font-semibold text-indigo-800">Perfect organization!</span>
+              </div>
+            </div>
+
+            {/* Business Hours */}
+            <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 border-2 border-cyan-200 rounded-lg p-6">
+              <div className="text-4xl mb-3">🕐</div>
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">Business Hours Sync</h3>
+              <ul className="space-y-1 text-sm text-neutral-700">
+                <li>• Google Profile sync</li>
+                <li>• Holiday hours</li>
+                <li>• Special events</li>
+                <li>• Real-time updates</li>
+              </ul>
+              <div className="mt-3 pt-3 border-t border-cyan-300">
+                <span className="text-xs font-semibold text-cyan-800">Set once, update everywhere!</span>
+              </div>
+            </div>
+
+            {/* QR Marketing */}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-lg p-6">
+              <div className="text-4xl mb-3">📱</div>
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">QR Code Marketing</h3>
+              <ul className="space-y-1 text-sm text-neutral-700">
+                <li>• High-res QR codes</li>
+                <li>• Print-ready formats</li>
+                <li>• Product-specific codes</li>
+                <li>• Trackable campaigns</li>
+              </ul>
+              <div className="mt-3 pt-3 border-t border-purple-300">
+                <span className="text-xs font-semibold text-purple-800">Bridge print to digital!</span>
               </div>
             </div>
           </div>
