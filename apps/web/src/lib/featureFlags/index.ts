@@ -100,7 +100,7 @@ let FEATURE_FLAGS: Record<FeatureFlag, FeatureFlagConfig> = {
     flag: 'FF_TENANT_GBP_CATEGORY_SYNC',
     strategy: 'pilot', // M3: Start with pilot
     percentage: 0,
-    pilotTenants: [],
+    pilotTenants: ['cmhhzd64m0008g8b47ui6ivnd'], // Add staging test tenant
     pilotRegions: [],
   },
   FF_CATEGORY_MIRRORING: {
