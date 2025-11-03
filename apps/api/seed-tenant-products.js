@@ -189,7 +189,7 @@ async function main() {
   if (config.clear) {
     console.log('🗑️  Clearing existing data...');
     await prisma.inventoryItem.deleteMany({ where: { tenantId: config.tenantId } });
-    await prisma.category.deleteMany({ where: { tenantId: config.tenantId } });
+    await prisma.tenantCategory.deleteMany({ where: { tenantId: config.tenantId } });
     console.log('   ✅ Cleared\n');
   }
   
@@ -199,7 +199,7 @@ async function main() {
     console.log('📁 Creating categories...');
     
     for (const cat of scenario.categories) {
-      const category = await prisma.category.create({
+      const category = await prisma.tenantCategory.create({
         data: {
           tenantId: config.tenantId,
           name: cat.name,
