@@ -29,7 +29,7 @@ export default function ProfileCompletenessPage() {
           headers['Authorization'] = `Bearer ${token}`;
         }
         
-        const res = await fetch(`${API_BASE_URL}/api/tenant/${tenantId}/profile/completeness`, {
+        const res = await fetch(`${API_BASE_URL}/tenant/${tenantId}/profile/completeness`, {
           headers,
           credentials: 'include',
         })
