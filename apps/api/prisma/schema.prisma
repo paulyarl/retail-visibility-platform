@@ -159,7 +159,8 @@ model InventoryItem {
   auditLogId           String?
   availability         AvailabilityStatus       @default(in_stock)
   brand                String
-  categoryPath         String[]                 @default([])
+  categoryPath         String[]                 @default([]) // Google taxonomy path
+  tenantCategoryId     String?                  @map("tenant_category_id") // FK to TenantCategory
   condition            ProductCondition?        @default(new)
   currency             String                   @default("USD") @db.Char(3)
   description          String?
@@ -178,11 +179,13 @@ model InventoryItem {
   visibility           ItemVisibility?          @default(public)
   manufacturer         String?
   tenant               Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantCategory       TenantCategory?          @relation(fields: [tenantCategoryId], references: [id], onDelete: SetNull)
   photos               PhotoAsset[]
   performance          ProductPerformance[]
 
   @@unique([tenantId, sku], name: "uq_tenant_sku")
   @@index([tenantId, updatedAt])
+  @@index([tenantCategoryId])
 }
 
 model PhotoAsset {
@@ -791,16 +794,17 @@ model OutreachFeedback {
 
 // Tenant Category - Vendor-owned categories
 model TenantCategory {
-  id               String   @id @default(cuid())
-  tenantId         String   @map("tenant_id")
+  id               String          @id @default(cuid())
+  tenantId         String          @map("tenant_id")
   name             String
   slug             String
-  parentId         String?  @map("parent_id")
-  googleCategoryId String?  @map("google_category_id")
-  isActive         Boolean  @default(true) @map("is_active")
-  sortOrder        Int      @default(0) @map("sort_order")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  parentId         String?         @map("parent_id")
+  googleCategoryId String?         @map("google_category_id")
+  isActive         Boolean         @default(true) @map("is_active")
+  sortOrder        Int             @default(0) @map("sort_order")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  items            InventoryItem[] // Reverse relation
 
   @@unique([tenantId, slug])
   @@index([tenantId, isActive])

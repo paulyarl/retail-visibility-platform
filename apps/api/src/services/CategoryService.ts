@@ -103,7 +103,10 @@ export const categoryService = {
 
     const updated = await prisma.inventoryItem.update({
       where: { id: itemId },
-      data: { categoryPath: [category.slug] as any },
+      data: { 
+        tenantCategoryId: category.id,
+        categoryPath: [category.slug] as any, // Keep for backward compatibility
+      },
     })
 
     try {

@@ -16,6 +16,9 @@
  * 
  * Complete Example:
  *   doppler run -- node seed-tenant-products.js --tenant=tenant_123 --scenario=grocery --products=300 --assign-all --clear
+ * 
+ * Note: Use --assign-all to automatically assign products to categories during seeding.
+ *       Without it, categories are created but products remain unassigned (good for testing assignment UI).
  */
 
 const { PrismaClient } = require('@prisma/client');
@@ -230,11 +233,15 @@ async function main() {
       const availability = getRandom(['in_stock', 'in_stock', 'in_stock', 'out_of_stock']);
       const stock = availability === 'in_stock' ? getRandomInt(5, 100) : 0;
       
-      // Find matching category if we created them
-      let categoryId = null;
+      // Assign category if --assign-all flag is used and categories exist
+      let categoryAssignment = {};
       if (config.assignAll && categories.length > 0) {
         const matchingCat = categories.find(c => c.originalName === product.category);
-        categoryId = matchingCat ? matchingCat.id : getRandom(categories).id;
+        const selectedCat = matchingCat || getRandom(categories);
+        categoryAssignment = {
+          tenantCategoryId: selectedCat.id,
+          categoryPath: [selectedCat.slug],
+        };
       }
       
       return {
@@ -249,7 +256,7 @@ async function main() {
         stock: stock,
         availability: availability,
         itemStatus: getRandom(['active', 'active', 'active', 'inactive']),
-        categoryId: categoryId,
+        ...categoryAssignment,
       };
     });
     
@@ -277,7 +284,7 @@ async function main() {
   });
   
   const categorizedProducts = await prisma.inventoryItem.count({
-    where: { tenantId: config.tenantId, categoryId: { not: null } },
+    where: { tenantId: config.tenantId, tenantCategoryId: { not: null } },
   });
   
   // Summary
@@ -290,8 +297,12 @@ async function main() {
   console.log(`In Stock: ${inStockProducts} (${((inStockProducts / totalProducts) * 100).toFixed(1)}%)`);
   
   if (categories.length > 0) {
-    console.log(`Categories: ${categories.length}`);
-    console.log(`Categorized: ${categorizedProducts} (${((categorizedProducts / totalProducts) * 100).toFixed(1)}%)`);
+    console.log(`Categories Created: ${categories.length}`);
+    if (config.assignAll) {
+      console.log(`Categorized Products: ${categorizedProducts} (${((categorizedProducts / totalProducts) * 100).toFixed(1)}%)`);
+    } else {
+      console.log(`Note: Use --assign-all flag to auto-assign products to categories`);
+    }
   }
   
   console.log('━'.repeat(60));
