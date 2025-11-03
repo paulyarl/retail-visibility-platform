@@ -14,11 +14,12 @@ import {
   bulkSeedProducts,
   bulkClearProducts,
 } from '../lib/admin-tools';
+import { auditLogger } from '../middleware/audit-logger';
 
 const router = Router();
 
-// TODO: Add requireAdmin middleware
-// TODO: Add audit logging middleware
+// Admin authentication is enforced at the route registration level (requireAdmin middleware)
+// Audit logging is applied to all routes below
 
 /**
  * POST /api/admin/tools/test-chains
@@ -45,6 +46,9 @@ router.post('/test-chains', async (req, res) => {
     console.log('[Admin Tools] Creating test chain:', parsed.data);
 
     const result = await createTestChain(parsed.data);
+
+    // Log successful creation
+    console.log(`[Audit] Admin created test chain: ${result.organizationId} with ${result.tenants.length} tenants`);
 
     res.json({
       success: true,

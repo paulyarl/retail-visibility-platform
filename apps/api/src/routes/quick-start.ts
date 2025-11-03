@@ -7,11 +7,11 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
 import { generateQuickStartProducts, getAvailableScenarios, QuickStartScenario } from '../lib/quick-start';
+import { prisma } from '../prisma';
+import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Rate limiting store (in-memory for now, move to Redis in production)
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
@@ -74,15 +74,38 @@ const quickStartSchema = z.object({
   createAsDrafts: z.boolean().optional().default(true),
 });
 
-router.post('/tenants/:tenantId/quick-start', async (req, res) => {
+router.post('/tenants/:tenantId/quick-start', authenticateToken, async (req, res) => {
   try {
     const { tenantId } = req.params;
+    const userId = (req as any).user?.userId;
 
-    // TODO: Add proper authentication middleware
-    // For now, this endpoint is accessible but should verify:
-    // 1. User is authenticated
-    // 2. User has permission to manage this tenant (owner/admin)
-    // SECURITY: This is a critical gap that must be fixed before production!
+    // Verify user is authenticated
+    if (!userId) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'You must be logged in to use Quick Start',
+      });
+    }
+
+    // Verify tenant exists
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'Tenant not found',
+      });
+    }
+
+    // TODO: Add proper tenant permission check
+    // For now, we verify user is authenticated but don't check tenant ownership
+    // SECURITY: Need to implement tenant ownership/permission system
+    // Options:
+    // 1. Add ownerId field to Tenant model
+    // 2. Create TenantUser junction table with roles
+    // 3. Check user's organization membership
 
     // Validate request body
     const parsed = quickStartSchema.safeParse(req.body);
@@ -154,9 +177,18 @@ router.post('/tenants/:tenantId/quick-start', async (req, res) => {
  * GET /api/v1/tenants/:tenantId/quick-start/eligibility
  * Check if tenant is eligible for quick start
  */
-router.get('/tenants/:tenantId/quick-start/eligibility', async (req, res) => {
+router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, async (req, res) => {
   try {
     const { tenantId } = req.params;
+    const userId = (req as any).user?.userId;
+
+    // Verify user is authenticated
+    if (!userId) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'You must be logged in to check eligibility',
+      });
+    }
 
     // Check rate limit
     const rateLimit = checkRateLimit(tenantId);
