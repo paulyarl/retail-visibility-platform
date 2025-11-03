@@ -61,13 +61,13 @@ export default function CategoriesPage() {
         setLoading(true)
         
         // Fetch categories
-        const catRes = await api.get(`api/v1/tenants/${tenantId}/categories`)
+        const catRes = await api.get(`/api/v1/tenants/${tenantId}/categories`)
         if (!catRes.ok) throw new Error('Failed to fetch categories')
         const catData = await catRes.json()
         setCategories(catData.data || [])
 
         // Fetch alignment status
-        const statusRes = await api.get(`api/v1/tenants/${tenantId}/categories-alignment-status`)
+        const statusRes = await api.get(`/api/v1/tenants/${tenantId}/categories-alignment-status`)
         if (!statusRes.ok) throw new Error('Failed to fetch alignment status')
         const statusData = await statusRes.json()
         setAlignmentStatus(statusData.data)
@@ -112,23 +112,23 @@ export default function CategoriesPage() {
       setSaving(true)
       if (isCreate || !selected) {
         // Create
-        const postRes = await api.post(`api/v1/tenants/${tenantId}/categories`, { name: formName, slug: formName.toLowerCase().replace(/\s+/g, '-'), sortOrder: formSort })
+        const postRes = await api.post(`/api/v1/tenants/${tenantId}/categories`, { name: formName, slug: formName.toLowerCase().replace(/\s+/g, '-'), sortOrder: formSort })
         if (!postRes.ok) throw new Error('Failed to create category')
         const created = await postRes.json()
         // Align if provided
         if (formGoogleId) {
-          const alignRes = await api.post(`api/v1/tenants/${tenantId}/categories/${created.data.id}/align`, { googleCategoryId: formGoogleId })
+          const alignRes = await api.post(`/api/v1/tenants/${tenantId}/categories/${created.data.id}/align`, { googleCategoryId: formGoogleId })
           if (!alignRes.ok) throw new Error('Failed to align category')
         }
         showToast('success', 'Category created')
       } else {
         // Update core fields
-        const putRes = await api.put(`api/v1/tenants/${tenantId}/categories/${selected.id}`, { name: formName, sortOrder: formSort })
+        const putRes = await api.put(`/api/v1/tenants/${tenantId}/categories/${selected.id}`, { name: formName, sortOrder: formSort })
         if (!putRes.ok) throw new Error('Failed to update category')
 
         // Align if a googleCategoryId is provided
         if (formGoogleId && formGoogleId !== (selected.googleCategoryId || '')) {
-          const alignRes = await api.post(`api/v1/tenants/${tenantId}/categories/${selected.id}/align`, { googleCategoryId: formGoogleId })
+          const alignRes = await api.post(`/api/v1/tenants/${tenantId}/categories/${selected.id}/align`, { googleCategoryId: formGoogleId })
           if (!alignRes.ok) throw new Error('Failed to align category')
         }
         showToast('success', 'Changes saved')
@@ -136,8 +136,8 @@ export default function CategoriesPage() {
 
       // Refresh data
       const [catRes, statusRes] = await Promise.all([
-        api.get(`api/v1/tenants/${tenantId}/categories`),
-        api.get(`api/v1/tenants/${tenantId}/categories-alignment-status`)
+        api.get(`/api/v1/tenants/${tenantId}/categories`),
+        api.get(`/api/v1/tenants/${tenantId}/categories-alignment-status`)
       ])
       const catData = await catRes.json()
       const statusData = await statusRes.json()
@@ -157,15 +157,15 @@ export default function CategoriesPage() {
   async function deleteCategory(cat: Category) {
     if (!confirm(`Delete category "${cat.name}"? This is a soft delete and may be blocked if it has dependencies.`)) return
     try {
-      const res = await api.delete(`api/v1/tenants/${tenantId}/categories/${cat.id}`)
+      const res = await api.delete(`/api/v1/tenants/${tenantId}/categories/${cat.id}`)
       if (!res.ok) {
         const body = await res.text()
         throw new Error(body || 'Failed to delete category')
       }
       // Refresh
       const [catRes, statusRes] = await Promise.all([
-        api.get(`api/v1/tenants/${tenantId}/categories`),
-        api.get(`api/v1/tenants/${tenantId}/categories-alignment-status`)
+        api.get(`/api/v1/tenants/${tenantId}/categories`),
+        api.get(`/api/v1/tenants/${tenantId}/categories-alignment-status`)
       ])
       const catData = await catRes.json()
       const statusData = await statusRes.json()
@@ -184,7 +184,7 @@ export default function CategoriesPage() {
     const t = setTimeout(async () => {
       try {
         setTaxLoading(true)
-        const res = await api.get(`categories/search?q=${encodeURIComponent(taxQuery)}&limit=8`)
+        const res = await api.get(`/categories/search?q=${encodeURIComponent(taxQuery)}&limit=8`)
         if (res.ok) {
           const data = await res.json()
           if (active) setTaxResults(data.results || [])
