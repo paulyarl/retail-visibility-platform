@@ -6,6 +6,24 @@ Quick reference for all seeding scripts in the project.
 
 ---
 
+## 🚀 Quick Start (TL;DR)
+
+**Need test data fast?** Run this:
+
+```bash
+# Get a tenant ID from your database or create a chain first
+doppler run -- node seed-tenant-products.js \
+  --tenant=YOUR_TENANT_ID \
+  --scenario=grocery \
+  --products=50 \
+  --assign-all \
+  --clear
+```
+
+**Result:** 50 products + 8 categories, 100% categorized in 1-2 seconds! ⚡
+
+---
+
 ## Running with Doppler
 
 All commands should be prefixed with `doppler run --`:
@@ -84,8 +102,11 @@ doppler run -- node seed-tenant-products.js --tenant=tenant_123 --products=500
 # With categories
 doppler run -- node seed-tenant-products.js --tenant=tenant_123 --with-categories
 
-# Assign all products to categories
+# Assign all products to categories (recommended!)
 doppler run -- node seed-tenant-products.js --tenant=tenant_123 --assign-all
+
+# Quick test with 50 products, fully categorized
+doppler run -- node seed-tenant-products.js --tenant=tenant_123 --scenario=grocery --products=50 --assign-all --clear
 ```
 
 ### Scenarios
@@ -232,26 +253,31 @@ doppler run -- node create-test-chain-enhanced.js --name="M3 Test Chain" --size=
 
 # Output shows tenant IDs, e.g., tenant_1699123456789_0
 
-# 2. Seed first location with grocery products
+# 2. Seed first location with grocery products (FULLY CATEGORIZED)
 doppler run -- node seed-tenant-products.js \
   --tenant=tenant_1699123456789_0 \
   --scenario=grocery \
   --products=300 \
-  --assign-all
+  --assign-all \
+  --clear
 
-# 3. Seed second location with partial categorization
+# Result: 300 products, 8 categories, 100% categorized in ~2 seconds!
+
+# 3. Seed second location with partial categorization (for testing assignment UI)
 doppler run -- node seed-tenant-products.js \
   --tenant=tenant_1699123456789_1 \
   --scenario=grocery \
   --products=250 \
   --with-categories
 
+# Result: 250 products, 8 categories, 0% categorized (test manual assignment)
+
 # Now you can test:
-# - Category management UI
-# - Product assignment to categories
-# - GBP category selection
+# - Category management UI (/t/{tenantId}/categories)
+# - Product assignment to categories (/t/{tenantId}/items)
+# - GBP category selection (/t/{tenantId}/settings/gbp-category)
 # - Feed validation with category mapping
-# - Category alignment status
+# - Category alignment status (should show 100% for first tenant)
 ```
 
 ---
