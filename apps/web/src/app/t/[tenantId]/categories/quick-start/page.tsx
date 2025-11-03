@@ -217,15 +217,18 @@ export default function CategoryQuickStartPage() {
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: index * 0.1 }}
             >
-              <Card
-                className={`p-6 cursor-pointer transition-all ${
-                  selectedType === type.id
-                    ? 'ring-2 ring-primary-500 shadow-lg scale-105'
-                    : 'hover:shadow-md hover:scale-102'
-                }`}
+              <div
+                className="cursor-pointer"
                 onClick={() => setSelectedType(type.id)}
               >
-                <div className="flex items-start gap-4">
+                <Card
+                  className={`p-6 transition-all ${
+                    selectedType === type.id
+                      ? 'ring-2 ring-primary-500 shadow-lg scale-105'
+                      : 'hover:shadow-md hover:scale-102'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
                   <div className="text-5xl">{type.icon}</div>
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-neutral-900 mb-2">
@@ -235,7 +238,7 @@ export default function CategoryQuickStartPage() {
                       {type.description}
                     </p>
                     <div className="flex items-center gap-2 mb-3">
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge className="text-xs bg-purple-100 text-purple-800">
                         {type.categoryCount} categories
                       </Badge>
                     </div>
@@ -255,7 +258,8 @@ export default function CategoryQuickStartPage() {
                     </div>
                   )}
                 </div>
-              </Card>
+                </Card>
+              </div>
             </motion.div>
           ))}
         </div>
