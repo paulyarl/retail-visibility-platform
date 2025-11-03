@@ -74,7 +74,7 @@ export default function OnboardingWizard({
           const response = await api.get(`/api/tenants/${tenantId}`);
           if (response.ok) {
             const tenant = await response.json();
-            
+
             // Extract business data from existing tenant
             if (tenant.name) {
               apiData.business_name = tenant.name;
@@ -102,45 +102,24 @@ export default function OnboardingWizard({
             } catch (e) {
               // ignore
             }
-          }
-            
+
+            // Also enrich from tenant.metadata if present
             if (tenant.metadata) {
               const metadata = tenant.metadata as any;
-              if (metadata.business_name) {
-                apiData.business_name = metadata.business_name;
-              }
-              if (metadata.address_line1) {
-                apiData.address_line1 = metadata.address_line1;
-              }
-              if (metadata.address_line2) {
-                apiData.address_line2 = metadata.address_line2;
-              }
-              if (metadata.city) {
-                apiData.city = metadata.city;
-              }
-              if (metadata.state) {
-                apiData.state = metadata.state;
-              }
-              if (metadata.postal_code) {
-                apiData.postal_code = metadata.postal_code;
-              }
-              if (metadata.country_code) {
-                apiData.country_code = metadata.country_code;
-              }
-              if (metadata.phone_number || metadata.phone) {
-                apiData.phone_number = normalizePhoneInput(metadata.phone_number || metadata.phone);
-              }
-              if (metadata.email) {
-                apiData.email = metadata.email;
-              }
-              if (metadata.website) {
-                apiData.website = metadata.website;
-              }
-              if (metadata.contact_person) {
-                apiData.contact_person = metadata.contact_person;
-              }
+              if (metadata.business_name) apiData.business_name = metadata.business_name;
+              if (metadata.address_line1) apiData.address_line1 = metadata.address_line1;
+              if (metadata.address_line2) apiData.address_line2 = metadata.address_line2;
+              if (metadata.city) apiData.city = metadata.city;
+              if (metadata.state) apiData.state = metadata.state;
+              if (metadata.postal_code) apiData.postal_code = metadata.postal_code;
+              if (metadata.country_code) apiData.country_code = metadata.country_code;
+              if (metadata.phone_number || metadata.phone) apiData.phone_number = normalizePhoneInput(metadata.phone_number || metadata.phone);
+              if (metadata.email) apiData.email = metadata.email;
+              if (metadata.website) apiData.website = metadata.website;
+              if (metadata.contact_person) apiData.contact_person = metadata.contact_person;
             }
           }
+
         } catch (error) {
           console.error('Failed to fetch tenant data:', error);
         }
