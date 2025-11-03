@@ -342,10 +342,12 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {paginatedTenants.map((t, index) => {
-                  const role = user?.tenants?.find(x => x.id === t.id)?.role;
-                  const isAdmin = user?.role === 'ADMIN';
-                  const canEdit = isAdmin || role === 'OWNER' || role === 'ADMIN';
-                  const canDelete = isAdmin || role === 'OWNER';
+                  const memberRoleRaw = user?.tenants?.find(x => x.id === t.id)?.role;
+                  const memberRole = typeof memberRoleRaw === 'string' ? memberRoleRaw.toUpperCase() : null;
+                  const userRole = typeof user?.role === 'string' ? user.role.toUpperCase() : null;
+                  const isAdmin = userRole === 'ADMIN';
+                  const canEdit = isAdmin || memberRole === 'OWNER' || memberRole === 'ADMIN';
+                  const canDelete = isAdmin || memberRole === 'OWNER';
                   const canRename = canEdit;
                   return (
                   <TenantRow 
