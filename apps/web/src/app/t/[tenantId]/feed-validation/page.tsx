@@ -51,7 +51,7 @@ export default function FeedValidationPage() {
     async function fetchValidation() {
       try {
         setLoading(true)
-        const res = await api.get(`${API_BASE_URL}/api/v1/tenant/feed/validate?tenantId=${tenantId}`)
+        const res = await api.get(`${API_BASE_URL}/api/${tenantId}/feed/validate`)
         if (!res.ok) throw new Error('Failed to fetch validation data')
         const data = await res.json()
         setValidationData(data.data)
@@ -65,7 +65,7 @@ export default function FeedValidationPage() {
 
     async function fetchCoverage() {
       try {
-        const r = await api.get(`${API_BASE_URL}/api/v1/tenant/categories/coverage?tenantId=${tenantId}`)
+        const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`)
         if (!r.ok) return
         const d = await r.json()
         setCoverage(d?.data || null)
@@ -129,7 +129,7 @@ export default function FeedValidationPage() {
             onClick={async () => {
               try {
                 setLoading(true)
-                const res = await api.post(`${API_BASE_URL}/api/v1/tenant/feed/precheck?tenantId=${tenantId}`)
+                const res = await api.post(`${API_BASE_URL}/api/${tenantId}/feed/precheck`)
                 const data = await res.json()
                 // Convert precheck result to validation-like display
                 const errors: ValidationError[] = []
@@ -142,7 +142,7 @@ export default function FeedValidationPage() {
                 setValidationData({ total: data?.data?.total || 0, errors, warnings: [] })
                 setError(null)
                 // refresh coverage
-                try { const r = await api.get(`${API_BASE_URL}/api/v1/tenant/categories/coverage?tenantId=${tenantId}`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
+                try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Failed to run precheck')
               } finally {
@@ -178,7 +178,7 @@ export default function FeedValidationPage() {
                 // Auto-dismiss after 3s
                 setTimeout(() => setToast({ open: false, message: '' }), 3000)
                 // also refresh coverage
-                try { const r = await api.get(`${API_BASE_URL}/api/v1/tenant/categories/coverage?tenantId=${tenantId}`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
+                try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Failed to push feed')
               } finally {
@@ -327,7 +327,7 @@ export default function FeedValidationPage() {
                 onClick={async () => {
                   try {
                     setLoading(true)
-                    const res = await api.post(`${API_BASE_URL}/api/v1/tenant/feed/precheck?tenantId=${tenantId}`)
+                    const res = await api.post(`${API_BASE_URL}/api/${tenantId}/feed/precheck`)
                     const data = await res.json()
                     const errors: ValidationError[] = []
                     for (const m of (data?.data?.missingCategory || [])) errors.push({ id: m.id, field: 'categoryPath', message: 'category_required' })
@@ -335,7 +335,7 @@ export default function FeedValidationPage() {
                     setValidationData({ total: data?.data?.total || 0, errors, warnings: [] })
                     setAlignmentModal({ ...alignmentModal, open: false })
                     // refresh coverage
-                    try { const r = await api.get(`${API_BASE_URL}/api/v1/tenant/categories/coverage?tenantId=${tenantId}`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
+                    try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
                   } catch (e) {
                     // keep modal open but surface error inline
                     alert('Failed to run precheck')
