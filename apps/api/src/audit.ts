@@ -11,9 +11,10 @@ export async function audit(opts: {
 }) {
   if (!Flags.AUDIT_LOG) return; // feature-guarded noop
   try {
+    const payloadJson = opts.payload ? JSON.stringify(opts.payload) : null;
     await prisma.$executeRaw`
       INSERT INTO audit_log (tenant_id, actor, action, payload)
-      VALUES (${opts.tenantId}, ${opts.actor ?? null}, ${opts.action}, ${opts.payload ? JSON.stringify(opts.payload) : null})
+      VALUES (${opts.tenantId}, ${opts.actor ?? null}, ${opts.action}, ${payloadJson}::jsonb)
     `;
   } catch (e) {
     // swallow errors to avoid impacting hot paths
