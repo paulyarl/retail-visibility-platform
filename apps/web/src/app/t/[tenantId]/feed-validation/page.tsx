@@ -74,7 +74,8 @@ export default function FeedValidationPage() {
 
     if (tenantId) {
       fetchValidation()
-      fetchCoverage()
+      // TEMP: Disabled due to Prisma JsonBody error on backend
+      // fetchCoverage()
     }
   }, [tenantId])
 
@@ -142,7 +143,8 @@ export default function FeedValidationPage() {
                 setValidationData({ total: data?.data?.total || 0, errors, warnings: [] })
                 setError(null)
                 // refresh coverage
-                try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
+                // TEMP: Disabled due to Prisma JsonBody error
+                // try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Failed to run precheck')
               } finally {
@@ -178,7 +180,8 @@ export default function FeedValidationPage() {
                 // Auto-dismiss after 3s
                 setTimeout(() => setToast({ open: false, message: '' }), 3000)
                 // also refresh coverage
-                try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
+                // TEMP: Disabled due to Prisma JsonBody error
+                // try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Failed to push feed')
               } finally {
@@ -335,7 +338,8 @@ export default function FeedValidationPage() {
                     setValidationData({ total: data?.data?.total || 0, errors, warnings: [] })
                     setAlignmentModal({ ...alignmentModal, open: false })
                     // refresh coverage
-                    try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
+                    // TEMP: Disabled due to Prisma JsonBody error
+                // try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
                   } catch (e) {
                     // keep modal open but surface error inline
                     alert('Failed to run precheck')
