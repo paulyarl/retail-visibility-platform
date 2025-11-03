@@ -15,9 +15,7 @@ function collectNodes(nodes: CategoryNode[], opts?: { parentId?: string; level?:
       parentId,
       level,
     });
-    if (node.children?.length) {
-      out.push(...collectNodes(node.children, { parentId: node.id, level: level + 1 }));
-    }
+    // Taxonomy is flat - no children property
   }
   return out;
 }
