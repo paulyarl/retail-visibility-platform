@@ -96,6 +96,7 @@ import categoriesMirrorRoutes from './routes/categories.mirror';
 import mirrorAdminRoutes from './routes/mirror.admin';
 import quickStartRoutes from './routes/quick-start';
 import adminToolsRoutes from './routes/admin-tools';
+import testGbpRoutes from './routes/test-gbp';
 
 const app = express();
 
@@ -1919,6 +1920,7 @@ app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
 app.use('/api', feedValidationRoutes);
 app.use('/api', businessProfileValidationRoutes);
 app.use('/api', businessHoursRoutes);
+app.use(testGbpRoutes); // Test endpoint for GBP API verification
 // Tenant flags: accessible by platform admins OR store owners of that specific tenant
 app.use('/admin', authenticateToken, tenantFlagsRoutes);
 app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
