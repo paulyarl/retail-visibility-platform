@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { api, API_BASE_URL } from '@/lib/api'
 
 interface Category {
@@ -225,6 +226,13 @@ export default function CategoriesPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
+      {/* Breadcrumb */}
+      <nav className="text-sm text-gray-600 mb-4">
+        <Link href={`/t/${tenantId}/settings`} className="hover:text-gray-900">Settings</Link>
+        {' '}/{' '}
+        <span className="text-gray-900 font-medium">Product Categories</span>
+      </nav>
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Category Management</h1>
         <div className="flex items-center gap-3">
@@ -480,6 +488,21 @@ export default function CategoriesPage() {
               <p className="text-sm text-gray-600">See how your categorized products appear to customers.</p>
             </div>
           </a>
+
+          <Link
+            href={`/t/${tenantId}/settings/gbp-category`}
+            className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-amber-300 hover:shadow-md transition-all group"
+          >
+            <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-200 transition-colors">
+              <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-gray-900 mb-1">Set Business Category</h4>
+              <p className="text-sm text-gray-600">Configure your Google Business Profile category (different from product categories).</p>
+            </div>
+          </Link>
         </div>
       </div>
 

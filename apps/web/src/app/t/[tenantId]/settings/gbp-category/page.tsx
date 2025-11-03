@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import GBPCategoryCard from '@/components/settings/GBPCategoryCard';
 import PageHeader from '@/components/PageHeader';
 import { api } from '@/lib/api';
@@ -43,10 +44,41 @@ export default function GBPCategoryPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {/* Breadcrumb */}
+      <nav className="text-sm text-gray-600 mb-4">
+        <Link href={`/t/${tenantId}/settings`} className="hover:text-gray-900">Settings</Link>
+        {' '}/{' '}
+        <span className="text-gray-900 font-medium">GBP Business Category</span>
+      </nav>
+
       <PageHeader
         title="Google Business Profile Category"
         description="Manage your primary business category for Google Business Profile"
       />
+
+      {/* Clarification Card */}
+      <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          What's the difference?
+        </h4>
+        <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+          <strong>Business Category</strong> (this page) describes your store type for Google Business Profile 
+          (e.g., "Grocery store", "Clothing store"). <strong>Product Categories</strong> organize 
+          individual items you sell (e.g., "Dairy", "Produce", "Men's Apparel").
+        </p>
+        <Link 
+          href={`/t/${tenantId}/categories`}
+          className="inline-flex items-center gap-1 text-sm font-medium text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 underline"
+        >
+          Manage Product Categories
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
 
       <div className="mt-6 space-y-6">
         <GBPCategoryCard
