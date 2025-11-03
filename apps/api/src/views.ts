@@ -12,7 +12,7 @@ import { Flags } from './config';
 export async function ensureFeedCategoryView() {
   // No flag guard; a harmless utility view
   try {
-    await prisma.$executeRawUnsafe(`
+    await prisma.$executeRaw`
       CREATE OR REPLACE VIEW v_feed_category_resolved AS
       SELECT
         ii.id               AS item_id,
@@ -32,7 +32,7 @@ export async function ensureFeedCategoryView() {
                 THEN ii.category_path[array_length(ii.category_path, 1)]
                 ELSE NULL
            END = tc.slug;
-    `);
+    `;
   } catch (e) {
     // swallow — view creation failure should not block server
   }
