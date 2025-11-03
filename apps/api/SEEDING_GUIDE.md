@@ -107,6 +107,9 @@ doppler run -- node seed-tenant-products.js --tenant=tenant_123 --assign-all
 
 # Quick test with 50 products, fully categorized
 doppler run -- node seed-tenant-products.js --tenant=tenant_123 --scenario=grocery --products=50 --assign-all --clear
+
+# Real onboarding - create as drafts for customization (NEW!)
+doppler run -- node seed-tenant-products.js --tenant=tenant_123 --scenario=grocery --products=50 --assign-all --draft
 ```
 
 ### Scenarios
@@ -175,6 +178,35 @@ doppler run -- node seed-tenant-products.js --tenant=tenant_XXX_0 --scenario=gro
 doppler run -- node seed-tenant-products.js --tenant=tenant_XXX_1 --scenario=fashion --products=300 --assign-all
 doppler run -- node seed-tenant-products.js --tenant=tenant_XXX_2 --scenario=electronics --products=200 --assign-all
 ```
+
+### Workflow 4: Real Business Onboarding (Draft Mode) 🆕
+```bash
+# Create products as INACTIVE drafts for customization
+doppler run -- node seed-tenant-products.js \
+  --tenant=new_customer_id \
+  --scenario=grocery \
+  --products=50 \
+  --assign-all \
+  --draft
+
+# Result:
+# ✅ 50 products created as INACTIVE
+# ✅ All categorized and ready to customize
+# ✅ Owner reviews each product (name, price, photos, description)
+# ✅ Owner activates products when ready to publish
+# ✅ No accidental publishing of template data
+```
+
+**Why use `--draft` for onboarding?**
+- ✅ Gives business owners a **starting point** without overwhelming them
+- ✅ Prevents **accidental publishing** of generic template data
+- ✅ Encourages **customization** (photos, prices, descriptions)
+- ✅ Better UX - **intentional activation** vs bulk cleanup
+- ✅ Products only appear in feeds when activated
+
+**When to use each mode:**
+- **`--assign-all`** (no draft): Demo, testing, development
+- **`--assign-all --draft`**: Real customer onboarding
 
 ---
 
@@ -247,13 +279,14 @@ Navigate to: `http://localhost:3000/admin/organizations`
 
 ## 7. Example: Complete M3 Testing Setup
 
+### Demo/Testing Mode (Active Products)
 ```bash
 # 1. Create a test chain
 doppler run -- node create-test-chain-enhanced.js --name="M3 Test Chain" --size=small
 
 # Output shows tenant IDs, e.g., tenant_1699123456789_0
 
-# 2. Seed first location with grocery products (FULLY CATEGORIZED)
+# 2. Seed first location with grocery products (FULLY CATEGORIZED, ACTIVE)
 doppler run -- node seed-tenant-products.js \
   --tenant=tenant_1699123456789_0 \
   --scenario=grocery \
@@ -261,7 +294,7 @@ doppler run -- node seed-tenant-products.js \
   --assign-all \
   --clear
 
-# Result: 300 products, 8 categories, 100% categorized in ~2 seconds!
+# Result: 300 products, 8 categories, 100% categorized, 75% active in ~2 seconds!
 
 # 3. Seed second location with partial categorization (for testing assignment UI)
 doppler run -- node seed-tenant-products.js \
@@ -271,13 +304,29 @@ doppler run -- node seed-tenant-products.js \
   --with-categories
 
 # Result: 250 products, 8 categories, 0% categorized (test manual assignment)
+```
 
-# Now you can test:
-# - Category management UI (/t/{tenantId}/categories)
-# - Product assignment to categories (/t/{tenantId}/items)
-# - GBP category selection (/t/{tenantId}/settings/gbp-category)
-# - Feed validation with category mapping
-# - Category alignment status (should show 100% for first tenant)
+### Real Onboarding Mode (Draft Products) 🆕
+```bash
+# Create products as INACTIVE drafts for new business owner
+doppler run -- node seed-tenant-products.js \
+  --tenant=new_customer_id \
+  --scenario=grocery \
+  --products=50 \
+  --assign-all \
+  --draft
+
+# Result: 50 products, 8 categories, 100% categorized, 0% active (all drafts)
+# Owner customizes each product then activates when ready
+```
+
+### What You Can Test
+- ✅ Category management UI (`/t/{tenantId}/categories`)
+- ✅ Product assignment to categories (`/t/{tenantId}/items`)
+- ✅ GBP category selection (`/t/{tenantId}/settings/gbp-category`)
+- ✅ Feed validation with category mapping
+- ✅ Category alignment status (should show 100% for first tenant)
+- ✅ Draft workflow (review → customize → activate)
 ```
 
 ---

@@ -12,13 +12,19 @@
  *   doppler run -- node seed-tenant-products.js --tenant=tenant_123 --scenario=electronics # Electronics
  *   doppler run -- node seed-tenant-products.js --tenant=tenant_123 --with-categories  # Create categories too
  *   doppler run -- node seed-tenant-products.js --tenant=tenant_123 --assign-all       # Assign all products to categories
+ *   doppler run -- node seed-tenant-products.js --tenant=tenant_123 --draft            # Create as inactive (for customization)
  *   doppler run -- node seed-tenant-products.js --tenant=tenant_123 --clear            # Clear existing first
  * 
- * Complete Example:
+ * Complete Example (Demo/Testing):
  *   doppler run -- node seed-tenant-products.js --tenant=tenant_123 --scenario=grocery --products=300 --assign-all --clear
  * 
- * Note: Use --assign-all to automatically assign products to categories during seeding.
- *       Without it, categories are created but products remain unassigned (good for testing assignment UI).
+ * Complete Example (Real Onboarding):
+ *   doppler run -- node seed-tenant-products.js --tenant=tenant_123 --scenario=grocery --products=50 --assign-all --draft
+ * 
+ * Notes:
+ *   --assign-all: Automatically assign products to categories during seeding
+ *   --draft: Create products as inactive, requiring owner to review and activate each one
+ *            Perfect for onboarding - gives owners a starting point they can customize
  */
 
 const { PrismaClient } = require('@prisma/client');
@@ -35,6 +41,7 @@ const config = {
   scenario: getArg('scenario') || 'general',
   withCategories: hasFlag('with-categories'),
   assignAll: hasFlag('assign-all'),
+  draft: hasFlag('draft'),
   clear: hasFlag('clear'),
 };
 
@@ -256,6 +263,11 @@ async function main() {
         };
       }
       
+      // Determine item status based on --draft flag
+      const itemStatus = config.draft 
+        ? 'inactive'  // Draft mode: all products start inactive for customization
+        : getRandom(['active', 'active', 'active', 'inactive']); // Normal: mostly active
+      
       return {
         tenantId: config.tenantId,
         sku: `SKU-${timestamp}-${(i + idx).toString().padStart(5, '0')}`,
@@ -267,7 +279,7 @@ async function main() {
         currency: 'USD',
         stock: stock,
         availability: availability,
-        itemStatus: getRandom(['active', 'active', 'active', 'inactive']),
+        itemStatus: itemStatus,
         ...categoryAssignment,
       };
     });
@@ -305,7 +317,14 @@ async function main() {
   console.log(`Tenant: ${tenant.name}`);
   console.log(`Scenario: ${scenario.name}`);
   console.log(`Total Products: ${totalProducts}`);
-  console.log(`Active: ${activeProducts} (${((activeProducts / totalProducts) * 100).toFixed(1)}%)`);
+  
+  if (config.draft) {
+    console.log(`Status: All products created as INACTIVE (draft mode)`);
+    console.log(`Action Required: Review and activate each product after customization`);
+  } else {
+    console.log(`Active: ${activeProducts} (${((activeProducts / totalProducts) * 100).toFixed(1)}%)`);
+  }
+  
   console.log(`In Stock: ${inStockProducts} (${((inStockProducts / totalProducts) * 100).toFixed(1)}%)`);
   
   if (categories.length > 0) {
@@ -318,7 +337,16 @@ async function main() {
   }
   
   console.log('━'.repeat(60));
-  console.log('\n🎉 Seeding completed successfully!\n');
+  
+  if (config.draft) {
+    console.log('\n✅ Draft products created successfully!');
+    console.log('💡 Next Steps:');
+    console.log('   1. Review each product and customize (name, price, description, photos)');
+    console.log('   2. Activate products when ready to publish');
+    console.log('   3. Products will appear in feeds only when activated\n');
+  } else {
+    console.log('\n🎉 Seeding completed successfully!\n');
+  }
   console.log('📍 View at:');
   console.log(`   http://localhost:3000/t/${config.tenantId}/items`);
   if (categories.length > 0) {
