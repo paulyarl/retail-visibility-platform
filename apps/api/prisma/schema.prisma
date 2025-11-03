@@ -106,8 +106,11 @@ model Tenant {
   scanTemplates         ScanTemplate[]
   scanSessions          ScanSession[]
   scanResults           ScanResult[]
-  barcodeLookupLogs     BarcodeLookupLog[]
-  categoryMirrorRuns    CategoryMirrorRun[]
+  barcodeLookupLogs            BarcodeLookupLog[]
+  categoryMirrorRuns           CategoryMirrorRun[]
+  googleBusinessAccessToken    String?
+  googleBusinessRefreshToken   String?
+  googleBusinessTokenExpiry    DateTime?
 
   @@index([name])
   @@index([subscriptionStatus])

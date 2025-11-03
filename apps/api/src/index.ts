@@ -97,6 +97,7 @@ import mirrorAdminRoutes from './routes/mirror.admin';
 import quickStartRoutes from './routes/quick-start';
 import adminToolsRoutes from './routes/admin-tools';
 import testGbpRoutes from './routes/test-gbp';
+import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 
 const app = express();
 
@@ -1921,6 +1922,7 @@ app.use('/api', feedValidationRoutes);
 app.use('/api', businessProfileValidationRoutes);
 app.use('/api', businessHoursRoutes);
 app.use(testGbpRoutes); // Test endpoint for GBP API verification
+app.use('/auth', googleBusinessOAuthRoutes); // Google Business Profile OAuth flow
 // Tenant flags: accessible by platform admins OR store owners of that specific tenant
 app.use('/admin', authenticateToken, tenantFlagsRoutes);
 app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
