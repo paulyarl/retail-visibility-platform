@@ -111,11 +111,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
 
   const onRename = async (id: string, newName: string) => {
     if (!newName.trim()) return;
-    const res = await fetch(`/api/tenants/${encodeURIComponent(id)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName.trim() }),
-    });
+    const res = await api.put(`/api/tenants/${encodeURIComponent(id)}`, { name: newName.trim() });
     if (!res.ok) {
       setError("Failed to rename tenant");
       return;
@@ -126,7 +122,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
 
   const onDelete = async (id: string) => {
     if (!confirm("Delete tenant? This cannot be undone.")) return;
-    const res = await fetch(`/api/tenants/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const res = await api.delete(`/api/tenants/${encodeURIComponent(id)}`);
     if (res.status !== 204 && !res.ok) {
       setError("Failed to delete tenant");
       return;
