@@ -27,7 +27,10 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const res = await fetch(`${apiUrl}/api/admin/tools/test-chains`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Send cookies for authentication
         body: JSON.stringify({
           name,
           size,
