@@ -112,7 +112,7 @@ doppler run -- node seed-tenant-products.js --tenant=tenant_123 --scenario=groce
 doppler run -- node seed-tenant-products.js --tenant=tenant_123 --scenario=grocery --products=50 --assign-all --draft
 ```
 
-### Scenarios
+### Scenarios and options
 
 #### Grocery Store
 ```bash
