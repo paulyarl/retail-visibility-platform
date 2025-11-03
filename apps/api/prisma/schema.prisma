@@ -520,6 +520,13 @@ model TenantBusinessProfile {
   longitude      Decimal?
   displayMap     Boolean  @default(false) @map("display_map")
   mapPrivacyMode String   @default("precise") @map("map_privacy_mode")
+  
+  // GBP business category (M3)
+  gbpCategoryId           String?   @map("gbp_category_id")
+  gbpCategoryName         String?   @map("gbp_category_name")
+  gbpCategoryLastMirrored DateTime? @map("gbp_category_last_mirrored")
+  gbpCategorySyncStatus   String?   @map("gbp_category_sync_status")
+  
   updatedAt      DateTime @updatedAt @map("updated_at")
   @@unique([tenantId])
   @@map("tenant_business_profile")

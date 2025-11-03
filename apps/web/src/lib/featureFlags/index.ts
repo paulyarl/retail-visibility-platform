@@ -15,7 +15,9 @@ export type FeatureFlag =
   | 'FF_TENANT_URLS'
   | 'FF_CATEGORY_MANAGEMENT_PAGE'
   | 'FF_CATEGORY_QUICK_ACTIONS'
-  | 'FF_ITEMS_V2_GRID';
+  | 'FF_ITEMS_V2_GRID'
+  | 'FF_TENANT_GBP_CATEGORY_SYNC'
+  | 'FF_CATEGORY_MIRRORING';
 
 export type RolloutStrategy = 
   | 'off'           // Feature disabled for all
@@ -93,6 +95,20 @@ let FEATURE_FLAGS: Record<FeatureFlag, FeatureFlagConfig> = {
     flag: 'FF_ITEMS_V2_GRID',
     strategy: 'off',
     percentage: 0,
+  },
+  FF_TENANT_GBP_CATEGORY_SYNC: {
+    flag: 'FF_TENANT_GBP_CATEGORY_SYNC',
+    strategy: 'pilot', // M3: Start with pilot
+    percentage: 0,
+    pilotTenants: [],
+    pilotRegions: [],
+  },
+  FF_CATEGORY_MIRRORING: {
+    flag: 'FF_CATEGORY_MIRRORING',
+    strategy: 'off', // M3: Enable after UI/API tested
+    percentage: 0,
+    pilotTenants: [],
+    pilotRegions: [],
   },
 };
 

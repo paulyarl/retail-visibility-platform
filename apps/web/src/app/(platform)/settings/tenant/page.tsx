@@ -5,6 +5,7 @@ import { useTranslation } from "@/lib/useTranslation";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Alert, Spinner, Modal, ModalFooter, Button } from "@/components/ui";
 import BusinessProfileCard from "@/components/settings/BusinessProfileCard";
+import GBPCategoryCard from "@/components/settings/GBPCategoryCard";
 import MapCardSettings from "@/components/tenant/MapCardSettings";
 import SwisPreviewSettings from "@/components/tenant/SwisPreviewSettings";
 import GoogleConnectCard from "@/components/google/GoogleConnectCard";
@@ -358,6 +359,20 @@ export default function TenantSettingsPage() {
                     alert('Failed to update business profile');
                   }
                 }}
+              />
+            )}
+
+            {/* GBP Business Category - Feature Flag: FF_TENANT_GBP_CATEGORY_SYNC (M3) */}
+            {isFeatureEnabled('FF_TENANT_GBP_CATEGORY_SYNC', tenant.id, tenant.region) && profile && (
+              <GBPCategoryCard
+                tenantId={tenant.id}
+                initialCategory={
+                  (profile as any).gbpCategoryId && (profile as any).gbpCategoryName
+                    ? { id: (profile as any).gbpCategoryId, name: (profile as any).gbpCategoryName }
+                    : null
+                }
+                syncStatus={(profile as any).gbpCategorySyncStatus}
+                lastMirrored={(profile as any).gbpCategoryLastMirrored}
               />
             )}
 
