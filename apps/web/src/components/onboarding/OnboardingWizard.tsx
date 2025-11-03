@@ -71,7 +71,7 @@ export default function OnboardingWizard({
         // First, fetch existing tenant data from API
         let apiData: Partial<BusinessProfile> = {};
         try {
-          const response = await api.get(`/tenants/${tenantId}`);
+          const response = await api.get(`/api/tenants/${tenantId}`);
           if (response.ok) {
             const tenant = await response.json();
             
@@ -82,7 +82,7 @@ export default function OnboardingWizard({
             } else {
             // Fallback: try tenant profile to infer business_name
             try {
-              const resp2 = await api.get(`/tenant/profile?tenant_id=${tenantId}`);
+              const resp2 = await api.get(`/api/tenant/profile?tenant_id=${tenantId}`);
               if (resp2.ok) {
                 const prof = await resp2.json();
                 const p = prof?.data || prof || {};
@@ -191,7 +191,7 @@ export default function OnboardingWizard({
       setError(null);
 
       try {
-        const response = await api.post('/tenant/profile', {
+        const response = await api.post('/api/tenant/profile', {
           tenant_id: tenantId,
           ...businessData,
         });
