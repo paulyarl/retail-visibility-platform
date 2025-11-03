@@ -292,6 +292,66 @@ export default function CategoriesPage() {
         </div>
       )}
 
+      {/* Quick Start Guide */}
+      <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6 mb-6">
+        <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100 mb-4">
+          🚀 Quick Start: Common Product Categories
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div>
+            <h4 className="font-medium text-purple-800 dark:text-purple-200 mb-2">Food & Grocery</h4>
+            <ul className="space-y-1 text-sm text-purple-700 dark:text-purple-300">
+              <li>• Fresh Produce</li>
+              <li>• Dairy & Eggs</li>
+              <li>• Meat & Seafood</li>
+              <li>• Bakery</li>
+              <li>• Beverages</li>
+              <li>• Snacks & Candy</li>
+            </ul>
+          </div>
+          
+          <div>
+            <h4 className="font-medium text-purple-800 dark:text-purple-200 mb-2">Household & Personal Care</h4>
+            <ul className="space-y-1 text-sm text-purple-700 dark:text-purple-300">
+              <li>• Cleaning Supplies</li>
+              <li>• Paper Products</li>
+              <li>• Health & Beauty</li>
+              <li>• Personal Care</li>
+              <li>• Baby Products</li>
+            </ul>
+          </div>
+          
+          <div>
+            <h4 className="font-medium text-purple-800 dark:text-purple-200 mb-2">General Merchandise</h4>
+            <ul className="space-y-1 text-sm text-purple-700 dark:text-purple-300">
+              <li>• Apparel & Accessories</li>
+              <li>• Electronics</li>
+              <li>• Home & Garden</li>
+              <li>• Toys & Games</li>
+              <li>• Sports & Outdoors</li>
+              <li>• Pet Supplies</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-purple-200 dark:border-purple-700">
+          <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            Best Practices
+          </h4>
+          <ul className="space-y-1 text-sm text-neutral-700 dark:text-neutral-300">
+            <li>• <strong>Keep it simple:</strong> Use clear, customer-friendly category names</li>
+            <li>• <strong>Map to Google:</strong> Always align categories to Google's taxonomy for better feed quality</li>
+            <li>• <strong>Organize logically:</strong> Group similar products together (e.g., all dairy in one category)</li>
+            <li>• <strong>Start broad:</strong> Create 5-10 main categories, then add subcategories as needed</li>
+            <li>• <strong>Check coverage:</strong> Aim for 100% mapping coverage for optimal performance</li>
+          </ul>
+        </div>
+      </div>
+
       {/* Categories List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
