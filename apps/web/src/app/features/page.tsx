@@ -11,6 +11,18 @@ const features = [
   {
     icon: (
       <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+    title: 'Quick Start Wizard',
+    description: '🚀 Generate 50-100 products in 1 second! Our AI-powered wizard creates realistic product data instantly - 360x faster than manual entry.',
+    benefits: ['4 business scenarios', '1-second generation', 'Auto-categorized', 'Draft mode for review'],
+    color: 'bg-gradient-to-br from-blue-500 to-purple-600 text-white',
+    badge: 'NEW!',
+  },
+  {
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
       </svg>
     ),
@@ -320,8 +332,13 @@ export default function FeaturesPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white border border-neutral-200 rounded-xl p-6 hover:shadow-lg transition-shadow"
+                className="bg-white border border-neutral-200 rounded-xl p-6 hover:shadow-lg transition-shadow relative"
               >
+                {feature.badge && (
+                  <div className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs px-3 py-1 rounded-full font-bold shadow-lg">
+                    {feature.badge}
+                  </div>
+                )}
                 <div className={`inline-flex items-center justify-center w-16 h-16 rounded-lg ${feature.color} mb-4`}>
                   {feature.icon}
                 </div>
