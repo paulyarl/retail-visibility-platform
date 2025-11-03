@@ -44,6 +44,12 @@ export async function generateProductFeed(tenantId: string): Promise<FeedItem[]>
         availability: true,
         imageUrl: true,
         categoryPath: true,
+        tenantCategory: {
+          select: {
+            name: true,
+            googleCategoryId: true,
+          },
+        },
         photos: {
           orderBy: { position: 'asc' },
           select: { url: true, position: true },

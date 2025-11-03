@@ -1217,7 +1217,19 @@ app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
 });
 
 app.get(["/items/:id", "/inventory/:id"], async (req, res) => {
-  const it = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
+  const it = await prisma.inventoryItem.findUnique({ 
+    where: { id: req.params.id },
+    include: {
+      tenantCategory: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          googleCategoryId: true,
+        },
+      },
+    },
+  });
   if (!it) return res.status(404).json({ error: "not_found" });
   res.json(it);
 });
