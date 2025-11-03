@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button, AnimatedCard, Alert } from '@/components/ui';
 import ProgressSteps, { Step } from './ProgressSteps';
@@ -39,6 +39,12 @@ export default function OnboardingWizard({
   onComplete 
 }: OnboardingWizardProps) {
   const router = useRouter();
+  const search = useSearchParams();
+  const stepParam = (search?.get('step') || '').toLowerCase();
+  const forceParam = search?.get('force');
+  const forced = forceParam === '1' || forceParam === 'true';
+  const stepMap: Record<string, number> = { account: 0, store: 1, profile: 1, complete: 2, hours: 1 };
+  const requestedStep = stepMap[stepParam] ?? initialStep;
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [businessData, setBusinessData] = useState<Partial<BusinessProfile>>({});
   const [isValid, setIsValid] = useState(false);
@@ -57,7 +63,7 @@ export default function OnboardingWizard({
     }
   }, [tenantId]);
 
-  // Load existing tenant data and saved progress from localStorage
+  // Load existing tenant data and saved progress from localStorage (unless forced)
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -143,9 +149,9 @@ export default function OnboardingWizard({
         }
 
         // Then load saved progress from localStorage (should override API data if it exists)
-        const saved = localStorage.getItem(`onboarding_${tenantId}`);
+        const saved = !forced ? localStorage.getItem(`onboarding_${tenantId}`) : null;
         let localData: Partial<BusinessProfile> = {};
-        let savedStep = initialStep;
+        let savedStep = forced ? requestedStep : initialStep;
         
         if (saved) {
           try {
@@ -170,17 +176,17 @@ export default function OnboardingWizard({
     };
 
     loadInitialData();
-  }, [tenantId, initialStep]);
+  }, [tenantId, initialStep, forced, requestedStep]);
 
-  // Save progress to localStorage
+  // Save progress to localStorage (skip when in forced mode)
   useEffect(() => {
-    if (Object.keys(businessData).length > 0) {
+    if (!forced && Object.keys(businessData).length > 0) {
       localStorage.setItem(`onboarding_${tenantId}`, JSON.stringify({
         currentStep,
         businessData,
       }));
     }
-  }, [currentStep, businessData, tenantId]);
+  }, [currentStep, businessData, tenantId, forced]);
 
   const handleNext = async () => {
     if (currentStep === 1) {

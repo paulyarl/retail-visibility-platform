@@ -131,8 +131,18 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           ),
-          href: `/t/${tenantId}/onboarding`,
+          href: `/t/${tenantId}/onboarding?force=1&step=profile`,
           color: 'bg-teal-500',
+        }, {
+          title: 'Business Hours',
+          description: 'Manage hours and special days',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/onboarding?force=1&step=hours`,
+          color: 'bg-green-500',
         }] as SettingCard[] : []),
         {
           title: 'Tenant Users',
@@ -386,7 +396,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
                   onClick={() => {
                     const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
                     if (tenantId) {
-                      router.push(`/t/${tenantId}/onboarding`);
+                      router.push(`/t/${tenantId}/onboarding?force=1&step=profile`);
                     } else {
                       router.push('/tenants');
                     }
