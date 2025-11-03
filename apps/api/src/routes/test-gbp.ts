@@ -9,9 +9,9 @@ const router = Router();
  */
 router.get('/test-gbp', async (req, res) => {
   try {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    const clientId = process.env.GOOGLE_BUSINESS_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_BUSINESS_CLIENT_SECRET;
+    const redirectUri = process.env.GOOGLE_BUSINESS_REDIRECT_URI;
 
     // Check if credentials are configured
     if (!clientId || !clientSecret || !redirectUri) {
