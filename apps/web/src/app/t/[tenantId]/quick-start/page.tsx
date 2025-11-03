@@ -41,7 +41,8 @@ export default function QuickStartPage() {
 
   const fetchScenarios = async () => {
     try {
-      const res = await fetch('/api/v1/quick-start/scenarios');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const res = await fetch(`${apiUrl}/api/v1/quick-start/scenarios`);
       const data = await res.json();
       setScenarios(data.scenarios);
     } catch (err) {
@@ -51,7 +52,8 @@ export default function QuickStartPage() {
 
   const checkEligibility = async () => {
     try {
-      const res = await fetch(`/api/v1/tenants/${tenantId}/quick-start/eligibility`);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start/eligibility`);
       const data = await res.json();
       setEligibility(data);
     } catch (err) {
@@ -64,7 +66,8 @@ export default function QuickStartPage() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/v1/tenants/${tenantId}/quick-start`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
