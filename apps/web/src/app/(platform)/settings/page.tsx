@@ -133,16 +133,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: `/t/${tenantId}/onboarding?force=1&step=profile`,
           color: 'bg-teal-500',
-        }, {
-          title: 'Business Hours',
-          description: 'Manage hours and special days',
-          icon: (
-            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ),
-          href: `/t/${tenantId}/onboarding?force=1&step=hours`,
-          color: 'bg-green-500',
         }] as SettingCard[] : []),
         {
           title: 'Tenant Users',
