@@ -20,8 +20,8 @@ export function setCsrfCookie(req: Request, res: Response, next: NextFunction) {
     const isProd = String(process.env.NODE_ENV) === 'production';
     res.cookie('csrf', token, {
       httpOnly: false,
-      sameSite: 'lax',
-      secure: isProd,
+      sameSite: 'none', // Allow cross-site requests (frontend on Vercel, backend on Railway)
+      secure: true, // Required when sameSite=none
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
     });
