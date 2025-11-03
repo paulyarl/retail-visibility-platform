@@ -41,14 +41,11 @@ export async function dailyRatesJob(req: Request, res: Response) {
     };
 
     // Store in settings.currency_rates table
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO currency_rates (base, date, rates, created_at)
-       VALUES ($1, $2, $3, now())
-       ON CONFLICT (base, date) DO UPDATE SET rates = $3, updated_at = now()`,
-      mockRates.base,
-      mockRates.date,
-      JSON.stringify(mockRates.rates)
-    );
+    await prisma.$executeRaw`
+      INSERT INTO currency_rates (base, date, rates, created_at)
+      VALUES (${mockRates.base}, ${mockRates.date}, ${JSON.stringify(mockRates.rates)}, now())
+      ON CONFLICT (base, date) DO UPDATE SET rates = ${JSON.stringify(mockRates.rates)}, updated_at = now()
+    `;
 
     // Log metrics
     console.log(JSON.stringify({
