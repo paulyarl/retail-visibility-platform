@@ -60,9 +60,20 @@ export default function CategoryQuickStartPage() {
     setError(null);
 
     try {
+      // Get access token from localStorage
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/tenants/${tenantId}/categories/quick-start`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         credentials: 'include',
         body: JSON.stringify({
           businessType: selectedType,

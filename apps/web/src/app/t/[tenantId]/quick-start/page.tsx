@@ -61,7 +61,15 @@ export default function QuickStartPage() {
   const checkEligibility = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start/eligibility`, {
+        headers,
         credentials: 'include',
       });
       
@@ -85,9 +93,19 @@ export default function QuickStartPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         credentials: 'include',
         body: JSON.stringify({
           scenario: selectedScenario,
