@@ -52,3 +52,25 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: false, error: e?.message || 'proxy_failed' }, { status: 500 })
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const body = await req.json()
+    const base = process.env.API_BASE_URL || 'http://localhost:4000'
+    const headers = buildAuthHeaders(req)
+    const res = await fetch(`${base}/api/admin/platform-flags`, { 
+      method: 'DELETE', 
+      headers, 
+      body: JSON.stringify(body) 
+    })
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.includes('application/json')) {
+      const text = await res.text()
+      return NextResponse.json({ success: false, error: text || `HTTP ${res.status}` }, { status: res.status })
+    }
+    const data = await res.json()
+    return NextResponse.json(data, { status: res.status })
+  } catch (e: any) {
+    return NextResponse.json({ success: false, error: e?.message || 'proxy_failed' }, { status: 500 })
+  }
+}

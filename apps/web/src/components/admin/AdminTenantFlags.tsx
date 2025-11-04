@@ -4,7 +4,8 @@ import React, { useEffect, useRef, useState } from "react";
 type FlagRow = { 
   id: string; 
   flag: string; 
-  enabled: boolean; 
+  enabled: boolean;
+  description?: string | null;
   rollout?: string | null;
   _isPlatformInherited?: boolean;
 };
@@ -68,7 +69,7 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
       const r = await fetch(`/api/admin/tenant-flags/${tenantId}/${encodeURIComponent(flag)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: next.enabled, rollout: next.rollout ?? null }),
+        body: JSON.stringify({ enabled: next.enabled, description: next.description ?? null, rollout: next.rollout ?? null }),
         credentials: 'include',
       });
       const ct = r.headers.get('content-type') || '';
@@ -115,30 +116,8 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
     await upsert(flag, { enabled: true });
   };
 
-  const setTenantOverride = async (flag: string, value: boolean | null) => {
-    try {
-      setSaving(flag);
-      const r = await fetch(`/api/admin/flags/override/tenant/${encodeURIComponent(tenantId)}/${encodeURIComponent(flag)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value }),
-        credentials: 'include',
-      });
-      const ct = r.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        const j = await r.json();
-        if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-      } else {
-        const text = await r.text();
-        if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
-        throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
-      }
-      await load();
-    } catch (e: any) {
-      setError(e?.message || String(e));
-    } finally {
-      setSaving(null);
-    }
+  const toggleFlag = async (flag: string, enabled: boolean) => {
+    await upsert(flag, { enabled });
   };
 
   const ranForTenant = useRef(new Set<string>());
@@ -163,9 +142,10 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
           <tr className="text-left text-gray-500">
             <th className="py-2">Flag</th>
             <th className="py-2">Enabled</th>
+            <th className="py-2">Description</th>
             <th className="py-2">Rollout</th>
             <th className="py-2">Live Status</th>
-            <th className="py-2">Override</th>
+            <th className="py-2">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -194,7 +174,10 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
                 <input type="checkbox" checked={r.enabled} onChange={(e) => upsert(r.flag, { enabled: e.target.checked })} disabled={saving === r.flag} />
               </td>
               <td className="py-2 pr-4">
-                <input className="border px-2 py-1 rounded w-64" defaultValue={r.rollout || ''} onBlur={(e) => upsert(r.flag, { rollout: e.target.value })} disabled={saving === r.flag} />
+                <input className="border px-2 py-1 rounded w-64" placeholder="Feature description..." defaultValue={r.description || ''} onBlur={(e) => upsert(r.flag, { description: e.target.value })} disabled={saving === r.flag} />
+              </td>
+              <td className="py-2 pr-4">
+                <input className="border px-2 py-1 rounded w-64" placeholder="Rollout strategy..." defaultValue={r.rollout || ''} onBlur={(e) => upsert(r.flag, { rollout: e.target.value })} disabled={saving === r.flag} />
               </td>
               <td className="py-2 pr-4">
                 {effective[r.flag] ? (
@@ -263,9 +246,8 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
               </td>
               <td className="py-2 pr-4">
                 <div className="flex items-center gap-2">
-                  <button className="px-2 py-1 text-xs rounded bg-red-600 text-white" disabled={saving === r.flag} onClick={() => setTenantOverride(r.flag, false)}>Kill</button>
-                  <button className="px-2 py-1 text-xs rounded bg-green-600 text-white" disabled={saving === r.flag} onClick={() => setTenantOverride(r.flag, true)}>Force On</button>
-                  <button className="px-2 py-1 text-xs rounded bg-neutral-200" disabled={saving === r.flag} onClick={() => setTenantOverride(r.flag, null)}>Clear</button>
+                  <button className="px-2 py-1 text-xs rounded bg-red-600 text-white" disabled={saving === r.flag} onClick={() => toggleFlag(r.flag, false)}>Disable</button>
+                  <button className="px-2 py-1 text-xs rounded bg-green-600 text-white" disabled={saving === r.flag} onClick={() => toggleFlag(r.flag, true)}>Enable</button>
                 </div>
               </td>
             </tr>

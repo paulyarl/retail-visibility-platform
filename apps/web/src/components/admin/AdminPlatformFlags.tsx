@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 
-type FlagRow = { id: string; flag: string; enabled: boolean; rollout?: string | null; allowTenantOverride?: boolean };
+type FlagRow = { id: string; flag: string; enabled: boolean; description?: string | null; rollout?: string | null; allowTenantOverride?: boolean };
 type EffectiveRow = {
   flag: string;
   effectiveOn: boolean;
@@ -114,7 +114,7 @@ export default function AdminPlatformFlags() {
       const r = await fetch(`/api/admin/platform-flags`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flag, enabled: next.enabled, rollout: next.rollout ?? null, allowTenantOverride: next.allowTenantOverride }),
+        body: JSON.stringify({ flag, enabled: next.enabled, description: next.description ?? null, rollout: next.rollout ?? null, allowTenantOverride: next.allowTenantOverride }),
         credentials: 'include',
       });
       const ct = r.headers.get('content-type') || '';
@@ -166,6 +166,46 @@ export default function AdminPlatformFlags() {
     }
   };
 
+  const deleteFlag = async (flag: string) => {
+    const confirmed = confirm(
+      `⚠️ Delete Feature Flag?\n\n` +
+      `Flag: ${flag}\n\n` +
+      `This will delete the platform flag and all tenant overrides.\n` +
+      `This action cannot be undone.\n\n` +
+      `Are you sure?`
+    );
+    
+    if (!confirmed) return;
+    
+    setSaving(flag);
+    setError(null);
+    try {
+      const r = await fetch(`/api/admin/platform-flags`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flag }),
+        credentials: 'include',
+      });
+      const ct = r.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        const j = await r.json();
+        if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
+        if (j.tenantUsageCount > 0) {
+          alert(`✅ Deleted flag and ${j.tenantUsageCount} tenant override(s)`);
+        }
+      } else {
+        const text = await r.text();
+        if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
+        throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
+      }
+      await load();
+    } catch (e: any) {
+      setError(e?.message || String(e));
+    } finally {
+      setSaving(null);
+    }
+  };
+
   if (loading) return <div className="text-sm text-gray-500">Loading flags…</div>;
   if (error) return <div className="text-sm text-red-600">{error}</div>;
 
@@ -181,6 +221,7 @@ export default function AdminPlatformFlags() {
             <th className="py-2">Flag</th>
             <th className="py-2">Enabled</th>
             <th className="py-2">Allow Tenant Override</th>
+            <th className="py-2">Description</th>
             <th className="py-2">Rollout</th>
             <th className="py-2">Live</th>
             <th className="py-2">Action</th>
@@ -188,15 +229,16 @@ export default function AdminPlatformFlags() {
         </thead>
         <tbody>
           {rows.map((r) => {
-            const desc = FLAG_DESCRIPTIONS[r.flag];
+            const hardcodedDesc = FLAG_DESCRIPTIONS[r.flag];
+            const displayDesc = r.description || hardcodedDesc?.description;
             return (
             <tr key={r.id} className="border-t">
               <td className="py-2 pr-4">
                 <div className="font-mono text-sm">{r.flag}</div>
-                {desc && (
+                {displayDesc && (
                   <div className="mt-1">
-                    <div className="text-xs font-semibold text-gray-700">{desc.title}</div>
-                    <div className="text-xs text-gray-500">{desc.description}</div>
+                    {hardcodedDesc?.title && <div className="text-xs font-semibold text-gray-700">{hardcodedDesc.title}</div>}
+                    <div className="text-xs text-gray-500">{displayDesc}</div>
                   </div>
                 )}
               </td>
@@ -207,7 +249,10 @@ export default function AdminPlatformFlags() {
                 <input type="checkbox" checked={r.allowTenantOverride ?? false} onChange={(e) => upsert(r.flag, { allowTenantOverride: e.target.checked })} disabled={saving === r.flag} />
               </td>
               <td className="py-2 pr-4">
-                <input className="border px-2 py-1 rounded w-64" defaultValue={r.rollout || ''} onBlur={(e) => upsert(r.flag, { rollout: e.target.value })} disabled={saving === r.flag} />
+                <input className="border px-2 py-1 rounded w-64" placeholder="Feature description..." defaultValue={r.description || ''} onBlur={(e) => upsert(r.flag, { description: e.target.value })} disabled={saving === r.flag} />
+              </td>
+              <td className="py-2 pr-4">
+                <input className="border px-2 py-1 rounded w-64" placeholder="Rollout strategy..." defaultValue={r.rollout || ''} onBlur={(e) => upsert(r.flag, { rollout: e.target.value })} disabled={saving === r.flag} />
               </td>
               <td className="py-2 pr-4">
                 {effective[r.flag] ? (
@@ -228,13 +273,14 @@ export default function AdminPlatformFlags() {
                   <button className="px-2 py-1 text-xs rounded bg-red-600 text-white" disabled={saving === r.flag} onClick={() => setOverride(r.flag, false)}>Kill</button>
                   <button className="px-2 py-1 text-xs rounded bg-green-600 text-white" disabled={saving === r.flag} onClick={() => setOverride(r.flag, true)}>Force On</button>
                   <button className="px-2 py-1 text-xs rounded bg-neutral-200" disabled={saving === r.flag} onClick={() => setOverride(r.flag, null)}>Clear</button>
+                  <button className="px-2 py-1 text-xs rounded bg-red-800 text-white hover:bg-red-900" disabled={saving === r.flag} onClick={() => deleteFlag(r.flag)} title="Delete flag permanently">🗑️ Delete</button>
                 </div>
               </td>
             </tr>
           );
           })}
           {rows.length === 0 && (
-            <tr><td colSpan={6} className="py-4 text-gray-500">No flags yet.</td></tr>
+            <tr><td colSpan={7} className="py-4 text-gray-500">No flags yet.</td></tr>
           )}
         </tbody>
       </table>

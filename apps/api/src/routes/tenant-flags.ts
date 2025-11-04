@@ -53,11 +53,11 @@ router.get('/tenant-flags/:tenantId', checkTenantAccess, async (req, res) => {
 // PUT /admin/tenant-flags/:tenantId/:flag - Write operation, requires OWNER role
 router.put('/tenant-flags/:tenantId/:flag', requireTenantOwner, async (req, res) => {
   const { tenantId, flag } = req.params
-  const { enabled, rollout } = req.body || {}
+  const { enabled, description, rollout } = req.body || {}
   const row = await prisma.tenantFeatureFlag.upsert({
     where: { tenantId_flag: { tenantId, flag } },
-    update: { enabled: !!enabled, rollout: rollout ?? null },
-    create: { tenantId, flag, enabled: !!enabled, rollout: rollout ?? null },
+    update: { enabled: !!enabled, description: description ?? null, rollout: rollout ?? null },
+    create: { tenantId, flag, enabled: !!enabled, description: description ?? null, rollout: rollout ?? null },
   })
   return res.json({ success: true, data: row })
 })

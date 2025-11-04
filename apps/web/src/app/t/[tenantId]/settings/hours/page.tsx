@@ -1,4 +1,5 @@
 import React from "react";
+import { cookies } from "next/headers";
 import HoursEditor from "@/components/hours/HoursEditor";
 import SpecialHoursCalendar from "@/components/hours/SpecialHoursCalendar";
 import SyncStateBadge from "@/components/hours/SyncStateBadge";
@@ -6,16 +7,42 @@ import TimezonePicker from "@/components/hours/TimezonePicker";
 
 export default async function HoursSettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
-  const uiFlag = (process.env.NEXT_PUBLIC_ENABLE_HOURS_UI === 'true') || (process.env as any).NEXT_PUBLIC_ENABLE_HOURS_UI_ === 'true';
-  const allowList = (process.env.NEXT_PUBLIC_HOURS_TENANTS || '').split(',').map(s => s.trim()).filter(Boolean);
-  const isTenantEnabled = allowList.includes(tenantId);
-  if (!uiFlag || !isTenantEnabled) {
+  
+  // Check if business hours feature is enabled via feature flag system
+  const serverApiBase = process.env.API_BASE_URL || "http://localhost:4000";
+  const clientApiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
+  let isEnabled = false;
+  
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('ACCESS_TOKEN')?.value || cookieStore.get('access_token')?.value;
+    
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const res = await fetch(`${serverApiBase}/api/admin/tenant-flags/${tenantId}`, {
+      cache: 'no-store',
+      headers
+    });
+    if (res.ok) {
+      const data = await res.json();
+      // Check if FF_TENANT_GBP_HOURS_SYNC is enabled for this tenant
+      const hoursFlag = data.data?.find((f: any) => f.flag === 'FF_TENANT_GBP_HOURS_SYNC');
+      isEnabled = hoursFlag?.enabled === true;
+    }
+  } catch (e) {
+    console.error('Failed to check hours flag:', e);
+  }
+  
+  if (!isEnabled) {
     return (
-      <div className="p-6 text-sm text-gray-500">Business Hours is not enabled for this tenant.</div>
+      <div className="p-6 text-sm text-gray-500">
+        Business Hours is not enabled for this tenant. Enable the <strong>FF_TENANT_GBP_HOURS_SYNC</strong> flag in Admin → Tenant Flags.
+      </div>
     );
   }
-
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -34,13 +61,13 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
             >
               Business Profile
             </a>
-            <SyncStateBadge apiBase={apiBase} tenantId={tenantId} />
+            <SyncStateBadge apiBase={clientApiBase} tenantId={tenantId} />
           </div>
         </div>
       </div>
 
       {/* Timezone */}
-      <TimezonePicker tenantId={tenantId} apiBase={apiBase} />
+      <TimezonePicker tenantId={tenantId} apiBase={clientApiBase} />
 
       {/* Helpful Reminder */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -60,7 +87,7 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
           <h2 className="text-lg font-semibold">Regular Hours</h2>
         </div>
         <div className="p-6">
-          <HoursEditor apiBase={apiBase} tenantId={tenantId} />
+          <HoursEditor apiBase={clientApiBase} tenantId={tenantId} />
         </div>
       </div>
 
@@ -70,7 +97,7 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
           <h2 className="text-lg font-semibold">Special / Holiday Hours</h2>
         </div>
         <div className="p-6">
-          <SpecialHoursCalendar apiBase={apiBase} tenantId={tenantId} />
+          <SpecialHoursCalendar apiBase={clientApiBase} tenantId={tenantId} />
         </div>
       </div>
     </div>

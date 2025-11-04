@@ -123,6 +123,13 @@ function computeStoreStatus(hours: any): { isOpen: boolean; label: string } | nu
       return { isOpen: false, label: `Closed • Opens ${dayLabel} at ${minutesToLabel(r.openM, timeZone)}` };
     }
   }
+  
+  // If no hours found in next 7 days, check if any hours are set at all
+  const hasAnyHours = Object.keys(hours).some(k => k !== 'timezone' && hours[k]);
+  if (hasAnyHours) {
+    return { isOpen: false, label: 'Closed • Check hours for details' };
+  }
+  
   return { isOpen: false, label: 'Closed' };
 }
 
@@ -275,7 +282,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Header with Business Info */}
+      {/* Header with Business Name and Logo */}
       <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center gap-6">
@@ -293,28 +300,12 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
               <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">
                 {businessName}
               </h1>
-              {tenant.metadata?.address && (
-                <p className="text-neutral-600 dark:text-neutral-400 mt-2">
-                  📍 {tenant.metadata.address}
+              {storeStatus && (
+                <p className="text-neutral-600 dark:text-neutral-400 mt-2 flex items-center gap-2">
+                  <span className={`inline-block w-2 h-2 rounded-full ${storeStatus.isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  {storeStatus.label}
                 </p>
               )}
-              <div className="flex gap-4 mt-3 text-sm">
-                {tenant.metadata?.phone && (
-                  <a href={`tel:${tenant.metadata.phone}`} className="text-primary-600 hover:text-primary-700">
-                    📞 {tenant.metadata.phone}
-                  </a>
-                )}
-                {tenant.metadata?.email && (
-                  <a href={`mailto:${tenant.metadata.email}`} className="text-primary-600 hover:text-primary-700">
-                    ✉️ {tenant.metadata.email}
-                  </a>
-                )}
-                {tenant.metadata?.website && (
-                  <a href={tenant.metadata.website} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-700">
-                    🌐 Website
-                  </a>
-                )}
-              </div>
             </div>
           </div>
         </div>
@@ -493,14 +484,29 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                   </p>
                 )}
 
-                {/* Hours (public) */}
+                {/* Hours Schedule */}
                 {businessHours && (
-                  <p className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{storeStatus?.label || 'Hours available'}</span>
-                  </p>
+                  <div className="mt-4">
+                    <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
+                      <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Hours
+                    </h4>
+                    <div className="space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
+                        const dayHours = businessHours[day];
+                        return (
+                          <div key={day} className="flex justify-between">
+                            <span className="font-medium">{day}</span>
+                            <span>
+                              {dayHours ? `${dayHours.open} - ${dayHours.close}` : 'Closed'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

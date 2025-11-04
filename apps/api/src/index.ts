@@ -532,6 +532,32 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     const bp = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } });
     const md = (tenant.metadata as any) || {};
     
+    // Fetch business hours from BusinessHours table
+    const businessHours = await prisma.businessHours.findUnique({ where: { tenantId } });
+    let hoursData = null;
+    
+    if (businessHours && businessHours.periods) {
+      // Convert periods array to day-keyed object for storefront
+      const periods = businessHours.periods as any[];
+      const hoursByDay: any = { timezone: businessHours.timezone || 'America/New_York' };
+      
+      for (const period of periods) {
+        if (period.day && period.open && period.close) {
+          // Convert MONDAY to Monday for storefront compatibility
+          const dayName = period.day.charAt(0).toUpperCase() + period.day.slice(1).toLowerCase();
+          hoursByDay[dayName] = {
+            open: period.open,
+            close: period.close
+          };
+        }
+      }
+      
+      hoursData = hoursByDay;
+      console.log('[Profile API] Business hours for', tenantId, ':', JSON.stringify(hoursData));
+    } else {
+      console.log('[Profile API] No business hours found for', tenantId);
+    }
+    
     // Return public business information only
     const profile = {
       business_name: bp?.businessName || md.business_name || tenant.name || null,
@@ -546,7 +572,7 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
       website: bp?.website || md.website || null,
       contact_person: bp?.contactPerson || md.contact_person || null,
       logo_url: bp?.logoUrl ?? md.logo_url ?? null,
-      hours: bp?.hours || md.hours || null,
+      hours: hoursData || bp?.hours || md.hours || null,
       social_links: bp?.socialLinks || md.social_links || null,
       latitude: bp?.latitude ? Number(bp.latitude) : (md.latitude || null),
       longitude: bp?.longitude ? Number(bp.longitude) : (md.longitude || null),
