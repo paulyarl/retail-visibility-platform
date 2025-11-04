@@ -52,6 +52,8 @@ export default function AdminCategoryQuickStartPage() {
   const router = useRouter();
 
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [filteredTenants, setFilteredTenants] = useState<Tenant[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<BusinessType | null>(null);
   const [categoryCount, setCategoryCount] = useState<number>(15);
@@ -65,6 +67,22 @@ export default function AdminCategoryQuickStartPage() {
   useEffect(() => {
     loadTenants();
   }, []);
+
+  // Filter tenants based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredTenants(tenants);
+    } else {
+      const query = searchQuery.toLowerCase();
+      setFilteredTenants(
+        tenants.filter(
+          (tenant) =>
+            tenant.name.toLowerCase().includes(query) ||
+            tenant.id.toLowerCase().includes(query)
+        )
+      );
+    }
+  }, [searchQuery, tenants]);
 
   const loadTenants = async () => {
     try {
@@ -155,7 +173,7 @@ export default function AdminCategoryQuickStartPage() {
   if (success) {
     const selectedTenantName = tenants.find(t => t.id === selectedTenant)?.name || 'tenant';
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+      <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-full flex items-center justify-center p-4">
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -191,8 +209,8 @@ export default function AdminCategoryQuickStartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4 py-12">
-      <div className="max-w-6xl mx-auto">
+    <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-full">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <motion.div
           initial={{ y: -20, opacity: 0 }}
@@ -221,29 +239,87 @@ export default function AdminCategoryQuickStartPage() {
           className="mb-8"
         >
           <Card className="p-6">
-            <h3 className="text-lg font-bold text-neutral-900 mb-4">1. Select Tenant</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-neutral-900">1. Select Tenant</h3>
+              {!isLoadingTenants && (
+                <Badge className="bg-neutral-100 text-neutral-700">
+                  {filteredTenants.length} of {tenants.length}
+                </Badge>
+              )}
+            </div>
+            
             {isLoadingTenants ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
                 <p className="text-sm text-neutral-600 mt-2">Loading tenants...</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {tenants.map((tenant) => (
-                  <button
-                    key={tenant.id}
-                    onClick={() => setSelectedTenant(tenant.id)}
-                    className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      selectedTenant === tenant.id
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-neutral-200 hover:border-primary-300'
-                    }`}
-                  >
-                    <div className="font-semibold text-neutral-900">{tenant.name}</div>
-                    <div className="text-xs text-neutral-500 mt-1">{tenant.id}</div>
-                  </button>
-                ))}
-              </div>
+              <>
+                {/* Search Bar */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search by name or ID..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full px-4 py-2 pl-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                    <svg
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tenant Grid */}
+                {filteredTenants.length === 0 ? (
+                  <div className="text-center py-8 text-neutral-500">
+                    <svg className="w-12 h-12 mx-auto mb-2 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm">No tenants found matching "{searchQuery}"</p>
+                  </div>
+                ) : (
+                  <div className="max-h-96 overflow-y-auto pr-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {filteredTenants.map((tenant) => (
+                        <button
+                          key={tenant.id}
+                          onClick={() => setSelectedTenant(tenant.id)}
+                          className={`p-4 rounded-lg border-2 text-left transition-all ${
+                            selectedTenant === tenant.id
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-neutral-200 hover:border-primary-300'
+                          }`}
+                        >
+                          <div className="font-semibold text-neutral-900 truncate">{tenant.name}</div>
+                          <div className="text-xs text-neutral-500 mt-1 truncate">{tenant.id}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </Card>
         </motion.div>
