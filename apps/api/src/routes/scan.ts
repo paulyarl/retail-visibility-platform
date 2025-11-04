@@ -735,6 +735,188 @@ router.get('/api/admin/enrichment/:barcode', authenticateToken, async (req: Requ
   }
 });
 
+// Tenant-specific enrichment analytics
+router.get('/api/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const user = req.user as any;
+
+    // Check tenant access
+    if (user.role !== UserRole.ADMIN && user.tenantId !== tenantId) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Get all inventory items for this tenant that were created via scanning
+    const scannedItems = await prisma.inventoryItem.findMany({
+      where: {
+        tenantId,
+        sku: { not: '' }, // Items with SKU were likely scanned
+      },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        brand: true,
+        metadata: true,
+        imageUrl: true,
+        createdAt: true,
+      },
+    });
+
+    // Calculate data quality metrics
+    const totalScanned = scannedItems.length;
+    let withNutrition = 0;
+    let withImages = 0;
+    let withEnvironmental = 0;
+    let withAllergens = 0;
+
+    scannedItems.forEach(item => {
+      const metadata = item.metadata as any;
+      if (metadata?.nutrition?.per_100g) withNutrition++;
+      if (item.imageUrl || metadata?.images) withImages++;
+      if (metadata?.environmental) withEnvironmental++;
+      if (metadata?.allergens || metadata?.allergens_tags) withAllergens++;
+    });
+
+    // Get scanning activity (last 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const recentScans = await prisma.inventoryItem.count({
+      where: {
+        tenantId,
+        sku: { not: '' },
+        createdAt: { gte: thirtyDaysAgo },
+      },
+    });
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const weekScans = await prisma.inventoryItem.count({
+      where: {
+        tenantId,
+        sku: { not: '' },
+        createdAt: { gte: sevenDaysAgo },
+      },
+    });
+
+    // Get most scanned products (by SKU frequency)
+    const skuCounts = scannedItems.reduce((acc: any, item) => {
+      if (item.sku) {
+        acc[item.sku] = (acc[item.sku] || 0) + 1;
+      }
+      return acc;
+    }, {});
+
+    const topProducts = Object.entries(skuCounts)
+      .sort(([, a]: any, [, b]: any) => b - a)
+      .slice(0, 10)
+      .map(([sku, count]) => {
+        const item = scannedItems.find(i => i.sku === sku);
+        return {
+          sku,
+          name: item?.name,
+          brand: item?.brand,
+          scanCount: count,
+        };
+      });
+
+    // Calculate cache benefit (estimate)
+    const cacheHits = scannedItems.filter(item => {
+      const metadata = item.metadata as any;
+      return metadata?.source === 'open_food_facts' || metadata?.source === 'upc_database';
+    }).length;
+
+    const apiCallsSaved = cacheHits > 0 ? cacheHits - 1 : 0; // First scan per product hits API
+    const estimatedSavings = (apiCallsSaved * 0.01).toFixed(2);
+
+    return res.json({
+      success: true,
+      analytics: {
+        totalScanned,
+        recentScans: {
+          last7Days: weekScans,
+          last30Days: recentScans,
+        },
+        dataQuality: {
+          withNutrition,
+          withImages,
+          withEnvironmental,
+          withAllergens,
+          nutritionPercentage: totalScanned > 0 ? ((withNutrition / totalScanned) * 100).toFixed(1) : '0',
+          imagesPercentage: totalScanned > 0 ? ((withImages / totalScanned) * 100).toFixed(1) : '0',
+          environmentalPercentage: totalScanned > 0 ? ((withEnvironmental / totalScanned) * 100).toFixed(1) : '0',
+          allergensPercentage: totalScanned > 0 ? ((withAllergens / totalScanned) * 100).toFixed(1) : '0',
+        },
+        topProducts,
+        cacheBenefit: {
+          cacheHits,
+          apiCallsSaved,
+          estimatedSavings,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[tenant/analytics] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
+// Enrichment preview tool - check what data is available for a barcode
+router.get('/api/scan/preview/:barcode', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { barcode } = req.params;
+
+    // Check universal cache first
+    const cached = await prisma.barcodeEnrichment.findUnique({
+      where: { barcode },
+      select: {
+        barcode: true,
+        name: true,
+        brand: true,
+        description: true,
+        imageUrl: true,
+        imageThumbnailUrl: true,
+        metadata: true,
+        source: true,
+        fetchCount: true,
+      },
+    });
+
+    if (cached) {
+      const metadata = cached.metadata as any;
+      return res.json({
+        success: true,
+        found: true,
+        product: {
+          barcode: cached.barcode,
+          name: cached.name,
+          brand: cached.brand,
+          description: cached.description,
+          imageUrl: cached.imageUrl,
+          source: cached.source,
+          popularity: cached.fetchCount,
+          dataAvailable: {
+            nutrition: !!metadata?.nutrition?.per_100g,
+            images: !!(cached.imageUrl || metadata?.images),
+            allergens: !!(metadata?.allergens || metadata?.allergens_tags),
+            environmental: !!metadata?.environmental,
+            specifications: !!metadata?.specifications,
+            ingredients: !!metadata?.ingredients,
+          },
+        },
+      });
+    }
+
+    // Not in cache - would require API call
+    return res.json({
+      success: true,
+      found: false,
+      message: 'Product not in cache. Will fetch from external APIs when scanned.',
+    });
+  } catch (error: any) {
+    console.error('[preview] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
 // Helper: Validate scan results
 async function validateScanResults(results: any[], template: any): Promise<{ valid: boolean; errors: any[] }> {
   const errors = [];
