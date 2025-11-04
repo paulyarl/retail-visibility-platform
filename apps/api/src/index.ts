@@ -1960,7 +1960,7 @@ app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no aut
 app.use('/api/feed-jobs', feedJobsRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/v1/tenants', tenantCategoriesRoutes);
-app.use('/api/v1/quick-start', quickStartRoutes);
+app.use('/api/v1', quickStartRoutes);
 // Admin tools require admin authentication
 app.use('/api/admin/tools', requireAdmin, adminToolsRoutes);
 app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);

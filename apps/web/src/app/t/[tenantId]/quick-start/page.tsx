@@ -68,7 +68,7 @@ export default function QuickStartPage() {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      const res = await fetch(`${apiUrl}/api/v1/quick-start/scenarios`, {
+      const res = await fetch(`${apiUrl}/api/v1/scenarios`, {
         headers,
         credentials: 'include',
       });
