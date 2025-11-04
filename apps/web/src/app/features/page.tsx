@@ -66,15 +66,15 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
       </svg>
     ),
-    title: 'SKU Scanning - Real Inventory, Real Fast',
-    description: '📱 Scan barcodes with USB scanner or manual entry. Automatic product enrichment with names, images, categories, and prices from 50M+ products. Add real inventory in seconds, not hours.',
+    title: 'SKU Scanning - Complete Product Intelligence',
+    description: '🎯 BREAKTHROUGH: Scan barcodes and capture EVERYTHING - nutrition facts, allergens, specifications, environmental data, and images. Get the same product detail level as CVS, Walmart, and Target! Level the playing field for small retailers.',
     benefits: [
-      'USB scanner & manual entry support',
-      'Auto product info & images',
+      'Complete nutrition facts & Nutri-Score',
+      'Allergen warnings & dietary info',
+      'Product specs & dimensions',
+      'Environmental impact & Eco-Score',
       'Universal barcode cache (80% faster)',
-      'Batch scanning & commit',
-      'Duplicate detection',
-      'Google Merchant Center ready'
+      'Matches major retailer product pages'
     ],
     color: 'bg-gradient-to-br from-green-500 to-emerald-600 text-white',
     badge: 'NEW!',
