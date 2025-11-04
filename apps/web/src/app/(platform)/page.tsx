@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import Image from "next/image";
 import PublicFooter from "@/components/PublicFooter";
+import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
 
 export default function PlatformHomePage() {
   return <Home embedded />;
@@ -38,6 +39,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   });
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showcaseMode, setShowcaseMode] = useState<ShowcaseMode>('hybrid');
   const [platformStats, setPlatformStats] = useState({
     activeRetailers: 0,
     activeRetailersFormatted: '0',
@@ -68,6 +70,36 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
       fetchPlatformStats();
     }
   }, [isAuthenticated, authLoading]);
+
+  // Fetch showcase mode configuration
+  useEffect(() => {
+    const fetchShowcaseConfig = async () => {
+      try {
+        // Check for preview mode in URL
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const preview = params.get('preview_showcase') as ShowcaseMode;
+          if (preview) {
+            setShowcaseMode(preview);
+            return;
+          }
+        }
+
+        // Fetch from public endpoint (no auth needed for reading)
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const response = await fetch(`${API_BASE_URL}/api/public/features-showcase-config`);
+        if (response.ok) {
+          const data = await response.json();
+          setShowcaseMode(data.mode || 'hybrid');
+        }
+      } catch (error) {
+        console.error('[Home] Failed to fetch showcase config:', error);
+        // Default to hybrid mode on error
+        setShowcaseMode('hybrid');
+      }
+    };
+    fetchShowcaseConfig();
+  }, []);
 
   // Fetch tenant business hours when a tenant is selected
   useEffect(() => {
@@ -322,6 +354,67 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   </div>
                 </div>
               </AnimatedCard>
+            </div>
+
+            {/* Mission Statement - For visitors */}
+            <div className="my-16 text-center max-w-4xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+              >
+                <h2 className="text-3xl md:text-4xl font-bold text-neutral-900 mb-4">
+                  Empowering Local Retailers to Compete Online
+                </h2>
+                <p className="text-lg text-neutral-600 mb-8 leading-relaxed">
+                  We believe every local retailer deserves the same online presence as major chains. 
+                  That's why we built a platform that gives you enterprise-level tools without the 
+                  enterprise price tag or complexity.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                  <motion.div 
+                    className="p-6 bg-primary-50 rounded-xl border-2 border-primary-100"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                  >
+                    <div className="text-4xl mb-3">🎯</div>
+                    <h3 className="font-bold text-neutral-900 mb-2 text-lg">Our Mission</h3>
+                    <p className="text-sm text-neutral-600 leading-relaxed">
+                      Level the playing field for local retailers competing against big box stores
+                    </p>
+                  </motion.div>
+                  <motion.div 
+                    className="p-6 bg-green-50 rounded-xl border-2 border-green-100"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.4 }}
+                  >
+                    <div className="text-4xl mb-3">💡</div>
+                    <h3 className="font-bold text-neutral-900 mb-2 text-lg">Our Vision</h3>
+                    <p className="text-sm text-neutral-600 leading-relaxed">
+                      A world where local businesses thrive online as easily as they do in-store
+                    </p>
+                  </motion.div>
+                  <motion.div 
+                    className="p-6 bg-blue-50 rounded-xl border-2 border-blue-100"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.5 }}
+                  >
+                    <div className="text-4xl mb-3">⚡</div>
+                    <h3 className="font-bold text-neutral-900 mb-2 text-lg">Our Promise</h3>
+                    <p className="text-sm text-neutral-600 leading-relaxed">
+                      Enterprise features, small business pricing, and setup in minutes—not months
+                    </p>
+                  </motion.div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Features Showcase - WOW Factor for visitors */}
+            <div className="my-12">
+              <FeaturesShowcase mode={showcaseMode} />
             </div>
 
             {/* CTA for visitors */}

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import PublicFooter from '@/components/PublicFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
+import FeaturesShowcase from '@/components/FeaturesShowcase';
 
 const features = [
   {
@@ -302,6 +303,137 @@ export default function FeaturesPage() {
             </div>
           </motion.div>
         </div>
+      </section>
+
+      {/* The Problem/Solution Story */}
+      <section className="py-16 bg-white border-b border-neutral-200">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold text-neutral-900 mb-4">
+              The Challenge Every Local Retailer Faces
+            </h2>
+            <p className="text-lg text-neutral-600 max-w-3xl mx-auto leading-relaxed">
+              You're competing against chains with unlimited budgets and entire IT departments. 
+              They have developers, marketers, and data scientists. You have... a to-do list a mile long.
+            </p>
+          </motion.div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+            <motion.div 
+              className="bg-red-50 border-2 border-red-200 rounded-xl p-8"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <h3 className="text-2xl font-bold text-red-900 mb-6 flex items-center gap-2">
+                <span>❌</span> The Old Way
+              </h3>
+              <ul className="space-y-3 text-neutral-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-600 mt-1">•</span>
+                  <span>Hire a developer ($5,000-$20,000)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-600 mt-1">•</span>
+                  <span>Wait 3-6 months for launch</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-600 mt-1">•</span>
+                  <span>Pay monthly maintenance fees</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-600 mt-1">•</span>
+                  <span>Manually update every product</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-600 mt-1">•</span>
+                  <span>Hope Google finds you (eventually)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-600 mt-1">•</span>
+                  <span>Compete with outdated tools</span>
+                </li>
+              </ul>
+            </motion.div>
+            
+            <motion.div 
+              className="bg-green-50 border-2 border-green-200 rounded-xl p-8"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+            >
+              <h3 className="text-2xl font-bold text-green-900 mb-6 flex items-center gap-2">
+                <span>✅</span> Our Way
+              </h3>
+              <ul className="space-y-3 text-neutral-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-1">•</span>
+                  <span><strong>Generate 100 products in 1 second</strong></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-1">•</span>
+                  <span><strong>Live on Google in minutes</strong></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-1">•</span>
+                  <span><strong>Beautiful storefront, no coding</strong></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-1">•</span>
+                  <span><strong>Auto-sync across all channels</strong></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-1">•</span>
+                  <span><strong>Compete with major retailers</strong></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-1">•</span>
+                  <span><strong>Save $2,400/month in labor</strong></span>
+                </li>
+              </ul>
+            </motion.div>
+          </div>
+          
+          <motion.div 
+            className="text-center bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-8 md:p-12 border-2 border-primary-200"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            <h3 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-4">
+              Built by Retailers, for Retailers
+            </h3>
+            <p className="text-lg text-neutral-600 max-w-2xl mx-auto leading-relaxed mb-6">
+              We're not a tech company trying to understand retail. We're retailers who learned 
+              tech because we were tired of expensive, complicated solutions that didn't work 
+              for real businesses like ours.
+            </p>
+            <div className="flex flex-wrap justify-center gap-4 text-sm text-neutral-700">
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg">
+                <span className="text-xl">🏪</span>
+                <span>Real retail experience</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg">
+                <span className="text-xl">💰</span>
+                <span>Small business pricing</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg">
+                <span className="text-xl">🤝</span>
+                <span>Built for your success</span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Features Showcase - WOW Factor */}
+      <section className="py-8 bg-white">
+        <FeaturesShowcase mode="hybrid" />
       </section>
 
       {/* What You Get Overview */}
