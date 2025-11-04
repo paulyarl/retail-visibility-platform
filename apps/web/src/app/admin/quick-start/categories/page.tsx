@@ -1,0 +1,387 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button, Card, Badge } from '@/components/ui';
+import { motion } from 'framer-motion';
+
+type BusinessType = 'grocery' | 'fashion' | 'electronics' | 'general';
+
+interface Tenant {
+  id: string;
+  name: string;
+  organizationId: string;
+}
+
+const businessTypes = [
+  {
+    id: 'grocery' as BusinessType,
+    name: 'Grocery Store',
+    icon: '🛒',
+    description: 'Fresh produce, dairy, meat, bakery, beverages',
+    categoryCount: 15,
+    examples: ['Fresh Produce', 'Dairy & Eggs', 'Meat & Seafood', 'Bakery', 'Beverages'],
+  },
+  {
+    id: 'fashion' as BusinessType,
+    name: 'Fashion Retail',
+    icon: '👗',
+    description: 'Clothing, shoes, accessories, jewelry',
+    categoryCount: 12,
+    examples: ['Women\'s Clothing', 'Men\'s Clothing', 'Shoes', 'Accessories', 'Jewelry'],
+  },
+  {
+    id: 'electronics' as BusinessType,
+    name: 'Electronics Store',
+    icon: '📱',
+    description: 'Phones, computers, audio, gaming, accessories',
+    categoryCount: 10,
+    examples: ['Mobile Phones', 'Computers', 'Audio', 'Gaming', 'Smart Home'],
+  },
+  {
+    id: 'general' as BusinessType,
+    name: 'General Retail',
+    icon: '🏪',
+    description: 'Mixed merchandise, variety store',
+    categoryCount: 20,
+    examples: ['Home & Garden', 'Health & Beauty', 'Sports', 'Toys', 'Books'],
+  },
+];
+
+export default function AdminCategoryQuickStartPage() {
+  const router = useRouter();
+
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<BusinessType | null>(null);
+  const [categoryCount, setCategoryCount] = useState<number>(15);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingTenants, setIsLoadingTenants] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [generatedCount, setGeneratedCount] = useState(0);
+
+  // Load tenants on mount
+  useEffect(() => {
+    loadTenants();
+  }, []);
+
+  const loadTenants = async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/tenants`, {
+        headers,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load tenants');
+      }
+
+      const data = await response.json();
+      setTenants(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoadingTenants(false);
+    }
+  };
+
+  // Update category count when business type changes
+  const handleTypeChange = (typeId: BusinessType) => {
+    setSelectedType(typeId);
+    const type = businessTypes.find(t => t.id === typeId);
+    if (type) {
+      setCategoryCount(type.categoryCount);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!selectedType || !selectedTenant) return;
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/v1/tenants/${selectedTenant}/categories/quick-start`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          businessType: selectedType,
+          categoryCount,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        if (response.status === 401 || response.status === 403) {
+          setError(data.message || 'You do not have permission to use Category Quick Start');
+          setIsGenerating(false);
+          return;
+        }
+        throw new Error(data.message || 'Failed to generate categories');
+      }
+
+      const data = await response.json();
+      setGeneratedCount(data.categoriesCreated);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  if (success) {
+    const selectedTenantName = tenants.find(t => t.id === selectedTenant)?.name || 'tenant';
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="max-w-2xl w-full"
+        >
+          <Card className="p-8 text-center">
+            <div className="text-6xl mb-4">🎉</div>
+            <h1 className="text-3xl font-bold text-neutral-900 mb-4">
+              Categories Created Successfully!
+            </h1>
+            <p className="text-lg text-neutral-600 mb-2">
+              Generated <span className="font-bold text-primary-600">{generatedCount} categories</span>
+            </p>
+            <p className="text-sm text-neutral-500 mb-6">
+              for <strong>{selectedTenantName}</strong>
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => router.push(`/t/${selectedTenant}/categories`)}>
+                View Categories
+              </Button>
+              <Button variant="secondary" onClick={() => {
+                setSuccess(false);
+                setSelectedType(null);
+                setSelectedTenant(null);
+              }}>
+                Generate More
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4 py-12">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <motion.div
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="text-center mb-12"
+        >
+          <Badge className="mb-4 bg-gradient-to-r from-red-500 to-orange-600 text-white">
+            Admin Tool
+          </Badge>
+          <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 mb-4">
+            Category Quick Start
+            <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+              Admin Panel
+            </span>
+          </h1>
+          <p className="text-xl text-neutral-600 max-w-2xl mx-auto">
+            Generate product categories for any tenant instantly
+          </p>
+        </motion.div>
+
+        {/* Tenant Selection */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <Card className="p-6">
+            <h3 className="text-lg font-bold text-neutral-900 mb-4">1. Select Tenant</h3>
+            {isLoadingTenants ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                <p className="text-sm text-neutral-600 mt-2">Loading tenants...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {tenants.map((tenant) => (
+                  <button
+                    key={tenant.id}
+                    onClick={() => setSelectedTenant(tenant.id)}
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                      selectedTenant === tenant.id
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-neutral-200 hover:border-primary-300'
+                    }`}
+                  >
+                    <div className="font-semibold text-neutral-900">{tenant.name}</div>
+                    <div className="text-xs text-neutral-500 mt-1">{tenant.id}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </Card>
+        </motion.div>
+
+        {/* Business Type Selection */}
+        {selectedTenant && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <Card className="p-6">
+              <h3 className="text-lg font-bold text-neutral-900 mb-4">2. Select Business Type</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {businessTypes.map((type) => (
+                  <div
+                    key={type.id}
+                    className="cursor-pointer"
+                    onClick={() => handleTypeChange(type.id)}
+                  >
+                    <div
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        selectedType === type.id
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-neutral-200 hover:border-primary-300'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-3xl">{type.icon}</div>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-neutral-900 mb-1">
+                            {type.name}
+                          </h4>
+                          <p className="text-xs text-neutral-600 mb-2">
+                            {type.description}
+                          </p>
+                          <Badge className="text-xs bg-purple-100 text-purple-800">
+                            {type.categoryCount} categories
+                          </Badge>
+                        </div>
+                        {selectedType === type.id && (
+                          <div className="text-primary-600">
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Category Count Slider */}
+        {selectedType && selectedTenant && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <Card className="p-6">
+              <h3 className="text-lg font-bold text-neutral-900 mb-4">3. Adjust Category Count</h3>
+              <div className="max-w-md mx-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-neutral-700">
+                    Number of Categories
+                  </span>
+                  <span className="text-2xl font-bold text-primary-600">
+                    {categoryCount}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="30"
+                  value={categoryCount}
+                  onChange={(e) => setCategoryCount(parseInt(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
+                />
+                <div className="flex justify-between text-xs text-neutral-500 mt-1">
+                  <span>5 min</span>
+                  <span>30 max</span>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700"
+          >
+            {error}
+          </motion.div>
+        )}
+
+        {/* Generate Button */}
+        <div className="text-center">
+          <Button
+            size="lg"
+            disabled={!selectedType || !selectedTenant || isGenerating}
+            onClick={handleGenerate}
+            className="px-12"
+          >
+            {isGenerating ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Generating...
+              </>
+            ) : (
+              <>⚡ Generate Categories</>
+            )}
+          </Button>
+        </div>
+
+        {/* Back Link */}
+        <div className="text-center mt-6">
+          <button
+            onClick={() => router.push('/admin')}
+            className="text-sm text-neutral-600 hover:text-neutral-900"
+          >
+            ← Back to Admin
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
