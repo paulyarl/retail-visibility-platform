@@ -4,7 +4,7 @@ import { prisma } from '../prisma';
 import { Flags } from '../config';
 import { audit } from '../audit';
 import { z } from 'zod';
-import { UserRole } from '@prisma/client';
+import { UserRole, Prisma } from '@prisma/client';
 import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
 import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import {
@@ -580,7 +580,7 @@ router.get('/api/admin/enrichment/analytics', authenticateToken, async (req: Req
       where: {
         metadata: {
           path: ['nutrition', 'per_100g'],
-          not: null,
+          not: Prisma.JsonNull,
         },
       },
     });
@@ -598,7 +598,7 @@ router.get('/api/admin/enrichment/analytics', authenticateToken, async (req: Req
       where: {
         metadata: {
           path: ['environmental'],
-          not: null,
+          not: Prisma.JsonNull,
         },
       },
     });
