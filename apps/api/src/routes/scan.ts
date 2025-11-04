@@ -20,7 +20,7 @@ const startSessionSchema = z.object({
   tenantId: z.string(),
   templateId: z.string().optional(),
   deviceType: z.enum(['camera', 'usb', 'manual']).optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const lookupBarcodeSchema = z.object({
