@@ -23,7 +23,7 @@ export default function BarcodeScanner({
   const [lastScan, setLastScan] = useState<string | null>(null);
   const [manualInput, setManualInput] = useState('');
   const [isScanning, setIsScanning] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
