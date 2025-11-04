@@ -121,7 +121,17 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           const day = new Date().toLocaleDateString(undefined, { weekday: 'long' });
           if (hours && typeof hours === 'object' && hours[day]) {
             const h = hours[day];
-            if (h?.open && h?.close) today = `${day}: ${h.open} - ${h.close}`;
+            if (h?.open && h?.close) {
+              // Convert to 12-hour format
+              const to12Hour = (time24: string): string => {
+                if (!time24) return "";
+                const [hour, min] = time24.split(":").map(Number);
+                const period = hour >= 12 ? "PM" : "AM";
+                const hour12 = hour % 12 || 12;
+                return `${hour12}:${min.toString().padStart(2, "0")} ${period}`;
+              };
+              today = `${day}: ${to12Hour(h.open)} - ${to12Hour(h.close)}`;
+            }
           }
         } catch {}
 
@@ -654,14 +664,54 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           <div className="mb-6">
             <AnimatedCard delay={0.35} className="p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-neutral-600">Business Hours</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="h-5 w-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3 className="text-lg font-bold text-neutral-900">Business Hours</h3>
+                  </div>
                   {hoursInfo?.hasHours ? (
-                    <p className="text-base text-neutral-900 mt-1">
-                      {hoursInfo.today || 'Hours configured'}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      {hoursInfo.today ? (() => {
+                        // Check if currently open
+                        const now = new Date();
+                        const currentTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                        const day = now.toLocaleDateString(undefined, { weekday: 'long' });
+                        const todayMatch = hoursInfo.today.startsWith(day);
+                        
+                        // Extract times from the today string (format: "Tuesday: 9:00 AM - 5:00 PM")
+                        const timeMatch = hoursInfo.today.match(/(\d+):(\d+)\s*(AM|PM)\s*-\s*(\d+):(\d+)\s*(AM|PM)/);
+                        let isOpen = false;
+                        if (todayMatch && timeMatch) {
+                          const [, openH, openM, openP, closeH, closeM, closeP] = timeMatch;
+                          let openHour = parseInt(openH);
+                          let closeHour = parseInt(closeH);
+                          if (openP === 'PM' && openHour !== 12) openHour += 12;
+                          if (openP === 'AM' && openHour === 12) openHour = 0;
+                          if (closeP === 'PM' && closeHour !== 12) closeHour += 12;
+                          if (closeP === 'AM' && closeHour === 12) closeHour = 0;
+                          
+                          const openTime = `${openHour.toString().padStart(2, '0')}:${openM}`;
+                          const closeTime = `${closeHour.toString().padStart(2, '0')}:${closeM}`;
+                          isOpen = currentTime >= openTime && currentTime < closeTime;
+                        }
+                        
+                        const dotColor = isOpen ? 'bg-green-500' : 'bg-red-500';
+                        const statusText = isOpen ? 'Open' : 'Closed';
+                        const statusColor = isOpen ? 'text-green-700' : 'text-red-700';
+                        return (
+                          <>
+                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`}></span>
+                            <span className={`font-semibold ${statusColor}`}>{statusText}</span>
+                            <span className="text-neutral-400">•</span>
+                            <span className="text-base text-neutral-900">{hoursInfo.today}</span>
+                          </>
+                        );
+                      })() : <span className="text-base text-neutral-900">Hours configured</span>}
+                    </div>
                   ) : (
-                    <p className="text-base text-neutral-900 mt-1">
+                    <p className="text-base text-neutral-500">
                       Set your store hours to display them here.
                     </p>
                   )}
@@ -672,8 +722,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   if (!canManage) return null;
                   return (
                     <Link href={`/t/${selectedTenantId}/settings/hours`}>
-                      <Button variant="secondary" size="sm" className="whitespace-nowrap">
-                        {hoursInfo?.hasHours ? 'Manage Hours' : 'Set Hours'}
+                      <Button variant="secondary" size="sm" className="whitespace-nowrap font-semibold">
+                        {hoursInfo?.hasHours ? '⚙️ Manage Hours' : '➕ Set Hours'}
                       </Button>
                     </Link>
                   );

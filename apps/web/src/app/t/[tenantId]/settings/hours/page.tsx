@@ -83,8 +83,9 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
 
       {/* Regular Hours Card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold">Regular Hours</h2>
+        <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+          <h2 className="text-xl font-bold text-gray-900">Business Hours</h2>
+          <p className="text-sm text-gray-600 mt-1">Set your weekly operating schedule</p>
         </div>
         <div className="p-6">
           <HoursEditor apiBase={clientApiBase} tenantId={tenantId} />
@@ -93,8 +94,9 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
 
       {/* Special / Holiday Hours Card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold">Special / Holiday Hours</h2>
+        <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+          <h2 className="text-xl font-bold text-gray-900">Special Hours</h2>
+          <p className="text-sm text-gray-600 mt-1">Manage holiday and exception hours</p>
         </div>
         <div className="p-6">
           <SpecialHoursCalendar apiBase={clientApiBase} tenantId={tenantId} />

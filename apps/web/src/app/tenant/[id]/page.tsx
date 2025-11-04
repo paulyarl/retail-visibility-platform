@@ -496,11 +496,18 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                     <div className="space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
                       {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
                         const dayHours = businessHours[day];
+                        const formatTime = (time24: string): string => {
+                          if (!time24) return "";
+                          const [h, m] = time24.split(":").map(Number);
+                          const period = h >= 12 ? "PM" : "AM";
+                          const hour12 = h % 12 || 12;
+                          return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+                        };
                         return (
                           <div key={day} className="flex justify-between">
                             <span className="font-medium">{day}</span>
                             <span>
-                              {dayHours ? `${dayHours.open} - ${dayHours.close}` : 'Closed'}
+                              {dayHours ? `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}` : 'Closed'}
                             </span>
                           </div>
                         );
