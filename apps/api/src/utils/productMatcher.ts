@@ -327,12 +327,12 @@ export function getEnrichableFields(
   const missing = getMissingFields(product);
 
   return {
-    useName: scannedData.name && scannedData.name.length > product.name.length,
+    useName: Boolean(scannedData.name && scannedData.name.length > product.name.length),
     useDescription: missing.missingDescription && !!scannedData.description,
     useImages: missing.missingImages && !!scannedData.images && scannedData.images.length > 0,
     useBrand: missing.missingBrand && !!scannedData.brand,
     useSpecs: missing.missingSpecs && !!scannedData.specifications,
-    usePrice: scannedData.price && scannedData.price > 0,
+    usePrice: Boolean(scannedData.price && scannedData.price > 0),
     useCategory: !!scannedData.category
   };
 }
