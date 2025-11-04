@@ -1,9 +1,17 @@
 import { Router, Request, Response } from 'express';
-import { authenticateToken, checkTenantAccess } from '../middleware/auth';
+import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { Flags } from '../config';
 import { audit } from '../audit';
 import { z } from 'zod';
+import { UserRole } from '@prisma/client';
+
+// Helper to check tenant access
+function hasAccessToTenant(req: Request, tenantId: string): boolean {
+  if (!req.user) return false;
+  if ((req.user as any).role === UserRole.ADMIN) return true;
+  return (req.user as any).tenantIds?.includes(tenantId) || false;
+}
 
 const router = Router();
 
@@ -45,8 +53,7 @@ router.post('/api/scan/start', authenticateToken, async (req: Request, res: Resp
     const userId = (req.user as any)?.userId;
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, res, tenantId);
-    if (!hasAccess) {
+    if (!hasAccessToTenant(req, tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
@@ -119,8 +126,7 @@ router.get('/api/scan/:sessionId', authenticateToken, async (req: Request, res: 
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, res, session.tenantId);
-    if (!hasAccess) {
+    if (!hasAccessToTenant(req, session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
@@ -158,8 +164,7 @@ router.post('/api/scan/:sessionId/lookup-barcode', authenticateToken, async (req
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, res, session.tenantId);
-    if (!hasAccess) {
+    if (!hasAccessToTenant(req, session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
@@ -233,8 +238,7 @@ router.get('/api/scan/:sessionId/results', authenticateToken, async (req: Reques
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, res, session.tenantId);
-    if (!hasAccess) {
+    if (!hasAccessToTenant(req, session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
@@ -265,8 +269,7 @@ router.delete('/api/scan/:sessionId/results/:resultId', authenticateToken, async
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, res, result.tenantId);
-    if (!hasAccess) {
+    if (!hasAccessToTenant(req, result.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
@@ -325,8 +328,7 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, res, session.tenantId);
-    if (!hasAccess) {
+    if (!hasAccessToTenant(req, session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
@@ -351,8 +353,11 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
           data: {
             tenantId: session.tenantId,
             name: enrichment.name || `Product ${result.barcode}`,
+            title: enrichment.name || `Product ${result.barcode}`,
+            brand: enrichment.brand || 'Unknown',
             description: enrichment.description || null,
             sku: result.sku || result.barcode,
+            price: (enrichment.priceCents || session.template?.defaultPriceCents || 0) / 100,
             priceCents: enrichment.priceCents || session.template?.defaultPriceCents || 0,
             currency: session.template?.defaultCurrency || 'USD',
             visibility: (session.template?.defaultVisibility as any) || 'private',
@@ -408,8 +413,7 @@ router.delete('/api/scan/:sessionId', authenticateToken, async (req: Request, re
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, res, session.tenantId);
-    if (!hasAccess) {
+    if (!hasAccessToTenant(req, session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
