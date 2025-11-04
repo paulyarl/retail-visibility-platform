@@ -181,6 +181,20 @@ model InventoryItem {
   title                String
   visibility           ItemVisibility?          @default(public)
   manufacturer         String?
+  
+  // Product enrichment tracking
+  source               ProductSource        @default(MANUAL)
+  enrichmentStatus     EnrichmentStatus     @default(COMPLETE)
+  enrichedAt           DateTime?            @map("enriched_at")
+  enrichedBy           String?              @map("enriched_by")
+  enrichedFromBarcode  String?              @map("enriched_from_barcode")
+  
+  // Track what's missing for enrichment
+  missingImages        Boolean              @default(false) @map("missing_images")
+  missingDescription   Boolean              @default(false) @map("missing_description")
+  missingSpecs         Boolean              @default(false) @map("missing_specs")
+  missingBrand         Boolean              @default(false) @map("missing_brand")
+  
   tenant               Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   tenantCategory       TenantCategory?          @relation(fields: [tenantCategoryId], references: [id], onDelete: SetNull)
   photos               PhotoAsset[]
@@ -189,6 +203,8 @@ model InventoryItem {
   @@unique([tenantId, sku], name: "uq_tenant_sku")
   @@index([tenantId, updatedAt])
   @@index([tenantCategoryId])
+  @@index([tenantId, enrichmentStatus])
+  @@index([source])
 }
 
 model PhotoAsset {
@@ -957,4 +973,25 @@ model BarcodeEnrichment {
   @@index([source])
   @@index([lastFetchedAt])
   @@map("barcode_enrichment")
+}
+
+// Product source tracking
+enum ProductSource {
+  MANUAL
+  QUICK_START_WIZARD
+  PRODUCT_SCAN
+  IMPORT
+  API
+  BULK_UPLOAD
+
+  @@map("product_source")
+}
+
+// Product enrichment status
+enum EnrichmentStatus {
+  COMPLETE
+  NEEDS_ENRICHMENT
+  PARTIALLY_ENRICHED
+
+  @@map("enrichment_status")
 }
