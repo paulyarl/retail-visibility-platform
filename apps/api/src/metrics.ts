@@ -36,3 +36,4 @@ export const gbpHoursDurationMs = metrics.histogram('gbp_hours_sync_last_duratio
 export const categoryMirrorSuccess = metrics.counter('category_mirror_success_total')
 export const categoryMirrorFail = metrics.counter('category_mirror_fail_total')
 export const categoryMirrorDurationMs = metrics.histogram('category_mirror_last_duration_ms')
+export const categoryOutOfSyncDetected = metrics.counter('gbp_sync_out_of_sync_detected')

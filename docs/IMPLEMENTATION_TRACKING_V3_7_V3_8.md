@@ -19,7 +19,7 @@ Dates: target vs. actual
 |---|---|---|---|---|---|
 | M1 | Data model + RLS + audit (v3.7) | | | [~] | Core tables, RLS, audit hooks; add CategoryService abstraction |
 | M2 | Unified validation API + feed enforcement | | | [~] | OpenAPI docs, enforcement on push; include scanning precheck |
-| M3 | Tenant Categories + GBP (elevated) | | | [ ] | Mirror endpoint + strategy switch; sync worker + retries/backoff; out-of-sync detection + telemetry; admin dashboard tiles |
+| M3 | Tenant Categories + GBP (elevated) | | | [x] | Mirror endpoint + strategy switch; sync worker + retries/backoff; out-of-sync detection + telemetry; admin dashboard tiles |
 | M4 | SKU Scanning core (elevated) | | | [ ] | Tables (session/result/template/lookup_log + RLS); APIs (start, results, lookup-barcode, commit); components (BarcodeScanner, BatchReview, EnrichmentPreview); validation hook |
 | M6 | Observability dashboards + alerts | | | [ ] | Category + scanning KPIs |
 | M7 | CI schema drift + release gate | | | [ ] | Nightly diff, PR gate |
@@ -38,10 +38,10 @@ Dates: target vs. actual
 - [ ] Taxonomy versioning jobs + stale mapping marker
 
 ### 2.2 Tenant Categories + GBP
-- [ ] Mirror endpoint + strategy switch (platform → GBP)
-- [ ] GBP sync worker with retries/backoff
-- [ ] Out-of-sync detection + telemetry `gbp.sync.out_of_sync_detected`
-- [ ] Admin dashboard tiles (sync status, errors, retry CTA)
+- [x] Mirror endpoint + strategy switch (platform → GBP)
+- [x] GBP sync worker with retries/backoff
+- [x] Out-of-sync detection + telemetry `gbp.sync.out_of_sync_detected`
+- [x] Admin dashboard tiles (sync status, errors, retry CTA)
   - Notes: Elevated to Milestone M3; gated by `FF_CATEGORY_MIRRORING` and `FF_TENANT_PLATFORM_CATEGORY`.
 
 ### 2.3 Product Feed Alignment
@@ -125,6 +125,10 @@ Mitigations documented in Observability & CI sections.
 | 2025-11-01 | API | Coverage endpoint (viewless) | commit 09bfc8f | |
 | 2025-11-01 | Web | Coverage badges; TenantContextProvider split | commit 09bfc8f | |
 | 2025-11-01 | Docs | Batch test scripts + e2e instructions | commit 09bfc8f | |
+| 2025-11-03 | API | Out-of-sync detection metric + telemetry emission | M3 completion | |
+| 2025-11-03 | API | Sync logs API endpoints (GET /api/admin/sync-logs, /api/admin/sync-stats) | M3 completion | |
+| 2025-11-03 | Web | Admin dashboard GBP sync tiles + dedicated sync page | M3 completion | |
+| 2025-11-03 | Docs | M3 milestone marked complete | M3 completion | |
 
 ---
 

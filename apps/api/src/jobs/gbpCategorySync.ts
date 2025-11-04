@@ -1,5 +1,5 @@
 import { setTimeout as wait } from 'timers/promises';
-import { categoryMirrorSuccess, categoryMirrorFail, categoryMirrorDurationMs } from '../metrics';
+import { categoryMirrorSuccess, categoryMirrorFail, categoryMirrorDurationMs, categoryOutOfSyncDetected } from '../metrics';
 import { prisma } from '../prisma';
 import { gbpClient } from '../clients/gbp';
 
@@ -83,6 +83,18 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
       const platformCats = await fetchPlatformCategories(payload.tenantId ?? null);
       const gbpCats = await fetchGbpCategories(payload.tenantId ?? null);
       const diff = computeDiff(platformCats, gbpCats);
+
+      // Detect out-of-sync state
+      const isOutOfSync = diff.counts.created > 0 || diff.counts.updated > 0 || diff.counts.deleted > 0;
+      if (isOutOfSync) {
+        categoryOutOfSyncDetected.inc({
+          tenant: String(payload.tenantId ?? 'all'),
+          created: String(diff.counts.created),
+          updated: String(diff.counts.updated),
+          deleted: String(diff.counts.deleted),
+        });
+        console.log(`[GBP_SYNC][${jobId}] OUT-OF-SYNC detected: +${diff.counts.created} ~${diff.counts.updated} -${diff.counts.deleted}`);
+      }
 
       if (!dryRun) {
         await applyDiffToGbp(diff, payload.tenantId ?? null);

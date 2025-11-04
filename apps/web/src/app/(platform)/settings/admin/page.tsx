@@ -28,7 +28,14 @@ export default function AdminDashboardPage() {
     totalTenants: 0,
     totalUsers: 0,
   });
+  const [syncStats, setSyncStats] = useState({
+    totalRuns: 0,
+    successRate: 0,
+    outOfSyncCount: 0,
+    failedRuns: 0,
+  });
   const [loading, setLoading] = useState(true);
+  const [syncLoading, setSyncLoading] = useState(true);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -48,6 +55,28 @@ export default function AdminDashboardPage() {
       }
     };
     loadStats();
+  }, []);
+
+  useEffect(() => {
+    const loadSyncStats = async () => {
+      try {
+        const res = await api.get('/api/admin/sync-stats');
+        if (res.ok) {
+          const data = await res.json();
+          setSyncStats(data.stats || {
+            totalRuns: 0,
+            successRate: 0,
+            outOfSyncCount: 0,
+            failedRuns: 0,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load sync stats:', error);
+      } finally {
+        setSyncLoading(false);
+      }
+    };
+    loadSyncStats();
   }, []);
 
   const adminGroups: AdminGroup[] = [
@@ -211,6 +240,25 @@ export default function AdminDashboardPage() {
           color: 'bg-purple-500',
           stats: 'Product organization',
           badge: 'NEW',
+        },
+      ],
+    },
+    {
+      title: 'Google Business Profile Sync',
+      description: 'Monitor and manage GBP category synchronization',
+      sections: [
+        {
+          title: 'GBP Category Sync',
+          description: 'Monitor sync status and trigger manual syncs',
+          href: '/settings/admin/gbp-sync',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          ),
+          color: 'bg-cyan-500',
+          stats: syncLoading ? 'Loading...' : `${syncStats.successRate}% success rate`,
+          badge: 'M3',
         },
       ],
     },

@@ -94,6 +94,7 @@ import categoriesPlatformRoutes from './routes/categories.platform';
 import categoriesTenantRoutes from './routes/categories.tenant';
 import categoriesMirrorRoutes from './routes/categories.mirror';
 import mirrorAdminRoutes from './routes/mirror.admin';
+import syncLogsRoutes from './routes/sync-logs';
 import quickStartRoutes from './routes/quick-start';
 import adminToolsRoutes from './routes/admin-tools';
 import testGbpRoutes from './routes/test-gbp';
@@ -1936,6 +1937,7 @@ app.use(categoriesPlatformRoutes);
 app.use(categoriesTenantRoutes);
 app.use(categoriesMirrorRoutes);
 app.use(mirrorAdminRoutes);
+app.use(syncLogsRoutes);
 
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenantId/items/:itemId/category
