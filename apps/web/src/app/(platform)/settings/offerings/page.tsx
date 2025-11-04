@@ -176,6 +176,75 @@ export default function OfferingsPage() {
             </div>
           </div>
 
+          {/* Quick Start + Scanning Integration Callout */}
+          <div className="mt-6 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-xl p-8 text-white">
+            <div className="text-center mb-6">
+              <div className="inline-block bg-yellow-400 text-yellow-900 px-4 py-2 rounded-full font-bold text-sm mb-3">
+                ⚡ POWER COMBO
+              </div>
+              <h3 className="text-2xl font-bold mb-2">Quick Start + Scanning Work Together!</h3>
+              <p className="text-blue-100 max-w-2xl mx-auto">
+                These aren't competing features—they're a <strong className="text-yellow-300">perfectly aligned system</strong>
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {/* Step 1 */}
+              <div className="bg-white/10 backdrop-blur rounded-lg p-4 border border-white/20">
+                <div className="text-center mb-2">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mx-auto mb-2">
+                    <span className="text-lg font-bold text-blue-600">1</span>
+                  </div>
+                  <h4 className="font-bold text-sm">⚡ Quick Start</h4>
+                </div>
+                <ul className="space-y-1 text-xs">
+                  <li>✓ Generate 100 products (5 min)</li>
+                  <li>✓ Basic info created</li>
+                  <li>⚠ Missing images & details</li>
+                </ul>
+              </div>
+
+              {/* Step 2 */}
+              <div className="bg-yellow-400 rounded-lg p-4 border-2 border-yellow-300 text-yellow-900">
+                <div className="text-center mb-2">
+                  <div className="w-8 h-8 bg-yellow-900 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <span className="text-lg font-bold text-yellow-400">2</span>
+                  </div>
+                  <h4 className="font-bold text-sm">📱 Scan to Enrich</h4>
+                </div>
+                <ul className="space-y-1 text-xs">
+                  <li>✓ Detects matches (50 min)</li>
+                  <li>✓ Adds images & descriptions</li>
+                  <li>✓ No duplicates!</li>
+                </ul>
+              </div>
+
+              {/* Step 3 */}
+              <div className="bg-white/10 backdrop-blur rounded-lg p-4 border border-white/20">
+                <div className="text-center mb-2">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <span className="text-lg">🎉</span>
+                  </div>
+                  <h4 className="font-bold text-sm">Complete!</h4>
+                </div>
+                <ul className="space-y-1 text-xs">
+                  <li>★ 100 enriched products</li>
+                  <li>★ Professional quality</li>
+                  <li>★ Ready in 55 minutes</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="bg-white/10 backdrop-blur rounded-lg p-4 border border-white/20 text-center">
+              <p className="text-sm mb-1">
+                <strong className="text-yellow-300">Save $394.58 and 15.75 hours</strong> per 100 products
+              </p>
+              <p className="text-xs text-blue-100">
+                vs. 16.7 hours of manual entry • 94% time reduction
+              </p>
+            </div>
+          </div>
+
           <div className="mt-6 bg-gradient-to-r from-primary-50 to-primary-100 border-2 border-primary-300 rounded-lg p-6 text-center">
             <p className="text-lg font-semibold text-primary-900 mb-2">
               🚀 Zero to Online in Minutes
