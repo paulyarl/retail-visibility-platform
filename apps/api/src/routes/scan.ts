@@ -551,6 +551,190 @@ router.post('/api/admin/enrichment/clear-cache', authenticateToken, async (req: 
   }
 });
 
+// Comprehensive enrichment analytics
+router.get('/api/admin/enrichment/analytics', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    if ((req.user as any)?.role !== UserRole.ADMIN) {
+      return res.status(403).json({ success: false, error: 'admin_required' });
+    }
+
+    // Get total cached products
+    const totalCached = await prisma.barcodeEnrichment.count();
+    
+    // Get most popular products (top 10 by fetch count)
+    const popularProducts = await prisma.barcodeEnrichment.findMany({
+      orderBy: { fetchCount: 'desc' },
+      take: 10,
+      select: {
+        barcode: true,
+        name: true,
+        brand: true,
+        fetchCount: true,
+        source: true,
+        lastFetchedAt: true,
+      },
+    });
+
+    // Get data quality metrics
+    const withNutrition = await prisma.barcodeEnrichment.count({
+      where: {
+        metadata: {
+          path: ['nutrition', 'per_100g'],
+          not: null,
+        },
+      },
+    });
+
+    const withImages = await prisma.barcodeEnrichment.count({
+      where: {
+        OR: [
+          { imageUrl: { not: null } },
+          { imageThumbnailUrl: { not: null } },
+        ],
+      },
+    });
+
+    const withEnvironmental = await prisma.barcodeEnrichment.count({
+      where: {
+        metadata: {
+          path: ['environmental'],
+          not: null,
+        },
+      },
+    });
+
+    // Get source breakdown
+    const sourceBreakdown = await prisma.barcodeEnrichment.groupBy({
+      by: ['source'],
+      _count: true,
+    });
+
+    // Get recent additions (last 24 hours)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentAdditions = await prisma.barcodeEnrichment.count({
+      where: {
+        createdAt: { gte: oneDayAgo },
+      },
+    });
+
+    // Calculate total API calls saved (sum of fetchCount - 1 for each product)
+    const totalFetchCount = await prisma.barcodeEnrichment.aggregate({
+      _sum: { fetchCount: true },
+    });
+    const apiCallsSaved = (totalFetchCount._sum.fetchCount || 0) - totalCached;
+
+    return res.json({
+      success: true,
+      analytics: {
+        totalCached,
+        popularProducts,
+        dataQuality: {
+          withNutrition,
+          withImages,
+          withEnvironmental,
+          nutritionPercentage: totalCached > 0 ? ((withNutrition / totalCached) * 100).toFixed(1) : '0',
+          imagesPercentage: totalCached > 0 ? ((withImages / totalCached) * 100).toFixed(1) : '0',
+          environmentalPercentage: totalCached > 0 ? ((withEnvironmental / totalCached) * 100).toFixed(1) : '0',
+        },
+        sourceBreakdown,
+        recentAdditions,
+        apiCallsSaved,
+        estimatedCostSavings: (apiCallsSaved * 0.01).toFixed(2), // $0.01 per call
+      },
+    });
+  } catch (error: any) {
+    console.error('[enrichment/analytics] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
+// Search and browse cached products
+router.get('/api/admin/enrichment/search', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    if ((req.user as any)?.role !== UserRole.ADMIN) {
+      return res.status(403).json({ success: false, error: 'admin_required' });
+    }
+
+    const { query, source, page = '1', limit = '20' } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+    const where: any = {};
+    
+    if (query) {
+      where.OR = [
+        { barcode: { contains: query as string } },
+        { name: { contains: query as string, mode: 'insensitive' } },
+        { brand: { contains: query as string, mode: 'insensitive' } },
+      ];
+    }
+
+    if (source) {
+      where.source = source;
+    }
+
+    const [products, total] = await Promise.all([
+      prisma.barcodeEnrichment.findMany({
+        where,
+        orderBy: { fetchCount: 'desc' },
+        skip,
+        take: parseInt(limit as string),
+        select: {
+          id: true,
+          barcode: true,
+          name: true,
+          brand: true,
+          description: true,
+          imageUrl: true,
+          imageThumbnailUrl: true,
+          source: true,
+          fetchCount: true,
+          lastFetchedAt: true,
+          createdAt: true,
+        },
+      }),
+      prisma.barcodeEnrichment.count({ where }),
+    ]);
+
+    return res.json({
+      success: true,
+      products,
+      pagination: {
+        total,
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        totalPages: Math.ceil(total / parseInt(limit as string)),
+      },
+    });
+  } catch (error: any) {
+    console.error('[enrichment/search] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
+// Get detailed product enrichment data
+router.get('/api/admin/enrichment/:barcode', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    if ((req.user as any)?.role !== UserRole.ADMIN) {
+      return res.status(403).json({ success: false, error: 'admin_required' });
+    }
+
+    const { barcode } = req.params;
+
+    const product = await prisma.barcodeEnrichment.findUnique({
+      where: { barcode },
+    });
+
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+
+    return res.json({ success: true, product });
+  } catch (error: any) {
+    console.error('[enrichment/detail] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
 // Helper: Validate scan results
 async function validateScanResults(results: any[], template: any): Promise<{ valid: boolean; errors: any[] }> {
   const errors = [];

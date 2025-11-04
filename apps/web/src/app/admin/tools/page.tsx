@@ -65,6 +65,18 @@ export default function AdminToolsPage() {
     },
   ];
 
+  const dashboards = [
+    {
+      id: 'enrichment',
+      href: '/admin/enrichment',
+      icon: Rocket,
+      title: 'Product Intelligence Dashboard',
+      description: 'Universal barcode cache analytics, popular products, data quality metrics',
+      color: 'from-cyan-500 to-blue-600',
+      stats: 'Real-time analytics',
+    },
+  ];
+
   const categories = [
     { id: 'organization', title: '🏢 Organization Management', icon: Building2 },
     { id: 'user', title: '👤 User Management', icon: Users },
@@ -88,6 +100,49 @@ export default function AdminToolsPage() {
                 Powerful tools for platform management
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Dashboards Section */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            📊 Analytics Dashboards
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {dashboards.map((dashboard) => {
+              const Icon = dashboard.icon;
+              return (
+                <a
+                  key={dashboard.id}
+                  href={dashboard.href}
+                  className="group relative bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl p-6 border-2 border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 transition-all duration-200 hover:shadow-2xl"
+                >
+                  {/* Icon */}
+                  <div className={`w-14 h-14 bg-gradient-to-br ${dashboard.color} rounded-lg flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-200`}>
+                    <Icon className="w-7 h-7 text-white" />
+                  </div>
+
+                  {/* Content */}
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    {dashboard.title}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    {dashboard.description}
+                  </p>
+
+                  {/* Stats Badge */}
+                  <div className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300 rounded-full text-xs font-medium">
+                    <span className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></span>
+                    {dashboard.stats}
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="absolute top-6 right-6 text-gray-400 group-hover:text-cyan-500 group-hover:translate-x-1 transition-all duration-200">
+                    →
+                  </div>
+                </a>
+              );
+            })}
           </div>
         </div>
 
