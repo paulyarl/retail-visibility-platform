@@ -109,21 +109,21 @@ export default function OfferingsPage() {
 
           {/* Second row of features */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-            {/* SKU Scanning - BREAKTHROUGH! */}
+            {/* SKU Scanning + Analytics - BREAKTHROUGH! */}
             <div className="bg-gradient-to-br from-green-500 to-emerald-600 border-2 border-green-400 rounded-lg p-6 text-white relative shadow-xl">
               <div className="absolute -top-2 -right-2 bg-yellow-400 text-green-900 text-xs px-3 py-1 rounded-full font-bold">
                 BREAKTHROUGH
               </div>
               <div className="text-4xl mb-3">🎯</div>
-              <h3 className="text-lg font-bold mb-2">Complete Product Intelligence</h3>
+              <h3 className="text-lg font-bold mb-2">Scanning + Intelligence</h3>
               <ul className="space-y-1 text-sm">
-                <li>• Nutrition facts & allergens</li>
-                <li>• Environmental impact data</li>
-                <li>• Product specifications</li>
-                <li>• Matches CVS/Walmart/Target!</li>
+                <li>• Complete product data capture</li>
+                <li>• Real-time analytics dashboard</li>
+                <li>• Data quality tracking</li>
+                <li>• Product preview tool</li>
               </ul>
               <div className="mt-3 pt-3 border-t border-green-300">
-                <span className="text-xs font-semibold">Level playing field achieved!</span>
+                <span className="text-xs font-semibold">Intelligence + insights!</span>
               </div>
             </div>
 
