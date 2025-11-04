@@ -208,7 +208,7 @@ export default function ProductEnrichmentPreview({
                 </div>
                 <div>
                   <label className="text-xs text-neutral-500">Source</label>
-                  <Badge variant="outline">{existingProduct.source.replace(/_/g, ' ')}</Badge>
+                  <Badge>{existingProduct.source.replace(/_/g, ' ')}</Badge>
                 </div>
               </div>
             </div>
@@ -275,11 +275,13 @@ export default function ProductEnrichmentPreview({
             <div className="space-y-3">
               {match.enrichableFields.useName && (
                 <label className="flex items-center gap-3 cursor-pointer hover:bg-neutral-50 p-2 rounded">
-                  <Checkbox
+                  <input
+                    type="checkbox"
                     checked={enrichmentOptions.useName}
-                    onCheckedChange={(checked) => 
-                      setEnrichmentOptions({ ...enrichmentOptions, useName: checked as boolean })
+                    onChange={(e) => 
+                      setEnrichmentOptions({ ...enrichmentOptions, useName: e.target.checked })
                     }
+                    className="w-4 h-4"
                   />
                   <div className="flex-1">
                     <p className="font-medium">Use scanned product name</p>
@@ -290,11 +292,13 @@ export default function ProductEnrichmentPreview({
 
               {match.enrichableFields.useDescription && scannedData.description && (
                 <label className="flex items-center gap-3 cursor-pointer hover:bg-neutral-50 p-2 rounded">
-                  <Checkbox
+                  <input
+                    type="checkbox"
                     checked={enrichmentOptions.useDescription}
-                    onCheckedChange={(checked) => 
-                      setEnrichmentOptions({ ...enrichmentOptions, useDescription: checked as boolean })
+                    onChange={(e) => 
+                      setEnrichmentOptions({ ...enrichmentOptions, useDescription: e.target.checked })
                     }
+                    className="w-4 h-4"
                   />
                   <div className="flex-1">
                     <p className="font-medium">Add product description</p>
@@ -305,11 +309,13 @@ export default function ProductEnrichmentPreview({
 
               {match.enrichableFields.useImages && scannedData.images && scannedData.images.length > 0 && (
                 <label className="flex items-center gap-3 cursor-pointer hover:bg-neutral-50 p-2 rounded">
-                  <Checkbox
+                  <input
+                    type="checkbox"
                     checked={enrichmentOptions.useImages}
-                    onCheckedChange={(checked) => 
-                      setEnrichmentOptions({ ...enrichmentOptions, useImages: checked as boolean })
+                    onChange={(e) => 
+                      setEnrichmentOptions({ ...enrichmentOptions, useImages: e.target.checked })
                     }
+                    className="w-4 h-4"
                   />
                   <div className="flex-1">
                     <p className="font-medium">Add product images ({scannedData.images.length})</p>
@@ -320,11 +326,13 @@ export default function ProductEnrichmentPreview({
 
               {match.enrichableFields.useBrand && scannedData.brand && (
                 <label className="flex items-center gap-3 cursor-pointer hover:bg-neutral-50 p-2 rounded">
-                  <Checkbox
+                  <input
+                    type="checkbox"
                     checked={enrichmentOptions.useBrand}
-                    onCheckedChange={(checked) => 
-                      setEnrichmentOptions({ ...enrichmentOptions, useBrand: checked as boolean })
+                    onChange={(e) => 
+                      setEnrichmentOptions({ ...enrichmentOptions, useBrand: e.target.checked })
                     }
+                    className="w-4 h-4"
                   />
                   <div className="flex-1">
                     <p className="font-medium">Add brand information</p>
@@ -335,11 +343,13 @@ export default function ProductEnrichmentPreview({
 
               {match.enrichableFields.useSpecs && scannedData.specifications && (
                 <label className="flex items-center gap-3 cursor-pointer hover:bg-neutral-50 p-2 rounded">
-                  <Checkbox
+                  <input
+                    type="checkbox"
                     checked={enrichmentOptions.useSpecs}
-                    onCheckedChange={(checked) => 
-                      setEnrichmentOptions({ ...enrichmentOptions, useSpecs: checked as boolean })
+                    onChange={(e) => 
+                      setEnrichmentOptions({ ...enrichmentOptions, useSpecs: e.target.checked })
                     }
+                    className="w-4 h-4"
                   />
                   <div className="flex-1">
                     <p className="font-medium">Add product specifications</p>
@@ -352,11 +362,13 @@ export default function ProductEnrichmentPreview({
 
               {match.enrichableFields.usePrice && scannedData.price && (
                 <label className="flex items-center gap-3 cursor-pointer hover:bg-neutral-50 p-2 rounded">
-                  <Checkbox
+                  <input
+                    type="checkbox"
                     checked={enrichmentOptions.usePrice}
-                    onCheckedChange={(checked) => 
-                      setEnrichmentOptions({ ...enrichmentOptions, usePrice: checked as boolean })
+                    onChange={(e) => 
+                      setEnrichmentOptions({ ...enrichmentOptions, usePrice: e.target.checked })
                     }
+                    className="w-4 h-4"
                   />
                   <div className="flex-1">
                     <p className="font-medium">Update price to ${scannedData.price}</p>
