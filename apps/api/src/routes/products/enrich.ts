@@ -26,7 +26,8 @@ const prisma = new PrismaClient();
 router.post('/find-matches', async (req: Request, res: Response) => {
   try {
     const { scannedData } = req.body as { scannedData: ScannedProductData };
-    const tenantId = req.user?.tenantId;
+    const user = req.user as any;
+    const tenantId = user?.tenantIds?.[0]; // Get first tenant
 
     if (!tenantId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -87,8 +88,9 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
       scannedData: ScannedProductData;
       enrichmentOptions: EnrichmentOptions;
     };
-    const tenantId = req.user?.tenantId;
-    const userId = req.user?.id;
+    const user = req.user as any;
+    const tenantId = user?.tenantIds?.[0]; // Get first tenant
+    const userId = user?.userId;
 
     if (!tenantId || !userId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -188,9 +190,10 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
         alt: `${updatedProduct.name} - Image ${index + 1}`
       }));
 
-      addedImages = await prisma.photoAsset.createMany({
+      const batchResult = await prisma.photoAsset.createMany({
         data: photoData
       });
+      addedImages = photoData; // Return the data we created
 
       // Update missing images flag
       await prisma.inventoryItem.update({
@@ -261,7 +264,8 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
  */
 router.get('/needs-enrichment', async (req: Request, res: Response) => {
   try {
-    const tenantId = req.user?.tenantId;
+    const user = req.user as any;
+    const tenantId = user?.tenantIds?.[0]; // Get first tenant
 
     if (!tenantId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -315,7 +319,8 @@ router.get('/needs-enrichment', async (req: Request, res: Response) => {
 router.get('/:productId/enrichment-status', async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
-    const tenantId = req.user?.tenantId;
+    const user = req.user as any;
+    const tenantId = user?.tenantIds?.[0]; // Get first tenant
 
     if (!tenantId) {
       return res.status(401).json({ error: 'Unauthorized' });

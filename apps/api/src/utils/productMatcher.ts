@@ -310,10 +310,10 @@ export function getMissingFields(product: InventoryItem): {
   missingBrand: boolean;
 } {
   return {
-    missingImages: product.missingImages || false,
-    missingDescription: product.missingDescription || (!product.description || product.description.length < 20),
-    missingSpecs: product.missingSpecs || !product.metadata || Object.keys(product.metadata as any).length === 0,
-    missingBrand: product.missingBrand || !product.brand
+    missingImages: Boolean(product.missingImages),
+    missingDescription: Boolean(product.missingDescription) || (!product.description || product.description.length < 20),
+    missingSpecs: Boolean(product.missingSpecs) || !product.metadata || Object.keys(product.metadata as any).length === 0,
+    missingBrand: Boolean(product.missingBrand) || !product.brand
   };
 }
 
