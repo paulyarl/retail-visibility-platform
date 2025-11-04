@@ -27,6 +27,8 @@ export default function TenantScanPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<'usb' | 'camera' | 'manual'>('usb');
+  const [rateLimitError, setRateLimitError] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
 
   useEffect(() => {
     loadSessions();
@@ -34,9 +36,13 @@ export default function TenantScanPage() {
 
   const loadSessions = async () => {
     try {
-      // TODO: Implement GET /api/scan/sessions endpoint
-      // For now, just set empty array
-      setSessions([]);
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const response = await api.get(`${apiBaseUrl}/api/scan/my-sessions?tenantId=${tenantId}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSessions(data.sessions || []);
+      }
     } catch (error) {
       console.error('Failed to load sessions:', error);
     } finally {
@@ -67,16 +73,67 @@ export default function TenantScanPage() {
 
       if (response.ok) {
         const data = await response.json();
+        setRateLimitError(false);
         router.push(`/t/${tenantId}/scan/${data.session.id}`);
       } else {
         const error = await response.json();
-        alert(`Failed to start session: ${error.error || 'Unknown error'}`);
+        if (error.error === 'rate_limit_exceeded') {
+          setRateLimitError(true);
+        } else {
+          alert(`Failed to start session: ${error.error || 'Unknown error'}`);
+        }
       }
     } catch (error) {
       console.error('Failed to start session:', error);
       alert('Failed to start scanning session');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const cancelSession = async (sessionId: string) => {
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const response = await api.delete(`${apiBaseUrl}/api/scan/${sessionId}`);
+
+      if (response.ok) {
+        await loadSessions(); // Refresh the list
+      } else {
+        alert('Failed to cancel session');
+      }
+    } catch (error) {
+      console.error('Failed to cancel session:', error);
+      alert('Failed to cancel session');
+    }
+  };
+
+  const cleanupMySessions = async () => {
+    if (!confirm('This will close all your active scan sessions. Continue?')) {
+      return;
+    }
+
+    try {
+      setCleaningUp(true);
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      
+      const response = await api.post(`${apiBaseUrl}/api/scan/cleanup-my-sessions`, {
+        tenantId,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`✅ Cleaned up ${data.cleaned} active sessions. You can now start a new scan.`);
+        setRateLimitError(false);
+        await loadSessions();
+      } else {
+        const error = await response.json();
+        alert(`Failed to cleanup sessions: ${error.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Failed to cleanup sessions:', error);
+      alert('Failed to cleanup sessions');
+    } finally {
+      setCleaningUp(false);
     }
   };
 
@@ -214,6 +271,32 @@ export default function TenantScanPage() {
                 </div>
               </div>
 
+              {/* Rate Limit Error */}
+              {rateLimitError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-red-900 dark:text-red-300">
+                        Too Many Active Sessions
+                      </p>
+                      <p className="text-sm text-red-800 dark:text-red-400 mt-1">
+                        You have reached the maximum number of active scan sessions (50). Close your old sessions to start a new one.
+                      </p>
+                      <button
+                        onClick={cleanupMySessions}
+                        disabled={cleaningUp}
+                        className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {cleaningUp ? 'Cleaning up...' : 'Close All My Sessions'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Start Button */}
               <div className="flex items-center justify-between pt-4 border-t border-neutral-200 dark:border-neutral-700">
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
@@ -235,8 +318,22 @@ export default function TenantScanPage() {
         {/* Recent Sessions */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Sessions</CardTitle>
-            <CardDescription>View and manage your scanning sessions</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Recent Sessions</CardTitle>
+                <CardDescription>View and manage your scanning sessions</CardDescription>
+              </div>
+              <button
+                onClick={loadSessions}
+                disabled={loading}
+                className="px-3 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -258,14 +355,19 @@ export default function TenantScanPage() {
                 {sessions.map((session) => (
                   <div
                     key={session.id}
-                    className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors cursor-pointer"
-                    onClick={() => router.push(`/t/${tenantId}/scan/${session.id}`)}
+                    className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors"
                   >
-                    <div className="flex-1">
+                    <div 
+                      className="flex-1 cursor-pointer"
+                      onClick={() => router.push(`/t/${tenantId}/scan/${session.id}`)}
+                    >
                       <div className="flex items-center gap-3 mb-1">
                         {getStatusBadge(session.status)}
                         <span className="text-sm text-neutral-600 dark:text-neutral-400">
                           {new Date(session.startedAt).toLocaleString()}
+                        </span>
+                        <span className="text-xs text-neutral-500 dark:text-neutral-500">
+                          {session.deviceType}
                         </span>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-neutral-700 dark:text-neutral-300">
@@ -278,9 +380,24 @@ export default function TenantScanPage() {
                         )}
                       </div>
                     </div>
-                    <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    <div className="flex items-center gap-2">
+                      {session.status === 'active' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm('Cancel this session?')) {
+                              cancelSession(session.id);
+                            }
+                          }}
+                          className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </div>
                 ))}
               </div>

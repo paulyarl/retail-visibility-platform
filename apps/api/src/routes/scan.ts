@@ -79,12 +79,12 @@ router.post('/api/scan/start', authenticateToken, async (req: Request, res: Resp
       return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SCAN_USB' });
     }
 
-    // Check rate limit: max 10 active sessions per tenant
+    // Check rate limit: max 50 active sessions per tenant
     const activeSessions = await prisma.scanSession.count({
       where: { tenantId, status: 'active' },
     });
-    if (activeSessions >= 10) {
-      return res.status(429).json({ success: false, error: 'rate_limit_exceeded', limit: 10 });
+    if (activeSessions >= 50) {
+      return res.status(429).json({ success: false, error: 'rate_limit_exceeded', limit: 50 });
     }
 
     // Create session
@@ -499,6 +499,129 @@ router.delete('/api/scan/:sessionId', authenticateToken, async (req: Request, re
     return res.json({ success: true, cancelled: sessionId });
   } catch (error: any) {
     console.error('[scan/:sessionId DELETE] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
+// GET /api/scan/my-sessions - Get user's scan sessions for a tenant
+router.get('/api/scan/my-sessions', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.query;
+    const userId = (req.user as any)?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'unauthorized' });
+    }
+
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({ success: false, error: 'tenant_id_required' });
+    }
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, tenantId)) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Get user's sessions for this tenant, ordered by most recent first
+    const sessions = await prisma.scanSession.findMany({
+      where: {
+        tenantId,
+        userId,
+      },
+      orderBy: {
+        startedAt: 'desc',
+      },
+      take: 20, // Limit to 20 most recent
+    });
+
+    return res.json({ success: true, sessions });
+  } catch (error: any) {
+    console.error('[scan/my-sessions GET] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
+// POST /api/scan/cleanup-my-sessions - User cleanup their own active sessions
+router.post('/api/scan/cleanup-my-sessions', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.body;
+    const userId = (req.user as any)?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'unauthorized' });
+    }
+
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'tenant_id_required' });
+    }
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, tenantId)) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Close all active sessions for this user in this tenant
+    const result = await prisma.scanSession.updateMany({
+      where: {
+        tenantId,
+        userId,
+        status: 'active',
+      },
+      data: {
+        status: 'cancelled',
+        completedAt: new Date(),
+      },
+    });
+
+    // Audit
+    try {
+      await audit({
+        tenantId,
+        actor: userId,
+        action: 'scan.sessions.cleanup_my',
+        payload: { tenantId, cleaned: result.count },
+      });
+    } catch {}
+
+    return res.json({ 
+      success: true, 
+      cleaned: result.count,
+      message: `Cleaned up ${result.count} active sessions` 
+    });
+  } catch (error: any) {
+    console.error('[scan/cleanup-my-sessions POST] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
+// POST /api/scan/cleanup-idle-sessions - Cleanup idle sessions (can be called by cron)
+router.post('/api/scan/cleanup-idle-sessions', async (req: Request, res: Response) => {
+  try {
+    // Close sessions that have been active for more than 1 hour with no activity
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    
+    const result = await prisma.scanSession.updateMany({
+      where: {
+        status: 'active',
+        startedAt: {
+          lt: oneHourAgo,
+        },
+      },
+      data: {
+        status: 'cancelled',
+        completedAt: new Date(),
+      },
+    });
+
+    console.log(`[Idle Cleanup] Closed ${result.count} idle sessions`);
+    
+    return res.json({ 
+      success: true, 
+      cleaned: result.count,
+      message: `Cleaned up ${result.count} idle sessions` 
+    });
+  } catch (error: any) {
+    console.error('[scan/cleanup-idle-sessions POST] Error:', error);
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });

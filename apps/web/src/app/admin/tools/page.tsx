@@ -19,6 +19,7 @@ import CreateTestTenantModal from '@/components/admin/CreateTestTenantModal';
 import DeleteTestTenantModal from '@/components/admin/DeleteTestTenantModal';
 import BulkSeedModal from '@/components/admin/BulkSeedModal';
 import BulkClearModal from '@/components/admin/BulkClearModal';
+import CleanupScanSessionsModal from '@/components/admin/CleanupScanSessionsModal';
 
 export default function AdminToolsPage() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -72,6 +73,14 @@ export default function AdminToolsPage() {
       color: 'from-orange-500 to-orange-600',
       category: 'data',
     },
+    {
+      id: 'cleanup-sessions',
+      icon: Trash2,
+      title: 'Cleanup Scan Sessions',
+      description: 'Close active scan sessions for a tenant',
+      color: 'from-red-500 to-pink-600',
+      category: 'maintenance',
+    },
   ];
 
   const dashboards = [
@@ -90,6 +99,7 @@ export default function AdminToolsPage() {
     { id: 'organization', title: '🏢 Organization Management', icon: Building2 },
     { id: 'user', title: '👤 User Management', icon: Users },
     { id: 'data', title: '📦 Data Management', icon: Package },
+    { id: 'maintenance', title: '🔧 System Maintenance', icon: Clock },
   ];
 
   return (
@@ -246,6 +256,12 @@ export default function AdminToolsPage() {
       )}
       {activeModal === 'bulk-clear' && (
         <BulkClearModal onClose={() => setActiveModal(null)} />
+      )}
+      {activeModal === 'cleanup-sessions' && (
+        <CleanupScanSessionsModal 
+          isOpen={true}
+          onClose={() => setActiveModal(null)} 
+        />
       )}
     </div>
   );

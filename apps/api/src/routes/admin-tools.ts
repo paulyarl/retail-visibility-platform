@@ -5,7 +5,7 @@
  * All routes require admin authentication and are audit logged.
  */
 
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import {
   createTestChain,
@@ -14,7 +14,7 @@ import {
   bulkSeedProducts,
   bulkClearProducts,
 } from '../lib/admin-tools';
-import { auditLogger } from '../middleware/audit-logger';
+import { audit } from '../audit';
 import { prisma } from '../prisma';
 
 const router = Router();
@@ -272,6 +272,90 @@ router.delete('/bulk-clear', async (req, res) => {
     console.error('[Admin Tools] Error bulk clearing:', error);
     res.status(500).json({
       error: 'Failed to bulk clear products',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/scan-sessions/stats
+ * Get scan session statistics for a tenant
+ */
+router.get('/scan-sessions/stats', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.query;
+
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({ error: 'tenantId is required' });
+    }
+
+    const [active, total] = await Promise.all([
+      prisma.scanSession.count({
+        where: { tenantId, status: 'active' },
+      }),
+      prisma.scanSession.count({
+        where: { tenantId },
+      }),
+    ]);
+
+    res.json({ active, total });
+  } catch (error: any) {
+    console.error('[Admin Tools] Error fetching scan session stats:', error);
+    res.status(500).json({
+      error: 'Failed to fetch scan session stats',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/admin/scan-sessions/cleanup
+ * Close all active scan sessions for a tenant
+ */
+const cleanupSessionsSchema = z.object({
+  tenantId: z.string().min(1),
+});
+
+router.post('/scan-sessions/cleanup', async (req: Request, res: Response) => {
+  try {
+    const parsed = cleanupSessionsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Invalid input',
+        details: parsed.error.issues,
+      });
+    }
+
+    const { tenantId } = parsed.data;
+
+    // Close all active sessions for this tenant
+    const result = await prisma.scanSession.updateMany({
+      where: {
+        tenantId,
+        status: 'active',
+      },
+      data: {
+        status: 'cancelled',
+        completedAt: new Date(),
+      },
+    });
+
+    await audit({
+      tenantId,
+      actor: (req as any).user?.userId || 'system',
+      action: 'admin.scan_sessions.cleanup',
+      payload: { tenantId, cleaned: result.count },
+    });
+
+    res.json({
+      success: true,
+      cleaned: result.count,
+      message: `Cleaned up ${result.count} active scan sessions`,
+    });
+  } catch (error: any) {
+    console.error('[Admin Tools] Error cleaning up scan sessions:', error);
+    res.status(500).json({
+      error: 'Failed to cleanup scan sessions',
       message: error.message,
     });
   }
