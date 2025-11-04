@@ -44,7 +44,8 @@ export default function GBPSyncPage() {
 
   const loadStats = async () => {
     try {
-      const res = await api.get('/api/admin/sync-stats');
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const res = await api.get(`${apiBaseUrl}/api/admin/sync-stats`);
       if (res.ok) {
         const data = await res.json();
         setStats(data.stats);
@@ -58,7 +59,8 @@ export default function GBPSyncPage() {
 
   const loadLogs = async () => {
     try {
-      const res = await api.get('/api/admin/sync-logs?limit=20');
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const res = await api.get(`${apiBaseUrl}/api/admin/sync-logs?limit=20`);
       if (res.ok) {
         const data = await res.json();
         setLogs(data.data || []);
@@ -80,7 +82,8 @@ export default function GBPSyncPage() {
     
     try {
       setTriggering(true);
-      const res = await api.post('/api/categories/mirror', {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const res = await api.post(`${apiBaseUrl}/api/categories/mirror`, {
         strategy: 'platform_to_gbp',
         dryRun: false,
       });

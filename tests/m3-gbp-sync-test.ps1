@@ -3,10 +3,10 @@
 # Usage: .\tests\m3-gbp-sync-test.ps1
 
 param(
-    [string]$ApiBaseUrl = $env:API_BASE_URL ?? "http://localhost:4000",
-    [string]$WebBaseUrl = $env:WEB_BASE_URL ?? "http://localhost:3000",
-    [string]$AdminToken = $env:ADMIN_TOKEN ?? "",
-    [string]$TestTenantId = $env:TEST_TENANT_ID ?? ""
+    [string]$ApiBaseUrl = $(if ($env:API_BASE_URL) { $env:API_BASE_URL } else { "http://localhost:4000" }),
+    [string]$WebBaseUrl = $(if ($env:WEB_BASE_URL) { $env:WEB_BASE_URL } else { "http://localhost:3000" }),
+    [string]$AdminToken = $(if ($env:ADMIN_TOKEN) { $env:ADMIN_TOKEN } else { "" }),
+    [string]$TestTenantId = $(if ($env:TEST_TENANT_ID) { $env:TEST_TENANT_ID } else { "" })
 )
 
 # Colors
@@ -76,9 +76,9 @@ try {
     
     $statsResponse | ConvertTo-Json -Depth 5
     
-    $totalRuns = $statsResponse.stats.totalRuns ?? 0
-    $successRate = $statsResponse.stats.successRate ?? 0
-    $outOfSync = $statsResponse.stats.outOfSyncCount ?? 0
+    $totalRuns = if ($statsResponse.stats.totalRuns) { $statsResponse.stats.totalRuns } else { 0 }
+    $successRate = if ($statsResponse.stats.successRate) { $statsResponse.stats.successRate } else { 0 }
+    $outOfSync = if ($statsResponse.stats.outOfSyncCount) { $statsResponse.stats.outOfSyncCount } else { 0 }
     
     Print-Info "Total Runs (24h): $totalRuns"
     Print-Info "Success Rate: ${successRate}%"
@@ -127,7 +127,7 @@ try {
     $mirrorResponse = Invoke-RestMethod -Uri "$ApiBaseUrl/api/categories/mirror" -Method Post -Headers $headers -Body $body -ContentType "application/json" -ErrorAction Stop
     Print-Success "Mirror endpoint accepted dry-run job (202)"
     
-    $jobId = $mirrorResponse.jobId ?? "unknown"
+    $jobId = if ($mirrorResponse.jobId) { $mirrorResponse.jobId } else { "unknown" }
     Print-Info "Job ID: $jobId"
     $mirrorResponse | ConvertTo-Json -Depth 3
     
@@ -139,7 +139,7 @@ try {
     Print-Test "Verifying job appears in logs"
     $logsCheck = Invoke-RestMethod -Uri "$ApiBaseUrl/api/admin/sync-logs?limit=1" -Method Get -Headers $headers -ErrorAction Stop
     
-    $latestJob = $logsCheck.data[0].jobId ?? "none"
+    $latestJob = if ($logsCheck.data[0].jobId) { $logsCheck.data[0].jobId } else { "none" }
     if ($latestJob -eq $jobId) {
         Print-Success "Job found in sync logs"
     } else {

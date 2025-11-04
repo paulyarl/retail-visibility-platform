@@ -60,7 +60,8 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const loadSyncStats = async () => {
       try {
-        const res = await api.get('/api/admin/sync-stats');
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const res = await api.get(`${apiBaseUrl}/api/admin/sync-stats`);
         if (res.ok) {
           const data = await res.json();
           setSyncStats(data.stats || {
