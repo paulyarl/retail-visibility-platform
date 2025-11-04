@@ -319,20 +319,112 @@ export default function QuickStartPage() {
   // Show main wizard
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="max-w-2xl mx-auto px-4 py-12">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
-          {/* Header */}
-          <div className="text-center mb-8">
+      <div className="max-w-4xl mx-auto px-4 py-12">
+        {/* Page Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Quick Start: Add Products Fast
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 text-lg">
+            Choose the best method to populate your inventory
+          </p>
+        </div>
+
+        {/* Two Options: Generate or Scan */}
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          {/* Option 1: Generate Products */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
             <div className="flex justify-center mb-4">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <Rocket className="w-8 h-8 text-white" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Quick Start: Jumpstart Your Inventory
-            </h1>
+            <h2 className="text-2xl font-bold mb-2 text-center text-gray-900 dark:text-white">
+              Generate Products
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
+              Create 25-100 realistic products instantly with AI
+            </p>
+            
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>Perfect for testing and demos</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>Auto-categorized with prices</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>Ready in 1 second</span>
+              </div>
+            </div>
+
+            <div className="text-center text-xs text-gray-500 dark:text-gray-400 mb-4">
+              Best for: New stores, testing, demos
+            </div>
+          </div>
+
+          {/* Option 2: SKU Scanning */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border-2 border-green-500 dark:border-green-600 relative">
+            <div className="absolute -top-3 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+              RECOMMENDED
+            </div>
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold mb-2 text-center text-gray-900 dark:text-white">
+              Scan Products
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
+              Scan barcodes to add real products with images
+            </p>
+            
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>Automatic product info & images</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>USB scanner or manual entry</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>Real products, real data</span>
+              </div>
+            </div>
+
+            <div className="text-center text-xs text-gray-500 dark:text-gray-400 mb-4">
+              Best for: Real inventory, existing products
+            </div>
+
+            <button
+              onClick={() => router.push('/scan')}
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+              </svg>
+              Start Scanning
+            </button>
+          </div>
+        </div>
+
+        {/* Generate Products Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+              Generate Products Configuration
+            </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              Get started fast with pre-built product templates. Customize them to match your business!
+              Customize your generated product set
             </p>
           </div>
 
