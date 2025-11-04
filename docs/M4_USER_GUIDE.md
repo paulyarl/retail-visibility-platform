@@ -177,15 +177,52 @@ The system automatically enriches products with:
 - **Brand** - Manufacturer or brand name
 - **Category** - Product classification
 - **Description** - Product details
-- **Images** - Product photos (when available)
+- **Images** - Product photos (automatically downloaded and stored) ✨
 - **Price** - Suggested retail price (when available)
 - **Attributes** - Size, color, weight, etc.
 
 **Data Sources:**
 - Internal product database
 - UPC Database API
+- Open Food Facts (includes images)
 - Google Shopping
 - Manufacturer databases
+
+### 📸 Product Images (Automatic)
+
+**What Happens:**
+When you scan a barcode, the system automatically:
+1. ✅ Fetches product images from external sources
+2. ✅ Downloads images to platform storage
+3. ✅ Creates optimized versions
+4. ✅ Links images to your product
+5. ✅ Sets primary image automatically
+
+**Image Support:**
+- **Up to 11 images** per product (Google Merchant Center compliant)
+- **Primary image** - Main product photo (position 0)
+- **Additional images** - Multiple angles, ingredients, nutrition facts
+- **Automatic optimization** - Images optimized for web and mobile
+- **CDN delivery** - Fast loading via Supabase Storage
+
+**Image Sources:**
+- Open Food Facts - Product photos, ingredients, nutrition labels
+- UPC Database - Product images when available
+- Manufacturer data - Official product photos
+
+**No Manual Upload Needed:**
+- Images are automatically downloaded during commit
+- No extra steps required from you
+- Works seamlessly in background
+- Failures don't block product creation
+
+**Viewing Images:**
+After committing scanned products:
+1. Go to **Inventory**
+2. Find your scanned product
+3. Product card shows primary image
+4. Click product to see all images
+5. Images ready for Google Merchant Center feed
 
 ---
 
@@ -355,10 +392,21 @@ If validation fails, you'll see:
 
 **After Commit:**
 - ✅ Items appear in inventory
+- 📸 Product images automatically downloaded and stored
 - 📊 Inventory counts updated
 - 📝 Audit log entry created
 - 🎉 Success notification shown
 - 🔄 Session status: Completed
+
+**Image Processing:**
+During commit, the system automatically:
+- Downloads product images from enrichment sources
+- Uploads to Supabase Storage
+- Creates PhotoAsset records
+- Links images to inventory items
+- Sets primary image (imageUrl)
+- Processes up to 11 images per product
+- Continues even if some images fail
 
 ### What Gets Added to Inventory
 
@@ -551,6 +599,39 @@ Speed up your workflow with shortcuts:
 4. Reduce number of items per session
 5. Commit current session and start new one
 6. Use Chrome or Edge (recommended browsers)
+
+### Images Not Appearing
+
+**Problem:** Scanned products don't have images
+
+**Possible Causes:**
+- Product not in image databases
+- Image download failed
+- Network issues during commit
+- Enrichment disabled
+
+**Solutions:**
+
+**Check Enrichment Enabled:**
+1. Verify `FF_SCAN_ENRICHMENT` is enabled
+2. Contact admin if disabled
+
+**Check Product Source:**
+- Not all products have images available
+- Food products (Open Food Facts) usually have images
+- Generic products may not have images
+
+**Manual Upload:**
+1. Go to product in inventory
+2. Click "Upload Photo"
+3. Add images manually
+
+**Check Logs:**
+Admin can check logs for:
+```
+[commit] Processed 0/3 images for PROD-001
+[commit] Failed to process images: <error>
+```
 
 ### Session Lost
 
