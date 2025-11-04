@@ -6,6 +6,18 @@ import { audit } from '../audit';
 import { z } from 'zod';
 import { UserRole } from '@prisma/client';
 import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
+import {
+  scanSessionStarted,
+  scanSessionCompleted,
+  scanSessionCancelled,
+  scanBarcodeSuccess,
+  scanBarcodeFail,
+  scanBarcodeDuplicate,
+  scanCommitSuccess,
+  scanCommitFail,
+  scanCommitDurationMs,
+  scanValidationError,
+} from '../metrics';
 
 // Helper to check tenant access
 function hasAccessToTenant(req: Request, tenantId: string): boolean {
@@ -99,6 +111,9 @@ router.post('/api/scan/start', authenticateToken, async (req: Request, res: Resp
       });
     } catch {}
 
+    // Emit metric
+    scanSessionStarted.inc({ tenant: tenantId, deviceType: deviceType || 'manual' });
+
     return res.status(201).json({ success: true, session });
   } catch (error: any) {
     console.error('[scan/start] Error:', error);
@@ -175,6 +190,7 @@ router.post('/api/scan/:sessionId/lookup-barcode', authenticateToken, async (req
     });
 
     if (existing) {
+      scanBarcodeDuplicate.inc({ tenant: session.tenantId });
       return res.status(409).json({ success: false, error: 'duplicate_barcode', result: existing });
     }
 
@@ -214,6 +230,12 @@ router.post('/api/scan/:sessionId/lookup-barcode', authenticateToken, async (req
         duplicateCount: duplicateItem ? { increment: 1 } : undefined,
       },
     });
+
+    // Emit metrics
+    scanBarcodeSuccess.inc({ tenant: session.tenantId, hasDuplicate: String(!!duplicateItem) });
+    if (duplicateItem) {
+      scanBarcodeDuplicate.inc({ tenant: session.tenantId });
+    }
 
     return res.status(201).json({
       success: true,
@@ -302,6 +324,7 @@ router.delete('/api/scan/:sessionId/results/:resultId', authenticateToken, async
 // POST /api/scan/:sessionId/commit - Commit scanned items to inventory
 router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Request, res: Response) => {
   try {
+    const startTime = Date.now();
     const { sessionId } = req.params;
     const parsed = commitSessionSchema.safeParse(req.body);
     
@@ -343,6 +366,10 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
     if (!skipValidation) {
       const validation = await validateScanResults(session.results, session.template);
       if (!validation.valid) {
+        // Emit validation error metrics
+        validation.errors.forEach(() => {
+          scanValidationError.inc({ tenant: session.tenantId });
+        });
         return res.status(422).json({ success: false, error: 'validation_failed', validation });
       }
     }
@@ -394,6 +421,12 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
       });
     } catch {}
 
+    // Emit metrics
+    const duration = Date.now() - startTime;
+    scanCommitSuccess.inc({ tenant: session.tenantId, itemCount: String(committed.length) });
+    scanCommitDurationMs.observe(duration, { tenant: session.tenantId });
+    scanSessionCompleted.inc({ tenant: session.tenantId });
+
     return res.json({ success: true, committed: committed.length, itemIds: committed });
   } catch (error: any) {
     console.error('[scan/:sessionId/commit] Error:', error);
@@ -438,6 +471,9 @@ router.delete('/api/scan/:sessionId', authenticateToken, async (req: Request, re
         payload: { sessionId },
       });
     } catch {}
+
+    // Emit metric
+    scanSessionCancelled.inc({ tenant: session.tenantId });
 
     return res.json({ success: true, cancelled: sessionId });
   } catch (error: any) {

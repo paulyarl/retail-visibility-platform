@@ -1,4 +1,12 @@
 import { prisma } from '../prisma';
+import {
+  enrichmentCacheHit,
+  enrichmentCacheMiss,
+  enrichmentApiSuccess,
+  enrichmentApiFail,
+  enrichmentDurationMs,
+  enrichmentFallback,
+} from '../metrics';
 
 // Rate limiting state (in-memory, consider Redis for production)
 const rateLimitState = new Map<string, { count: number; resetAt: number }>();
@@ -39,9 +47,13 @@ export class BarcodeEnrichmentService {
       // 1. Check cache first
       const cached = this.getFromCache(barcode);
       if (cached) {
+        enrichmentCacheHit.inc({ tenant: tenantId });
+        enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'cache' });
         await this.logLookup(tenantId, barcode, 'cache', 'success', cached, Date.now() - startTime);
         return cached;
       }
+
+      enrichmentCacheMiss.inc({ tenant: tenantId });
 
       // 2. Try UPC Database API
       if (this.checkRateLimit('upc_database')) {
@@ -49,10 +61,13 @@ export class BarcodeEnrichmentService {
           const result = await this.enrichFromUPCDatabase(barcode);
           if (result) {
             this.saveToCache(barcode, result);
+            enrichmentApiSuccess.inc({ tenant: tenantId, provider: 'upc_database' });
+            enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'upc_database' });
             await this.logLookup(tenantId, barcode, 'upc_database', 'success', result, Date.now() - startTime);
             return result;
           }
         } catch (error) {
+          enrichmentApiFail.inc({ tenant: tenantId, provider: 'upc_database' });
           console.warn('[Enrichment] UPC Database failed:', error);
         }
       }
@@ -63,10 +78,13 @@ export class BarcodeEnrichmentService {
           const result = await this.enrichFromOpenFoodFacts(barcode);
           if (result) {
             this.saveToCache(barcode, result);
+            enrichmentApiSuccess.inc({ tenant: tenantId, provider: 'open_food_facts' });
+            enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'open_food_facts' });
             await this.logLookup(tenantId, barcode, 'open_food_facts', 'success', result, Date.now() - startTime);
             return result;
           }
         } catch (error) {
+          enrichmentApiFail.inc({ tenant: tenantId, provider: 'open_food_facts' });
           console.warn('[Enrichment] Open Food Facts failed:', error);
         }
       }
@@ -74,6 +92,8 @@ export class BarcodeEnrichmentService {
       // 4. Fallback to stub data
       const fallback = this.createFallbackData(barcode);
       this.saveToCache(barcode, fallback);
+      enrichmentFallback.inc({ tenant: tenantId });
+      enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'fallback' });
       await this.logLookup(tenantId, barcode, 'fallback', 'success', fallback, Date.now() - startTime);
       return fallback;
 
