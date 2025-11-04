@@ -20,6 +20,11 @@ const lookupBarcodeSchema = z.object({
   sku: z.string().optional(),
 });
 
+const precheckSchema = z.object({
+  enforceCategories: z.boolean().optional(),
+  checkDuplicates: z.boolean().optional(),
+});
+
 const commitSessionSchema = z.object({
   skipValidation: z.boolean().optional().default(false),
 });
@@ -33,14 +38,14 @@ router.post('/api/scan/start', authenticateToken, async (req: Request, res: Resp
 
     const parsed = startSessionSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ success: false, error: 'invalid_input', details: parsed.error.errors });
+      return res.status(400).json({ success: false, error: 'invalid_input', details: parsed.error.issues });
     }
 
     const { tenantId, templateId, deviceType, metadata } = parsed.data;
     const userId = (req.user as any)?.userId;
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, tenantId);
+    const hasAccess = await checkTenantAccess(req, res, tenantId);
     if (!hasAccess) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
@@ -69,7 +74,7 @@ router.post('/api/scan/start', authenticateToken, async (req: Request, res: Resp
         templateId,
         deviceType: deviceType || 'manual',
         status: 'active',
-        metadata: metadata || {},
+        metadata: metadata as any || {},
       },
       include: {
         template: true,
@@ -114,7 +119,7 @@ router.get('/api/scan/:sessionId', authenticateToken, async (req: Request, res: 
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, session.tenantId);
+    const hasAccess = await checkTenantAccess(req, res, session.tenantId);
     if (!hasAccess) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
@@ -133,7 +138,7 @@ router.post('/api/scan/:sessionId/lookup-barcode', authenticateToken, async (req
     const parsed = lookupBarcodeSchema.safeParse(req.body);
     
     if (!parsed.success) {
-      return res.status(400).json({ success: false, error: 'invalid_input', details: parsed.error.errors });
+      return res.status(400).json({ success: false, error: 'invalid_input', details: parsed.error.issues });
     }
 
     const { barcode, sku } = parsed.data;
@@ -153,7 +158,7 @@ router.post('/api/scan/:sessionId/lookup-barcode', authenticateToken, async (req
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, session.tenantId);
+    const hasAccess = await checkTenantAccess(req, res, session.tenantId);
     if (!hasAccess) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
@@ -171,12 +176,9 @@ router.post('/api/scan/:sessionId/lookup-barcode', authenticateToken, async (req
     const duplicateItem = await prisma.inventoryItem.findFirst({
       where: {
         tenantId: session.tenantId,
-        OR: [
-          { barcode },
-          { sku: sku || barcode },
-        ],
+        sku: sku || barcode,
       },
-      select: { id: true, name: true, barcode: true, sku: true },
+      select: { id: true, name: true, sku: true },
     });
 
     // Perform barcode lookup/enrichment (stubbed for now)
@@ -231,7 +233,7 @@ router.get('/api/scan/:sessionId/results', authenticateToken, async (req: Reques
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, session.tenantId);
+    const hasAccess = await checkTenantAccess(req, res, session.tenantId);
     if (!hasAccess) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
@@ -263,7 +265,7 @@ router.delete('/api/scan/:sessionId/results/:resultId', authenticateToken, async
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, result.tenantId);
+    const hasAccess = await checkTenantAccess(req, res, result.tenantId);
     if (!hasAccess) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
@@ -298,7 +300,7 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
     const parsed = commitSessionSchema.safeParse(req.body);
     
     if (!parsed.success) {
-      return res.status(400).json({ success: false, error: 'invalid_input', details: parsed.error.errors });
+      return res.status(400).json({ success: false, error: 'invalid_input', details: parsed.error.issues });
     }
 
     const { skipValidation } = parsed.data;
@@ -323,7 +325,7 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, session.tenantId);
+    const hasAccess = await checkTenantAccess(req, res, session.tenantId);
     if (!hasAccess) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
@@ -350,11 +352,10 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
             tenantId: session.tenantId,
             name: enrichment.name || `Product ${result.barcode}`,
             description: enrichment.description || null,
-            barcode: result.barcode,
             sku: result.sku || result.barcode,
             priceCents: enrichment.priceCents || session.template?.defaultPriceCents || 0,
             currency: session.template?.defaultCurrency || 'USD',
-            visibility: session.template?.defaultVisibility || 'private',
+            visibility: (session.template?.defaultVisibility as any) || 'private',
             categoryPath: enrichment.categoryPath || (session.template?.defaultCategory ? [session.template.defaultCategory] : []),
             metadata: { ...enrichment.metadata, scannedFrom: sessionId },
           },
@@ -407,7 +408,7 @@ router.delete('/api/scan/:sessionId', authenticateToken, async (req: Request, re
     }
 
     // Check tenant access
-    const hasAccess = await checkTenantAccess(req, session.tenantId);
+    const hasAccess = await checkTenantAccess(req, res, session.tenantId);
     if (!hasAccess) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
