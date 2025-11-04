@@ -346,12 +346,72 @@ The detailed guide covers:
 - Business Profile
 - Dark Mode
 - i18n Scaffold
+- Category Mirroring
 - (More coming soon)
 
 **How to Toggle:**
 1. Find the feature
 2. Click the toggle switch
 3. Feature enabled/disabled immediately
+
+### Category Sync (Google Business Profile) 🆕
+
+**Location:** `/admin/categories/sync`
+
+**What It Does:**
+Synchronizes product categories between your platform and Google Business Profile (GBP), ensuring consistency across systems and optimizing for Google search visibility.
+
+**Key Features:**
+- 🔄 **Bi-directional Sync** - Platform ↔ Google Business Profile
+- ✅ **Validation** - Dry-run mode to preview changes
+- 🔁 **Auto-Retry** - Handles temporary failures automatically
+- 📊 **Monitoring** - Track sync status and out-of-sync items
+- 📈 **Analytics** - View sync history and performance metrics
+
+**Sync Strategies:**
+
+**Platform to GBP** (Recommended)
+- Push your categories to Google
+- Use when your taxonomy is well-organized
+- Maintains your category structure
+
+**GBP to Platform**
+- Pull Google's categories to your platform
+- Use when adopting Google's standardization
+- Ensures Google compliance
+
+**How to Sync:**
+1. Go to Admin → Category Sync
+2. Choose sync strategy
+3. Enable "Dry Run" for testing (recommended)
+4. Click "Start Sync"
+5. Monitor progress in real-time
+6. Review results
+
+**Monitoring:**
+- **Out-of-Sync Count** - Categories needing sync
+- **Last Sync** - When last sync completed
+- **Success Rate** - % of successful syncs
+- **Sync History** - View past sync operations
+
+**Best Practices:**
+- ✅ Always run dry-run first
+- ✅ Sync regularly (weekly recommended)
+- ✅ Monitor out-of-sync count
+- ✅ Review sync results
+- ✅ Keep category names standardized
+
+**Learn More:**
+
+📚 **[Complete M3 Category Sync Guide](./docs/M3_USER_GUIDE.md)**
+
+The detailed guide covers:
+- Understanding sync strategies
+- Step-by-step sync instructions
+- Category mapping and management
+- Troubleshooting sync issues
+- Advanced features and automation
+- Best practices for category management
 
 ---
 
