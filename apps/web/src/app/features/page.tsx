@@ -85,10 +85,18 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
       </svg>
     ),
-    title: 'Smart Product Categories',
-    description: 'Organize products with Google Product Taxonomy (5,595 categories). Auto-categorization and custom tenant categories for perfect organization.',
-    benefits: ['Google taxonomy sync', 'Custom categories', 'Auto-categorization', 'Hierarchical structure'],
+    title: 'Smart Product Categories + GMB Alignment',
+    description: '🎯 Organize products with Google Product Taxonomy (5,595 categories). Bi-directional sync between your tenant categories and Google My Business categories. Auto-categorization with out-of-sync detection.',
+    benefits: [
+      'Tenant ↔ GMB category sync',
+      'Google taxonomy (5,595 categories)',
+      'Custom tenant categories',
+      'Auto-categorization',
+      'Out-of-sync detection',
+      'Category mirroring'
+    ],
     color: 'bg-indigo-100 text-indigo-600',
+    badge: 'M3',
   },
   {
     icon: (

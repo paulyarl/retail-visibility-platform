@@ -127,18 +127,21 @@ export default function OfferingsPage() {
               </div>
             </div>
 
-            {/* Smart Categories */}
-            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-lg p-6">
+            {/* Smart Categories + GMB Alignment */}
+            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-lg p-6 relative">
+              <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-bold">
+                M3
+              </div>
               <div className="text-4xl mb-3">🏷️</div>
-              <h3 className="text-lg font-bold text-neutral-900 mb-2">Smart Product Categories</h3>
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">Categories + GMB Sync</h3>
               <ul className="space-y-1 text-sm text-neutral-700">
+                <li>• Tenant ↔ GMB category sync</li>
                 <li>• 5,595 Google categories</li>
                 <li>• Auto-categorization</li>
-                <li>• Custom tenant categories</li>
-                <li>• Hierarchical structure</li>
+                <li>• Out-of-sync detection</li>
               </ul>
               <div className="mt-3 pt-3 border-t border-indigo-300">
-                <span className="text-xs font-semibold text-indigo-800">Perfect organization!</span>
+                <span className="text-xs font-semibold text-indigo-800">Perfect alignment!</span>
               </div>
             </div>
 
