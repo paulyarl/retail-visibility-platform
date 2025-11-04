@@ -492,6 +492,220 @@ export default function FeaturesPage() {
         </div>
       </section>
 
+      {/* SKU Scanning Comparison - BREAKTHROUGH */}
+      <section className="py-16 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <div className="inline-block bg-yellow-400 text-green-900 text-sm px-4 py-1 rounded-full font-bold mb-4">
+              🎯 BREAKTHROUGH FEATURE
+            </div>
+            <h2 className="text-4xl font-bold text-neutral-900 mb-4">
+              Product Intelligence That Beats Shopify & WooCommerce
+            </h2>
+            <p className="text-xl text-neutral-600">
+              Get the same rich product pages as CVS, Walmart, and Target. Impossible with traditional e-commerce platforms.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Shopify/WooCommerce */}
+            <div className="bg-white rounded-xl p-6 border-2 border-red-200">
+              <div className="text-center mb-4">
+                <div className="text-4xl mb-2">🛒</div>
+                <h3 className="font-bold text-lg text-neutral-900">Shopify/WooCommerce</h3>
+                <div className="text-red-600 font-semibold text-sm mt-1">Manual Entry Only ❌</div>
+              </div>
+              <ul className="space-y-2 text-sm text-neutral-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">✗</span>
+                  <span>Type everything manually</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">✗</span>
+                  <span>No nutrition facts</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">✗</span>
+                  <span>No allergen warnings</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">✗</span>
+                  <span>No environmental data</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">✗</span>
+                  <span>Basic product pages only</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Major Retailers */}
+            <div className="bg-white rounded-xl p-6 border-2 border-orange-200">
+              <div className="text-center mb-4">
+                <div className="text-4xl mb-2">🏬</div>
+                <h3 className="font-bold text-lg text-neutral-900">CVS/Walmart/Target</h3>
+                <div className="text-orange-600 font-semibold text-sm mt-1">Rich Data, But... ⚠️</div>
+              </div>
+              <ul className="space-y-2 text-sm text-neutral-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Complete nutrition facts</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Allergen warnings</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Environmental data</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-orange-500 mt-0.5">✗</span>
+                  <span>Only for major chains</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-orange-500 mt-0.5">✗</span>
+                  <span>Small retailers left behind</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Our Platform */}
+            <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-6 border-2 border-green-400 shadow-xl scale-105">
+              <div className="text-center mb-4">
+                <div className="text-4xl mb-2">✨</div>
+                <h3 className="font-bold text-lg text-white">Our Platform</h3>
+                <div className="text-yellow-300 font-semibold text-sm mt-1">LEVEL PLAYING FIELD! 🎯</div>
+              </div>
+              <ul className="space-y-2 text-sm text-white">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-300 mt-0.5">✓</span>
+                  <span className="font-medium">Complete nutrition facts</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-300 mt-0.5">✓</span>
+                  <span className="font-medium">Allergen warnings & dietary info</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-300 mt-0.5">✓</span>
+                  <span className="font-medium">Environmental impact data</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-300 mt-0.5">✓</span>
+                  <span className="font-medium">Product specifications</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-300 mt-0.5">✓</span>
+                  <span className="font-medium">For EVERY small retailer!</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Rich Storefront Examples */}
+          <div className="mt-12 bg-white rounded-xl p-8 border-2 border-green-200 shadow-lg">
+            <h3 className="text-2xl font-bold text-neutral-900 mb-6 text-center">
+              What Your Customers See on Your Storefront
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Without Our Platform */}
+              <div>
+                <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-3">
+                  <h4 className="font-bold text-red-900 mb-2">❌ Without Our Platform</h4>
+                  <div className="space-y-2 text-sm text-neutral-700">
+                    <div className="bg-white p-3 rounded border border-red-200">
+                      <p className="font-semibold">Coca-Cola 12oz</p>
+                      <p className="text-xs text-neutral-500">$1.99</p>
+                      <p className="text-xs mt-2 text-neutral-400">That's it. Just name and price.</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-neutral-600 italic">
+                  Shopify/WooCommerce: Basic product info only. No nutrition, no allergens, no trust.
+                </p>
+              </div>
+
+              {/* With Our Platform */}
+              <div>
+                <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4 mb-3">
+                  <h4 className="font-bold text-green-900 mb-2">✅ With Our Platform</h4>
+                  <div className="space-y-2 text-sm text-neutral-700">
+                    <div className="bg-white p-3 rounded border border-green-400 shadow-sm">
+                      <p className="font-semibold">Coca-Cola Classic 12oz</p>
+                      <p className="text-xs text-neutral-500 mb-2">$1.99 • By Coca-Cola</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center gap-1">
+                          <span className="text-green-600">✓</span>
+                          <span>Nutrition Facts</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-green-600">✓</span>
+                          <span>Allergen Info</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-green-600">✓</span>
+                          <span>Ingredients</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-green-600">✓</span>
+                          <span>Eco-Score</span>
+                        </div>
+                      </div>
+                      <p className="text-xs mt-2 text-green-700 font-medium">+ Product images, specs, and more!</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-green-700 font-medium">
+                  Professional product pages that build customer trust and drive sales!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Analytics Dashboard Highlight */}
+          <div className="mt-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white">
+            <div className="text-center">
+              <h3 className="text-2xl font-bold mb-3">PLUS: Real-Time Inventory Intelligence</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                <div className="bg-white/10 rounded-lg p-4">
+                  <div className="text-3xl mb-2">📊</div>
+                  <p className="font-semibold">Analytics Dashboard</p>
+                  <p className="text-xs mt-1 opacity-90">Track your scanning activity</p>
+                </div>
+                <div className="bg-white/10 rounded-lg p-4">
+                  <div className="text-3xl mb-2">✅</div>
+                  <p className="font-semibold">Data Quality</p>
+                  <p className="text-xs mt-1 opacity-90">See completeness metrics</p>
+                </div>
+                <div className="bg-white/10 rounded-lg p-4">
+                  <div className="text-3xl mb-2">🔍</div>
+                  <p className="font-semibold">Preview Tool</p>
+                  <p className="text-xs mt-1 opacity-90">Check before you scan</p>
+                </div>
+                <div className="bg-white/10 rounded-lg p-4">
+                  <div className="text-3xl mb-2">💰</div>
+                  <p className="font-semibold">Cost Savings</p>
+                  <p className="text-xs mt-1 opacity-90">See your ROI</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <div className="inline-block bg-white rounded-lg px-6 py-4 shadow-lg border-2 border-green-400">
+              <p className="text-lg font-bold text-neutral-900 mb-1">
+                🎯 The Breakthrough
+              </p>
+              <p className="text-sm text-neutral-700">
+                Small retailers can now compete with major chains on product information quality.
+                <br />
+                <span className="text-green-600 font-semibold">This was impossible before. Now it's automatic.</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Grid */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
