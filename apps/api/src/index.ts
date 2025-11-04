@@ -652,6 +652,23 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
   }
 });
 
+// Public endpoint for features showcase config (no auth required)
+app.get("/api/public/features-showcase-config", async (req, res) => {
+  try {
+    // Return default config for now (can be extended to read from database later)
+    const defaultConfig = {
+      mode: 'hybrid',
+      rotationEnabled: false,
+      rotationInterval: 24,
+      enabledModes: ['hybrid', 'random', 'fixed']
+    };
+    return res.json(defaultConfig);
+  } catch (e: any) {
+    console.error("[GET /api/public/features-showcase-config] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_config" });
+  }
+});
+
 // PATCH /tenant/profile - partial update
 const tenantProfileUpdateSchema = tenantProfileSchema.partial().extend({ tenant_id: z.string().min(1) });
 app.patch("/tenant/profile", authenticateToken, async (req, res) => {
