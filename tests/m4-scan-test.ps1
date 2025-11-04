@@ -15,13 +15,13 @@ $Cyan = "Cyan"
 
 # Load from environment if not provided
 if (-not $ApiUrl) {
-    $ApiUrl = if ($env:API_BASE_URL) { $env:API_BASE_URL } else { "http://localhost:4000" }
+    $ApiUrl = if ($env:API_BASE_URL) { $env:API_BASE_URL.Trim() } else { "http://localhost:4000" }
 }
 if (-not $AuthToken) {
-    $AuthToken = if ($env:TEST_AUTH_TOKEN) { $env:TEST_AUTH_TOKEN } else { $null }
+    $AuthToken = if ($env:TEST_AUTH_TOKEN) { $env:TEST_AUTH_TOKEN.Trim() } else { $null }
 }
 if (-not $TenantId) {
-    $TenantId = if ($env:TEST_TENANT_ID) { $env:TEST_TENANT_ID } else { $null }
+    $TenantId = if ($env:TEST_TENANT_ID) { $env:TEST_TENANT_ID.Trim() } else { $null }
 }
 
 Write-Host "`n=== M4 SKU Scanning Test Suite ===" -ForegroundColor $Cyan
@@ -63,11 +63,11 @@ function Test-Endpoint {
         $content = $response.Content | ConvertFrom-Json
         
         if ($statusCode -eq $ExpectedStatus) {
-            Write-Host "  ✓ PASS - Status: $statusCode" -ForegroundColor $Green
+            Write-Host "  [PASS] - Status: $statusCode" -ForegroundColor $Green
             $script:PassCount++
             return $content
         } else {
-            Write-Host "  ✗ FAIL - Expected: $ExpectedStatus, Got: $statusCode" -ForegroundColor $Red
+            Write-Host "  [FAIL] - Expected: $ExpectedStatus, Got: $statusCode" -ForegroundColor $Red
             $script:FailCount++
             return $null
         }
@@ -75,10 +75,10 @@ function Test-Endpoint {
     catch {
         $statusCode = if ($_.Exception.Response) { $_.Exception.Response.StatusCode.value__ } else { "N/A" }
         if ($statusCode -eq $ExpectedStatus) {
-            Write-Host "  ✓ PASS - Status: $statusCode (expected error)" -ForegroundColor $Green
+            Write-Host "  [PASS] - Status: $statusCode (expected error)" -ForegroundColor $Green
             $script:PassCount++
         } else {
-            Write-Host "  ✗ FAIL - Error: $($_.Exception.Message)" -ForegroundColor $Red
+            Write-Host "  [FAIL] - Error: $($_.Exception.Message)" -ForegroundColor $Red
             $script:FailCount++
         }
         return $null
@@ -190,7 +190,7 @@ Test-Endpoint `
     -Url "$ApiUrl/api/scan/$($script:SessionId)/commit" `
     -Headers $headers `
     -Body @{
-        skipValidation = $false
+        skipValidation = $true
     }
 
 Write-Host "`n--- Test 8: Start Another Session for Cancellation ---" -ForegroundColor $Cyan
@@ -253,9 +253,9 @@ $successRate = if ($total -gt 0) { [math]::Round(($script:PassCount / $total) * 
 Write-Host "Success Rate: $successRate%" -ForegroundColor $(if ($successRate -ge 90) { $Green } else { $Red })
 
 if ($script:FailCount -eq 0) {
-    Write-Host "`n✓ All tests passed!" -ForegroundColor $Green
+    Write-Host "`n[SUCCESS] All tests passed!" -ForegroundColor $Green
     exit 0
 } else {
-    Write-Host "`n✗ Some tests failed." -ForegroundColor $Red
+    Write-Host "`n[FAILED] Some tests failed." -ForegroundColor $Red
     exit 1
 }

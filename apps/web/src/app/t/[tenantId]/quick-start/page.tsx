@@ -58,7 +58,7 @@ export default function QuickStartPage() {
 
   const fetchScenarios = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
       
       const headers: Record<string, string> = {};
@@ -79,7 +79,7 @@ export default function QuickStartPage() {
 
   const checkEligibility = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
       
       const headers: Record<string, string> = {};
@@ -111,7 +111,7 @@ export default function QuickStartPage() {
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
       
       const headers: Record<string, string> = {

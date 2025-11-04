@@ -81,7 +81,7 @@ export default function CategoryQuickStartPage() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/tenants/${tenantId}/categories/quick-start`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/v1/tenants/${tenantId}/categories/quick-start`, {
         method: 'POST',
         headers,
         credentials: 'include',

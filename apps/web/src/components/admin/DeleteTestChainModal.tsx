@@ -27,7 +27,7 @@ export default function DeleteTestChainModal({ onClose }: DeleteTestChainModalPr
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const res = await fetch(`${apiUrl}/api/admin/tools/test-chains/${organizationId}?confirm=true`, {
         method: 'DELETE',
         credentials: 'include',
