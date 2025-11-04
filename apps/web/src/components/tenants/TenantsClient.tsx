@@ -413,7 +413,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: index * 0.05 }}
-        className="p-4 border border-neutral-200 rounded-lg hover:shadow-md transition-shadow bg-white"
+        className="p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 shadow-md hover:shadow-xl transition-all duration-200 hover:-translate-y-1"
       >
         {/* Tenant Info */}
         <div className="flex-1 min-w-0">
