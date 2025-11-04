@@ -436,6 +436,216 @@ export default function FeaturesPage() {
         <FeaturesShowcase mode="hybrid" />
       </section>
 
+      {/* Quick Start + Scanning Integration Callout */}
+      <section className="py-16 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-12"
+          >
+            <div className="inline-block bg-yellow-400 text-yellow-900 px-4 py-2 rounded-full font-bold text-sm mb-4">
+              ⚡ POWER COMBO
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              Quick Start Wizard + Product Scanning
+            </h2>
+            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+              These aren't competing features—they're a <strong className="text-yellow-300">perfectly aligned system</strong> that saves you 15+ hours per 100 products
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {/* Step 1: Quick Start */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="bg-white rounded-xl p-6 shadow-2xl"
+            >
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl font-bold text-blue-600">1</span>
+                </div>
+                <h3 className="text-xl font-bold text-neutral-900 mb-2">
+                  ⚡ Quick Start Wizard
+                </h3>
+                <p className="text-sm text-neutral-600 font-semibold">Generate in 5 minutes</p>
+              </div>
+              <ul className="space-y-2 text-sm text-neutral-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">✓</span>
+                  <span>Generate <strong>100 products instantly</strong></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">✓</span>
+                  <span>Basic info (name, category, price)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-600 mt-0.5">⚠</span>
+                  <span>Missing: Images, descriptions, specs</span>
+                </li>
+              </ul>
+            </motion.div>
+
+            {/* Step 2: Product Scanning */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="bg-white rounded-xl p-6 shadow-2xl border-4 border-yellow-400"
+            >
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl font-bold text-purple-600">2</span>
+                </div>
+                <h3 className="text-xl font-bold text-neutral-900 mb-2">
+                  📱 Product Scanning
+                </h3>
+                <p className="text-sm text-neutral-600 font-semibold">Enrich in 50 minutes</p>
+              </div>
+              <ul className="space-y-2 text-sm text-neutral-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">✓</span>
+                  <span><strong>Detects matching products</strong></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">✓</span>
+                  <span>Adds professional images (3+)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">✓</span>
+                  <span>Adds descriptions & specifications</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">✓</span>
+                  <span>Enriches existing products (no duplicates!)</span>
+                </li>
+              </ul>
+            </motion.div>
+
+            {/* Step 3: Result */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-6 shadow-2xl"
+            >
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">🎉</span>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">
+                  Complete Products
+                </h3>
+                <p className="text-sm text-green-100 font-semibold">Ready in 55 minutes</p>
+              </div>
+              <ul className="space-y-2 text-sm text-white">
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-300 mt-0.5">★</span>
+                  <span><strong>100 fully enriched products</strong></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-300 mt-0.5">★</span>
+                  <span>Professional images & descriptions</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-300 mt-0.5">★</span>
+                  <span>Complete specifications</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-300 mt-0.5">★</span>
+                  <span>Ready for Google Shopping</span>
+                </li>
+              </ul>
+            </motion.div>
+          </div>
+
+          {/* Time Savings Comparison */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+            className="bg-white rounded-xl p-8 shadow-2xl"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Old Way */}
+              <div>
+                <h4 className="text-lg font-bold text-red-600 mb-4 flex items-center gap-2">
+                  <span className="text-2xl">❌</span>
+                  The Old Way (Manual Entry)
+                </h4>
+                <div className="space-y-3 text-neutral-700">
+                  <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                    <span>Enter 100 products manually</span>
+                    <span className="font-bold text-red-600">16.7 hours</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                    <span>Labor cost (@$25/hour)</span>
+                    <span className="font-bold text-red-600">$417.50</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                    <span>Data quality</span>
+                    <span className="font-bold text-red-600">Inconsistent</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* New Way */}
+              <div>
+                <h4 className="text-lg font-bold text-green-600 mb-4 flex items-center gap-2">
+                  <span className="text-2xl">✅</span>
+                  The Smart Way (Quick Start + Scan)
+                </h4>
+                <div className="space-y-3 text-neutral-700">
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <span>Quick Start + Scan enrichment</span>
+                    <span className="font-bold text-green-600">55 minutes</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <span>Labor cost (@$25/hour)</span>
+                    <span className="font-bold text-green-600">$22.92</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <span>Data quality</span>
+                    <span className="font-bold text-green-600">Professional</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Savings Summary */}
+            <div className="mt-8 pt-8 border-t-2 border-neutral-200">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-neutral-900 mb-2">
+                  💰 Save <span className="text-green-600">$394.58</span> and <span className="text-blue-600">15.75 hours</span> per 100 products
+                </p>
+                <p className="text-neutral-600">
+                  That's a <strong className="text-purple-600">94% time reduction</strong> with better quality data!
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Key Insight */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+            className="mt-8 bg-yellow-400 rounded-xl p-6 text-center"
+          >
+            <p className="text-xl font-bold text-yellow-900 mb-2">
+              🎯 The Key: They Work TOGETHER, Not Against Each Other
+            </p>
+            <p className="text-neutral-800 max-w-3xl mx-auto">
+              Quick Start Wizard creates the foundation instantly. Product Scanning enriches it with professional data. 
+              The result? <strong>Complete, accurate products in under an hour</strong> instead of days of manual work.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
       {/* What You Get Overview */}
       <section className="py-16 bg-white border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
