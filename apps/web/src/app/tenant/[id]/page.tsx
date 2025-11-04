@@ -70,9 +70,11 @@ function parseTimeToMinutes(t: string): number | null {
 function minutesToLabel(mins: number, timeZone?: string): string {
   const hh = Math.floor(mins / 60);
   const mm = mins % 60;
-  const date = new Date();
-  date.setHours(hh, mm, 0, 0);
-  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
+  // Convert to 12-hour format
+  const period = hh >= 12 ? 'PM' : 'AM';
+  const hour12 = hh % 12 || 12;
+  const mmStr = mm.toString().padStart(2, '0');
+  return `${hour12}:${mmStr} ${period}`;
 }
 
 function computeStoreStatus(hours: any): { isOpen: boolean; label: string } | null {
