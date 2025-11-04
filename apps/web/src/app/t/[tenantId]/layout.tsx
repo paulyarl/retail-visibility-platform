@@ -57,6 +57,7 @@ export default async function TenantLayout({ children, params }: { children: Rea
     { label: 'Dashboard', href: `/t/${tenantId}/dashboard` },
     { label: 'Items', href: `/t/${tenantId}/items` },
     { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
+    { label: 'Insights', href: `/t/${tenantId}/insights` },
     { label: 'Storefront', href: `/tenant/${tenantId}` },
     // Categories link gated by FF_CATEGORY_MANAGEMENT_PAGE; default show when flag off is false? Keep conservative: show only when enabled
     ...(ffCategoryMgmt ? [{ label: 'Categories', href: `/t/${tenantId}/categories` }] as const : []),
