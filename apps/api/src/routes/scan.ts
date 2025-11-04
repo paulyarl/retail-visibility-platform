@@ -5,6 +5,7 @@ import { Flags } from '../config';
 import { audit } from '../audit';
 import { z } from 'zod';
 import { UserRole } from '@prisma/client';
+import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
 
 // Helper to check tenant access
 function hasAccessToTenant(req: Request, tenantId: string): boolean {
@@ -186,8 +187,10 @@ router.post('/api/scan/:sessionId/lookup-barcode', authenticateToken, async (req
       select: { id: true, name: true, sku: true },
     });
 
-    // Perform barcode lookup/enrichment (stubbed for now)
-    const enrichment = await performBarcodeEnrichment(barcode, session.tenantId);
+    // Perform barcode lookup/enrichment using the service
+    const enrichment = Flags.SCAN_ENRICHMENT 
+      ? await barcodeEnrichmentService.enrich(barcode, session.tenantId)
+      : null;
 
     // Create scan result
     const result = await prisma.scanResult.create({
@@ -443,53 +446,53 @@ router.delete('/api/scan/:sessionId', authenticateToken, async (req: Request, re
   }
 });
 
-// Helper: Perform barcode enrichment (stubbed)
-async function performBarcodeEnrichment(barcode: string, tenantId: string): Promise<any> {
-  // Log the lookup
-  const startTime = Date.now();
-  
+// Admin endpoints for enrichment stats
+router.get('/api/admin/enrichment/cache-stats', authenticateToken, async (req: Request, res: Response) => {
   try {
-    // TODO: Call external barcode API (UPC Database, Open Food Facts, etc.)
-    // For now, return stubbed data
-    const enrichment = {
-      name: `Product ${barcode}`,
-      description: 'Enrichment data will be added in future implementation',
-      categoryPath: [],
-      metadata: {
-        source: 'stub',
-        barcode,
-      },
-    };
+    if ((req.user as any)?.role !== UserRole.ADMIN) {
+      return res.status(403).json({ success: false, error: 'admin_required' });
+    }
 
-    // Log successful lookup
-    await prisma.barcodeLookupLog.create({
-      data: {
-        tenantId,
-        barcode,
-        provider: 'stub',
-        status: 'success',
-        response: enrichment,
-        latencyMs: Date.now() - startTime,
-      },
-    });
-
-    return enrichment;
+    const stats = barcodeEnrichmentService.getCacheStats();
+    return res.json({ success: true, stats });
   } catch (error: any) {
-    // Log failed lookup
-    await prisma.barcodeLookupLog.create({
-      data: {
-        tenantId,
-        barcode,
-        provider: 'stub',
-        status: 'error',
-        error: error.message,
-        latencyMs: Date.now() - startTime,
-      },
-    });
-
-    return null;
+    console.error('[enrichment/cache-stats] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
-}
+});
+
+router.get('/api/admin/enrichment/rate-limits', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    if ((req.user as any)?.role !== UserRole.ADMIN) {
+      return res.status(403).json({ success: false, error: 'admin_required' });
+    }
+
+    const stats = barcodeEnrichmentService.getRateLimitStats();
+    return res.json({ success: true, stats });
+  } catch (error: any) {
+    console.error('[enrichment/rate-limits] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
+router.post('/api/admin/enrichment/clear-cache', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    if ((req.user as any)?.role !== UserRole.ADMIN) {
+      return res.status(403).json({ success: false, error: 'admin_required' });
+    }
+
+    const { barcode } = req.body;
+    barcodeEnrichmentService.clearCache(barcode);
+    
+    return res.json({ 
+      success: true, 
+      message: barcode ? `Cache cleared for ${barcode}` : 'All cache cleared' 
+    });
+  } catch (error: any) {
+    console.error('[enrichment/clear-cache] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
 
 // Helper: Validate scan results
 async function validateScanResults(results: any[], template: any): Promise<{ valid: boolean; errors: any[] }> {
