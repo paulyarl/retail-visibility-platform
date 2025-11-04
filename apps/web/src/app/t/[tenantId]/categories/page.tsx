@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { api, API_BASE_URL } from '@/lib/api'
+import { Pagination } from '@/components/ui'
 
 interface Category {
   id: string
@@ -34,6 +35,10 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
   // Edit modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selected, setSelected] = useState<Category | null>(null)
@@ -55,6 +60,13 @@ export default function CategoriesPage() {
     setToast({ type, message })
     setTimeout(() => setToast(null), 3000)
   }
+
+  // Paginated categories
+  const paginatedCategories = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return categories.slice(startIndex, endIndex)
+  }, [categories, currentPage, pageSize])
 
   useEffect(() => {
     async function fetchData() {
@@ -317,7 +329,7 @@ export default function CategoriesPage() {
               No categories found. Create your first category to get started.
             </div>
           ) : (
-            categories.map((cat) => (
+            paginatedCategories.map((cat) => (
               <div key={cat.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
@@ -357,6 +369,18 @@ export default function CategoriesPage() {
             ))
           )}
         </div>
+        {categories.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalItems={categories.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setCurrentPage(1)
+            }}
+          />
+        )}
       </div>
 
       {/* Category Quick Start Wizard CTA */}
