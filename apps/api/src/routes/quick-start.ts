@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { generateQuickStartProducts, getAvailableScenarios, QuickStartScenario } from '../lib/quick-start';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { UserRole } from '@prisma/client';
 
 const router = Router();
 
@@ -89,7 +90,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, async (req, res
 
     // Check if user is a platform admin (admins can use Quick Start on any tenant)
     const user = (req as any).user;
-    const isPlatformAdmin = user?.role === 'platform_admin' || user?.isPlatformAdmin === true;
+    const isPlatformAdmin = user?.role === UserRole.ADMIN;
 
     // Verify tenant exists and user has access
     const tenant = await prisma.tenant.findUnique({
@@ -211,7 +212,7 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
 
     // Check if user is a platform admin (admins bypass all limits)
     const user = (req as any).user;
-    const isPlatformAdmin = user?.role === 'platform_admin' || user?.isPlatformAdmin === true;
+    const isPlatformAdmin = user?.role === UserRole.ADMIN;
 
     // Check rate limit (platform admins bypass this)
     const rateLimit = isPlatformAdmin ? { allowed: true } : checkRateLimit(tenantId);
@@ -273,7 +274,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
 
     // Check if user is a platform admin (admins can use Quick Start on any tenant)
     const user = (req as any).user;
-    const isPlatformAdmin = user?.role === 'platform_admin' || user?.isPlatformAdmin === true;
+    const isPlatformAdmin = user?.role === UserRole.ADMIN;
 
     // Verify tenant exists and user has access
     const tenant = await prisma.tenant.findUnique({
