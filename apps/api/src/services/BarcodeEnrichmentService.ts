@@ -230,7 +230,9 @@ export class BarcodeEnrichmentService {
     // Cleanup old entries (simple LRU)
     if (enrichmentCache.size > 10000) {
       const oldestKey = enrichmentCache.keys().next().value;
-      enrichmentCache.delete(oldestKey);
+      if (oldestKey) {
+        enrichmentCache.delete(oldestKey);
+      }
     }
   }
 
@@ -276,7 +278,7 @@ export class BarcodeEnrichmentService {
         data: {
           tenantId,
           barcode,
-          provider,
+          provider: provider || 'unknown',
           status,
           response: response || undefined,
           latencyMs: Math.round(latencyMs),

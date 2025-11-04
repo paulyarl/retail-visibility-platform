@@ -200,7 +200,7 @@ router.post('/api/scan/:sessionId/lookup-barcode', authenticateToken, async (req
         barcode,
         sku: sku || barcode,
         status: duplicateItem ? 'duplicate' : 'new',
-        enrichment: enrichment || {},
+        enrichment: enrichment as any || {},
         duplicateOf: duplicateItem?.id,
         rawPayload: { barcode, sku, timestamp: new Date().toISOString() },
       },
