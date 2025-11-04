@@ -639,6 +639,175 @@ Speed up your workflow with shortcuts:
 
 ---
 
+## 📊 Inventory Intelligence Dashboard
+
+### Your Personal Analytics Hub
+
+**Location:** `/t/[tenantId]/insights`
+
+The Inventory Intelligence Dashboard gives you complete visibility into your scanning activity, data quality, and product insights.
+
+### Key Metrics at a Glance
+
+**Dashboard Overview:**
+```
+┌─────────────────────────────────────────────────┐
+│  📦 Total Products Scanned: 1,234               │
+│  📈 Last 30 Days: 234 products                  │
+│  💰 Your Savings: $11.56                        │
+│  📊 Nutrition Data: 87% coverage                │
+└─────────────────────────────────────────────────┘
+```
+
+### Data Quality Tracking
+
+**See Your Product Completeness:**
+- **Nutrition Facts:** X% of products have complete nutrition data
+- **Product Images:** X% of products have images
+- **Environmental Data:** X% of products have Eco-Score
+- **Allergen Info:** X% of products have allergen warnings
+
+**Why This Matters:**
+- Identify products needing manual enrichment
+- Track improvement over time
+- Ensure customer-facing data is complete
+- Focus efforts on incomplete categories
+
+### Your Most Scanned Products
+
+**Top 10 Products in Your Store:**
+```
+1. Coca-Cola 12oz - 234 scans
+2. Tide Detergent - 187 scans
+3. Cheerios - 156 scans
+...
+```
+
+**Insights You Get:**
+- Understand your inventory patterns
+- Identify your best sellers
+- Optimize reordering
+- Track product popularity
+
+### Product Preview Tool
+
+**Check Before You Scan:**
+
+**How to Use:**
+1. Enter a barcode in the preview tool
+2. Click "Check"
+3. See what data is available
+
+**Preview Results:**
+
+**✅ Product Found in Cache:**
+```
+Product: Coca-Cola Classic 12oz by Coca-Cola
+✅ Nutrition Facts Available
+✅ Product Images Available (3)
+✅ Allergen Info Available
+✅ Environmental Data Available
+
+Scanned by 1,234 other stores
+→ This product will have complete data!
+```
+
+**⚠️ Product Not in Cache:**
+```
+Not in Cache
+Will fetch from external APIs when scanned.
+This product will be cached for future use.
+```
+
+**Benefits:**
+- Know what data you'll get before scanning
+- Decide if manual entry is needed
+- Build confidence in the system
+- See product popularity
+
+### Your Cost Savings
+
+**See Your ROI:**
+```
+💰 Your Savings from Universal Cache:
+
+Products Scanned: 1,234
+Cache Hits: 1,156 (94%)
+API Calls Saved: 1,156
+Estimated Savings: $11.56
+
+Without Platform: $12.34
+With Platform: $0.78
+You Saved: $11.56 (94%)
+```
+
+**Why This Matters:**
+- See tangible ROI
+- Understand platform value
+- Justify subscription cost
+- Track efficiency gains
+
+### Accessing the Dashboard
+
+**From Main Menu:**
+1. Navigate to **Insights** or **Analytics**
+2. View your scanning metrics
+3. Check product preview tool
+4. Review top products
+
+**From Scanning Page:**
+- Link to insights dashboard
+- Quick access to analytics
+- Preview tool integration
+
+### What You Can Do
+
+**Track Performance:**
+- Monitor scanning activity
+- See weekly/monthly trends
+- Track data quality improvements
+- Identify patterns
+
+**Improve Quality:**
+- Find products without nutrition data
+- Identify products missing images
+- Focus manual enrichment efforts
+- Ensure complete customer experience
+
+**Gain Insights:**
+- Understand best sellers
+- Track inventory patterns
+- Optimize product mix
+- Make data-driven decisions
+
+**Verify Value:**
+- See cost savings
+- Track cache efficiency
+- Understand platform ROI
+- Justify investment
+
+### Tips for Using the Dashboard
+
+**Regular Check-ins:**
+- Review weekly to track progress
+- Monitor data quality trends
+- Check top products monthly
+- Use preview tool before big scanning sessions
+
+**Data Quality Goals:**
+- Aim for 90%+ nutrition coverage
+- Target 95%+ image coverage
+- Improve environmental data over time
+- Complete allergen info for food products
+
+**Preview Tool Best Practices:**
+- Check new products before scanning
+- Verify popular items are in cache
+- Plan manual entry for uncached items
+- Share findings with team
+
+---
+
 ## 🔧 Troubleshooting
 
 ### Scanner Not Working
