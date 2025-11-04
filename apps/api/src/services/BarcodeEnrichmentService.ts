@@ -46,22 +46,34 @@ export class BarcodeEnrichmentService {
     const startTime = Date.now();
     
     try {
-      // 1. Check cache first
-      const cached = this.getFromCache(barcode);
-      if (cached) {
+      // 1. Check in-memory cache first (fastest)
+      const memCached = this.getFromCache(barcode);
+      if (memCached) {
         enrichmentCacheHit.inc({ tenant: tenantId });
-        enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'cache' });
-        await this.logLookup(tenantId, barcode, 'cache', 'success', cached, Date.now() - startTime);
-        return cached;
+        enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'memory_cache' });
+        await this.logLookup(tenantId, barcode, 'memory_cache', 'success', memCached, Date.now() - startTime);
+        return memCached;
+      }
+
+      // 2. Check database cache (persistent, cross-tenant)
+      const dbCached = await this.getFromDatabase(barcode);
+      if (dbCached) {
+        // Save to memory cache for faster subsequent access
+        this.saveToCache(barcode, dbCached);
+        enrichmentCacheHit.inc({ tenant: tenantId });
+        enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'database_cache' });
+        await this.logLookup(tenantId, barcode, 'database_cache', 'success', dbCached, Date.now() - startTime);
+        return dbCached;
       }
 
       enrichmentCacheMiss.inc({ tenant: tenantId });
 
-      // 2. Try UPC Database API
+      // 3. Try UPC Database API
       if (this.checkRateLimit('upc_database')) {
         try {
           const result = await this.enrichFromUPCDatabase(barcode);
           if (result) {
+            await this.saveToDatabase(barcode, result);
             this.saveToCache(barcode, result);
             enrichmentApiSuccess.inc({ tenant: tenantId, provider: 'upc_database' });
             enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'upc_database' });
@@ -74,11 +86,12 @@ export class BarcodeEnrichmentService {
         }
       }
 
-      // 3. Try Open Food Facts API
+      // 4. Try Open Food Facts API
       if (this.checkRateLimit('open_food_facts')) {
         try {
           const result = await this.enrichFromOpenFoodFacts(barcode);
           if (result) {
+            await this.saveToDatabase(barcode, result);
             this.saveToCache(barcode, result);
             enrichmentApiSuccess.inc({ tenant: tenantId, provider: 'open_food_facts' });
             enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'open_food_facts' });
@@ -91,8 +104,9 @@ export class BarcodeEnrichmentService {
         }
       }
 
-      // 4. Fallback to stub data
+      // 5. Fallback to stub data
       const fallback = this.createFallbackData(barcode);
+      await this.saveToDatabase(barcode, fallback);
       this.saveToCache(barcode, fallback);
       enrichmentFallback.inc({ tenant: tenantId });
       enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'fallback' });
@@ -262,6 +276,84 @@ export class BarcodeEnrichmentService {
       if (oldestKey) {
         enrichmentCache.delete(oldestKey);
       }
+    }
+  }
+
+  /**
+   * Database cache management (persistent, cross-tenant)
+   */
+  private async getFromDatabase(barcode: string): Promise<EnrichmentResult | null> {
+    try {
+      const cached = await prisma.barcodeEnrichment.findUnique({
+        where: { barcode },
+      });
+
+      if (!cached) {
+        return null;
+      }
+
+      // Update fetch count and last fetched timestamp
+      await prisma.barcodeEnrichment.update({
+        where: { barcode },
+        data: {
+          fetchCount: { increment: 1 },
+          lastFetchedAt: new Date(),
+        },
+      });
+
+      // Convert database record to EnrichmentResult
+      return {
+        name: cached.name || undefined,
+        brand: cached.brand || undefined,
+        description: cached.description || undefined,
+        categoryPath: cached.categoryPath || undefined,
+        priceCents: cached.priceCents || undefined,
+        imageUrl: cached.imageUrl || undefined,
+        imageThumbnailUrl: cached.imageThumbnailUrl || undefined,
+        metadata: (cached.metadata as Record<string, any>) || undefined,
+        source: cached.source as any,
+      };
+    } catch (error) {
+      console.error('[Enrichment] Database cache read error:', error);
+      return null;
+    }
+  }
+
+  private async saveToDatabase(barcode: string, data: EnrichmentResult): Promise<void> {
+    try {
+      await prisma.barcodeEnrichment.upsert({
+        where: { barcode },
+        create: {
+          barcode,
+          name: data.name || null,
+          brand: data.brand || null,
+          description: data.description || null,
+          categoryPath: data.categoryPath || [],
+          priceCents: data.priceCents || null,
+          imageUrl: data.imageUrl || null,
+          imageThumbnailUrl: data.imageThumbnailUrl || null,
+          metadata: data.metadata || null,
+          source: data.source,
+          lastFetchedAt: new Date(),
+          fetchCount: 1,
+        },
+        update: {
+          name: data.name || null,
+          brand: data.brand || null,
+          description: data.description || null,
+          categoryPath: data.categoryPath || [],
+          priceCents: data.priceCents || null,
+          imageUrl: data.imageUrl || null,
+          imageThumbnailUrl: data.imageThumbnailUrl || null,
+          metadata: data.metadata || null,
+          source: data.source,
+          lastFetchedAt: new Date(),
+          fetchCount: { increment: 1 },
+        },
+      });
+    } catch (error) {
+      // Don't fail enrichment if database save fails
+      console.error('[Enrichment] Database cache write error:', error);
     }
   }
 

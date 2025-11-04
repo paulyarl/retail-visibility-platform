@@ -935,3 +935,26 @@ model BarcodeLookupLog {
   @@index([barcode])
   @@map("barcode_lookup_log")
 }
+
+model BarcodeEnrichment {
+  id                String   @id @default(cuid())
+  barcode           String   @unique
+  name              String?
+  brand             String?
+  description       String?
+  categoryPath      String[] @map("category_path")
+  priceCents        Int?     @map("price_cents")
+  imageUrl          String?  @map("image_url")
+  imageThumbnailUrl String?  @map("image_thumbnail_url")
+  metadata          Json?
+  source            String   // 'upc_database', 'open_food_facts', 'manual'
+  lastFetchedAt     DateTime @default(now()) @map("last_fetched_at")
+  fetchCount        Int      @default(1) @map("fetch_count")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([barcode])
+  @@index([source])
+  @@index([lastFetchedAt])
+  @@map("barcode_enrichment")
+}
