@@ -95,6 +95,7 @@ import categoriesTenantRoutes from './routes/categories.tenant';
 import categoriesMirrorRoutes from './routes/categories.mirror';
 import mirrorAdminRoutes from './routes/mirror.admin';
 import syncLogsRoutes from './routes/sync-logs';
+import scanRoutes from './routes/scan';
 import quickStartRoutes from './routes/quick-start';
 import adminToolsRoutes from './routes/admin-tools';
 import testGbpRoutes from './routes/test-gbp';
@@ -1938,6 +1939,8 @@ app.use(categoriesTenantRoutes);
 app.use(categoriesMirrorRoutes);
 app.use(mirrorAdminRoutes);
 app.use(syncLogsRoutes);
+// M4: SKU Scanning routes
+app.use(scanRoutes);
 
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenantId/items/:itemId/category
