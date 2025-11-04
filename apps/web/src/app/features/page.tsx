@@ -63,6 +63,25 @@ const features = [
   {
     icon: (
       <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+      </svg>
+    ),
+    title: 'SKU Scanning - Real Inventory, Real Fast',
+    description: '📱 Scan barcodes with USB scanner or manual entry. Automatic product enrichment with names, images, categories, and prices from 50M+ products. Add real inventory in seconds, not hours.',
+    benefits: [
+      'USB scanner & manual entry support',
+      'Auto product info & images',
+      'Universal barcode cache (80% faster)',
+      'Batch scanning & commit',
+      'Duplicate detection',
+      'Google Merchant Center ready'
+    ],
+    color: 'bg-gradient-to-br from-green-500 to-emerald-600 text-white',
+    badge: 'NEW!',
+  },
+  {
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
       </svg>
     ),
@@ -70,7 +89,6 @@ const features = [
     description: 'Organize products with Google Product Taxonomy (5,595 categories). Auto-categorization and custom tenant categories for perfect organization.',
     benefits: ['Google taxonomy sync', 'Custom categories', 'Auto-categorization', 'Hierarchical structure'],
     color: 'bg-indigo-100 text-indigo-600',
-    badge: 'NEW!',
   },
   {
     icon: (
@@ -89,10 +107,18 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
       </svg>
     ),
-    title: 'Google Integration & SWIS',
-    description: 'Seamless sync with Google Merchant Center, Business Profile, and See What\'s In Store (SWIS) for maximum online visibility.',
-    benefits: ['Merchant Center sync', 'SWIS integration', 'Auto product feed', 'Local inventory ads'],
-    color: 'bg-green-100 text-green-600',
+    title: 'Full Google Business Profile Integration',
+    description: '🚀 Complete GMB sync: categories, business hours, photos, and products. Bi-directional category sync, automatic feed generation, and SWIS (See What\'s In Store) for maximum local visibility.',
+    benefits: [
+      'Full GMB category sync',
+      'Business hours automation',
+      'Product feed auto-generation',
+      'SWIS integration',
+      'Local inventory ads',
+      'Out-of-sync detection'
+    ],
+    color: 'bg-gradient-to-br from-blue-500 to-green-600 text-white',
+    badge: 'COMPLETE',
   },
   {
     icon: (

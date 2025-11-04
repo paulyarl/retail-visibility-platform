@@ -108,12 +108,27 @@ export default function OfferingsPage() {
           </div>
 
           {/* Second row of features */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-            {/* Smart Categories */}
-            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-lg p-6 relative">
-              <div className="absolute -top-2 -right-2 bg-yellow-400 text-indigo-900 text-xs px-3 py-1 rounded-full font-bold">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+            {/* SKU Scanning - NEW! */}
+            <div className="bg-gradient-to-br from-green-500 to-emerald-600 border-2 border-green-400 rounded-lg p-6 text-white relative shadow-xl">
+              <div className="absolute -top-2 -right-2 bg-yellow-400 text-green-900 text-xs px-3 py-1 rounded-full font-bold">
                 NEW!
               </div>
+              <div className="text-4xl mb-3">🔍</div>
+              <h3 className="text-lg font-bold mb-2">SKU Scanning</h3>
+              <ul className="space-y-1 text-sm">
+                <li>• Scan barcodes instantly</li>
+                <li>• Auto product info & images</li>
+                <li>• USB or manual entry</li>
+                <li>• Universal barcode cache</li>
+              </ul>
+              <div className="mt-3 pt-3 border-t border-green-300">
+                <span className="text-xs font-semibold">Real inventory, real fast!</span>
+              </div>
+            </div>
+
+            {/* Smart Categories */}
+            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-lg p-6">
               <div className="text-4xl mb-3">🏷️</div>
               <h3 className="text-lg font-bold text-neutral-900 mb-2">Smart Product Categories</h3>
               <ul className="space-y-1 text-sm text-neutral-700">
