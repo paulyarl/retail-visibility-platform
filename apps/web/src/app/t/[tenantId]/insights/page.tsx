@@ -57,8 +57,10 @@ export default function TenantInsightsPage() {
 
   const loadAnalytics = async () => {
     try {
-      const response = await fetch(`/api/scan/tenant/${tenantId}/analytics`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${apiBaseUrl}/api/scan/tenant/${tenantId}/analytics`, {
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       const data = await response.json();
       if (data.success) {
@@ -78,8 +80,10 @@ export default function TenantInsightsPage() {
     setPreviewResult(null);
     
     try {
-      const response = await fetch(`/api/scan/preview/${previewBarcode}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${apiBaseUrl}/api/scan/preview/${previewBarcode}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       const data = await response.json();
       if (data.success) {
