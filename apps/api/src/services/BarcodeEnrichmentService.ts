@@ -17,6 +17,8 @@ interface EnrichmentResult {
   brand?: string;
   categoryPath?: string[];
   priceCents?: number;
+  imageUrl?: string;
+  imageThumbnailUrl?: string;
   metadata?: Record<string, any>;
   source: 'cache' | 'upc_database' | 'open_food_facts' | 'stub' | 'fallback';
 }
@@ -188,6 +190,8 @@ export class BarcodeEnrichmentService {
       description: product.generic_name || null,
       brand: product.brands || 'Unknown',
       categoryPath: product.categories_tags?.slice(0, 3) || [],
+      imageUrl: product.image_url || product.image_front_url || null,
+      imageThumbnailUrl: product.image_small_url || product.image_thumb_url || null,
       metadata: {
         barcode: product.code,
         quantity: product.quantity,
@@ -195,6 +199,11 @@ export class BarcodeEnrichmentService {
         countries: product.countries,
         ingredients: product.ingredients_text_en,
         nutrition_grade: product.nutrition_grade_fr,
+        images: {
+          front: product.image_front_url,
+          ingredients: product.image_ingredients_url,
+          nutrition: product.image_nutrition_url,
+        },
       },
       source: 'open_food_facts',
     };

@@ -6,6 +6,7 @@ import { audit } from '../audit';
 import { z } from 'zod';
 import { UserRole } from '@prisma/client';
 import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
+import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import {
   scanSessionStarted,
   scanSessionCompleted,
@@ -396,6 +397,26 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
           },
         });
         committed.push(item.id);
+
+        // Process product images if available
+        if (Flags.SCAN_ENRICHMENT && enrichment) {
+          try {
+            const imageUrls = imageEnrichmentService.extractImageUrls(enrichment);
+            if (imageUrls.length > 0) {
+              const imageCount = await imageEnrichmentService.processProductImages(
+                session.tenantId,
+                item.id,
+                item.sku,
+                imageUrls,
+                item.name
+              );
+              console.log(`[commit] Processed ${imageCount}/${imageUrls.length} images for ${item.sku}`);
+            }
+          } catch (imageError) {
+            // Don't fail commit if image processing fails
+            console.error(`[commit] Failed to process images for ${item.sku}:`, imageError);
+          }
+        }
       } catch (error) {
         console.error(`[commit] Failed to create item for barcode ${result.barcode}:`, error);
       }
