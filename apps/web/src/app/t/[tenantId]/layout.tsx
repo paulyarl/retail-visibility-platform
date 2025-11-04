@@ -56,15 +56,16 @@ export default async function TenantLayout({ children, params }: { children: Rea
   const nav = [
     { label: 'Dashboard', href: `/t/${tenantId}/dashboard` },
     { label: 'Items', href: `/t/${tenantId}/items` },
+    { label: 'Scan Products', href: `/t/${tenantId}/scan` },
+    ...(ffCategoryMgmt ? [{ label: 'Categories', href: `/t/${tenantId}/categories` }] as const : []),
     { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
     { label: 'Insights', href: `/t/${tenantId}/insights` },
     { label: 'Storefront', href: `/tenant/${tenantId}` },
-    // Categories link gated by FF_CATEGORY_MANAGEMENT_PAGE; default show when flag off is false? Keep conservative: show only when enabled
-    ...(ffCategoryMgmt ? [{ label: 'Categories', href: `/t/${tenantId}/categories` }] as const : []),
+    { label: 'Settings', href: `/t/${tenantId}/settings` },
+    // Advanced/Diagnostic tools - consider moving to Settings submenu in future
     { label: 'Feed Validation', href: `/t/${tenantId}/feed-validation` },
     { label: 'Profile Completeness', href: `/t/${tenantId}/profile-completeness` },
     { label: 'Onboarding', href: `/t/${tenantId}/onboarding` },
-    { label: 'Settings', href: `/t/${tenantId}/settings` },
   ];
 
   return (

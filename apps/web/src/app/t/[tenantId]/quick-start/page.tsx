@@ -14,6 +14,8 @@ type Scenario = {
 type EligibilityResponse = {
   eligible: boolean;
   productCount: number;
+  productLimit: number;
+  isPlatformAdmin: boolean;
   rateLimitReached: boolean;
   resetAt?: number;
   recommendation: string;
@@ -200,7 +202,7 @@ export default function QuickStartPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-red-500 mt-0.5">•</span>
-                  <span><strong>Product Limit:</strong> You already have 100+ products</span>
+                  <span><strong>Product Limit:</strong> You already have {eligibility?.productLimit || 500}+ products</span>
                 </li>
               </ul>
             </div>
@@ -328,6 +330,14 @@ export default function QuickStartPage() {
           <p className="text-gray-600 dark:text-gray-400 text-lg">
             Choose the best method to populate your inventory
           </p>
+          {eligibility?.isPlatformAdmin && (
+            <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-300 dark:border-purple-700 rounded-full">
+              <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <span className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+                Platform Admin: All limits bypassed
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Two Options: Generate or Scan */}
@@ -405,7 +415,7 @@ export default function QuickStartPage() {
             </div>
 
             <button
-              onClick={() => router.push('/scan')}
+              onClick={() => router.push(`/t/${tenantId}/scan`)}
               className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

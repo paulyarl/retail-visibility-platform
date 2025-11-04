@@ -37,7 +37,11 @@ interface ProductNeedingEnrichment {
   };
 }
 
-export default function ProductEnrichmentBanner() {
+interface ProductEnrichmentBannerProps {
+  tenantId?: string;
+}
+
+export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentBannerProps = {}) {
   const router = useRouter();
   const [products, setProducts] = useState<ProductNeedingEnrichment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,7 +121,7 @@ export default function ProductEnrichmentBanner() {
               {/* Quick Actions */}
               <div className="flex flex-wrap gap-3 mt-4">
                 <Button
-                  onClick={() => router.push('/scan?mode=enrich')}
+                  onClick={() => router.push(tenantId ? `/t/${tenantId}/scan?mode=enrich` : '/scan?mode=enrich')}
                   className="bg-primary-600 hover:bg-primary-700"
                 >
                   <ScanLine className="w-4 h-4 mr-2" />
@@ -189,7 +193,7 @@ export default function ProductEnrichmentBanner() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => router.push(`/scan?mode=enrich&productId=${product.id}`)}
+                              onClick={() => router.push(tenantId ? `/t/${tenantId}/scan?mode=enrich&productId=${product.id}` : `/scan?mode=enrich&productId=${product.id}`)}
                             >
                               <ScanLine className="w-4 h-4 mr-1" />
                               Scan

@@ -135,15 +135,17 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, async (req, res
 
     const { scenario, productCount, assignCategories, createAsDrafts } = parsed.data;
 
-    // Check rate limit
-    const rateLimit = checkRateLimit(tenantId);
-    if (!rateLimit.allowed) {
-      const hoursRemaining = Math.ceil((rateLimit.resetAt! - Date.now()) / (1000 * 60 * 60));
-      return res.status(429).json({
-        error: 'Rate limit exceeded',
-        message: `Quick Start can only be used once per 24 hours. Try again in ${hoursRemaining} hours.`,
-        resetAt: rateLimit.resetAt,
-      });
+    // Check rate limit (platform admins bypass this)
+    if (!isPlatformAdmin) {
+      const rateLimit = checkRateLimit(tenantId);
+      if (!rateLimit.allowed) {
+        const hoursRemaining = Math.ceil((rateLimit.resetAt! - Date.now()) / (1000 * 60 * 60));
+        return res.status(429).json({
+          error: 'Rate limit exceeded',
+          message: `Quick Start can only be used once per 24 hours. Try again in ${hoursRemaining} hours.`,
+          resetAt: rateLimit.resetAt,
+        });
+      }
     }
 
     // Check if tenant already has products (warn if > 10)
@@ -207,28 +209,39 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
       });
     }
 
-    // Check rate limit
-    const rateLimit = checkRateLimit(tenantId);
+    // Check if user is a platform admin (admins bypass all limits)
+    const user = (req as any).user;
+    const isPlatformAdmin = user?.role === 'platform_admin' || user?.isPlatformAdmin === true;
+
+    // Check rate limit (platform admins bypass this)
+    const rateLimit = isPlatformAdmin ? { allowed: true } : checkRateLimit(tenantId);
     
     // Check existing product count
     const productCount = await prisma.inventoryItem.count({
       where: { tenantId },
     });
 
-    const eligible = rateLimit.allowed && productCount < 100;
+    // Configurable product limit (default: 500, allows testing multiple scenarios)
+    // Platform admins bypass this limit to help multiple stores
+    const productLimit = parseInt(process.env.QUICK_START_PRODUCT_LIMIT || '500', 10);
+    const eligible = isPlatformAdmin || (rateLimit.allowed && productCount < productLimit);
 
     res.json({
       eligible,
       productCount,
+      productLimit,
+      isPlatformAdmin,
       rateLimitReached: !rateLimit.allowed,
       resetAt: rateLimit.resetAt,
-      recommendation: productCount === 0
+      recommendation: isPlatformAdmin
+        ? 'Platform Admin: All limits bypassed. You can use Quick Start anytime.'
+        : productCount === 0
         ? 'Quick Start is perfect for you! Get started with pre-built products.'
-        : productCount < 10
+        : productCount < 50
         ? 'You have a few products. Quick Start can add more to help you get going.'
-        : productCount < 100
+        : productCount < productLimit
         ? 'You already have products. Quick Start will add to your existing inventory.'
-        : 'You have a full inventory! Quick Start is not needed.',
+        : `You have ${productCount} products (limit: ${productLimit}). Quick Start is not available.`,
     });
   } catch (error: any) {
     console.error('[Quick Start] Error checking eligibility:', error);
@@ -309,7 +322,8 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
       where: { tenantId },
     });
 
-    if (existingCategoryCount > 50) {
+    // Platform admins bypass category limit
+    if (!isPlatformAdmin && existingCategoryCount > 50) {
       return res.status(400).json({
         error: 'Too many categories',
         message: 'You already have 50+ categories. Category Quick Start is designed for new stores.',

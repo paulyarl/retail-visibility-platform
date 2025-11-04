@@ -16,6 +16,7 @@ import {
 import CreateTestChainModal from '@/components/admin/CreateTestChainModal';
 import DeleteTestChainModal from '@/components/admin/DeleteTestChainModal';
 import CreateTestTenantModal from '@/components/admin/CreateTestTenantModal';
+import DeleteTestTenantModal from '@/components/admin/DeleteTestTenantModal';
 import BulkSeedModal from '@/components/admin/BulkSeedModal';
 import BulkClearModal from '@/components/admin/BulkClearModal';
 
@@ -45,6 +46,14 @@ export default function AdminToolsPage() {
       title: 'Create Test Tenant',
       description: 'Create standalone test tenants for testing',
       color: 'from-purple-500 to-purple-600',
+      category: 'user',
+    },
+    {
+      id: 'delete-tenant',
+      icon: Trash2,
+      title: 'Delete Test Tenant',
+      description: 'Remove test tenants and all associated data',
+      color: 'from-red-500 to-red-600',
       category: 'user',
     },
     {
@@ -228,6 +237,9 @@ export default function AdminToolsPage() {
       )}
       {activeModal === 'create-tenant' && (
         <CreateTestTenantModal onClose={() => setActiveModal(null)} />
+      )}
+      {activeModal === 'delete-tenant' && (
+        <DeleteTestTenantModal onClose={() => setActiveModal(null)} />
       )}
       {activeModal === 'bulk-seed' && (
         <BulkSeedModal onClose={() => setActiveModal(null)} />

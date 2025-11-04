@@ -15,6 +15,7 @@ import {
   bulkClearProducts,
 } from '../lib/admin-tools';
 import { auditLogger } from '../middleware/audit-logger';
+import { prisma } from '../prisma';
 
 const router = Router();
 
@@ -105,6 +106,8 @@ router.delete('/test-chains/:organizationId', async (req, res) => {
  */
 const createTenantSchema = z.object({
   name: z.string().min(1),
+  city: z.string().optional(),
+  state: z.string().optional(),
   subscriptionTier: z.string().optional().default('professional'),
   scenario: z.enum(['grocery', 'fashion', 'electronics', 'general']).optional().default('general'),
   productCount: z.number().int().min(0).max(100).optional().default(0),
@@ -134,6 +137,57 @@ router.post('/tenants', async (req, res) => {
     console.error('[Admin Tools] Error creating test tenant:', error);
     res.status(500).json({
       error: 'Failed to create test tenant',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/tools/tenants/:tenantId
+ * Delete a test tenant and all associated data
+ */
+router.delete('/tenants/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { confirm } = req.query;
+
+    if (confirm !== 'true') {
+      return res.status(400).json({
+        error: 'Confirmation required',
+        message: 'Must include confirm=true query parameter',
+      });
+    }
+
+    console.log('[Admin Tools] Deleting test tenant:', tenantId);
+
+    // Delete all products for this tenant
+    const deletedProducts = await prisma.inventoryItem.deleteMany({
+      where: { tenantId },
+    });
+
+    // Delete all categories for this tenant
+    const deletedCategories = await prisma.tenantCategory.deleteMany({
+      where: { tenantId },
+    });
+
+    // Delete the tenant
+    const deletedTenant = await prisma.tenant.delete({
+      where: { id: tenantId },
+    });
+
+    console.log(`[Audit] Admin deleted test tenant: ${tenantId} (${deletedProducts.count} products, ${deletedCategories.count} categories)`);
+
+    res.json({
+      success: true,
+      tenantId,
+      deletedProducts: deletedProducts.count,
+      deletedCategories: deletedCategories.count,
+      message: 'Test tenant deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('[Admin Tools] Error deleting test tenant:', error);
+    res.status(500).json({
+      error: 'Failed to delete test tenant',
       message: error.message,
     });
   }
