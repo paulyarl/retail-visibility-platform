@@ -156,16 +156,52 @@ export class BarcodeEnrichmentService {
     }
 
     return {
-      name: data.title,
+      name: data.title || 'Unknown Product',
       description: data.description || null,
       brand: data.brand || 'Unknown',
       categoryPath: data.category ? [data.category] : [],
       priceCents: data.msrp ? Math.round(parseFloat(data.msrp) * 100) : undefined,
+      imageUrl: data.images?.[0] || null,
+      imageThumbnailUrl: data.images?.[0] || null,
       metadata: {
+        // Identifiers
         upc: barcode,
         ean: data.ean,
         asin: data.asin,
+        isbn: data.isbn,
+        mpn: data.mpn,
         model: data.model,
+        elid: data.elid,
+        
+        // Product Specifications
+        specifications: {
+          weight: data.weight,
+          length: data.length,
+          width: data.width,
+          height: data.height,
+          color: data.color,
+          size: data.size,
+          material: data.material,
+        },
+        
+        // Pricing & Retail
+        pricing: {
+          msrp: data.msrp,
+          currency: data.currency,
+          lowest_recorded_price: data.lowest_recorded_price,
+          highest_recorded_price: data.highest_recorded_price,
+        },
+        
+        // Offers from retailers
+        offers: data.offers,
+        
+        // Additional Details
+        features: data.features,
+        warranty: data.warranty,
+        manufacturer: data.manufacturer,
+        
+        // All Available Images
+        images: data.images || [],
       },
       source: 'upc_database',
     };
@@ -211,12 +247,87 @@ export class BarcodeEnrichmentService {
         quantity: product.quantity,
         packaging: product.packaging,
         countries: product.countries,
-        ingredients: product.ingredients_text_en,
-        nutrition_grade: product.nutrition_grade_fr,
+        
+        // Ingredients & Composition
+        ingredients: product.ingredients_text_en || product.ingredients_text,
+        ingredients_tags: product.ingredients_tags,
+        
+        // Nutrition Facts (Complete)
+        nutrition: {
+          grade: product.nutrition_grade_fr,
+          score: product.nutrition_score_fr,
+          per_100g: product.nutriments ? {
+            energy_kj: product.nutriments['energy-kj_100g'],
+            energy_kcal: product.nutriments['energy-kcal_100g'],
+            fat: product.nutriments.fat_100g,
+            saturated_fat: product.nutriments['saturated-fat_100g'],
+            trans_fat: product.nutriments['trans-fat_100g'],
+            carbohydrates: product.nutriments.carbohydrates_100g,
+            sugars: product.nutriments.sugars_100g,
+            fiber: product.nutriments.fiber_100g,
+            proteins: product.nutriments.proteins_100g,
+            salt: product.nutriments.salt_100g,
+            sodium: product.nutriments.sodium_100g,
+            // Vitamins
+            vitamin_a: product.nutriments['vitamin-a_100g'],
+            vitamin_c: product.nutriments['vitamin-c_100g'],
+            vitamin_d: product.nutriments['vitamin-d_100g'],
+            // Minerals
+            calcium: product.nutriments.calcium_100g,
+            iron: product.nutriments.iron_100g,
+          } : null,
+          serving_size: product.serving_size,
+          serving_quantity: product.serving_quantity,
+        },
+        
+        // Allergens & Dietary
+        allergens: product.allergens,
+        allergens_tags: product.allergens_tags,
+        traces: product.traces,
+        traces_tags: product.traces_tags,
+        additives_tags: product.additives_tags,
+        ingredients_analysis: {
+          vegan: product.ingredients_analysis_tags?.includes('en:vegan'),
+          vegetarian: product.ingredients_analysis_tags?.includes('en:vegetarian'),
+          palm_oil_free: product.ingredients_analysis_tags?.includes('en:palm-oil-free'),
+        },
+        
+        // Labels & Certifications
+        labels: product.labels,
+        labels_tags: product.labels_tags,
+        
+        // Environmental Data
+        environmental: {
+          ecoscore_grade: product.ecoscore_grade,
+          ecoscore_score: product.ecoscore_score,
+          carbon_footprint: product.carbon_footprint_100g,
+          packaging_materials: product.packaging_materials_tags,
+        },
+        
+        // Nova Score (Food Processing Level: 1-4)
+        nova_group: product.nova_group,
+        
+        // Store & Purchase Info
+        stores: product.stores,
+        stores_tags: product.stores_tags,
+        purchase_places: product.purchase_places,
+        origins: product.origins,
+        manufacturing_places: product.manufacturing_places,
+        
+        // Product Lifecycle
+        created_t: product.created_t,
+        last_modified_t: product.last_modified_t,
+        completeness: product.completeness,
+        
+        // All Available Images
         images: {
           front: product.image_front_url,
           ingredients: product.image_ingredients_url,
           nutrition: product.image_nutrition_url,
+          packaging: product.image_packaging_url,
+          other: product.image_other_url,
+          small_front: product.image_front_small_url,
+          thumb_front: product.image_front_thumb_url,
         },
       },
       source: 'open_food_facts',
