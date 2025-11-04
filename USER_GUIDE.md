@@ -7,9 +7,10 @@
 3. [Dashboard Navigation](#dashboard-navigation)
 4. [Managing Tenants](#managing-tenants)
 5. [Managing Inventory](#managing-inventory)
-6. [Settings](#settings)
-7. [Admin Features](#admin-features)
-8. [Troubleshooting](#troubleshooting)
+6. [SKU Scanning](#sku-scanning) 🆕
+7. [Settings](#settings)
+8. [Admin Features](#admin-features)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -179,6 +180,46 @@
 2. Click "Delete"
 3. Confirm deletion
 4. ⚠️ **Warning:** This cannot be undone!
+
+---
+
+## 📱 SKU Scanning
+
+### Quick Inventory with Barcode Scanning
+
+The SKU Scanning feature allows you to quickly add products to your inventory by scanning barcodes. Perfect for initial setup, stock taking, and receiving shipments.
+
+### Key Features
+
+- ⚡ **Fast Entry** - Scan dozens of products in minutes
+- 🔍 **Auto-Enrichment** - Product details fetched automatically
+- ✅ **Validation** - Catch errors before committing
+- 🚫 **Duplicate Detection** - Prevents scanning same item twice
+
+### Getting Started
+
+1. Go to **Quick Start** → **SKU Scanning**
+2. Choose device type (USB Scanner or Manual Entry)
+3. Start scanning barcodes
+4. Review and commit to inventory
+
+### Supported Devices
+
+- 🖱️ USB Barcode Scanners (recommended)
+- ⌨️ Manual keyboard entry
+- 📱 Camera scanning (coming soon)
+
+### Learn More
+
+📚 **[Complete M4 SKU Scanning User Guide](./docs/M4_USER_GUIDE.md)**
+
+The detailed guide covers:
+- Step-by-step scanning instructions
+- Managing scan sessions
+- Product enrichment
+- Troubleshooting tips
+- Best practices
+- Advanced features
 
 ---
 
