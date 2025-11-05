@@ -27,7 +27,6 @@ export async function GET(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[API Proxy] GET /organizations/${organizationId} failed:`, response.status, errorText);
       try {
         const errorData = JSON.parse(errorText);
         return NextResponse.json(errorData, { status: response.status });
@@ -39,7 +38,7 @@ export async function GET(
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error('[API Proxy] Error fetching organization:', error);
+    console.error('[Organizations API] Error:', error.message);
     return NextResponse.json({ message: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
