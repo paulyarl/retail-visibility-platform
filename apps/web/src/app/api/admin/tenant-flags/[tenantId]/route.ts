@@ -8,17 +8,37 @@ export async function GET(req: NextRequest, context: { params: Promise<{ tenantI
     const { tenantId } = await context.params
     const base = process.env.API_BASE_URL || 'http://localhost:4000'
 
-    // Get auth token from request cookies
-    const token = req.cookies.get('access_token')?.value
+    // Get auth token from request cookies - try multiple methods
+    let token = req.cookies.get('access_token')?.value
+    
+    // Fallback: parse from cookie header directly
+    if (!token) {
+      const cookieHeader = req.headers.get('cookie')
+      if (cookieHeader) {
+        const match = cookieHeader.match(/access_token=([^;]+)/)
+        if (match) {
+          token = match[1]
+        }
+      }
+    }
     
     console.log('[Tenant Flags API] Cookie check:', { 
       hasToken: !!token, 
       allCookies: req.cookies.getAll().map(c => c.name),
+      hasCookieHeader: !!req.headers.get('cookie'),
       tenantId 
     })
     
     if (!token) {
-      return NextResponse.json({ success: false, error: 'authentication_required', debug: 'no_token_in_cookies' }, { status: 401 })
+      return NextResponse.json({ 
+        success: false, 
+        error: 'authentication_required', 
+        debug: {
+          message: 'no_token_in_cookies',
+          availableCookies: req.cookies.getAll().map(c => c.name),
+          hasCookieHeader: !!req.headers.get('cookie')
+        }
+      }, { status: 401 })
     }
 
     const headers: HeadersInit = { 
@@ -45,8 +65,19 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ tenantI
     const body = await req.json()
     const base = process.env.API_BASE_URL || 'http://localhost:4000'
     
-    // Get auth token from request cookies
-    const token = req.cookies.get('access_token')?.value
+    // Get auth token from request cookies - try multiple methods
+    let token = req.cookies.get('access_token')?.value
+    
+    // Fallback: parse from cookie header directly
+    if (!token) {
+      const cookieHeader = req.headers.get('cookie')
+      if (cookieHeader) {
+        const match = cookieHeader.match(/access_token=([^;]+)/)
+        if (match) {
+          token = match[1]
+        }
+      }
+    }
     
     if (!token) {
       return NextResponse.json({ success: false, error: 'authentication_required' }, { status: 401 })

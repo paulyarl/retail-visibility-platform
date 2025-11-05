@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function PUT(req: NextRequest, context: { params: Promise<{ tenantId: string, flag: string }> }) {
   try {
     const { tenantId, flag } = await context.params
     const base = process.env.API_BASE_URL || 'http://localhost:4000'
     
-    // Get auth token from request cookies
-    const token = req.cookies.get('access_token')?.value
+    // Get auth token from request cookies - try multiple methods
+    let token = req.cookies.get('access_token')?.value
+    
+    // Fallback: parse from cookie header directly
+    if (!token) {
+      const cookieHeader = req.headers.get('cookie')
+      if (cookieHeader) {
+        const match = cookieHeader.match(/access_token=([^;]+)/)
+        if (match) {
+          token = match[1]
+        }
+      }
+    }
     
     if (!token) {
       return NextResponse.json({ success: false, error: 'authentication_required' }, { status: 401 })
