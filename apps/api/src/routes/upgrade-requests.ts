@@ -140,6 +140,23 @@ router.patch('/:id', async (req, res) => {
       data: updateData,
     });
 
+    // If status is 'complete', update the tenant's subscription tier
+    if (parsed.data.status === 'complete') {
+      try {
+        await prisma.tenant.update({
+          where: { id: request.tenantId },
+          data: { 
+            subscriptionTier: request.requestedTier,
+            subscriptionStatus: 'active',
+          },
+        });
+        console.log(`[Upgrade Request] Updated tenant ${request.tenantId} to tier ${request.requestedTier}`);
+      } catch (tenantError) {
+        console.error('[Upgrade Request] Failed to update tenant tier:', tenantError);
+        // Don't fail the request update, but log the error
+      }
+    }
+
     res.json(request);
   } catch (error) {
     console.error('Error updating upgrade request:', error);
