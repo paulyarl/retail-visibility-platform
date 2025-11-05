@@ -1,5 +1,16 @@
 # Feature Flags in Tenant Onboarding
 
+## 📋 Feature Flag Inventory
+
+### Legend
+- ✅ **ACTIVE** - Currently implemented and in use
+- 🚧 **PLANNED** - Documented but not yet implemented
+- 🔮 **FUTURE** - Conceptual example for illustration
+- 🎯 **PILOT** - In testing with select tenants
+- ⚠️ **DEPRECATED** - Being phased out
+
+---
+
 ## 🎯 Concept: Pre-Launch Feature Validation
 
 Use feature flags as part of the tenant onboarding checklist to verify features work correctly before releasing the platform to the business owner.
@@ -52,33 +63,37 @@ Use feature flags as part of the tenant onboarding checklist to verify features 
 
 **🟢 RECOMMENDED - Test & Enable for Most Tenants**
 
-| Feature | Flag | Priority | Test Checklist |
-|---------|------|----------|----------------|
-| **Google Business Profile Sync** | `FF_TENANT_GBP_SYNC` | HIGH | ☐ GBP account connected<br>☐ Test sync successful<br>☐ Data appears correctly<br>☐ Products visible on Google |
-| **Business Hours Sync** | `FF_TENANT_GBP_HOURS_SYNC` | HIGH | ☐ Hours configured<br>☐ Sync to GBP works<br>☐ Real-time updates verified<br>☐ Special hours working |
-| **Category Management** | `FF_CATEGORY_MANAGEMENT_PAGE` | HIGH | ☐ Categories imported<br>☐ Products categorized<br>☐ Taxonomy aligned<br>☐ Search working |
-| **SKU Scanning** | `FF_SKU_SCANNING` | MEDIUM | ☐ Barcode scanner working<br>☐ Product lookup successful<br>☐ Data enrichment verified<br>☐ Images loading |
-| **Photo Management** | `FF_PHOTO_MANAGEMENT` | MEDIUM | ☐ Upload working<br>☐ Gallery displaying<br>☐ Optimization working<br>☐ Cloud storage connected |
+| Feature | Flag | Status | Priority | Test Checklist |
+|---------|------|--------|----------|----------------|
+| **Business Hours Sync** | `FF_TENANT_GBP_HOURS_SYNC` | ✅ ACTIVE | HIGH | ☐ Hours configured<br>☐ Sync to GBP works<br>☐ Real-time updates verified<br>☐ Special hours working |
+| **Category Management** | `FF_CATEGORY_MANAGEMENT_PAGE` | ✅ ACTIVE | HIGH | ☐ Categories imported<br>☐ Products categorized<br>☐ Taxonomy aligned<br>☐ Search working |
+| **Category Sync to GBP** | `FF_TENANT_GBP_CATEGORY_SYNC` | 🎯 PILOT | HIGH | ☐ Categories syncing<br>☐ GBP categories match<br>☐ Updates propagating<br>☐ No conflicts |
+| **SKU Scanning** | `FF_SKU_SCANNING` | ✅ ACTIVE | MEDIUM | ☐ Barcode scanner working<br>☐ Product lookup successful<br>☐ Data enrichment verified<br>☐ Images loading |
+| **Business Profile** | `FF_BUSINESS_PROFILE` | ✅ ACTIVE | HIGH | ☐ Profile complete<br>☐ Data accurate<br>☐ Public page working<br>☐ SEO optimized |
 
 **🟡 OPTIONAL - Enable Based on Business Type**
 
-| Feature | Flag | Use Case | Test Checklist |
-|---------|------|----------|----------------|
-| **Chain Management** | `FF_CHAIN_PROPAGATION` | Multi-location only | ☐ Organization created<br>☐ Multiple locations added<br>☐ Test propagation works<br>☐ Hero location set |
-| **Google Shopping Feed** | `FF_GOOGLE_SHOPPING_FEED` | E-commerce focus | ☐ Merchant Center linked<br>☐ Feed generated<br>☐ Products approved<br>☐ Feed updating |
-| **Advanced Analytics** | `FF_ADVANCED_ANALYTICS` | Data-driven tenants | ☐ Tracking configured<br>☐ Data collecting<br>☐ Reports generating<br>☐ Dashboards loading |
-| **Inventory Sync** | `FF_INVENTORY_SYNC` | POS integration | ☐ POS connected<br>☐ Test sync successful<br>☐ Stock levels accurate<br>☐ Real-time updates |
-| **Email Notifications** | `FF_EMAIL_NOTIFICATIONS` | Customer engagement | ☐ SMTP configured<br>☐ Test email sent<br>☐ Templates working<br>☐ Unsubscribe working |
+| Feature | Flag | Status | Use Case | Test Checklist |
+|---------|------|--------|----------|----------------|
+| **Chain Management** | `FF_CHAIN_PROPAGATION` | ✅ ACTIVE | Multi-location only | ☐ Organization created<br>☐ Multiple locations added<br>☐ Test propagation works<br>☐ Hero location set |
+| **Google Connect Suite** | `FF_GOOGLE_CONNECT_SUITE` | 🎯 PILOT | Google integration | ☐ OAuth working<br>☐ API connected<br>☐ Data syncing<br>☐ Permissions correct |
+| **Category Mirroring** | `FF_CATEGORY_MIRRORING` | 🚧 PLANNED | Auto-sync categories | ☐ Mirroring enabled<br>☐ Changes sync both ways<br>☐ No conflicts<br>☐ History tracked |
+| **Google Shopping Feed** | `FF_GOOGLE_SHOPPING_FEED` | 🚧 PLANNED | E-commerce focus | ☐ Merchant Center linked<br>☐ Feed generated<br>☐ Products approved<br>☐ Feed updating |
+| **Advanced Analytics** | `FF_ADVANCED_ANALYTICS` | 🚧 PLANNED | Data-driven tenants | ☐ Tracking configured<br>☐ Data collecting<br>☐ Reports generating<br>☐ Dashboards loading |
+| **Inventory Sync** | `FF_INVENTORY_SYNC` | 🚧 PLANNED | POS integration | ☐ POS connected<br>☐ Test sync successful<br>☐ Stock levels accurate<br>☐ Real-time updates |
+| **Email Notifications** | `FF_EMAIL_NOTIFICATIONS` | 🚧 PLANNED | Customer engagement | ☐ SMTP configured<br>☐ Test email sent<br>☐ Templates working<br>☐ Unsubscribe working |
 
 **🔴 AVOID FOR NOW - Not Ready for Production**
 
 | Feature | Flag | Status | Reason to Avoid |
 |---------|------|--------|-----------------|
-| **AI Product Descriptions** | `FF_AI_DESCRIPTIONS` | BETA | API costs high, quality inconsistent |
-| **Voice Search** | `FF_VOICE_SEARCH` | ALPHA | Browser compatibility issues |
-| **AR Product Preview** | `FF_AR_PREVIEW` | EXPERIMENTAL | Limited device support |
-| **Blockchain Inventory** | `FF_BLOCKCHAIN_INVENTORY` | PROTOTYPE | Performance issues, not production-ready |
-| **Crypto Payments** | `FF_CRYPTO_PAYMENTS` | DISABLED | Regulatory concerns, security review needed |
+| **AI Product Descriptions** | `FF_AI_DESCRIPTIONS` | 🔮 FUTURE | Example - API costs high, quality inconsistent |
+| **Voice Search** | `FF_VOICE_SEARCH` | 🔮 FUTURE | Example - Browser compatibility issues |
+| **AR Product Preview** | `FF_AR_PREVIEW` | 🔮 FUTURE | Example - Limited device support |
+| **Blockchain Inventory** | `FF_BLOCKCHAIN_INVENTORY` | 🔮 FUTURE | Example - Performance issues, not production-ready |
+| **Crypto Payments** | `FF_CRYPTO_PAYMENTS` | 🔮 FUTURE | Example - Regulatory concerns, security review needed |
+
+**Note:** The flags in the "AVOID FOR NOW" section are conceptual examples to illustrate what NOT to enable. They are not currently implemented in the codebase.
 
 ### **Step 4: Launch** ✅
 - Review enabled features
@@ -464,6 +479,92 @@ Shows all tenants in onboarding:
 - ⏭️ Feature in beta/experimental
 - ⏭️ Tenant wants to add later
 - ⏭️ Technical blockers present
+
+---
+
+## 📚 Complete Feature Flag Reference
+
+### ✅ ACTIVE FLAGS (Currently Implemented)
+
+| Flag | Description | Default | Location |
+|------|-------------|---------|----------|
+| `FF_BUSINESS_PROFILE` | Business profile page | ON | `featureFlags/index.ts` |
+| `FF_CATEGORY_MANAGEMENT_PAGE` | Category management UI | ON | `featureFlags/index.ts` |
+| `FF_TENANT_GBP_HOURS_SYNC` | Sync hours to Google Business Profile | DB | Platform flags |
+| `FF_SKU_SCANNING` | Barcode scanning & enrichment | ENV | `lib/flags.ts` |
+| `FF_SCAN_CAMERA` | Camera-based scanning | ENV | `lib/flags.ts` |
+| `FF_SCAN_USB` | USB scanner support | ON | `lib/flags.ts` |
+| `FF_SCAN_ENRICHMENT` | Product data enrichment | ENV | `lib/flags.ts` |
+| `FF_SCAN_DUPLICATE_CHECK` | Duplicate SKU detection | ON | `lib/flags.ts` |
+| `FF_CHAIN_PROPAGATION` | Chain product propagation | NEW | Just implemented! |
+
+### 🎯 PILOT FLAGS (Testing with Select Tenants)
+
+| Flag | Description | Pilot Tenants | Status |
+|------|-------------|---------------|--------|
+| `FF_TENANT_GBP_CATEGORY_SYNC` | Sync categories to GBP | `cmhhzd64m0008g8b47ui6ivnd` | Testing |
+| `FF_GOOGLE_CONNECT_SUITE` | Google OAuth & API suite | US East region | Pilot |
+
+### 🚧 PLANNED FLAGS (Documented but Not Implemented)
+
+| Flag | Description | Target Date | Notes |
+|------|-------------|-------------|-------|
+| `FF_CATEGORY_MIRRORING` | Bi-directional category sync | TBD | After M3 testing |
+| `FF_GOOGLE_SHOPPING_FEED` | Google Shopping product feed | TBD | Requires Merchant Center |
+| `FF_ADVANCED_ANALYTICS` | Enhanced analytics dashboard | TBD | Data pipeline needed |
+| `FF_INVENTORY_SYNC` | POS inventory synchronization | TBD | POS integration required |
+| `FF_EMAIL_NOTIFICATIONS` | Customer email campaigns | TBD | SMTP setup needed |
+
+### 🔮 FUTURE/EXAMPLE FLAGS (Conceptual Only)
+
+These are illustrative examples, not actual implementations:
+- `FF_AI_DESCRIPTIONS` - AI-generated product descriptions
+- `FF_VOICE_SEARCH` - Voice-activated search
+- `FF_AR_PREVIEW` - Augmented reality product preview
+- `FF_BLOCKCHAIN_INVENTORY` - Blockchain-based inventory
+- `FF_CRYPTO_PAYMENTS` - Cryptocurrency payment processing
+
+### 🔄 DEPRECATED/DISABLED FLAGS
+
+| Flag | Description | Deprecated | Replacement |
+|------|-------------|------------|-------------|
+| `FF_ITEMS_V2_GRID` | Old grid view | OFF | Replaced by default grid |
+| `FF_CATEGORY_QUICK_ACTIONS` | Quick action buttons | OFF | Integrated into main UI |
+| `FF_APP_SHELL_NAV` | Alternative navigation | OFF | Standard nav preferred |
+| `FF_TENANT_URLS` | Tenant-specific URLs | OFF | Standard routing used |
+| `FF_MAP_CARD` | Map display card | OFF | Integrated elsewhere |
+| `FF_SWIS_PREVIEW` | SWIS preview feature | OFF | Not pursued |
+| `FF_DARK_MODE` | Dark theme | OFF | Future consideration |
+
+### 📝 Flag Management Best Practices
+
+**When to Create a New Flag:**
+- ✅ Feature is experimental or risky
+- ✅ Gradual rollout needed
+- ✅ A/B testing required
+- ✅ Tenant-specific customization
+- ✅ External dependency (API, service)
+
+**When NOT to Create a Flag:**
+- ❌ Simple UI change
+- ❌ Bug fix
+- ❌ Performance optimization
+- ❌ Refactoring
+- ❌ Already stable feature
+
+**Flag Lifecycle:**
+1. **Create** → Add to codebase with default OFF
+2. **Test** → Enable for pilot tenants
+3. **Rollout** → Gradually increase percentage
+4. **Stabilize** → Monitor for issues
+5. **Default ON** → Make it standard
+6. **Remove** → Clean up flag code
+
+**Flag Naming Convention:**
+- Prefix: `FF_` (Feature Flag)
+- Scope: `TENANT_` or `PLATFORM_`
+- Feature: Descriptive name
+- Example: `FF_TENANT_GBP_HOURS_SYNC`
 
 ---
 
