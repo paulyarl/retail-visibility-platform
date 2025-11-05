@@ -15,6 +15,7 @@ import AssignCategoryModal from "./AssignCategoryModal";
 import QuickStartEmptyState from "./QuickStartEmptyState";
 import ProductEnrichmentBanner from "@/components/ProductEnrichmentBanner";
 import SyncStatusIndicator from "./SyncStatusIndicator";
+import PropagateItemModal from "./PropagateItemModal";
 
 type Tenant = {
   id: string;
@@ -131,6 +132,11 @@ export default function ItemsClient({
   // Category assignment modal state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categoryItem, setCategoryItem] = useState<Item | null>(null);
+
+  // Propagate modal state
+  const [showPropagateModal, setShowPropagateModal] = useState(false);
+  const [propagateItem, setPropagateItem] = useState<Item | null>(null);
+  const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -294,6 +300,23 @@ export default function ItemsClient({
     loadTenants();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch organizationId for current tenant
+  useEffect(() => {
+    const fetchOrgId = async () => {
+      if (!tenantId) return;
+      try {
+        const res = await api.get(`/api/tenants/${tenantId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setOrganizationId(data.organizationId);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchOrgId();
+  }, [tenantId]);
 
   // Persist tenantId
   useEffect(() => {
@@ -1122,6 +1145,21 @@ export default function ItemsClient({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                         </svg>
                       </Button>
+                      {organizationId && (
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => {
+                            setPropagateItem(i);
+                            setShowPropagateModal(true);
+                          }}
+                          title="Propagate to other locations"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </Button>
+                      )}
                       <Button 
                         size="sm" 
                         variant={i.itemStatus === 'active' ? 'secondary' : 'primary'}
@@ -1488,6 +1526,25 @@ export default function ItemsClient({
           }}
           onSave={() => {
             refresh();
+          }}
+        />
+      )}
+
+      {/* Propagate Item Modal */}
+      {showPropagateModal && propagateItem && (
+        <PropagateItemModal
+          isOpen={showPropagateModal}
+          onClose={() => {
+            setShowPropagateModal(false);
+            setPropagateItem(null);
+          }}
+          itemId={propagateItem.id}
+          itemName={propagateItem.name}
+          currentTenantId={tenantId}
+          organizationId={organizationId}
+          onSuccess={() => {
+            // Optionally refresh or show success message
+            console.log('Item propagated successfully');
           }}
         />
       )}
