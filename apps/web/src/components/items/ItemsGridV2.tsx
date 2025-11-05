@@ -24,6 +24,8 @@ type ItemsGridV2Props = {
   onStatusToggle?: (item: Item) => void;
   onVisibilityToggle?: (item: Item) => void;
   onViewPhotos?: (item: Item) => void;
+  onPropagate?: (item: Item) => void;
+  showPropagateButton?: boolean;
 };
 
 export default function ItemsGridV2({ 
@@ -32,7 +34,9 @@ export default function ItemsGridV2({
   onDelete, 
   onStatusToggle, 
   onVisibilityToggle,
-  onViewPhotos 
+  onViewPhotos,
+  onPropagate,
+  showPropagateButton = false
 }: ItemsGridV2Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   
@@ -205,6 +209,18 @@ export default function ItemsGridV2({
                               title={item.visibility === 'public' ? 'Hide from storefront' : 'Show on storefront'}
                             >
                               {item.visibility === 'public' ? 'Hide' : 'Show'}
+                            </Button>
+                          )}
+                          {showPropagateButton && onPropagate && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onPropagate(item)}
+                              title="Propagate to other locations"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
                             </Button>
                           )}
                           {onEdit && (
@@ -396,6 +412,21 @@ export default function ItemsGridV2({
                             Private
                           </>
                         )}
+                      </Button>
+                    )}
+
+                    {showPropagateButton && onPropagate && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onPropagate(item)}
+                        className="w-full"
+                        title="Propagate to other locations"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Propagate
                       </Button>
                     )}
 

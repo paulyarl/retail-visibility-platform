@@ -832,6 +832,11 @@ export default function ItemsClient({
               setGalleryItem(item);
               setShowPhotoGallery(true);
             }}
+            onPropagate={(item) => {
+              setPropagateItem(item);
+              setShowPropagateModal(true);
+            }}
+            showPropagateButton={!!organizationId}
           />
         ) : (
           <Card>

@@ -383,4 +383,202 @@ router.post('/:id/items/propagate', async (req, res) => {
   }
 });
 
+// POST /organizations/:id/items/propagate-bulk - Bulk propagate multiple items
+const propagateBulkSchema = z.object({
+  sourceItemIds: z.array(z.string()).min(1),
+  targetTenantIds: z.array(z.string()).min(1),
+  overrides: z.object({
+    price: z.number().optional(),
+    stock: z.number().int().optional(),
+    visibility: z.enum(['public', 'private']).optional(),
+    itemStatus: z.enum(['active', 'inactive']).optional(),
+  }).optional(),
+});
+
+router.post('/:id/items/propagate-bulk', async (req, res) => {
+  try {
+    const parsed = propagateBulkSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+
+    const { sourceItemIds, targetTenantIds, overrides } = parsed.data;
+
+    // Verify organization exists
+    const organization = await prisma.organization.findUnique({
+      where: { id: req.params.id },
+      include: {
+        tenants: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!organization) {
+      return res.status(404).json({ error: 'organization_not_found' });
+    }
+
+    // Verify all target tenants belong to this organization
+    const orgTenantIds = organization.tenants.map(t => t.id);
+    const invalidTenants = targetTenantIds.filter(id => !orgTenantIds.includes(id));
+    if (invalidTenants.length > 0) {
+      return res.status(400).json({ 
+        error: 'invalid_target_tenants',
+        message: 'Some target tenants do not belong to this organization',
+        invalidTenants,
+      });
+    }
+
+    // Get all source items
+    const sourceItems = await prisma.inventoryItem.findMany({
+      where: { 
+        id: { in: sourceItemIds },
+      },
+      include: {
+        photos: true,
+      },
+    });
+
+    if (sourceItems.length === 0) {
+      return res.status(404).json({ error: 'no_source_items_found' });
+    }
+
+    // Verify all source items belong to this organization
+    const invalidSourceItems = sourceItems.filter(item => !orgTenantIds.includes(item.tenantId));
+    if (invalidSourceItems.length > 0) {
+      return res.status(400).json({ 
+        error: 'source_items_not_in_organization',
+        message: 'Some source items do not belong to this organization',
+      });
+    }
+
+    // Propagate each item to each target tenant
+    const results = {
+      created: [] as Array<{ itemId: string; tenantId: string; sku: string }>,
+      skipped: [] as Array<{ itemId: string; tenantId: string; sku: string; reason: string }>,
+      errors: [] as Array<{ itemId: string; tenantId: string; sku: string; error: string }>,
+    };
+
+    for (const sourceItem of sourceItems) {
+      for (const tenantId of targetTenantIds) {
+        try {
+          // Skip if it's the source tenant
+          if (tenantId === sourceItem.tenantId) {
+            results.skipped.push({ 
+              itemId: sourceItem.id, 
+              tenantId, 
+              sku: sourceItem.sku,
+              reason: 'source_tenant' 
+            });
+            continue;
+          }
+
+          // Check if SKU already exists for this tenant
+          const existing = await prisma.inventoryItem.findFirst({
+            where: {
+              tenantId,
+              sku: sourceItem.sku,
+            },
+          });
+
+          if (existing) {
+            results.skipped.push({ 
+              itemId: sourceItem.id, 
+              tenantId, 
+              sku: sourceItem.sku,
+              reason: 'sku_already_exists' 
+            });
+            continue;
+          }
+
+          // Create the item for this tenant
+          const newItem = await prisma.inventoryItem.create({
+            data: {
+              tenantId,
+              sku: sourceItem.sku,
+              name: sourceItem.name,
+              title: sourceItem.title,
+              brand: sourceItem.brand,
+              description: sourceItem.description,
+              price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
+              priceCents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.priceCents,
+              stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
+              quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
+              imageUrl: sourceItem.imageUrl,
+              imageGallery: sourceItem.imageGallery,
+              marketingDescription: sourceItem.marketingDescription,
+              metadata: sourceItem.metadata as any,
+              availability: sourceItem.availability,
+              categoryPath: sourceItem.categoryPath,
+              condition: sourceItem.condition,
+              currency: sourceItem.currency,
+              gtin: sourceItem.gtin,
+              itemStatus: overrides?.itemStatus || sourceItem.itemStatus,
+              mpn: sourceItem.mpn,
+              visibility: overrides?.visibility || sourceItem.visibility,
+              manufacturer: sourceItem.manufacturer,
+              source: sourceItem.source,
+              enrichmentStatus: sourceItem.enrichmentStatus,
+              enrichedAt: sourceItem.enrichedAt,
+              enrichedBy: sourceItem.enrichedBy,
+              enrichedFromBarcode: sourceItem.enrichedFromBarcode,
+              missingImages: sourceItem.missingImages,
+              missingDescription: sourceItem.missingDescription,
+              missingSpecs: sourceItem.missingSpecs,
+              missingBrand: sourceItem.missingBrand,
+            },
+          });
+
+          // Copy photos if any
+          if (sourceItem.photos && sourceItem.photos.length > 0) {
+            await prisma.photoAsset.createMany({
+              data: sourceItem.photos.map((photo, index) => ({
+                tenantId,
+                inventoryItemId: newItem.id,
+                url: photo.url,
+                width: photo.width,
+                height: photo.height,
+                contentType: photo.contentType,
+                bytes: photo.bytes,
+                position: photo.position !== undefined ? photo.position : index,
+                alt: photo.alt,
+                caption: photo.caption,
+              })),
+            });
+          }
+
+          results.created.push({ 
+            itemId: newItem.id, 
+            tenantId, 
+            sku: sourceItem.sku 
+          });
+        } catch (error: any) {
+          console.error(`[Organizations] Error propagating ${sourceItem.sku} to tenant ${tenantId}:`, error);
+          results.errors.push({ 
+            itemId: sourceItem.id, 
+            tenantId, 
+            sku: sourceItem.sku,
+            error: error.message 
+          });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      sourceItemCount: sourceItems.length,
+      results,
+      summary: {
+        totalOperations: sourceItems.length * targetTenantIds.length,
+        created: results.created.length,
+        skipped: results.skipped.length,
+        errors: results.errors.length,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Organizations] Bulk propagate error:', error);
+    res.status(500).json({ error: 'failed_to_bulk_propagate', message: error.message });
+  }
+});
+
 export default router;
