@@ -7,7 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext'
 
-export default function TenantShell({ tenantId, tenantName, nav, tenants, children }: { tenantId: string; tenantName?: string; nav: { label: string; href: string }[]; tenants: TenantOption[]; children: React.ReactNode }) {
+export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, tenants, children }: { tenantId: string; tenantName?: string; tenantLogoUrl?: string; nav: { label: string; href: string }[]; tenants: TenantOption[]; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const { settings } = usePlatformSettings()
 
@@ -42,7 +42,7 @@ export default function TenantShell({ tenantId, tenantName, nav, tenants, childr
 
       <div className="flex">
         {/* Desktop sidebar */}
-        <TenantSidebar tenantId={tenantId} tenantName={tenantName} nav={nav} />
+        <TenantSidebar tenantId={tenantId} tenantName={tenantName} tenantLogoUrl={tenantLogoUrl} nav={nav} />
         {/* Content */}
         <main className="flex-1">{children}</main>
       </div>
@@ -57,7 +57,7 @@ export default function TenantShell({ tenantId, tenantName, nav, tenants, childr
               <button onClick={() => setOpen(false)} className="text-gray-600">✕</button>
             </div>
             <div className="h-[calc(100%-48px)] overflow-auto">
-              <TenantSidebar tenantId={tenantId} nav={nav} />
+              <TenantSidebar tenantId={tenantId} tenantName={tenantName} tenantLogoUrl={tenantLogoUrl} nav={nav} />
             </div>
           </div>
         </div>

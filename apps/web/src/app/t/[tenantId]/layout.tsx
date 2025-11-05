@@ -44,9 +44,24 @@ export default async function TenantLayout({ children, params }: { children: Rea
     redirect('/tenants');
   }
 
-  // Resolve current tenant friendly name
+  // Resolve current tenant friendly name and logo
   const current = tenantList.find(t => t.id === tenantId);
   const tenantName = current?.name || tenantId;
+  
+  // Fetch tenant logo
+  let tenantLogoUrl: string | undefined;
+  try {
+    const tenantRes = await fetch(`${apiBaseUrl}/tenant/${tenantId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+    if (tenantRes.ok) {
+      const tenantData = await tenantRes.json();
+      tenantLogoUrl = tenantData.metadata?.logo_url;
+    }
+  } catch {
+    // Logo fetch failed, continue without it
+  }
 
   // Feature flags (server-side) for gating nav items/variants
   const ffTenantUrls = isFeatureEnabled('FF_TENANT_URLS', tenantId);
@@ -75,7 +90,8 @@ export default async function TenantLayout({ children, params }: { children: Rea
       <TenantContextProvider value={{ tenantId: tenantCtx.tenantId ?? tenantId, tenantSlug: tenantCtx.tenantSlug, aud: tenantCtx.aud }}>
         <TenantShell 
           tenantId={tenantId} 
-          tenantName={tenantName} 
+          tenantName={tenantName}
+          tenantLogoUrl={tenantLogoUrl}
           nav={nav} 
           tenants={tenantList}
           // Pass a hint for shell variant; component may ignore if it doesn't support it yet
