@@ -8,7 +8,7 @@ import TenantMapSection from '@/components/tenant/TenantMapSection';
 import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductDisplay from '@/components/storefront/ProductDisplay';
-import { computeStoreStatus } from '@/lib/hours-utils';
+import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -422,7 +422,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                       <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Hours
+                      Regular Hours
                     </h4>
                     <div className="space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
                       {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
@@ -444,6 +444,46 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                         );
                       })}
                     </div>
+
+                    {/* Special Hours - Today Only */}
+                    {(() => {
+                      const todaySpecialHours = getTodaySpecialHours(businessHours);
+                      if (todaySpecialHours.length === 0) return null;
+                      
+                      const formatTime = (time24: string): string => {
+                        if (!time24) return "";
+                        const [h, m] = time24.split(":").map(Number);
+                        const period = h >= 12 ? "PM" : "AM";
+                        const hour12 = h % 12 || 12;
+                        return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+                      };
+                      
+                      return (
+                        <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+                          <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
+                            <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                            </svg>
+                            Today's Special Hours
+                          </h4>
+                          <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
+                            {todaySpecialHours.map((sh, idx) => (
+                              <div key={`${sh.date}-${idx}`} className="flex flex-col gap-1 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+                                <div className="flex justify-between items-start">
+                                  <span className="font-medium text-amber-900 dark:text-amber-100">Today</span>
+                                  <span className="text-amber-800 dark:text-amber-200">
+                                    {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
+                                  </span>
+                                </div>
+                                {sh.note && (
+                                  <span className="text-xs text-amber-700 dark:text-amber-300 italic">{sh.note}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

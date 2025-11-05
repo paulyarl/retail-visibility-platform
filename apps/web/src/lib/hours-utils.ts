@@ -112,3 +112,34 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; label: string
 
   return { isOpen: false, label: 'Closed' };
 }
+
+/**
+ * Get today's special hours for display
+ * Returns array of special hours entries for today only
+ */
+export function getTodaySpecialHours(hours: any): Array<{
+  date: string;
+  open?: string;
+  close?: string;
+  isClosed: boolean;
+  note?: string;
+}> {
+  if (!hours || typeof hours !== 'object') return [];
+  
+  const now = new Date();
+  const timeZone: string | undefined = typeof hours.timezone === 'string' ? hours.timezone : undefined;
+  const todayDate = now.toLocaleDateString('en-CA', { timeZone }); // YYYY-MM-DD format
+  
+  const specialHours = hours.special as any[] | undefined;
+  if (!specialHours || !Array.isArray(specialHours)) return [];
+  
+  return specialHours
+    .filter((sh: any) => sh.date === todayDate)
+    .map((sh: any) => ({
+      date: sh.date,
+      open: sh.open,
+      close: sh.close,
+      isClosed: sh.isClosed || false,
+      note: sh.note,
+    }));
+}
