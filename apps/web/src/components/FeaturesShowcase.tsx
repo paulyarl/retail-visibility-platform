@@ -29,6 +29,16 @@ const features = [
     priority: 1, // Top 3 feature
   },
   {
+    id: 'chain-management',
+    icon: '🔗',
+    title: 'Chain Management & Sync',
+    description: 'Distribute & UPDATE products across 50+ locations in ONE CLICK',
+    subtext: 'Save 400+ hours per rollout - Enterprise retailers pay $50K+/year for this',
+    gradient: 'from-emerald-500 to-teal-600',
+    badge: 'ENTERPRISE',
+    priority: 1, // Top 3 feature
+  },
+  {
     id: 'google-integration',
     icon: '🔍',
     title: 'Google Integration Suite',
