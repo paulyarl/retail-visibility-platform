@@ -24,9 +24,12 @@ interface Tenant {
 interface PendingRequest {
   id: string;
   requestedTier: string;
+  currentTier: string;
   status: string;
   createdAt: string;
   adminNotes?: string;
+  processedAt?: string;
+  processedBy?: string;
 }
 
 export default function SubscriptionPage() {
@@ -35,6 +38,8 @@ export default function SubscriptionPage() {
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | ChainTier | null>(null);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [requestHistory, setRequestHistory] = useState<PendingRequest[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     const loadTenant = async () => {
@@ -46,11 +51,12 @@ export default function SubscriptionPage() {
           return;
         }
 
-        // Fetch tenant info, SKU count, and pending requests in parallel
-        const [tenantRes, itemsRes, requestsRes] = await Promise.all([
+        // Fetch tenant info, SKU count, pending requests, and history in parallel
+        const [tenantRes, itemsRes, requestsRes, historyRes] = await Promise.all([
           api.get(`/api/tenants/${tenantId}`),
           api.get(`/api/items?tenantId=${tenantId}&count=true`),
-          api.get(`/api/upgrade-requests?tenantId=${tenantId}&status=new,pending,waiting`)
+          api.get(`/api/upgrade-requests?tenantId=${tenantId}&status=new,pending,waiting`),
+          api.get(`/api/upgrade-requests?tenantId=${tenantId}&status=complete,denied`)
         ]);
         
         if (tenantRes.ok) {
@@ -67,6 +73,12 @@ export default function SubscriptionPage() {
           if (requestsRes.ok) {
             const requestsData = await requestsRes.json();
             setPendingRequests(requestsData.data || []);
+          }
+          
+          // Get request history
+          if (historyRes.ok) {
+            const historyData = await historyRes.json();
+            setRequestHistory(historyData.data || []);
           }
           
           setTenant({
@@ -372,6 +384,106 @@ export default function SubscriptionPage() {
                 })}
               </div>
             </CardContent>
+          </Card>
+        )}
+
+        {/* Subscription History */}
+        {requestHistory.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <CardTitle>Subscription History</CardTitle>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowHistory(!showHistory)}
+                >
+                  {showHistory ? 'Hide' : 'Show'} ({requestHistory.length})
+                </Button>
+              </div>
+            </CardHeader>
+            {showHistory && (
+              <CardContent>
+                <div className="space-y-3">
+                  {requestHistory.map((request) => {
+                    const fromTierInfo = getTierInfo(request.currentTier as any);
+                    const toTierInfo = getTierInfo(request.requestedTier as any);
+                    const isApproved = request.status === 'complete';
+                    const isDenied = request.status === 'denied';
+                    
+                    return (
+                      <div 
+                        key={request.id} 
+                        className={`p-4 rounded-lg border-2 ${
+                          isApproved ? 'bg-green-50 border-green-200' : 
+                          isDenied ? 'bg-red-50 border-red-200' : 
+                          'bg-neutral-50 border-neutral-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="font-semibold text-neutral-900">
+                                {fromTierInfo.name}
+                              </span>
+                              <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                              </svg>
+                              <span className="font-semibold text-neutral-900">
+                                {toTierInfo.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm text-neutral-600">
+                              <span>
+                                Requested: {new Date(request.createdAt).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </span>
+                              {request.processedAt && (
+                                <>
+                                  <span>•</span>
+                                  <span>
+                                    {isApproved ? 'Approved' : 'Denied'}: {new Date(request.processedAt).toLocaleDateString('en-US', {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric'
+                                    })}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <Badge className={
+                            isApproved ? 'bg-green-100 text-green-800' : 
+                            isDenied ? 'bg-red-100 text-red-800' : 
+                            'bg-neutral-100 text-neutral-800'
+                          }>
+                            {isApproved ? '✓ Approved' : isDenied ? '✗ Denied' : request.status}
+                          </Badge>
+                        </div>
+                        {request.adminNotes && (
+                          <div className={`mt-2 p-2 rounded border ${
+                            isApproved ? 'bg-green-100 border-green-300' : 
+                            isDenied ? 'bg-red-100 border-red-300' : 
+                            'bg-neutral-100 border-neutral-300'
+                          }`}>
+                            <p className="text-xs font-medium text-neutral-900 mb-1">Admin Notes:</p>
+                            <p className="text-sm text-neutral-700">{request.adminNotes}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            )}
           </Card>
         )}
 
