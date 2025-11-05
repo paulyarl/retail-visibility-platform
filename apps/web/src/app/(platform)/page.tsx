@@ -38,7 +38,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     organizationName: null as string | null,
   });
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
-  const [tenantData, setTenantData] = useState<{ name: string; logoUrl?: string } | null>(null);
+  const [tenantData, setTenantData] = useState<{ name: string; logoUrl?: string; bannerUrl?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showcaseMode, setShowcaseMode] = useState<ShowcaseMode>('hybrid');
   const [platformStats, setPlatformStats] = useState({
@@ -175,6 +175,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
               setTenantData({
                 name: tenantInfo.name,
                 logoUrl: tenantInfo.metadata?.logo_url,
+                bannerUrl: tenantInfo.metadata?.banner_url,
               });
             }
           } catch (tenantError) {
@@ -278,6 +279,21 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Banner Hero Section (if authenticated and banner exists) */}
+        {isAuthenticated && tenantData?.bannerUrl && (
+          <div className="mb-8">
+            <div className="relative w-full h-48 md:h-64 rounded-lg overflow-hidden shadow-lg">
+              <Image
+                src={tenantData.bannerUrl}
+                alt={`${tenantData.name} banner`}
+                fill
+                className="object-cover"
+                priority
+              />
+            </div>
+          </div>
+        )}
+
         {/* Welcome Section */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-2">
