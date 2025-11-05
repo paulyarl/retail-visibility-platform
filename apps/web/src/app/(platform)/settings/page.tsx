@@ -13,6 +13,7 @@ type SettingCard = {
   color: string;
   badge?: string;
   adminOnly?: boolean;
+  platformAdminOnly?: boolean; // Only for platform-wide admins
   personalOnly?: boolean; // Hide in tenant-scoped settings
 };
 
@@ -319,7 +320,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
       ),
           href: '/settings/admin',
           color: 'bg-purple-500',
-          adminOnly: true,
+          platformAdminOnly: true,
         },
         {
           title: 'User Management',
@@ -331,7 +332,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: '/settings/admin/users',
           color: 'bg-orange-500',
-          adminOnly: true,
+          platformAdminOnly: true,
         },
       ],
     },
@@ -361,8 +362,11 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
     .map(group => ({
       ...group,
       cards: group.cards.filter(card => {
-        if (hideAdmin && card.adminOnly) return false;
-        if (tenantId && card.personalOnly) return false; // Hide personal settings in tenant context
+        // Hide platform admin features in tenant context
+        if (hideAdmin && card.platformAdminOnly) return false;
+        // Hide personal settings in tenant context
+        if (tenantId && card.personalOnly) return false;
+        // Keep tenant admin features even when hideAdmin is true
         return true;
       })
     }))
