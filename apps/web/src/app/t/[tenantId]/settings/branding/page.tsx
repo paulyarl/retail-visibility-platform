@@ -165,17 +165,28 @@ export default function TenantBrandingPage() {
       setError(null);
 
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.put(`${apiBaseUrl}/tenant/${encodeURIComponent(tenantId)}/profile`, {
-        business_name: businessName,
-        business_description: tagline,
-        logo_url: logoUrl,
+      const token = localStorage.getItem('access_token');
+      
+      const response = await fetch(`${apiBaseUrl}/tenant/${encodeURIComponent(tenantId)}/profile`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          business_name: businessName,
+          business_description: tagline,
+          logo_url: logoUrl,
+        }),
       });
 
       if (response.ok) {
         setSuccess('Branding updated successfully!');
         setTimeout(() => setSuccess(null), 3000);
       } else {
-        throw new Error('Failed to update branding');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Save failed:', response.status, errorData);
+        throw new Error(errorData.message || errorData.error || 'Failed to update branding');
       }
     } catch (err: any) {
       console.error('Save error:', err);
