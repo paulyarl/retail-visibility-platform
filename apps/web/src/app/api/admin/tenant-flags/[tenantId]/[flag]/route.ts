@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 
 export async function PUT(req: NextRequest, context: { params: Promise<{ tenantId: string, flag: string }> }) {
   try {
     const { tenantId, flag } = await context.params
     const base = process.env.API_BASE_URL || 'http://localhost:4000'
     
-    // Get auth token from cookies
-    const cookieStore = await cookies()
-    const token = cookieStore.get('access_token')?.value
+    // Get auth token from request cookies
+    const token = req.cookies.get('access_token')?.value
     
     if (!token) {
       return NextResponse.json({ success: false, error: 'authentication_required' }, { status: 401 })
