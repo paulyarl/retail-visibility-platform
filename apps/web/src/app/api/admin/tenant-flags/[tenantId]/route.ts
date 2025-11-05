@@ -24,9 +24,11 @@ export async function GET(req: NextRequest, context: { params: Promise<{ tenantI
     
     console.log('[Tenant Flags API] Cookie check:', { 
       hasToken: !!token, 
+      tokenPreview: token ? `${token.substring(0, 20)}...` : null,
       allCookies: req.cookies.getAll().map(c => c.name),
       hasCookieHeader: !!req.headers.get('cookie'),
-      tenantId 
+      tenantId,
+      backendUrl: `${base}/api/admin/tenant-flags/${encodeURIComponent(tenantId)}`
     })
     
     if (!token) {
@@ -48,11 +50,24 @@ export async function GET(req: NextRequest, context: { params: Promise<{ tenantI
 
     const res = await fetch(`${base}/api/admin/tenant-flags/${encodeURIComponent(tenantId)}`, { headers, cache: 'no-store' })
     const ct = res.headers.get('content-type') || ''
+    
+    console.log('[Tenant Flags API] Backend response:', {
+      status: res.status,
+      contentType: ct,
+      ok: res.ok
+    })
+    
     if (!ct.includes('application/json')) {
       const text = await res.text()
+      console.log('[Tenant Flags API] Non-JSON response:', text.substring(0, 200))
       return NextResponse.json({ success: false, error: text || `HTTP ${res.status}` }, { status: res.status })
     }
     const data = await res.json()
+    
+    if (!res.ok) {
+      console.log('[Tenant Flags API] Backend error:', data)
+    }
+    
     return NextResponse.json(data, { status: res.status })
   } catch (e: any) {
     return NextResponse.json({ success: false, error: e?.message || 'proxy_failed' }, { status: 500 })
