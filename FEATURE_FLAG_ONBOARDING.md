@@ -49,16 +49,36 @@ Use feature flags as part of the tenant onboarding checklist to verify features 
 - ✅ QR Codes
 
 #### Optional Features (Test & Enable)
-| Feature | Flag | Test Checklist |
-|---------|------|----------------|
-| **Google Business Profile Sync** | `FF_TENANT_GBP_SYNC` | ☐ GBP account connected<br>☐ Test sync successful<br>☐ Data appears correctly |
-| **Business Hours Sync** | `FF_TENANT_GBP_HOURS_SYNC` | ☐ Hours configured<br>☐ Sync to GBP works<br>☐ Real-time updates verified |
-| **Google Shopping Feed** | `FF_GOOGLE_SHOPPING_FEED` | ☐ Merchant Center linked<br>☐ Feed generated<br>☐ Products approved |
-| **Category Management** | `FF_CATEGORY_MANAGEMENT_PAGE` | ☐ Categories imported<br>☐ Products categorized<br>☐ Taxonomy aligned |
-| **Chain Management** | `FF_CHAIN_PROPAGATION` | ☐ Organization created<br>☐ Multiple locations added<br>☐ Test propagation works |
-| **Advanced Analytics** | `FF_ADVANCED_ANALYTICS` | ☐ Tracking configured<br>☐ Data collecting<br>☐ Reports generating |
-| **Email Notifications** | `FF_EMAIL_NOTIFICATIONS` | ☐ SMTP configured<br>☐ Test email sent<br>☐ Templates working |
-| **Inventory Sync** | `FF_INVENTORY_SYNC` | ☐ POS connected<br>☐ Test sync successful<br>☐ Stock levels accurate |
+
+**🟢 RECOMMENDED - Test & Enable for Most Tenants**
+
+| Feature | Flag | Priority | Test Checklist |
+|---------|------|----------|----------------|
+| **Google Business Profile Sync** | `FF_TENANT_GBP_SYNC` | HIGH | ☐ GBP account connected<br>☐ Test sync successful<br>☐ Data appears correctly<br>☐ Products visible on Google |
+| **Business Hours Sync** | `FF_TENANT_GBP_HOURS_SYNC` | HIGH | ☐ Hours configured<br>☐ Sync to GBP works<br>☐ Real-time updates verified<br>☐ Special hours working |
+| **Category Management** | `FF_CATEGORY_MANAGEMENT_PAGE` | HIGH | ☐ Categories imported<br>☐ Products categorized<br>☐ Taxonomy aligned<br>☐ Search working |
+| **SKU Scanning** | `FF_SKU_SCANNING` | MEDIUM | ☐ Barcode scanner working<br>☐ Product lookup successful<br>☐ Data enrichment verified<br>☐ Images loading |
+| **Photo Management** | `FF_PHOTO_MANAGEMENT` | MEDIUM | ☐ Upload working<br>☐ Gallery displaying<br>☐ Optimization working<br>☐ Cloud storage connected |
+
+**🟡 OPTIONAL - Enable Based on Business Type**
+
+| Feature | Flag | Use Case | Test Checklist |
+|---------|------|----------|----------------|
+| **Chain Management** | `FF_CHAIN_PROPAGATION` | Multi-location only | ☐ Organization created<br>☐ Multiple locations added<br>☐ Test propagation works<br>☐ Hero location set |
+| **Google Shopping Feed** | `FF_GOOGLE_SHOPPING_FEED` | E-commerce focus | ☐ Merchant Center linked<br>☐ Feed generated<br>☐ Products approved<br>☐ Feed updating |
+| **Advanced Analytics** | `FF_ADVANCED_ANALYTICS` | Data-driven tenants | ☐ Tracking configured<br>☐ Data collecting<br>☐ Reports generating<br>☐ Dashboards loading |
+| **Inventory Sync** | `FF_INVENTORY_SYNC` | POS integration | ☐ POS connected<br>☐ Test sync successful<br>☐ Stock levels accurate<br>☐ Real-time updates |
+| **Email Notifications** | `FF_EMAIL_NOTIFICATIONS` | Customer engagement | ☐ SMTP configured<br>☐ Test email sent<br>☐ Templates working<br>☐ Unsubscribe working |
+
+**🔴 AVOID FOR NOW - Not Ready for Production**
+
+| Feature | Flag | Status | Reason to Avoid |
+|---------|------|--------|-----------------|
+| **AI Product Descriptions** | `FF_AI_DESCRIPTIONS` | BETA | API costs high, quality inconsistent |
+| **Voice Search** | `FF_VOICE_SEARCH` | ALPHA | Browser compatibility issues |
+| **AR Product Preview** | `FF_AR_PREVIEW` | EXPERIMENTAL | Limited device support |
+| **Blockchain Inventory** | `FF_BLOCKCHAIN_INVENTORY` | PROTOTYPE | Performance issues, not production-ready |
+| **Crypto Payments** | `FF_CRYPTO_PAYMENTS` | DISABLED | Regulatory concerns, security review needed |
 
 ### **Step 4: Launch** ✅
 - Review enabled features
@@ -321,6 +341,129 @@ Shows all tenants in onboarding:
 - Third-party integrations
 - Plugin system
 - Custom feature modules
+
+---
+
+## 📚 Quick Reference: Feature Flag Decision Tree
+
+### For Single Location Retail Store
+```
+✅ ENABLE:
+- FF_TENANT_GBP_SYNC (Google visibility)
+- FF_TENANT_GBP_HOURS_SYNC (Keep hours updated)
+- FF_CATEGORY_MANAGEMENT_PAGE (Organize products)
+- FF_SKU_SCANNING (Quick product entry)
+- FF_PHOTO_MANAGEMENT (Professional photos)
+
+❌ SKIP:
+- FF_CHAIN_PROPAGATION (Single location)
+- FF_INVENTORY_SYNC (No POS)
+```
+
+### For Restaurant/Food Service
+```
+✅ ENABLE:
+- FF_TENANT_GBP_SYNC (Critical for discovery)
+- FF_TENANT_GBP_HOURS_SYNC (Hours change frequently)
+- FF_CATEGORY_MANAGEMENT_PAGE (Menu organization)
+- FF_PHOTO_MANAGEMENT (Food photos essential)
+
+🟡 OPTIONAL:
+- FF_EMAIL_NOTIFICATIONS (Promotions)
+
+❌ SKIP:
+- FF_GOOGLE_SHOPPING_FEED (Not selling products)
+- FF_INVENTORY_SYNC (Not applicable)
+```
+
+### For Multi-Location Chain
+```
+✅ ENABLE:
+- FF_TENANT_GBP_SYNC (All locations)
+- FF_TENANT_GBP_HOURS_SYNC (All locations)
+- FF_CATEGORY_MANAGEMENT_PAGE (Consistency)
+- FF_CHAIN_PROPAGATION (Critical!)
+- FF_ADVANCED_ANALYTICS (Track all locations)
+
+🟡 OPTIONAL:
+- FF_GOOGLE_SHOPPING_FEED (If e-commerce)
+- FF_EMAIL_NOTIFICATIONS (Marketing)
+```
+
+### For E-Commerce Focused
+```
+✅ ENABLE:
+- FF_TENANT_GBP_SYNC (Local visibility)
+- FF_CATEGORY_MANAGEMENT_PAGE (Product organization)
+- FF_GOOGLE_SHOPPING_FEED (Critical!)
+- FF_SKU_SCANNING (Inventory management)
+- FF_PHOTO_MANAGEMENT (Product photos)
+- FF_ADVANCED_ANALYTICS (Track conversions)
+
+🟡 OPTIONAL:
+- FF_INVENTORY_SYNC (If using POS)
+- FF_EMAIL_NOTIFICATIONS (Customer engagement)
+```
+
+### For Service Business (No Products)
+```
+✅ ENABLE:
+- FF_TENANT_GBP_SYNC (Discovery)
+- FF_TENANT_GBP_HOURS_SYNC (Availability)
+
+❌ SKIP:
+- FF_CATEGORY_MANAGEMENT_PAGE (No products)
+- FF_SKU_SCANNING (No products)
+- FF_GOOGLE_SHOPPING_FEED (No products)
+- FF_INVENTORY_SYNC (No inventory)
+- FF_CHAIN_PROPAGATION (Unless multi-location)
+```
+
+## 🎯 Onboarding Checklist Template
+
+### Pre-Onboarding (Admin Prep)
+- [ ] Review tenant business type
+- [ ] Identify required features
+- [ ] Prepare test data
+- [ ] Check API credentials (GBP, etc.)
+
+### During Onboarding (With Tenant)
+- [ ] Complete store identity
+- [ ] Configure recommended features
+- [ ] Run all feature tests
+- [ ] Verify data accuracy
+- [ ] Enable validated features
+- [ ] Document any issues
+
+### Post-Onboarding (Follow-up)
+- [ ] Monitor feature usage
+- [ ] Check for errors
+- [ ] Gather feedback
+- [ ] Enable additional features as needed
+- [ ] Schedule 1-week check-in
+
+## 🚨 Red Flags to Watch For
+
+### During Feature Testing
+- ⚠️ **GBP Sync Fails** → Check API credentials, verify account ownership
+- ⚠️ **Hours Not Syncing** → Verify timezone, check special hours format
+- ⚠️ **Shopping Feed Rejected** → Review product data quality, check Merchant Center policies
+- ⚠️ **Chain Propagation Errors** → Verify organization setup, check tenant relationships
+- ⚠️ **Photos Not Uploading** → Check file size, verify cloud storage quota
+
+### Signs to Delay Launch
+- 🛑 Core features failing tests
+- 🛑 Data not syncing to Google
+- 🛑 Critical errors in logs
+- 🛑 Tenant reporting confusion
+- 🛑 Performance issues
+
+### When to Skip Features
+- ⏭️ Tenant doesn't need it
+- ⏭️ External service not set up
+- ⏭️ Feature in beta/experimental
+- ⏭️ Tenant wants to add later
+- ⏭️ Technical blockers present
 
 ---
 
