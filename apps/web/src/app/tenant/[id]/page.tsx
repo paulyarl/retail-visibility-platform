@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Image from 'next/image';
-import ProductCard from '@/components/ProductCard';
 import { Pagination } from '@/components/ui';
 import Link from 'next/link';
 import { getLandingPageFeatures } from '@/lib/landing-page-tiers';

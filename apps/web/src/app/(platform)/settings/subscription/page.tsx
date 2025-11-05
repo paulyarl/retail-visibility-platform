@@ -227,6 +227,111 @@ export default function SubscriptionPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
         {/* Current Plan */}
+        {/* SKU Overage Alert */}
+        {skuLimit !== Infinity && usagePercent > 100 && (
+          <Card className="border-2 border-red-500 bg-red-50">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <CardTitle className="text-red-900">⚠️ SKU Limit Exceeded</CardTitle>
+                  <p className="text-sm text-red-800 mt-1">
+                    You are currently using <strong>{skuUsage.toLocaleString()} SKUs</strong>, which exceeds your plan limit of <strong>{skuLimit.toLocaleString()} SKUs</strong>.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-red-100 rounded-lg p-4 border border-red-300 mb-4">
+                <h4 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Current Limitations:
+                </h4>
+                <ul className="space-y-2 text-sm text-red-900">
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 font-bold">✗</span>
+                    <span><strong>Cannot add new products</strong> - Product creation is disabled until you're back within your limit</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 font-bold">✗</span>
+                    <span><strong>Cannot import products</strong> - Bulk imports and scanning are temporarily blocked</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 font-bold">✗</span>
+                    <span><strong>Existing products remain visible</strong> - Your storefront and inventory are still accessible</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 font-bold">⚠</span>
+                    <span><strong>Grace period:</strong> You have 7 days to resolve this before additional restrictions may apply</span>
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="bg-white rounded-lg p-4 border border-red-200">
+                <h4 className="font-semibold text-red-900 mb-2">Action Required:</h4>
+                <ul className="space-y-2 text-sm text-red-800">
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-500 font-bold">•</span>
+                    <span><strong>Option 1:</strong> Remove {(skuUsage - skuLimit).toLocaleString()} SKUs to get back within your limit</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-500 font-bold">•</span>
+                    <span><strong>Option 2:</strong> Upgrade to a higher tier plan to accommodate your inventory</span>
+                  </li>
+                </ul>
+                <div className="mt-4 flex gap-3">
+                  <Button 
+                    variant="danger" 
+                    onClick={() => {
+                      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+                      if (tenantId) {
+                        window.location.href = `/t/${tenantId}/products`;
+                      }
+                    }}
+                  >
+                    Manage Products
+                  </Button>
+                  <Button 
+                    variant="secondary"
+                    onClick={() => {
+                      document.getElementById('available-plans')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  >
+                    View Upgrade Options
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Near Limit Warning */}
+        {skuLimit !== Infinity && usagePercent >= 90 && usagePercent <= 100 && (
+          <Card className="border-2 border-amber-500 bg-amber-50">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <CardTitle className="text-amber-900">⚠️ Approaching SKU Limit</CardTitle>
+                  <p className="text-sm text-amber-800 mt-1">
+                    You're using <strong>{usagePercent}%</strong> of your SKU limit ({skuUsage.toLocaleString()} / {skuLimit.toLocaleString()} SKUs). Consider upgrading soon to avoid hitting your limit.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+        )}
+
         <Card className="border-2 border-primary-500">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -422,11 +527,21 @@ export default function SubscriptionPage() {
                     const isApproved = request.status === 'complete';
                     const isDenied = request.status === 'denied';
                     
+                    // Determine if upgrade or downgrade
+                    const tierOrder = ['starter', 'professional', 'enterprise'];
+                    const chainTierOrder = ['chain_starter', 'chain_professional', 'chain_enterprise'];
+                    const isChain = (request.currentTier as string).startsWith('chain_');
+                    const order = isChain ? chainTierOrder : tierOrder;
+                    const fromIndex = order.indexOf(request.currentTier as string);
+                    const toIndex = order.indexOf(request.requestedTier as string);
+                    const isUpgrade = toIndex > fromIndex;
+                    
                     return (
                       <div 
                         key={request.id} 
                         className={`p-4 rounded-lg border-2 ${
-                          isApproved ? 'bg-green-50 border-green-200' : 
+                          isApproved && isUpgrade ? 'bg-green-50 border-green-200' : 
+                          isApproved && !isUpgrade ? 'bg-red-50 border-red-200' :
                           isDenied ? 'bg-red-50 border-red-200' : 
                           'bg-neutral-50 border-neutral-200'
                         }`}
@@ -467,16 +582,18 @@ export default function SubscriptionPage() {
                             </div>
                           </div>
                           <Badge className={
-                            isApproved ? 'bg-green-100 text-green-800' : 
+                            isApproved && isUpgrade ? 'bg-green-100 text-green-800' : 
+                            isApproved && !isUpgrade ? 'bg-red-100 text-red-800' :
                             isDenied ? 'bg-red-100 text-red-800' : 
                             'bg-neutral-100 text-neutral-800'
                           }>
-                            {isApproved ? '✓ Approved' : isDenied ? '✗ Denied' : request.status}
+                            {isApproved ? (isUpgrade ? '↑ Upgraded' : '↓ Downgraded') : isDenied ? '✗ Denied' : request.status}
                           </Badge>
                         </div>
                         {request.adminNotes && (
                           <div className={`mt-2 p-2 rounded border ${
-                            isApproved ? 'bg-green-100 border-green-300' : 
+                            isApproved && isUpgrade ? 'bg-green-100 border-green-300' : 
+                            isApproved && !isUpgrade ? 'bg-red-100 border-red-300' :
                             isDenied ? 'bg-red-100 border-red-300' : 
                             'bg-neutral-100 border-neutral-300'
                           }`}>
@@ -494,7 +611,7 @@ export default function SubscriptionPage() {
         )}
 
         {/* Change Plan Section */}
-        <div>
+        <div id="available-plans">
           <h2 className="text-xl font-bold text-neutral-900 mb-4">Change Your Plan</h2>
           <p className="text-neutral-600 mb-6">
             Select a different plan to request a subscription change. An email will be sent to our team for approval.
