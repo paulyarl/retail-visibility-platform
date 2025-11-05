@@ -386,39 +386,46 @@ export default function OnboardingWizard({
             </div>
           </div>
           {currentStep === 2 && (
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button onClick={() => router.push(`/t/${tenantId}/dashboard`)}>
-                Go to Tenant Dashboard
-                <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </Button>
-              <Button variant="primary" onClick={() => router.push(`/t/${tenantId}/quick-start`)}>
-                🚀 Quick Start - Generate Products (Recommended)
-              </Button>
-              <Button variant="secondary" onClick={() => router.push('/') }>
-                Platform Dashboard
-              </Button>
-              <Button variant="secondary" onClick={() => router.push(`/t/${tenantId}/profile-completeness`)}>
-                Profile Completeness
-              </Button>
-              {ffCategory && (
-                <Button variant="secondary" onClick={() => router.push(`/t/${tenantId}/categories`)}>
-                  Categories
+            <div className="mt-8">
+              {/* Primary Actions */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <Button onClick={() => router.push(`/t/${tenantId}/dashboard`)}>
+                  Go to Tenant Dashboard
+                  <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
                 </Button>
-              )}
-              <Button variant="secondary" onClick={() => router.push(`/t/${tenantId}/items`)}>
-                Products
-              </Button>
-              <Button variant="secondary" onClick={() => router.push(`/t/${tenantId}/settings/hours`)}>
-                Hours
-              </Button>
-              <Button variant="secondary" onClick={() => router.push(`/t/${tenantId}/settings`)}>
-                Settings
-              </Button>
-              <Button variant="secondary" onClick={() => router.push(`/tenant/${tenantId}`)}>
-                Storefront
-              </Button>
+                <Button variant="primary" onClick={() => router.push(`/t/${tenantId}/quick-start`)}>
+                  🚀 Quick Start (Recommended)
+                </Button>
+              </div>
+              
+              {/* Secondary Actions - Responsive Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                <Button variant="secondary" size="sm" onClick={() => router.push('/') }>
+                  Platform
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/profile-completeness`)}>
+                  Profile
+                </Button>
+                {ffCategory && (
+                  <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/categories`)}>
+                    Categories
+                  </Button>
+                )}
+                <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/items`)}>
+                  Products
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/settings/hours`)}>
+                  Hours
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/settings`)}>
+                  Settings
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => router.push(`/tenant/${tenantId}`)}>
+                  Storefront
+                </Button>
+              </div>
             </div>
           )}
         </AnimatedCard>
