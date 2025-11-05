@@ -25,14 +25,20 @@ export async function GET(
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      return NextResponse.json(errorData, { status: response.status });
+      const errorText = await response.text();
+      console.error(`[API Proxy] GET /organizations/${organizationId} failed:`, response.status, errorText);
+      try {
+        const errorData = JSON.parse(errorText);
+        return NextResponse.json(errorData, { status: response.status });
+      } catch {
+        return NextResponse.json({ message: errorText || 'Failed to fetch organization' }, { status: response.status });
+      }
     }
 
     const data = await response.json();
     return NextResponse.json(data);
-  } catch (error) {
-    console.error('Error fetching organization:', error);
-    return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+  } catch (error: any) {
+    console.error('[API Proxy] Error fetching organization:', error);
+    return NextResponse.json({ message: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
