@@ -57,7 +57,16 @@ export default function UpgradeRequestsPage() {
       const res = await fetch(`/api/upgrade-requests?${params}`);
       const data = await res.json();
       
-      setRequests(data.requests || []);
+      console.log('[Upgrade Requests Page] Received data:', { 
+        hasRequests: !!data.requests, 
+        hasData: !!data.data,
+        requestsLength: data.requests?.length,
+        dataLength: data.data?.length,
+        pagination: data.pagination 
+      });
+      
+      // Backend returns data.data, not data.requests
+      setRequests(data.data || data.requests || []);
       setPagination(data.pagination);
     } catch (error) {
       console.error('Failed to load upgrade requests:', error);
