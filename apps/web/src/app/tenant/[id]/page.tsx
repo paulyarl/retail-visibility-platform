@@ -36,6 +36,7 @@ interface Tenant {
     website?: string;
     address?: string;
     logo_url?: string;
+    banner_url?: string;
   };
 }
 
@@ -312,6 +313,23 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           </div>
         </div>
       </header>
+
+      {/* Banner Hero Section (if banner exists) */}
+      {tenant.metadata?.banner_url && (
+        <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="relative w-full h-48 md:h-64 rounded-lg overflow-hidden">
+              <Image
+                src={tenant.metadata.banner_url}
+                alt={`${businessName} banner`}
+                fill
+                className="object-cover"
+                priority
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Products Grid */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
