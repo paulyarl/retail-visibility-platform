@@ -167,13 +167,14 @@ export default function TenantBrandingPage() {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const token = localStorage.getItem('access_token');
       
-      const response = await fetch(`${apiBaseUrl}/tenant/${encodeURIComponent(tenantId)}/profile`, {
+      const response = await fetch(`${apiBaseUrl}/tenant/profile`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
+          tenant_id: tenantId,
           business_name: businessName,
           business_description: tagline,
           logo_url: logoUrl,
