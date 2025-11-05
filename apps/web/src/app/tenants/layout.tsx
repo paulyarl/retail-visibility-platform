@@ -6,7 +6,6 @@ export default function TenantsLayout({ children }: { children: React.ReactNode 
   const nav = [
     { label: 'Your Tenants', href: '/tenants' },
     { label: 'Platform Dashboard', href: '/' },
-    { label: 'Onboarding', href: '/onboarding?force=1' },
     { label: 'Settings', href: '/settings' },
   ];
 
