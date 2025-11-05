@@ -317,7 +317,7 @@ export default function CategoriesPage() {
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Categories</h2>
           <button
-            onClick={() => setIsCreate(true)}
+            onClick={openCreate}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
           >
             + Create Category
