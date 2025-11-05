@@ -1,27 +1,23 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
-function buildAuthHeaders(req: Request): HeadersInit {
-  const headers: HeadersInit = { 'Content-Type': 'application/json' }
-  const cookie = req.headers.get('cookie') || ''
-  let auth = req.headers.get('authorization') || undefined
-  if (!auth) {
-    const jar = Object.fromEntries(cookie.split(';').map(p => p.trim()).filter(Boolean).map(kv => {
-      const i = kv.indexOf('=')
-      return i === -1 ? [kv, ''] : [kv.slice(0, i), decodeURIComponent(kv.slice(1 + i))]
-    })) as Record<string, string>
-    const token = jar['ACCESS_TOKEN'] || jar['access_token'] || jar['token'] || jar['auth_token']
-    if (token) auth = `Bearer ${token}`
-  }
-  if (auth) headers['Authorization'] = auth
-  if (cookie) headers['Cookie'] = cookie
-  return headers
-}
-
-export async function PUT(req: Request, context: { params: Promise<{ tenantId: string, flag: string }> }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ tenantId: string, flag: string }> }) {
   try {
     const { tenantId, flag } = await context.params
     const base = process.env.API_BASE_URL || 'http://localhost:4000'
-    const headers = buildAuthHeaders(req)
+    
+    // Get auth token from cookies
+    const cookieStore = await cookies()
+    const token = cookieStore.get('access_token')?.value
+    
+    if (!token) {
+      return NextResponse.json({ success: false, error: 'authentication_required' }, { status: 401 })
+    }
+
+    const headers: HeadersInit = { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }
     const body = await req.json()
     // Forward to API
     const res = await fetch(`${base}/api/admin/tenant-flags/${encodeURIComponent(tenantId)}/${encodeURIComponent(flag)}` , {
