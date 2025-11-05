@@ -4,7 +4,7 @@ const API_URL = process.env.API_URL || 'http://localhost:3001';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { organizationId: string } }
+  { params }: { params: Promise<{ organizationId: string }> }
 ) {
   // Get authorization header from client request
   const authHeader = req.headers.get('authorization');
@@ -13,7 +13,7 @@ export async function POST(
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
-  const { organizationId } = params;
+  const { organizationId } = await params;
   const body = await req.json();
 
   try {
