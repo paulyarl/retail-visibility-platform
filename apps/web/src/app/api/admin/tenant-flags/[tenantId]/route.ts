@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(req: NextRequest, context: { params: Promise<{ tenantId: string }> }) {
   try {
     const { tenantId } = await context.params
@@ -8,8 +11,14 @@ export async function GET(req: NextRequest, context: { params: Promise<{ tenantI
     // Get auth token from request cookies
     const token = req.cookies.get('access_token')?.value
     
+    console.log('[Tenant Flags API] Cookie check:', { 
+      hasToken: !!token, 
+      allCookies: req.cookies.getAll().map(c => c.name),
+      tenantId 
+    })
+    
     if (!token) {
-      return NextResponse.json({ success: false, error: 'authentication_required' }, { status: 401 })
+      return NextResponse.json({ success: false, error: 'authentication_required', debug: 'no_token_in_cookies' }, { status: 401 })
     }
 
     const headers: HeadersInit = { 
