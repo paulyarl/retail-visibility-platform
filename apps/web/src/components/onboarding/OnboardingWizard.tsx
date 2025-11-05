@@ -405,6 +405,9 @@ export default function OnboardingWizard({
                 <Button variant="secondary" size="sm" onClick={() => router.push('/') }>
                   Platform
                 </Button>
+                <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/settings/branding`)}>
+                  🎨 Branding
+                </Button>
                 <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/profile-completeness`)}>
                   Profile
                 </Button>
