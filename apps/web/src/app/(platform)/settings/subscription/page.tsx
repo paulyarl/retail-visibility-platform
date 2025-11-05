@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/compo
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
-import { getAdminEmail } from '@/lib/admin-emails';
+import { getAllAdminEmails } from '@/lib/admin-emails';
 import { api } from '@/lib/api';
 
 interface Tenant {
@@ -152,8 +152,11 @@ export default function SubscriptionPage() {
       const changeType = isUpgrade ? 'upgrade' : 'downgrade';
       const actionVerb = isUpgrade ? 'upgrading' : 'downgrading';
       
+      // Get configured admin email (async to ensure we get the latest from database)
+      const adminEmails = await getAllAdminEmails();
+      const adminEmail = adminEmails.subscription;
+      
       // Also open email client with pre-filled content
-      const adminEmail = getAdminEmail('subscription');
       const subject = encodeURIComponent(`Subscription ${isUpgrade ? 'Upgrade' : 'Downgrade'} Request - ${metadata?.businessName || tenant.name}`);
       const body = encodeURIComponent(
         `Hello,\n\n` +

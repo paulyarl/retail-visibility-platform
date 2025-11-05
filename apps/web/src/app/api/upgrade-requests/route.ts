@@ -36,14 +36,6 @@ export async function GET(req: NextRequest) {
     });
     const data = await res.json();
     
-    console.log('[Upgrade Requests API] Response:', { 
-      status: res.status, 
-      dataKeys: Object.keys(data),
-      requestsCount: data.requests?.length || 0,
-      dataCount: data.data?.length || 0,
-      paginationTotal: data.pagination?.total
-    });
-    
     return NextResponse.json(data, { status: res.status });
   } catch (error) {
     console.error('Error fetching upgrade requests:', error);
