@@ -38,6 +38,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     organizationName: null as string | null,
   });
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [tenantData, setTenantData] = useState<{ name: string; logoUrl?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showcaseMode, setShowcaseMode] = useState<ShowcaseMode>('hybrid');
   const [platformStats, setPlatformStats] = useState({
@@ -164,6 +165,15 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
         
         if (data.tenant) {
           setSelectedTenantId(data.tenant.id);
+          // Fetch tenant details for logo
+          const tenantRes = await api.get(`/api/tenants/${data.tenant.id}`);
+          if (tenantRes.ok) {
+            const tenantInfo = await tenantRes.json();
+            setTenantData({
+              name: tenantInfo.name,
+              logoUrl: tenantInfo.metadata?.logo_url,
+            });
+          }
         }
         
         setStats({
@@ -259,18 +269,32 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-neutral-900 mb-2">
-            {isAuthenticated ? 'Welcome to Your Dashboard' : 'Platform Overview'}
-          </h2>
-          <p className="text-neutral-600">
-            {isAuthenticated 
-              ? (stats.isChain 
-                  ? `Managing ${stats.locations} locations across ${stats.organizationName || 'your organization'}`
-                  : 'Manage your retail inventory and visibility across platforms'
-                )
-              : 'Empowering retailers with complete online visibility'
-            }
-          </p>
+          <div className="flex items-center gap-4 mb-2">
+            {isAuthenticated && tenantData?.logoUrl && (
+              <div className="relative w-16 h-16 flex-shrink-0">
+                <Image
+                  src={tenantData.logoUrl}
+                  alt={tenantData.name}
+                  fill
+                  className="object-contain rounded-lg"
+                />
+              </div>
+            )}
+            <div>
+              <h2 className="text-3xl font-bold text-neutral-900">
+                {isAuthenticated ? (tenantData?.name ? `${tenantData.name} Dashboard` : 'Welcome to Your Dashboard') : 'Platform Overview'}
+              </h2>
+              <p className="text-neutral-600">
+                {isAuthenticated 
+                  ? (stats.isChain 
+                      ? `Managing ${stats.locations} locations across ${stats.organizationName || 'your organization'}`
+                      : 'Manage your retail inventory and visibility across platforms'
+                    )
+                  : 'Empowering retailers with complete online visibility'
+                }
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Public Platform Health - For visitors/non-authenticated users */}
