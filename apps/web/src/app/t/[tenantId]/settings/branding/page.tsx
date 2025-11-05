@@ -33,15 +33,21 @@ export default function TenantBrandingPage() {
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
-      // Fetch tenant info for name
+      // Fetch tenant info for name, logo, and banner
       const tenantResponse = await api.get(`${apiBaseUrl}/tenants/${encodeURIComponent(tenantId)}`);
       let tenantName = '';
+      let logoUrl = '';
+      let bannerUrl = '';
+      
       if (tenantResponse.ok) {
         const tenantData = await tenantResponse.json();
         tenantName = tenantData.name || '';
+        // Logo and banner are stored in tenant.metadata
+        logoUrl = tenantData.metadata?.logo_url || '';
+        bannerUrl = tenantData.metadata?.banner_url || '';
       }
       
-      // Fetch profile for other branding data
+      // Fetch profile for business description
       const response = await api.get(`${apiBaseUrl}/tenant/${encodeURIComponent(tenantId)}/profile`);
       
       if (response.ok) {
@@ -49,11 +55,13 @@ export default function TenantBrandingPage() {
         // Use tenant name if no business_name is set, otherwise use business_name
         setBusinessName(data.business_name || tenantName || '');
         setTagline(data.business_description || '');
-        setLogoUrl(data.logo_url || '');
-        setLogoPreview(data.logo_url || '');
-        setBannerUrl(data.banner_url || '');
-        setBannerPreview(data.banner_url || '');
       }
+      
+      // Set logo and banner from tenant metadata
+      setLogoUrl(logoUrl);
+      setLogoPreview(logoUrl);
+      setBannerUrl(bannerUrl);
+      setBannerPreview(bannerUrl);
     } catch (err) {
       console.error('Failed to load branding:', err);
       setError('Failed to load branding settings');
