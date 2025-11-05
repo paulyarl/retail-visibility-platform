@@ -896,6 +896,102 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
   }
 });
 
+// Banner upload endpoint (similar to logo but for wide banners)
+app.post("/tenant/:id/banner", logoUploadMulter.single("file"), async (req, res) => {
+  try {
+    const tenantId = req.params.id;
+    console.log(`[Banner Upload] Starting upload for tenant ${tenantId}`);
+
+    // Verify tenant exists
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      return res.status(404).json({ error: "tenant_not_found" });
+    }
+
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseBanner = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+      ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+      : null;
+
+    if (!supabaseBanner) {
+      return res.status(500).json({ error: "supabase_not_configured" });
+    }
+
+    let publicUrl: string;
+    const TENANT_BUCKET = StorageBuckets.TENANTS;
+
+    // JSON dataUrl upload (frontend sends compressed base64)
+    if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
+      const parsed = logoDataUrlSchema.safeParse(req.body || {});
+      if (!parsed.success) {
+        console.error(`[Banner Upload] Invalid dataUrl payload:`, parsed.error.flatten());
+        return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+      }
+
+      const match = /^data:[^;]+;base64,(.+)$/i.exec(parsed.data.dataUrl);
+      if (!match) return res.status(400).json({ error: "invalid_data_url" });
+      
+      const buf = Buffer.from(match[1], "base64");
+      
+      // Enforce 5MB limit for banners
+      if (buf.length > 5 * 1024 * 1024) {
+        return res.status(413).json({ error: "banner_too_large", maxSizeMB: 5 });
+      }
+
+      const ext = parsed.data.contentType.includes("png")
+        ? ".png"
+        : parsed.data.contentType.includes("webp")
+        ? ".webp"
+        : ".jpg";
+      
+      const pathKey = `tenants/${tenantId}/banner-${Date.now()}${ext}`;
+      console.log(`[Banner Upload] Uploading dataUrl to Supabase:`, { 
+        bucket: TENANT_BUCKET.name,
+        pathKey, 
+        size: buf.length 
+      });
+
+      const { error, data } = await supabaseBanner.storage
+        .from(TENANT_BUCKET.name)
+        .upload(pathKey, buf, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: parsed.data.contentType,
+        });
+
+      if (error) {
+        console.error("[Banner Upload] Supabase upload error:", error);
+        return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
+      }
+
+      publicUrl = supabaseBanner.storage.from(TENANT_BUCKET.name).getPublicUrl(data.path).data.publicUrl;
+      console.log(`[Banner Upload] Supabase upload successful:`, { publicUrl });
+    } else {
+      return res.status(400).json({ error: "unsupported_payload" });
+    }
+
+    // Update tenant metadata with banner URL
+    const updatedTenant = await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        metadata: {
+          ...(tenant.metadata as any || {}),
+          banner_url: publicUrl,
+        },
+      },
+    });
+
+    return res.status(200).json({ url: publicUrl, tenant: updatedTenant });
+  } catch (e: any) {
+    console.error("[Banner Upload Error]:", e?.message);
+    return res.status(500).json({ 
+      error: "failed_to_upload_banner",
+      details: DEV ? e?.message : undefined 
+    });
+  }
+});
+
 /* ----------------------------- PHOTOS (MOUNTED BEFORE /items) ----------------------------- */
 /** Accept JSON { url } (already uploaded), JSON { dataUrl } (dev), or multipart "file" (server uploads to Supabase or dev FS) */
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });

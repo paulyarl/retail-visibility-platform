@@ -14,11 +14,14 @@ export default function TenantBrandingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [logoPreview, setLogoPreview] = useState<string>('');
+  const [bannerUrl, setBannerUrl] = useState<string>('');
+  const [bannerPreview, setBannerPreview] = useState<string>('');
   const [businessName, setBusinessName] = useState<string>('');
   const [tagline, setTagline] = useState<string>('');
 
@@ -37,6 +40,8 @@ export default function TenantBrandingPage() {
         setTagline(data.business_description || '');
         setLogoUrl(data.logo_url || '');
         setLogoPreview(data.logo_url || '');
+        setBannerUrl(data.banner_url || '');
+        setBannerPreview(data.banner_url || '');
       }
     } catch (err) {
       console.error('Failed to load branding:', err);
@@ -113,6 +118,21 @@ export default function TenantBrandingPage() {
         throw new Error('Image must be less than 5MB');
       }
 
+      // Validate aspect ratio (should be roughly square for logos)
+      const img = document.createElement('img');
+      const imageUrl = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+      URL.revokeObjectURL(imageUrl);
+
+      const aspectRatio = img.width / img.height;
+      if (aspectRatio < 0.5 || aspectRatio > 2) {
+        throw new Error('Logo should be roughly square (aspect ratio between 1:2 and 2:1). For wide images, use the Banner upload below.');
+      }
+
       // Compress image
       const compressedBase64 = await compressImage(file);
 
@@ -159,6 +179,82 @@ export default function TenantBrandingPage() {
     }
   };
 
+  const handleBannerUpload = async (file: File) => {
+    try {
+      setUploadingBanner(true);
+      setError(null);
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Please upload an image file');
+      }
+
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error('Image must be less than 5MB');
+      }
+
+      // Validate aspect ratio (should be wide/landscape for banners)
+      const img = document.createElement('img');
+      const imageUrl = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+      URL.revokeObjectURL(imageUrl);
+
+      const aspectRatio = img.width / img.height;
+      if (aspectRatio < 2) {
+        throw new Error('Banner should be wide/landscape (aspect ratio at least 2:1, e.g., 1200x400). For square images, use the Logo upload above.');
+      }
+
+      // Compress image with wider aspect ratio (1200px for banners)
+      const compressedBase64 = await compressImage(file, 1200);
+
+      // Upload to backend
+      const body = JSON.stringify({
+        tenant_id: tenantId,
+        dataUrl: compressedBase64,
+        contentType: "image/jpeg" 
+      });
+
+      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/banner`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Banner upload error:', errorData);
+        throw new Error(errorData.message || errorData.error || 'Upload failed');
+      }
+
+      const payload = await res.json();
+      const uploadedUrl = payload.url;
+      
+      if (uploadedUrl) {
+        setBannerUrl(uploadedUrl);
+        setBannerPreview(uploadedUrl);
+        setSuccess('Banner uploaded successfully!');
+        setTimeout(() => setSuccess(null), 3000);
+      }
+    } catch (err: any) {
+      console.error('Banner upload error:', err);
+      setError(err.message || 'Failed to upload banner');
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
+
+  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleBannerUpload(file);
+    }
+  };
+
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -178,6 +274,7 @@ export default function TenantBrandingPage() {
           business_name: businessName,
           business_description: tagline,
           logo_url: logoUrl,
+          banner_url: bannerUrl,
         }),
       });
 
@@ -223,9 +320,9 @@ export default function TenantBrandingPage() {
         {/* Logo Upload */}
         <Card>
           <CardHeader>
-            <CardTitle>Store Logo</CardTitle>
+            <CardTitle>Store Logo (Square)</CardTitle>
             <CardDescription>
-              Upload your store logo. This will appear on your public landing page and in various places throughout the platform.
+              Upload your square or circular logo. Used on: storefront, dashboard, sidebar, and profile pages. Must be roughly square (aspect ratio 1:2 to 2:1).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -268,6 +365,62 @@ export default function TenantBrandingPage() {
                 Recommended: Square image, 400x400px to 800x800px. Smaller files load faster and save storage. Max 5MB. Automatically optimized to 800px.
               </p>
               {uploadingLogo && (
+                <p className="mt-2 text-sm text-primary-600 dark:text-primary-400">
+                  Uploading and optimizing...
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Banner Upload */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Store Banner (Wide)</CardTitle>
+            <CardDescription>
+              Upload a wide banner image. Used on: items/inventory page header and other wide display areas. Must be landscape/wide (aspect ratio at least 2:1, e.g., 1200x400).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Banner Preview */}
+            {bannerPreview && (
+              <div className="flex justify-center p-6 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
+                <div className="relative w-full max-w-2xl h-32">
+                  <Image
+                    src={bannerPreview}
+                    alt="Store banner"
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Upload Button */}
+            <div>
+              <Label htmlFor="banner-upload">Upload Banner</Label>
+              <div className="mt-2">
+                <input
+                  id="banner-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleBannerChange}
+                  disabled={uploadingBanner}
+                  className="block w-full text-sm text-neutral-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-lg file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-primary-50 file:text-primary-700
+                    hover:file:bg-primary-100
+                    dark:file:bg-primary-900/20 dark:file:text-primary-400
+                    dark:hover:file:bg-primary-900/30
+                    disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+              <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+                Recommended: Wide image, 1200x300px to 1200x400px. Max 5MB. Automatically optimized to 1200px width.
+              </p>
+              {uploadingBanner && (
                 <p className="mt-2 text-sm text-primary-600 dark:text-primary-400">
                   Uploading and optimizing...
                 </p>
@@ -323,7 +476,7 @@ export default function TenantBrandingPage() {
           </Button>
           <Button
             onClick={handleSave}
-            disabled={loading || saving || uploadingLogo}
+            disabled={loading || saving || uploadingLogo || uploadingBanner}
           >
             {saving ? 'Saving...' : 'Save Changes'}
           </Button>
