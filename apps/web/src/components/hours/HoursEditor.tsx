@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import TimeInput from "./TimeInput";
 
 type Period = { day: string; open: string; close: string };
 
@@ -55,6 +56,43 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
   const remove = (i: number) => setPeriods(periods.filter((_, idx) => idx !== i));
 
   const save = async () => {
+    // Validate that open time is before close time for each period
+    const invalidPeriods = periods.filter(p => {
+      if (!p.open || !p.close) return false;
+      return p.open >= p.close;
+    });
+
+    if (invalidPeriods.length > 0) {
+      setMsg("✗ Opening time must be before closing time");
+      setTimeout(() => setMsg(null), 3000);
+      return;
+    }
+
+    // Check for duplicate days with overlapping times
+    const dayGroups = periods.reduce((acc, p) => {
+      if (!acc[p.day]) acc[p.day] = [];
+      acc[p.day].push(p);
+      return acc;
+    }, {} as Record<string, Period[]>);
+
+    for (const [day, dayPeriods] of Object.entries(dayGroups)) {
+      if (dayPeriods.length > 1) {
+        // Check for overlaps
+        for (let i = 0; i < dayPeriods.length; i++) {
+          for (let j = i + 1; j < dayPeriods.length; j++) {
+            const p1 = dayPeriods[i];
+            const p2 = dayPeriods[j];
+            // Check if periods overlap: p1.open < p2.close AND p2.open < p1.close
+            if (p1.open < p2.close && p2.open < p1.close) {
+              setMsg(`✗ Overlapping hours on ${day.charAt(0) + day.slice(1).toLowerCase()}`);
+              setTimeout(() => setMsg(null), 3000);
+              return;
+            }
+          }
+        }
+      }
+    }
+
     setSaving(true);
     setMsg(null);
     const r = await fetch(`${apiBase}/api/tenant/${tenantId}/business-hours`, {
@@ -91,38 +129,72 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
       </div>
       
       <div className="space-y-2">
-        {periods.map((p, i) => (
-          <div key={i} className="flex gap-2 items-center">
-            <select 
-              className="border border-gray-300 px-3 py-2 rounded-lg w-40 font-medium" 
-              value={p.day} 
-              onChange={(e) => update(i, "day", e.target.value)}
-            >
-              {"SUNDAY,MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY".split(",").map((d) => (
-                <option key={d} value={d}>{d.charAt(0) + d.slice(1).toLowerCase()}</option>
-              ))}
-            </select>
-            <input 
-              className="border border-gray-300 px-3 py-2 rounded-lg w-28" 
-              placeholder="9:00 AM"
-              value={to12Hour(p.open)} 
-              onChange={(e) => update(i, "open", e.target.value)} 
-            />
-            <span className="text-gray-400">to</span>
-            <input 
-              className="border border-gray-300 px-3 py-2 rounded-lg w-28" 
-              placeholder="5:00 PM"
-              value={to12Hour(p.close)} 
-              onChange={(e) => update(i, "close", e.target.value)} 
-            />
-            <button 
-              className="text-red-600 hover:text-red-700 px-3 py-2 rounded-lg hover:bg-red-50" 
-              onClick={() => remove(i)}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
+        {periods.map((p, i) => {
+          const isInvalid = p.open && p.close && p.open >= p.close;
+          
+          // Check for overlaps with other periods on the same day
+          const hasOverlap = periods.some((other, j) => {
+            if (i === j || p.day !== other.day) return false;
+            return p.open < other.close && other.open < p.close;
+          });
+          
+          const hasDuplicate = periods.filter((other, j) => i !== j && p.day === other.day).length > 0;
+          
+          return (
+            <div key={i} className={`flex gap-2 items-center flex-wrap p-2 rounded-lg ${isInvalid || hasOverlap ? 'bg-red-50 border border-red-200' : hasDuplicate ? 'bg-amber-50 border border-amber-200' : ''}`}>
+              <select 
+                className="border border-gray-300 px-3 py-2 rounded-lg w-40 font-medium" 
+                value={p.day} 
+                onChange={(e) => update(i, "day", e.target.value)}
+              >
+                {"SUNDAY,MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY".split(",").map((d) => (
+                  <option key={d} value={d}>{d.charAt(0) + d.slice(1).toLowerCase()}</option>
+                ))}
+              </select>
+              <TimeInput
+                value={to12Hour(p.open)}
+                onChange={(val) => update(i, "open", val)}
+                placeholder="9:00 AM"
+              />
+              <span className="text-gray-400">to</span>
+              <TimeInput
+                value={to12Hour(p.close)}
+                onChange={(val) => update(i, "close", val)}
+                placeholder="5:00 PM"
+              />
+              {isInvalid && (
+                <span className="text-red-600 text-sm font-medium flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Invalid time range
+                </span>
+              )}
+              {!isInvalid && hasOverlap && (
+                <span className="text-red-600 text-sm font-medium flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Overlaps with another period
+                </span>
+              )}
+              {!isInvalid && !hasOverlap && hasDuplicate && (
+                <span className="text-amber-600 text-sm font-medium flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Multiple periods for same day
+                </span>
+              )}
+              <button 
+                className="text-red-600 hover:text-red-700 px-3 py-2 rounded-lg hover:bg-red-50" 
+                onClick={() => remove(i)}
+              >
+                Remove
+              </button>
+            </div>
+          );
+        })}
         <button className="text-blue-600 hover:text-blue-700 font-medium" onClick={add}>+ Add period</button>
       </div>
       

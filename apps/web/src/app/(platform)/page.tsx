@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import Image from "next/image";
 import PublicFooter from "@/components/PublicFooter";
 import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
+import { computeStoreStatus } from "@/lib/hours-utils";
 
 export default function PlatformHomePage() {
   return <Home embedded />;
@@ -114,27 +115,11 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
         const hours = prof?.hours;
         let hasHours = false;
         if (Array.isArray(hours)) hasHours = hours.length > 0;
-        else if (hours && typeof hours === 'object') hasHours = Object.keys(hours).length > 0;
+        else if (hours && typeof hours === 'object') hasHours = Object.keys(hours).filter(k => k !== 'timezone' && k !== 'special').length > 0;
 
-        // Try to compute a simple "today" label if possible
-        let today: string | undefined;
-        try {
-          const day = new Date().toLocaleDateString(undefined, { weekday: 'long' });
-          if (hours && typeof hours === 'object' && hours[day]) {
-            const h = hours[day];
-            if (h?.open && h?.close) {
-              // Convert to 12-hour format
-              const to12Hour = (time24: string): string => {
-                if (!time24) return "";
-                const [hour, min] = time24.split(":").map(Number);
-                const period = hour >= 12 ? "PM" : "AM";
-                const hour12 = hour % 12 || 12;
-                return `${hour12}:${min.toString().padStart(2, "0")} ${period}`;
-              };
-              today = `${day}: ${to12Hour(h.open)} - ${to12Hour(h.close)}`;
-            }
-          }
-        } catch {}
+        // Use shared utility to compute store status (handles special hours too!)
+        const status = computeStoreStatus(hours);
+        const today = status?.label;
 
         setHoursInfo({ hasHours, today });
       } catch {
@@ -725,32 +710,12 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   {hoursInfo?.hasHours ? (
                     <div className="flex items-center gap-2">
                       {hoursInfo.today ? (() => {
-                        // Check if currently open
-                        const now = new Date();
-                        const currentTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-                        const day = now.toLocaleDateString(undefined, { weekday: 'long' });
-                        const todayMatch = hoursInfo.today.startsWith(day);
-                        
-                        // Extract times from the today string (format: "Tuesday: 9:00 AM - 5:00 PM")
-                        const timeMatch = hoursInfo.today.match(/(\d+):(\d+)\s*(AM|PM)\s*-\s*(\d+):(\d+)\s*(AM|PM)/);
-                        let isOpen = false;
-                        if (todayMatch && timeMatch) {
-                          const [, openH, openM, openP, closeH, closeM, closeP] = timeMatch;
-                          let openHour = parseInt(openH);
-                          let closeHour = parseInt(closeH);
-                          if (openP === 'PM' && openHour !== 12) openHour += 12;
-                          if (openP === 'AM' && openHour === 12) openHour = 0;
-                          if (closeP === 'PM' && closeHour !== 12) closeHour += 12;
-                          if (closeP === 'AM' && closeHour === 12) closeHour = 0;
-                          
-                          const openTime = `${openHour.toString().padStart(2, '0')}:${openM}`;
-                          const closeTime = `${closeHour.toString().padStart(2, '0')}:${closeM}`;
-                          isOpen = currentTime >= openTime && currentTime < closeTime;
-                        }
-                        
+                        // Parse status from label (e.g., "Open now • Closes at 5:00 PM" or "Closed • Opens today at 9:00 AM")
+                        const isOpen = hoursInfo.today.startsWith('Open');
                         const dotColor = isOpen ? 'bg-green-500' : 'bg-red-500';
                         const statusText = isOpen ? 'Open' : 'Closed';
                         const statusColor = isOpen ? 'text-green-700' : 'text-red-700';
+                        
                         return (
                           <>
                             <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`}></span>

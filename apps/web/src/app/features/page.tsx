@@ -105,9 +105,9 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
-    title: 'Business Hours Sync',
-    description: 'Automatic synchronization of business hours across Google Business Profile, storefront, and all marketing channels. Set once, update everywhere.',
-    benefits: ['Google sync', 'Holiday hours', 'Special events', 'Real-time updates'],
+    title: 'Smart Business Hours',
+    description: 'Go beyond Google with real-time status that handles complex schedules. Multiple periods per day, split shifts, emergency updates - your storefront shows accurate open/closed status even when Google can\'t. Customers get the complete picture with custom notes and unlimited flexibility.',
+    benefits: ['Real-time open/closed status', 'Multiple periods per day', 'Split shift support', 'Emergency schedule updates', 'Custom customer notes', 'Google sync (first 2-3 periods)'],
     color: 'bg-cyan-100 text-cyan-600',
   },
   {

@@ -11,7 +11,8 @@ import {
   Clock,
   FileText,
   Plus,
-  Loader2
+  Loader2,
+  Shield
 } from 'lucide-react';
 import CreateTestChainModal from '@/components/admin/CreateTestChainModal';
 import DeleteTestChainModal from '@/components/admin/DeleteTestChainModal';
@@ -84,6 +85,15 @@ export default function AdminToolsPage() {
   ];
 
   const dashboards = [
+    {
+      id: 'permissions',
+      href: '/settings/admin/permissions',
+      icon: Shield,
+      title: 'Permission Matrix',
+      description: 'Configure role-based permissions across the platform',
+      color: 'from-red-500 to-pink-600',
+      stats: 'Access Control',
+    },
     {
       id: 'enrichment',
       href: '/admin/enrichment',

@@ -535,6 +535,10 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     
     // Fetch business hours from BusinessHours table
     const businessHours = await prisma.businessHours.findUnique({ where: { tenantId } });
+    const specialHours = await prisma.businessHoursSpecial.findMany({ 
+      where: { tenantId },
+      orderBy: { date: 'asc' }
+    });
     let hoursData = null;
     
     if (businessHours && businessHours.periods) {
@@ -551,6 +555,17 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
             close: period.close
           };
         }
+      }
+      
+      // Add special hours overrides
+      if (specialHours && specialHours.length > 0) {
+        hoursByDay.special = specialHours.map(sh => ({
+          date: sh.date.toISOString().split('T')[0], // YYYY-MM-DD format
+          isClosed: sh.isClosed,
+          open: sh.open,
+          close: sh.close,
+          note: sh.note
+        }));
       }
       
       hoursData = hoursByDay;
@@ -1397,6 +1412,7 @@ const createItemSchema = z.object({
   manufacturer: z.string().optional(),
   price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
   currency: z.string().length(3).optional(),
+  availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
 });
 
 app.post(["/items", "/inventory"], checkSubscriptionLimits, enforcePolicyCompliance, async (req, res) => {
@@ -1410,6 +1426,8 @@ app.post(["/items", "/inventory"], checkSubscriptionLimits, enforcePolicyComplia
       brand: parsed.data.brand || 'Unknown',
       price: parsed.data.price ?? parsed.data.priceCents / 100,
       currency: parsed.data.currency || 'USD',
+      // Auto-set availability based on stock if not explicitly provided
+      availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
     };
     const created = await prisma.inventoryItem.create({ data });
     await audit({ tenantId: created.tenantId, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
@@ -1429,7 +1447,14 @@ app.put(["/items/:id", "/inventory/:id"], enforcePolicyCompliance, async (req, r
     return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   }
   try {
-    const updated = await prisma.inventoryItem.update({ where: { id: req.params.id }, data: parsed.data });
+    // Auto-sync availability based on stock count
+    const updateData = { ...parsed.data };
+    if (updateData.stock !== undefined) {
+      // If stock is being updated, automatically set availability
+      updateData.availability = updateData.stock > 0 ? 'in_stock' : 'out_of_stock';
+    }
+    
+    const updated = await prisma.inventoryItem.update({ where: { id: req.params.id }, data: updateData });
     await audit({ tenantId: updated.tenantId, actor: null, action: "inventory.update", payload: { id: updated.id } });
     res.json(updated);
   } catch {
@@ -1465,6 +1490,48 @@ app.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, res) 
   } catch (error) {
     console.error('[PATCH Item] Error:', error);
     res.status(500).json({ error: "failed_to_update_item" });
+  }
+});
+
+// Sync availability status for all items (fix out-of-sync items)
+app.post("/items/sync-availability", authenticateToken, async (req, res) => {
+  try {
+    const tenantId = req.body.tenantId as string;
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenant_required" });
+    }
+
+    // Get all items for the tenant
+    const items = await prisma.inventoryItem.findMany({
+      where: { tenantId },
+      select: { id: true, stock: true, availability: true },
+    });
+
+    // Find items that are out of sync
+    const outOfSync = items.filter(item => {
+      const expectedAvailability = item.stock > 0 ? 'in_stock' : 'out_of_stock';
+      return item.availability !== expectedAvailability;
+    });
+
+    // Update out-of-sync items
+    const updates = await Promise.all(
+      outOfSync.map(item =>
+        prisma.inventoryItem.update({
+          where: { id: item.id },
+          data: { availability: item.stock > 0 ? 'in_stock' : 'out_of_stock' },
+        })
+      )
+    );
+
+    res.json({
+      success: true,
+      total: items.length,
+      synced: updates.length,
+      message: `Synced ${updates.length} out of ${items.length} items`,
+    });
+  } catch (error) {
+    console.error('[Sync Availability] Error:', error);
+    res.status(500).json({ error: "failed_to_sync_availability" });
   }
 });
 

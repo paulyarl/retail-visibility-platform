@@ -1,12 +1,15 @@
 import { notFound } from 'next/navigation';
-import { Metadata } from 'next';
-import Link from 'next/link';
+import type { Metadata } from 'next';
 import Image from 'next/image';
+import ProductCard from '@/components/ProductCard';
+import { Pagination } from '@/components/ui';
+import Link from 'next/link';
 import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
 import TenantMapSection from '@/components/tenant/TenantMapSection';
 import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductDisplay from '@/components/storefront/ProductDisplay';
+import { computeStoreStatus } from '@/lib/hours-utils';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -43,97 +46,6 @@ interface Tenant {
 interface PlatformSettings {
   platformName?: string;
   logoUrl?: string;
-}
-
-// Helpers to compute open/closed status from hours object
-function parseTimeToMinutes(t: string): number | null {
-  if (!t || typeof t !== 'string') return null;
-  const s = t.trim();
-  // HH:mm
-  const m24 = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(s);
-  if (m24) {
-    const hh = parseInt(m24[1], 10);
-    const mm = parseInt(m24[2], 10);
-    return hh * 60 + mm;
-  }
-  // h:mm AM/PM
-  const m12 = /^(\d{1,2}):([0-5]\d)\s*([AP]M)$/i.exec(s);
-  if (m12) {
-    let hh = parseInt(m12[1], 10) % 12;
-    const mm = parseInt(m12[2], 10);
-    const ampm = m12[3].toUpperCase();
-    if (ampm === 'PM') hh += 12;
-    return hh * 60 + mm;
-  }
-  return null;
-}
-
-function minutesToLabel(mins: number, timeZone?: string): string {
-  const hh = Math.floor(mins / 60);
-  const mm = mins % 60;
-  // Convert to 12-hour format
-  const period = hh >= 12 ? 'PM' : 'AM';
-  const hour12 = hh % 12 || 12;
-  const mmStr = mm.toString().padStart(2, '0');
-  return `${hour12}:${mmStr} ${period}`;
-}
-
-function computeStoreStatus(hours: any): { isOpen: boolean; label: string } | null {
-  if (!hours || typeof hours !== 'object') return null;
-  const now = new Date();
-  const locale = 'en-US';
-  const timeZone: string | undefined = typeof hours.timezone === 'string' ? hours.timezone : undefined;
-  const weekday = (d: Date) => d.toLocaleDateString(locale, { weekday: 'long', timeZone });
-  const todayName = weekday(now);
-  const today = (hours as any)[todayName];
-  // Compute "now" in target timezone
-  const fmt = new Intl.DateTimeFormat('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: timeZone });
-  const parts = fmt.formatToParts(now);
-  const hh = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
-  const mm = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
-  const currentMins = hh * 60 + mm;
-
-  const parseRange = (entry: any): { openM: number; closeM: number } | null => {
-    if (!entry) return null;
-    const openStr = entry.open || entry.start || entry.from;
-    const closeStr = entry.close || entry.end || entry.to;
-    const o = parseTimeToMinutes(openStr);
-    const c = parseTimeToMinutes(closeStr);
-    if (o == null || c == null) return null;
-    return { openM: o, closeM: c };
-  };
-
-  const todayRange = parseRange(today);
-  if (todayRange) {
-    const { openM, closeM } = todayRange;
-    if (currentMins >= openM && currentMins < closeM) {
-      return { isOpen: true, label: `Open now • Closes at ${minutesToLabel(closeM, timeZone)}` };
-    }
-    if (currentMins < openM) {
-      return { isOpen: false, label: `Closed • Opens today at ${minutesToLabel(openM, timeZone)}` };
-    }
-    // After close today, find next open day
-  }
-
-  // Find next open day within next 7 days
-  for (let i = 1; i <= 7; i++) {
-    const d = new Date(now);
-    d.setDate(now.getDate() + i);
-    const name = weekday(d);
-    const r = parseRange((hours as any)[name]);
-    if (r) {
-      const dayLabel = i === 1 ? 'tomorrow' : name;
-      return { isOpen: false, label: `Closed • Opens ${dayLabel} at ${minutesToLabel(r.openM, timeZone)}` };
-    }
-  }
-  
-  // If no hours found in next 7 days, check if any hours are set at all
-  const hasAnyHours = Object.keys(hours).some(k => k !== 'timezone' && hours[k]);
-  if (hasAnyHours) {
-    return { isOpen: false, label: 'Closed • Check hours for details' };
-  }
-  
-  return { isOpen: false, label: 'Closed' };
 }
 
 interface PageProps {

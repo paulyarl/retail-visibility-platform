@@ -4,6 +4,7 @@ import HoursEditor from "@/components/hours/HoursEditor";
 import SpecialHoursCalendar from "@/components/hours/SpecialHoursCalendar";
 import SyncStateBadge from "@/components/hours/SyncStateBadge";
 import TimezonePicker from "@/components/hours/TimezonePicker";
+import HoursPreview from "@/components/hours/HoursPreview";
 
 export default async function HoursSettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
@@ -81,25 +82,36 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      {/* Regular Hours Card */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-          <h2 className="text-xl font-bold text-gray-900">Business Hours</h2>
-          <p className="text-sm text-gray-600 mt-1">Set your weekly operating schedule</p>
-        </div>
-        <div className="p-6">
-          <HoursEditor apiBase={clientApiBase} tenantId={tenantId} />
-        </div>
-      </div>
+      {/* Two Column Layout: Editor + Preview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Editors (2/3 width) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Regular Hours Card */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+              <h2 className="text-xl font-bold text-gray-900">Business Hours</h2>
+              <p className="text-sm text-gray-600 mt-1">Set your weekly operating schedule</p>
+            </div>
+            <div className="p-6">
+              <HoursEditor apiBase={clientApiBase} tenantId={tenantId} />
+            </div>
+          </div>
 
-      {/* Special / Holiday Hours Card */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-          <h2 className="text-xl font-bold text-gray-900">Special Hours</h2>
-          <p className="text-sm text-gray-600 mt-1">Manage holiday and exception hours</p>
+          {/* Special / Holiday Hours Card */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+              <h2 className="text-xl font-bold text-gray-900">Special Hours</h2>
+              <p className="text-sm text-gray-600 mt-1">Manage holiday and exception hours</p>
+            </div>
+            <div className="p-6">
+              <SpecialHoursCalendar apiBase={clientApiBase} tenantId={tenantId} />
+            </div>
+          </div>
         </div>
-        <div className="p-6">
-          <SpecialHoursCalendar apiBase={clientApiBase} tenantId={tenantId} />
+
+        {/* Right Column: Live Preview (1/3 width, sticky) */}
+        <div className="lg:col-span-1">
+          <HoursPreview apiBase={clientApiBase} tenantId={tenantId} />
         </div>
       </div>
     </div>

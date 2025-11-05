@@ -13,6 +13,7 @@ type SettingCard = {
   color: string;
   badge?: string;
   adminOnly?: boolean;
+  personalOnly?: boolean; // Hide in tenant-scoped settings
 };
 
 type SettingsGroup = {
@@ -42,18 +43,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           color: 'bg-blue-500',
         },
     {
-      title: 'Platform Offerings',
-      description: 'View all subscription tiers, managed services, and benefits',
-      icon: (
-        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
-      ),
-      href: '/settings/offerings',
-      color: 'bg-emerald-500',
-      badge: 'Explore',
-    },
-    {
       title: 'My Subscription',
       description: 'Manage your plan, view features, and request changes',
       icon: (
@@ -75,6 +64,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: '/settings/appearance',
           color: 'bg-indigo-500',
+          personalOnly: true,
         },
         {
           title: 'Language & Region',
@@ -86,6 +76,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: '/settings/language',
           color: 'bg-teal-500',
+          personalOnly: true,
         },
       ],
     },
@@ -119,6 +110,49 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
         },
       ],
     },
+    // Quick Start & Onboarding (only when tenantId is provided)
+    ...(tenantId ? [{
+      title: 'Quick Start & Onboarding',
+      description: 'Get your store up and running quickly',
+      cards: [
+        {
+          title: 'Business Profile Setup',
+          description: 'Complete your store profile and contact information',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/onboarding?force=1&step=profile`,
+          color: 'bg-green-500',
+          badge: 'Start Here',
+        },
+        {
+          title: 'Product Quick Start',
+          description: 'Generate 50 sample products in 1 second',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/quick-start`,
+          color: 'bg-blue-500',
+          badge: '⚡ Fast',
+        },
+        {
+          title: 'Category Quick Start',
+          description: 'Generate product categories instantly',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/categories/quick-start`,
+          color: 'bg-purple-500',
+          badge: '⚡ Fast',
+        },
+      ] as SettingCard[],
+    }] : []),
     {
       title: 'Tenant Management',
       description: 'Manage your business locations and users',
@@ -155,20 +189,42 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: `/t/${tenantId}/settings/branding`,
           color: 'bg-purple-500',
-        },
+        }] as SettingCard[] : []),
         {
-          title: 'GBP Business Category',
-          description: 'Set your Google Business Profile category',
+          title: 'Organization Dashboard',
+          description: 'View chain-wide SKU usage and location breakdown',
           icon: (
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/gbp-category`,
-          color: 'bg-amber-500',
-          badge: 'M3',
+          href: '/settings/organization',
+          color: 'bg-orange-500',
+          badge: 'Chain',
         },
-        {
+        // Tenant Administration cards (only when tenantId is provided)
+        ...(tenantId ? [
+          {
+            title: 'Feature Flags',
+            description: 'Control per-tenant features',
+            icon: (
+              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+              </svg>
+            ),
+            href: `/t/${tenantId}/settings/admin/flags`,
+            color: 'bg-purple-500',
+            adminOnly: true,
+            badge: 'Admin',
+          },
+        ] : []) as SettingCard[],
+      ],
+    },
+    {
+      title: 'Team Management',
+      description: 'Manage users, roles, and permissions',
+      cards: [
+        ...(tenantId ? [{
           title: 'Team Members',
           description: 'Invite and manage your store team',
           icon: (
@@ -192,73 +248,61 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           badge: 'New',
         },
         {
-          title: 'Organization Dashboard',
-          description: 'View chain-wide SKU usage and location breakdown',
+          title: 'User Management',
+          description: 'Manage users, roles, and permissions',
           icon: (
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
           ),
-          href: '/settings/organization',
+          href: '/settings/admin/users',
           color: 'bg-orange-500',
-          badge: 'Chain',
+          adminOnly: true,
         },
-        // Quick Start Wizards (only when tenantId is provided)
-        ...(tenantId ? [
-          {
-            title: 'Product Quick Start',
-            description: 'Generate 50 sample products in 1 second',
-            icon: (
-              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            ),
-            href: `/t/${tenantId}/quick-start`,
-            color: 'bg-blue-500',
-            badge: '⚡ NEW',
-          },
-          {
-            title: 'Category Quick Start',
-            description: 'Generate product categories instantly',
-            icon: (
-              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-            ),
-            href: `/t/${tenantId}/categories/quick-start`,
-            color: 'bg-purple-500',
-            badge: '⚡ NEW',
-          },
-        ] : []) as SettingCard[],
-        // Tenant Administration cards (only when tenantId is provided)
-        ...(tenantId ? [
-          {
-            title: 'Feature Flags',
-            description: 'Control per-tenant features',
-            icon: (
-              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-              </svg>
-            ),
-            href: `/t/${tenantId}/settings/admin/flags`,
-            color: 'bg-purple-500',
-            adminOnly: true,
-            badge: 'Admin',
-          },
-          {
-            title: 'Business Hours',
-            description: 'Manage hours and special days',
-            icon: (
-              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            ),
-            href: `/t/${tenantId}/settings/hours`,
-            color: 'bg-green-500',
-          },
-        ] : []) as SettingCard[],
       ],
     },
+    // Google Business Profile (only when tenantId is provided)
+    ...(tenantId ? [{
+      title: 'Google Business Profile',
+      description: 'Manage your Google Business Profile integration',
+      cards: [
+        {
+          title: 'Business Hours',
+          description: 'Manage hours and special days (syncs to Google)',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/hours`,
+          color: 'bg-green-500',
+          badge: 'Auto-Sync',
+        },
+        {
+          title: 'Business Category',
+          description: 'Set your Google Business Profile category',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/gbp-category`,
+          color: 'bg-amber-500',
+          badge: 'M3',
+        },
+        {
+          title: 'Product Categories',
+          description: 'Manage product categories for your inventory',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/categories`,
+          color: 'bg-indigo-500',
+        },
+      ] as SettingCard[],
+    }] : []),
     {
       title: 'Platform Administration',
       description: 'System-wide settings and user management',
@@ -289,19 +333,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           color: 'bg-orange-500',
           adminOnly: true,
         },
-        {
-          title: 'Permission Matrix',
-          description: 'Configure role-based permissions across the platform',
-          icon: (
-            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          ),
-          href: '/settings/admin/permissions',
-          color: 'bg-red-500',
-          adminOnly: true,
-          badge: 'New',
-        },
       ],
     },
     {
@@ -324,7 +355,18 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
     },
   ];
 
-  const displayGroups = hideAdmin ? settingsGroups.filter(g => !g.adminOnly) : settingsGroups;
+  // Filter groups and cards based on context
+  const displayGroups = settingsGroups
+    .filter(g => hideAdmin ? !g.adminOnly : true)
+    .map(group => ({
+      ...group,
+      cards: group.cards.filter(card => {
+        if (hideAdmin && card.adminOnly) return false;
+        if (tenantId && card.personalOnly) return false; // Hide personal settings in tenant context
+        return true;
+      })
+    }))
+    .filter(group => group.cards.length > 0); // Remove empty groups
 
   return (
     <ProtectedRoute>

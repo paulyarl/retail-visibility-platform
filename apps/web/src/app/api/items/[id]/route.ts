@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { proxyPut, proxyPatch, proxyDelete } from '@/lib/api-proxy';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const body = await req.json();
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/items/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const res = await proxyPut(req, `/items/${id}`, body);
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (e) {
@@ -22,14 +18,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const body = await req.json();
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const url = new URL(req.url);
     const queryString = url.searchParams.toString();
-    const res = await fetch(`${base}/items/${id}${queryString ? `?${queryString}` : ''}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const path = `/items/${id}${queryString ? `?${queryString}` : ''}`;
+    const res = await proxyPatch(req, path, body);
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (e) {
@@ -41,10 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/items/${id}`, {
-      method: 'DELETE',
-    });
+    const res = await proxyDelete(req, `/items/${id}`);
     if (res.status === 204) {
       return new NextResponse(null, { status: 204 });
     }

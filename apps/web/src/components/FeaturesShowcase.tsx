@@ -81,11 +81,11 @@ const features = [
   {
     id: 'business-hours',
     icon: '🕐',
-    title: 'Business Hours Sync',
-    description: 'Automatic sync across all channels',
-    subtext: 'Set once, update everywhere',
+    title: 'Smart Business Hours',
+    description: 'Real-time status that goes beyond Google',
+    subtext: 'Multiple periods, split shifts, emergency updates - your storefront shows it all',
     gradient: 'from-teal-500 to-cyan-600',
-    badge: 'AUTOMATED',
+    badge: 'REAL-TIME',
     priority: 3,
   },
 ];

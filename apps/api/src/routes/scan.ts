@@ -380,6 +380,7 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
     for (const result of session.results) {
       try {
         const enrichment = result.enrichment as any || {};
+        const stock = enrichment.stock || 0;
         const item = await prisma.inventoryItem.create({
           data: {
             tenantId: session.tenantId,
@@ -390,8 +391,10 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
             sku: result.sku || result.barcode,
             price: (enrichment.priceCents || session.template?.defaultPriceCents || 0) / 100,
             priceCents: enrichment.priceCents || session.template?.defaultPriceCents || 0,
+            stock: stock,
             currency: session.template?.defaultCurrency || 'USD',
             visibility: (session.template?.defaultVisibility as any) || 'private',
+            availability: stock > 0 ? 'in_stock' : 'out_of_stock',
             categoryPath: enrichment.categoryPath || (session.template?.defaultCategory ? [session.template.defaultCategory] : []),
             metadata: { ...enrichment.metadata, scannedFrom: sessionId },
           },

@@ -20,6 +20,7 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
   const specials = await prisma.businessHoursSpecial.findMany({ where: { tenantId } })
 
   // Build GBP payload (shape simplified)
+  // Note: GBP supports multiple special hour periods per date
   const gbpPayload = {
     regularHours: {
       periods: (hours.periods as any[]).map((p: any) => ({ day: p.day, openTime: p.open, closeTime: p.close })),
