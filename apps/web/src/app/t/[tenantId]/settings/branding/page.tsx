@@ -32,11 +32,22 @@ export default function TenantBrandingPage() {
   const loadBranding = async () => {
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      
+      // Fetch tenant info for name
+      const tenantResponse = await api.get(`${apiBaseUrl}/tenants/${encodeURIComponent(tenantId)}`);
+      let tenantName = '';
+      if (tenantResponse.ok) {
+        const tenantData = await tenantResponse.json();
+        tenantName = tenantData.name || '';
+      }
+      
+      // Fetch profile for other branding data
       const response = await api.get(`${apiBaseUrl}/tenant/${encodeURIComponent(tenantId)}/profile`);
       
       if (response.ok) {
         const data = await response.json();
-        setBusinessName(data.business_name || '');
+        // Use tenant name if no business_name is set, otherwise use business_name
+        setBusinessName(data.business_name || tenantName || '');
         setTagline(data.business_description || '');
         setLogoUrl(data.logo_url || '');
         setLogoPreview(data.logo_url || '');
@@ -263,6 +274,25 @@ export default function TenantBrandingPage() {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const token = localStorage.getItem('access_token');
       
+      // Update tenant name
+      const tenantResponse = await fetch(`${apiBaseUrl}/tenants/${encodeURIComponent(tenantId)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: businessName,
+        }),
+      });
+
+      if (!tenantResponse.ok) {
+        const errorData = await tenantResponse.json().catch(() => ({}));
+        console.error('Tenant name update failed:', tenantResponse.status, errorData);
+        throw new Error('Failed to update tenant name');
+      }
+      
+      // Update profile (business description, logo, banner)
       const response = await fetch(`${apiBaseUrl}/tenant/profile`, {
         method: 'PATCH',
         headers: {
@@ -447,6 +477,9 @@ export default function TenantBrandingPage() {
                 placeholder="Your Store Name"
                 disabled={loading}
               />
+              <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                This updates both your tenant name and business profile
+              </p>
             </div>
 
             <div>
