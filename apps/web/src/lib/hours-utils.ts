@@ -114,8 +114,8 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; label: string
 }
 
 /**
- * Get today's special hours for display
- * Returns array of special hours entries for today only
+ * Get today's and upcoming special hours for display
+ * Returns array of special hours entries for today + next 7 days with labels
  */
 export function getTodaySpecialHours(hours: any): Array<{
   date: string;
@@ -123,6 +123,8 @@ export function getTodaySpecialHours(hours: any): Array<{
   close?: string;
   isClosed: boolean;
   note?: string;
+  label: 'today' | 'upcoming';
+  daysAway?: number;
 }> {
   if (!hours || typeof hours !== 'object') return [];
   
@@ -130,16 +132,39 @@ export function getTodaySpecialHours(hours: any): Array<{
   const timeZone: string | undefined = typeof hours.timezone === 'string' ? hours.timezone : undefined;
   const todayDate = now.toLocaleDateString('en-CA', { timeZone }); // YYYY-MM-DD format
   
+  // Calculate date 7 days from now
+  const nextWeek = new Date(now);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const nextWeekDate = nextWeek.toLocaleDateString('en-CA', { timeZone });
+  
   const specialHours = hours.special as any[] | undefined;
   if (!specialHours || !Array.isArray(specialHours)) return [];
   
   return specialHours
-    .filter((sh: any) => sh.date === todayDate)
-    .map((sh: any) => ({
-      date: sh.date,
-      open: sh.open,
-      close: sh.close,
-      isClosed: sh.isClosed || false,
-      note: sh.note,
-    }));
+    .filter((sh: any) => {
+      // Include today and next 7 days
+      return sh.date >= todayDate && sh.date <= nextWeekDate;
+    })
+    .map((sh: any) => {
+      const isToday = sh.date === todayDate;
+      
+      // Calculate days away for upcoming dates
+      let daysAway: number | undefined;
+      if (!isToday) {
+        const specialDate = new Date(sh.date + 'T00:00:00');
+        const todayStart = new Date(todayDate + 'T00:00:00');
+        daysAway = Math.ceil((specialDate.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
+      }
+      
+      return {
+        date: sh.date,
+        open: sh.open,
+        close: sh.close,
+        isClosed: sh.isClosed || false,
+        note: sh.note,
+        label: isToday ? 'today' as const : 'upcoming' as const,
+        daysAway,
+      };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date)); // Sort chronologically
 }

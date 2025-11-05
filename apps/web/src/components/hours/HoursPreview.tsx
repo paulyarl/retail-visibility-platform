@@ -144,27 +144,36 @@ export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
         </div>
       </div>
 
-      {/* Today's Special Hours */}
-      {specialHours.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-amber-200">
-          <div className="flex items-center gap-2 mb-2">
-            <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-            </svg>
-            <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Today's Special Hours</span>
-          </div>
-          <div className="space-y-2">
-            {specialHours.map((sh, idx) => {
-              const formatTime = (time24: string): string => {
-                if (!time24) return "";
-                const [h, m] = time24.split(":").map(Number);
-                const period = h >= 12 ? "PM" : "AM";
-                const hour12 = h % 12 || 12;
-                return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
-              };
-              
-              return (
-                <div key={idx} className="bg-amber-50 rounded p-2 border border-amber-200">
+      {/* Special Hours - Today & Upcoming */}
+      {specialHours.length > 0 && (() => {
+        const todayHours = specialHours.filter(sh => sh.label === 'today');
+        const upcomingHours = specialHours.filter(sh => sh.label === 'upcoming');
+        
+        const formatTime = (time24: string): string => {
+          if (!time24) return "";
+          const [h, m] = time24.split(":").map(Number);
+          const period = h >= 12 ? "PM" : "AM";
+          const hour12 = h % 12 || 12;
+          return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+        };
+        
+        const formatDate = (dateStr: string): string => {
+          const date = new Date(dateStr + 'T00:00:00');
+          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        };
+        
+        return (
+          <div className="mt-4 pt-4 border-t border-amber-200">
+            <div className="flex items-center gap-2 mb-2">
+              <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+              <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Special Hours</span>
+            </div>
+            <div className="space-y-2">
+              {/* Today's Special Hours */}
+              {todayHours.map((sh, idx) => (
+                <div key={`today-${idx}`} className="bg-amber-50 rounded p-2 border border-amber-200">
                   <div className="flex justify-between items-start text-sm">
                     <span className="font-medium text-amber-900">Today</span>
                     <span className="text-amber-800">
@@ -175,11 +184,28 @@ export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
                     <p className="text-xs text-amber-700 italic mt-1">{sh.note}</p>
                   )}
                 </div>
-              );
-            })}
+              ))}
+              
+              {/* Upcoming Special Hours */}
+              {upcomingHours.map((sh, idx) => (
+                <div key={`upcoming-${idx}`} className="bg-blue-50 rounded p-2 border border-blue-200">
+                  <div className="flex justify-between items-start text-sm">
+                    <span className="font-medium text-blue-900">
+                      {formatDate(sh.date)} {sh.daysAway && `(in ${sh.daysAway} day${sh.daysAway > 1 ? 's' : ''})`}
+                    </span>
+                    <span className="text-blue-800">
+                      {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
+                    </span>
+                  </div>
+                  {sh.note && (
+                    <p className="text-xs text-blue-700 italic mt-1">{sh.note}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Info Footer */}
       <div className="mt-4 pt-4 border-t border-gray-200">

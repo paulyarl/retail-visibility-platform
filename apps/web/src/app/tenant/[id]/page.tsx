@@ -445,10 +445,13 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                       })}
                     </div>
 
-                    {/* Special Hours - Today Only */}
+                    {/* Special Hours - Today & Upcoming */}
                     {(() => {
-                      const todaySpecialHours = getTodaySpecialHours(businessHours);
-                      if (todaySpecialHours.length === 0) return null;
+                      const specialHours = getTodaySpecialHours(businessHours);
+                      if (specialHours.length === 0) return null;
+                      
+                      const todayHours = specialHours.filter(sh => sh.label === 'today');
+                      const upcomingHours = specialHours.filter(sh => sh.label === 'upcoming');
                       
                       const formatTime = (time24: string): string => {
                         if (!time24) return "";
@@ -458,17 +461,23 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                         return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
                       };
                       
+                      const formatDate = (dateStr: string): string => {
+                        const date = new Date(dateStr + 'T00:00:00');
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                      };
+                      
                       return (
                         <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
                           <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
                             <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                             </svg>
-                            Today's Special Hours
+                            Special Hours
                           </h4>
                           <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
-                            {todaySpecialHours.map((sh, idx) => (
-                              <div key={`${sh.date}-${idx}`} className="flex flex-col gap-1 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+                            {/* Today's Special Hours */}
+                            {todayHours.map((sh, idx) => (
+                              <div key={`today-${sh.date}-${idx}`} className="flex flex-col gap-1 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
                                 <div className="flex justify-between items-start">
                                   <span className="font-medium text-amber-900 dark:text-amber-100">Today</span>
                                   <span className="text-amber-800 dark:text-amber-200">
@@ -477,6 +486,23 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                                 </div>
                                 {sh.note && (
                                   <span className="text-xs text-amber-700 dark:text-amber-300 italic">{sh.note}</span>
+                                )}
+                              </div>
+                            ))}
+                            
+                            {/* Upcoming Special Hours */}
+                            {upcomingHours.map((sh, idx) => (
+                              <div key={`upcoming-${sh.date}-${idx}`} className="flex flex-col gap-1 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                                <div className="flex justify-between items-start">
+                                  <span className="font-medium text-blue-900 dark:text-blue-100">
+                                    {formatDate(sh.date)} {sh.daysAway && `(in ${sh.daysAway} day${sh.daysAway > 1 ? 's' : ''})`}
+                                  </span>
+                                  <span className="text-blue-800 dark:text-blue-200">
+                                    {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
+                                  </span>
+                                </div>
+                                {sh.note && (
+                                  <span className="text-xs text-blue-700 dark:text-blue-300 italic">{sh.note}</span>
                                 )}
                               </div>
                             ))}
