@@ -157,6 +157,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
         const dashboardRes = await api.get('/api/dashboard');
         
         if (!dashboardRes.ok) {
+          console.error('[Dashboard] Dashboard API returned error:', dashboardRes.status);
           setLoading(false);
           return;
         }
@@ -166,13 +167,18 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
         if (data.tenant) {
           setSelectedTenantId(data.tenant.id);
           // Fetch tenant details for logo
-          const tenantRes = await api.get(`/api/tenants/${data.tenant.id}`);
-          if (tenantRes.ok) {
-            const tenantInfo = await tenantRes.json();
-            setTenantData({
-              name: tenantInfo.name,
-              logoUrl: tenantInfo.metadata?.logo_url,
-            });
+          try {
+            const tenantRes = await api.get(`/api/tenants/${data.tenant.id}`);
+            if (tenantRes.ok) {
+              const tenantInfo = await tenantRes.json();
+              setTenantData({
+                name: tenantInfo.name,
+                logoUrl: tenantInfo.metadata?.logo_url,
+              });
+            }
+          } catch (tenantError) {
+            console.error('[Dashboard] Failed to fetch tenant details:', tenantError);
+            // Continue without logo - non-critical
           }
         }
         
@@ -186,6 +192,10 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
         });
       } catch (error) {
         console.error('[Dashboard] Failed to fetch stats:', error);
+        // Check if it's a network error
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          console.error('[Dashboard] Network error - is the backend running?');
+        }
       } finally {
         setLoading(false);
       }
