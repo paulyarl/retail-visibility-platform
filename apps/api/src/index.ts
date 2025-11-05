@@ -2123,7 +2123,7 @@ app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no aut
 /* ------------------------------ v3.6.2-prep APIs ------------------------------ */
 app.use('/api/feed-jobs', feedJobsRoutes);
 app.use('/api/feedback', feedbackRoutes);
-app.use('/api/v1/tenants', tenantCategoriesRoutes);
+app.use('/api/v1/tenants', authenticateToken, checkTenantAccess, tenantCategoriesRoutes);
 app.use('/api/v1', quickStartRoutes);
 // IMPORTANT: Route order matters in Express! More specific routes MUST come before generic ones.
 // Tenant flags: accessible by platform admins OR store owners of that specific tenant
