@@ -253,7 +253,7 @@ export default function TenantBrandingPage() {
                 />
               </div>
               <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-                Recommended: Square image, at least 400x400px. Max 5MB. Will be automatically optimized.
+                Recommended: Square image, 400x400px to 800x800px. Smaller files load faster and save storage. Max 5MB. Automatically optimized to 800px.
               </p>
               {uploadingLogo && (
                 <p className="mt-2 text-sm text-primary-600 dark:text-primary-400">
