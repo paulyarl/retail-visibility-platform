@@ -32,6 +32,7 @@ export default function PropagateItemModal({
 }: PropagateItemModalProps) {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenantIds, setSelectedTenantIds] = useState<string[]>([]);
+  const [mode, setMode] = useState<'create_only' | 'update_only' | 'create_or_update'>('create_or_update');
   const [loading, setLoading] = useState(false);
   const [propagating, setPropagating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +92,7 @@ export default function PropagateItemModal({
       const res = await api.post(`/api/organizations/${organizationId}/items/propagate`, {
         sourceItemId: itemId,
         targetTenantIds: selectedTenantIds,
+        mode,
       });
 
       if (!res.ok) {
@@ -101,7 +103,7 @@ export default function PropagateItemModal({
       const data = await res.json();
       setResult(data);
       
-      if (data.summary.created > 0) {
+      if (data.summary.created > 0 || data.summary.updated > 0) {
         onSuccess?.();
       }
     } catch (err: any) {
@@ -171,9 +173,14 @@ export default function PropagateItemModal({
               Propagation Complete!
             </h4>
             <div className="text-sm text-green-800 dark:text-green-200 space-y-1">
-              <p>✅ Created: {result.summary.created} location{result.summary.created !== 1 ? 's' : ''}</p>
+              {result.summary.created > 0 && (
+                <p>✅ Created: {result.summary.created} location{result.summary.created !== 1 ? 's' : ''}</p>
+              )}
+              {result.summary.updated > 0 && (
+                <p>🔄 Updated: {result.summary.updated} location{result.summary.updated !== 1 ? 's' : ''}</p>
+              )}
               {result.summary.skipped > 0 && (
-                <p>⏭️ Skipped: {result.summary.skipped} (already exists)</p>
+                <p>⏭️ Skipped: {result.summary.skipped}</p>
               )}
               {result.summary.errors > 0 && (
                 <p>❌ Errors: {result.summary.errors}</p>
@@ -190,6 +197,63 @@ export default function PropagateItemModal({
 
         {!loading && !result && tenants.length > 0 && (
           <>
+            {/* Mode Selector */}
+            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+              <label className="block text-sm font-semibold text-neutral-900 dark:text-white mb-2">
+                Propagation Mode
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="mode"
+                    value="create_or_update"
+                    checked={mode === 'create_or_update'}
+                    onChange={(e) => setMode(e.target.value as any)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-neutral-900 dark:text-white">Create or Update (Recommended)</div>
+                    <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                      Creates new items and updates existing ones with latest data, photos, and enrichment
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="mode"
+                    value="create_only"
+                    checked={mode === 'create_only'}
+                    onChange={(e) => setMode(e.target.value as any)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-neutral-900 dark:text-white">Create Only</div>
+                    <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                      Only creates new items, skips locations that already have this SKU
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="mode"
+                    value="update_only"
+                    checked={mode === 'update_only'}
+                    onChange={(e) => setMode(e.target.value as any)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-neutral-900 dark:text-white">Update Only</div>
+                    <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                      Only updates existing items, skips locations that don't have this SKU
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div className="mb-4 flex items-center justify-between">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input

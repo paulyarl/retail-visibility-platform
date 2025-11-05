@@ -209,10 +209,11 @@ router.delete('/:id/tenants/:tenantId', async (req, res) => {
   }
 });
 
-// POST /organizations/:id/items/propagate - Propagate item to multiple locations
-const propagateItemSchema = z.object({
+// POST /organizations/:id/items/propagate - Propagate a single item to multiple tenants
+const propagateSchema = z.object({
   sourceItemId: z.string().min(1),
   targetTenantIds: z.array(z.string()).min(1),
+  mode: z.enum(['create_only', 'update_only', 'create_or_update']).optional().default('create_only'),
   overrides: z.object({
     price: z.number().optional(),
     stock: z.number().int().optional(),
@@ -223,12 +224,12 @@ const propagateItemSchema = z.object({
 
 router.post('/:id/items/propagate', async (req, res) => {
   try {
-    const parsed = propagateItemSchema.safeParse(req.body);
+    const parsed = propagateSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
-    const { sourceItemId, targetTenantIds, overrides } = parsed.data;
+    const { sourceItemId, targetTenantIds, mode, overrides } = parsed.data;
 
     // Verify organization exists
     const organization = await prisma.organization.findUnique({
@@ -278,6 +279,7 @@ router.post('/:id/items/propagate', async (req, res) => {
     // Propagate to each target tenant
     const results = {
       created: [] as string[],
+      updated: [] as string[],
       skipped: [] as Array<{ tenantId: string; reason: string }>,
       errors: [] as Array<{ tenantId: string; error: string }>,
     };
@@ -298,12 +300,83 @@ router.post('/:id/items/propagate', async (req, res) => {
           },
         });
 
+        // Handle based on mode
         if (existing) {
-          results.skipped.push({ tenantId, reason: 'sku_already_exists' });
+          if (mode === 'create_only') {
+            results.skipped.push({ tenantId, reason: 'sku_already_exists' });
+            continue;
+          }
+          
+          // Update mode - update existing item
+          const updatedItem = await prisma.inventoryItem.update({
+            where: { id: existing.id },
+            data: {
+              name: sourceItem.name,
+              title: sourceItem.title,
+              brand: sourceItem.brand,
+              description: sourceItem.description,
+              price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
+              priceCents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.priceCents,
+              stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
+              quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
+              imageUrl: sourceItem.imageUrl,
+              imageGallery: sourceItem.imageGallery,
+              marketingDescription: sourceItem.marketingDescription,
+              metadata: sourceItem.metadata as any,
+              availability: sourceItem.availability,
+              categoryPath: sourceItem.categoryPath,
+              condition: sourceItem.condition,
+              currency: sourceItem.currency,
+              gtin: sourceItem.gtin,
+              itemStatus: overrides?.itemStatus || sourceItem.itemStatus,
+              mpn: sourceItem.mpn,
+              visibility: overrides?.visibility || sourceItem.visibility,
+              manufacturer: sourceItem.manufacturer,
+              source: sourceItem.source,
+              enrichmentStatus: sourceItem.enrichmentStatus,
+              enrichedAt: sourceItem.enrichedAt,
+              enrichedBy: sourceItem.enrichedBy,
+              enrichedFromBarcode: sourceItem.enrichedFromBarcode,
+              missingImages: sourceItem.missingImages,
+              missingDescription: sourceItem.missingDescription,
+              missingSpecs: sourceItem.missingSpecs,
+              missingBrand: sourceItem.missingBrand,
+            },
+          });
+
+          // Delete old photos and copy new ones
+          await prisma.photoAsset.deleteMany({
+            where: { inventoryItemId: existing.id },
+          });
+
+          if (sourceItem.photos && sourceItem.photos.length > 0) {
+            await prisma.photoAsset.createMany({
+              data: sourceItem.photos.map((photo: any, index: number) => ({
+                tenantId,
+                inventoryItemId: updatedItem.id,
+                url: photo.url,
+                width: photo.width,
+                height: photo.height,
+                contentType: photo.contentType,
+                bytes: photo.bytes,
+                position: photo.position !== undefined ? photo.position : index,
+                alt: photo.alt,
+                caption: photo.caption,
+              })),
+            });
+          }
+
+          results.updated.push(tenantId);
           continue;
         }
 
-        // Create the item for this tenant
+        // Item doesn't exist
+        if (mode === 'update_only') {
+          results.skipped.push({ tenantId, reason: 'sku_does_not_exist' });
+          continue;
+        }
+
+        // Create mode - create new item
         const newItem = await prisma.inventoryItem.create({
           data: {
             tenantId,
@@ -373,6 +446,7 @@ router.post('/:id/items/propagate', async (req, res) => {
       summary: {
         total: targetTenantIds.length,
         created: results.created.length,
+        updated: results.updated.length,
         skipped: results.skipped.length,
         errors: results.errors.length,
       },
