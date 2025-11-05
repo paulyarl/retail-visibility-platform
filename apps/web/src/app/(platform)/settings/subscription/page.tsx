@@ -21,11 +21,20 @@ interface Tenant {
   };
 }
 
+interface PendingRequest {
+  id: string;
+  requestedTier: string;
+  status: string;
+  createdAt: string;
+  adminNotes?: string;
+}
+
 export default function SubscriptionPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | ChainTier | null>(null);
   const [showChangeModal, setShowChangeModal] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
 
   useEffect(() => {
     const loadTenant = async () => {
@@ -37,10 +46,11 @@ export default function SubscriptionPage() {
           return;
         }
 
-        // Fetch tenant info and SKU count in parallel
-        const [tenantRes, itemsRes] = await Promise.all([
+        // Fetch tenant info, SKU count, and pending requests in parallel
+        const [tenantRes, itemsRes, requestsRes] = await Promise.all([
           api.get(`/api/tenants/${tenantId}`),
-          api.get(`/api/items?tenantId=${tenantId}&count=true`)
+          api.get(`/api/items?tenantId=${tenantId}&count=true`),
+          api.get(`/api/upgrade-requests?tenantId=${tenantId}&status=new,pending,waiting`)
         ]);
         
         if (tenantRes.ok) {
@@ -51,6 +61,12 @@ export default function SubscriptionPage() {
           if (itemsRes.ok) {
             const itemsData = await itemsRes.json();
             itemCount = itemsData.count || (Array.isArray(itemsData) ? itemsData.length : 0);
+          }
+          
+          // Get pending requests
+          if (requestsRes.ok) {
+            const requestsData = await requestsRes.json();
+            setPendingRequests(requestsData.data || []);
           }
           
           setTenant({
@@ -296,6 +312,68 @@ export default function SubscriptionPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Pending Requests */}
+        {pendingRequests.length > 0 && (
+          <Card className="border-2 border-amber-500 bg-amber-50">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <CardTitle className="text-amber-900">Pending Subscription Change Requests</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {pendingRequests.map((request) => {
+                  const requestedTierInfo = getTierInfo(request.requestedTier as any);
+                  const statusColors = {
+                    new: 'bg-blue-100 text-blue-800',
+                    pending: 'bg-amber-100 text-amber-800',
+                    waiting: 'bg-gray-100 text-gray-800',
+                  };
+                  const statusColor = statusColors[request.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800';
+                  
+                  return (
+                    <div key={request.id} className="bg-white p-4 rounded-lg border border-amber-200">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-neutral-900">
+                              Requesting: {requestedTierInfo.name}
+                            </span>
+                            <Badge className={statusColor}>
+                              {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-neutral-600">
+                            Submitted: {new Date(request.createdAt).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      {request.adminNotes && (
+                        <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                          <p className="text-xs font-medium text-blue-900 mb-1">Admin Notes:</p>
+                          <p className="text-sm text-blue-800">{request.adminNotes}</p>
+                        </div>
+                      )}
+                      <p className="text-xs text-amber-700 mt-2">
+                        ⏳ Your subscription will be updated once this request is approved by our team.
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Change Plan Section */}
         <div>
