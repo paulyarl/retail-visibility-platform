@@ -48,16 +48,24 @@ export default function TenantBrandingPage() {
       }
       
       // Fetch profile for business description
-      const response = await api.get(`${apiBaseUrl}/tenant/${encodeURIComponent(tenantId)}/profile`);
+      let businessName = tenantName;
+      let businessDescription = '';
       
-      if (response.ok) {
-        const data = await response.json();
-        // Use tenant name if no business_name is set, otherwise use business_name
-        setBusinessName(data.business_name || tenantName || '');
-        setTagline(data.business_description || '');
+      try {
+        const response = await api.get(`${apiBaseUrl}/tenant/${encodeURIComponent(tenantId)}/profile`);
+        if (response.ok) {
+          const data = await response.json();
+          // Use tenant name if no business_name is set, otherwise use business_name
+          businessName = data.business_name || tenantName || '';
+          businessDescription = data.business_description || '';
+        }
+      } catch (profileErr) {
+        console.warn('Profile fetch failed, using tenant name:', profileErr);
       }
       
-      // Set logo and banner from tenant metadata
+      // Set all state
+      setBusinessName(businessName);
+      setTagline(businessDescription);
       setLogoUrl(logoUrl);
       setLogoPreview(logoUrl);
       setBannerUrl(bannerUrl);

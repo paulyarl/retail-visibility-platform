@@ -688,14 +688,14 @@ export default function ItemsClient({
           </CardContent>
         </Card>
 
-        {/* Tenant Logo */}
-        {currentTenant?.metadata?.logo_url && (
+        {/* Tenant Banner or Logo */}
+        {(currentTenant?.metadata?.banner_url || currentTenant?.metadata?.logo_url) && (
           <Card>
             <CardContent className="pt-6 flex justify-center">
               <img 
-                src={currentTenant.metadata.logo_url} 
-                alt={`${currentTenant.name} logo`}
-                className="max-h-32 object-contain"
+                src={currentTenant.metadata.banner_url || currentTenant.metadata.logo_url} 
+                alt={`${currentTenant.name} ${currentTenant.metadata.banner_url ? 'banner' : 'logo'}`}
+                className={currentTenant.metadata.banner_url ? "max-h-40 w-full object-contain" : "max-h-32 object-contain"}
               />
             </CardContent>
           </Card>
