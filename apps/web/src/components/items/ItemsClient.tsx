@@ -155,6 +155,24 @@ export default function ItemsClient({
 
   const [isV2, setIsV2] = useState(false);
   
+  // View mode toggle for default (non-V2) view
+  const getInitialView = (): 'grid' | 'list' => {
+    if (typeof window === 'undefined') return 'grid';
+    try {
+      const saved = localStorage.getItem('items_view_mode');
+      if (saved === 'grid' || saved === 'list') return saved as 'grid' | 'list';
+    } catch {}
+    return 'grid';
+  };
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(getInitialView);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('items_view_mode', viewMode);
+    } catch {}
+  }, [viewMode]);
+  
   useEffect(() => {
     // Evaluate feature flag on client only to avoid hydration mismatch
     setIsV2(isFeatureEnabled('FF_ITEMS_V2_GRID', tenantId));
@@ -797,9 +815,40 @@ export default function ItemsClient({
           <CardHeader>
             <div className="flex items-center justify-between mb-4">
               <CardTitle>{t('inventory.title', 'Inventory')}</CardTitle>
-              <Badge variant="info">
-                Showing {items.length} of {totalItems} products
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Badge variant="info">
+                  Showing {items.length} of {totalItems} products
+                </Badge>
+                {/* View Toggle */}
+                <div className="inline-flex rounded-lg border border-neutral-300 dark:border-neutral-600 p-1 bg-white dark:bg-neutral-800">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`px-3 py-1.5 rounded-md transition-colors ${
+                      viewMode === 'grid'
+                        ? 'bg-primary-600 text-white'
+                        : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                    }`}
+                    aria-label="Grid view"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`px-3 py-1.5 rounded-md transition-colors ${
+                      viewMode === 'list'
+                        ? 'bg-primary-600 text-white'
+                        : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                    }`}
+                    aria-label="List view"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
             
             {/* Search and Filters */}
@@ -937,9 +986,9 @@ export default function ItemsClient({
                 <p className="text-sm text-neutral-500">No items match your filters.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className={viewMode === 'list' ? 'space-y-3' : 'grid grid-cols-1 lg:grid-cols-2 gap-4'}>
                 {paginatedItems.map((i) => (
-                  <div key={i.id} className="p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:shadow-2xl hover:border-neutral-400 dark:hover:border-neutral-500 hover:-translate-y-1 transition-all duration-200 bg-white dark:bg-neutral-800 shadow-md">
+                  <div key={i.id} className={`p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:shadow-2xl hover:border-neutral-400 dark:hover:border-neutral-500 hover:-translate-y-1 transition-all duration-200 bg-white dark:bg-neutral-800 shadow-md ${viewMode === 'list' ? 'w-full' : ''}`}>
                     <div className="flex items-start gap-4 mb-3">
                       {/* Image */}
                       <div className="flex-shrink-0">

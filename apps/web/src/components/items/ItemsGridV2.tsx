@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from "@/components/ui";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -35,8 +35,59 @@ export default function ItemsGridV2({
   onViewPhotos 
 }: ItemsGridV2Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  
+  // View mode toggle
+  const getInitialView = (): 'grid' | 'list' => {
+    if (typeof window === 'undefined') return 'grid';
+    try {
+      const saved = localStorage.getItem('items_view_mode');
+      if (saved === 'grid' || saved === 'list') return saved as 'grid' | 'list';
+    } catch {}
+    return 'grid';
+  };
+
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(getInitialView);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('items_view_mode', viewMode);
+    } catch {}
+  }, [viewMode]);
+
   return (
     <div className="space-y-4">
+      {/* View Toggle */}
+      <div className="flex justify-end">
+        <div className="inline-flex rounded-lg border border-neutral-300 dark:border-neutral-600 p-1 bg-white dark:bg-neutral-800">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`px-4 py-2 rounded-md transition-colors ${
+              viewMode === 'grid'
+                ? 'bg-primary-600 text-white'
+                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+            }`}
+            aria-label="Grid view"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded-md transition-colors ${
+              viewMode === 'list'
+                ? 'bg-primary-600 text-white'
+                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+            }`}
+            aria-label="List view"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
       {(!items || items.length === 0) ? (
         <Card>
           <CardContent className="py-12">
@@ -48,7 +99,135 @@ export default function ItemsGridV2({
             </div>
           </CardContent>
         </Card>
+      ) : viewMode === 'list' ? (
+        /* List View - Full Row Per Item */
+        <div className="space-y-3">
+          {items.map((item, index) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.03, duration: 0.2 }}
+            >
+              <Card className="hover:shadow-lg transition-shadow duration-200">
+                <CardContent className="p-4">
+                  <div className="flex gap-4">
+                    {/* Image */}
+                    <div className="flex-shrink-0 w-24 h-24 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg overflow-hidden">
+                      {item.imageUrl ? (
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.name} 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <svg className="h-10 w-10 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-neutral-900 text-lg mb-1 truncate">
+                            {item.name}
+                          </h3>
+                          <p className="text-sm text-neutral-500 font-mono">{item.sku}</p>
+                        </div>
+                        
+                        {/* Badges */}
+                        <div className="flex flex-wrap gap-1 justify-end">
+                          {item.itemStatus === 'active' && <Badge variant="success">Active</Badge>}
+                          {item.itemStatus === 'inactive' && <Badge variant="default">Paused</Badge>}
+                          {item.visibility === 'public' && <Badge variant="info">Public</Badge>}
+                          {item.googleSyncStatus === 'error' && <Badge variant="error">Sync Error</Badge>}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-3">
+                        {/* Price & Stock */}
+                        <div className="flex items-center gap-6">
+                          {typeof item.priceCents === 'number' && (
+                            <div>
+                              <p className="text-xs text-neutral-500">Price</p>
+                              <p className="text-xl font-bold text-neutral-900">
+                                ${(item.priceCents / 100).toFixed(2)}
+                              </p>
+                            </div>
+                          )}
+                          {typeof item.stock === 'number' && (
+                            <div>
+                              <p className="text-xs text-neutral-500">Stock</p>
+                              <p className={`text-lg font-semibold ${
+                                item.stock === 0 ? 'text-danger' : 
+                                item.stock < 10 ? 'text-warning' : 
+                                'text-success'
+                              }`}>
+                                {item.stock}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2">
+                          {onViewPhotos && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onViewPhotos(item)}
+                              title="View photos"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            </Button>
+                          )}
+                          {onStatusToggle && (
+                            <Button
+                              size="sm"
+                              variant={item.itemStatus === 'active' ? 'secondary' : 'primary'}
+                              onClick={() => onStatusToggle(item)}
+                              title={item.itemStatus === 'active' ? 'Pause item' : 'Activate item'}
+                            >
+                              {item.itemStatus === 'active' ? 'Pause' : 'Resume'}
+                            </Button>
+                          )}
+                          {onVisibilityToggle && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onVisibilityToggle(item)}
+                              title={item.visibility === 'public' ? 'Hide from storefront' : 'Show on storefront'}
+                            >
+                              {item.visibility === 'public' ? 'Hide' : 'Show'}
+                            </Button>
+                          )}
+                          {onEdit && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onEdit(item)}
+                              title="Edit item"
+                            >
+                              Edit
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
       ) : (
+        /* Grid View - Original */
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {items.map((item, index) => (
             <motion.div
