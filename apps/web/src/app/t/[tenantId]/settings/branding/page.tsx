@@ -422,9 +422,9 @@ export default function TenantBrandingPage() {
         {/* Banner Upload */}
         <Card>
           <CardHeader>
-            <CardTitle>Store Banner (Wide)</CardTitle>
+            <CardTitle>Store Banner (Wide) - Optional</CardTitle>
             <CardDescription>
-              Upload a wide banner image. Used on: items/inventory page header and other wide display areas. Must be landscape/wide (aspect ratio at least 2:1, e.g., 1200x400).
+              Upload a wide banner image for a professional look on the items/inventory page. Optional - if not provided, the page will simply not show a banner (your logo appears in the sidebar anyway). Must be landscape/wide (aspect ratio at least 2:1, e.g., 1200x400).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

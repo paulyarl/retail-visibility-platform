@@ -31,6 +31,7 @@ type Tenant = {
     postal_code?: string;
     subscriptionTier?: string;
     logo_url?: string;
+    banner_url?: string;
   };
 };
 
