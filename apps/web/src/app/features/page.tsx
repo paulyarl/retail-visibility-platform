@@ -31,6 +31,27 @@ const features = [
   {
     icon: (
       <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+      </svg>
+    ),
+    title: 'Chain Management & Product Synchronization - Enterprise Grade',
+    description: '🚀 REVOLUTIONARY: Distribute AND UPDATE products across your entire chain in ONE CLICK. Set a hero location, sync 100s of products to 50+ locations in seconds. Update descriptions, photos, and enrichment chain-wide instantly. This is what enterprise retailers pay $50K+/year for.',
+    benefits: [
+      'One-click chain-wide distribution',
+      'Update existing products everywhere',
+      'Hero location concept',
+      'Create, Update, or Sync modes',
+      'Photos & enrichment included',
+      'Save 400+ hours per rollout',
+      'Perfect consistency across all locations',
+      'Instant product launches'
+    ],
+    color: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white',
+    badge: 'ENTERPRISE',
+  },
+  {
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
       </svg>
     ),
@@ -1266,12 +1287,61 @@ export default function FeaturesPage() {
           {/* Chain Pricing Section */}
           <div className="mt-16">
             <div className="text-center mb-8">
+              <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white mb-4">
+                🚀 ENTERPRISE CHAIN MANAGEMENT
+              </Badge>
               <h3 className="text-3xl font-bold text-neutral-900 mb-3">
                 Multi-Location Chain Pricing
               </h3>
-              <p className="text-lg text-neutral-600 max-w-2xl mx-auto">
+              <p className="text-lg text-neutral-600 max-w-2xl mx-auto mb-4">
                 Massive savings for chains and franchises. Same great features, better pricing.
               </p>
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-lg p-6 max-w-4xl mx-auto">
+                <h4 className="text-xl font-bold text-emerald-900 mb-3">✨ Exclusive Chain Features</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <div>
+                      <p className="font-semibold text-emerald-900">One-Click Chain Sync</p>
+                      <p className="text-sm text-emerald-700">Distribute 100s of products to all locations instantly</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <div>
+                      <p className="font-semibold text-emerald-900">Chain-Wide Updates</p>
+                      <p className="text-sm text-emerald-700">Update photos, descriptions, pricing everywhere at once</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    <div>
+                      <p className="font-semibold text-emerald-900">Hero Location</p>
+                      <p className="text-sm text-emerald-700">Designate HQ as master catalog source</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="font-semibold text-emerald-900">Save 400+ Hours</p>
+                      <p className="text-sm text-emerald-700">Per product rollout vs manual entry</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-emerald-200">
+                  <p className="text-sm text-emerald-800 text-center">
+                    <strong>ROI Example:</strong> 50-location chain saves $25,000+ in labor costs per product rollout
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1288,6 +1358,12 @@ export default function FeaturesPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <span>All Starter features per location</span>
+                  </li>
+                  <li className="flex items-start">
+                    <svg className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span className="font-semibold text-emerald-900">Chain product sync</span>
                   </li>
                   <li className="flex items-start">
                     <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
