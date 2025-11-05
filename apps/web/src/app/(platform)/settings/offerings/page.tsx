@@ -46,6 +46,24 @@ export default function OfferingsPage() {
               </div>
             </div>
 
+            {/* Chain Management - ENTERPRISE! */}
+            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 border-2 border-emerald-400 rounded-lg p-6 text-white relative shadow-xl">
+              <div className="absolute -top-2 -right-2 bg-amber-400 text-emerald-900 text-xs px-3 py-1 rounded-full font-bold">
+                ENTERPRISE
+              </div>
+              <div className="text-4xl mb-3">🔗</div>
+              <h3 className="text-lg font-bold mb-2">Chain Management</h3>
+              <ul className="space-y-1 text-sm">
+                <li>• One-click chain sync</li>
+                <li>• Update 50+ locations</li>
+                <li>• Hero location concept</li>
+                <li>• Save 400+ hours</li>
+              </ul>
+              <div className="mt-3 pt-3 border-t border-emerald-300">
+                <span className="text-xs font-semibold">Worth $50K+/year!</span>
+              </div>
+            </div>
+
             {/* Storefront */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-lg p-6">
               <div className="text-4xl mb-3">🏪</div>
@@ -717,8 +735,61 @@ export default function OfferingsPage() {
 
         {/* Chain/Multi-Location Subscriptions */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Multi-Location Chain Pricing</h2>
-          <p className="text-neutral-600 mb-6">Massive savings for chains and franchises</p>
+          <div className="text-center mb-8">
+            <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white mb-4">
+              🚀 ENTERPRISE CHAIN MANAGEMENT
+            </Badge>
+            <h2 className="text-3xl font-bold text-neutral-900 mb-3">Multi-Location Chain Pricing</h2>
+            <p className="text-lg text-neutral-600 mb-4">Massive savings for chains and franchises</p>
+            
+            {/* Chain Features Callout */}
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-lg p-6 max-w-4xl mx-auto mb-8">
+              <h3 className="text-xl font-bold text-emerald-900 mb-3">✨ Exclusive Chain Features</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <div>
+                    <p className="font-semibold text-emerald-900">One-Click Chain Sync</p>
+                    <p className="text-sm text-emerald-700">Distribute 100s of products to all locations instantly</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <div>
+                    <p className="font-semibold text-emerald-900">Chain-Wide Updates</p>
+                    <p className="text-sm text-emerald-700">Update photos, descriptions, pricing everywhere at once</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                  </svg>
+                  <div>
+                    <p className="font-semibold text-emerald-900">Hero Location</p>
+                    <p className="text-sm text-emerald-700">Designate HQ as master catalog source</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="font-semibold text-emerald-900">Save 400+ Hours</p>
+                    <p className="text-sm text-emerald-700">Per product rollout vs manual entry</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-emerald-200">
+                <p className="text-sm text-emerald-800 text-center">
+                  <strong>ROI Example:</strong> 50-location chain saves $25,000+ in labor costs per product rollout
+                </p>
+              </div>
+            </div>
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {Object.values(CHAIN_TIERS).map((tier) => (
