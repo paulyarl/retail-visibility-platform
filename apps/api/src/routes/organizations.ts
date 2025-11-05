@@ -581,4 +581,250 @@ router.post('/:id/items/propagate-bulk', async (req, res) => {
   }
 });
 
+// PUT /organizations/:id/hero-location - Set hero location for organization
+const setHeroLocationSchema = z.object({
+  tenantId: z.string().min(1),
+});
+
+router.put('/:id/hero-location', async (req, res) => {
+  try {
+    const parsed = setHeroLocationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+
+    const { tenantId } = parsed.data;
+
+    // Verify organization exists
+    const organization = await prisma.organization.findUnique({
+      where: { id: req.params.id },
+      include: {
+        tenants: true,
+      },
+    });
+
+    if (!organization) {
+      return res.status(404).json({ error: 'organization_not_found' });
+    }
+
+    // Verify tenant belongs to this organization
+    const tenant = organization.tenants.find(t => t.id === tenantId);
+    if (!tenant) {
+      return res.status(400).json({ 
+        error: 'tenant_not_in_organization',
+        message: 'Selected tenant does not belong to this organization',
+      });
+    }
+
+    // Clear hero flag from all tenants in this organization
+    await prisma.$transaction(
+      organization.tenants.map(t => 
+        prisma.tenant.update({
+          where: { id: t.id },
+          data: {
+            metadata: {
+              ...(t.metadata as any || {}),
+              isHeroLocation: false,
+            },
+          },
+        })
+      )
+    );
+
+    // Set hero flag on selected tenant
+    const updatedTenant = await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        metadata: {
+          ...(tenant.metadata as any || {}),
+          isHeroLocation: true,
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      heroTenantId: tenantId,
+      heroTenantName: updatedTenant.name,
+    });
+  } catch (error: any) {
+    console.error('[Organizations] Set hero location error:', error);
+    res.status(500).json({ error: 'failed_to_set_hero_location', message: error.message });
+  }
+});
+
+// POST /organizations/:id/sync-from-hero - Sync all items from hero location to all other locations
+router.post('/:id/sync-from-hero', async (req, res) => {
+  try {
+    // Verify organization exists
+    const organization = await prisma.organization.findUnique({
+      where: { id: req.params.id },
+      include: {
+        tenants: true,
+      },
+    });
+
+    if (!organization) {
+      return res.status(404).json({ error: 'organization_not_found' });
+    }
+
+    // Find hero location
+    const heroTenant = organization.tenants.find(t => {
+      const metadata = t.metadata as any;
+      return metadata?.isHeroLocation === true;
+    });
+
+    if (!heroTenant) {
+      return res.status(400).json({ 
+        error: 'no_hero_location',
+        message: 'No hero location has been set for this organization. Please set a hero location first.',
+      });
+    }
+
+    // Get all items from hero location
+    const heroItems = await prisma.inventoryItem.findMany({
+      where: { tenantId: heroTenant.id },
+      include: { photos: true },
+    });
+
+    if (heroItems.length === 0) {
+      return res.status(400).json({ 
+        error: 'no_items_at_hero',
+        message: 'Hero location has no items to propagate.',
+      });
+    }
+
+    // Get all other tenants (excluding hero)
+    const targetTenants = organization.tenants.filter(t => t.id !== heroTenant.id);
+
+    if (targetTenants.length === 0) {
+      return res.status(400).json({ 
+        error: 'no_target_locations',
+        message: 'No other locations found in this organization.',
+      });
+    }
+
+    // Propagate each item to each target tenant
+    const results = {
+      created: [] as Array<{ itemId: string; tenantId: string; sku: string }>,
+      skipped: [] as Array<{ itemId: string; tenantId: string; sku: string; reason: string }>,
+      errors: [] as Array<{ itemId: string; tenantId: string; sku: string; error: string }>,
+    };
+
+    for (const sourceItem of heroItems) {
+      for (const targetTenant of targetTenants) {
+        try {
+          // Check if SKU already exists for this tenant
+          const existing = await prisma.inventoryItem.findFirst({
+            where: {
+              tenantId: targetTenant.id,
+              sku: sourceItem.sku,
+            },
+          });
+
+          if (existing) {
+            results.skipped.push({ 
+              itemId: sourceItem.id, 
+              tenantId: targetTenant.id, 
+              sku: sourceItem.sku,
+              reason: 'sku_already_exists' 
+            });
+            continue;
+          }
+
+          // Create the item for this tenant
+          const newItem = await prisma.inventoryItem.create({
+            data: {
+              tenantId: targetTenant.id,
+              sku: sourceItem.sku,
+              name: sourceItem.name,
+              title: sourceItem.title,
+              brand: sourceItem.brand,
+              description: sourceItem.description,
+              price: sourceItem.price,
+              priceCents: sourceItem.priceCents,
+              stock: sourceItem.stock,
+              quantity: sourceItem.quantity,
+              imageUrl: sourceItem.imageUrl,
+              imageGallery: sourceItem.imageGallery,
+              marketingDescription: sourceItem.marketingDescription,
+              metadata: sourceItem.metadata as any,
+              availability: sourceItem.availability,
+              categoryPath: sourceItem.categoryPath,
+              condition: sourceItem.condition,
+              currency: sourceItem.currency,
+              gtin: sourceItem.gtin,
+              itemStatus: sourceItem.itemStatus,
+              mpn: sourceItem.mpn,
+              visibility: sourceItem.visibility,
+              manufacturer: sourceItem.manufacturer,
+              source: sourceItem.source,
+              enrichmentStatus: sourceItem.enrichmentStatus,
+              enrichedAt: sourceItem.enrichedAt,
+              enrichedBy: sourceItem.enrichedBy,
+              enrichedFromBarcode: sourceItem.enrichedFromBarcode,
+              missingImages: sourceItem.missingImages,
+              missingDescription: sourceItem.missingDescription,
+              missingSpecs: sourceItem.missingSpecs,
+              missingBrand: sourceItem.missingBrand,
+            },
+          });
+
+          // Copy photos if any
+          if (sourceItem.photos && sourceItem.photos.length > 0) {
+            await prisma.photoAsset.createMany({
+              data: sourceItem.photos.map((photo, index) => ({
+                tenantId: targetTenant.id,
+                inventoryItemId: newItem.id,
+                url: photo.url,
+                width: photo.width,
+                height: photo.height,
+                contentType: photo.contentType,
+                bytes: photo.bytes,
+                position: photo.position !== undefined ? photo.position : index,
+                alt: photo.alt,
+                caption: photo.caption,
+              })),
+            });
+          }
+
+          results.created.push({ 
+            itemId: newItem.id, 
+            tenantId: targetTenant.id, 
+            sku: sourceItem.sku 
+          });
+        } catch (error: any) {
+          console.error(`[Organizations] Error syncing ${sourceItem.sku} to tenant ${targetTenant.id}:`, error);
+          results.errors.push({ 
+            itemId: sourceItem.id, 
+            tenantId: targetTenant.id, 
+            sku: sourceItem.sku,
+            error: error.message 
+          });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      heroLocation: {
+        tenantId: heroTenant.id,
+        tenantName: heroTenant.name,
+        itemCount: heroItems.length,
+      },
+      targetLocations: targetTenants.length,
+      results,
+      summary: {
+        totalOperations: heroItems.length * targetTenants.length,
+        created: results.created.length,
+        skipped: results.skipped.length,
+        errors: results.errors.length,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Organizations] Sync from hero error:', error);
+    res.status(500).json({ error: 'failed_to_sync_from_hero', message: error.message });
+  }
+});
+
 export default router;
