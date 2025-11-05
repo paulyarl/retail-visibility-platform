@@ -2058,18 +2058,20 @@ app.use('/api/feed-jobs', feedJobsRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/v1/tenants', tenantCategoriesRoutes);
 app.use('/api/v1', quickStartRoutes);
-// Admin tools require admin authentication
-app.use('/api/admin/tools', requireAdmin, adminToolsRoutes);
-app.use('/api/admin', requireAdmin, adminUsersRoutes);
+// IMPORTANT: Route order matters in Express! More specific routes MUST come before generic ones.
+// Tenant flags: accessible by platform admins OR store owners of that specific tenant
+// MUST be mounted BEFORE the generic /api/admin route below to prevent route matching conflicts
+app.use('/admin', authenticateToken, tenantFlagsRoutes);
+app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
+// Admin tools and users - these are more generic and should come after specific routes
+app.use('/api/admin/tools', authenticateToken, requireAdmin, adminToolsRoutes);
+app.use('/api/admin', authenticateToken, requireAdmin, adminUsersRoutes);
 app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
 app.use('/api', feedValidationRoutes);
 app.use('/api', businessProfileValidationRoutes);
 app.use('/api', businessHoursRoutes);
 app.use(testGbpRoutes); // Test endpoint for GBP API verification
 app.use('/auth', googleBusinessOAuthRoutes); // Google Business Profile OAuth flow
-// Tenant flags: accessible by platform admins OR store owners of that specific tenant
-app.use('/admin', authenticateToken, tenantFlagsRoutes);
-app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
 app.use('/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
 app.use('/api/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
 // Effective flags: middleware applied per-route (admin for platform, tenant access for tenant)

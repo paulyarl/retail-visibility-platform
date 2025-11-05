@@ -28,23 +28,14 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-    console.log('[authenticateToken]', {
-      hasAuthHeader: !!authHeader,
-      authHeaderPreview: authHeader ? authHeader.substring(0, 30) + '...' : null,
-      hasToken: !!token,
-      path: req.path
-    });
-
     if (!token) {
       return res.status(401).json({ error: 'authentication_required', message: 'No token provided' });
     }
 
     const payload = authService.verifyAccessToken(token);
-    console.log('[authenticateToken] Token verified:', { userId: payload.userId, role: payload.role });
     req.user = payload;
     next();
   } catch (error) {
-    console.log('[authenticateToken] Error:', error);
     if (error instanceof Error) {
       if (error.name === 'TokenExpiredError') {
         return res.status(401).json({ error: 'token_expired', message: 'Token has expired' });
