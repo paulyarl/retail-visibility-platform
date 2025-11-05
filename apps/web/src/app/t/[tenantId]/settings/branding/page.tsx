@@ -118,8 +118,8 @@ export default function TenantBrandingPage() {
 
       // Upload to backend
       const body = JSON.stringify({
-        base64: compressedBase64,
-        filename: file.name,
+        tenant_id: tenantId,
+        dataUrl: compressedBase64,
         contentType: "image/jpeg" 
       });
 
@@ -131,7 +131,8 @@ export default function TenantBrandingPage() {
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.message || 'Upload failed');
+        console.error('Logo upload error:', errorData);
+        throw new Error(errorData.message || errorData.error || 'Upload failed');
       }
 
       const payload = await res.json();
