@@ -77,8 +77,13 @@ router.get('/:id', async (req, res) => {
 
     res.json(organization);
   } catch (error: any) {
+    // If the database is temporarily unreachable (e.g., Supabase paused), return a helpful error
+    if (error?.code === 'P1001' || (typeof error?.message === 'string' && error.message.includes("Can't reach database server"))) {
+      console.warn('[Organizations] DB unreachable (P1001). Organization:', req.params.id);
+      return res.status(503).json({ error: 'database_unavailable', message: 'Database is temporarily unavailable' });
+    }
     console.error('[Organizations] Get error:', error);
-    res.status(500).json({ error: 'failed_to_get_organization' });
+    res.status(500).json({ error: 'failed_to_get_organization', message: error.message });
   }
 });
 
