@@ -37,6 +37,45 @@ router.put('/platform-flags/:flag', async (req, res) => {
   res.json({ success: true, data: row })
 })
 
+// POST /api/admin/platform-flags/:flag/override
+router.post('/platform-flags/:flag/override', async (req, res) => {
+  const { flag } = req.params
+  const { value } = req.body as { value: boolean | null }
+  
+  try {
+    // If value is null, we're clearing the override (setting to platform default)
+    if (value === null) {
+      // Just update the platform flag's enabled state
+      const row = await prisma.platformFeatureFlag.update({
+        where: { flag },
+        data: { enabled: false }
+      })
+      return res.json({ success: true, data: row, message: 'Override cleared' })
+    }
+    
+    // Otherwise, force the flag to the specified value
+    const row = await prisma.platformFeatureFlag.upsert({
+      where: { flag },
+      update: { enabled: !!value },
+      create: { 
+        flag, 
+        enabled: !!value,
+        description: null,
+        rollout: null,
+        allowTenantOverride: false
+      },
+    })
+    
+    res.json({ success: true, data: row, message: `Flag forced to ${value}` })
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Flag not found' })
+    }
+    console.error('[platform-flags] Override error:', error)
+    res.status(500).json({ success: false, error: error.message || 'Failed to override flag' })
+  }
+})
+
 // DELETE /api/admin/platform-flags
 router.delete('/platform-flags', async (req, res) => {
   const { flag } = req.body
