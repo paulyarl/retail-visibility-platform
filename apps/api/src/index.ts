@@ -99,6 +99,7 @@ import scanRoutes from './routes/scan';
 import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
 import adminToolsRoutes from './routes/admin-tools';
+import adminUsersRoutes from './routes/admin-users';
 import testGbpRoutes from './routes/test-gbp';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 
@@ -1963,6 +1964,7 @@ app.use('/api/v1/tenants', tenantCategoriesRoutes);
 app.use('/api/v1', quickStartRoutes);
 // Admin tools require admin authentication
 app.use('/api/admin/tools', requireAdmin, adminToolsRoutes);
+app.use('/api/admin', requireAdmin, adminUsersRoutes);
 app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
 app.use('/api', feedValidationRoutes);
 app.use('/api', businessProfileValidationRoutes);

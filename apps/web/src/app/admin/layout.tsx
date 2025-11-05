@@ -10,7 +10,8 @@ import {
   DollarSign,
   Layers,
   Settings,
-  Home
+  Home,
+  Users
 } from 'lucide-react';
 import SettingsFooter from '@/components/SettingsFooter';
 
@@ -19,6 +20,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navItems = [
     { href: '/admin/tools', label: 'Control Panel', icon: Rocket },
+    { href: '/admin/users', label: 'User Management', icon: Users },
     { href: '/admin/enrichment', label: 'Product Intelligence', icon: Sparkles },
     { href: '/admin/organizations', label: 'Organizations', icon: Building2 },
     { href: '/admin/categories', label: 'Categories', icon: Layers },
