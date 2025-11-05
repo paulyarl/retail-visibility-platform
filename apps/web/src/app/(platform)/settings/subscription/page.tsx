@@ -409,6 +409,12 @@ export default function SubscriptionPage() {
             </CardHeader>
             {showHistory && (
               <CardContent>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-blue-900">
+                    <span className="font-semibold">💡 Transparency Note:</span> This history shows all your subscription changes. 
+                    If you're wondering why certain features are no longer available, check here to see when your plan changed and why.
+                  </p>
+                </div>
                 <div className="space-y-3">
                   {requestHistory.map((request) => {
                     const fromTierInfo = getTierInfo(request.currentTier as any);
