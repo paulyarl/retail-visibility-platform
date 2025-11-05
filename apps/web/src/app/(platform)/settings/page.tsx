@@ -30,6 +30,17 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
       title: 'Account & Preferences',
       description: 'Personalize your experience',
       cards: [
+        {
+          title: 'My Account',
+          description: 'View your role, privileges, and account information',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          ),
+          href: '/settings/account',
+          color: 'bg-blue-500',
+        },
     {
       title: 'Platform Offerings',
       description: 'View all subscription tiers, managed services, and benefits',
