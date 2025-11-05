@@ -168,7 +168,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           setSelectedTenantId(data.tenant.id);
           // Fetch tenant details for logo
           try {
-            const tenantRes = await api.get(`/api/tenants/${data.tenant.id}`);
+            const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+            const tenantRes = await api.get(`${apiBaseUrl}/tenants/${data.tenant.id}`);
             if (tenantRes.ok) {
               const tenantInfo = await tenantRes.json();
               setTenantData({

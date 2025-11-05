@@ -51,7 +51,7 @@ export default async function TenantLayout({ children, params }: { children: Rea
   // Fetch tenant logo
   let tenantLogoUrl: string | undefined;
   try {
-    const tenantRes = await fetch(`${apiBaseUrl}/tenant/${tenantId}`, {
+    const tenantRes = await fetch(`${apiBaseUrl}/tenants/${tenantId}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     });
