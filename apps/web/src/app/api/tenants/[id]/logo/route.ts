@@ -8,10 +8,19 @@ export async function POST(
     const { id: tenantId } = await context.params;
     const body = await req.json();
     
+    // Get auth token from cookies
+    const token = req.cookies.get('access_token')?.value;
+    if (!token) {
+      return NextResponse.json({ error: 'unauthorized', message: 'Authentication required' }, { status: 401 });
+    }
+    
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const res = await fetch(`${base}/tenant/${encodeURIComponent(tenantId)}/logo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
       body: JSON.stringify(body),
     });
     
