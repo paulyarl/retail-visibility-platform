@@ -606,80 +606,6 @@ export default function ItemsClient({
         {/* Product Enrichment Banner */}
         <ProductEnrichmentBanner tenantId={tenantId} />
 
-        {/* Chain Management Guide - Show if part of organization */}
-        {organizationId && items.length > 0 && (
-          <Card className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200">
-            <CardContent className="pt-4">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-emerald-100 rounded-lg">
-                  <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h4 className="text-sm font-semibold text-emerald-900">🚀 Chain Management</h4>
-                    <Badge className="bg-emerald-600 text-white text-xs">ENTERPRISE</Badge>
-                  </div>
-                  <p className="text-sm text-emerald-800 mb-3">
-                    You're part of a chain! Distribute and update products across all your locations instantly.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-emerald-800">
-                    <div className="flex items-start gap-2">
-                      <svg className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      <div>
-                        <p className="font-semibold">Single Item:</p>
-                        <p>Click propagate button on any item → Select locations → Done!</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <svg className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      <div>
-                        <p className="font-semibold">Bulk Sync:</p>
-                        <p>Go to Organization Settings → Set hero location → Sync all!</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <svg className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <div>
-                        <p className="font-semibold">3 Modes:</p>
-                        <p>Create Only, Update Only, or Create & Update (recommended)</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <svg className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <div>
-                        <p className="font-semibold">Photos Included:</p>
-                        <p>All product images are automatically copied to target locations</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-emerald-200 flex items-center justify-between">
-                    <p className="text-xs text-emerald-700">
-                      💡 <strong>Pro Tip:</strong> Use "Create or Update" mode to keep all locations in sync with latest data
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => window.location.href = '/settings/organization'}
-                      className="text-emerald-700 hover:text-emerald-900"
-                    >
-                      Manage Chain →
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Quick Stats Dashboard */}
         {!loading && totalItems > 0 && (
@@ -1228,15 +1154,16 @@ export default function ItemsClient({
                       {organizationId && (
                         <Button 
                           size="sm" 
-                          variant="ghost"
+                          variant="primary"
                           onClick={() => {
                             setPropagateItem(i);
                             setShowPropagateModal(true);
                           }}
                           title="Propagate to other locations"
+                          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                           </svg>
                         </Button>
                       )}
@@ -1339,6 +1266,84 @@ export default function ItemsClient({
               }}
             />
           )}
+          </Card>
+        )}
+
+        {/* Chain Management Guide - Show if part of organization */}
+        {organizationId && items.length > 0 && (
+          <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-lg">
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h4 className="text-sm font-semibold text-blue-900">🚀 Chain Management</h4>
+                    <Badge className="bg-blue-600 text-white text-xs">ENTERPRISE</Badge>
+                  </div>
+                  <p className="text-sm text-blue-800 mb-3">
+                    You're part of a chain! Distribute and update products across all your locations instantly.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-blue-800">
+                    <div className="flex items-start gap-2">
+                      <Button size="sm" variant="primary" className="bg-gradient-to-r from-blue-600 to-cyan-600 text-xs px-2 py-1 h-auto pointer-events-none">
+                        <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        Propagate
+                      </Button>
+                      <div>
+                        <p className="font-semibold">Single Item:</p>
+                        <p>Click the blue propagate button on any item → Select locations → Done!</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <svg className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <div>
+                        <p className="font-semibold">Bulk Sync:</p>
+                        <p>Go to Organization Settings → Set hero location → Sync all!</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <svg className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <div>
+                        <p className="font-semibold">3 Modes:</p>
+                        <p>Create Only, Update Only, or Create & Update (recommended)</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <svg className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <div>
+                        <p className="font-semibold">Photos Included:</p>
+                        <p>All product images are automatically copied to target locations</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-blue-200 flex items-center justify-between">
+                    <p className="text-xs text-blue-700">
+                      💡 <strong>Pro Tip:</strong> Use "Create or Update" mode to keep all locations in sync with latest data
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.location.href = '/settings/organization'}
+                      className="text-blue-700 hover:text-blue-900"
+                    >
+                      Manage Chain →
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
           </Card>
         )}
 
