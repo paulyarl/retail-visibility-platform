@@ -11,6 +11,7 @@ import { generateQuickStartProducts, getAvailableScenarios, QuickStartScenario }
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
+import { validateSKULimits } from '../middleware/sku-limits';
 
 const router = Router();
 
@@ -75,7 +76,7 @@ const quickStartSchema = z.object({
   createAsDrafts: z.boolean().optional().default(true),
 });
 
-router.post('/tenants/:tenantId/quick-start', authenticateToken, async (req, res) => {
+router.post('/tenants/:tenantId/quick-start', authenticateToken, validateSKULimits, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId;

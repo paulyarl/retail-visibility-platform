@@ -165,6 +165,9 @@ export async function deleteTestChain(organizationId: string): Promise<{
 export async function createTestTenant(options: {
   name: string;
   subscriptionTier?: string;
+  subscriptionStatus?: string;
+  organizationId?: string;
+  ownerId?: string;
   scenario?: 'grocery' | 'fashion' | 'electronics' | 'general';
   productCount?: number;
   createAsDrafts?: boolean;
@@ -172,6 +175,9 @@ export async function createTestTenant(options: {
   const {
     name,
     subscriptionTier = 'professional',
+    subscriptionStatus = 'trial',
+    organizationId,
+    ownerId,
     scenario = 'general',
     productCount = 0,
     createAsDrafts = true,
@@ -185,9 +191,22 @@ export async function createTestTenant(options: {
       id: tenantId,
       name,
       subscriptionTier,
-      subscriptionStatus: 'active',
+      subscriptionStatus,
+      organizationId: organizationId || null,
     },
   });
+
+  // Link to owner if provided
+  if (ownerId) {
+    await prisma.userTenant.create({
+      data: {
+        userId: ownerId,
+        tenantId: tenant.id,
+        role: 'OWNER',
+      },
+    });
+    console.log(`[Admin Tools] Linked tenant ${tenant.id} to owner ${ownerId}`);
+  }
 
   // Seed products if requested
   let result = null;
