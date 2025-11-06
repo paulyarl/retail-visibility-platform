@@ -4,7 +4,8 @@ import { PrismaClient } from '@prisma/client';
 const globalForPrisma = global as unknown as { prisma?: PrismaClient };
 
 // Configure Prisma with connection pooling and retry logic
-const basePrisma = new PrismaClient({
+// Export basePrisma for use in transactions (avoids retry wrapper issues)
+export const basePrisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   datasources: {
     db: {

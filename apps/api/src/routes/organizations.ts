@@ -1,7 +1,7 @@
 // Organization Management API Routes
 import { Router } from 'express';
-import { prisma } from '../prisma';
 import { z } from 'zod';
+import { prisma, basePrisma } from '../prisma';
 
 const router = Router();
 
@@ -696,9 +696,10 @@ router.put('/:id/hero-location', async (req, res) => {
     }
 
     // Update all tenants in a single transaction - clear all hero flags and set the new one
-    await prisma.$transaction(
+    // Note: Use basePrisma for transactions to avoid retry wrapper issues
+    await basePrisma.$transaction(
       organization.tenants.map(t => 
-        prisma.tenant.update({
+        basePrisma.tenant.update({
           where: { id: t.id },
           data: {
             metadata: {
