@@ -75,7 +75,7 @@ export default function AdminUsersPage() {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
-        title="User Management"
+        title="Test User Management"
         description="Create and manage platform users for testing"
         icon={Icons.Settings}
       />
