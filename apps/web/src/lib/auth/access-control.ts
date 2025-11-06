@@ -143,7 +143,16 @@ export function checkAccess(
   const { tenantId, tenantData, organizationData } = context;
 
   // 1. Platform admin override (if enabled)
-  if (allowPlatformAdminOverride && isPlatformAdmin(user)) {
+  const userIsPlatformAdmin = isPlatformAdmin(user);
+  console.log('[Access Control] Platform admin check:', { 
+    allowPlatformAdminOverride, 
+    userIsPlatformAdmin,
+    userRole: user.role,
+    isPlatformAdminFlag: user.isPlatformAdmin 
+  });
+  
+  if (allowPlatformAdminOverride && userIsPlatformAdmin) {
+    console.log('[Access Control] ✅ Platform admin override - granting access');
     return { hasAccess: true };
   }
 
