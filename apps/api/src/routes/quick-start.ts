@@ -7,11 +7,12 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { generateQuickStartProducts, getAvailableScenarios, QuickStartScenario } from '../lib/quick-start';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
+import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
+import { requireTierFeature } from '../middleware/tier-access';
 
 const router = Router();
 
@@ -51,7 +52,12 @@ function checkRateLimit(tenantId: string): { allowed: boolean; resetAt?: number 
  */
 router.get('/scenarios', async (req, res) => {
   try {
-    const scenarios = getAvailableScenarios();
+    const scenarios = [
+      { id: 'grocery', name: 'Grocery Store', description: 'Fresh produce, dairy, meat, and packaged goods' },
+      { id: 'fashion', name: 'Fashion Retail', description: 'Clothing, accessories, and footwear' },
+      { id: 'electronics', name: 'Electronics Store', description: 'Phones, computers, and tech accessories' },
+      { id: 'general', name: 'General Retail', description: 'Mixed merchandise for general stores' },
+    ];
     res.json({ scenarios });
   } catch (error: any) {
     console.error('[Quick Start] Error fetching scenarios:', error);
@@ -76,7 +82,7 @@ const quickStartSchema = z.object({
   createAsDrafts: z.boolean().optional().default(true),
 });
 
-router.post('/tenants/:tenantId/quick-start', authenticateToken, validateSKULimits, async (req, res) => {
+router.post('/tenants/:tenantId/quick-start', authenticateToken, requireTierFeature('quick_start_wizard'), validateSKULimits, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId;

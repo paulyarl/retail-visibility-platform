@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
+import { requireTierFeature } from '../middleware/tier-access';
 import { prisma } from '../prisma';
 import { Flags } from '../config';
 import { audit } from '../audit';
@@ -52,7 +53,7 @@ const commitSessionSchema = z.object({
 });
 
 // POST /api/scan/start - Start new scan session
-router.post('/api/scan/start', authenticateToken, async (req: Request, res: Response) => {
+router.post('/api/scan/start', authenticateToken, requireTierFeature('product_scanning'), async (req: Request, res: Response) => {
   try {
     if (!Flags.SKU_SCANNING) {
       return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SKU_SCANNING' });
