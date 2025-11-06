@@ -68,13 +68,17 @@ export default function PropagationControlPanel() {
         const userRes = await api.get(`${API_BASE_URL}/user/me`);
         if (userRes.ok) {
           const userData = await userRes.json();
+          console.log('User data:', userData);
+          
           const tenantRole = userData.tenants?.find((t: any) => t.tenantId === tenantId);
           const role = tenantRole?.role || null;
           setUserRole(role);
           
           // Platform admins, owners, and admins can access propagation control panel
-          const isPlatformAdmin = userData.isPlatformAdmin === true;
+          const isPlatformAdmin = userData.isPlatformAdmin === true || userData.role === 'ADMIN';
           const isOwnerOrAdmin = role === 'OWNER' || role === 'ADMIN';
+          
+          console.log('Access check:', { isPlatformAdmin, isOwnerOrAdmin, role, userRole: userData.role });
           setHasAccess(isPlatformAdmin || isOwnerOrAdmin);
         }
 
@@ -354,8 +358,8 @@ export default function PropagationControlPanel() {
                 <p className="text-neutral-600 dark:text-neutral-400 mb-2">
                   The Propagation Control Panel is only available to organization owners and administrators.
                 </p>
-                <p className="text-sm text-neutral-500 dark:text-neutral-500 mb-6">
-                  Your current role: <strong>{userRole || 'Member'}</strong>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6">
+                  Your current role: <strong className="text-neutral-700 dark:text-neutral-300">{userRole || 'Member'}</strong>
                 </p>
                 <Link href={`/t/${tenantId}/settings`} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors">
                   Back to Settings
