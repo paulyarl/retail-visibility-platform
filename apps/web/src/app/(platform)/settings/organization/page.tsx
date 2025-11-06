@@ -51,12 +51,22 @@ export default function OrganizationPage() {
         // If not found, try to get it from the current tenant
         if (!orgId) {
           const tenantId = localStorage.getItem('tenantId');
+          console.log('Attempting to load tenant:', tenantId);
+          
           if (tenantId) {
-            const tenantRes = await fetch(`/api/tenants/${tenantId}`);
+            const tenantRes = await fetch(`/tenants/${tenantId}`);
+            console.log('Tenant response status:', tenantRes.status);
+            
             if (tenantRes.ok) {
               const tenantData = await tenantRes.json();
+              console.log('Tenant data:', tenantData);
               orgId = tenantData.organizationId;
+              console.log('Found organizationId:', orgId);
+            } else {
+              console.error('Failed to fetch tenant:', await tenantRes.text());
             }
+          } else {
+            console.log('No tenantId in localStorage');
           }
         }
         
@@ -65,11 +75,13 @@ export default function OrganizationPage() {
           await loadOrganizationData(orgId);
         } else {
           setLoading(false);
-          setError('No organization selected');
+          setError('No organization selected. This tenant may not be part of an organization.');
+          console.log('No organization ID found');
         }
       } catch (err) {
+        console.error('Error loading organization:', err);
         setLoading(false);
-        setError('Failed to load organization');
+        setError(err instanceof Error ? err.message : 'Failed to load organization');
       }
     }
     
