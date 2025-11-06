@@ -730,6 +730,139 @@ router.post('/:tenantId/categories/propagate', async (req, res) => {
   }
 });
 
+const propagateFeatureFlagsSchema = z.object({
+  mode: z.enum(['create_only', 'update_only', 'create_or_update']).optional().default('create_or_update'),
+});
+
+/**
+ * POST /api/v1/tenants/:tenantId/feature-flags/propagate
+ * Propagate feature flags from hero tenant to all location tenants in the organization
+ * Body: { mode?: 'create_only' | 'update_only' | 'create_or_update' }
+ */
+router.post('/:tenantId/feature-flags/propagate', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const body = propagateFeatureFlagsSchema.parse(req.body);
+    const { mode } = body;
+
+    // Get the tenant and verify it's a hero tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        organization: {
+          include: {
+            tenants: {
+              where: { id: { not: tenantId } },
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ success: false, error: 'Tenant not found' });
+    }
+
+    if (!tenant.organizationId) {
+      return res.status(400).json({ success: false, error: 'Tenant is not part of an organization' });
+    }
+
+    const metadata = tenant.metadata as any;
+    if (metadata?.isHeroLocation !== true) {
+      return res.status(400).json({
+        success: false,
+        error: 'Only hero locations can propagate feature flags',
+      });
+    }
+
+    // Get feature flags from hero tenant
+    const heroFlags = await prisma.tenantFeatureFlag.findMany({
+      where: { tenantId },
+    });
+
+    if (heroFlags.length === 0) {
+      return res.status(400).json({ success: false, error: 'No feature flags found for hero location' });
+    }
+
+    const locationTenants = tenant.organization!.tenants;
+    if (locationTenants.length === 0) {
+      return res.status(400).json({ success: false, error: 'No location tenants found in organization' });
+    }
+
+    const results = {
+      totalLocations: locationTenants.length,
+      totalFlags: heroFlags.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+    };
+
+    for (const location of locationTenants) {
+      try {
+        for (const heroFlag of heroFlags) {
+          const existing = await prisma.tenantFeatureFlag.findFirst({
+            where: {
+              tenantId: location.id,
+              flag: heroFlag.flag,
+            },
+          });
+
+          if (existing) {
+            if (mode === 'create_only') {
+              results.skipped++;
+              continue;
+            }
+            
+            await prisma.tenantFeatureFlag.update({
+              where: { id: existing.id },
+              data: {
+                enabled: heroFlag.enabled,
+                description: heroFlag.description,
+                rollout: heroFlag.rollout,
+              },
+            });
+            results.updated++;
+          } else {
+            if (mode === 'update_only') {
+              results.skipped++;
+              continue;
+            }
+            
+            await prisma.tenantFeatureFlag.create({
+              data: {
+                tenantId: location.id,
+                flag: heroFlag.flag,
+                enabled: heroFlag.enabled,
+                description: heroFlag.description,
+                rollout: heroFlag.rollout,
+              },
+            });
+            results.created++;
+          }
+        }
+      } catch (error: any) {
+        console.error(`Error propagating to tenant ${location.id}:`, error);
+        results.errors.push({
+          tenantId: location.id,
+          tenantName: location.name,
+          error: error.message || 'Unknown error',
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Feature flags propagated successfully',
+      data: results,
+    });
+  } catch (error) {
+    console.error('Error propagating feature flags:', error);
+    res.status(500).json({ success: false, error: 'Failed to propagate feature flags' });
+  }
+});
+
 /**
  * POST /api/v1/tenants/:tenantId/business-hours/propagate
  * Propagate business hours from hero tenant to all location tenants in the organization

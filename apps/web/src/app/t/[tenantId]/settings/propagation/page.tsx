@@ -51,6 +51,9 @@ export default function PropagationControlPanel() {
   const [propagating, setPropagating] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Feature Flags propagation state
+  const [featureFlagsMode, setFeatureFlagsMode] = useState<'create_only' | 'update_only' | 'create_or_update'>('create_or_update');
+
   useEffect(() => {
     async function loadOrganizationInfo() {
       try {
@@ -117,6 +120,30 @@ export default function PropagationControlPanel() {
       showToast('success', `Successfully propagated business hours to ${result.data.totalLocations} locations (${summary})`);
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate business hours');
+    } finally {
+      setPropagating(false);
+    }
+  }
+
+  async function propagateFeatureFlags() {
+    try {
+      setPropagating(true);
+      setShowFeatureFlagsModal(false);
+
+      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/feature-flags/propagate`, {
+        mode: featureFlagsMode
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || error.error || 'Failed to propagate feature flags');
+      }
+
+      const result = await res.json();
+      const summary = `Created: ${result.data.created}, Updated: ${result.data.updated}, Skipped: ${result.data.skipped}`;
+      showToast('success', `Successfully propagated ${result.data.totalFlags} feature flags to ${result.data.totalLocations} locations (${summary})`);
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Failed to propagate feature flags');
     } finally {
       setPropagating(false);
     }
@@ -447,8 +474,64 @@ export default function PropagationControlPanel() {
           </div>
         )}
 
+        {/* Feature Flags Modal */}
+        {showFeatureFlagsModal && organizationInfo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowFeatureFlagsModal(false)}>
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold mb-4">Propagate Feature Flags</h3>
+              
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    This will copy feature flags from <strong>{organizationInfo.tenants.find(t => t.isHero)?.name || 'hero location'}</strong> to all {organizationInfo.tenants.length - 1} other locations.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">Propagation Mode</label>
+                  <select
+                    value={featureFlagsMode}
+                    onChange={(e) => setFeatureFlagsMode(e.target.value as any)}
+                    className="w-full border border-neutral-300 dark:border-neutral-600 rounded-md px-3 py-2 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="create_or_update">Create or Update (Sync All)</option>
+                    <option value="create_only">Create Only (Skip Existing)</option>
+                    <option value="update_only">Update Only (Skip New)</option>
+                  </select>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-2">
+                    {featureFlagsMode === 'create_or_update' && '✅ Creates new flags and updates existing ones'}
+                    {featureFlagsMode === 'create_only' && '➕ Only creates flags that don\'t exist at locations'}
+                    {featureFlagsMode === 'update_only' && '🔄 Only updates existing flags, won\'t create new ones'}
+                  </p>
+                </div>
+
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <strong>Note:</strong> This will propagate flag states (enabled/disabled) and descriptions. Location-specific customizations may be overwritten in update modes.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={() => setShowFeatureFlagsModal(false)}
+                  className="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={propagateFeatureFlags}
+                  disabled={propagating}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {propagating ? 'Propagating...' : 'Propagate Flags'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {[
-          { show: showFeatureFlagsModal, setShow: setShowFeatureFlagsModal, title: 'Feature Flags Propagation', message: 'Coming soon! This feature will allow you to propagate feature flags to all locations.' },
           { show: showUserRolesModal, setShow: setShowUserRolesModal, title: 'User Roles Propagation', message: 'Coming soon! This feature will allow you to propagate user roles and permissions to all locations.' },
           { show: showBrandAssetsModal, setShow: setShowBrandAssetsModal, title: 'Brand Assets Propagation', message: 'Coming soon! This feature will allow you to propagate brand assets to all locations.' },
           { show: showBusinessProfileModal, setShow: setShowBusinessProfileModal, title: 'Business Profile Propagation', message: 'Coming soon! This feature will allow you to propagate business profile information to all locations.' },
