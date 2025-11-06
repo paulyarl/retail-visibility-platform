@@ -546,6 +546,84 @@ export default function PropagationControlPanel() {
           </CardContent>
         </Card>
 
+        {/* Hero Location Selector */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="h-12 w-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-1">Hero Location</h3>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+                  The hero location is the source of truth for propagation. All propagation operations will copy data from this location to other locations.
+                </p>
+                <div className="flex items-center gap-4">
+                  <select
+                    value={organizationInfo.tenants.find(t => t.isHero)?.id || ''}
+                    onChange={async (e) => {
+                      const newHeroId = e.target.value;
+                      if (!newHeroId) return;
+                      
+                      if (confirm(`Set ${organizationInfo.tenants.find(t => t.id === newHeroId)?.name} as the hero location?`)) {
+                        try {
+                          const res = await api.put(`${API_BASE_URL}/organizations/${organizationInfo.id}/hero-location`, {
+                            tenantId: newHeroId
+                          });
+                          
+                          if (res.ok) {
+                            // Reload organization info
+                            const tenantRes = await api.get(`${API_BASE_URL}/tenants/${tenantId}`);
+                            if (tenantRes.ok) {
+                              const tenantData = await tenantRes.json();
+                              if (tenantData.organizationId) {
+                                const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenantData.organizationId}`);
+                                if (orgRes.ok) {
+                                  const orgData = await orgRes.json();
+                                  const tenantsWithHeroFlag = orgData.tenants?.map((t: any) => ({
+                                    id: t.id,
+                                    name: t.name,
+                                    isHero: t.metadata?.isHeroLocation === true
+                                  })) || [];
+                                  
+                                  setOrganizationInfo({
+                                    id: orgData.id,
+                                    name: orgData.name,
+                                    tenants: tenantsWithHeroFlag
+                                  });
+                                  
+                                  alert('✅ Hero location updated successfully!');
+                                }
+                              }
+                            }
+                          } else {
+                            const error = await res.json();
+                            alert(`❌ Failed to set hero location: ${error.message || 'Unknown error'}`);
+                          }
+                        } catch (err) {
+                          alert(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                        }
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
+                  >
+                    {organizationInfo.tenants.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} {t.isHero ? '⭐ (Current Hero)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {!organizationInfo.tenants.find(t => t.isHero) && (
+                    <span className="text-sm text-amber-600 dark:text-amber-400">⚠️ No hero location set</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Organization Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <AnimatedCard delay={0} hover={false}>
@@ -555,7 +633,7 @@ export default function PropagationControlPanel() {
                   <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Organization</p>
                   <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">{organizationInfo.name}</p>
                 </div>
-                <div className="h-12 w-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                <div className="h-12 w-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-between">
                   <svg className="w-6 h-6 text-orange-600 dark:text-orange-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
