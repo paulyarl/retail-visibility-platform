@@ -4,6 +4,17 @@
 
 This document outlines the systematic plan to retrofit all existing pages with the new centralized access control system for platform integrity and consistency.
 
+## 🎯 Core Principle: Fix Once, Apply Everywhere
+
+**The Power of Centralization:**
+When we discovered bugs in the access control system (wrong API endpoint, wrong response structure, wrong field checks), we fixed them in ONE place and ALL pages using the system were immediately fixed. This is the key value of centralized middleware.
+
+**Lesson Learned:**
+- ✅ Fix bugs once in the utility → All pages benefit
+- ✅ Add features once → All pages get them
+- ✅ Change logic once → Consistent everywhere
+- ❌ Custom logic per page → Fix bugs N times, high risk of inconsistency
+
 ## Goals
 
 1. ✅ Replace all custom access control logic
@@ -12,6 +23,27 @@ This document outlines the systematic plan to retrofit all existing pages with t
 4. ✅ Add proper platform admin support everywhere
 5. ✅ Handle organization context correctly
 6. ✅ Provide clear access denied messages
+7. ✅ **Establish single source of truth for all future implementations**
+
+## 🚨 Mandatory Rules Going Forward
+
+**For ALL New Pages:**
+1. ✅ MUST use `useAccessControl` hook
+2. ✅ MUST use `AccessPresets` or define custom options
+3. ✅ MUST use `<AccessDenied />` component
+4. ❌ NEVER implement custom access control logic
+5. ❌ NEVER duplicate user fetching
+6. ❌ NEVER create custom access denied UI
+
+**For ALL Existing Pages:**
+1. Must be retrofitted following this plan
+2. Custom logic must be removed
+3. Must be tested with all user roles
+
+**Enforcement:**
+- Code reviews must check for centralized access control usage
+- PRs with custom access control logic will be rejected
+- All security-related changes go through the centralized system
 
 ## Phase 1: Critical Pages (Priority 1) 🔴
 
