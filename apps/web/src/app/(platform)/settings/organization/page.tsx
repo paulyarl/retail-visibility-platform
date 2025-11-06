@@ -548,160 +548,241 @@ export default function OrganizationPage() {
             <CardContent>
               {/* Group 1: Product & Catalog Management */}
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide mb-3">Product & Catalog Management</h3>
+                <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide mb-3">
+                  Product & Catalog Management
+                </h3>
+                <p className="text-xs text-neutral-600 mb-4">
+                  Propagate products, categories, and catalog structure
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Categories */}
-                <div className="p-4 bg-white rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-colors">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm text-neutral-900">Bulk Sync from Hero</h4>
-                        <Badge variant="success" className="text-xs">Recommended</Badge>
+                  {/* 1. Categories */}
+                  <div className="p-4 bg-white rounded-lg border-2 border-purple-200 hover:border-purple-400 transition-colors">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
                       </div>
-                      <p className="text-xs text-neutral-600">Copy all products from hero to all locations at once</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-full"
-                    disabled={!heroLocation || syncing}
-                    onClick={handleSyncFromHero}
-                  >
-                    {syncing ? 'Syncing...' : 'Sync All'}
-                  </Button>
-                </div>
-
-                {/* Type 2: Individual Item Propagation */}
-                <div className="p-4 bg-white rounded-lg border-2 border-purple-200 hover:border-purple-400 transition-colors">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm text-neutral-900 mb-1">Individual Propagation</h4>
-                      <p className="text-xs text-neutral-600">Propagate specific products to selected locations</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => window.location.href = `/items`}
-                  >
-                    Go to Items
-                  </Button>
-                </div>
-
-                {/* Type 3: Category-Based Propagation */}
-                <div className="p-4 bg-white rounded-lg border-2 border-green-200 hover:border-green-400 transition-colors">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm text-neutral-900">By Category</h4>
-                        <Badge variant="default" className="text-xs">Coming Soon</Badge>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-sm text-neutral-900">Categories</h4>
+                          <Badge variant="success" className="text-xs">ACTIVE</Badge>
+                        </div>
+                        <p className="text-xs text-neutral-600 mb-1">Propagate product categories and Google taxonomy alignments</p>
+                        <p className="text-xs text-neutral-500">Bulk propagation</p>
                       </div>
-                      <p className="text-xs text-neutral-600">Propagate all items in a category</p>
                     </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#categories`)}
+                      disabled={!heroLocation}
+                    >
+                      Configure →
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    disabled={true}
-                  >
-                    Coming Soon
-                  </Button>
-                </div>
 
-                {/* Type 4: Selective Sync (Hero to Specific Locations) */}
-                <div className="p-4 bg-white rounded-lg border-2 border-amber-200 hover:border-amber-400 transition-colors">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="p-2 bg-amber-100 rounded-lg">
-                      <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm text-neutral-900">Selective Sync</h4>
-                        <Badge variant="default" className="text-xs">Coming Soon</Badge>
+                  {/* 2. Products/SKUs */}
+                  <div className="p-4 bg-white rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-colors">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
                       </div>
-                      <p className="text-xs text-neutral-600">Sync hero to specific locations only</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-sm text-neutral-900">Products/SKUs</h4>
+                          <Badge variant="success" className="text-xs">ACTIVE</Badge>
+                        </div>
+                        <p className="text-xs text-neutral-600 mb-1">Propagate individual or bulk products to locations</p>
+                        <p className="text-xs text-neutral-500">Single or bulk</p>
+                      </div>
                     </div>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="w-full"
+                      disabled={!heroLocation || syncing}
+                      onClick={handleSyncFromHero}
+                    >
+                      {syncing ? 'Syncing...' : 'Sync All from Hero'}
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    disabled={true}
-                  >
-                    Coming Soon
-                  </Button>
                 </div>
+              </div>
 
-                {/* Type 5: Price-Only Updates */}
-                <div className="p-4 bg-white rounded-lg border-2 border-pink-200 hover:border-pink-400 transition-colors">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="p-2 bg-pink-100 rounded-lg">
-                      <svg className="w-5 h-5 text-pink-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm text-neutral-900">Price Updates</h4>
-                        <Badge variant="default" className="text-xs">Coming Soon</Badge>
+              {/* Group 2: Business Information */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide mb-3">
+                  Business Information
+                </h3>
+                <p className="text-xs text-neutral-600 mb-4">
+                  Propagate business hours, profile, and operational details
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 3. Business Hours */}
+                  <div className="p-4 bg-white rounded-lg border-2 border-green-200 hover:border-green-400 transition-colors">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                       </div>
-                      <p className="text-xs text-neutral-600">Update prices across all locations</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-sm text-neutral-900">Business Hours</h4>
+                          <Badge variant="default" className="text-xs">NEW</Badge>
+                        </div>
+                        <p className="text-xs text-neutral-600 mb-1">Propagate regular and special hours to all locations</p>
+                        <p className="text-xs text-neutral-500">Hours template</p>
+                      </div>
                     </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#hours`)}
+                      disabled={!heroLocation}
+                    >
+                      Configure →
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    disabled={true}
-                  >
-                    Coming Soon
-                  </Button>
+
+                  {/* 4. Business Profile */}
+                  <div className="p-4 bg-white rounded-lg border-2 border-cyan-200 hover:border-cyan-400 transition-colors">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="p-2 bg-cyan-100 rounded-lg">
+                        <svg className="w-5 h-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-sm text-neutral-900">Business Profile</h4>
+                          <Badge variant="default" className="text-xs">NEW</Badge>
+                        </div>
+                        <p className="text-xs text-neutral-600 mb-1">Propagate business description, attributes, and settings</p>
+                        <p className="text-xs text-neutral-500">Profile info</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#profile`)}
+                      disabled={!heroLocation}
+                    >
+                      Configure →
+                    </Button>
+                  </div>
                 </div>
+              </div>
 
-                {/* Type 6: Photo Sync */}
-                <div className="p-4 bg-white rounded-lg border-2 border-indigo-200 hover:border-indigo-400 transition-colors">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="p-2 bg-indigo-100 rounded-lg">
-                      <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm text-neutral-900">Photo Sync</h4>
-                        <Badge variant="default" className="text-xs">Coming Soon</Badge>
+              {/* Group 3: Configuration & Settings */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide mb-3">
+                  Configuration & Settings
+                </h3>
+                <p className="text-xs text-neutral-600 mb-4">
+                  Propagate feature flags, permissions, and system settings
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 5. Feature Flags */}
+                  <div className="p-4 bg-white rounded-lg border-2 border-indigo-200 hover:border-indigo-400 transition-colors">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="p-2 bg-indigo-100 rounded-lg">
+                        <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                        </svg>
                       </div>
-                      <p className="text-xs text-neutral-600">Update product photos across chain</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-sm text-neutral-900">Feature Flags</h4>
+                          <Badge variant="default" className="text-xs">NEW</Badge>
+                        </div>
+                        <p className="text-xs text-neutral-600 mb-1">Enable or disable features across all locations</p>
+                        <p className="text-xs text-neutral-500">Centralized control</p>
+                      </div>
                     </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#flags`)}
+                      disabled={!heroLocation}
+                    >
+                      Configure →
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    disabled={true}
-                  >
-                    Coming Soon
-                  </Button>
+
+                  {/* 6. User Roles & Permissions */}
+                  <div className="p-4 bg-white rounded-lg border-2 border-pink-200 hover:border-pink-400 transition-colors">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="p-2 bg-pink-100 rounded-lg">
+                        <svg className="w-5 h-5 text-pink-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-sm text-neutral-900">User Roles & Permissions</h4>
+                          <Badge variant="default" className="text-xs">NEW</Badge>
+                        </div>
+                        <p className="text-xs text-neutral-600 mb-1">Propagate user invitations and role assignments</p>
+                        <p className="text-xs text-neutral-500">Team management</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#roles`)}
+                      disabled={!heroLocation}
+                    >
+                      Configure →
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Group 4: Branding & Assets */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide mb-3">
+                  Branding & Assets
+                </h3>
+                <p className="text-xs text-neutral-600 mb-4">
+                  Propagate logos, colors, and brand identity
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 7. Brand Assets */}
+                  <div className="p-4 bg-white rounded-lg border-2 border-orange-200 hover:border-orange-400 transition-colors">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-sm text-neutral-900">Brand Assets</h4>
+                          <Badge variant="default" className="text-xs">NEW</Badge>
+                        </div>
+                        <p className="text-xs text-neutral-600 mb-1">Propagate logos, colors, and branding elements</p>
+                        <p className="text-xs text-neutral-500">Brand consistency</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#brand`)}
+                      disabled={!heroLocation}
+                    >
+                      Configure →
+                    </Button>
+                  </div>
                 </div>
               </div>
 
