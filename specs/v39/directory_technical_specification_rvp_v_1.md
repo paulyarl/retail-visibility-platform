@@ -134,6 +134,54 @@ PostgreSQL + PostGIS
 - GMB: "Pet Store" → Directory: "pet"
 - GMB: "Hardware Store" → Directory: "home"
 
+---
+
+### NAP Data Integration (Name, Address, Phone)
+
+**Existing Platform Infrastructure:**
+- `TenantBusinessProfile`: Complete NAP data storage
+  - `businessName`: Business name
+  - `addressLine1`, `addressLine2`: Street address
+  - `city`, `state`, `postalCode`, `countryCode`: Location data
+  - `phoneNumber`: Contact phone
+  - `email`, `website`: Additional contact info
+  - `latitude`, `longitude`: Geocoded coordinates
+  - `displayMap`: Map visibility toggle
+  - `mapPrivacyMode`: Precise vs neighborhood display
+
+**Directory NAP Strategy:**
+1. **Business Name:** Synced from `TenantBusinessProfile.businessName`
+2. **Address:** Complete address from `addressLine1`, `addressLine2`, `city`, `state`, `postalCode`
+3. **Phone:** Synced from `TenantBusinessProfile.phoneNumber`
+4. **Coordinates:** Latitude/longitude for geospatial queries and map display
+5. **Privacy Respect:** Honor `mapPrivacyMode` setting (precise vs neighborhood)
+
+**Google Maps Integration:**
+- **Existing Feature:** Platform already has Google Maps integration (`FF_MAP_CARD`)
+- **API Key:** `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (already configured)
+- **Map Display:** Embedded Google Maps on storefront pages
+- **Directory Maps:** Leverage same infrastructure for directory map view
+- **Geocoding:** Use existing lat/lng from `TenantBusinessProfile`
+- **Privacy Mode:** Respect merchant's `mapPrivacyMode` preference
+
+**NAP Data Sync Flow:**
+```
+TenantBusinessProfile (Source of Truth)
+    ↓
+Auto-Sync Trigger
+    ↓
+directory_listings (Denormalized for Performance)
+    ↓
+Directory Search & Map View
+```
+
+**Denormalized Fields for Performance:**
+- `business_name` - Direct copy from TenantBusinessProfile
+- `address` - Concatenated full address
+- `city`, `state`, `zip_code` - Individual fields for filtering
+- `latitude`, `longitude` - Geocoded coordinates
+- `geolocation` - PostGIS geography point for spatial queries
+
 ### Key Indexes
 
 - Full-text search (GIN index on tsvector)

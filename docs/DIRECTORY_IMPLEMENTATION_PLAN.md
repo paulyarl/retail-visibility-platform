@@ -103,6 +103,50 @@ secondary_categories = ARRAY(
 )
 ```
 
+**NAP Data Sync Logic:**
+```sql
+-- Sync NAP data from TenantBusinessProfile
+INSERT INTO directory_listings (
+  tenant_id,
+  business_name,
+  address,
+  city,
+  state,
+  zip_code,
+  country,
+  phone,
+  email,
+  website,
+  latitude,
+  longitude,
+  geolocation,
+  logo_url,
+  business_hours
+)
+SELECT 
+  tbp.tenant_id,
+  tbp.business_name,
+  CONCAT_WS(', ', tbp.address_line1, tbp.address_line2),
+  tbp.city,
+  tbp.state,
+  tbp.postal_code,
+  tbp.country_code,
+  tbp.phone_number,
+  tbp.email,
+  tbp.website,
+  tbp.latitude,
+  tbp.longitude,
+  ST_SetSRID(ST_MakePoint(tbp.longitude, tbp.latitude), 4326)::geography,
+  tbp.logo_url,
+  tbp.hours
+FROM tenant_business_profile tbp
+WHERE tbp.tenant_id = NEW.id;
+
+-- Respect privacy mode
+-- If mapPrivacyMode = 'neighborhood', fuzzy coordinates in directory
+-- If displayMap = false, hide map but show city/state
+```
+
 ---
 
 #### 1.2 Search API
@@ -240,6 +284,13 @@ Phase 2 enhances discovery and establishes SEO foundation:
 - "best [category] near me"
 - "stores in [city]"
 
+**Google Maps Integration:**
+- Leverage existing `FF_MAP_CARD` feature flag
+- Use existing `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+- Reuse `MapCard.tsx` component architecture
+- Respect merchant `mapPrivacyMode` settings
+- Display markers with store info popups
+
 ---
 
 ### 🎯 Goals
@@ -259,12 +310,27 @@ Phase 2 enhances discovery and establishes SEO foundation:
 **File:** `apps/web/src/components/directory/MapView.tsx`
 
 **Features:**
-- Mapbox GL JS integration
+- **Google Maps Integration** (leverage existing platform infrastructure)
+  - Use `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (already configured)
+  - Reuse architecture from `MapCard.tsx` component
+  - Embedded Google Maps with markers
 - Marker clustering (zoom to expand)
 - Store info popups on click
 - Fit bounds to visible markers
 - Current location marker
 - Filter by category on map
+- **Privacy Mode Support:**
+  - Respect `TenantBusinessProfile.mapPrivacyMode`
+  - Precise: Show exact coordinates
+  - Neighborhood: Show approximate location (fuzzy coordinates)
+  - Hidden: Show city/state only, no map marker
+
+**NAP Data Display:**
+- Business name from `directory_listings.business_name`
+- Address from `directory_listings.address`
+- Phone from `directory_listings.phone`
+- Coordinates from `directory_listings.latitude`, `directory_listings.longitude`
+- "Get Directions" link to Google Maps
 
 ---
 
