@@ -503,8 +503,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
               </motion.div>
             </div>
 
-            {/* Features Showcase - WOW Factor for visitors */}
-            <div className="my-8 sm:my-12">
+            {/* Features Showcase - WOW Factor for visitors (hidden on mobile) */}
+            <div className="hidden md:block my-8 sm:my-12">
               <FeaturesShowcase mode={showcaseMode} />
             </div>
 
