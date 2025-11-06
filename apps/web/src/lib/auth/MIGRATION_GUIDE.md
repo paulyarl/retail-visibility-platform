@@ -62,7 +62,7 @@ const [hasAccess, setHasAccess] = useState(false);
 
 useEffect(() => {
   async function loadOrganizationInfo() {
-    const userRes = await api.get(`${API_BASE_URL}/user/me`);
+    const userRes = await api.get(`${API_BASE_URL}/auth/me`);
     if (userRes.ok) {
       const userData = await userRes.json();
       const tenantRole = userData.tenants?.find((t: any) => t.tenantId === tenantId);
