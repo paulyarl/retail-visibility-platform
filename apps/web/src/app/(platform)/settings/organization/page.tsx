@@ -70,6 +70,8 @@ export default function OrganizationPage() {
   const [settingHero, setSettingHero] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
+  const [syncingCategories, setSyncingCategories] = useState(false);
+  const [categorySyncResult, setCategorySyncResult] = useState<any>(null);
   const [showHeroModal, setShowHeroModal] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -155,6 +157,57 @@ export default function OrganizationPage() {
       alert(`❌ Error: ${err.message}`);
     } finally {
       setSettingHero(false);
+    }
+  };
+
+  const handleSyncCategoriesToGBP = async () => {
+    if (!organizationId) return;
+
+    if (!confirm('This will sync product categories to Google Business Profile for all locations in this organization. Continue?')) {
+      return;
+    }
+
+    setSyncingCategories(true);
+    setCategorySyncResult(null);
+
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const response = await fetch(`${API_BASE}/api/categories/mirror`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          scope: 'organization',
+          organizationId: organizationId,
+          strategy: 'platform_to_gbp',
+          dryRun: false,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setCategorySyncResult({
+          success: true,
+          message: 'Categories synced successfully to GBP',
+          jobId: data.jobId,
+        });
+      } else {
+        setCategorySyncResult({
+          success: false,
+          message: data.error || 'Failed to sync categories',
+        });
+      }
+    } catch (error) {
+      console.error('Category sync error:', error);
+      setCategorySyncResult({
+        success: false,
+        message: 'Failed to sync categories to GBP',
+      });
+    } finally {
+      setSyncingCategories(false);
     }
   };
 
@@ -628,14 +681,30 @@ export default function OrganizationPage() {
                         <p className="text-xs text-neutral-500">Organization-wide sync</p>
                       </div>
                     </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => window.location.href = '/admin/categories'}
-                    >
-                      Manage Sync →
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-1"
+                        disabled={!organizationId || syncingCategories}
+                        onClick={handleSyncCategoriesToGBP}
+                      >
+                        {syncingCategories ? 'Syncing...' : 'Sync to GBP'}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => window.location.href = '/admin/categories'}
+                      >
+                        Manage →
+                      </Button>
+                    </div>
+                    {categorySyncResult && (
+                      <div className={`mt-2 p-2 rounded text-xs ${categorySyncResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                        {categorySyncResult.success ? '✅' : '❌'} {categorySyncResult.message}
+                        {categorySyncResult.jobId && <div className="text-xs mt-1">Job ID: {categorySyncResult.jobId}</div>}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
