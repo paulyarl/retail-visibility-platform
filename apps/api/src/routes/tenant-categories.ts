@@ -561,4 +561,155 @@ router.get('/:tenantId/categories-alignment-status', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/v1/tenants/:tenantId/categories/propagate
+ * Propagate all categories from hero tenant to all location tenants in the organization
+ */
+router.post('/:tenantId/categories/propagate', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    // Get the tenant and verify it's a hero tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        organization: {
+          include: {
+            tenants: {
+              where: {
+                id: { not: tenantId }, // Exclude the hero tenant itself
+              },
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+      });
+    }
+
+    if (!tenant.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tenant is not part of an organization',
+      });
+    }
+
+    // Check if this is a hero location
+    const metadata = tenant.metadata as any;
+    const isHeroLocation = metadata?.isHeroLocation === true;
+
+    if (!isHeroLocation) {
+      return res.status(400).json({
+        success: false,
+        error: 'Only hero locations can propagate categories',
+        message: 'This tenant is not set as the hero location for the organization',
+      });
+    }
+
+    // Get all active categories from the hero tenant
+    const heroCategories = await prisma.tenantCategory.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    if (heroCategories.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No categories to propagate',
+      });
+    }
+
+    const locationTenants = tenant.organization!.tenants;
+    
+    if (locationTenants.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No location tenants found in organization',
+      });
+    }
+
+    // Propagate categories to each location
+    const results = {
+      totalLocations: locationTenants.length,
+      totalCategories: heroCategories.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+    };
+
+    for (const location of locationTenants) {
+      try {
+        for (const heroCategory of heroCategories) {
+          // Check if category with same slug already exists
+          const existing = await prisma.tenantCategory.findFirst({
+            where: {
+              tenantId: location.id,
+              slug: heroCategory.slug,
+            },
+          });
+
+          if (existing) {
+            // Update existing category
+            await prisma.tenantCategory.update({
+              where: { id: existing.id },
+              data: {
+                name: heroCategory.name,
+                googleCategoryId: heroCategory.googleCategoryId,
+                sortOrder: heroCategory.sortOrder,
+                isActive: true,
+              },
+            });
+            results.updated++;
+          } else {
+            // Create new category
+            await prisma.tenantCategory.create({
+              data: {
+                tenantId: location.id,
+                name: heroCategory.name,
+                slug: heroCategory.slug,
+                googleCategoryId: heroCategory.googleCategoryId,
+                sortOrder: heroCategory.sortOrder,
+                isActive: true,
+              },
+            });
+            results.created++;
+          }
+        }
+
+        // Trigger revalidate for this location
+        triggerRevalidate(location.id).catch(() => {});
+      } catch (error: any) {
+        console.error(`Error propagating to tenant ${location.id}:`, error);
+        results.errors.push({
+          tenantId: location.id,
+          tenantName: location.name,
+          error: error.message || 'Unknown error',
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Categories propagated successfully',
+      data: results,
+    });
+  } catch (error) {
+    console.error('Error propagating categories:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to propagate categories',
+    });
+  }
+});
+
 export default router;
