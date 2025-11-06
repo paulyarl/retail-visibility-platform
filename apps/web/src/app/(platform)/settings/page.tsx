@@ -106,49 +106,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
         },
       ],
     },
-    // Quick Start & Onboarding (only when tenantId is provided)
-    ...(tenantId ? [{
-      title: 'Quick Start & Onboarding',
-      description: 'Get your store up and running quickly',
-      cards: [
-        {
-          title: 'Business Profile Setup',
-          description: 'Complete your store profile and contact information',
-          icon: (
-            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ),
-          href: `/t/${tenantId}/onboarding?force=1&step=profile`,
-          color: 'bg-green-500',
-          badge: 'Start Here',
-        },
-        {
-          title: 'Product Quick Start',
-          description: 'Generate 50 sample products in 1 second',
-          icon: (
-            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          ),
-          href: `/t/${tenantId}/quick-start`,
-          color: 'bg-blue-500',
-          badge: '⚡ Fast',
-        },
-        {
-          title: 'Category Quick Start',
-          description: 'Generate product categories instantly',
-          icon: (
-            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-          ),
-          href: `/t/${tenantId}/categories/quick-start`,
-          color: 'bg-purple-500',
-          badge: '⚡ Fast',
-        },
-      ] as SettingCard[],
-    }] : []),
     // Organization Management (only when tenantId is provided and user is in an org)
     ...(tenantId ? [{
       title: 'Organization Management',
@@ -181,18 +138,18 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
       ] as SettingCard[],
     }] : []),
     {
-      title: 'Tenant Management',
-      description: 'Manage your business locations and users',
+      title: tenantId ? 'Store Settings' : 'Tenant Management',
+      description: tenantId ? 'Configure your store profile and settings' : 'Manage your business locations',
       cards: [
         {
-          title: 'Tenant Settings',
-      description: 'Manage your business profile and store information',
+          title: tenantId ? 'Store Profile' : 'Tenant Settings',
+      description: tenantId ? 'Edit store identity and contact details' : 'Manage your business locations',
       icon: (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
       ),
-      href: '/tenants',
+      href: tenantId ? `/t/${tenantId}/settings/tenant` : '/tenants',
       color: 'bg-blue-500',
     },
         {
@@ -203,7 +160,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           ),
-          href: '/settings/organization',
+          href: tenantId ? `/t/${tenantId}/settings/organization` : '/settings/organization',
           color: 'bg-amber-500',
           accessOptions: AccessPresets.ORGANIZATION_MEMBER,
           fetchOrganization: true,
@@ -249,31 +206,19 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
       ],
     },
     {
-      title: 'Team Management',
-      description: 'Manage your store team and access levels',
+      title: tenantId ? 'Team' : 'Team Management',
+      description: tenantId ? 'Manage your store team members' : 'Manage your store team and access levels',
       cards: [
-        ...(tenantId ? [{
-          title: 'Team Members',
-          description: 'Invite and manage your store team',
-          icon: (
-            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          ),
-          href: `/t/${tenantId}/settings/users`,
-          color: 'bg-cyan-500',
-        }] as SettingCard[] : []),
         {
-          title: 'Tenant Users',
-          description: 'Manage users and roles within your tenant',
+          title: tenantId ? 'Team Members' : 'Tenant Users',
+          description: tenantId ? 'Invite and manage your store team' : 'Manage users across all your locations',
           icon: (
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
           ),
-          href: '/tenants/users',
+          href: tenantId ? `/t/${tenantId}/settings/users` : '/tenants/users',
           color: 'bg-cyan-500',
-          badge: 'New',
         },
       ],
     },
