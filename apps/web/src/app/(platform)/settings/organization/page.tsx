@@ -726,6 +726,7 @@ export default function OrganizationPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Warning Messages */}
         {orgData.status.overall !== 'ok' && (
