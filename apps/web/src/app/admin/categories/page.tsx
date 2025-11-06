@@ -21,6 +21,8 @@ export default function AdminCategoriesPage() {
   const [dryRun, setDryRun] = useState(true);
   const [mirrorLoading, setMirrorLoading] = useState(false);
   const [tenantIdInput, setTenantIdInput] = useState('');
+  const [organizationIdInput, setOrganizationIdInput] = useState('');
+  const [scope, setScope] = useState<'tenant' | 'organization' | 'platform'>('organization');
   const [lastJobId, setLastJobId] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<any>(null);
   const [lastSummary, setLastSummary] = useState<any>(null);
@@ -155,8 +157,13 @@ export default function AdminCategoriesPage() {
     setMirrorLoading(true);
     setLastResult(null);
     try {
-      const body: any = { strategy: 'platform_to_gbp', dryRun };
-      if (tenantIdInput.trim()) body.tenantId = tenantIdInput.trim();
+      const body: any = { strategy: 'platform_to_gbp', dryRun, scope };
+      if (scope === 'tenant' && tenantIdInput.trim()) body.tenantId = tenantIdInput.trim();
+      if (scope === 'organization' && organizationIdInput.trim()) body.organizationId = organizationIdInput.trim();
+      if (scope === 'platform' && !confirm('⚠️ WARNING: This will affect ALL tenants across ALL organizations on the platform! Are you absolutely sure?')) {
+        setMirrorLoading(false);
+        return;
+      }
       const csrf = getCookie('csrf');
       const res = await fetch(apiUrl('/api/categories/mirror'), {
         method: 'POST',
@@ -226,15 +233,72 @@ export default function AdminCategoriesPage() {
             <CardTitle>GBP Category Mirror</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-              <div className="w-full sm:w-64">
-                <Input
-                  label="Tenant ID (optional)"
-                  placeholder="tenant_..."
-                  value={tenantIdInput}
-                  onChange={(e) => setTenantIdInput(e.target.value)}
-                />
+            {/* Scope Selection */}
+            <div className="mb-4 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+              <label className="block text-sm font-semibold text-neutral-700 mb-2">Scope</label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="tenant"
+                    checked={scope === 'tenant'}
+                    onChange={(e) => setScope('tenant')}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm">Single Location</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="organization"
+                    checked={scope === 'organization'}
+                    onChange={(e) => setScope('organization')}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm font-semibold text-blue-700">Entire Organization/Chain (Recommended)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="platform"
+                    checked={scope === 'platform'}
+                    onChange={(e) => setScope('platform')}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm text-red-600">⚠️ All Tenants (Platform-Wide - Dangerous!)</span>
+                </label>
               </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+              {scope === 'organization' && (
+                <div className="w-full sm:w-64">
+                  <Input
+                    label="Organization ID"
+                    placeholder="org_..."
+                    value={organizationIdInput}
+                    onChange={(e) => setOrganizationIdInput(e.target.value)}
+                  />
+                </div>
+              )}
+              {scope === 'tenant' && (
+                <div className="w-full sm:w-64">
+                  <Input
+                    label="Tenant ID"
+                    placeholder="tenant_..."
+                    value={tenantIdInput}
+                    onChange={(e) => setTenantIdInput(e.target.value)}
+                  />
+                </div>
+              )}
+              {scope === 'platform' && (
+                <div className="w-full p-3 bg-red-50 border border-red-200 rounded">
+                  <p className="text-sm text-red-800 font-semibold">⚠️ WARNING: Platform-wide operations affect ALL organizations and tenants!</p>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   id="dryRunToggle"
@@ -260,6 +324,18 @@ export default function AdminCategoriesPage() {
                 {summaryLoading ? 'Refreshing…' : 'Refresh summary'}
               </Button>
             </div>
+            {/* Scope Summary */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+              <p className="text-sm font-semibold text-blue-900 mb-1">Scope Summary:</p>
+              <p className="text-sm text-blue-800">
+                {scope === 'tenant' && tenantIdInput && `Single location: ${tenantIdInput}`}
+                {scope === 'tenant' && !tenantIdInput && 'Please enter a tenant ID'}
+                {scope === 'organization' && organizationIdInput && `All locations in organization: ${organizationIdInput}`}
+                {scope === 'organization' && !organizationIdInput && 'Please enter an organization ID'}
+                {scope === 'platform' && '⚠️ ALL TENANTS ACROSS ALL ORGANIZATIONS (Platform-Wide)'}
+              </p>
+            </div>
+
             <div className="mt-4 flex items-center gap-3">
               {lastJobId && (
                 <Badge variant="success">jobId: {lastJobId}</Badge>
