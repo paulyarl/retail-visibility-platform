@@ -330,9 +330,9 @@ export default function CategoriesPage() {
       </nav>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Category Management</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Product Categories</h1>
         <div className="flex items-center gap-3">
-          <p className="text-gray-600">Manage your product categories and align them with Google taxonomy</p>
+          <p className="text-gray-600">Organize your products and align with Google Product Taxonomy for better visibility</p>
           {alignmentStatus && (
             <span
               className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${alignmentStatus.mappingCoverage === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}

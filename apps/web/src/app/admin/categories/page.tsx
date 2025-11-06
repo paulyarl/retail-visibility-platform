@@ -209,7 +209,7 @@ export default function AdminCategoriesPage() {
     return (
       <div className="container mx-auto p-6">
         <PageHeader
-          title="Category Management"
+          title="Product Category Management"
           description="Loading..."
           icon={Icons.Settings}
           backLink={{ href: '/settings/admin', label: 'Back to Admin' }}
@@ -221,8 +221,8 @@ export default function AdminCategoriesPage() {
   return (
     <div className="container mx-auto p-6">
       <PageHeader
-        title="Category Management"
-        description="Manage product categories and hierarchies"
+        title="Product Category Management"
+        description="Manage product categories for all tenants and sync to Google Business Profile"
         icon={Icons.Settings}
         backLink={{ href: '/settings/admin', label: 'Back to Admin' }}
       />
@@ -230,7 +230,7 @@ export default function AdminCategoriesPage() {
       <div className="mt-6 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>GBP Category Mirror</CardTitle>
+            <CardTitle>Sync Product Categories to Google Business Profile</CardTitle>
           </CardHeader>
           <CardContent>
             {/* Scope Selection */}
