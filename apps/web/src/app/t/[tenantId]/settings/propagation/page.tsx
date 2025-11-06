@@ -36,6 +36,8 @@ export default function PropagationControlPanel() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isHeroLocation, setIsHeroLocation] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [hasAccess, setHasAccess] = useState(false);
 
   // Modal states
   const [showCategoriesModal, setShowCategoriesModal] = useState(false);
@@ -62,6 +64,20 @@ export default function PropagationControlPanel() {
       try {
         setLoading(true);
         
+        // Check user role for this tenant
+        const userRes = await api.get(`${API_BASE_URL}/user/me`);
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          const tenantRole = userData.tenants?.find((t: any) => t.tenantId === tenantId);
+          const role = tenantRole?.role || null;
+          setUserRole(role);
+          
+          // Only OWNER and ADMIN can access propagation control panel
+          const isOwnerOrAdmin = role === 'OWNER' || role === 'ADMIN';
+          setHasAccess(isOwnerOrAdmin);
+        }
+
+        // Check if this is a hero location and get organization info
         const tenantRes = await api.get(`${API_BASE_URL}/tenants/${tenantId}`);
         if (!tenantRes.ok) throw new Error('Failed to fetch tenant');
         
@@ -312,6 +328,41 @@ export default function PropagationControlPanel() {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  // Access denied for non-owner/admin users
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+        <PageHeader
+          title="Propagation Control Panel"
+          description="Manage multi-location propagation"
+          icon={Icons.Admin}
+          backLink={{ href: `/t/${tenantId}/settings`, label: 'Back to Settings' }}
+        />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-12">
+                <svg className="w-16 h-16 text-amber-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-2">Access Restricted</h3>
+                <p className="text-neutral-600 dark:text-neutral-400 mb-2">
+                  The Propagation Control Panel is only available to organization owners and administrators.
+                </p>
+                <p className="text-sm text-neutral-500 dark:text-neutral-500 mb-6">
+                  Your current role: <strong>{userRole || 'Member'}</strong>
+                </p>
+                <Link href={`/t/${tenantId}/settings`} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors">
+                  Back to Settings
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
