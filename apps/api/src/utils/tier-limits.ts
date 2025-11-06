@@ -27,11 +27,11 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   },
   professional: {
     name: 'Professional',
-    maxSKUs: 2000,
+    maxSKUs: 5000, // Updated from 2000 to 5000
   },
   enterprise: {
     name: 'Enterprise',
-    maxSKUs: 10000,
+    maxSKUs: Infinity, // Unlimited SKUs
   },
   organization: {
     name: 'Organization',
