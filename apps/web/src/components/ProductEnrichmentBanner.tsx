@@ -102,18 +102,18 @@ export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentB
             </div>
 
             <div className="flex-1">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-yellow-600" />
-                    {products.length} {products.length === 1 ? 'Product Needs' : 'Products Need'} Enrichment
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg sm:text-xl font-bold text-neutral-900 flex items-center gap-2 flex-wrap">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+                    <span>{products.length} {products.length === 1 ? 'Product Needs' : 'Products Need'} Enrichment</span>
                   </h3>
-                  <p className="text-neutral-600 mt-1">
+                  <p className="text-sm sm:text-base text-neutral-600 mt-1">
                     These products were created by Quick Start Wizard and are missing important details.
                     Enrich them by scanning barcodes to add images, descriptions, and specifications.
                   </p>
                 </div>
-                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 flex-shrink-0">
                   {products.length}
                 </Badge>
               </div>

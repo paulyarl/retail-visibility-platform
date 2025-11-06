@@ -535,11 +535,11 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
         {/* Platform Overview - Only for chains with multiple locations */}
         {!loading && stats.isChain && stats.locations > 1 && (
           <div className="mb-6 sm:mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4">
-              <h3 className="text-lg sm:text-xl font-semibold text-neutral-900">
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4">
+              <h3 className="text-lg sm:text-xl font-semibold text-neutral-900 flex-1 min-w-0">
                 {stats.organizationName} - Platform Overview
               </h3>
-              <Badge variant="default" className="bg-primary-600 text-white self-start sm:self-auto">
+              <Badge variant="default" className="bg-primary-600 text-white flex-shrink-0">
                 {stats.locations} Locations
               </Badge>
             </div>
@@ -962,9 +962,9 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
             {/* Storefront Status */}
             <AnimatedCard delay={0.6} hover={false}>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base sm:text-lg">Your Storefront</CardTitle>
-                  <Badge variant="success">Live</Badge>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-base sm:text-lg flex-1 min-w-0">Your Storefront</CardTitle>
+                  <Badge variant="success" className="flex-shrink-0">Live</Badge>
                 </div>
               </CardHeader>
               <CardContent>

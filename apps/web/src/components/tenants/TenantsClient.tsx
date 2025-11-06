@@ -274,15 +274,15 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
         {/* Tenants List */}
         <AnimatedCard delay={0.1} hover={false}>
           <CardHeader>
-            <div className="flex items-center justify-between mb-4">
-              <div>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="flex-1 min-w-0">
                 <CardTitle>Your Tenants</CardTitle>
                 <CardDescription>Manage your store locations</CardDescription>
               </div>
-              <div className="flex items-center gap-3">
-                <Badge variant="info">{filteredTenants.length} of {tenants.length}</Badge>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <Badge variant="info" className="flex-shrink-0">{filteredTenants.length} of {tenants.length}</Badge>
                 {/* View Toggle */}
-                <div className="inline-flex rounded-lg border border-neutral-300 dark:border-neutral-600 p-1 bg-white dark:bg-neutral-800">
+                <div className="inline-flex rounded-lg border border-neutral-300 dark:border-neutral-600 p-1 bg-white dark:bg-neutral-800 flex-shrink-0">
                   <button
                     onClick={() => setViewMode('grid')}
                     className={`px-3 py-1.5 rounded-md transition-colors ${
