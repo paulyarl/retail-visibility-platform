@@ -761,10 +761,11 @@ export default function CategoriesPage() {
                   <div className="flex-1">
                     <h4 className="text-sm font-semibold text-blue-900 mb-2">📋 How Category Propagation Works</h4>
                     <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-                      <li><strong>Select a hero location</strong> - This is the location with the master category list</li>
-                      <li><strong>All categories</strong> from the hero location will be copied to all other locations</li>
+                      <li><strong>Select a hero location</strong> - Choose the location with the master category list</li>
+                      <li><strong>Choose a propagation mode</strong> - Create new, update existing, or both</li>
+                      <li><strong>All categories</strong> from the hero location will be propagated to all other locations</li>
                       <li><strong>Google taxonomy alignments</strong> are preserved during propagation</li>
-                      <li><strong>Existing categories</strong> at locations will be updated, new ones will be created</li>
+                      <li><strong>Categories are matched by slug</strong> - Same slug = update, new slug = create</li>
                     </ul>
                   </div>
                 </div>
