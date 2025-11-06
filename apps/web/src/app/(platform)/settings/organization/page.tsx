@@ -637,33 +637,33 @@ export default function OrganizationPage() {
         </Card>
 
         {/* 5. QUICK START GUIDE - Collapsible */}
-        {showQuickStart && (
-          <Card className="border-primary-200 bg-gradient-to-br from-primary-50 to-white">
-            <CardHeader>
-              <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowQuickStart(!showQuickStart)}>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary-600 rounded-lg">
-                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <CardTitle>Chain Management Quick Start</CardTitle>
-                    <p className="text-sm text-neutral-600 mt-1">Get your chain up and running in minutes</p>
-                  </div>
+        <Card className="border-primary-200 bg-gradient-to-br from-primary-50 to-white">
+          <CardHeader>
+            <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowQuickStart(!showQuickStart)}>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary-600 rounded-lg">
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
                 </div>
-                <svg 
-                  className={`w-5 h-5 text-neutral-500 transition-transform ${
-                    showQuickStart ? 'rotate-180' : ''
-                  }`}
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                <div>
+                  <CardTitle>Chain Management Quick Start</CardTitle>
+                  <p className="text-sm text-neutral-600 mt-1">Get your chain up and running in minutes</p>
+                </div>
               </div>
-            </CardHeader>
+              <svg 
+                className={`w-5 h-5 text-neutral-500 transition-transform ${
+                  showQuickStart ? 'rotate-180' : ''
+                }`}
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </CardHeader>
+          {showQuickStart && (
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Left Column - Quick Start */}
@@ -762,8 +762,8 @@ export default function OrganizationPage() {
               </div>
             </div>
           </CardContent>
+          )}
         </Card>
-        )}
 
         {/* Warning Messages */}
         {orgData.status.overall !== 'ok' && (
