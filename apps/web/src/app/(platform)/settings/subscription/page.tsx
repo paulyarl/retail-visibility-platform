@@ -209,7 +209,7 @@ export default function SubscriptionPage() {
     }
   };
 
-  const availableTiers: SubscriptionTier[] = ['google_only', 'starter', 'professional', 'enterprise'];
+  const availableTiers: SubscriptionTier[] = ['google_only', 'starter', 'professional', 'enterprise', 'organization'];
   const availableChainTiers: ChainTier[] = ['chain_starter', 'chain_professional', 'chain_enterprise'];
 
   return (

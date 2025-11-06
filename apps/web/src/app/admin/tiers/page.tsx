@@ -31,6 +31,7 @@ const TIERS = [
   { value: 'starter', label: 'Starter ($49/mo)', color: 'bg-blue-100 text-blue-800' },
   { value: 'professional', label: 'Professional ($149/mo)', color: 'bg-purple-100 text-purple-800' },
   { value: 'enterprise', label: 'Enterprise ($299/mo)', color: 'bg-amber-100 text-amber-800' },
+  { value: 'organization', label: 'Organization ($500/mo)', color: 'bg-gradient-to-r from-purple-500 to-pink-600 text-white' },
 ];
 
 const STATUSES = [
@@ -153,15 +154,17 @@ export default function AdminTiersPage() {
               {/* Tier Information */}
               <div>
                 <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Subscription Tiers</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {TIERS.map(tier => (
                     <div key={tier.value} className="p-4 border border-neutral-200 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-2xl">
                           {tier.value === 'trial' && '🆓'}
+                          {tier.value === 'google_only' && '🔍'}
                           {tier.value === 'starter' && '🥉'}
                           {tier.value === 'professional' && '🥈'}
                           {tier.value === 'enterprise' && '🥇'}
+                          {tier.value === 'organization' && '🏢'}
                         </span>
                         <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${tier.color}`}>
                           {tier.label}
@@ -169,9 +172,11 @@ export default function AdminTiersPage() {
                       </div>
                       <div className="text-sm text-neutral-600">
                         {tier.value === 'trial' && '30-day trial, all features'}
+                        {tier.value === 'google_only' && '250 SKUs, Google only'}
                         {tier.value === 'starter' && '500 SKUs, basic QR codes'}
                         {tier.value === 'professional' && '5,000 SKUs, branded QR codes'}
                         {tier.value === 'enterprise' && 'Unlimited SKUs, white-label'}
+                        {tier.value === 'organization' && '10K shared SKUs, 8 propagation types'}
                       </div>
                     </div>
                   ))}

@@ -46,18 +46,19 @@ export default function OfferingsPage() {
               </div>
             </div>
 
-            {/* Chain Management - ENTERPRISE! */}
+            {/* Organization Propagation Control - ENTERPRISE! */}
             <div className="bg-gradient-to-br from-emerald-500 to-teal-600 border-2 border-emerald-400 rounded-lg p-6 text-white relative shadow-xl">
               <div className="absolute -top-2 -right-2 bg-amber-400 text-emerald-900 text-xs px-3 py-1 rounded-full font-bold">
                 ENTERPRISE
               </div>
               <div className="text-4xl mb-3">🔗</div>
-              <h3 className="text-lg font-bold mb-2">Chain Management</h3>
+              <h3 className="text-lg font-bold mb-2">Organization Propagation Control</h3>
               <ul className="space-y-1 text-sm">
-                <li>• One-click chain sync</li>
-                <li>• Update 50+ locations</li>
+                <li>• 8 propagation types (products, categories, GBP sync, hours, profile, flags, roles, brand)</li>
+                <li>• Test on 1 location before rollout</li>
+                <li>• One-click chain-wide sync</li>
                 <li>• Hero location concept</li>
-                <li>• Save 400+ hours</li>
+                <li>• Save 400+ hours per rollout</li>
               </ul>
               <div className="mt-3 pt-3 border-t border-emerald-300">
                 <span className="text-xs font-semibold">Worth $50K+/year!</span>

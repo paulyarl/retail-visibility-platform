@@ -1287,7 +1287,8 @@ export default function OrganizationPage() {
                     <span className="font-semibold text-sm text-indigo-900">8. GBP Category Sync</span>
                     <Badge variant="success" className="text-xs">ACTIVE</Badge>
                   </div>
-                  <p className="text-xs text-indigo-800">Sync product categories to Google Business Profile for all locations in your organization</p>
+                  <p className="text-xs text-indigo-800 mb-1">Sync product categories to Google Business Profile with strategic testing capability</p>
+                  <p className="text-xs text-indigo-700">• Test on 1 location before rollout • Sync to all locations with one click</p>
                 </div>
               </div>
               
