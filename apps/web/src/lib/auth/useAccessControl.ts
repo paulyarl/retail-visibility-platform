@@ -67,7 +67,9 @@ export function useAccessControl(
       // Fetch user data
       const userRes = await api.get(`${API_BASE_URL}/auth/me`);
       if (!userRes.ok) throw new Error('Failed to fetch user data');
-      const userData = await userRes.json();
+      const response = await userRes.json();
+      // API returns { user: {...} }, extract the user object
+      const userData = response.user || response;
       setUser(userData);
 
       // Fetch tenant data if tenantId provided
