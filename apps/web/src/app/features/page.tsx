@@ -7,6 +7,7 @@ import PublicFooter from '@/components/PublicFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
 import FeaturesShowcase from '@/components/FeaturesShowcase';
+import ChainPropagationCallout from '@/components/ChainPropagationCallout';
 
 const features = [
   {
@@ -1095,6 +1096,9 @@ export default function FeaturesPage() {
           </div>
         </div>
       </section>
+
+      {/* Chain Management - 8 Propagation Types */}
+      <ChainPropagationCallout />
 
       {/* Features Grid */}
       <section className="py-20 bg-white">
