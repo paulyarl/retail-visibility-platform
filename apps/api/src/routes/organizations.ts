@@ -695,7 +695,7 @@ router.put('/:id/hero-location', async (req, res) => {
       });
     }
 
-    // Clear hero flag from all tenants in this organization
+    // Update all tenants in a single transaction - clear all hero flags and set the new one
     await prisma.$transaction(
       organization.tenants.map(t => 
         prisma.tenant.update({
@@ -703,22 +703,16 @@ router.put('/:id/hero-location', async (req, res) => {
           data: {
             metadata: {
               ...(t.metadata as any || {}),
-              isHeroLocation: false,
+              isHeroLocation: t.id === tenantId, // Set true only for the selected tenant
             },
           },
         })
       )
     );
 
-    // Set hero flag on selected tenant
-    const updatedTenant = await prisma.tenant.update({
+    // Get the updated tenant for response
+    const updatedTenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
-      data: {
-        metadata: {
-          ...(tenant.metadata as any || {}),
-          isHeroLocation: true,
-        },
-      },
     });
 
     res.json({
