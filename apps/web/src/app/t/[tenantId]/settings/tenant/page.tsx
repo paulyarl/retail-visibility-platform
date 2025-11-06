@@ -6,10 +6,20 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import BusinessProfileCard from '@/components/settings/BusinessProfileCard';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
 import { api } from '@/lib/api';
+import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
+import AccessDenied from '@/components/AccessDenied';
+import { Spinner } from '@/components/ui';
 
 export default function TenantBusinessProfilePage() {
   const params = useParams();
   const tenantId = params.tenantId as string;
+  
+  // Centralized access control - Tenant Admin required
+  const { hasAccess, loading: accessLoading, tenantRole } = useAccessControl(
+    tenantId,
+    AccessPresets.TENANT_ADMIN
+  );
+  
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,6 +46,26 @@ export default function TenantBusinessProfilePage() {
   const handleUpdate = (updatedProfile: BusinessProfile) => {
     setProfile(updatedProfile);
   };
+
+  // Access control checks
+  if (accessLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <AccessDenied
+        title="Admin Access Required"
+        message="You need tenant administrator privileges to manage business profile settings."
+        userRole={tenantRole}
+        backLink={{ href: `/t/${tenantId}/settings`, label: 'Back to Settings' }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
