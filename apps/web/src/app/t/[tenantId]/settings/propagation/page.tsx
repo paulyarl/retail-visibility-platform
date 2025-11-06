@@ -504,19 +504,24 @@ export default function PropagationControlPanel() {
           </CardContent>
         </Card>
 
-        {/* Hero Location Selector */}
-        <Card>
+        {/* Hero Location Selector - Prominent Card */}
+        <Card className="border-2 border-purple-200 dark:border-purple-800 shadow-lg bg-gradient-to-br from-purple-50 to-white dark:from-purple-950 dark:to-neutral-900">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
-              <div className="h-12 w-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              <div className="h-14 w-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-1">Hero Location</h3>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-                  The hero location is the source of truth for propagation. All propagation operations will copy data from this location to other locations.
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-xl font-bold text-purple-900 dark:text-purple-100">Hero Location</h3>
+                  <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 font-semibold">
+                    Required
+                  </Badge>
+                </div>
+                <p className="text-sm text-neutral-700 dark:text-neutral-300 mb-4 font-medium">
+                  ⚡ The hero location is the source of truth for all propagation operations. Data will be copied FROM this location TO other locations.
                 </p>
                 <div className="flex items-center gap-4">
                   <select
@@ -565,16 +570,21 @@ export default function PropagationControlPanel() {
                         }
                       }
                     }}
-                    className="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
+                    className="flex-1 px-4 py-3 text-base font-semibold border-2 border-purple-300 dark:border-purple-700 rounded-lg focus:ring-4 focus:ring-purple-500/50 focus:border-purple-500 bg-white dark:bg-neutral-800 text-purple-900 dark:text-purple-100 shadow-sm hover:border-purple-400 dark:hover:border-purple-600 transition-all cursor-pointer"
                   >
                     {organizationInfo.tenants.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} {t.isHero ? '⭐ (Current Hero)' : ''}
+                      <option key={t.id} value={t.id} className="font-semibold">
+                        {t.isHero ? '⭐ ' : ''}{t.name}{t.isHero ? ' (Current Hero)' : ''}
                       </option>
                     ))}
                   </select>
                   {!organizationInfo.tenants.find(t => t.isHero) && (
-                    <span className="text-sm text-amber-600 dark:text-amber-400">⚠️ No hero location set</span>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">No hero location set</span>
+                    </div>
                   )}
                 </div>
               </div>
