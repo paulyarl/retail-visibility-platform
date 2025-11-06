@@ -494,13 +494,6 @@ export default function OrganizationPage() {
                 </svg>
                 Propagate Individual Items
               </Button>
-              <Button 
-                variant="ghost" 
-                size="lg"
-                onClick={() => window.open('/docs/CHAIN_PROPAGATION_TESTING.md', '_blank')}
-              >
-                View Guide →
-              </Button>
             </div>
             {!heroLocation && (
               <p className="text-sm text-amber-600 mt-4 flex items-center gap-2">
@@ -701,27 +694,18 @@ export default function OrganizationPage() {
               </div>
             </div>
 
-            {/* Bottom CTA */}
+            {/* Bottom Tip */}
             <div className="mt-6 pt-6 border-t border-primary-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-neutral-900">Need help?</p>
-                    <p className="text-xs text-neutral-600">Check out our detailed testing guide</p>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => window.open('/docs/CHAIN_PROPAGATION_TESTING.md', '_blank')}
-                >
-                  View Guide →
-                </Button>
+                <div>
+                  <p className="font-semibold text-neutral-900">💡 Pro Tip</p>
+                  <p className="text-xs text-neutral-600">Use the Quick Actions above to sync products across all your locations instantly</p>
+                </div>
               </div>
             </div>
           </CardContent>
