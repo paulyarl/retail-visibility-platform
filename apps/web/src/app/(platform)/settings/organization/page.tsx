@@ -523,7 +523,7 @@ export default function OrganizationPage() {
         {/* 4. PROPAGATION CONTROL PANEL - Admin Only */}
         <ProtectedCard
           tenantId={tenantId}
-          accessOptions={AccessPresets.TENANT_ADMIN}
+          accessOptions={AccessPresets.CHAIN_PROPAGATION}
           hideWhenDenied={true}
         >
           <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
@@ -546,9 +546,11 @@ export default function OrganizationPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Propagation Type Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                {/* Type 1: Bulk Sync from Hero */}
+              {/* Group 1: Product & Catalog Management */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide mb-3">Product & Catalog Management</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Categories */}
                 <div className="p-4 bg-white rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-colors">
                   <div className="flex items-start gap-3 mb-3">
                     <div className="p-2 bg-blue-100 rounded-lg">
