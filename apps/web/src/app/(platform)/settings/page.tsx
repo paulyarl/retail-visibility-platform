@@ -203,6 +203,18 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           color: 'bg-orange-500',
           badge: 'Chain',
         },
+        ...(tenantId ? [{
+          title: 'Propagation Control Panel',
+          description: 'Manage multi-location propagation for chains',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/propagation`,
+          color: 'bg-indigo-500',
+          badge: 'Chain',
+        }] as SettingCard[] : []),
         // Tenant Administration cards (only when tenantId is provided)
         ...(tenantId ? [
           {
