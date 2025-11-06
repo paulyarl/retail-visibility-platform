@@ -6,6 +6,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Anima
 import { motion } from 'framer-motion';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
+import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
+import AccessDenied from '@/components/AccessDenied';
 
 type AdminSection = {
   title: string;
@@ -24,6 +26,16 @@ type AdminGroup = {
 };
 
 export default function AdminDashboardPage() {
+  // Use centralized access control - platform admins only
+  const {
+    hasAccess,
+    loading: accessLoading,
+    isPlatformAdmin,
+  } = useAccessControl(
+    null, // No tenant context needed
+    AccessPresets.PLATFORM_ADMIN_ONLY
+  );
+
   const [stats, setStats] = useState({
     totalTenants: 0,
     totalUsers: 0,
@@ -373,6 +385,28 @@ export default function AdminDashboardPage() {
       ],
     },
   ];
+
+  // Access control checks
+  if (accessLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <AccessDenied
+        pageTitle="Admin Dashboard"
+        pageDescription="Platform administration and configuration"
+        title="Platform Administrator Access Required"
+        message="The Admin Dashboard is only accessible to platform administrators. This area contains sensitive platform-wide configuration and management tools."
+        userRole={isPlatformAdmin ? 'Platform Admin' : 'User'}
+        backLink={{ href: '/tenants', label: 'Back to Tenants' }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
