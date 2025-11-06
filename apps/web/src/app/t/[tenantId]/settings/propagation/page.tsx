@@ -412,6 +412,140 @@ export default function PropagationControlPanel() {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Getting Started Guide */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-2">🚀 Getting Started with Propagation</h3>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Propagation allows you to efficiently manage multiple locations by copying configurations from a hero location to all other locations in your organization.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Prerequisites */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Prerequisites
+                  </h4>
+                  <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Hero Location:</strong> Designate one location as the master in <Link href={`/t/${tenantId}/settings/organization`} className="underline hover:text-blue-600">Organization Settings</Link></span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Organization:</strong> All locations must be part of the same organization</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Permissions:</strong> You must be an Owner or Admin</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Best Practices */}
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <h4 className="font-semibold text-green-900 dark:text-green-100 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    Best Practices
+                  </h4>
+                  <ul className="text-sm text-green-800 dark:text-green-200 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 dark:text-green-400 mt-0.5">•</span>
+                      <span><strong>Test first:</strong> Try with 1-2 locations before propagating to all</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 dark:text-green-400 mt-0.5">•</span>
+                      <span><strong>Use modes wisely:</strong> "Create Only" preserves local customizations</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 dark:text-green-400 mt-0.5">•</span>
+                      <span><strong>Backup important data:</strong> Some propagations overwrite existing data</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Common Scenarios */}
+              <div>
+                <h4 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-3 flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Common Scenarios
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
+                    <h5 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">🆕 New Chain Setup</h5>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Setting up a new chain with multiple locations</p>
+                    <ol className="text-xs text-neutral-700 dark:text-neutral-300 space-y-1">
+                      <li>1. Configure hero location completely</li>
+                      <li>2. Propagate <strong>Categories</strong> (create_or_update)</li>
+                      <li>3. Propagate <strong>Brand Assets</strong></li>
+                      <li>4. Propagate <strong>Business Hours</strong></li>
+                      <li>5. Propagate <strong>Feature Flags</strong></li>
+                      <li>6. Add location-specific products</li>
+                    </ol>
+                  </div>
+
+                  <div className="bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
+                    <h5 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">🔄 Updating Existing Chain</h5>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Rolling out changes to all locations</p>
+                    <ol className="text-xs text-neutral-700 dark:text-neutral-300 space-y-1">
+                      <li>1. Update hero location settings</li>
+                      <li>2. Use <strong>update_only</strong> mode to preserve local data</li>
+                      <li>3. Propagate specific features (e.g., new categories)</li>
+                      <li>4. Verify changes at 1-2 locations</li>
+                      <li>5. Monitor for errors in results</li>
+                    </ol>
+                  </div>
+
+                  <div className="bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
+                    <h5 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">👥 Team Expansion</h5>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Adding team members across locations</p>
+                    <ol className="text-xs text-neutral-700 dark:text-neutral-300 space-y-1">
+                      <li>1. Add users to hero location</li>
+                      <li>2. Assign appropriate roles</li>
+                      <li>3. Propagate <strong>User Roles</strong> (create_only)</li>
+                      <li>4. Preserves existing team members</li>
+                      <li>5. New members get access to all locations</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+
+              {/* Propagation Modes Guide */}
+              <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-3">Understanding Propagation Modes</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="font-semibold text-purple-800 dark:text-purple-200 mb-1">✅ Create or Update</div>
+                    <p className="text-xs text-purple-700 dark:text-purple-300 mb-2">Syncs everything - creates new and updates existing</p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400"><strong>Use when:</strong> You want complete synchronization</p>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-purple-800 dark:text-purple-200 mb-1">➕ Create Only</div>
+                    <p className="text-xs text-purple-700 dark:text-purple-300 mb-2">Only adds new items, skips existing ones</p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400"><strong>Use when:</strong> You want to preserve local customizations</p>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-purple-800 dark:text-purple-200 mb-1">🔄 Update Only</div>
+                    <p className="text-xs text-purple-700 dark:text-purple-300 mb-2">Only updates existing items, won't create new</p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400"><strong>Use when:</strong> You want to update settings without adding new items</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Organization Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <AnimatedCard delay={0} hover={false}>
