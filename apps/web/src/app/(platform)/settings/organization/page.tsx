@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Spinner } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
+import AccessDenied from '@/components/AccessDenied';
 
 interface OrganizationData {
   organizationId: string;
@@ -30,6 +32,21 @@ interface OrganizationData {
 }
 
 export default function OrganizationPage() {
+  // Get tenantId from localStorage for access control
+  const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+  
+  // Use centralized access control - organization members can view
+  const {
+    hasAccess,
+    loading: accessLoading,
+    tenantRole,
+    organizationData: orgDataFromHook,
+  } = useAccessControl(
+    tenantId,
+    AccessPresets.ORGANIZATION_MEMBER,
+    true // Fetch organization data
+  );
+
   const [orgData, setOrgData] = useState<OrganizationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -187,19 +204,25 @@ export default function OrganizationPage() {
     }
   };
 
-  if (loading) {
+  // Access control checks
+  if (accessLoading || loading) {
     return (
-      <div className="container mx-auto p-6">
-        <PageHeader
-          title="Organization Dashboard"
-          description="Loading organization data..."
-          icon={Icons.Settings}
-          backLink={{
-            href: '/settings',
-            label: 'Back to Settings'
-          }}
-        />
+      <div className="container mx-auto p-6 flex items-center justify-center min-h-screen">
+        <Spinner size="lg" />
       </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <AccessDenied
+        pageTitle="Organization Dashboard"
+        pageDescription="Manage your chain organization"
+        title="Access Restricted"
+        message="The Organization Dashboard is only available to organization members (must be owner/admin of at least one location)."
+        userRole={tenantRole}
+        backLink={{ href: '/settings', label: 'Back to Settings' }}
+      />
     );
   }
 
