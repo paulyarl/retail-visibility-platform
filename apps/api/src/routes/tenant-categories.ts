@@ -730,4 +730,172 @@ router.post('/:tenantId/categories/propagate', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/v1/tenants/:tenantId/business-hours/propagate
+ * Propagate business hours from hero tenant to all location tenants in the organization
+ * Body: { includeSpecialHours?: boolean }
+ */
+router.post('/:tenantId/business-hours/propagate', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { includeSpecialHours = true } = req.body;
+
+    // Get the tenant and verify it's a hero tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        organization: {
+          include: {
+            tenants: {
+              where: {
+                id: { not: tenantId },
+              },
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+      });
+    }
+
+    if (!tenant.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tenant is not part of an organization',
+      });
+    }
+
+    // Check if this is a hero location
+    const metadata = tenant.metadata as any;
+    const isHeroLocation = metadata?.isHeroLocation === true;
+
+    if (!isHeroLocation) {
+      return res.status(400).json({
+        success: false,
+        error: 'Only hero locations can propagate business hours',
+        message: 'This tenant is not set as the hero location for the organization',
+      });
+    }
+
+    // Get business hours from hero tenant
+    const heroBusinessHours = await prisma.businessHours.findUnique({
+      where: { tenantId },
+    });
+
+    if (!heroBusinessHours) {
+      return res.status(400).json({
+        success: false,
+        error: 'No business hours found for hero location',
+      });
+    }
+
+    // Get special hours if requested
+    let heroSpecialHours: any[] = [];
+    if (includeSpecialHours) {
+      heroSpecialHours = await prisma.businessHoursSpecial.findMany({
+        where: { tenantId },
+      });
+    }
+
+    const locationTenants = tenant.organization!.tenants;
+
+    if (locationTenants.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No location tenants found in organization',
+      });
+    }
+
+    // Propagate business hours to each location
+    const results = {
+      totalLocations: locationTenants.length,
+      regularHoursUpdated: 0,
+      specialHoursCreated: 0,
+      specialHoursUpdated: 0,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+    };
+
+    for (const location of locationTenants) {
+      try {
+        // Upsert regular business hours
+        await prisma.businessHours.upsert({
+          where: { tenantId: location.id },
+          create: {
+            tenantId: location.id,
+            timezone: heroBusinessHours.timezone,
+            periods: heroBusinessHours.periods,
+          },
+          update: {
+            timezone: heroBusinessHours.timezone,
+            periods: heroBusinessHours.periods,
+          },
+        });
+        results.regularHoursUpdated++;
+
+        // Propagate special hours if requested
+        if (includeSpecialHours && heroSpecialHours.length > 0) {
+          for (const specialHour of heroSpecialHours) {
+            const existing = await prisma.businessHoursSpecial.findFirst({
+              where: {
+                tenantId: location.id,
+                date: specialHour.date,
+              },
+            });
+
+            if (existing) {
+              await prisma.businessHoursSpecial.update({
+                where: { id: existing.id },
+                data: {
+                  isClosed: specialHour.isClosed,
+                  open: specialHour.open,
+                  close: specialHour.close,
+                  note: specialHour.note,
+                },
+              });
+              results.specialHoursUpdated++;
+            } else {
+              await prisma.businessHoursSpecial.create({
+                data: {
+                  tenantId: location.id,
+                  date: specialHour.date,
+                  isClosed: specialHour.isClosed,
+                  open: specialHour.open,
+                  close: specialHour.close,
+                  note: specialHour.note,
+                },
+              });
+              results.specialHoursCreated++;
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error(`Error propagating to tenant ${location.id}:`, error);
+        results.errors.push({
+          tenantId: location.id,
+          tenantName: location.name,
+          error: error.message || 'Unknown error',
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Business hours propagated successfully',
+      data: results,
+    });
+  } catch (error) {
+    console.error('Error propagating business hours:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to propagate business hours',
+    });
+  }
+});
+
 export default router;

@@ -46,6 +46,11 @@ export default function PropagationControlPanel() {
   const [showBrandAssetsModal, setShowBrandAssetsModal] = useState(false);
   const [showBusinessProfileModal, setShowBusinessProfileModal] = useState(false);
 
+  // Business Hours propagation state
+  const [includeSpecialHours, setIncludeSpecialHours] = useState(true);
+  const [propagating, setPropagating] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
   useEffect(() => {
     async function loadOrganizationInfo() {
       try {
@@ -87,6 +92,35 @@ export default function PropagationControlPanel() {
       loadOrganizationInfo();
     }
   }, [tenantId]);
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 5000);
+  };
+
+  async function propagateBusinessHours() {
+    try {
+      setPropagating(true);
+      setShowBusinessHoursModal(false);
+
+      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/business-hours/propagate`, {
+        includeSpecialHours
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || error.error || 'Failed to propagate business hours');
+      }
+
+      const result = await res.json();
+      const summary = `Regular hours: ${result.data.regularHoursUpdated}, Special hours: ${result.data.specialHoursCreated + result.data.specialHoursUpdated}`;
+      showToast('success', `Successfully propagated business hours to ${result.data.totalLocations} locations (${summary})`);
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Failed to propagate business hours');
+    } finally {
+      setPropagating(false);
+    }
+  }
 
   const propagationGroups: PropagationGroup[] = [
     {
@@ -361,8 +395,59 @@ export default function PropagationControlPanel() {
           </div>
         )}
 
+        {/* Business Hours Modal */}
+        {showBusinessHoursModal && organizationInfo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowBusinessHoursModal(false)}>
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold mb-4">Propagate Business Hours</h3>
+              
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    This will copy business hours from <strong>{organizationInfo.tenants.find(t => t.isHero)?.name || 'hero location'}</strong> to all {organizationInfo.tenants.length - 1} other locations in your organization.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 p-4 bg-neutral-50 dark:bg-neutral-900 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="includeSpecialHours"
+                    checked={includeSpecialHours}
+                    onChange={(e) => setIncludeSpecialHours(e.target.checked)}
+                    className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+                  />
+                  <label htmlFor="includeSpecialHours" className="text-sm font-medium text-neutral-900 dark:text-neutral-100 cursor-pointer">
+                    Include special hours (holidays, closures)
+                  </label>
+                </div>
+
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <strong>Note:</strong> This will overwrite existing business hours at all locations. This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={() => setShowBusinessHoursModal(false)}
+                  className="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={propagateBusinessHours}
+                  disabled={propagating}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {propagating ? 'Propagating...' : 'Propagate Hours'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {[
-          { show: showBusinessHoursModal, setShow: setShowBusinessHoursModal, title: 'Business Hours Propagation', message: 'Coming soon! This feature will allow you to propagate business hours to all locations.' },
           { show: showFeatureFlagsModal, setShow: setShowFeatureFlagsModal, title: 'Feature Flags Propagation', message: 'Coming soon! This feature will allow you to propagate feature flags to all locations.' },
           { show: showUserRolesModal, setShow: setShowUserRolesModal, title: 'User Roles Propagation', message: 'Coming soon! This feature will allow you to propagate user roles and permissions to all locations.' },
           { show: showBrandAssetsModal, setShow: setShowBrandAssetsModal, title: 'Brand Assets Propagation', message: 'Coming soon! This feature will allow you to propagate brand assets to all locations.' },
@@ -376,6 +461,13 @@ export default function PropagationControlPanel() {
             </div>
           </div>
         ))}
+
+        {/* Toast */}
+        {toast && (
+          <div className={`fixed bottom-6 right-6 z-50 px-6 py-4 rounded-lg shadow-lg text-white max-w-md ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+            {toast.message}
+          </div>
+        )}
       </div>
     </div>
   );
