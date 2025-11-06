@@ -356,43 +356,43 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
         {/* Public Platform Health - For visitors/non-authenticated users */}
         {!isAuthenticated && !authLoading && (
-          <div className="mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <AnimatedCard delay={0} className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-neutral-600">Active Retailers</p>
+          <div className="mb-6 sm:mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
+              <AnimatedCard delay={0} className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Active Retailers</p>
                     <motion.p 
-                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
                       initial={{ scale: 0.5 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.2, type: "spring" }}
                     >
                       {platformStats.activeRetailersFormatted}
                     </motion.p>
-                    <p className="text-sm text-neutral-500 mt-1">using the platform</p>
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">using the platform</p>
                   </div>
-                  <div className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center">
-                    <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                   </div>
                 </div>
               </AnimatedCard>
 
-              <AnimatedCard delay={0.1} className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-neutral-600">Products Listed</p>
+              <AnimatedCard delay={0.1} className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Products Listed</p>
                     <motion.p 
-                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
                       initial={{ scale: 0.5 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.3, type: "spring" }}
                     >
                       {platformStats.productsListedFormatted}
                     </motion.p>
-                    <p className="text-sm text-neutral-500 mt-1">on Google Shopping</p>
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">on Google Shopping</p>
                   </div>
                   <div className="h-12 w-12 bg-success rounded-lg flex items-center justify-center">
                     <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -402,44 +402,44 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 </div>
               </AnimatedCard>
 
-              <AnimatedCard delay={0.2} className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-neutral-600">Storefronts Live</p>
+              <AnimatedCard delay={0.2} className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Storefronts Live</p>
                     <motion.p 
-                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
                       initial={{ scale: 0.5 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.4, type: "spring" }}
                     >
                       {platformStats.storefrontsLiveFormatted}
                     </motion.p>
-                    <p className="text-sm text-neutral-500 mt-1">total products</p>
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">total products</p>
                   </div>
-                  <div className="h-12 w-12 bg-info rounded-lg flex items-center justify-center">
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 bg-info rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                     </svg>
                   </div>
                 </div>
               </AnimatedCard>
 
-              <AnimatedCard delay={0.3} className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-neutral-600">Platform Uptime</p>
+              <AnimatedCard delay={0.3} className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Platform Uptime</p>
                     <motion.p 
-                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
                       initial={{ scale: 0.5 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.5, type: "spring" }}
                     >
                       {platformStats.platformUptimeFormatted}
                     </motion.p>
-                    <p className="text-sm text-neutral-500 mt-1">last 30 days</p>
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">last 30 days</p>
                   </div>
-                  <div className="h-12 w-12 bg-success rounded-lg flex items-center justify-center">
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
@@ -448,54 +448,54 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
             </div>
 
             {/* Mission Statement - For visitors */}
-            <div className="my-16 text-center max-w-4xl mx-auto">
+            <div className="my-8 sm:my-12 md:my-16 text-center max-w-4xl mx-auto px-2">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
               >
-                <h2 className="text-3xl md:text-4xl font-bold text-neutral-900 mb-4">
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-neutral-900 mb-3 sm:mb-4">
                   Empowering Local Retailers to Compete Online
                 </h2>
-                <p className="text-lg text-neutral-600 mb-8 leading-relaxed">
+                <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
                   We believe every local retailer deserves the same online presence as major chains. 
                   That's why we built a platform that gives you enterprise-level tools without the 
                   enterprise price tag or complexity.
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
                   <motion.div 
-                    className="p-6 bg-primary-50 rounded-xl border-2 border-primary-100"
+                    className="p-4 sm:p-6 bg-primary-50 rounded-xl border-2 border-primary-100"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.3 }}
                   >
-                    <div className="text-4xl mb-3">🎯</div>
-                    <h3 className="font-bold text-neutral-900 mb-2 text-lg">Our Mission</h3>
-                    <p className="text-sm text-neutral-600 leading-relaxed">
+                    <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">🎯</div>
+                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Mission</h3>
+                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
                       Level the playing field for local retailers competing against big box stores
                     </p>
                   </motion.div>
                   <motion.div 
-                    className="p-6 bg-green-50 rounded-xl border-2 border-green-100"
+                    className="p-4 sm:p-6 bg-green-50 rounded-xl border-2 border-green-100"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.4 }}
                   >
-                    <div className="text-4xl mb-3">💡</div>
-                    <h3 className="font-bold text-neutral-900 mb-2 text-lg">Our Vision</h3>
-                    <p className="text-sm text-neutral-600 leading-relaxed">
+                    <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">💡</div>
+                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Vision</h3>
+                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
                       A world where local businesses thrive online as easily as they do in-store
                     </p>
                   </motion.div>
                   <motion.div 
-                    className="p-6 bg-blue-50 rounded-xl border-2 border-blue-100"
+                    className="p-4 sm:p-6 bg-blue-50 rounded-xl border-2 border-blue-100"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.5 }}
                   >
-                    <div className="text-4xl mb-3">⚡</div>
-                    <h3 className="font-bold text-neutral-900 mb-2 text-lg">Our Promise</h3>
-                    <p className="text-sm text-neutral-600 leading-relaxed">
+                    <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">⚡</div>
+                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Promise</h3>
+                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
                       Enterprise features, small business pricing, and setup in minutes—not months
                     </p>
                   </motion.div>
@@ -504,26 +504,26 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
             </div>
 
             {/* Features Showcase - WOW Factor for visitors */}
-            <div className="my-12">
+            <div className="my-8 sm:my-12">
               <FeaturesShowcase mode={showcaseMode} />
             </div>
 
             {/* CTA for visitors */}
-            <Card className="p-8 text-center bg-gradient-to-br from-primary-50 to-primary-100 border-2 border-primary-200">
-              <h3 className="text-2xl font-bold text-neutral-900 mb-2">
+            <Card className="p-6 sm:p-8 text-center bg-gradient-to-br from-primary-50 to-primary-100 border-2 border-primary-200">
+              <h3 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-2">
                 Join Thousands of Retailers
               </h3>
-              <p className="text-neutral-600 mb-6 max-w-2xl mx-auto">
+              <p className="text-sm sm:text-base text-neutral-600 mb-6 max-w-2xl mx-auto">
                 Get your products on Google Shopping, create a beautiful storefront, and reach more customers - all in one platform.
               </p>
-              <div className="flex gap-4 justify-center">
-                <Link href="/register">
-                  <Button variant="primary" size="lg">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+                <Link href="/register" className="w-full sm:w-auto">
+                  <Button variant="primary" size="lg" className="w-full sm:w-auto">
                     Start Free Trial →
                   </Button>
                 </Link>
-                <Link href="/features">
-                  <Button variant="secondary" size="lg">
+                <Link href="/features" className="w-full sm:w-auto">
+                  <Button variant="secondary" size="lg" className="w-full sm:w-auto">
                     Learn More
                   </Button>
                 </Link>
@@ -882,41 +882,41 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
             <>
               <AnimatedCard delay={0.4} hover={false}>
                 <CardHeader>
-                  <CardTitle>Why Choose Us?</CardTitle>
-                  <CardDescription>Everything you need to succeed online</CardDescription>
+                  <CardTitle className="text-lg sm:text-xl">Why Choose Us?</CardTitle>
+                  <CardDescription className="text-sm">Everything you need to succeed online</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 sm:space-y-4">
                   <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
                     </div>
-                    <div>
-                      <p className="font-medium text-neutral-900">Instant Google Visibility</p>
-                      <p className="text-sm text-neutral-600">Get your products on Google Shopping automatically</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-neutral-900 text-sm sm:text-base">Instant Google Visibility</p>
+                      <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Get your products on Google Shopping automatically</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                       </svg>
                     </div>
-                    <div>
-                      <p className="font-medium text-neutral-900">Beautiful Storefront</p>
-                      <p className="text-sm text-neutral-600">Professional online store, no coding required</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-neutral-900 text-sm sm:text-base">Beautiful Storefront</p>
+                      <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Professional online store, no coding required</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-info flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-info flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
-                    <div>
-                      <p className="font-medium text-neutral-900">Easy Management</p>
-                      <p className="text-sm text-neutral-600">Update inventory from one simple dashboard</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-neutral-900 text-sm sm:text-base">Easy Management</p>
+                      <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Update inventory from one simple dashboard</p>
                     </div>
                   </div>
                 </CardContent>
@@ -924,12 +924,12 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
               <AnimatedCard delay={0.5} hover={false}>
                 <CardHeader>
-                  <CardTitle>Get Started Today</CardTitle>
-                  <CardDescription>Join retailers already using our platform</CardDescription>
+                  <CardTitle className="text-lg sm:text-xl">Get Started Today</CardTitle>
+                  <CardDescription className="text-sm">Join retailers already using our platform</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 sm:space-y-4">
                   <Link href="/register" className="block">
-                    <Button variant="primary" className="w-full justify-start" size="lg">
+                    <Button variant="primary" className="w-full justify-start" size="md">
                       <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                       </svg>
@@ -937,16 +937,16 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     </Button>
                   </Link>
                   <Link href="/login" className="block">
-                    <Button variant="secondary" className="w-full justify-start">
+                    <Button variant="secondary" className="w-full justify-start" size="md">
                       <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                       </svg>
                       Sign In
                     </Button>
                   </Link>
-                  <div className="pt-4 border-t border-neutral-200">
-                    <p className="text-sm text-neutral-600 mb-2">Questions?</p>
-                    <Link href="/contact" className="text-sm text-primary-600 hover:underline">
+                  <div className="pt-3 sm:pt-4 border-t border-neutral-200">
+                    <p className="text-xs sm:text-sm text-neutral-600 mb-2">Questions?</p>
+                    <Link href="/contact" className="text-xs sm:text-sm text-primary-600 hover:underline">
                       Contact our team →
                     </Link>
                   </div>
