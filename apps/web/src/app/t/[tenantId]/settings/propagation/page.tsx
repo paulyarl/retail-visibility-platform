@@ -70,16 +70,23 @@ export default function PropagationControlPanel() {
           const userData = await userRes.json();
           console.log('User data:', userData);
           
-          const tenantRole = userData.tenants?.find((t: any) => t.tenantId === tenantId);
-          const role = tenantRole?.role || null;
-          setUserRole(role);
-          
-          // Platform admins, owners, and admins can access propagation control panel
+          // Platform admins always have access (bypass tenant role check)
           const isPlatformAdmin = userData.isPlatformAdmin === true || userData.role === 'ADMIN';
-          const isOwnerOrAdmin = role === 'OWNER' || role === 'ADMIN';
           
-          console.log('Access check:', { isPlatformAdmin, isOwnerOrAdmin, role, userRole: userData.role });
-          setHasAccess(isPlatformAdmin || isOwnerOrAdmin);
+          if (isPlatformAdmin) {
+            console.log('Platform admin detected - granting access');
+            setUserRole('Platform Admin');
+            setHasAccess(true);
+          } else {
+            // For non-platform admins, check tenant role
+            const tenantRole = userData.tenants?.find((t: any) => t.tenantId === tenantId);
+            const role = tenantRole?.role || null;
+            setUserRole(role);
+            
+            const isOwnerOrAdmin = role === 'OWNER' || role === 'ADMIN';
+            console.log('Access check:', { isPlatformAdmin, isOwnerOrAdmin, role });
+            setHasAccess(isOwnerOrAdmin);
+          }
         }
 
         // Check if this is a hero location and get organization info
