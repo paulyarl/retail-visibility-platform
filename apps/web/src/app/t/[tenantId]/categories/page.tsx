@@ -174,6 +174,13 @@ export default function CategoriesPage() {
       return
     }
 
+    // Validate that the selected tenant is actually a hero location
+    const selectedTenant = organizationInfo?.tenants.find(t => t.id === selectedHeroId)
+    if (!selectedTenant?.isHero) {
+      showToast('error', 'The selected location is not set as a hero location. Please select the hero location or set one in Organization Settings.')
+      return
+    }
+
     try {
       setPropagating(true)
       setShowPropagateModal(false)
@@ -792,8 +799,8 @@ export default function CategoriesPage() {
                 >
                   <option value="">-- Select a hero location --</option>
                   {organizationInfo.tenants.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} {t.isHero ? '⭐ (Current Hero)' : ''}
+                    <option key={t.id} value={t.id} disabled={!t.isHero}>
+                      {t.name} {t.isHero ? '⭐ (Hero Location)' : '(Not a hero location)'}
                     </option>
                   ))}
                 </select>
