@@ -9,16 +9,17 @@ Use the centralized `api-proxy.ts` utility functions which automatically forward
 ## Status
 
 ### ✅ Fixed
-- `/api/organization/billing/counters` - Manually fixed with header forwarding
+- `/api/organization/billing/counters` - GET (Authorization + Cookie)
+- `/api/admin/settings/branding` - GET, POST (Authorization + Cookie)
+- `/api/admin/email-config` - GET, PUT (Authorization + Cookie)
+- `/api/tenant/gbp-category` - GET, PUT (Authorization + Cookie)
+- `/api/upgrade-requests` - GET, POST (Bearer token - already correct)
+- `/api/upgrade-requests/[id]` - GET, PATCH, DELETE (Bearer token - already correct)
 
-### ⚠️ Needs Review/Fix
-Routes that use `fetch(API_BASE_URL)` but may not forward auth headers:
+### ✅ Verified Correct
+Routes that already properly forward auth:
 
-1. `/api/admin/email-config/route.ts` - GET, PUT
-2. `/api/admin/settings/branding/route.ts` - GET, PUT  
-3. `/api/tenant/gbp-category/route.ts` - GET, PUT
-4. `/api/upgrade-requests/[id]/route.ts` - GET, PUT, DELETE
-5. `/api/upgrade-requests/route.ts` - GET, POST
+1. `/api/upgrade-requests/*` - Uses Bearer token extraction from cookies ✅
 
 ## Recommended Fix Pattern
 
