@@ -129,10 +129,10 @@ export default function OrganizationPage() {
 
     setSettingHero(true);
     try {
-      const res = await fetch(`/api/organizations/${organizationId}/hero-location`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId: selectedHeroId }),
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      // Call Railway API directly with auth
+      const res = await api.put(`${API_BASE_URL}/organizations/${organizationId}/hero-location`, {
+        tenantId: selectedHeroId,
       });
 
       if (!res.ok) {
