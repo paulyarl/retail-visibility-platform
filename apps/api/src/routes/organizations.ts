@@ -719,7 +719,7 @@ router.put('/:id/hero-location', async (req, res) => {
     res.json({
       success: true,
       heroTenantId: tenantId,
-      heroTenantName: updatedTenant.name,
+      heroTenantName: updatedTenant?.name || tenant.name,
     });
   } catch (error: any) {
     console.error('[Organizations] Set hero location error:', error);
