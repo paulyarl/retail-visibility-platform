@@ -16,6 +16,8 @@ import {
 } from '../lib/admin-tools';
 import { audit } from '../audit';
 import { prisma } from '../prisma';
+import { validateTierAssignment } from '../middleware/tier-validation';
+import { validateSKULimits } from '../middleware/sku-limits';
 
 const router = Router();
 
@@ -108,13 +110,16 @@ const createTenantSchema = z.object({
   name: z.string().min(1),
   city: z.string().optional(),
   state: z.string().optional(),
-  subscriptionTier: z.string().optional().default('professional'),
+  subscriptionTier: z.enum(['trial', 'google_only', 'starter', 'professional', 'enterprise', 'organization']).optional().default('professional'),
+  subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional().default('trial'),
+  organizationId: z.string().optional(), // Required for organization tier
+  ownerId: z.string().optional(), // Link to user as owner
   scenario: z.enum(['grocery', 'fashion', 'electronics', 'general']).optional().default('general'),
   productCount: z.number().int().min(0).max(100).optional().default(0),
   createAsDrafts: z.boolean().optional().default(true),
 });
 
-router.post('/tenants', async (req, res) => {
+router.post('/tenants', validateTierAssignment, validateSKULimits, async (req, res) => {
   try {
     const parsed = createTenantSchema.safeParse(req.body);
     if (!parsed.success) {

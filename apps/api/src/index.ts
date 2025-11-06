@@ -78,6 +78,8 @@ import {
   requireTenantOwner,
   checkTenantCreationLimit 
 } from './middleware/permissions';
+import { validateTierAssignment, validateTierCompatibility } from './middleware/tier-validation';
+import { validateSKULimits, validateTierSKUCompatibility } from './middleware/sku-limits';
 import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
 import platformStatsRoutes from './routes/platform-stats';
@@ -290,10 +292,11 @@ app.put("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) =
 
 // PATCH /tenants/:id - Update tenant subscription tier (admin only)
 const patchTenantSchema = z.object({
-  subscriptionTier: z.enum(['trial', 'starter', 'professional', 'enterprise']).optional(),
-  subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled']).optional(),
+  subscriptionTier: z.enum(['trial', 'google_only', 'starter', 'professional', 'enterprise', 'organization']).optional(),
+  subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
+  organizationId: z.string().optional(), // For linking to organization
 });
-app.patch("/tenants/:id", authenticateToken, requireAdmin, async (req, res) => {
+app.patch("/tenants/:id", authenticateToken, requireAdmin, validateTierAssignment, validateTierCompatibility, validateTierSKUCompatibility, async (req, res) => {
   const parsed = patchTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
