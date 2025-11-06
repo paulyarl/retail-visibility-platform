@@ -56,54 +56,16 @@ export default function OrganizationPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
 
+  // Use organization data from access control hook
   useEffect(() => {
-    async function loadOrganization() {
-      try {
-        setLoading(true);
-        
-        // First, try to get organizationId from URL or localStorage
-        const params = new URLSearchParams(window.location.search);
-        let orgId = params.get('organizationId') || localStorage.getItem('organizationId');
-        
-        // If not found, try to get it from the current tenant
-        if (!orgId) {
-          const tenantId = localStorage.getItem('tenantId');
-          console.log('Attempting to load tenant:', tenantId);
-          
-          if (tenantId) {
-            const tenantRes = await fetch(`/tenants/${tenantId}`);
-            console.log('Tenant response status:', tenantRes.status);
-            
-            if (tenantRes.ok) {
-              const tenantData = await tenantRes.json();
-              console.log('Tenant data:', tenantData);
-              orgId = tenantData.organizationId;
-              console.log('Found organizationId:', orgId);
-            } else {
-              console.error('Failed to fetch tenant:', await tenantRes.text());
-            }
-          } else {
-            console.log('No tenantId in localStorage');
-          }
-        }
-        
-        if (orgId) {
-          setOrganizationId(orgId);
-          await loadOrganizationData(orgId);
-        } else {
-          setLoading(false);
-          setError('No organization selected. This tenant may not be part of an organization.');
-          console.log('No organization ID found');
-        }
-      } catch (err) {
-        console.error('Error loading organization:', err);
-        setLoading(false);
-        setError(err instanceof Error ? err.message : 'Failed to load organization');
-      }
+    if (orgDataFromHook) {
+      setOrganizationId(orgDataFromHook.id);
+      loadOrganizationData(orgDataFromHook.id);
+    } else if (!accessLoading) {
+      setLoading(false);
+      setError('No organization found. This tenant may not be part of an organization.');
     }
-    
-    loadOrganization();
-  }, []);
+  }, [orgDataFromHook, accessLoading]);
 
   const loadOrganizationData = async (orgId: string) => {
     try {
