@@ -71,6 +71,8 @@ export default function OrganizationPage() {
   const [syncResult, setSyncResult] = useState<any>(null);
   const [showHeroModal, setShowHeroModal] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const locationsPerPage = 5;
 
   // Use organization data from access control hook or URL
   useEffect(() => {
@@ -528,10 +530,12 @@ export default function OrganizationPage() {
                 <p className="text-neutral-500">No locations in this organization</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {orgData.locationBreakdown
-                  .sort((a, b) => b.skuCount - a.skuCount)
-                  .map((location) => {
+              <>
+                <div className="space-y-3">
+                  {orgData.locationBreakdown
+                    .sort((a, b) => b.skuCount - a.skuCount)
+                    .slice((currentPage - 1) * locationsPerPage, currentPage * locationsPerPage)
+                    .map((location) => {
                     const locationPercentage = (location.skuCount / orgData.limits.maxTotalSKUs) * 100;
                     const isHero = location.tenantId === heroLocation?.tenantId;
                     return (
@@ -578,7 +582,56 @@ export default function OrganizationPage() {
                       </div>
                     );
                   })}
-              </div>
+                </div>
+
+                {/* Pagination Controls */}
+                {orgData.locationBreakdown.length > locationsPerPage && (
+                  <div className="mt-6 flex items-center justify-between border-t pt-4">
+                    <div className="text-sm text-neutral-600">
+                      Showing {((currentPage - 1) * locationsPerPage) + 1} to {Math.min(currentPage * locationsPerPage, orgData.locationBreakdown.length)} of {orgData.locationBreakdown.length} locations
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(orgData.locationBreakdown.length / locationsPerPage) }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                              currentPage === page
+                                ? 'bg-primary-600 text-white'
+                                : 'text-neutral-600 hover:bg-neutral-100'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(orgData.locationBreakdown.length / locationsPerPage), prev + 1))}
+                        disabled={currentPage === Math.ceil(orgData.locationBreakdown.length / locationsPerPage)}
+                      >
+                        Next
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
