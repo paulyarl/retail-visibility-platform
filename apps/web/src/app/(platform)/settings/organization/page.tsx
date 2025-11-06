@@ -73,6 +73,9 @@ export default function OrganizationPage() {
   const [syncingCategories, setSyncingCategories] = useState(false);
   const [categorySyncResult, setCategorySyncResult] = useState<any>(null);
   const [showHeroModal, setShowHeroModal] = useState(false);
+  const [showCategorySyncModal, setShowCategorySyncModal] = useState(false);
+  const [categorySyncScope, setCategorySyncScope] = useState<'single' | 'all'>('all');
+  const [selectedSyncTenantId, setSelectedSyncTenantId] = useState<string>('');
   const [showQuickStart, setShowQuickStart] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const locationsPerPage = 5;
@@ -163,36 +166,57 @@ export default function OrganizationPage() {
   const handleSyncCategoriesToGBP = async () => {
     if (!organizationId) return;
 
-    if (!confirm('This will sync product categories to Google Business Profile for all locations in this organization. Continue?')) {
+    // Validate tenant selection for single location sync
+    if (categorySyncScope === 'single' && !selectedSyncTenantId) {
+      alert('Please select a location for single-location sync');
+      return;
+    }
+
+    const confirmMessage = categorySyncScope === 'single'
+      ? `This will sync product categories to Google Business Profile for the selected location. Continue?`
+      : `This will sync product categories to Google Business Profile for ALL locations in this organization. Continue?`;
+
+    if (!confirm(confirmMessage)) {
       return;
     }
 
     setSyncingCategories(true);
     setCategorySyncResult(null);
+    setShowCategorySyncModal(false);
 
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const requestBody: any = {
+        strategy: 'platform_to_gbp',
+        dryRun: false,
+      };
+
+      if (categorySyncScope === 'single') {
+        requestBody.scope = 'tenant';
+        requestBody.tenantId = selectedSyncTenantId;
+      } else {
+        requestBody.scope = 'organization';
+        requestBody.organizationId = organizationId;
+      }
+
       const response = await fetch(`${API_BASE}/api/categories/mirror`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({
-          scope: 'organization',
-          organizationId: organizationId,
-          strategy: 'platform_to_gbp',
-          dryRun: false,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
       
       if (response.ok) {
+        const locationText = categorySyncScope === 'single' ? '1 location' : `all locations`;
         setCategorySyncResult({
           success: true,
-          message: 'Categories synced successfully to GBP',
+          message: `Categories synced to ${locationText} successfully`,
           jobId: data.jobId,
+          scope: categorySyncScope,
         });
       } else {
         setCategorySyncResult({
@@ -687,7 +711,7 @@ export default function OrganizationPage() {
                         size="sm"
                         className="flex-1"
                         disabled={!organizationId || syncingCategories}
-                        onClick={handleSyncCategoriesToGBP}
+                        onClick={() => setShowCategorySyncModal(true)}
                       >
                         {syncingCategories ? 'Syncing...' : 'Sync to GBP'}
                       </Button>
@@ -1369,6 +1393,109 @@ export default function OrganizationPage() {
           </Card>
         )}
       </div>
+
+      {/* Category Sync Modal */}
+      {showCategorySyncModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">Sync Categories to GBP</h3>
+            
+            <div className="space-y-4 mb-6">
+              {/* Scope Selection */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Sync Scope</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-neutral-50">
+                    <input
+                      type="radio"
+                      name="categorySyncScope"
+                      value="all"
+                      checked={categorySyncScope === 'all'}
+                      onChange={() => setCategorySyncScope('all')}
+                      className="h-4 w-4"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">All Locations</div>
+                      <div className="text-xs text-neutral-600">Sync to all {orgData?.locationBreakdown.length || 0} locations in organization</div>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-neutral-50">
+                    <input
+                      type="radio"
+                      name="categorySyncScope"
+                      value="single"
+                      checked={categorySyncScope === 'single'}
+                      onChange={() => setCategorySyncScope('single')}
+                      className="h-4 w-4"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">Single Location</div>
+                      <div className="text-xs text-neutral-600">Test on one location before rolling out</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Tenant Selector (shown when single is selected) */}
+              {categorySyncScope === 'single' && (
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Select Location</label>
+                  <select
+                    value={selectedSyncTenantId}
+                    onChange={(e) => setSelectedSyncTenantId(e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Choose a location...</option>
+                    {orgData?.locationBreakdown.map((location) => (
+                      <option key={location.tenantId} value={location.tenantId}>
+                        {location.tenantName} ({location.skuCount} SKUs)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Strategy Info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="text-xs text-blue-800">
+                    <strong>Use Case:</strong> {categorySyncScope === 'single' 
+                      ? 'Test new categories on one location before chain-wide rollout'
+                      : 'Update all locations with latest product categories'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => {
+                  setShowCategorySyncModal(false);
+                  setCategorySyncScope('all');
+                  setSelectedSyncTenantId('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={handleSyncCategoriesToGBP}
+                disabled={categorySyncScope === 'single' && !selectedSyncTenantId}
+              >
+                Sync Now
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
