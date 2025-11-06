@@ -546,102 +546,160 @@ export default function OrganizationPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Left Column - Bulk Operations */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-neutral-900 mb-3 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {/* Propagation Type Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                {/* Type 1: Bulk Sync from Hero */}
+                <div className="p-4 bg-white rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-colors">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
-                      Bulk Operations
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="p-3 bg-white rounded-lg border border-purple-100">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <p className="font-medium text-sm text-neutral-900">Sync All from Hero</p>
-                            <p className="text-xs text-neutral-600 mt-1">Copy all products from hero to all locations</p>
-                          </div>
-                          <Badge variant="success" className="text-xs">Primary</Badge>
-                        </div>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          className="w-full mt-2"
-                          disabled={!heroLocation || syncing}
-                          onClick={handleSyncFromHero}
-                        >
-                          {syncing ? 'Syncing...' : 'Sync All'}
-                        </Button>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-sm text-neutral-900">Bulk Sync from Hero</h4>
+                        <Badge variant="success" className="text-xs">Recommended</Badge>
                       </div>
-
-                      <div className="p-3 bg-white rounded-lg border border-purple-100">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <p className="font-medium text-sm text-neutral-900">Individual Propagation</p>
-                            <p className="text-xs text-neutral-600 mt-1">Propagate specific products manually</p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="w-full mt-2"
-                          onClick={() => window.location.href = `/items`}
-                        >
-                          Go to Items
-                        </Button>
-                      </div>
+                      <p className="text-xs text-neutral-600">Copy all products from hero to all locations at once</p>
                     </div>
                   </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="w-full"
+                    disabled={!heroLocation || syncing}
+                    onClick={handleSyncFromHero}
+                  >
+                    {syncing ? 'Syncing...' : 'Sync All'}
+                  </Button>
                 </div>
 
-                {/* Right Column - Hero Management */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-neutral-900 mb-3 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                {/* Type 2: Individual Item Propagation */}
+                <div className="p-4 bg-white rounded-lg border-2 border-purple-200 hover:border-purple-400 transition-colors">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
-                      Hero Management
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="p-3 bg-white rounded-lg border border-purple-100">
-                        <p className="font-medium text-sm text-neutral-900 mb-2">Current Hero Location</p>
-                        {heroLocation ? (
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-semibold text-neutral-900">{heroLocation.tenantName}</p>
-                              <p className="text-xs text-neutral-600">{heroLocation.skuCount} products</p>
-                            </div>
-                            <Badge variant="warning" className="text-xs">Hero</Badge>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-neutral-600">No hero location set</p>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full mt-3"
-                          onClick={() => setShowHeroModal(true)}
-                        >
-                          {heroLocation ? 'Change Hero' : 'Set Hero Location'}
-                        </Button>
-                      </div>
-
-                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <svg className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <div className="text-xs text-amber-900">
-                            <p className="font-semibold mb-1">Admin Privileges Required</p>
-                            <p>Only platform admins, tenant owners, and tenant admins can access these controls.</p>
-                          </div>
-                        </div>
-                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm text-neutral-900 mb-1">Individual Propagation</h4>
+                      <p className="text-xs text-neutral-600">Propagate specific products to selected locations</p>
                     </div>
                   </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => window.location.href = `/items`}
+                  >
+                    Go to Items
+                  </Button>
+                </div>
+
+                {/* Type 3: Category-Based Propagation */}
+                <div className="p-4 bg-white rounded-lg border-2 border-green-200 hover:border-green-400 transition-colors">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-sm text-neutral-900">By Category</h4>
+                        <Badge variant="default" className="text-xs">Coming Soon</Badge>
+                      </div>
+                      <p className="text-xs text-neutral-600">Propagate all items in a category</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    disabled={true}
+                  >
+                    Coming Soon
+                  </Button>
+                </div>
+
+                {/* Type 4: Selective Sync (Hero to Specific Locations) */}
+                <div className="p-4 bg-white rounded-lg border-2 border-amber-200 hover:border-amber-400 transition-colors">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-sm text-neutral-900">Selective Sync</h4>
+                        <Badge variant="default" className="text-xs">Coming Soon</Badge>
+                      </div>
+                      <p className="text-xs text-neutral-600">Sync hero to specific locations only</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    disabled={true}
+                  >
+                    Coming Soon
+                  </Button>
+                </div>
+
+                {/* Type 5: Price-Only Updates */}
+                <div className="p-4 bg-white rounded-lg border-2 border-pink-200 hover:border-pink-400 transition-colors">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="p-2 bg-pink-100 rounded-lg">
+                      <svg className="w-5 h-5 text-pink-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-sm text-neutral-900">Price Updates</h4>
+                        <Badge variant="default" className="text-xs">Coming Soon</Badge>
+                      </div>
+                      <p className="text-xs text-neutral-600">Update prices across all locations</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    disabled={true}
+                  >
+                    Coming Soon
+                  </Button>
+                </div>
+
+                {/* Type 6: Photo Sync */}
+                <div className="p-4 bg-white rounded-lg border-2 border-indigo-200 hover:border-indigo-400 transition-colors">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="p-2 bg-indigo-100 rounded-lg">
+                      <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-sm text-neutral-900">Photo Sync</h4>
+                        <Badge variant="default" className="text-xs">Coming Soon</Badge>
+                      </div>
+                      <p className="text-xs text-neutral-600">Update product photos across chain</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    disabled={true}
+                  >
+                    Coming Soon
+                  </Button>
                 </div>
               </div>
 
