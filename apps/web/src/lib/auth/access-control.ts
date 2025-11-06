@@ -81,7 +81,9 @@ export interface AccessControlOptions {
 }
 
 export function isPlatformAdmin(user: UserData): boolean {
-  return user.isPlatformAdmin === true || user.role === 'ADMIN';
+  // Platform admin is determined by role === 'ADMIN'
+  // isPlatformAdmin field doesn't exist in schema, kept in interface for backwards compatibility
+  return user.role === 'ADMIN' || user.isPlatformAdmin === true;
 }
 
 export function getTenantRole(user: UserData, tenantId: string): UserRole | null {

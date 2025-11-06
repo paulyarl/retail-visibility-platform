@@ -250,7 +250,6 @@ export class AuthService {
         firstName: true,
         lastName: true,
         role: true,
-        isPlatformAdmin: true,
         emailVerified: true,
         lastLogin: true,
         createdAt: true,
