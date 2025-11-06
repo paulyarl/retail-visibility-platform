@@ -561,13 +561,20 @@ router.get('/:tenantId/categories-alignment-status', async (req, res) => {
   }
 });
 
+const propagateCategoriesSchema = z.object({
+  mode: z.enum(['create_only', 'update_only', 'create_or_update']).optional().default('create_or_update'),
+});
+
 /**
  * POST /api/v1/tenants/:tenantId/categories/propagate
  * Propagate all categories from hero tenant to all location tenants in the organization
+ * Body: { mode?: 'create_only' | 'update_only' | 'create_or_update' }
  */
 router.post('/:tenantId/categories/propagate', async (req, res) => {
   try {
     const { tenantId } = req.params;
+    const body = propagateCategoriesSchema.parse(req.body);
+    const { mode } = body;
 
     // Get the tenant and verify it's a hero tenant
     const tenant = await prisma.tenant.findUnique({
@@ -658,8 +665,14 @@ router.post('/:tenantId/categories/propagate', async (req, res) => {
             },
           });
 
+          // Handle based on mode
           if (existing) {
-            // Update existing category
+            if (mode === 'create_only') {
+              results.skipped++;
+              continue;
+            }
+            
+            // Update mode - update existing category
             await prisma.tenantCategory.update({
               where: { id: existing.id },
               data: {
@@ -671,7 +684,12 @@ router.post('/:tenantId/categories/propagate', async (req, res) => {
             });
             results.updated++;
           } else {
-            // Create new category
+            if (mode === 'update_only') {
+              results.skipped++;
+              continue;
+            }
+            
+            // Create mode - create new category
             await prisma.tenantCategory.create({
               data: {
                 tenantId: location.id,

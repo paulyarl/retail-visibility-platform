@@ -64,6 +64,7 @@ export default function CategoriesPage() {
     tenants: Array<{ id: string; name: string; isHero: boolean }>
   } | null>(null)
   const [selectedHeroId, setSelectedHeroId] = useState<string>('')
+  const [propagateMode, setPropagateMode] = useState<'create_only' | 'update_only' | 'create_or_update'>('create_or_update')
 
   // Toasts
   const [toast, setToast] = useState<{ type: 'success'|'error'|'info'; message: string } | null>(null)
@@ -177,7 +178,9 @@ export default function CategoriesPage() {
       setPropagating(true)
       setShowPropagateModal(false)
       
-      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${selectedHeroId}/categories/propagate`)
+      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${selectedHeroId}/categories/propagate`, {
+        mode: propagateMode
+      })
       
       if (!res.ok) {
         const error = await res.json()
@@ -185,7 +188,8 @@ export default function CategoriesPage() {
       }
 
       const result = await res.json()
-      showToast('success', `Successfully propagated ${result.data.totalCategories} categories to ${result.data.totalLocations} locations (Created: ${result.data.created}, Updated: ${result.data.updated})`)
+      const summary = `Created: ${result.data.created}, Updated: ${result.data.updated}, Skipped: ${result.data.skipped}`
+      showToast('success', `Successfully propagated ${result.data.totalCategories} categories to ${result.data.totalLocations} locations (${summary})`)
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate categories')
     } finally {
@@ -799,6 +803,33 @@ export default function CategoriesPage() {
                     <span className="text-orange-600">⚠️ No hero location set. You can select one above or set it in <Link href={`/t/${tenantId}/settings/organization`} className="underline hover:text-orange-700">Organization Settings</Link></span>
                   )}
                 </p>
+              </div>
+
+              {/* Propagation Mode */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Propagation Mode
+                </label>
+                <select
+                  value={propagateMode}
+                  onChange={(e) => setPropagateMode(e.target.value as any)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="create_or_update">Create or Update (Recommended)</option>
+                  <option value="create_only">Create Only (Skip Existing)</option>
+                  <option value="update_only">Update Only (Skip New)</option>
+                </select>
+                <div className="mt-2 text-xs text-gray-600">
+                  {propagateMode === 'create_or_update' && (
+                    <p>✅ Creates new categories and updates existing ones. Best for keeping everything in sync.</p>
+                  )}
+                  {propagateMode === 'create_only' && (
+                    <p>➕ Only creates categories that don't exist. Skips categories that already exist at locations.</p>
+                  )}
+                  {propagateMode === 'update_only' && (
+                    <p>🔄 Only updates existing categories. Won't create new ones. Useful for updating alignments only.</p>
+                  )}
+                </div>
               </div>
 
               {/* Target Locations */}
