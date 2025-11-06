@@ -57,6 +57,13 @@ export default function CategoriesPage() {
   // Propagation state
   const [propagating, setPropagating] = useState(false)
   const [isHeroLocation, setIsHeroLocation] = useState(false)
+  const [showPropagateModal, setShowPropagateModal] = useState(false)
+  const [organizationInfo, setOrganizationInfo] = useState<{
+    id: string
+    name: string
+    tenants: Array<{ id: string; name: string; isHero: boolean }>
+  } | null>(null)
+  const [selectedHeroId, setSelectedHeroId] = useState<string>('')
 
   // Toasts
   const [toast, setToast] = useState<{ type: 'success'|'error'|'info'; message: string } | null>(null)
@@ -89,12 +96,36 @@ export default function CategoriesPage() {
         const statusData = await statusRes.json()
         setAlignmentStatus(statusData.data)
 
-        // Check if this is a hero location
+        // Check if this is a hero location and get organization info
         const tenantRes = await api.get(`${API_BASE_URL}/tenants/${tenantId}`)
         if (tenantRes.ok) {
           const tenantData = await tenantRes.json()
           const metadata = tenantData.metadata || {}
-          setIsHeroLocation(metadata.isHeroLocation === true)
+          const isHero = metadata.isHeroLocation === true
+          setIsHeroLocation(isHero)
+          
+          // If tenant has an organization, fetch organization details
+          if (tenantData.organizationId) {
+            const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenantData.organizationId}`)
+            if (orgRes.ok) {
+              const orgData = await orgRes.json()
+              const tenantsWithHeroFlag = orgData.tenants?.map((t: any) => ({
+                id: t.id,
+                name: t.name,
+                isHero: t.metadata?.isHeroLocation === true
+              })) || []
+              
+              setOrganizationInfo({
+                id: orgData.id,
+                name: orgData.name,
+                tenants: tenantsWithHeroFlag
+              })
+              
+              // Pre-select current tenant if it's hero, or find existing hero
+              const currentHero = tenantsWithHeroFlag.find((t: any) => t.isHero)
+              setSelectedHeroId(currentHero?.id || tenantId)
+            }
+          }
         }
 
         setError(null)
@@ -132,18 +163,25 @@ export default function CategoriesPage() {
     setIsModalOpen(true)
   }
 
+  function openPropagateModal() {
+    setShowPropagateModal(true)
+  }
+
   async function propagateCategories() {
-    if (!confirm('This will propagate all categories to all location tenants in your organization. Continue?')) {
+    if (!selectedHeroId) {
+      showToast('error', 'Please select a hero location first')
       return
     }
 
     try {
       setPropagating(true)
-      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/propagate`)
+      setShowPropagateModal(false)
+      
+      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${selectedHeroId}/categories/propagate`)
       
       if (!res.ok) {
         const error = await res.json()
-        throw new Error(error.error || 'Failed to propagate categories')
+        throw new Error(error.message || error.error || 'Failed to propagate categories')
       }
 
       const result = await res.json()
@@ -352,9 +390,9 @@ export default function CategoriesPage() {
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Categories</h2>
           <div className="flex gap-2">
-            {isHeroLocation && categories.length > 0 && (
+            {organizationInfo && categories.length > 0 && (
               <button
-                onClick={propagateCategories}
+                onClick={openPropagateModal}
                 disabled={propagating}
                 className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 title="Propagate categories to all locations in your organization"
@@ -694,6 +732,128 @@ export default function CategoriesPage() {
                 disabled={saving}
               >
                 {saving ? 'Saving...' : 'Save changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Propagate Modal */}
+      {showPropagateModal && organizationInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Propagate Categories to Locations</h3>
+              <button onClick={() => setShowPropagateModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Info Banner */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-blue-900 mb-2">📋 How Category Propagation Works</h4>
+                    <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                      <li><strong>Select a hero location</strong> - This is the location with the master category list</li>
+                      <li><strong>All categories</strong> from the hero location will be copied to all other locations</li>
+                      <li><strong>Google taxonomy alignments</strong> are preserved during propagation</li>
+                      <li><strong>Existing categories</strong> at locations will be updated, new ones will be created</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Organization Info */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Organization</h4>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-sm font-semibold text-gray-900">{organizationInfo.name}</p>
+                  <p className="text-xs text-gray-600">{organizationInfo.tenants.length} locations</p>
+                </div>
+              </div>
+
+              {/* Hero Location Selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Hero Location <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedHeroId}
+                  onChange={(e) => setSelectedHeroId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">-- Select a hero location --</option>
+                  {organizationInfo.tenants.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.isHero ? '⭐ (Current Hero)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-2">
+                  {organizationInfo.tenants.find(t => t.isHero) ? (
+                    <>Current hero: <strong>{organizationInfo.tenants.find(t => t.isHero)?.name}</strong></>
+                  ) : (
+                    <span className="text-orange-600">⚠️ No hero location set. You can select one above or set it in <Link href={`/t/${tenantId}/settings/organization`} className="underline hover:text-orange-700">Organization Settings</Link></span>
+                  )}
+                </p>
+              </div>
+
+              {/* Target Locations */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Target Locations</h4>
+                <div className="bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto">
+                  {selectedHeroId ? (
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      {organizationInfo.tenants
+                        .filter(t => t.id !== selectedHeroId)
+                        .map(t => (
+                          <li key={t.id} className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            {t.name}
+                          </li>
+                        ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">Select a hero location to see target locations</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Warning */}
+              {selectedHeroId && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-sm text-amber-800">
+                        <strong>Important:</strong> This will propagate {categories.length} categories from <strong>{organizationInfo.tenants.find(t => t.id === selectedHeroId)?.name}</strong> to {organizationInfo.tenants.filter(t => t.id !== selectedHeroId).length} other locations. Existing categories will be updated.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowPropagateModal(false)}
+                className="px-4 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={propagateCategories}
+                disabled={!selectedHeroId}
+                className="px-4 py-2 text-sm rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Propagate Categories
               </button>
             </div>
           </div>
