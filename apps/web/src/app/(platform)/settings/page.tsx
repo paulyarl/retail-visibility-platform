@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, AnimatedCard } from '@/components/ui';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { ProtectedCard } from '@/lib/auth/ProtectedCard';
+import { AccessPresets } from '@/lib/auth/useAccessControl';
+import { AccessControlOptions } from '@/lib/auth/access-control';
 
 type SettingCard = {
   title: string;
@@ -12,9 +15,13 @@ type SettingCard = {
   href: string;
   color: string;
   badge?: string;
+  // Legacy boolean flags (will be replaced with accessOptions)
   adminOnly?: boolean;
-  platformAdminOnly?: boolean; // Only for platform-wide admins
-  personalOnly?: boolean; // Hide in tenant-scoped settings
+  platformAdminOnly?: boolean;
+  personalOnly?: boolean;
+  // New centralized access control
+  accessOptions?: AccessControlOptions;
+  fetchOrganization?: boolean;
 };
 
 type SettingsGroup = {
@@ -330,16 +337,16 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
       cards: [
         {
           title: 'Admin Dashboard',
-      description: 'System administration and user management',
-      icon: (
-        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
+          description: 'System administration and user management',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          ),
           href: '/settings/admin',
           color: 'bg-purple-500',
-          platformAdminOnly: true,
+          accessOptions: AccessPresets.PLATFORM_ADMIN_ONLY,
         },
         {
           title: 'User Management',
@@ -351,7 +358,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: '/settings/admin/users',
           color: 'bg-orange-500',
-          platformAdminOnly: true,
+          accessOptions: AccessPresets.PLATFORM_ADMIN_ONLY,
         },
       ],
     },
@@ -375,20 +382,9 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
     },
   ];
 
-  // Filter groups and cards based on context
+  // No manual filtering needed - ProtectedCard handles visibility
   const displayGroups = settingsGroups
     .filter(g => hideAdmin ? !g.adminOnly : true)
-    .map(group => ({
-      ...group,
-      cards: group.cards.filter(card => {
-        // Hide platform admin features in tenant context
-        if (hideAdmin && card.platformAdminOnly) return false;
-        // Hide personal settings in tenant context
-        if (tenantId && card.personalOnly) return false;
-        // Keep tenant admin features even when hideAdmin is true
-        return true;
-      })
-    }))
     .filter(group => group.cards.length > 0); // Remove empty groups
 
   return (
@@ -427,11 +423,24 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
 
               {/* Group Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {group.cards.map((setting, cardIndex) => (
-                  <AnimatedCard
-                    key={setting.href}
-                    delay={(groupIndex * group.cards.length + cardIndex) * 0.05}
-                    onClick={() => {
+                {group.cards.map((setting, cardIndex) => {
+                  // Convert legacy flags to access options
+                  const accessOptions = setting.accessOptions || (
+                    setting.platformAdminOnly ? AccessPresets.PLATFORM_ADMIN_ONLY :
+                    setting.adminOnly ? AccessPresets.TENANT_ADMIN :
+                    undefined
+                  );
+
+                  return (
+                    <ProtectedCard
+                      key={setting.href}
+                      tenantId={tenantId || null}
+                      accessOptions={accessOptions}
+                      fetchOrganization={setting.fetchOrganization}
+                    >
+                      <AnimatedCard
+                        delay={(groupIndex * group.cards.length + cardIndex) * 0.05}
+                        onClick={() => {
                       // Special handling for tenant-specific pages
                       if (setting.href === '/settings/tenant' || setting.href === '/tenants/users') {
                         const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
@@ -484,7 +493,9 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
                       </div>
                     </CardHeader>
                   </AnimatedCard>
-                ))}
+                    </ProtectedCard>
+                  );
+                })}
               </div>
             </div>
           ))}
