@@ -69,6 +69,8 @@ export default function OrganizationPage() {
   const [settingHero, setSettingHero] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
+  const [showHeroModal, setShowHeroModal] = useState(false);
+  const [showQuickStart, setShowQuickStart] = useState(true);
 
   // Use organization data from access control hook or URL
   useEffect(() => {
@@ -240,6 +242,17 @@ export default function OrganizationPage() {
 
   const skuPercentage = (orgData.current.totalSKUs / orgData.limits.maxTotalSKUs) * 100;
   const locationPercentage = (orgData.current.totalLocations / orgData.limits.maxLocations) * 100;
+  
+  // Find current hero location
+  const heroLocation = orgData.locationBreakdown.find(loc => 
+    (loc as any).metadata?.isHeroLocation || loc.tenantId === selectedHeroId
+  );
+
+  const getGaugeColor = (percentage: number) => {
+    if (percentage >= 100) return 'bg-red-600';
+    if (percentage >= 90) return 'bg-yellow-600';
+    return 'bg-green-600';
+  };
 
   return (
     <div className="container mx-auto p-6">
@@ -254,30 +267,366 @@ export default function OrganizationPage() {
       />
 
       <div className="mt-6 space-y-6">
-        {/* Quick Start Guide */}
-        <Card className="border-primary-200 bg-gradient-to-br from-primary-50 to-white">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-600 rounded-lg">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        {/* 1. HERO LOCATION BANNER - Prominent Leader Status */}
+        <Card className="border-2 border-amber-400 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50">
+          <CardContent className="py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {/* Crown Icon */}
+                <div className="p-3 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-xl shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </div>
+                
+                {/* Hero Info */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="warning" className="text-xs font-bold">
+                      👑 HERO LOCATION
+                    </Badge>
+                    <Badge variant="default" className="text-xs">
+                      Master Catalog
+                    </Badge>
+                  </div>
+                  {heroLocation ? (
+                    <>
+                      <h2 className="text-2xl font-bold text-neutral-900">
+                        {heroLocation.tenantName}
+                      </h2>
+                      <p className="text-sm text-neutral-600">
+                        {heroLocation.skuCount.toLocaleString()} products • Source for chain-wide distribution
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h2 className="text-xl font-semibold text-neutral-700">
+                        No Hero Location Set
+                      </h2>
+                      <p className="text-sm text-neutral-600">
+                        Select your master catalog location to enable bulk sync
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {/* Change Hero Button */}
+              <Button 
+                variant="primary"
+                size="lg"
+                onClick={() => setShowHeroModal(true)}
+                className="flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-              </div>
-              <div>
-                <CardTitle>Chain Management Quick Start</CardTitle>
-                <p className="text-sm text-neutral-600 mt-1">Get your chain up and running in minutes</p>
-              </div>
+                {heroLocation ? 'Change Hero' : 'Set Hero Location'}
+              </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Hero Selection Modal */}
+        {showHeroModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowHeroModal(false)}>
+            <div className="w-full max-w-lg m-4" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Select Hero Location</CardTitle>
+                  <p className="text-sm text-neutral-600 mt-2">
+                    Choose the location with the most complete product catalog to use as your master source.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {orgData.locationBreakdown.map((location) => (
+                      <button
+                        key={location.tenantId}
+                        onClick={() => {
+                          setSelectedHeroId(location.tenantId);
+                          handleSetHeroLocation();
+                          setShowHeroModal(false);
+                        }}
+                        className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
+                          location.tenantId === heroLocation?.tenantId
+                            ? 'border-amber-400 bg-amber-50'
+                            : 'border-neutral-200 hover:border-primary-300 hover:bg-neutral-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-neutral-900">{location.tenantName}</h3>
+                              {location.tenantId === heroLocation?.tenantId && (
+                                <Badge variant="warning" className="text-xs">Current Hero</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-neutral-600 mt-1">
+                              {location.skuCount.toLocaleString()} products
+                            </p>
+                          </div>
+                          <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex justify-end gap-2">
+                    <Button variant="ghost" onClick={() => setShowHeroModal(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* 2. METRICS GAUGES - Above the fold, scannable */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Overall Status */}
+          <Card className="border-l-4 border-l-green-500">
+            <CardContent className="py-4">
+              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
+                Status
+              </div>
+              <div className="text-2xl font-bold text-neutral-900">
+                {getStatusText(orgData.status.overall)}
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Locations Gauge */}
+          <Card>
+            <CardContent className="py-4">
+              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
+                Locations
+              </div>
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className="text-2xl font-bold text-neutral-900">
+                  {orgData.current.totalLocations}
+                </span>
+                <span className="text-sm text-neutral-500">
+                  / {orgData.limits.maxLocations}
+                </span>
+              </div>
+              <div className="w-full bg-neutral-200 rounded-full h-2">
+                <div className={`h-2 rounded-full ${getGaugeColor(locationPercentage)}`} 
+                     style={{ width: `${Math.min(locationPercentage, 100)}%` }} />
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* SKUs Gauge */}
+          <Card>
+            <CardContent className="py-4">
+              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
+                Total SKUs
+              </div>
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className="text-2xl font-bold text-neutral-900">
+                  {orgData.current.totalSKUs.toLocaleString()}
+                </span>
+                <span className="text-sm text-neutral-500">
+                  / {orgData.limits.maxTotalSKUs.toLocaleString()}
+                </span>
+              </div>
+              <div className="w-full bg-neutral-200 rounded-full h-2">
+                <div className={`h-2 rounded-full ${getGaugeColor(skuPercentage)}`} 
+                     style={{ width: `${Math.min(skuPercentage, 100)}%` }} />
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Subscription Tier */}
+          <Card className="bg-gradient-to-br from-primary-50 to-white">
+            <CardContent className="py-4">
+              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
+                Plan
+              </div>
+              <div className="text-2xl font-bold text-primary-600">
+                {orgData.subscriptionTier}
+              </div>
+              <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={() => window.location.href = '/settings/subscription'}>
+                Upgrade →
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 3. QUICK ACTIONS - Primary CTAs */}
+        <Card>
+          <CardContent className="py-6">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+              <Button 
+                variant="primary" 
+                size="lg"
+                className="flex-1 flex items-center justify-center gap-2"
+                disabled={!heroLocation || syncing}
+                onClick={handleSyncFromHero}
+              >
+                {syncing ? (
+                  <>
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Sync All from Hero
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="secondary" 
+                size="lg"
+                className="flex-1 flex items-center justify-center gap-2"
+                onClick={() => window.location.href = `/items`}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                Propagate Individual Items
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="lg"
+                onClick={() => window.open('/docs/CHAIN_PROPAGATION_TESTING.md', '_blank')}
+              >
+                View Guide →
+              </Button>
+            </div>
+            {!heroLocation && (
+              <p className="text-sm text-amber-600 mt-4 flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Set a hero location first to enable bulk sync
+              </p>
+            )}
+            {syncResult && (
+              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <h4 className="font-semibold text-green-900 mb-2">✅ Sync Complete!</h4>
+                <div className="text-sm text-green-800 space-y-1">
+                  <p>Hero: <span className="font-semibold">{syncResult.heroLocation.tenantName}</span> ({syncResult.heroLocation.itemCount} items)</p>
+                  <p>✅ Created: {syncResult.summary.created} items</p>
+                  <p>⏭️ Skipped: {syncResult.summary.skipped} (already exist)</p>
+                  {syncResult.summary.errors > 0 && <p>❌ Errors: {syncResult.summary.errors}</p>}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 4. LOCATION BREAKDOWN - Detailed view */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Location Breakdown</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left Column - Quick Start */}
-              <div>
-                <h3 className="font-semibold text-neutral-900 mb-3 flex items-center gap-2">
-                  <span className="flex items-center justify-center w-6 h-6 bg-primary-600 text-white rounded-full text-xs font-bold">1</span>
-                  Quick Start Steps
-                </h3>
-                <ol className="space-y-3 text-sm">
+            {orgData.locationBreakdown.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-neutral-500">No locations in this organization</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {orgData.locationBreakdown
+                  .sort((a, b) => b.skuCount - a.skuCount)
+                  .map((location) => {
+                    const locationPercentage = (location.skuCount / orgData.limits.maxTotalSKUs) * 100;
+                    const isHero = location.tenantId === heroLocation?.tenantId;
+                    return (
+                      <div
+                        key={location.tenantId}
+                        className={`flex items-center justify-between p-4 rounded-lg transition-colors ${
+                          isHero 
+                            ? 'bg-amber-50 border-2 border-amber-300' 
+                            : 'bg-neutral-50 hover:bg-neutral-100'
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-semibold text-neutral-900">{location.tenantName}</h3>
+                            {isHero && (
+                              <Badge variant="warning" className="text-xs flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                </svg>
+                                Hero
+                              </Badge>
+                            )}
+                            <Badge variant="default" className="text-xs">
+                              {location.skuCount.toLocaleString()} SKUs
+                            </Badge>
+                          </div>
+                          <div className="mt-2 w-full bg-neutral-200 rounded-full h-1.5">
+                            <div
+                              className="bg-primary-600 h-1.5 rounded-full"
+                              style={{ width: `${locationPercentage}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-neutral-500 mt-1">
+                            {locationPercentage.toFixed(1)}% of total pool
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.location.href = `/items?tenantId=${location.tenantId}`}
+                        >
+                          View Items →
+                        </Button>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 5. QUICK START GUIDE - Collapsible */}
+        <Card className="border-primary-200 bg-gradient-to-br from-primary-50 to-white">
+          <CardHeader>
+            <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowQuickStart(!showQuickStart)}>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary-600 rounded-lg">
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <CardTitle>Chain Management Quick Start</CardTitle>
+                  <p className="text-sm text-neutral-600 mt-1">Get your chain up and running in minutes</p>
+                </div>
+              </div>
+              <svg 
+                className={`w-5 h-5 text-neutral-500 transition-transform ${
+                  showQuickStart ? 'rotate-180' : ''
+                }`}
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </CardHeader>
+          {showQuickStart && (
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left Column - Quick Start */}
+                <div>
+                  <h3 className="font-semibold text-neutral-900 mb-3 flex items-center gap-2">
+                    <span className="flex items-center justify-center w-6 h-6 bg-primary-600 text-white rounded-full text-xs font-bold">1</span>
+                    Quick Start Steps
+                  </h3>
+                  <ol className="space-y-3 text-sm">
                   <li className="flex items-start gap-3">
                     <span className="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-semibold">1</span>
                     <div>
