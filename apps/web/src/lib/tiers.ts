@@ -3,7 +3,7 @@
  * Centralized tier configuration for the platform
  */
 
-export type SubscriptionTier = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise';
+export type SubscriptionTier = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
 
 export interface TierLimits {
   name: string;
@@ -105,6 +105,27 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
       'SLA guarantee',
     ],
     color: 'bg-amber-100 text-amber-900',
+  },
+  organization: {
+    name: 'Organization',
+    price: '$500/month',
+    pricePerMonth: 500,
+    maxSKUs: 10000, // Shared pool across all locations
+    description: 'For franchise chains & multi-location businesses',
+    features: [
+      '10,000 shared SKUs across all locations',
+      'Unlimited locations',
+      '8 propagation types (chain-wide control)',
+      'Organization dashboard with analytics',
+      'Hero location management',
+      'GBP category sync (test on 1 or sync to all)',
+      'Centralized business hours & profile',
+      'Feature flags & user roles',
+      'Brand asset distribution',
+      'Chain-wide reporting',
+      'Priority support',
+    ],
+    color: 'bg-gradient-to-br from-purple-500 to-pink-600 text-white',
   },
 };
 

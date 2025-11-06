@@ -34,17 +34,17 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
       </svg>
     ),
-    title: 'Chain Management & Product Synchronization - Enterprise Grade',
-    description: '🚀 REVOLUTIONARY: Distribute AND UPDATE products across your entire chain in ONE CLICK. Set a hero location, sync 100s of products to 50+ locations in seconds. Update descriptions, photos, and enrichment chain-wide instantly. This is what enterprise retailers pay $50K+/year for.',
+    title: 'Organization Propagation Control - Enterprise Command Center',
+    description: '🚀 REVOLUTIONARY: Manage your entire chain from one dashboard. 8 propagation types give you complete control over products, categories, business info, and brand assets across all locations. Test on 1 location before chain-wide rollout. This is what enterprise retailers pay $50K+/year for.',
     benefits: [
+      '8 propagation types (products, categories, GBP sync, hours, profile, flags, roles, brand)',
+      'Test on single location before rollout',
       'One-click chain-wide distribution',
-      'Update existing products everywhere',
       'Hero location concept',
-      'Create, Update, or Sync modes',
-      'Photos & enrichment included',
+      'Organization dashboard with analytics',
+      'Dry run mode & rollback capability',
       'Save 400+ hours per rollout',
-      'Perfect consistency across all locations',
-      'Instant product launches'
+      'Perfect consistency across all locations'
     ],
     color: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white',
     badge: 'ENTERPRISE',
@@ -107,15 +107,16 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
       </svg>
     ),
-    title: 'Smart Product Categories + GMB Alignment',
-    description: '🎯 Organize products with Google Product Taxonomy (5,595 categories). Bi-directional sync between your tenant categories and Google My Business categories. Auto-categorization with out-of-sync detection.',
+    title: 'Smart Product Categories + Organization-Level GBP Sync',
+    description: '🎯 Organize products with Google Product Taxonomy (5,595 categories). Bi-directional sync between your categories and Google My Business. PLUS: Organization-level GBP sync with strategic testing - test on 1 location before rolling out to all.',
     benefits: [
-      'Tenant ↔ GMB category sync',
       'Google taxonomy (5,595 categories)',
-      'Custom tenant categories',
+      'Tenant ↔ GMB category sync',
+      'Test on single location first (strategic rollout)',
+      'Sync to all locations with one click',
       'Auto-categorization',
       'Out-of-sync detection',
-      'Category mirroring'
+      'Platform-level category management'
     ],
     color: 'bg-indigo-100 text-indigo-600',
     badge: 'M3',
@@ -257,6 +258,28 @@ const tiers = [
     ],
     cta: 'Contact Sales',
     popular: false,
+  },
+  {
+    name: 'Organization',
+    price: '$500',
+    period: '/month',
+    description: 'For franchise chains & multi-location businesses',
+    features: [
+      '10,000 shared SKUs across all locations',
+      'Unlimited locations',
+      '8 propagation types (chain-wide control)',
+      'Organization dashboard with analytics',
+      'Hero location management',
+      'GBP category sync (test on 1 or sync to all)',
+      'Centralized business hours & profile',
+      'Feature flags & user roles',
+      'Brand asset distribution',
+      'Chain-wide reporting',
+      'Priority support',
+    ],
+    cta: 'Contact Sales',
+    popular: true,
+    badge: 'BEST FOR CHAINS',
   },
 ];
 
