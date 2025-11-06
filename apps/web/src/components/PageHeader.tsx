@@ -70,7 +70,7 @@ export default function PageHeader({
             {backLink && (
               <Link
                 href={backLink.href}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 hover:text-primary-600 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-900 dark:text-neutral-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
