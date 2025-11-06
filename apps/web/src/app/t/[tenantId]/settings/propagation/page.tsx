@@ -72,9 +72,10 @@ export default function PropagationControlPanel() {
           const role = tenantRole?.role || null;
           setUserRole(role);
           
-          // Only OWNER and ADMIN can access propagation control panel
+          // Platform admins, owners, and admins can access propagation control panel
+          const isPlatformAdmin = userData.isPlatformAdmin === true;
           const isOwnerOrAdmin = role === 'OWNER' || role === 'ADMIN';
-          setHasAccess(isOwnerOrAdmin);
+          setHasAccess(isPlatformAdmin || isOwnerOrAdmin);
         }
 
         // Check if this is a hero location and get organization info
