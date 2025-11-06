@@ -2,6 +2,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma, basePrisma } from '../prisma';
+import { generateQuickStartProducts } from '../lib/quick-start';
+import { validateOrganizationTier, validateOrganizationLimits, validateOrganizationTierChange } from '../middleware/organization-validation';
 
 const router = Router();
 
@@ -91,12 +93,12 @@ router.get('/:id', async (req, res) => {
 const createOrgSchema = z.object({
   name: z.string().min(1),
   ownerId: z.string().min(1),
-  subscriptionTier: z.string().default('chain_starter'),
+  subscriptionTier: z.enum(['chain_starter', 'chain_professional', 'chain_enterprise']).default('chain_starter'),
   maxLocations: z.number().int().positive().default(5),
   maxTotalSKUs: z.number().int().positive().default(2500),
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validateOrganizationTier, validateOrganizationLimits, async (req, res) => {
   try {
     const parsed = createOrgSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -127,11 +129,11 @@ const updateOrgSchema = z.object({
   name: z.string().min(1).optional(),
   maxLocations: z.number().int().positive().optional(),
   maxTotalSKUs: z.number().int().positive().optional(),
-  subscriptionTier: z.string().optional(),
-  subscriptionStatus: z.string().optional(),
+  subscriptionTier: z.enum(['chain_starter', 'chain_professional', 'chain_enterprise']).optional(),
+  subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', validateOrganizationTier, validateOrganizationLimits, validateOrganizationTierChange, async (req, res) => {
   try {
     const parsed = updateOrgSchema.safeParse(req.body);
     if (!parsed.success) {
