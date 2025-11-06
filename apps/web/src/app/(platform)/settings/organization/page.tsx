@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Spinner } from
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
+import { api } from '@/lib/api';
 
 interface OrganizationData {
   organizationId: string;
@@ -88,7 +89,8 @@ export default function OrganizationPage() {
   const loadOrganizationData = async (orgId: string) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/organization/billing/counters?organizationId=${orgId}`);
+      // Use api utility which includes auth headers
+      const res = await api.get(`/api/organization/billing/counters?organizationId=${orgId}`);
       
       if (!res.ok) {
         throw new Error('Failed to load organization data');
