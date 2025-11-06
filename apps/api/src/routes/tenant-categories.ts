@@ -962,11 +962,11 @@ router.post('/:tenantId/business-hours/propagate', async (req, res) => {
           create: {
             tenantId: location.id,
             timezone: heroBusinessHours.timezone,
-            periods: heroBusinessHours.periods,
+            periods: heroBusinessHours.periods as any,
           },
           update: {
             timezone: heroBusinessHours.timezone,
-            periods: heroBusinessHours.periods,
+            periods: heroBusinessHours.periods as any,
           },
         });
         results.regularHoursUpdated++;
@@ -1070,7 +1070,7 @@ router.post('/:tenantId/user-roles/propagate', async (req, res) => {
 
     const heroUserRoles = await prisma.userTenant.findMany({
       where: { tenantId },
-      include: { user: { select: { email: true, name: true } } },
+      include: { user: { select: { email: true } } },
     });
 
     if (heroUserRoles.length === 0) {
@@ -1280,16 +1280,26 @@ router.post('/:tenantId/business-profile/propagate', async (req, res) => {
           where: { tenantId: location.id },
           create: {
             tenantId: location.id,
-            description: tenant.businessProfile.description,
+            businessName: tenant.businessProfile.businessName,
+            addressLine1: tenant.businessProfile.addressLine1,
+            addressLine2: tenant.businessProfile.addressLine2,
+            city: tenant.businessProfile.city,
+            state: tenant.businessProfile.state,
+            postalCode: tenant.businessProfile.postalCode,
+            country: tenant.businessProfile.country,
             website: tenant.businessProfile.website,
             email: tenant.businessProfile.email,
-            phone: tenant.businessProfile.phone,
           },
           update: {
-            description: tenant.businessProfile.description,
+            businessName: tenant.businessProfile.businessName,
+            addressLine1: tenant.businessProfile.addressLine1,
+            addressLine2: tenant.businessProfile.addressLine2,
+            city: tenant.businessProfile.city,
+            state: tenant.businessProfile.state,
+            postalCode: tenant.businessProfile.postalCode,
+            country: tenant.businessProfile.country,
             website: tenant.businessProfile.website,
             email: tenant.businessProfile.email,
-            phone: tenant.businessProfile.phone,
           },
         });
         results.updated++;
