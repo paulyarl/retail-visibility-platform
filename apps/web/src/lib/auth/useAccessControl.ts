@@ -18,7 +18,11 @@ import {
   getTenantRole,
   isOrganizationAdmin,
   isOrganizationMember,
+  AccessPresets,
 } from './access-control';
+
+// Re-export for convenience
+export { AccessPresets } from './access-control';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
