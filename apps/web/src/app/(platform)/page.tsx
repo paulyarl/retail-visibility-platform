@@ -42,6 +42,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   const [tenantData, setTenantData] = useState<{ name: string; logoUrl?: string; bannerUrl?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showcaseMode, setShowcaseMode] = useState<ShowcaseMode>('hybrid');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [platformStats, setPlatformStats] = useState({
     activeRetailers: 0,
     activeRetailersFormatted: '0',
@@ -217,7 +218,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     <div className="min-h-screen bg-neutral-50 flex flex-col">
       {!embedded && (
         <header className="bg-white border-b border-neutral-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
               {settings?.logoUrl ? (
                 <Link href="/">
@@ -226,17 +227,19 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     alt={settings.platformName || 'Platform Logo'}
                     width={150}
                     height={40}
-                    className="h-10 w-auto object-contain cursor-pointer"
+                    className="h-8 sm:h-10 w-auto object-contain cursor-pointer"
                   />
                 </Link>
               ) : (
                 <Link href="/">
-                  <h1 className="text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
+                  <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
                     {settings?.platformName || 'Visible Shelf'}
                   </h1>
                 </Link>
               )}
-              <div className="flex items-center gap-3">
+              
+              {/* Desktop Navigation */}
+              <div className="hidden sm:flex items-center gap-2 md:gap-3">
                 <Link href="/settings">
                   <Button variant="ghost" size="sm">Settings</Button>
                 </Link>
@@ -257,17 +260,59 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   </Link>
                 )}
               </div>
+
+              {/* Mobile Menu Button */}
+              <button
+                className="sm:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="Toggle menu"
+              >
+                <svg className="h-6 w-6 text-neutral-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {mobileMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
             </div>
+
+            {/* Mobile Menu Dropdown */}
+            {mobileMenuOpen && (
+              <div className="sm:hidden mt-4 pb-2 space-y-2 border-t border-neutral-200 pt-4">
+                <Link href="/settings" className="block" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className="w-full justify-start" size="md">Settings</Button>
+                </Link>
+                {isAuthenticated ? (
+                  <Button 
+                    variant="secondary" 
+                    className="w-full"
+                    size="md"
+                    onClick={async () => {
+                      setMobileMenuOpen(false);
+                      await logout();
+                      router.push('/');
+                    }}
+                  >
+                    Sign Out
+                  </Button>
+                ) : (
+                  <Link href="/login" className="block" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="secondary" className="w-full" size="md">Sign In</Button>
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         </header>
       )}
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
         {/* Banner Hero Section (if authenticated and banner exists) */}
         {isAuthenticated && tenantData?.bannerUrl && (
-          <div className="mb-8">
-            <div className="relative w-full h-48 md:h-64 rounded-lg overflow-hidden shadow-lg">
+          <div className="mb-6 sm:mb-8">
+            <div className="relative w-full h-40 sm:h-48 md:h-64 rounded-lg overflow-hidden shadow-lg">
               <Image
                 src={tenantData.bannerUrl}
                 alt={`${tenantData.name} banner`}
@@ -280,10 +325,10 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
         )}
 
         {/* Welcome Section */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-2">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-2">
             {isAuthenticated && tenantData?.logoUrl && (
-              <div className="relative w-16 h-16 flex-shrink-0">
+              <div className="relative w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0">
                 <Image
                   src={tenantData.logoUrl}
                   alt={tenantData.name}
@@ -293,10 +338,10 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
               </div>
             )}
             <div>
-              <h2 className="text-3xl font-bold text-neutral-900">
+              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900">
                 {isAuthenticated ? (tenantData?.name ? `${tenantData.name} Dashboard` : 'Welcome to Your Dashboard') : 'Platform Overview'}
               </h2>
-              <p className="text-neutral-600">
+              <p className="text-sm sm:text-base text-neutral-600 mt-1">
                 {isAuthenticated 
                   ? (stats.isChain 
                       ? `Managing ${stats.locations} locations across ${stats.organizationName || 'your organization'}`
@@ -489,37 +534,37 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
         {/* Platform Overview - Only for chains with multiple locations */}
         {!loading && stats.isChain && stats.locations > 1 && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-neutral-900">
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4">
+              <h3 className="text-lg sm:text-xl font-semibold text-neutral-900">
                 {stats.organizationName} - Platform Overview
               </h3>
-              <Badge variant="default" className="bg-primary-600 text-white">
+              <Badge variant="default" className="bg-primary-600 text-white self-start sm:self-auto">
                 {stats.locations} Locations
               </Badge>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="p-4">
-                <p className="text-sm text-neutral-600 mb-1">Total Locations</p>
-                <p className="text-2xl font-bold text-neutral-900">{stats.locations}</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+              <Card className="p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-neutral-600 mb-1">Total Locations</p>
+                <p className="text-xl sm:text-2xl font-bold text-neutral-900">{stats.locations}</p>
                 <p className="text-xs text-neutral-500 mt-1">Across organization</p>
               </Card>
-              <Card className="p-4">
-                <p className="text-sm text-neutral-600 mb-1">Organization Type</p>
-                <p className="text-2xl font-bold text-neutral-900">Chain</p>
+              <Card className="p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-neutral-600 mb-1">Organization Type</p>
+                <p className="text-xl sm:text-2xl font-bold text-neutral-900">Chain</p>
                 <p className="text-xs text-neutral-500 mt-1">Multi-location</p>
               </Card>
-              <Card className="p-4">
-                <p className="text-sm text-neutral-600 mb-1">Current View</p>
-                <p className="text-lg font-bold text-neutral-900 truncate" title={selectedTenantId || ''}>
+              <Card className="p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-neutral-600 mb-1">Current View</p>
+                <p className="text-base sm:text-lg font-bold text-neutral-900 truncate" title={selectedTenantId || ''}>
                   {selectedTenantId ? 'Single Location' : 'All'}
                 </p>
                 <Link href="/tenants" className="text-xs text-primary-600 hover:underline mt-1 block">
                   Switch location →
                 </Link>
               </Card>
-              <Card className="p-4">
-                <p className="text-sm text-neutral-600 mb-1">Quick Access</p>
+              <Card className="p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-neutral-600 mb-1">Quick Access</p>
                 <Link href="/tenants">
                   <Button variant="secondary" size="sm" className="w-full mt-1">
                     View All Locations
@@ -540,15 +585,15 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
         {/* Empty State - Only show for authenticated users */}
         {!loading && isAuthenticated && stats.total === 0 && (
-          <Card className="col-span-full text-center p-12 mb-8">
+          <Card className="col-span-full text-center p-6 sm:p-8 md:p-12 mb-6 sm:mb-8">
             <div className="max-w-md mx-auto">
-              <div className="text-6xl mb-4">🏪</div>
-              <h3 className="text-2xl font-bold text-neutral-900 mb-2">Welcome to Your Dashboard!</h3>
-              <p className="text-neutral-600 mb-6">
+              <div className="text-5xl sm:text-6xl mb-4">🏪</div>
+              <h3 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-2">Welcome to Your Dashboard!</h3>
+              <p className="text-sm sm:text-base text-neutral-600 mb-6">
                 Let's get your storefront up and running. Start by adding your first product.
               </p>
               <Link href={scopedLinks.createItem}>
-                <Button variant="primary" size="lg">
+                <Button variant="primary" size="lg" className="w-full sm:w-auto">
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
@@ -698,17 +743,17 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
         {/* Business Hours Card (tenant-scoped) */}
         {isAuthenticated && selectedTenantId && (
           <div className="mb-6">
-            <AnimatedCard delay={0.35} className="p-6">
-              <div className="flex items-center justify-between">
+            <AnimatedCard delay={0.35} className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-3">
                     <svg className="h-5 w-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <h3 className="text-lg font-bold text-neutral-900">Business Hours</h3>
+                    <h3 className="text-base sm:text-lg font-bold text-neutral-900">Business Hours</h3>
                   </div>
                   {hoursInfo?.hasHours ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {hoursInfo.today ? (() => {
                         // Parse status from label (e.g., "Open now • Closes at 5:00 PM" or "Closed • Opens today at 9:00 AM")
                         const isOpen = hoursInfo.today.startsWith('Open');
@@ -721,13 +766,13 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                             <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`}></span>
                             <span className={`font-semibold ${statusColor}`}>{statusText}</span>
                             <span className="text-neutral-400">•</span>
-                            <span className="text-base text-neutral-900">{hoursInfo.today}</span>
+                            <span className="text-sm sm:text-base text-neutral-900">{hoursInfo.today}</span>
                           </>
                         );
-                      })() : <span className="text-base text-neutral-900">Hours configured</span>}
+                      })() : <span className="text-sm sm:text-base text-neutral-900">Hours configured</span>}
                     </div>
                   ) : (
-                    <p className="text-base text-neutral-500">
+                    <p className="text-sm sm:text-base text-neutral-500">
                       Set your store hours to display them here.
                     </p>
                   )}
@@ -737,8 +782,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   const canManage = user?.role === 'ADMIN' || tenantRole === 'OWNER' || tenantRole === 'ADMIN';
                   if (!canManage) return null;
                   return (
-                    <Link href={`/t/${selectedTenantId}/settings/hours`}>
-                      <Button variant="secondary" size="sm" className="whitespace-nowrap font-semibold">
+                    <Link href={`/t/${selectedTenantId}/settings/hours`} className="w-full sm:w-auto">
+                      <Button variant="secondary" size="md" className="w-full sm:w-auto whitespace-nowrap font-semibold">
                         {hoursInfo?.hasHours ? '⚙️ Manage Hours' : '➕ Set Hours'}
                       </Button>
                     </Link>
@@ -755,13 +800,13 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
             <>
             <AnimatedCard delay={0.4} hover={false}>
               <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Get started with common tasks</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Quick Actions</CardTitle>
+                <CardDescription className="text-sm">Get started with common tasks</CardDescription>
               </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2 sm:space-y-3">
               {selectedTenantId && (
                 <Link href={`/tenant/${selectedTenantId}`} className="block" target="_blank">
-                  <Button variant="primary" className="w-full justify-start">
+                  <Button variant="primary" className="w-full justify-start" size="md">
                     <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                     </svg>
@@ -770,7 +815,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 </Link>
               )}
               <Link href={scopedLinks.tenants} className="block">
-                <Button variant="secondary" className="w-full justify-start">
+                <Button variant="secondary" className="w-full justify-start" size="md">
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
@@ -778,7 +823,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 </Button>
               </Link>
               <Link href={scopedLinks.items} className="block">
-                <Button variant="secondary" className="w-full justify-start">
+                <Button variant="secondary" className="w-full justify-start" size="md">
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                   </svg>
@@ -786,7 +831,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 </Button>
               </Link>
               <Link href={scopedLinks.createItem} className="block">
-                <Button variant="secondary" className="w-full justify-start">
+                <Button variant="secondary" className="w-full justify-start" size="md">
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
@@ -798,35 +843,35 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
           <AnimatedCard delay={0.5} hover={false}>
             <CardHeader>
-              <CardTitle>Getting Started</CardTitle>
-              <CardDescription>Set up your Visible Shelf</CardDescription>
+              <CardTitle className="text-lg sm:text-xl">Getting Started</CardTitle>
+              <CardDescription className="text-sm">Set up your Visible Shelf</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Link href={selectedTenantId ? `/t/${selectedTenantId}/onboarding` : "/tenants"} className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
-                <div className="h-6 w-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:scale-110 transition-transform">
+            <CardContent className="space-y-3 sm:space-y-4">
+              <Link href={selectedTenantId ? `/t/${selectedTenantId}/onboarding` : "/tenants"} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:scale-110 transition-transform">
                   1
                 </div>
-                <div>
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors">Complete Business Profile</p>
-                  <p className="text-sm text-neutral-600">Set up your store identity and details</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Complete Business Profile</p>
+                  <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Set up your store identity and details</p>
                 </div>
               </Link>
-              <Link href={scopedLinks.createItem} className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
-                <div className="h-6 w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
+              <Link href={scopedLinks.createItem} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
                   2
                 </div>
-                <div>
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors">Add inventory items</p>
-                  <p className="text-sm text-neutral-600">Upload products with photos</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Add inventory items</p>
+                  <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Upload products with photos</p>
                 </div>
               </Link>
-              <Link href={scopedLinks.settingsTenant} className="flex items-start gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
-                <div className="h-6 w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
+              <Link href={scopedLinks.settingsTenant} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
                   3
                 </div>
-                <div>
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors">Connect to Google</p>
-                  <p className="text-sm text-neutral-600">Sync with Google Merchant Center</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Connect to Google</p>
+                  <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Sync with Google Merchant Center</p>
                 </div>
               </Link>
             </CardContent>
@@ -913,31 +958,31 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
         {/* Value Showcase - Only show when user has products */}
         {!loading && stats.total > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
             {/* Storefront Status */}
             <AnimatedCard delay={0.6} hover={false}>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Your Storefront</CardTitle>
+                  <CardTitle className="text-base sm:text-lg">Your Storefront</CardTitle>
                   <Badge variant="success">Live</Badge>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                      <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                       </svg>
                     </div>
-                    <div>
-                      <p className="font-semibold text-neutral-900">{stats.active} Products Live</p>
-                      <p className="text-sm text-neutral-600">Visible to customers</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-neutral-900 text-sm sm:text-base">{stats.active} Products Live</p>
+                      <p className="text-xs sm:text-sm text-neutral-600">Visible to customers</p>
                     </div>
                   </div>
                   {selectedTenantId && (
                     <Link href={`/tenant/${selectedTenantId}`} target="_blank">
-                      <Button variant="secondary" className="w-full">
+                      <Button variant="secondary" className="w-full" size="md">
                         View Storefront →
                       </Button>
                     </Link>
@@ -949,23 +994,23 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
             {/* Google Integration Status */}
             <AnimatedCard delay={0.7} hover={false}>
               <CardHeader>
-                <CardTitle className="text-lg">Google Integration</CardTitle>
+                <CardTitle className="text-base sm:text-lg">Google Integration</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-success rounded-lg flex items-center justify-center">
-                      <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
-                    <div>
-                      <p className="font-semibold text-neutral-900">Google Shopping</p>
-                      <p className="text-sm text-neutral-600">{stats.active} products synced</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-neutral-900 text-sm sm:text-base">Google Shopping</p>
+                      <p className="text-xs sm:text-sm text-neutral-600">{stats.active} products synced</p>
                     </div>
                   </div>
                   <Link href={scopedLinks.settingsTenant}>
-                    <Button variant="secondary" className="w-full">
+                    <Button variant="secondary" className="w-full" size="md">
                       Manage Integration →
                     </Button>
                   </Link>
@@ -976,42 +1021,42 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
             {/* Actionable Insights */}
             <AnimatedCard delay={0.8} hover={false}>
               <CardHeader>
-                <CardTitle className="text-lg">Action Items</CardTitle>
+                <CardTitle className="text-base sm:text-lg">Action Items</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {stats.syncIssues > 0 && (
-                    <div className="flex items-start gap-2 p-2 bg-warning-50 rounded-lg">
-                      <svg className="h-5 w-5 text-warning mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="flex items-start gap-2 p-3 bg-warning-50 rounded-lg">
+                      <svg className="h-5 w-5 text-warning mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                      <div>
-                        <p className="text-sm font-medium text-neutral-900">{stats.syncIssues} items need Google sync</p>
-                        <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-neutral-900">{stats.syncIssues} items need Google sync</p>
+                        <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline block mt-1">
                           Review sync status →
                         </Link>
                       </div>
                     </div>
                   )}
                   {stats.total - stats.active > 0 && (
-                    <div className="flex items-start gap-2 p-2 bg-info-50 rounded-lg">
-                      <svg className="h-5 w-5 text-info mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="flex items-start gap-2 p-3 bg-info-50 rounded-lg">
+                      <svg className="h-5 w-5 text-info mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <div>
-                        <p className="text-sm font-medium text-neutral-900">{stats.total - stats.active} inactive products</p>
-                        <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-neutral-900">{stats.total - stats.active} inactive products</p>
+                        <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline block mt-1">
                           Activate products →
                         </Link>
                       </div>
                     </div>
                   )}
                   {stats.syncIssues === 0 && stats.total === stats.active && (
-                    <div className="flex items-start gap-2 p-2 bg-success-50 rounded-lg">
-                      <svg className="h-5 w-5 text-success mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="flex items-start gap-2 p-3 bg-success-50 rounded-lg">
+                      <svg className="h-5 w-5 text-success mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <p className="text-sm font-medium text-neutral-900">Everything looks great! 🎉</p>
+                      <p className="text-xs sm:text-sm font-medium text-neutral-900">Everything looks great! 🎉</p>
                     </div>
                   )}
                 </div>

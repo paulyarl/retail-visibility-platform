@@ -11,6 +11,7 @@ import { Button } from "@/components/ui";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { settings } = usePlatformSettings();
   const [enabled, setEnabled] = useState<boolean>(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [links, setLinks] = useState<{ dashboard: string; inventory: string; tenants: string; settings: string }>({
     dashboard: "/",
     inventory: "/items",
@@ -79,26 +80,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh flex flex-col bg-neutral-50">
       <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-neutral-900">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+            <span className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
               {settings?.platformName || 'RVP'}
             </span>
             {hydrated ? (
               tenantName ? (
-                <span className="text-sm text-neutral-500">· {tenantName}</span>
+                <span className="text-xs sm:text-sm text-neutral-500 truncate hidden sm:inline">· {tenantName}</span>
               ) : null
             ) : (
-              <span className="inline-block h-4 w-24 bg-neutral-200 rounded animate-pulse" />
+              <span className="h-4 w-24 bg-neutral-200 rounded animate-pulse hidden sm:inline-block" />
             )}
-            <nav className="hidden md:flex items-center gap-4 text-sm text-neutral-600">
-              <a className="hover:text-neutral-900" href={links.dashboard}>Dashboard</a>
-              <a className="hover:text-neutral-900" href={links.inventory}>Inventory</a>
-              <a className="hover:text-neutral-900" href={links.tenants}>Tenants</a>
-              <a className="hover:text-neutral-900" href={links.settings}>{tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}</a>
+            <nav className="hidden md:flex items-center gap-3 lg:gap-4 text-xs lg:text-sm text-neutral-600">
+              <a className="hover:text-neutral-900 whitespace-nowrap" href={links.dashboard}>Dashboard</a>
+              <a className="hover:text-neutral-900 whitespace-nowrap" href={links.inventory}>Inventory</a>
+              <a className="hover:text-neutral-900 whitespace-nowrap" href={links.tenants}>Tenants</a>
+              <a className="hover:text-neutral-900 whitespace-nowrap" href={links.settings}>{tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}</a>
             </nav>
           </div>
-          <div className="flex items-center gap-4">
+          
+          {/* Desktop Actions */}
+          <div className="hidden md:flex items-center gap-2 lg:gap-3">
             {user && <TenantSwitcher />}
             {user ? (
               <>
@@ -122,7 +125,95 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             )}
           </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            className="md:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors flex-shrink-0"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            <svg className="h-6 w-6 text-neutral-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
+
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-neutral-200 bg-white">
+            <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 space-y-2">
+              {/* Mobile Navigation */}
+              <nav className="space-y-1">
+                <a 
+                  className="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium" 
+                  href={links.dashboard}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Dashboard
+                </a>
+                <a 
+                  className="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium" 
+                  href={links.inventory}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Inventory
+                </a>
+                <a 
+                  className="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium" 
+                  href={links.tenants}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Tenants
+                </a>
+                <a 
+                  className="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium" 
+                  href={links.settings}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}
+                </a>
+              </nav>
+
+              {/* Mobile Tenant Switcher */}
+              {user && (
+                <div className="pt-2 border-t border-neutral-200">
+                  <TenantSwitcher />
+                </div>
+              )}
+
+              {/* Mobile Actions */}
+              <div className="pt-2 border-t border-neutral-200 space-y-2">
+                {user ? (
+                  <>
+                    <Link href="/settings" className="block" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className="w-full justify-start" size="md">Account</Button>
+                    </Link>
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      size="md"
+                      onClick={async () => {
+                        setMobileMenuOpen(false);
+                        try { await logout(); } catch {}
+                        if (typeof window !== 'undefined') window.location.href = '/';
+                      }}
+                    >
+                      Sign Out
+                    </Button>
+                  </>
+                ) : (
+                  <Link href="/login" className="block" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="secondary" className="w-full" size="md">Sign In</Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </header>
       <main className="flex-1">
         {children}

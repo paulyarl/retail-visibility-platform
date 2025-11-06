@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 
 type NavItem = { label: string; href: string }
 
-export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav }: { tenantId: string; tenantName?: string; tenantLogoUrl?: string; nav: NavItem[] }) {
+export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav, isMobile = false }: { tenantId: string; tenantName?: string; tenantLogoUrl?: string; nav: NavItem[]; isMobile?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const { logout } = useAuth()
@@ -19,11 +19,11 @@ export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav
   }
 
   return (
-    <aside className="hidden md:block w-64 bg-white border-r border-gray-200 min-h-screen sticky top-0 z-50">
-      <div className="p-4 border-b border-gray-200">
+    <aside className={isMobile ? "w-full bg-white" : "hidden md:block w-64 bg-white border-r border-gray-200 min-h-screen sticky top-0 z-50"}>
+      <div className={isMobile ? "p-3 sm:p-4 border-b border-gray-200" : "p-4 border-b border-gray-200"}>
         {tenantLogoUrl && (
-          <div className="mb-3 flex justify-center">
-            <div className="relative w-24 h-24">
+          <div className={isMobile ? "mb-2 flex justify-center" : "mb-3 flex justify-center"}>
+            <div className={isMobile ? "relative w-16 h-16" : "relative w-24 h-24"}>
               <Image
                 src={tenantLogoUrl}
                 alt={tenantName || 'Tenant logo'}
@@ -33,10 +33,10 @@ export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav
             </div>
           </div>
         )}
-        <div className="text-sm text-gray-500">Tenant</div>
-        <div className="text-base font-semibold text-gray-900 truncate">{tenantName || tenantId}</div>
+        <div className="text-xs sm:text-sm text-gray-500">Tenant</div>
+        <div className="text-sm sm:text-base font-semibold text-gray-900 truncate">{tenantName || tenantId}</div>
       </div>
-      <nav className="p-2 space-y-1">
+      <nav className={isMobile ? "p-2 space-y-0.5" : "p-2 space-y-1"}>
         {nav.map((item) => {
           const active = isActive(item.href)
           return (
@@ -44,7 +44,7 @@ export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav
               key={item.href}
               href={item.href}
               className={[
-                'block px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                isMobile ? 'block px-3 py-3 rounded-md text-base font-medium transition-colors' : 'block px-3 py-2 rounded-md text-sm font-medium transition-colors',
                 active ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:text-blue-700 hover:bg-blue-50',
               ].join(' ')}
               aria-current={active ? 'page' : undefined}
@@ -59,7 +59,7 @@ export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav
             <div className="border-t border-gray-200 my-2" />
             <Link
               href={`/t/${tenantId}/settings/hours`}
-              className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+              className={isMobile ? "block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors" : "block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"}
             >
               Business Hours
             </Link>
@@ -68,13 +68,13 @@ export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav
         <div className="border-t border-gray-200 my-2" />
         <Link
           href="/"
-          className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+          className={isMobile ? "block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors" : "block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"}
         >
           Platform Dashboard
         </Link>
         <button
           onClick={async () => { await logout(); router.push('/'); }}
-          className="w-full text-left block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+          className={isMobile ? "w-full text-left block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors" : "w-full text-left block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"}
         >
           Sign Out
         </button>
