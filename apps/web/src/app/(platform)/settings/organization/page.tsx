@@ -40,17 +40,40 @@ export default function OrganizationPage() {
   const [syncResult, setSyncResult] = useState<any>(null);
 
   useEffect(() => {
-    // Get organizationId from localStorage or URL
-    const params = new URLSearchParams(window.location.search);
-    const orgId = params.get('organizationId') || localStorage.getItem('organizationId') || '';
-    setOrganizationId(orgId);
-
-    if (orgId) {
-      loadOrganizationData(orgId);
-    } else {
-      setLoading(false);
-      setError('No organization selected');
+    async function loadOrganization() {
+      try {
+        setLoading(true);
+        
+        // First, try to get organizationId from URL or localStorage
+        const params = new URLSearchParams(window.location.search);
+        let orgId = params.get('organizationId') || localStorage.getItem('organizationId');
+        
+        // If not found, try to get it from the current tenant
+        if (!orgId) {
+          const tenantId = localStorage.getItem('tenantId');
+          if (tenantId) {
+            const tenantRes = await fetch(`/api/tenants/${tenantId}`);
+            if (tenantRes.ok) {
+              const tenantData = await tenantRes.json();
+              orgId = tenantData.organizationId;
+            }
+          }
+        }
+        
+        if (orgId) {
+          setOrganizationId(orgId);
+          await loadOrganizationData(orgId);
+        } else {
+          setLoading(false);
+          setError('No organization selected');
+        }
+      } catch (err) {
+        setLoading(false);
+        setError('Failed to load organization');
+      }
     }
+    
+    loadOrganization();
   }, []);
 
   const loadOrganizationData = async (orgId: string) => {
