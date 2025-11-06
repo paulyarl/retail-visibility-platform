@@ -6,10 +6,24 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const queryString = url.searchParams.toString();
     
+    // Forward authentication headers from the original request
+    const authHeader = req.headers.get('authorization');
+    const cookieHeader = req.headers.get('cookie');
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    
+    if (cookieHeader) {
+      headers['Cookie'] = cookieHeader;
+    }
+    
     const res = await fetch(`${base}/organization/billing/counters?${queryString}`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
     
     const data = await res.json();
