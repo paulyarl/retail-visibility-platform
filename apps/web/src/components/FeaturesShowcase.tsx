@@ -122,21 +122,29 @@ export default function FeaturesShowcase({ mode = 'hybrid', className = '' }: Fe
     }
   }, [mode]);
 
-  // Render based on active mode
-  switch (activeMode) {
-    case 'slider':
-      return <SliderMode features={features} prefersReducedMotion={prefersReducedMotion} className={className} />;
-    case 'hybrid':
-      return <HybridMode features={features} prefersReducedMotion={prefersReducedMotion} className={className} />;
-    case 'tabs':
-      return <TabsMode features={features} className={className} />;
-    case 'grid':
-      return <GridMode features={features} className={className} />;
-    case 'video-hero':
-      return <VideoHeroMode features={features} className={className} />;
-    default:
-      return <HybridMode features={features} prefersReducedMotion={prefersReducedMotion} className={className} />;
-  }
+  // Hidden on mobile (< 768px), visible on tablet and desktop (≥ 768px)
+  const showcaseContent = (() => {
+    switch (activeMode) {
+      case 'slider':
+        return <SliderMode features={features} prefersReducedMotion={prefersReducedMotion} className={className} />;
+      case 'hybrid':
+        return <HybridMode features={features} prefersReducedMotion={prefersReducedMotion} className={className} />;
+      case 'tabs':
+        return <TabsMode features={features} className={className} />;
+      case 'grid':
+        return <GridMode features={features} className={className} />;
+      case 'video-hero':
+        return <VideoHeroMode features={features} className={className} />;
+      default:
+        return <HybridMode features={features} prefersReducedMotion={prefersReducedMotion} className={className} />;
+    }
+  })();
+
+  return (
+    <div className="hidden md:block">
+      {showcaseContent}
+    </div>
+  );
 }
 
 // ==================== MODE 1: SLIDER ====================
