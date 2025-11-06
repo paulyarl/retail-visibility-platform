@@ -35,6 +35,19 @@ export default function OrganizationPage() {
   // Get tenantId from localStorage for access control
   const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
   
+  // Get organizationId from URL if provided
+  const [urlOrgId, setUrlOrgId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const orgId = params.get('organizationId');
+      if (orgId) {
+        setUrlOrgId(orgId);
+      }
+    }
+  }, []);
+  
   // Use centralized access control - organization members can view
   const {
     hasAccess,
@@ -56,16 +69,21 @@ export default function OrganizationPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
 
-  // Use organization data from access control hook
+  // Use organization data from access control hook or URL
   useEffect(() => {
     if (orgDataFromHook) {
+      // Use organization from hook (tenant-based)
       setOrganizationId(orgDataFromHook.id);
       loadOrganizationData(orgDataFromHook.id);
+    } else if (urlOrgId) {
+      // Use organization from URL (direct access)
+      setOrganizationId(urlOrgId);
+      loadOrganizationData(urlOrgId);
     } else if (!accessLoading) {
       setLoading(false);
-      setError('No organization found. This tenant may not be part of an organization.');
+      setError('No organization found. Please provide an organizationId parameter or select a tenant that belongs to an organization.');
     }
-  }, [orgDataFromHook, accessLoading]);
+  }, [orgDataFromHook, urlOrgId, accessLoading]);
 
   const loadOrganizationData = async (orgId: string) => {
     try {
