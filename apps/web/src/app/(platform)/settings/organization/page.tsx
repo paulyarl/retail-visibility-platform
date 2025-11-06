@@ -1074,8 +1074,8 @@ export default function OrganizationPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <CardTitle>What Gets Synced?</CardTitle>
-                  <p className="text-sm text-blue-800 mt-1">Detailed breakdown of bulk propagation</p>
+                  <CardTitle>What Can Be Propagated?</CardTitle>
+                  <p className="text-sm text-blue-800 mt-1">Complete guide to chain-wide propagation</p>
                 </div>
               </div>
               <svg 
@@ -1097,11 +1097,77 @@ export default function OrganizationPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div className="flex-1">
-                  <p className="font-bold text-blue-900 text-base mb-2">📋 What Gets Synced</p>
+                  <p className="font-bold text-blue-900 text-base mb-2">📋 7 Types of Propagation Available</p>
                   <p className="text-sm text-blue-800 mb-3">
-                    "Sync All from Hero" copies the following data from your hero location to all other locations:
+                    The Propagation Control Panel above provides 7 different ways to sync data across your organization:
                   </p>
                 </div>
+              </div>
+              
+              {/* 7 Propagation Types */}
+              <div className="space-y-3 mb-4">
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-purple-900">1. Categories</span>
+                    <Badge variant="success" className="text-xs">ACTIVE</Badge>
+                  </div>
+                  <p className="text-xs text-purple-800">Propagate product categories and Google taxonomy alignments across all locations</p>
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-blue-900">2. Products/SKUs</span>
+                    <Badge variant="success" className="text-xs">ACTIVE</Badge>
+                  </div>
+                  <p className="text-xs text-blue-800 mb-2">Bulk sync all products from hero location or propagate individual items</p>
+                </div>
+                
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-green-900">3. Business Hours</span>
+                    <Badge variant="default" className="text-xs">NEW</Badge>
+                  </div>
+                  <p className="text-xs text-green-800">Propagate regular and special hours to maintain consistent schedules</p>
+                </div>
+                
+                <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-cyan-900">4. Business Profile</span>
+                    <Badge variant="default" className="text-xs">NEW</Badge>
+                  </div>
+                  <p className="text-xs text-cyan-800">Sync business description, attributes, and settings</p>
+                </div>
+                
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-indigo-900">5. Feature Flags</span>
+                    <Badge variant="default" className="text-xs">NEW</Badge>
+                  </div>
+                  <p className="text-xs text-indigo-800">Enable or disable features across all locations from one place</p>
+                </div>
+                
+                <div className="bg-pink-50 border border-pink-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-pink-900">6. User Roles & Permissions</span>
+                    <Badge variant="default" className="text-xs">NEW</Badge>
+                  </div>
+                  <p className="text-xs text-pink-800">Propagate user invitations and role assignments for team management</p>
+                </div>
+                
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-orange-900">7. Brand Assets</span>
+                    <Badge variant="default" className="text-xs">NEW</Badge>
+                  </div>
+                  <p className="text-xs text-orange-800">Propagate logos, colors, and branding elements for consistency</p>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-xs text-blue-900 font-semibold mb-2">📦 Product/SKU Sync Details:</p>
+                <p className="text-xs text-blue-800 mb-2">
+                  When you use "Sync All from Hero", the following product data is copied:
+                </p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
