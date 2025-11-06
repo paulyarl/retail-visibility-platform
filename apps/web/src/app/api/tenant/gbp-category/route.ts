@@ -30,6 +30,7 @@ export async function PUT(request: NextRequest) {
 
     // Get auth token from request
     const authHeader = request.headers.get('authorization');
+    const cookieHeader = request.headers.get('cookie');
     if (!authHeader) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -38,12 +39,15 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update tenant business profile with GBP category
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Authorization': authHeader,
+    };
+    if (cookieHeader) headers['Cookie'] = cookieHeader;
+    
     const response = await fetch(`${API_BASE_URL}/api/tenant/profile`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader,
-      },
+      headers,
       body: JSON.stringify({
         tenant_id: tenantId,
         gbpCategoryId,
@@ -110,10 +114,15 @@ export async function GET(request: NextRequest) {
 
     // Get auth token from request
     const authHeader = request.headers.get('authorization');
+    const cookieHeader = request.headers.get('cookie');
 
     // Fetch tenant profile
+    const headers: HeadersInit = {};
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (cookieHeader) headers['Cookie'] = cookieHeader;
+    
     const response = await fetch(`${API_BASE_URL}/api/tenant/profile?tenant_id=${tenantId}`, {
-      headers: authHeader ? { 'Authorization': authHeader } : {},
+      headers,
     });
 
     if (!response.ok) {

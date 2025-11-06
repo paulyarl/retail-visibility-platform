@@ -1,10 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const res = await fetch(`${API_BASE_URL}/platform-settings`);
+    // Forward auth headers
+    const authHeader = req.headers.get('authorization');
+    const cookieHeader = req.headers.get('cookie');
+    
+    const headers: HeadersInit = {};
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (cookieHeader) headers['Cookie'] = cookieHeader;
+    
+    const res = await fetch(`${API_BASE_URL}/platform-settings`, { headers });
     if (!res.ok) {
       // Return default settings for any non-OK response (no error logging)
       return NextResponse.json({
@@ -31,13 +39,22 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
+    
+    // Forward auth headers
+    const authHeader = request.headers.get('authorization');
+    const cookieHeader = request.headers.get('cookie');
+    
+    const headers: HeadersInit = {};
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (cookieHeader) headers['Cookie'] = cookieHeader;
     
     // Forward the form data to the backend API
     const res = await fetch(`${API_BASE_URL}/platform-settings`, {
       method: 'POST',
+      headers,
       body: formData,
     });
 
