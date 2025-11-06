@@ -225,7 +225,38 @@ if (params.categories && params.categories.length > 0) {
 - Product count
 - Open/closed status
 - Featured badge
-- View Storefront CTA
+- **Website Destination CTA (Tier-Based):**
+  - Default: "View Storefront" → `/s/[slug]`
+  - Professional+: "Visit Website" → custom URL (if configured)
+  - Toggle based on `use_custom_website` flag
+
+**Implementation:**
+```typescript
+interface StoreCardProps {
+  listing: {
+    slug: string;
+    subscriptionTier: string; // 'google_only', 'starter', 'professional', 'enterprise', 'organization'
+    websiteUrl?: string;
+    useCustomWebsite: boolean;
+    // ... other fields
+  };
+}
+
+// Determine destination URL
+const canUseCustomUrl = ['professional', 'enterprise', 'organization'].includes(
+  listing.subscriptionTier
+);
+
+const destinationUrl = 
+  canUseCustomUrl && listing.useCustomWebsite && listing.websiteUrl
+    ? listing.websiteUrl
+    : `/s/${listing.slug}`;
+
+const ctaText = 
+  canUseCustomUrl && listing.useCustomWebsite && listing.websiteUrl
+    ? 'Visit Website'
+    : 'View Storefront';
+```
 
 ---
 
@@ -452,14 +483,69 @@ Phase 3 adds social features and monetization:
 
 ---
 
-#### 3.3 Analytics Dashboard
+#### 3.3 Directory Listing Settings
+
+**File:** `apps/web/src/app/(platform)/settings/directory/page.tsx`
+
+**Features (Professional+ Only):**
+- Toggle between platform storefront and custom website
+- Custom website URL input (HTTPS validation)
+- Preview of directory listing
+- CTA button preview
+- Tier-based access control
+
+**Implementation:**
+```typescript
+// Check tier eligibility
+const canUseCustomUrl = ['professional', 'enterprise', 'organization'].includes(
+  tenant.subscriptionTier
+);
+
+// Form validation
+const schema = z.object({
+  useCustomWebsite: z.boolean(),
+  websiteUrl: z.string().url().startsWith('https://').optional(),
+});
+
+// Save settings
+await db.update('directory_listings')
+  .set({
+    use_custom_website: data.useCustomWebsite,
+    website_url: data.websiteUrl,
+  })
+  .where('tenant_id', tenant.id);
+```
+
+**Upsell for Lower Tiers:**
+```
+┌────────────────────────────────────┐
+│ 🔒 Custom Website URL              │
+│                                    │
+│ Link your directory listing to    │
+│ your own website instead of the   │
+│ platform storefront.              │
+│                                    │
+│ Available on Professional tier    │
+│ and above.                        │
+│                                    │
+│ [Upgrade to Professional]         │
+└────────────────────────────────────┘
+```
+
+---
+
+#### 3.4 Analytics Dashboard
 
 **Merchant Dashboard:**
 - Directory views
-- Storefront clicks
+- Storefront clicks vs custom website clicks
 - CTR from directory
 - Review summary
 - Premium listing performance
+- **Website destination analytics:**
+  - Clicks to platform storefront
+  - Clicks to custom website (if configured)
+  - Conversion tracking
 
 ---
 

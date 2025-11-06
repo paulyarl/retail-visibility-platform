@@ -182,6 +182,83 @@ Directory Search & Map View
 - `latitude`, `longitude` - Geocoded coordinates
 - `geolocation` - PostGIS geography point for spatial queries
 
+---
+
+### Website Destination Strategy (Tier-Based)
+
+**Default Behavior:**
+- All directory store cards link to tenant's **platform storefront** (`/s/[slug]`)
+- This drives traffic to the platform and showcases the storefront
+- Maintains platform branding and ecosystem
+
+**Tier-Based Flexibility:**
+
+| Tier | Website Destination | Custom URL Allowed | Rationale |
+|------|---------------------|-------------------|-----------|
+| **Google-Only** ($29/mo) | Platform storefront only | ❌ No | Entry tier, platform branding |
+| **Starter** ($49/mo) | Platform storefront only | ❌ No | Standard tier, platform branding |
+| **Professional** ($499/mo) | Platform storefront (default) | ✅ Yes (optional) | Premium tier, flexibility |
+| **Enterprise** ($999/mo) | Platform storefront (default) | ✅ Yes (optional) | White-label, full control |
+| **Organization** ($999/mo) | Platform storefront (default) | ✅ Yes (optional) | Multi-location, flexibility |
+
+**Implementation:**
+```typescript
+// directory_listings table
+website_url: string | null  // Custom website URL (Professional+ only)
+use_custom_website: boolean // Toggle to use custom URL vs storefront
+
+// Logic for "View Store" button
+const destinationUrl = listing.use_custom_website && listing.website_url
+  ? listing.website_url  // Custom URL (Professional+)
+  : `/s/${listing.slug}`; // Platform storefront (default)
+```
+
+**Benefits:**
+1. **Platform Traffic:** Lower tiers drive traffic to platform storefronts
+2. **Premium Value:** Higher tiers get flexibility to use their own website
+3. **White-Label Support:** Enterprise can fully brand their presence
+4. **Upsell Opportunity:** "Want to link to your own website? Upgrade to Professional"
+5. **Analytics:** Track which merchants use custom URLs vs storefronts
+
+**Validation Rules:**
+- Custom URL must be valid HTTPS URL
+- Custom URL only available for Professional, Enterprise, Organization tiers
+- Platform storefront always available as fallback
+- Merchants can toggle between custom URL and storefront
+
+**UI/UX:**
+```
+Store Card:
+┌────────────────────────────────────┐
+│ [Logo] Store Name            ⭐ 4.8│
+│ Category • City, State             │
+│                                    │
+│ "Short description..."             │
+│                                    │
+│ 📍 1.2 mi • 🕒 Open • 📦 500+ SKUs │
+│                                    │
+│ [View Storefront] ← Default        │
+│ or                                 │
+│ [Visit Website] ← If custom URL    │
+└────────────────────────────────────┘
+
+Professional+ Settings:
+┌────────────────────────────────────┐
+│ Directory Listing Settings         │
+│                                    │
+│ Website Destination:               │
+│ ○ Platform Storefront (default)   │
+│ ● Custom Website                   │
+│                                    │
+│ Custom URL:                        │
+│ [https://example.com         ]     │
+│                                    │
+│ Preview: [View Storefront]         │
+│                                    │
+│ [Save Changes]                     │
+└────────────────────────────────────┘
+```
+
 ### Key Indexes
 
 - Full-text search (GIN index on tsvector)
