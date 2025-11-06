@@ -369,6 +369,87 @@ export default function AdminCategoriesPage() {
           </CardContent>
         </Card>
 
+        {/* Admin Guide */}
+        <Card>
+          <CardHeader>
+            <CardTitle>📚 Platform Admin Guide: Product Categories</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 text-sm">
+              {/* What are Product Categories */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 mb-2">💡 What are Product Categories?</h4>
+                <p className="text-blue-800">
+                  Product categories help organize inventory and improve visibility in Google Business Profile and Google Merchant Center. 
+                  These are different from <strong>business categories</strong> (which define what type of business you are).
+                </p>
+              </div>
+
+              {/* Admin Scope */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <h4 className="font-semibold text-purple-900 mb-2">🔧 Platform Admin Capabilities</h4>
+                <ul className="list-disc list-inside space-y-1 text-purple-800">
+                  <li><strong>Create platform-level categories</strong> that all tenants can use</li>
+                  <li><strong>Sync categories to GBP</strong> for single locations, entire organizations, or platform-wide</li>
+                  <li><strong>Manage category templates</strong> for quick onboarding (coming soon)</li>
+                  <li><strong>Monitor category usage</strong> across all tenants</li>
+                </ul>
+              </div>
+
+              {/* Scoping Guide */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-semibold text-amber-900 mb-2">🎯 Sync Scoping Guide</h4>
+                <div className="space-y-2 text-amber-800">
+                  <div>
+                    <strong>Single Location:</strong> Test changes on one store before rolling out
+                  </div>
+                  <div>
+                    <strong>Entire Organization/Chain:</strong> Update all locations in a specific chain (Recommended)
+                  </div>
+                  <div>
+                    <strong>Platform-Wide:</strong> Affects ALL organizations - use with extreme caution! ⚠️
+                  </div>
+                </div>
+              </div>
+
+              {/* Best Practices */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-semibold text-green-900 mb-2">✅ Best Practices</h4>
+                <ul className="list-disc list-inside space-y-1 text-green-800">
+                  <li>Always use <strong>Dry Run</strong> first to preview changes</li>
+                  <li>Start with <strong>organization scope</strong> to avoid cross-chain contamination</li>
+                  <li>Create <strong>industry-specific templates</strong> for faster onboarding</li>
+                  <li>Monitor sync results and check for errors</li>
+                  <li>Coordinate with organization admins before major changes</li>
+                </ul>
+              </div>
+
+              {/* Distinction */}
+              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4">
+                <h4 className="font-semibold text-neutral-900 mb-2">🔍 Category Types Explained</h4>
+                <div className="space-y-3 text-neutral-700">
+                  <div>
+                    <strong className="text-blue-700">Product Categories</strong> (This Page):
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      <li>Organize products/services (e.g., "Hot Coffee", "Pastries")</li>
+                      <li>Unlimited categories</li>
+                      <li>Syncs to GBP for product visibility</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-purple-700">Business Categories</strong> (Different Page):
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      <li>Define business type (e.g., "Coffee Shop", "Restaurant")</li>
+                      <li>1 primary + ~9 additional max</li>
+                      <li>Managed at /t/{'{tenantId}'}/settings/gbp-category</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-neutral-700">
             {categories.length} {categories.length === 1 ? 'category' : 'categories'}

@@ -344,22 +344,39 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Helpful Reminder */}
+      {/* Store Guide */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <div className="flex items-start gap-3">
           <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1 a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
           </svg>
           <div className="flex-1">
-            <h4 className="text-sm font-semibold text-blue-900 mb-1">💡 Why create categories here?</h4>
-            <p className="text-sm text-blue-800">
-              Categories help organize your products and improve feed quality for Google Merchant Center. 
-              Create categories here, align them to Google's taxonomy, then assign them to your products on the{' '}
-              <a href={`/t/${tenantId}/items`} className="underline font-medium hover:text-blue-900">
-                Items page
-              </a>
-              . Well-categorized products perform better in search results and shopping ads.
-            </p>
+            <h4 className="text-sm font-semibold text-blue-900 mb-2">📚 Product Categories Guide</h4>
+            <div className="space-y-2 text-sm text-blue-800">
+              <div>
+                <strong>💡 Why create categories?</strong>
+                <p>Organize your products and improve visibility in Google Business Profile and Google Merchant Center. Well-categorized products perform better in search results and shopping ads.</p>
+              </div>
+              <div>
+                <strong>🎯 How to use:</strong>
+                <ol className="list-decimal list-inside ml-2 space-y-1">
+                  <li>Create categories here (e.g., "Hot Coffee", "Pastries", "Sandwiches")</li>
+                  <li>Align each category to Google's Product Taxonomy for better matching</li>
+                  <li>Assign categories to your products on the{' '}
+                    <a href={`/t/${tenantId}/items`} className="underline font-medium hover:text-blue-900">
+                      Items page
+                    </a>
+                  </li>
+                  <li>If you're part of a chain, propagate to other locations</li>
+                </ol>
+              </div>
+              <div className="bg-blue-100 rounded p-2 mt-2">
+                <strong>🔍 Note:</strong> These are <strong>product categories</strong> (unlimited). Your <strong>business category</strong> (e.g., "Coffee Shop") is managed separately at{' '}
+                <a href={`/t/${tenantId}/settings/gbp-category`} className="underline font-medium hover:text-blue-900">
+                  Business Category Settings
+                </a>.
+              </div>
+            </div>
           </div>
         </div>
       </div>
