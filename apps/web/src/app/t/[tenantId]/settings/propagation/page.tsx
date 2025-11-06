@@ -54,6 +54,9 @@ export default function PropagationControlPanel() {
   // Feature Flags propagation state
   const [featureFlagsMode, setFeatureFlagsMode] = useState<'create_only' | 'update_only' | 'create_or_update'>('create_or_update');
 
+  // User Roles propagation state
+  const [userRolesMode, setUserRolesMode] = useState<'create_only' | 'update_only' | 'create_or_update'>('create_or_update');
+
   useEffect(() => {
     async function loadOrganizationInfo() {
       try {
@@ -144,6 +147,72 @@ export default function PropagationControlPanel() {
       showToast('success', `Successfully propagated ${result.data.totalFlags} feature flags to ${result.data.totalLocations} locations (${summary})`);
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate feature flags');
+    } finally {
+      setPropagating(false);
+    }
+  }
+
+  async function propagateUserRoles() {
+    try {
+      setPropagating(true);
+      setShowUserRolesModal(false);
+
+      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/user-roles/propagate`, {
+        mode: userRolesMode
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || error.error || 'Failed to propagate user roles');
+      }
+
+      const result = await res.json();
+      const summary = `Created: ${result.data.created}, Updated: ${result.data.updated}, Skipped: ${result.data.skipped}`;
+      showToast('success', `Successfully propagated ${result.data.totalUsers} user roles to ${result.data.totalLocations} locations (${summary})`);
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Failed to propagate user roles');
+    } finally {
+      setPropagating(false);
+    }
+  }
+
+  async function propagateBrandAssets() {
+    try {
+      setPropagating(true);
+      setShowBrandAssetsModal(false);
+
+      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/brand-assets/propagate`);
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || error.error || 'Failed to propagate brand assets');
+      }
+
+      const result = await res.json();
+      showToast('success', `Successfully propagated brand assets to ${result.data.totalLocations} locations (${result.data.updated} updated)`);
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Failed to propagate brand assets');
+    } finally {
+      setPropagating(false);
+    }
+  }
+
+  async function propagateBusinessProfile() {
+    try {
+      setPropagating(true);
+      setShowBusinessProfileModal(false);
+
+      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/business-profile/propagate`);
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || error.error || 'Failed to propagate business profile');
+      }
+
+      const result = await res.json();
+      showToast('success', `Successfully propagated business profile to ${result.data.totalLocations} locations (${result.data.updated} updated)`);
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Failed to propagate business profile');
     } finally {
       setPropagating(false);
     }
@@ -531,19 +600,88 @@ export default function PropagationControlPanel() {
           </div>
         )}
 
-        {[
-          { show: showUserRolesModal, setShow: setShowUserRolesModal, title: 'User Roles Propagation', message: 'Coming soon! This feature will allow you to propagate user roles and permissions to all locations.' },
-          { show: showBrandAssetsModal, setShow: setShowBrandAssetsModal, title: 'Brand Assets Propagation', message: 'Coming soon! This feature will allow you to propagate brand assets to all locations.' },
-          { show: showBusinessProfileModal, setShow: setShowBusinessProfileModal, title: 'Business Profile Propagation', message: 'Coming soon! This feature will allow you to propagate business profile information to all locations.' },
-        ].map((modal, idx) => modal.show && (
-          <div key={idx} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => modal.setShow(false)}>
-            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-              <h3 className="text-lg font-semibold mb-4">{modal.title}</h3>
-              <p className="text-neutral-600 dark:text-neutral-400 mb-4">{modal.message}</p>
-              <button onClick={() => modal.setShow(false)} className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Close</button>
+        {/* User Roles Modal */}
+        {showUserRolesModal && organizationInfo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowUserRolesModal(false)}>
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold mb-4">Propagate User Roles</h3>
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    This will copy user roles from <strong>{organizationInfo.tenants.find(t => t.isHero)?.name || 'hero location'}</strong> to all {organizationInfo.tenants.length - 1} other locations.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">Propagation Mode</label>
+                  <select value={userRolesMode} onChange={(e) => setUserRolesMode(e.target.value as any)} className="w-full border border-neutral-300 dark:border-neutral-600 rounded-md px-3 py-2 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                    <option value="create_or_update">Create or Update (Sync All)</option>
+                    <option value="create_only">Create Only (Skip Existing)</option>
+                    <option value="update_only">Update Only (Skip New)</option>
+                  </select>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-2">
+                    {userRolesMode === 'create_or_update' && '✅ Adds new team members and updates existing roles'}
+                    {userRolesMode === 'create_only' && '➕ Only adds team members that don\'t exist at locations'}
+                    {userRolesMode === 'update_only' && '🔄 Only updates existing team members\' roles'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button onClick={() => setShowUserRolesModal(false)} className="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">Cancel</button>
+                <button onClick={propagateUserRoles} disabled={propagating} className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{propagating ? 'Propagating...' : 'Propagate Roles'}</button>
+              </div>
             </div>
           </div>
-        ))}
+        )}
+
+        {/* Brand Assets Modal */}
+        {showBrandAssetsModal && organizationInfo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowBrandAssetsModal(false)}>
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold mb-4">Propagate Brand Assets</h3>
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    This will copy brand assets (logo, colors) from <strong>{organizationInfo.tenants.find(t => t.isHero)?.name || 'hero location'}</strong> to all {organizationInfo.tenants.length - 1} other locations.
+                  </p>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <strong>Note:</strong> This will overwrite existing brand assets at all locations to ensure brand consistency.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button onClick={() => setShowBrandAssetsModal(false)} className="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">Cancel</button>
+                <button onClick={propagateBrandAssets} disabled={propagating} className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{propagating ? 'Propagating...' : 'Propagate Assets'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Business Profile Modal */}
+        {showBusinessProfileModal && organizationInfo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowBusinessProfileModal(false)}>
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold mb-4">Propagate Business Profile</h3>
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    This will copy business profile information from <strong>{organizationInfo.tenants.find(t => t.isHero)?.name || 'hero location'}</strong> to all {organizationInfo.tenants.length - 1} other locations.
+                  </p>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <strong>Note:</strong> This will overwrite existing business profile information at all locations for consistency.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button onClick={() => setShowBusinessProfileModal(false)} className="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">Cancel</button>
+                <button onClick={propagateBusinessProfile} disabled={propagating} className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{propagating ? 'Propagating...' : 'Propagate Profile'}</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Toast */}
         {toast && (

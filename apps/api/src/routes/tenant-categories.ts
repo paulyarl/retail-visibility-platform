@@ -1031,4 +1031,282 @@ router.post('/:tenantId/business-hours/propagate', async (req, res) => {
   }
 });
 
+const propagateUserRolesSchema = z.object({
+  mode: z.enum(['create_only', 'update_only', 'create_or_update']).optional().default('create_or_update'),
+});
+
+/**
+ * POST /api/v1/tenants/:tenantId/user-roles/propagate
+ * Propagate user roles from hero tenant to all location tenants in the organization
+ * Body: { mode?: 'create_only' | 'update_only' | 'create_or_update' }
+ */
+router.post('/:tenantId/user-roles/propagate', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const body = propagateUserRolesSchema.parse(req.body);
+    const { mode } = body;
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        organization: {
+          include: {
+            tenants: {
+              where: { id: { not: tenantId } },
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!tenant) return res.status(404).json({ success: false, error: 'Tenant not found' });
+    if (!tenant.organizationId) return res.status(400).json({ success: false, error: 'Tenant is not part of an organization' });
+
+    const metadata = tenant.metadata as any;
+    if (metadata?.isHeroLocation !== true) {
+      return res.status(400).json({ success: false, error: 'Only hero locations can propagate user roles' });
+    }
+
+    const heroUserRoles = await prisma.userTenant.findMany({
+      where: { tenantId },
+      include: { user: { select: { email: true, name: true } } },
+    });
+
+    if (heroUserRoles.length === 0) {
+      return res.status(400).json({ success: false, error: 'No user roles found for hero location' });
+    }
+
+    const locationTenants = tenant.organization!.tenants;
+    if (locationTenants.length === 0) {
+      return res.status(400).json({ success: false, error: 'No location tenants found' });
+    }
+
+    const results = {
+      totalLocations: locationTenants.length,
+      totalUsers: heroUserRoles.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+    };
+
+    for (const location of locationTenants) {
+      try {
+        for (const heroRole of heroUserRoles) {
+          const existing = await prisma.userTenant.findFirst({
+            where: {
+              tenantId: location.id,
+              userId: heroRole.userId,
+            },
+          });
+
+          if (existing) {
+            if (mode === 'create_only') {
+              results.skipped++;
+              continue;
+            }
+            await prisma.userTenant.update({
+              where: { id: existing.id },
+              data: { role: heroRole.role },
+            });
+            results.updated++;
+          } else {
+            if (mode === 'update_only') {
+              results.skipped++;
+              continue;
+            }
+            await prisma.userTenant.create({
+              data: {
+                tenantId: location.id,
+                userId: heroRole.userId,
+                role: heroRole.role,
+              },
+            });
+            results.created++;
+          }
+        }
+      } catch (error: any) {
+        results.errors.push({
+          tenantId: location.id,
+          tenantName: location.name,
+          error: error.message || 'Unknown error',
+        });
+      }
+    }
+
+    res.json({ success: true, message: 'User roles propagated successfully', data: results });
+  } catch (error) {
+    console.error('Error propagating user roles:', error);
+    res.status(500).json({ success: false, error: 'Failed to propagate user roles' });
+  }
+});
+
+/**
+ * POST /api/v1/tenants/:tenantId/brand-assets/propagate
+ * Propagate brand assets from hero tenant to all location tenants (always overwrites)
+ */
+router.post('/:tenantId/brand-assets/propagate', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        organization: {
+          include: {
+            tenants: {
+              where: { id: { not: tenantId } },
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!tenant) return res.status(404).json({ success: false, error: 'Tenant not found' });
+    if (!tenant.organizationId) return res.status(400).json({ success: false, error: 'Tenant is not part of an organization' });
+
+    const metadata = tenant.metadata as any;
+    if (metadata?.isHeroLocation !== true) {
+      return res.status(400).json({ success: false, error: 'Only hero locations can propagate brand assets' });
+    }
+
+    // Extract brand assets from hero metadata
+    const brandAssets = {
+      logo: metadata?.brandLogo,
+      primaryColor: metadata?.brandPrimaryColor,
+      secondaryColor: metadata?.brandSecondaryColor,
+      accentColor: metadata?.brandAccentColor,
+    };
+
+    if (!brandAssets.logo && !brandAssets.primaryColor) {
+      return res.status(400).json({ success: false, error: 'No brand assets found for hero location' });
+    }
+
+    const locationTenants = tenant.organization!.tenants;
+    if (locationTenants.length === 0) {
+      return res.status(400).json({ success: false, error: 'No location tenants found' });
+    }
+
+    const results = {
+      totalLocations: locationTenants.length,
+      updated: 0,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+    };
+
+    for (const location of locationTenants) {
+      try {
+        const currentMetadata = (await prisma.tenant.findUnique({ where: { id: location.id }, select: { metadata: true } }))?.metadata as any || {};
+        
+        await prisma.tenant.update({
+          where: { id: location.id },
+          data: {
+            metadata: {
+              ...currentMetadata,
+              brandLogo: brandAssets.logo,
+              brandPrimaryColor: brandAssets.primaryColor,
+              brandSecondaryColor: brandAssets.secondaryColor,
+              brandAccentColor: brandAssets.accentColor,
+            },
+          },
+        });
+        results.updated++;
+      } catch (error: any) {
+        results.errors.push({
+          tenantId: location.id,
+          tenantName: location.name,
+          error: error.message || 'Unknown error',
+        });
+      }
+    }
+
+    res.json({ success: true, message: 'Brand assets propagated successfully', data: results });
+  } catch (error) {
+    console.error('Error propagating brand assets:', error);
+    res.status(500).json({ success: false, error: 'Failed to propagate brand assets' });
+  }
+});
+
+/**
+ * POST /api/v1/tenants/:tenantId/business-profile/propagate
+ * Propagate business profile from hero tenant to all location tenants (always overwrites)
+ */
+router.post('/:tenantId/business-profile/propagate', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        businessProfile: true,
+        organization: {
+          include: {
+            tenants: {
+              where: { id: { not: tenantId } },
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!tenant) return res.status(404).json({ success: false, error: 'Tenant not found' });
+    if (!tenant.organizationId) return res.status(400).json({ success: false, error: 'Tenant is not part of an organization' });
+
+    const metadata = tenant.metadata as any;
+    if (metadata?.isHeroLocation !== true) {
+      return res.status(400).json({ success: false, error: 'Only hero locations can propagate business profile' });
+    }
+
+    if (!tenant.businessProfile) {
+      return res.status(400).json({ success: false, error: 'No business profile found for hero location' });
+    }
+
+    const locationTenants = tenant.organization!.tenants;
+    if (locationTenants.length === 0) {
+      return res.status(400).json({ success: false, error: 'No location tenants found' });
+    }
+
+    const results = {
+      totalLocations: locationTenants.length,
+      updated: 0,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+    };
+
+    for (const location of locationTenants) {
+      try {
+        await prisma.tenantBusinessProfile.upsert({
+          where: { tenantId: location.id },
+          create: {
+            tenantId: location.id,
+            description: tenant.businessProfile.description,
+            website: tenant.businessProfile.website,
+            email: tenant.businessProfile.email,
+            phone: tenant.businessProfile.phone,
+          },
+          update: {
+            description: tenant.businessProfile.description,
+            website: tenant.businessProfile.website,
+            email: tenant.businessProfile.email,
+            phone: tenant.businessProfile.phone,
+          },
+        });
+        results.updated++;
+      } catch (error: any) {
+        results.errors.push({
+          tenantId: location.id,
+          tenantName: location.name,
+          error: error.message || 'Unknown error',
+        });
+      }
+    }
+
+    res.json({ success: true, message: 'Business profile propagated successfully', data: results });
+  } catch (error) {
+    console.error('Error propagating business profile:', error);
+    res.status(500).json({ success: false, error: 'Failed to propagate business profile' });
+  }
+});
+
 export default router;
