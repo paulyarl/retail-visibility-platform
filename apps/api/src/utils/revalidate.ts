@@ -2,7 +2,14 @@ export async function triggerRevalidate(tenantId: string, paths?: string[]) {
   try {
     const WEB_URL = process.env.WEB_URL || 'http://localhost:3000'
     const secret = process.env.REVALIDATE_SECRET || ''
-    const url = `${WEB_URL.replace(/\/$/, '')}/api/revalidate`
+    const bypassToken = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || ''
+    
+    // Build URL with bypass token if available (for Vercel deployment protection)
+    let url = `${WEB_URL.replace(/\/$/, '')}/api/revalidate`
+    if (bypassToken) {
+      url += `?x-vercel-protection-bypass=${encodeURIComponent(bypassToken)}`
+    }
+    
     const payload = { tenantId, paths }
 
     // simple retry: 3 attempts with backoff

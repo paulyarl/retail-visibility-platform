@@ -4,6 +4,7 @@ import { prisma } from '../prisma';
 import { audit } from '../audit';
 import { triggerRevalidate } from '../utils/revalidate';
 import { categoryService } from '../services/CategoryService';
+import { getCategoryById } from '../lib/google/taxonomy';
 
 const router = Router();
 
@@ -437,10 +438,8 @@ router.post('/:tenantId/categories/:id/align', async (req, res) => {
       });
     }
 
-    // Validate Google category exists
-    const googleCategory = await prisma.googleTaxonomy.findUnique({
-      where: { categoryId: body.googleCategoryId },
-    });
+    // Validate Google category exists in taxonomy
+    const googleCategory = getCategoryById(body.googleCategoryId);
 
     if (!googleCategory) {
       return res.status(404).json({
@@ -455,7 +454,11 @@ router.post('/:tenantId/categories/:id/align', async (req, res) => {
       success: true,
       data: {
         ...updated,
-        googleCategory,
+        googleCategory: {
+          id: googleCategory.id,
+          name: googleCategory.name,
+          path: googleCategory.path,
+        },
       },
       message: 'Category aligned successfully',
     });
