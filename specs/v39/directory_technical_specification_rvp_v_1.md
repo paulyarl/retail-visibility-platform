@@ -91,6 +91,9 @@ PostgreSQL + PostGIS
 - Extends tenants with directory-specific fields
 - Auto-syncs from tenants table via trigger
 - Includes SEO, categorization, location, stats
+- **GMB Category Alignment:** Syncs from `TenantBusinessProfile.gbpCategoryId` (FK to `GBPCategory`)
+- **Multiple Categories:** Supports `primary_category` + `secondary_categories[]` array
+- **Category Hierarchy:** Aligns with platform's existing GMB category sync system
 
 **directory_reviews**
 - Customer reviews with 1-5 star ratings
@@ -110,12 +113,34 @@ PostgreSQL + PostGIS
 - Curated lists (e.g., "Top Rated Grocery Stores")
 - Platform admin managed
 
+### GMB Category Integration
+
+**Existing Platform Infrastructure:**
+- `GBPCategory` table: Local cache of Google Business Profile categories
+- `TenantBusinessProfile.gbpCategoryId`: FK relation to GBPCategory
+- `TenantBusinessProfile.gbpCategorySyncStatus`: Sync status tracking
+- `TenantCategory`: Vendor-owned custom categories with `googleCategoryId` mapping
+- **Bi-directional Sync:** Tenant ↔ GMB category synchronization
+
+**Directory Category Strategy:**
+1. **Primary Category:** Synced from `TenantBusinessProfile.gbpCategory.name`
+2. **Secondary Categories:** Derived from `TenantCategory` with `googleCategoryId` mappings
+3. **Fallback:** If no GMB category, use tenant's custom category or default to "retail"
+4. **Sync Trigger:** Auto-update directory listing when GMB category changes
+
+**Category Mapping Examples:**
+- GMB: "Restaurant" → Directory: "restaurants"
+- GMB: "Grocery Store" → Directory: "grocery"
+- GMB: "Pet Store" → Directory: "pet"
+- GMB: "Hardware Store" → Directory: "home"
+
 ### Key Indexes
 
 - Full-text search (GIN index on tsvector)
 - Geospatial queries (PostGIS GIST index)
-- Category and location filtering
+- Category and location filtering (includes GMB categories)
 - Rating and featured sorting
+- GMB category FK index for sync performance
 
 ---
 

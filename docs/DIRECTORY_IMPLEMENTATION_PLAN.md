@@ -74,8 +74,34 @@ The foundation establishes core directory infrastructure:
 - Auto-sync trigger from tenants table
 - Full-text search indexes
 - PostGIS geospatial indexes
+- **GMB Category Integration:**
+  - `primary_category` - Synced from `TenantBusinessProfile.gbpCategory.name`
+  - `secondary_categories[]` - Array from `TenantCategory` with `googleCategoryId` mappings
+  - `gbp_category_id` - FK reference to `GBPCategory` table
+  - Auto-updates when GMB category changes via trigger
 
 **Backfill:** Sync all existing tenants with `storefront_enabled = true`
+
+**GMB Category Sync Logic:**
+```sql
+-- Sync primary category from GBP
+primary_category = COALESCE(
+  (SELECT LOWER(REPLACE(name, ' ', '_')) 
+   FROM gbp_categories gc 
+   JOIN tenant_business_profile tbp ON tbp.gbp_category_id = gc.id 
+   WHERE tbp.tenant_id = NEW.id),
+  'retail' -- fallback
+)
+
+-- Sync secondary categories from TenantCategory
+secondary_categories = ARRAY(
+  SELECT LOWER(REPLACE(name, ' ', '_'))
+  FROM tenant_category
+  WHERE tenant_id = NEW.id 
+    AND google_category_id IS NOT NULL
+    AND is_active = true
+)
+```
 
 ---
 
@@ -90,7 +116,10 @@ The foundation establishes core directory infrastructure:
 
 **Features:**
 - Full-text search (business name, description, tags)
-- Category filtering
+- **Category filtering (GMB-aligned):**
+  - Filter by primary GMB category
+  - Filter by secondary categories
+  - Multi-category support (OR logic)
 - Location filtering (city, state, radius)
 - Distance calculation (PostGIS)
 - Rating filtering
@@ -98,6 +127,25 @@ The foundation establishes core directory infrastructure:
 - Open now filtering (business hours)
 - Sorting (relevance, distance, rating, newest)
 - Pagination
+
+**GMB Category Filtering:**
+```typescript
+// Support filtering by GMB categories
+if (params.category) {
+  query = query.where(
+    sql`primary_category = ${params.category} 
+        OR ${params.category} = ANY(secondary_categories)`
+  );
+}
+
+// Support multiple categories (OR logic)
+if (params.categories && params.categories.length > 0) {
+  query = query.where(
+    sql`primary_category = ANY(${params.categories}) 
+        OR secondary_categories && ${params.categories}`
+  );
+}
+```
 
 ---
 
