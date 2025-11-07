@@ -105,16 +105,21 @@ export function ViewingAsBadge({ tenantId, showPlatformRole = false }: RoleBadge
   let viewingAs: string = 'User';
   let variant: 'default' | 'success' | 'warning' | 'error' | 'info' = 'default';
 
+  const platformRole = user.role as string;
+  const isPlatformUser = platformRole === 'PLATFORM_ADMIN' || 
+                         platformRole === 'ADMIN' || 
+                         platformRole === 'PLATFORM_SUPPORT' || 
+                         platformRole === 'PLATFORM_VIEWER';
+
   if (showPlatformRole || !tenantId) {
     // Viewing as platform user
-    const role = user.role as string;
-    if (role === 'PLATFORM_ADMIN' || role === 'ADMIN') {
+    if (platformRole === 'PLATFORM_ADMIN' || platformRole === 'ADMIN') {
       viewingAs = 'Platform Admin';
       variant = 'error';
-    } else if (role === 'PLATFORM_SUPPORT') {
+    } else if (platformRole === 'PLATFORM_SUPPORT') {
       viewingAs = 'Platform Support';
       variant = 'info';
-    } else if (role === 'PLATFORM_VIEWER') {
+    } else if (platformRole === 'PLATFORM_VIEWER') {
       viewingAs = 'Platform Viewer';
       variant = 'warning';
     } else {
@@ -122,7 +127,7 @@ export function ViewingAsBadge({ tenantId, showPlatformRole = false }: RoleBadge
       variant = 'default';
     }
   } else {
-    // Viewing as tenant user
+    // Viewing as tenant user - check tenant role first
     const tenantRole = user.tenants?.find(t => t.id === tenantId);
     const role = tenantRole?.role;
     
@@ -138,6 +143,18 @@ export function ViewingAsBadge({ tenantId, showPlatformRole = false }: RoleBadge
     } else if (role === 'VIEWER') {
       viewingAs = 'Tenant Viewer';
       variant = 'warning';
+    } else if (isPlatformUser) {
+      // Fall back to platform role if user has platform access but no tenant role
+      if (platformRole === 'PLATFORM_ADMIN' || platformRole === 'ADMIN') {
+        viewingAs = 'Platform Admin';
+        variant = 'error';
+      } else if (platformRole === 'PLATFORM_SUPPORT') {
+        viewingAs = 'Platform Support';
+        variant = 'info';
+      } else if (platformRole === 'PLATFORM_VIEWER') {
+        viewingAs = 'Platform Viewer';
+        variant = 'warning';
+      }
     } else {
       viewingAs = 'No Access';
       variant = 'default';
