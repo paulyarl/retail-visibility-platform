@@ -8,6 +8,14 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
 import { getDemoItems, convertDemoItemToRVPFormat } from '../../services/clover-demo-emulator';
+import {
+  generateAuthorizationUrl,
+  decodeState,
+  exchangeCodeForToken,
+  encryptToken,
+  calculateTokenExpiration,
+  formatScopesForDisplay
+} from '../../services/clover-oauth';
 
 const router = Router();
 
@@ -327,6 +335,173 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
     console.error('[GET /integrations/:tenantId/clover/status] Error:', error);
     return res.status(500).json({
       error: 'failed_to_get_status',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Get OAuth authorization URL
+ * Initiates the OAuth flow by generating the Clover authorization URL
+ */
+router.get('/:tenantId/clover/oauth/authorize', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const user = (req as any).user;
+
+    // Verify tenant exists and user has access
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: { users: true }
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: 'tenant_not_found' });
+    }
+
+    // Check if user has access to this tenant
+    const hasAccess = tenant.users.some((ut: any) => ut.userId === user.id);
+    if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
+      return res.status(403).json({ error: 'access_denied' });
+    }
+
+    // Check if already in production mode
+    const integration = await prisma.cloverIntegration.findUnique({
+      where: { tenantId }
+    });
+
+    if (integration && integration.mode === 'production') {
+      return res.status(400).json({
+        error: 'already_connected',
+        message: 'Clover account already connected'
+      });
+    }
+
+    // Generate authorization URL
+    const authUrl = generateAuthorizationUrl(tenantId);
+    
+    // Return URL and scope information
+    return res.json({
+      authorizationUrl: authUrl,
+      scopes: formatScopesForDisplay(),
+      message: 'Redirect user to authorizationUrl to begin OAuth flow'
+    });
+
+  } catch (error: any) {
+    console.error('[GET /integrations/:tenantId/clover/oauth/authorize] Error:', error);
+    return res.status(500).json({
+      error: 'failed_to_generate_auth_url',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * OAuth callback handler
+ * Receives authorization code from Clover and exchanges it for access token
+ */
+router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
+  try {
+    const { code, state, error: oauthError } = req.query;
+
+    // Check for OAuth errors
+    if (oauthError) {
+      console.error('[OAuth Callback] OAuth error:', oauthError);
+      return res.redirect(`/settings/integrations?error=oauth_denied&message=${oauthError}`);
+    }
+
+    if (!code || !state) {
+      return res.status(400).json({
+        error: 'missing_parameters',
+        message: 'Missing code or state parameter'
+      });
+    }
+
+    // Decode state to get tenant ID
+    const stateData = decodeState(state as string);
+    const { tenantId } = stateData;
+
+    // Verify state timestamp (prevent replay attacks)
+    const stateAge = Date.now() - stateData.timestamp;
+    const maxAge = 10 * 60 * 1000; // 10 minutes
+    if (stateAge > maxAge) {
+      return res.redirect(`/t/${tenantId}/settings/integrations?error=state_expired`);
+    }
+
+    // Exchange code for token
+    const tokenData = await exchangeCodeForToken(code as string);
+
+    // Encrypt tokens for storage
+    const encryptedAccessToken = encryptToken(tokenData.access_token);
+    const encryptedRefreshToken = tokenData.refresh_token 
+      ? encryptToken(tokenData.refresh_token)
+      : null;
+
+    // Calculate token expiration
+    const tokenExpiresAt = tokenData.expires_in
+      ? calculateTokenExpiration(tokenData.expires_in)
+      : null;
+
+    // Find or create integration
+    let integration = await prisma.cloverIntegration.findUnique({
+      where: { tenantId }
+    });
+
+    if (integration) {
+      // Update existing integration to production mode
+      integration = await prisma.cloverIntegration.update({
+        where: { id: integration.id },
+        data: {
+          mode: 'production',
+          status: 'active',
+          accessToken: encryptedAccessToken,
+          refreshToken: encryptedRefreshToken,
+          tokenExpiresAt,
+          merchantId: tokenData.merchant_id,
+          productionEnabledAt: new Date()
+        }
+      });
+    } else {
+      // Create new integration in production mode
+      integration = await prisma.cloverIntegration.create({
+        data: {
+          tenantId,
+          mode: 'production',
+          status: 'active',
+          accessToken: encryptedAccessToken,
+          refreshToken: encryptedRefreshToken,
+          tokenExpiresAt,
+          merchantId: tokenData.merchant_id,
+          productionEnabledAt: new Date()
+        }
+      });
+    }
+
+    // Create sync log for OAuth connection
+    await prisma.cloverSyncLog.create({
+      data: {
+        integrationId: integration.id,
+        traceId: `oauth_connect_${Date.now()}`,
+        operation: 'import',
+        status: 'started',
+        itemsProcessed: 0,
+        itemsSucceeded: 0,
+        itemsFailed: 0
+      }
+    });
+
+    // Redirect back to integrations page with success message
+    return res.redirect(`/t/${tenantId}/settings/integrations?success=connected`);
+
+  } catch (error: any) {
+    console.error('[OAuth Callback] Error:', error);
+    // Try to redirect with error, fallback to error page
+    const tenantId = req.query.state ? decodeState(req.query.state as string).tenantId : null;
+    if (tenantId) {
+      return res.redirect(`/t/${tenantId}/settings/integrations?error=connection_failed&message=${encodeURIComponent(error.message)}`);
+    }
+    return res.status(500).json({
+      error: 'oauth_callback_failed',
       message: error.message
     });
   }
