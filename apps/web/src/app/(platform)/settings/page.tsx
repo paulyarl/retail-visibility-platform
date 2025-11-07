@@ -199,7 +199,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
             ),
             href: `/t/${tenantId}/settings/admin/flags`,
             color: 'bg-purple-500',
-            adminOnly: true,
+            accessOptions: AccessPresets.PLATFORM_ADMIN_ONLY,
             badge: 'Admin',
           },
         ] : []) as SettingCard[],
@@ -377,18 +377,11 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
               {/* Group Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {group.cards.map((setting, cardIndex) => {
-                  // Convert legacy flags to access options
-                  const accessOptions = setting.accessOptions || (
-                    setting.platformAdminOnly ? AccessPresets.PLATFORM_ADMIN_ONLY :
-                    setting.adminOnly ? AccessPresets.TENANT_ADMIN :
-                    undefined
-                  );
-
                   return (
                     <ProtectedCard
                       key={setting.href}
                       tenantId={tenantId || null}
-                      accessOptions={accessOptions}
+                      accessOptions={setting.accessOptions}
                       fetchOrganization={setting.fetchOrganization}
                     >
                       <AnimatedCard
@@ -423,11 +416,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
                             {setting.badge && (
                               <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
                                 {setting.badge}
-                              </span>
-                            )}
-                            {setting.adminOnly && (
-                              <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded">
-                                Admin
                               </span>
                             )}
                           </div>

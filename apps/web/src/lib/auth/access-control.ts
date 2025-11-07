@@ -376,6 +376,16 @@ export const AccessPresets = {
     allowPlatformAdminOverride: false,
   } as AccessControlOptions,
 
+  /** Platform admin or support (can help customers, but not viewers) */
+  PLATFORM_SUPPORT: {
+    customCheck: (user) => {
+      return user.role === 'PLATFORM_ADMIN' || 
+             user.role === 'PLATFORM_SUPPORT' ||
+             user.role === 'ADMIN'; // Legacy
+    },
+    allowPlatformAdminOverride: false,
+  } as AccessControlOptions,
+
   /** Tenant owner/admin for the scoped tenant, or platform admin */
   TENANT_ADMIN: {
     requireTenantRole: ['OWNER', 'ADMIN'],
@@ -386,6 +396,33 @@ export const AccessPresets = {
   TENANT_OWNER_ONLY: {
     requireTenantRole: ['OWNER'],
     allowPlatformAdminOverride: true,
+  } as AccessControlOptions,
+
+  /** Tenant owner/admin/member (for viewing/basic operations), or platform admin */
+  TENANT_MEMBER: {
+    requireTenantRole: ['OWNER', 'ADMIN', 'MEMBER'],
+    allowPlatformAdminOverride: true,
+  } as AccessControlOptions,
+
+  /** Platform support OR tenant owner/admin (for inventory/propagation operations) */
+  SUPPORT_OR_TENANT_ADMIN: {
+    customCheck: (user, context) => {
+      // Platform support can help any tenant
+      if (user.role === 'PLATFORM_ADMIN' || 
+          user.role === 'PLATFORM_SUPPORT' ||
+          user.role === 'ADMIN') {
+        return true;
+      }
+      // Tenant owner/admin can manage their own tenant
+      if (context?.tenantId) {
+        const tenantRole = user.tenants?.find(t => 
+          t.tenantId === context.tenantId || t.id === context.tenantId
+        )?.role;
+        return tenantRole === 'OWNER' || tenantRole === 'ADMIN';
+      }
+      return false;
+    },
+    allowPlatformAdminOverride: false,
   } as AccessControlOptions,
 
   /** Organization admin (owner/admin of hero location), or platform admin */
@@ -409,11 +446,31 @@ export const AccessPresets = {
     allowPlatformAdminOverride: true,
   } as AccessControlOptions,
 
-  /** Chain propagation access (org admin for scoped tenant's org), or platform admin */
+  /** Chain propagation access (org admin for scoped tenant's org), or platform support */
   CHAIN_PROPAGATION: {
     requireOrganization: true,
-    requireOrganizationAdmin: true,
-    allowPlatformAdminOverride: true,
+    customCheck: (user, context) => {
+      // Platform support can help with propagation
+      if (user.role === 'PLATFORM_ADMIN' || 
+          user.role === 'PLATFORM_SUPPORT' ||
+          user.role === 'ADMIN') {
+        return true;
+      }
+      // Organization admin can propagate
+      if (context?.organizationData) {
+        const heroTenant = context.organizationData.tenants.find(
+          t => t.metadata?.isHeroLocation === true
+        );
+        if (heroTenant) {
+          const tenantRole = user.tenants?.find(t => 
+            t.tenantId === heroTenant.id || t.id === heroTenant.id
+          )?.role;
+          return tenantRole === 'OWNER' || tenantRole === 'ADMIN';
+        }
+      }
+      return false;
+    },
+    allowPlatformAdminOverride: false,
   } as AccessControlOptions,
 
   /** Any authenticated user */
