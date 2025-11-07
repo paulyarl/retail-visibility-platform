@@ -285,7 +285,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                     <p className="font-medium">Set your store branding and add products to populate this page automatically.</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <a
-                        href={`/t/${id}/onboarding`}
+                        href={`/t/${id}/settings/branding`}
                         className="inline-flex items-center px-3 py-1.5 rounded bg-primary-600 text-white text-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-1 no-underline"
                         style={{ color: 'white' }}
                       >
