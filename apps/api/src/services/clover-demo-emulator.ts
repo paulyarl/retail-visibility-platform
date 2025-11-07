@@ -5,7 +5,7 @@
  * Provides realistic sample data for testing and evaluation.
  */
 
-import { AvailabilityStatus } from '@prisma/client';
+import { AvailabilityStatus, ProductSource } from '@prisma/client';
 
 export interface DemoItem {
   id: string;
@@ -314,7 +314,7 @@ export function convertDemoItemToRVPFormat(demoItem: DemoItem) {
     currency: 'USD',
     stock: demoItem.stock,
     availability: demoItem.stock > 0 ? AvailabilityStatus.in_stock : AvailabilityStatus.out_of_stock,
-    source: 'CLOVER_DEMO',
+    source: ProductSource.CLOVER_DEMO,
     metadata: {
       cloverItemId: demoItem.id,
       cloverCategory: demoItem.category,

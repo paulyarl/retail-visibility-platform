@@ -1011,6 +1011,7 @@ enum ProductSource {
   IMPORT
   API
   BULK_UPLOAD
+  CLOVER_DEMO
 
   @@map("product_source")
 }
