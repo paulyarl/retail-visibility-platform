@@ -1,4 +1,29 @@
-// Auth middleware for Express
+/**
+ * Authentication & Authorization Middleware
+ * 
+ * This module provides centralized auth middleware for Express routes.
+ * All middleware uses centralized helpers from utils/platform-admin.ts
+ * for consistent role checking across the platform.
+ * 
+ * Middleware Hierarchy:
+ * 1. authenticateToken - Validates JWT and adds user to request
+ * 2. requirePlatformAdmin - Platform admins only (PLATFORM_ADMIN, ADMIN)
+ * 3. requirePlatformUser - Any platform role (ADMIN, SUPPORT, VIEWER)
+ * 4. checkTenantAccess - Platform users OR tenant members
+ * 5. requireTenantOwner - Platform admins OR tenant owners/admins
+ * 
+ * Platform Roles (User.role):
+ * - PLATFORM_ADMIN: Full platform access
+ * - PLATFORM_SUPPORT: View all + support actions
+ * - PLATFORM_VIEWER: Read-only all tenants
+ * - ADMIN: Legacy platform admin
+ * 
+ * Tenant Roles (UserTenant.role):
+ * - OWNER: Full tenant control
+ * - ADMIN: Tenant admin
+ * - MEMBER: Basic tenant access
+ * - VIEWER: Read-only tenant access
+ */
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../auth/auth.service';
 import { UserRole } from '@prisma/client';
@@ -76,14 +101,14 @@ export function authorize(...roles: UserRole[]) {
 
 /**
  * Platform admin-only middleware (explicit)
+ * Uses centralized helper for consistent role checking
  */
 export function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
   }
 
-  // Check for explicit PLATFORM_ADMIN role, or legacy ADMIN role
-  if (req.user.role !== UserRole.PLATFORM_ADMIN && req.user.role !== UserRole.ADMIN) {
+  if (!isPlatformAdmin(req.user)) {
     return res.status(403).json({ 
       error: 'platform_admin_required', 
       message: 'Platform administrator access required' 
@@ -122,6 +147,7 @@ export function requirePlatformUser(req: Request, res: Response, next: NextFunct
 
 /**
  * Middleware to check if user has access to a specific tenant
+ * Uses centralized helper for consistent platform role checking
  */
 export function checkTenantAccess(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
@@ -129,18 +155,14 @@ export function checkTenantAccess(req: Request, res: Response, next: NextFunctio
   }
 
   // Platform users (admin, support, viewer) have access to all tenants
-  if (req.user.role === UserRole.PLATFORM_ADMIN || 
-      req.user.role === UserRole.PLATFORM_SUPPORT ||
-      req.user.role === UserRole.PLATFORM_VIEWER ||
-      req.user.role === UserRole.ADMIN) {
+  if (isPlatformUser(req.user)) {
     return next();
   }
 
-  // Get tenant ID from request (params, query, or body)
-  const tenantId = req.params.tenantId || req.params.id || req.query.tenantId || req.body.tenantId;
-
+  // Get and validate tenant ID using helper
+  const tenantId = requireTenantId(req, res);
   if (!tenantId) {
-    return res.status(400).json({ error: 'tenant_id_required', message: 'Tenant ID is required' });
+    return; // Error response already sent by requireTenantId
   }
 
   // Check if user has access to this tenant
@@ -173,16 +195,43 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
- * Extract tenant ID from query or user context
+ * Extract tenant ID from request (params, query, or body)
+ * Checks multiple locations in order of priority
  */
 export function getTenantId(req: Request): string | null {
-  return (req.query.tenantId as string) || (req.user?.tenantIds && req.user.tenantIds[0]) || null;
+  return (
+    req.params.tenantId ||
+    req.params.id ||
+    (req.query.tenantId as string) ||
+    req.body.tenantId ||
+    (req.user?.tenantIds && req.user.tenantIds[0]) ||
+    null
+  );
+}
+
+/**
+ * Extract and validate tenant ID from request
+ * Returns error response if tenant ID is missing
+ */
+export function requireTenantId(req: Request, res: Response): string | null {
+  const tenantId = getTenantId(req);
+  
+  if (!tenantId) {
+    res.status(400).json({ 
+      error: 'tenant_id_required', 
+      message: 'Tenant ID is required' 
+    });
+    return null;
+  }
+  
+  return tenantId;
 }
 
 /**
  * Middleware to check if user is a tenant owner/admin or platform admin
  * Used for sensitive tenant operations like managing feature flags
  * Allows: Platform ADMIN (global), or users with OWNER/ADMIN role within the specific tenant
+ * Uses centralized helpers for consistent permission checking
  */
 export async function requireTenantOwner(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
@@ -194,11 +243,10 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
     return next();
   }
 
-  // Get tenant ID from request
-  const tenantId = req.params.tenantId || req.params.id || req.query.tenantId || req.body.tenantId;
-
+  // Get and validate tenant ID using helper
+  const tenantId = requireTenantId(req, res);
   if (!tenantId) {
-    return res.status(400).json({ error: 'tenant_id_required', message: 'Tenant ID is required' });
+    return; // Error response already sent by requireTenantId
   }
 
   // Check if user has access to this tenant and their role within it
