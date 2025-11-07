@@ -117,6 +117,34 @@ The platform uses **explicit role names** to avoid ambiguity:
 
 ---
 
+### Platform Support Testing
+**User:** charlie.support@testing.app
+- Role: `PLATFORM_SUPPORT`
+- Tenant Assignments: None (not needed - platform-wide view access)
+- Test support team workflows
+- Can view all tenants (read-only)
+- Can reset user passwords
+- Can unlock accounts
+- Can view logs and metrics
+- Cannot delete or modify tenants
+- Cannot change platform settings
+
+---
+
+### Platform Viewer Testing
+**User:** diana.analytics@testing.app
+- Role: `PLATFORM_VIEWER`
+- Tenant Assignments: None (not needed - platform-wide view access)
+- Test analytics/sales/legal workflows
+- Can view all tenants (read-only)
+- Can view metrics and generate reports
+- Can export data
+- Cannot modify any data
+- Cannot perform any actions
+- Cannot access admin tools
+
+---
+
 ### Organization Owner Testing
 **Users:** carol.owner@testing.app, david.owner@testing.app
 - Role: `OWNER`
@@ -319,6 +347,16 @@ VALUES
   (gen_random_uuid(), 'alice.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
   (gen_random_uuid(), 'bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
 
+-- Platform Support (PLATFORM_SUPPORT role)
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+VALUES 
+  (gen_random_uuid(), 'charlie.support@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+
+-- Platform Viewer (PLATFORM_VIEWER role)
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+VALUES 
+  (gen_random_uuid(), 'diana.analytics@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+
 -- Organization Owners
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
@@ -365,6 +403,16 @@ INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_
 VALUES 
   (gen_random_uuid(), 'alice.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Alice', 'PlatformAdmin', 'PLATFORM_ADMIN', true, NOW(), NOW()),
   (gen_random_uuid(), 'bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Bob', 'PlatformAdmin', 'PLATFORM_ADMIN', true, NOW(), NOW());
+
+-- Platform Support (PLATFORM_SUPPORT role - view all + support actions)
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
+VALUES 
+  (gen_random_uuid(), 'charlie.support@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Charlie', 'Support', 'PLATFORM_SUPPORT', true, NOW(), NOW());
+
+-- Platform Viewer (PLATFORM_VIEWER role - read-only all)
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
+VALUES 
+  (gen_random_uuid(), 'diana.analytics@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Diana', 'Analytics', 'PLATFORM_VIEWER', true, NOW(), NOW());
 
 -- Organization Owners
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
