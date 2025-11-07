@@ -33,7 +33,7 @@ interface PendingRequest {
   processedBy?: string;
 }
 
-export default function SubscriptionPage() {
+export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?: string } = {}) {
   const [user, setUser] = useState<UserData | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,8 +56,8 @@ export default function SubscriptionPage() {
         const userData = await userRes.json();
         setUser(userData);
         
-        // Get current tenant from localStorage (try both keys for compatibility)
-        const tenantId = localStorage.getItem('current_tenant_id') || localStorage.getItem('tenantId');
+        // Get tenant ID from prop first, then fall back to localStorage
+        const tenantId = propTenantId || localStorage.getItem('current_tenant_id') || localStorage.getItem('tenantId');
         
         // Platform users viewing without tenant context - show catalog view
         if (isPlatformUser(userData) && !tenantId) {
@@ -115,7 +115,7 @@ export default function SubscriptionPage() {
       }
     };
     loadUserAndSubscription();
-  }, []);
+  }, [propTenantId]);
 
   if (loading) {
     return (
