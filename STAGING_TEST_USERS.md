@@ -329,45 +329,48 @@ VALUES
 ### Step 2: Create User Records in Application Database
 
 ```sql
--- Create User records (adjust IDs based on your schema)
+-- Create User records in the "users" table (note: lowercase table name)
+-- Note: User model uses first_name and last_name, not a single name field
+-- Note: User model uses cuid() by default, but we're using UUIDs for consistency
+
 -- Platform Admins (PLATFORM_ADMIN role - explicit, no ambiguity)
-INSERT INTO "User" (id, email, name, role, created_at, updated_at)
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), 'alice.platformadmin@testing.app', 'Alice PlatformAdmin', 'PLATFORM_ADMIN', NOW(), NOW()),
-  (gen_random_uuid(), 'bob.platformadmin@testing.app', 'Bob PlatformAdmin', 'PLATFORM_ADMIN', NOW(), NOW());
+  (gen_random_uuid(), 'alice.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Alice', 'PlatformAdmin', 'PLATFORM_ADMIN', true, NOW(), NOW()),
+  (gen_random_uuid(), 'bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Bob', 'PlatformAdmin', 'PLATFORM_ADMIN', true, NOW(), NOW());
 
 -- Organization Owners
-INSERT INTO "User" (id, email, name, role, created_at, updated_at)
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), 'carol.owner@testing.app', 'Carol Owner', 'OWNER', NOW(), NOW()),
-  (gen_random_uuid(), 'david.owner@testing.app', 'David Owner', 'OWNER', NOW(), NOW());
+  (gen_random_uuid(), 'carol.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Carol', 'Owner', 'OWNER', true, NOW(), NOW()),
+  (gen_random_uuid(), 'david.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), 'David', 'Owner', 'OWNER', true, NOW(), NOW());
 
 -- Independent Owners
-INSERT INTO "User" (id, email, name, role, created_at, updated_at)
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), 'emma.owner@testing.app', 'Emma Owner', 'OWNER', NOW(), NOW()),
-  (gen_random_uuid(), 'leo.owner@testing.app', 'Leo Owner', 'OWNER', NOW(), NOW());
+  (gen_random_uuid(), 'emma.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Emma', 'Owner', 'OWNER', true, NOW(), NOW()),
+  (gen_random_uuid(), 'leo.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Leo', 'Owner', 'OWNER', true, NOW(), NOW());
 
--- Tenant Admins (ADMIN role, WILL have UserTenant records)
-INSERT INTO "User" (id, email, name, role, created_at, updated_at)
+-- Tenant Admins (USER role - they get ADMIN via UserTenant.role)
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), 'frank.tenantadmin@testing.app', 'Frank TenantAdmin', 'ADMIN', NOW(), NOW()),
-  (gen_random_uuid(), 'grace.tenantadmin@testing.app', 'Grace TenantAdmin', 'ADMIN', NOW(), NOW()),
-  (gen_random_uuid(), 'maya.tenantadmin@testing.app', 'Maya TenantAdmin', 'ADMIN', NOW(), NOW());
+  (gen_random_uuid(), 'frank.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Frank', 'TenantAdmin', 'USER', true, NOW(), NOW()),
+  (gen_random_uuid(), 'grace.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Grace', 'TenantAdmin', 'USER', true, NOW(), NOW()),
+  (gen_random_uuid(), 'maya.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Maya', 'TenantAdmin', 'USER', true, NOW(), NOW());
 
 -- Tenant Members
-INSERT INTO "User" (id, email, name, role, created_at, updated_at)
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), 'henry.member@testing.app', 'Henry Member', 'MEMBER', NOW(), NOW()),
-  (gen_random_uuid(), 'iris.member@testing.app', 'Iris Member', 'MEMBER', NOW(), NOW()),
-  (gen_random_uuid(), 'noah.member@testing.app', 'Noah Member', 'MEMBER', NOW(), NOW());
+  (gen_random_uuid(), 'henry.member@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Henry', 'Member', 'USER', true, NOW(), NOW()),
+  (gen_random_uuid(), 'iris.member@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Iris', 'Member', 'USER', true, NOW(), NOW()),
+  (gen_random_uuid(), 'noah.member@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Noah', 'Member', 'USER', true, NOW(), NOW());
 
 -- Tenant Viewers
-INSERT INTO "User" (id, email, name, role, created_at, updated_at)
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), 'jack.viewer@testing.app', 'Jack Viewer', 'VIEWER', NOW(), NOW()),
-  (gen_random_uuid(), 'kate.viewer@testing.app', 'Kate Viewer', 'VIEWER', NOW(), NOW()),
-  (gen_random_uuid(), 'olivia.viewer@testing.app', 'Olivia Viewer', 'VIEWER', NOW(), NOW());
+  (gen_random_uuid(), 'jack.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Jack', 'Viewer', 'USER', true, NOW(), NOW()),
+  (gen_random_uuid(), 'kate.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Kate', 'Viewer', 'USER', true, NOW(), NOW()),
+  (gen_random_uuid(), 'olivia.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Olivia', 'Viewer', 'USER', true, NOW(), NOW());
 ```
 
 ### Step 3: Create Test Tenants
