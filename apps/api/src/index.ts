@@ -147,10 +147,13 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 /* ------------------------------ TENANTS ------------------------------ */
 app.get("/tenants", authenticateToken, async (req, res) => {
   try {
-    // Admin users see all tenants, regular users see only their tenants
-    const isAdmin = req.user?.role === 'ADMIN';
+    // Platform users (admin, support, viewer) see all tenants, regular users see only their tenants
+    const isPlatformUserRole = req.user?.role === 'ADMIN' || 
+                                req.user?.role === 'PLATFORM_ADMIN' ||
+                                req.user?.role === 'PLATFORM_SUPPORT' ||
+                                req.user?.role === 'PLATFORM_VIEWER';
     const tenants = await prisma.tenant.findMany({ 
-      where: isAdmin ? {} : {
+      where: isPlatformUserRole ? {} : {
         users: {
           some: {
             userId: req.user?.userId
