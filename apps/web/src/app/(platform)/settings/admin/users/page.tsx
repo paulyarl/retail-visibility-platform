@@ -7,6 +7,8 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
+import { useAccessControl } from '@/lib/auth/useAccessControl';
+import { canManageUsers } from '@/lib/auth/access-control';
 
 interface User {
   id: string;
@@ -52,6 +54,11 @@ export default function UsersManagementPage() {
     canManageInventory: true,
     canAccessAdmin: false,
   });
+  
+  // Access control
+  const { user } = useAccessControl(null, {});
+  const canManage = user ? canManageUsers(user) : false;
+  const canInvite = user ? (canManageUsers(user) || user.role === 'PLATFORM_SUPPORT') : false;
   
   // Pagination and search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -248,7 +255,7 @@ export default function UsersManagementPage() {
           label: 'Back to Admin'
         }}
         actions={
-          <Button onClick={() => setShowInviteModal(true)}>
+          <Button onClick={() => setShowInviteModal(true)} disabled={!canInvite} title={!canInvite ? 'View only' : undefined}>
             <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
@@ -467,13 +474,13 @@ export default function UsersManagementPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => handleEditClick(user)}>
+                    <Button size="sm" variant="secondary" onClick={() => handleEditClick(user)} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
                       Edit
                     </Button>
                     <Button size="sm" variant="secondary" onClick={() => handlePermissionsClick(user)}>
                       Permissions
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id)}>
+                    <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id)} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
                       <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
@@ -538,7 +545,7 @@ export default function UsersManagementPage() {
           <Button variant="ghost" onClick={() => setShowInviteModal(false)}>
             Cancel
           </Button>
-          <Button onClick={handleInvite}>
+          <Button onClick={handleInvite} disabled={!canInvite} title={!canInvite ? 'View only' : undefined}>
             Send Invitation
           </Button>
         </ModalFooter>
@@ -557,6 +564,7 @@ export default function UsersManagementPage() {
             placeholder="Full name"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
+            disabled={!canManage}
           />
           <Input
             type="email"
@@ -564,6 +572,7 @@ export default function UsersManagementPage() {
             placeholder="user@example.com"
             value={editEmail}
             onChange={(e) => setEditEmail(e.target.value)}
+            disabled={!canManage}
           />
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -573,6 +582,7 @@ export default function UsersManagementPage() {
               value={editRole}
               onChange={(e) => setEditRole(e.target.value as 'ADMIN' | 'OWNER' | 'USER')}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              disabled={!canManage}
             >
               <option value="USER">User</option>
               <option value="OWNER">Tenant Owner</option>
@@ -587,6 +597,7 @@ export default function UsersManagementPage() {
               value={editStatus}
               onChange={(e) => setEditStatus(e.target.value as 'active' | 'inactive' | 'pending')}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              disabled={!canManage}
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -598,7 +609,7 @@ export default function UsersManagementPage() {
           <Button variant="ghost" onClick={() => setShowEditModal(false)}>
             Cancel
           </Button>
-          <Button onClick={handleEditSave}>
+          <Button onClick={handleEditSave} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
             Save Changes
           </Button>
         </ModalFooter>
@@ -733,7 +744,7 @@ export default function UsersManagementPage() {
           <Button variant="ghost" onClick={() => setShowPermissionsModal(false)}>
             Cancel
           </Button>
-          <Button onClick={handlePermissionsSave}>
+          <Button onClick={handlePermissionsSave} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
             Save Permissions
           </Button>
         </ModalFooter>
