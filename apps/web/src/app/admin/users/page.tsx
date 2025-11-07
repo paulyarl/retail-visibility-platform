@@ -6,6 +6,8 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import CreateUserModal from '@/components/admin/CreateUserModal';
 import ResetPasswordModal from '@/components/admin/ResetPasswordModal';
 import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { isPlatformAdmin } from '@/lib/auth/access-control';
 
 interface User {
   id: string;
@@ -17,6 +19,8 @@ interface User {
 }
 
 export default function AdminUsersPage() {
+  const { user } = useAuth();
+  const isAdmin = user ? isPlatformAdmin(user) : false;
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -91,13 +95,20 @@ export default function AdminUsersPage() {
               {users.length} total users
             </p>
           </div>
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium rounded-lg transition-all flex items-center gap-2"
-          >
-            <UserPlus className="w-4 h-4" />
-            Create User
-          </button>
+          {isAdmin ? (
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium rounded-lg transition-all flex items-center gap-2"
+            >
+              <UserPlus className="w-4 h-4" />
+              Create User
+            </button>
+          ) : (
+            <div className="px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
+              <Shield className="w-4 h-4 inline mr-2" />
+              Read-Only Access
+            </div>
+          )}
         </div>
 
         {/* Users Table */}
@@ -173,22 +184,26 @@ export default function AdminUsersPage() {
                           : 'Never'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => setResetPasswordModal({ open: true, user })}
-                            className="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
-                            title="Reset Password"
-                          >
-                            <Key className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user.id, user.email)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                            title="Delete User"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {isAdmin ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setResetPasswordModal({ open: true, user })}
+                              className="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
+                              title="Reset Password"
+                            >
+                              <Key className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id, user.email)}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                              title="Delete User"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-600 text-xs">View Only</span>
+                        )}
                       </td>
                     </tr>
                   ))}
