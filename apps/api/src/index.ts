@@ -2139,15 +2139,15 @@ app.use('/admin', authenticateToken, tenantFlagsRoutes);
 app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
 // Admin tools and users - these are more generic and should come after specific routes
 app.use('/api/admin/tools', authenticateToken, requireAdmin, adminToolsRoutes);
-app.use('/api/admin', authenticateToken, requireAdmin, adminUsersRoutes);
+app.use('/api/admin', authenticateToken, adminUsersRoutes);
 app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
 app.use('/api', feedValidationRoutes);
 app.use('/api', businessProfileValidationRoutes);
 app.use('/api', businessHoursRoutes);
 app.use(testGbpRoutes); // Test endpoint for GBP API verification
 app.use('/auth', googleBusinessOAuthRoutes); // Google Business Profile OAuth flow
-app.use('/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
-app.use('/api/admin', authenticateToken, requireAdmin, platformFlagsRoutes);
+app.use('/admin', authenticateToken, platformFlagsRoutes);
+app.use('/api/admin', authenticateToken, platformFlagsRoutes);
 // Effective flags: middleware applied per-route (admin for platform, tenant access for tenant)
 app.use('/admin', authenticateToken, effectiveFlagsRoutes);
 app.use('/api/admin', authenticateToken, effectiveFlagsRoutes);

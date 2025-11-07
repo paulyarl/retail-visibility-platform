@@ -1,14 +1,14 @@
 import { Router } from 'express'
 import { prisma } from '../prisma'
 import { getEffectivePlatform, getEffectiveTenant, setPlatformOverride, setTenantOverride } from '../utils/effectiveFlags'
-import { checkTenantAccess, requireAdmin } from '../middleware/auth'
+import { checkTenantAccess, requirePlatformUser } from '../middleware/auth'
 
 const router = Router()
 
 console.log('[Effective Flags Router] Initializing routes...')
 
-// GET /api/admin/effective-flags - list effective platform flags (admin only)
-router.get('/effective-flags', requireAdmin, async (_req, res) => {
+// GET /api/admin/effective-flags - list effective platform flags (platform users: admin/support/viewer)
+router.get('/effective-flags', requirePlatformUser, async (_req, res) => {
   try {
     const rows = await prisma.platformFeatureFlag.findMany({ orderBy: { flag: 'asc' } })
     const flags = [...new Set(rows.map(r => r.flag))]

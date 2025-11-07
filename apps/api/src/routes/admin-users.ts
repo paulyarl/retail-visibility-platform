@@ -11,6 +11,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../prisma';
 import { audit } from '../audit';
 import { UserRole } from '@prisma/client';
+import { requirePlatformAdmin, requirePlatformUser } from '../middleware/auth';
 
 const router = Router();
 
@@ -18,7 +19,7 @@ const router = Router();
  * GET /api/admin/users
  * List all users
  */
-router.get('/users', async (req: Request, res: Response) => {
+router.get('/users', requirePlatformUser, async (req: Request, res: Response) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -64,7 +65,7 @@ const createUserSchema = z.object({
   role: z.enum(['USER', 'ADMIN']).default('USER'),
 });
 
-router.post('/users', async (req: Request, res: Response) => {
+router.post('/users', requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     const parsed = createUserSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -148,7 +149,7 @@ const resetPasswordSchema = z.object({
   password: z.string().min(8),
 });
 
-router.put('/users/:userId/password', async (req: Request, res: Response) => {
+router.put('/users/:userId/password', requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const parsed = resetPasswordSchema.safeParse(req.body);
@@ -211,7 +212,7 @@ router.put('/users/:userId/password', async (req: Request, res: Response) => {
  * DELETE /api/admin/users/:userId
  * Delete a user
  */
-router.delete('/users/:userId', async (req: Request, res: Response) => {
+router.delete('/users/:userId', requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 

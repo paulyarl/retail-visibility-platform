@@ -1,16 +1,17 @@
 import { Router } from 'express'
 import { prisma } from '../prisma'
+import { requirePlatformAdmin, requirePlatformUser } from '../middleware/auth'
 
 const router = Router()
 
 // GET /api/admin/platform-flags
-router.get('/platform-flags', async (_req, res) => {
+router.get('/platform-flags', requirePlatformUser, async (_req, res) => {
   const rows = await prisma.platformFeatureFlag.findMany({ orderBy: { flag: 'asc' } })
   res.json({ success: true, data: rows })
 })
 
 // PUT /api/admin/platform-flags/:flag
-router.put('/platform-flags/:flag', async (req, res) => {
+router.put('/platform-flags/:flag', requirePlatformAdmin, async (req, res) => {
   const { flag } = req.params
   const { enabled, description, rollout, allowTenantOverride } = (req.body || {}) as { 
     enabled?: boolean;
@@ -38,7 +39,7 @@ router.put('/platform-flags/:flag', async (req, res) => {
 })
 
 // POST /api/admin/platform-flags/:flag/override
-router.post('/platform-flags/:flag/override', async (req, res) => {
+router.post('/platform-flags/:flag/override', requirePlatformAdmin, async (req, res) => {
   const { flag } = req.params
   const { value } = req.body as { value: boolean | null }
   
@@ -77,7 +78,7 @@ router.post('/platform-flags/:flag/override', async (req, res) => {
 })
 
 // DELETE /api/admin/platform-flags
-router.delete('/platform-flags', async (req, res) => {
+router.delete('/platform-flags', requirePlatformAdmin, async (req, res) => {
   const { flag } = req.body
   
   try {
