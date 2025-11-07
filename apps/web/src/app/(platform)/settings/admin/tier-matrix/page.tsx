@@ -163,7 +163,7 @@ export default function TierMatrixPage() {
                     {price === 0 ? 'Free' : `$${price}/mo`}
                   </p>
                   <p className="text-sm opacity-75">
-                    {featureCount} {featureCount === 1 ? 'feature' : 'features'}
+                    {featureCount} features
                   </p>
                 </div>
               );
@@ -328,7 +328,7 @@ export default function TierMatrixPage() {
                     ))}
                   </div>
 
-                  {(!tierFeatures || tierFeatures.length === 0) && (
+                  {!tierFeatures && (
                     <p className="text-neutral-600 dark:text-neutral-400 italic">
                       No features configured for this tier
                     </p>
