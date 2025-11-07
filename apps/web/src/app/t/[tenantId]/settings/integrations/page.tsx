@@ -26,6 +26,8 @@ export default function IntegrationsPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showScopeDisclosure, setShowScopeDisclosure] = useState(false);
+  const [oauthScopes, setOauthScopes] = useState<Array<{ scope: string; description: string }>>([]);
 
   // Fetch Clover integration status
   const fetchStatus = async () => {
@@ -51,6 +53,24 @@ export default function IntegrationsPage() {
   useEffect(() => {
     if (tenantId) {
       fetchStatus();
+    }
+    
+    // Check for OAuth callback status
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const errorParam = urlParams.get('error');
+    const message = urlParams.get('message');
+    
+    if (success === 'connected') {
+      alert('Successfully connected to Clover! Your inventory will sync shortly.');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+      fetchStatus();
+    } else if (errorParam) {
+      const errorMessage = message || errorParam;
+      setError(`Connection failed: ${errorMessage}`);
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, [tenantId]);
 
@@ -81,6 +101,47 @@ export default function IntegrationsPage() {
       alert(`Error: ${err.message}`);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // Connect Clover account (OAuth)
+  const handleConnectClover = async () => {
+    try {
+      setActionLoading(true);
+      setError(null);
+      
+      // Fetch authorization URL and scopes
+      const res = await fetch(`/api/integrations/${tenantId}/clover/oauth/authorize`);
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Failed to initiate OAuth flow');
+      }
+      
+      const data = await res.json();
+      
+      // Show scope disclosure
+      setOauthScopes(data.scopes);
+      setShowScopeDisclosure(true);
+      
+      // Store auth URL for later
+      (window as any).cloverAuthUrl = data.authorizationUrl;
+      
+    } catch (err: any) {
+      console.error('Failed to connect Clover:', err);
+      setError(err.message);
+      alert(`Error: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Proceed with OAuth after user reviews scopes
+  const handleProceedWithOAuth = () => {
+    const authUrl = (window as any).cloverAuthUrl;
+    if (authUrl) {
+      // Redirect to Clover authorization page
+      window.location.href = authUrl;
     }
   };
 
@@ -236,19 +297,29 @@ export default function IntegrationsPage() {
                   {actionLoading ? 'Enabling...' : 'Enable Demo Mode'}
                 </button>
                 <button
-                  disabled
-                  className="px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-400 dark:text-neutral-500 rounded-lg cursor-not-allowed font-medium"
-                  title="Coming soon"
+                  onClick={handleConnectClover}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
                 >
-                  Connect Clover Account
+                  {actionLoading ? 'Connecting...' : 'Connect Clover Account'}
                 </button>
               </div>
 
-              <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg">
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  <strong>Note:</strong> Production Clover integration (OAuth) will be available in Phase 2.
-                  Demo mode is perfect for testing and evaluation.
-                </p>
+              <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <h4 className="font-semibold text-green-900 dark:text-green-100 mb-1">
+                      Production Ready
+                    </h4>
+                    <p className="text-sm text-green-800 dark:text-green-200">
+                      Connect your real Clover account to sync live inventory automatically. 
+                      Your data is encrypted and secure.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
@@ -347,6 +418,61 @@ export default function IntegrationsPage() {
           </span>
         </div>
       </div>
+
+      {/* Scope Disclosure Modal */}
+      {showScopeDisclosure && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-4">
+                Authorize Clover Access
+              </h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+                To sync your inventory, we need the following permissions from your Clover account:
+              </p>
+              
+              <div className="space-y-3 mb-6">
+                {oauthScopes.map((scope, index) => (
+                  <div key={index} className="flex items-start gap-3 p-3 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg">
+                    <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <div>
+                      <div className="font-medium text-neutral-900 dark:text-neutral-100 text-sm">
+                        {scope.scope}
+                      </div>
+                      <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                        {scope.description}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg mb-6">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Your data is secure:</strong> All tokens are encrypted and we only access the data necessary for inventory sync.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowScopeDisclosure(false)}
+                  className="flex-1 px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleProceedWithOAuth}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
+                >
+                  Continue to Clover
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
