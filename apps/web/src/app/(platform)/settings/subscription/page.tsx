@@ -8,6 +8,7 @@ import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 import { getAllAdminEmails } from '@/lib/admin-emails';
 import { api } from '@/lib/api';
 import { isPlatformUser, isPlatformAdmin, type UserData } from '@/lib/auth/access-control';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Tenant {
   id: string;
@@ -34,7 +35,7 @@ interface PendingRequest {
 }
 
 export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?: string } = {}) {
-  const [user, setUser] = useState<UserData | null>(null);
+  const { user } = useAuth();
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | ChainTier | null>(null);
@@ -44,23 +45,19 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
-    const loadUserAndSubscription = async () => {
+    const loadSubscription = async () => {
       try {
-        // First, get the current user
-        const userRes = await api.get('/api/auth/me');
-        if (!userRes.ok) {
+        // Wait for user to be loaded
+        if (!user) {
           setLoading(false);
           return;
         }
-        
-        const userData = await userRes.json();
-        setUser(userData);
         
         // Get tenant ID from prop first, then fall back to localStorage
         const tenantId = propTenantId || localStorage.getItem('current_tenant_id') || localStorage.getItem('tenantId');
         
         // Platform users viewing without tenant context - show catalog view
-        if (isPlatformUser(userData) && !tenantId) {
+        if (isPlatformUser(user) && !tenantId) {
           setLoading(false);
           return;
         }
@@ -114,8 +111,8 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
         setLoading(false);
       }
     };
-    loadUserAndSubscription();
-  }, [propTenantId]);
+    loadSubscription();
+  }, [propTenantId, user]);
 
   if (loading) {
     return (
@@ -145,15 +142,15 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
-                  {user.role === 'PLATFORM_ADMIN' && <span className="text-white text-xl">👑</span>}
-                  {user.role === 'PLATFORM_SUPPORT' && <span className="text-white text-xl">🛠️</span>}
-                  {user.role === 'PLATFORM_VIEWER' && <span className="text-white text-xl">👁️</span>}
+                  {(user.role as string) === 'PLATFORM_ADMIN' && <span className="text-white text-xl">👑</span>}
+                  {(user.role as string) === 'PLATFORM_SUPPORT' && <span className="text-white text-xl">🛠️</span>}
+                  {(user.role as string) === 'PLATFORM_VIEWER' && <span className="text-white text-xl">👁️</span>}
                 </div>
                 <div className="flex-1">
                   <CardTitle className="text-purple-900">
-                    {user.role === 'PLATFORM_ADMIN' && '👑 Platform Administrator'}
-                    {user.role === 'PLATFORM_SUPPORT' && '🛠️ Platform Support'}
-                    {user.role === 'PLATFORM_VIEWER' && '👁️ Platform Viewer'}
+                    {(user.role as string) === 'PLATFORM_ADMIN' && '👑 Platform Administrator'}
+                    {(user.role as string) === 'PLATFORM_SUPPORT' && '🛠️ Platform Support'}
+                    {(user.role as string) === 'PLATFORM_VIEWER' && '👁️ Platform Viewer'}
                   </CardTitle>
                   <p className="text-sm text-purple-800 mt-1">
                     You have platform-level access. You don't have a personal subscription.
@@ -165,7 +162,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
               <div className="bg-white rounded-lg p-4 border border-purple-200">
                 <h4 className="font-semibold text-purple-900 mb-2">Your Access:</h4>
                 <ul className="space-y-2 text-sm text-purple-800">
-                  {user.role === 'PLATFORM_ADMIN' && (
+                  {(user.role as string) === 'PLATFORM_ADMIN' && (
                     <>
                       <li className="flex items-start gap-2">
                         <span className="text-purple-500 font-bold">✓</span>
@@ -181,7 +178,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       </li>
                     </>
                   )}
-                  {user.role === 'PLATFORM_SUPPORT' && (
+                  {(user.role as string) === 'PLATFORM_SUPPORT' && (
                     <>
                       <li className="flex items-start gap-2">
                         <span className="text-purple-500 font-bold">✓</span>
@@ -193,7 +190,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       </li>
                     </>
                   )}
-                  {user.role === 'PLATFORM_VIEWER' && (
+                  {(user.role as string) === 'PLATFORM_VIEWER' && (
                     <>
                       <li className="flex items-start gap-2">
                         <span className="text-purple-500 font-bold">✓</span>
