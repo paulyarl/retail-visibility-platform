@@ -214,7 +214,66 @@ export function getTierPricing(tier: string): number {
 }
 
 /**
- * Middleware to require a specific feature based on tier
+ * Check if a tenant has access to a feature (including overrides)
+ * Returns the access status and source (tier, override, or none)
+ */
+export async function checkTierAccessWithOverrides(
+  tenantId: string,
+  feature: string
+): Promise<{ hasAccess: boolean; source: 'tier' | 'override' | 'none'; override?: any }> {
+  try {
+    // Get tenant with overrides
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { 
+        subscriptionTier: true,
+        featureOverrides: {
+          where: {
+            feature,
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: new Date() } }
+            ]
+          }
+        }
+      },
+    });
+
+    if (!tenant) {
+      return { hasAccess: false, source: 'none' };
+    }
+
+    // 1. Check for active override first (highest priority)
+    const override = tenant.featureOverrides[0];
+    if (override) {
+      return { 
+        hasAccess: override.granted, 
+        source: 'override',
+        override: {
+          id: override.id,
+          reason: override.reason,
+          expiresAt: override.expiresAt,
+          grantedBy: override.grantedBy,
+        }
+      };
+    }
+
+    // 2. Fall back to tier-based access
+    const tier = tenant.subscriptionTier || 'trial';
+    const tierAccess = checkTierAccess(tier, feature);
+    
+    return { 
+      hasAccess: tierAccess, 
+      source: tierAccess ? 'tier' : 'none' 
+    };
+  } catch (error) {
+    console.error('[checkTierAccessWithOverrides] Error:', error);
+    return { hasAccess: false, source: 'none' };
+  }
+}
+
+/**
+ * Middleware to require a specific feature based on tier (with override support)
  * 
  * Usage:
  * router.post('/quick-start', requireTierFeature('quick_start_wizard'), handler);
@@ -232,7 +291,7 @@ export function requireTierFeature(feature: string) {
         });
       }
       
-      // Get tenant's subscription tier
+      // Get tenant's subscription tier and status
       const tenant = await prisma.tenant.findUnique({
         where: { id: String(tenantId || '') },
         select: { 
@@ -258,11 +317,11 @@ export function requireTierFeature(feature: string) {
         });
       }
       
-      // Check if tier has access to feature
-      const tierString = tenant.subscriptionTier || 'trial';
-      const hasAccess = checkTierAccess(tierString, feature);
+      // Check access (including overrides)
+      const access = await checkTierAccessWithOverrides(String(tenantId), feature);
       
-      if (!hasAccess) {
+      if (!access.hasAccess) {
+        const tierString = tenant.subscriptionTier || 'trial';
         const requiredTier = getRequiredTier(feature);
         const requiredTierDisplay = getTierDisplayName(requiredTier);
         const currentTierDisplay = getTierDisplayName(tierString);
@@ -282,6 +341,18 @@ export function requireTierFeature(feature: string) {
           upgradeCost: requiredTierPrice - currentTierPrice,
           upgradeUrl: '/settings/subscription',
         });
+      }
+      
+      // Add access info to request for logging
+      (req as any).featureAccess = {
+        feature,
+        source: access.source,
+        override: access.override,
+      };
+      
+      // Log override usage
+      if (access.source === 'override') {
+        console.log(`[Feature Access] Override used: ${feature} for tenant ${tenantId} (reason: ${access.override?.reason || 'none'})`);
       }
       
       // Access granted

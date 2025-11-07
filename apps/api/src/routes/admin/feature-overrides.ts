@@ -244,7 +244,7 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
       return res.status(400).json({
         error: 'validation_error',
         message: 'Invalid request data',
-        details: error.errors,
+        details: error.issues,
       });
     }
 
@@ -332,7 +332,7 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
       return res.status(400).json({
         error: 'validation_error',
         message: 'Invalid request data',
-        details: error.errors,
+        details: error.issues,
       });
     }
 
