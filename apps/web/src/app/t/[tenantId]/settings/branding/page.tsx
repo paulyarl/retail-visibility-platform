@@ -2,14 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Alert } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Alert, Spinner } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import Image from 'next/image';
+import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
+import AccessDenied from '@/components/AccessDenied';
 
 export default function TenantBrandingPage() {
   const params = useParams();
   const tenantId = params.tenantId as string;
+  
+  // Centralized access control - Platform Support or Tenant Admin
+  const { hasAccess, loading: accessLoading, tenantRole } = useAccessControl(
+    tenantId,
+    AccessPresets.SUPPORT_OR_TENANT_ADMIN
+  );
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -339,6 +347,26 @@ export default function TenantBrandingPage() {
       setSaving(false);
     }
   };
+
+  // Access control checks
+  if (accessLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <AccessDenied
+        title="Admin Access Required"
+        message="You need tenant administrator privileges to manage branding settings."
+        userRole={tenantRole}
+        backLink={{ href: `/t/${tenantId}/settings`, label: 'Back to Settings' }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
