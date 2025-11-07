@@ -126,9 +126,22 @@ export default function AdminDashboardPage() {
       ],
     },
     {
-      title: 'Feature Flags',
-      description: 'Control feature rollout and tenant override permissions',
+      title: 'Feature Flags & Overrides',
+      description: 'Control feature rollout and custom tenant access',
       sections: [
+        {
+          title: 'Feature Overrides',
+          description: 'Grant or revoke tier features for specific tenants',
+          href: '/settings/admin/feature-overrides',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          ),
+          color: 'bg-amber-500',
+          stats: 'Custom access control',
+          badge: 'NEW',
+        },
         {
           title: 'Feature Flags (DB)',
           description: 'Database-backed flags with tenant override support',
@@ -140,7 +153,6 @@ export default function AdminDashboardPage() {
           ),
           color: 'bg-indigo-500',
           stats: 'Persistent flags',
-          badge: 'NEW',
         },
         {
           title: 'Feature Flags (Legacy)',

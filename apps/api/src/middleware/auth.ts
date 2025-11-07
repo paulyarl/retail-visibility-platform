@@ -282,3 +282,41 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
     return res.status(500).json({ error: 'authorization_check_failed' });
   }
 }
+
+/**
+ * Middleware for read-only platform staff access (Platform Admin + Platform Support)
+ * Use for GET/HEAD requests that should be accessible to support staff
+ * Write operations (POST/PUT/PATCH/DELETE) require Platform Admin
+ * 
+ * Usage:
+ *   router.get('/api/admin/resource', requirePlatformStaffOrAdmin, handler)
+ *   router.post('/api/admin/resource', requirePlatformStaffOrAdmin, handler) // Auto-checks for admin on write
+ */
+export function requirePlatformStaffOrAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
+  }
+
+  const method = req.method.toUpperCase();
+  
+  // Read operations: Allow Platform Staff (Admin + Support + Viewer)
+  if (method === 'GET' || method === 'HEAD') {
+    if (isPlatformUser(req.user)) {
+      return next();
+    }
+    return res.status(403).json({ 
+      error: 'platform_staff_required', 
+      message: 'Platform staff access required to view this resource' 
+    });
+  }
+  
+  // Write operations: Platform Admin only
+  if (!isPlatformAdmin(req.user)) {
+    return res.status(403).json({ 
+      error: 'platform_admin_required', 
+      message: 'Platform administrator access required for write operations' 
+    });
+  }
+  
+  next();
+}
