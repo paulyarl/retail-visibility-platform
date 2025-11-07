@@ -34,6 +34,27 @@ model TenantFeatureFlag {
   @@map("tenant_feature_flags")
 }
 
+// Tier Feature Overrides - Custom feature access per tenant
+// Allows granting/revoking specific tier features regardless of subscription tier
+model TenantFeatureOverride {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  feature     String   // e.g., 'quick_start_wizard', 'product_scanning'
+  granted     Boolean  @default(true) // true = grant access, false = revoke access
+  reason      String?  // e.g., 'Beta tester', 'Custom deal', 'Support exception'
+  expiresAt   DateTime? @map("expires_at") // Optional expiration
+  grantedBy   String   @map("granted_by") // User ID who created the override
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, feature])
+  @@index([tenantId])
+  @@index([feature])
+  @@index([expiresAt])
+  @@map("tenant_feature_overrides")
+}
+
 // Business Hours (platform is source of truth)
 model BusinessHours {
   id           String    @id @default(cuid())
@@ -105,6 +126,7 @@ model Tenant {
   businessHours         BusinessHours?
   businessHoursSpecials BusinessHoursSpecial[]
   featureFlags          TenantFeatureFlag[]
+  featureOverrides      TenantFeatureOverride[]
   scanTemplates         ScanTemplate[]
   scanSessions          ScanSession[]
   scanResults           ScanResult[]
