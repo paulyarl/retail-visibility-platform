@@ -163,7 +163,7 @@ export default function TierMatrixPage() {
                     {price === 0 ? 'Free' : `$${price}/mo`}
                   </p>
                   <p className="text-sm opacity-75">
-                    {featureCount} feature{featureCount !== 1 ? 's' : ''}
+                    {featureCount} {featureCount === 1 ? 'feature' : 'features'}
                   </p>
                 </div>
               );
