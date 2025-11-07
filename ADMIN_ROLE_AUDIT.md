@@ -16,29 +16,24 @@ Found **multiple locations** checking `role === 'ADMIN'` that should use central
 
 ### ✅ Already Fixed
 - `apps/api/src/index.ts` (line 151) - GET /tenants endpoint ✅
+- `apps/api/src/index.ts` (line 1285) - Inventory list endpoint ✅
 - `apps/api/src/middleware/auth.ts` - Uses centralized helpers ✅
+- `apps/api/src/auth/auth.middleware.ts` - Tenant access check ✅
 - `apps/web/src/lib/auth/access-control.ts` - Centralized helper definitions ✅
+- `apps/web/src/components/tenants/TenantsClient.tsx` - Permission checks ✅
+- `apps/web/src/components/app-shell/TenantSwitcher.tsx` - Tenant switching ✅
+- `apps/web/src/app/(platform)/page.tsx` - Dashboard manage hours ✅
+- `apps/web/src/app/(platform)/settings/tenant/page.tsx` - Organization assignment (5 locations) ✅
 
-### ⚠️ Needs Review
+### 🟢 Safe to Keep (UI Display Only)
 
-#### Backend (apps/api/src)
+These checks are for **UI display purposes only** (badges, labels, filters) and don't affect access control:
 
-| File | Line | Code | Should Use | Priority |
-|------|------|------|------------|----------|
-| `auth/auth.middleware.ts` | 70 | `req.user.role === 'ADMIN'` | `isPlatformAdmin()` | 🔴 HIGH |
-| `index.ts` | 1285 | `req.user?.role === 'ADMIN'` | `isPlatformAdmin()` | 🔴 HIGH |
-
-#### Frontend (apps/web/src)
-
-| File | Line | Code | Context | Should Use | Priority |
-|------|------|------|---------|------------|----------|
-| `components/tenants/TenantsClient.tsx` | 393 | `userRole === 'ADMIN'` | Permission checks | `isPlatformAdmin()` | 🔴 HIGH |
-| `components/app-shell/TenantSwitcher.tsx` | 50 | `user?.role === 'ADMIN'` | Tenant switching | `isPlatformAdmin()` | 🔴 HIGH |
-| `app/(platform)/page.tsx` | 782 | `user?.role === 'ADMIN'` | Can manage check | `isPlatformAdmin()` | 🟡 MEDIUM |
-| `app/(platform)/settings/tenant/page.tsx` | 456, 461, 489, 521, 626 | `user?.role === 'ADMIN'` | Org assignment | `isPlatformAdmin()` | 🟡 MEDIUM |
-| `components/admin/CreateUserModal.tsx` | 175 | `formData.role === 'ADMIN'` | UI display only | Keep as-is | 🟢 LOW |
-| `app/admin/users/page.tsx` | 159, 163 | `user.role === 'ADMIN'` | UI display only | Keep as-is | 🟢 LOW |
-| `app/(platform)/settings/admin/users/page.tsx` | 324, 391 | `role === 'ADMIN'` | Filtering/counting | Keep as-is | 🟢 LOW |
+| File | Line | Code | Context | Status |
+|------|------|------|---------|--------|
+| `components/admin/CreateUserModal.tsx` | 175 | `formData.role === 'ADMIN'` | UI display only | ✅ Keep as-is |
+| `app/admin/users/page.tsx` | 159, 163 | `user.role === 'ADMIN'` | UI display only | ✅ Keep as-is |
+| `app/(platform)/settings/admin/users/page.tsx` | 324, 391 | `role === 'ADMIN'` | Filtering/counting | ✅ Keep as-is |
 
 ---
 
@@ -148,19 +143,19 @@ These checks are for **UI display purposes only** (badges, labels, filters) and 
 
 ## 📋 Implementation Plan
 
-### Phase 1: Critical Backend (Immediate)
-- [ ] Fix `auth/auth.middleware.ts` - Tenant access check
-- [ ] Fix `index.ts` - Admin check in route handler
+### Phase 1: Critical Backend (Immediate) ✅ COMPLETE
+- [x] Fix `auth/auth.middleware.ts` - Tenant access check
+- [x] Fix `index.ts` - Admin check in route handler
 
-### Phase 2: Critical Frontend (High Priority)
-- [ ] Fix `TenantsClient.tsx` - Permission checks
-- [ ] Fix `TenantSwitcher.tsx` - Tenant switching access
+### Phase 2: Critical Frontend (High Priority) ✅ COMPLETE
+- [x] Fix `TenantsClient.tsx` - Permission checks
+- [x] Fix `TenantSwitcher.tsx` - Tenant switching access
 
-### Phase 3: Medium Priority Frontend
-- [ ] Fix `page.tsx` (platform dashboard) - Can manage check
-- [ ] Fix `settings/tenant/page.tsx` - Organization assignment
+### Phase 3: Medium Priority Frontend ✅ COMPLETE
+- [x] Fix `page.tsx` (platform dashboard) - Can manage check
+- [x] Fix `settings/tenant/page.tsx` - Organization assignment
 
-### Phase 4: Testing
+### Phase 4: Testing 🔄 READY
 - [ ] Test with PLATFORM_ADMIN
 - [ ] Test with PLATFORM_SUPPORT
 - [ ] Test with PLATFORM_VIEWER

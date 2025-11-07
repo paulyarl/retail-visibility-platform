@@ -14,6 +14,7 @@ import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAdminEmail } from "@/lib/admin-emails";
+import { isPlatformAdmin } from "@/lib/auth/access-control";
 import { BusinessProfile, geocodeAddress } from "@/lib/validation/businessProfile";
 
 type Tenant = {
@@ -453,12 +454,12 @@ export default function TenantSettingsPage() {
               <div>
                 <CardTitle>Organization / Chain Assignment</CardTitle>
                 <CardDescription>
-                  {user?.role === 'ADMIN' 
+                  {user && isPlatformAdmin(user)
                     ? 'Assign this tenant to a chain organization (Admin Only)' 
                     : 'Request to join a chain organization'}
                 </CardDescription>
               </div>
-              {user?.role === 'ADMIN' && !editingOrg && (
+              {user && isPlatformAdmin(user) && !editingOrg && (
                 <button
                   onClick={() => setEditingOrg(true)}
                   className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
@@ -486,7 +487,7 @@ export default function TenantSettingsPage() {
                     {tenant.organization ? 'Part of a chain organization' : 'Standalone location'}
                   </p>
                 </div>
-                {user?.role === 'ADMIN' && editingOrg ? (
+                {user && isPlatformAdmin(user) && editingOrg ? (
                   <select
                     value={selectedOrgId}
                     onChange={(e) => setSelectedOrgId(e.target.value)}
@@ -518,7 +519,7 @@ export default function TenantSettingsPage() {
               </div>
 
               {/* Admin Edit Controls */}
-              {user?.role === 'ADMIN' && editingOrg && (
+              {user && isPlatformAdmin(user) && editingOrg && (
                 <div className="flex items-center gap-2 pt-2">
                   <button
                     onClick={async () => {
@@ -623,7 +624,7 @@ export default function TenantSettingsPage() {
               )}
 
               {/* No Organizations Alert */}
-              {!editingOrg && organizations.length === 0 && user?.role === 'ADMIN' && (
+              {!editingOrg && organizations.length === 0 && user && isPlatformAdmin(user) && (
                 <Alert variant="info" title="No Organizations Available">
                   <p className="text-sm">
                     No chain organizations have been created yet. Create an organization first to assign this tenant to a chain.

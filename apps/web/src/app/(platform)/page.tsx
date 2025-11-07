@@ -11,6 +11,7 @@ import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import Image from "next/image";
+import { canManageTenantSettings } from "@/lib/auth/access-control";
 import PublicFooter from "@/components/PublicFooter";
 import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
 import { computeStoreStatus } from "@/lib/hours-utils";
@@ -778,9 +779,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   )}
                 </div>
                 {(() => {
-                  const tenantRole = user?.tenants.find(t => t.id === selectedTenantId)?.role;
-                  const canManage = user?.role === 'ADMIN' || tenantRole === 'OWNER' || tenantRole === 'ADMIN';
-                  if (!canManage) return null;
+                  // Use centralized permission helper
+                  if (!user || !canManageTenantSettings(user, selectedTenantId)) return null;
                   return (
                     <Link href={`/t/${selectedTenantId}/settings/hours`} className="w-full sm:w-auto">
                       <Button variant="secondary" size="md" className="w-full sm:w-auto whitespace-nowrap font-semibold">
