@@ -135,6 +135,7 @@ model Tenant {
   googleBusinessAccessToken    String?
   googleBusinessRefreshToken   String?
   googleBusinessTokenExpiry    DateTime?
+  cloverIntegration            CloverIntegration?
 
   @@index([name])
   @@index([subscriptionStatus])
@@ -1021,4 +1022,123 @@ enum EnrichmentStatus {
   PARTIALLY_ENRICHED
 
   @@map("enrichment_status")
+}
+
+// ============================================================================
+// CLOVER POS INTEGRATION
+// ============================================================================
+
+// Main integration record - tracks connection status and mode
+model CloverIntegration {
+  id                String   @id @default(cuid())
+  tenantId          String   @unique @map("tenant_id")
+  mode              String   @default("demo") // 'demo' or 'production'
+  status            String   @default("active") // 'active', 'paused', 'error', 'migrating'
+  
+  // OAuth tokens (encrypted at application level)
+  accessToken       String?  @map("access_token")
+  refreshToken      String?  @map("refresh_token")
+  tokenExpiresAt    DateTime? @map("token_expires_at")
+  merchantId        String?  @map("merchant_id") // Clover merchant ID
+  
+  // Demo mode tracking
+  demoEnabledAt     DateTime? @map("demo_enabled_at")
+  demoLastActiveAt  DateTime? @map("demo_last_active_at")
+  
+  // Production mode tracking
+  productionEnabledAt DateTime? @map("production_enabled_at")
+  lastSyncAt        DateTime? @map("last_sync_at")
+  lastSyncStatus    String?   @map("last_sync_status") // 'success', 'partial', 'failed'
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  syncLogs          CloverSyncLog[]
+  itemMappings      CloverItemMapping[]
+  demoSnapshots     CloverDemoSnapshot[]
+  
+  @@index([tenantId])
+  @@index([status])
+  @@index([mode])
+  @@map("clover_integrations")
+}
+
+// Sync log - tracks all sync operations with trace IDs
+model CloverSyncLog {
+  id                String   @id @default(cuid())
+  integrationId     String   @map("integration_id")
+  traceId           String   @unique @map("trace_id") // Unified trace ID for observability
+  
+  operation         String   // 'sync', 'import', 'migrate', 'rollback'
+  status            String   // 'started', 'success', 'failed', 'partial'
+  
+  itemsProcessed    Int      @default(0) @map("items_processed")
+  itemsSucceeded    Int      @default(0) @map("items_succeeded")
+  itemsFailed       Int      @default(0) @map("items_failed")
+  
+  errorMessage      String?  @map("error_message")
+  errorDetails      Json?    @map("error_details")
+  
+  durationMs        Int?     @map("duration_ms") // Sync duration in milliseconds
+  
+  startedAt         DateTime @default(now()) @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  
+  integration       CloverIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  @@index([integrationId])
+  @@index([traceId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("clover_sync_logs")
+}
+
+// Item mapping - maps Clover items to RVP inventory items
+model CloverItemMapping {
+  id                String   @id @default(cuid())
+  integrationId     String   @map("integration_id")
+  
+  cloverItemId      String   @map("clover_item_id") // Clover's item ID
+  cloverItemName    String   @map("clover_item_name")
+  cloverSku         String?  @map("clover_sku")
+  
+  rvpItemId         String?  @map("rvp_item_id") // RVP inventory item ID
+  rvpSku            String?  @map("rvp_sku")
+  
+  mappingStatus     String   @default("pending") @map("mapping_status") // 'pending', 'mapped', 'conflict', 'unmapped'
+  conflictReason    String?  @map("conflict_reason")
+  
+  // Sync tracking
+  lastSyncedAt      DateTime? @map("last_synced_at")
+  lastSyncStatus    String?   @map("last_sync_status")
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  
+  integration       CloverIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  @@unique([integrationId, cloverItemId])
+  @@index([integrationId])
+  @@index([rvpItemId])
+  @@index([mappingStatus])
+  @@map("clover_item_mappings")
+}
+
+// Demo snapshot - stores demo data for rollback during migration
+model CloverDemoSnapshot {
+  id                String   @id @default(cuid())
+  integrationId     String   @map("integration_id")
+  
+  snapshotData      Json     @map("snapshot_data") // Full demo state
+  itemCount         Int      @map("item_count")
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+  expiresAt         DateTime @map("expires_at") // Auto-delete after 30 days
+  
+  integration       CloverIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  @@index([integrationId])
+  @@index([expiresAt])
+  @@map("clover_demo_snapshots")
 }
