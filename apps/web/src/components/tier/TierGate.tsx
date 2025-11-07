@@ -176,7 +176,7 @@ function TierUpgradePrompt({ feature, currentTier, upgrade, tenantId, className 
             </div>
           )}
           
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center bg-orange-200">
             <Link
               href={upgradeUrl}
               className="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-primary-300 dark:border-primary-600 text-primary-700 dark:text-primary-300 font-medium hover:bg-primary-100 dark:hover:bg-primary-700 transition-colors"  
