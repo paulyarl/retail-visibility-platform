@@ -10,7 +10,7 @@ import ItemPhotoGallery from "./ItemPhotoGallery";
 import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { isFeatureEnabled } from "@/lib/featureFlags";
-import { ViewingAsBadge } from "@/components/RoleBadge";
+import { ContextBadges } from "@/components/ContextBadges";
 import ItemsGridV2 from "./ItemsGridV2";
 import AssignCategoryModal from "./AssignCategoryModal";
 import QuickStartEmptyState from "./QuickStartEmptyState";
@@ -532,7 +532,6 @@ export default function ItemsClient({
         title="Inventory"
         description="Manage your catalog and stock levels"
         icon={Icons.Inventory}
-        badge={tenantId ? <ViewingAsBadge tenantId={tenantId} /> : <ViewingAsBadge showPlatformRole />}
         actions={
           <div className="flex gap-3">
             {tenantId && (
@@ -559,6 +558,12 @@ export default function ItemsClient({
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Context Badges */}
+        <ContextBadges 
+          tenant={tenantId ? { id: tenantId, name: currentTenant?.name || '' } : undefined}
+          showPlatformRole={!tenantId}
+          contextLabel="Inventory"
+        />
         {/* Active Scan Session Banner */}
         {activeScanSession && (
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4 shadow-md">
