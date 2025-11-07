@@ -404,7 +404,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
       window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
 
       // Show success message
-      alert('Upgrade request submitted successfully! Our team will review it shortly.');
+      alert('Your ${changeType} request submitted successfully! Our team will review it shortly.');
       setShowChangeModal(false);
     } catch (error) {
       console.error('Failed to submit upgrade request:', error);
