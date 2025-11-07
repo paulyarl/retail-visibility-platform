@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Rocket, Package, Sparkles, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { ContextBadges } from '@/components/ContextBadges';
 
 type Scenario = {
   id: string;
@@ -160,6 +161,7 @@ export default function QuickStartPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="max-w-2xl mx-auto px-4 py-12">
+          <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border-2 border-red-200 dark:border-red-800">
             {/* Blocked Icon */}
             <div className="flex justify-center mb-6">
@@ -233,6 +235,7 @@ export default function QuickStartPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="max-w-2xl mx-auto px-4 py-12">
+          <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
             {/* Success Icon */}
             <div className="flex justify-center mb-6">
@@ -322,6 +325,7 @@ export default function QuickStartPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="max-w-4xl mx-auto px-4 py-12">
+        <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
         {/* Page Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">

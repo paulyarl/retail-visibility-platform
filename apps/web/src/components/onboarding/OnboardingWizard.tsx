@@ -9,6 +9,7 @@ import StoreIdentityStep from './StoreIdentityStep';
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import { api } from '@/lib/api';
+import { ContextBadges } from '@/components/ContextBadges';
 
 interface OnboardingWizardProps {
   tenantId: string;
@@ -232,6 +233,15 @@ export default function OnboardingWizard({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
+      {/* Context Badges */}
+      <div className="absolute top-4 left-4 right-4 z-10">
+        <ContextBadges 
+          tenant={{ id: tenantId, name: '' }}
+          contextLabel="Onboarding"
+          showBorder={false}
+        />
+      </div>
+      
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-grid-pattern opacity-5" />
       
