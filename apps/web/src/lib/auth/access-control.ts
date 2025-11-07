@@ -81,12 +81,67 @@ export interface AccessControlOptions {
   customCheck?: (user: UserData, context: AccessControlContext) => boolean;
 }
 
+/**
+ * Check if user is a platform admin
+ */
 export function isPlatformAdmin(user: UserData): boolean {
-  // Platform admin is determined by role === 'PLATFORM_ADMIN' (explicit)
-  // Also check legacy 'ADMIN' role and isPlatformAdmin flag for backwards compatibility
   return user.role === 'PLATFORM_ADMIN' || 
-         user.role === 'ADMIN' || 
-         user.isPlatformAdmin === true;
+         user.role === 'ADMIN' || // Legacy
+         user.isPlatformAdmin === true; // Legacy
+}
+
+/**
+ * Permission Helpers
+ * These functions check if a user has permission to perform specific actions.
+ * Use these instead of checking roles directly for better maintainability.
+ */
+
+/**
+ * Check if user can manage platform users (create, edit, delete)
+ */
+export function canManageUsers(user: UserData): boolean {
+  return user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN';
+}
+
+/**
+ * Check if user can view platform users (read-only)
+ */
+export function canViewUsers(user: UserData): boolean {
+  return user.role === 'PLATFORM_ADMIN' || 
+         user.role === 'PLATFORM_SUPPORT' || 
+         user.role === 'ADMIN';
+}
+
+/**
+ * Check if user can manage feature flags
+ */
+export function canManageFeatureFlags(user: UserData): boolean {
+  return user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN';
+}
+
+/**
+ * Check if user can view feature flags (read-only)
+ */
+export function canViewFeatureFlags(user: UserData): boolean {
+  return user.role === 'PLATFORM_ADMIN' || 
+         user.role === 'PLATFORM_SUPPORT' || 
+         user.role === 'ADMIN';
+}
+
+/**
+ * Check if user can manage organizations
+ */
+export function canManageOrganizations(user: UserData): boolean {
+  return user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN';
+}
+
+/**
+ * Check if user can view organizations (read-only)
+ */
+export function canViewOrganizations(user: UserData): boolean {
+  return user.role === 'PLATFORM_ADMIN' || 
+         user.role === 'PLATFORM_SUPPORT' || 
+         user.role === 'ADMIN';
 }
 
 export function isPlatformUser(user: UserData): boolean {

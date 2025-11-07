@@ -7,7 +7,7 @@ import CreateUserModal from '@/components/admin/CreateUserModal';
 import ResetPasswordModal from '@/components/admin/ResetPasswordModal';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { isPlatformAdmin } from '@/lib/auth/access-control';
+import { canManageUsers, canViewUsers } from '@/lib/auth/access-control';
 
 interface User {
   id: string;
@@ -20,7 +20,8 @@ interface User {
 
 export default function AdminUsersPage() {
   const { user } = useAuth();
-  const isAdmin = user ? isPlatformAdmin(user) : false;
+  const canManage = user ? canManageUsers(user) : false;
+  const canView = user ? canViewUsers(user) : false;
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -95,7 +96,7 @@ export default function AdminUsersPage() {
               {users.length} total users
             </p>
           </div>
-          {isAdmin ? (
+          {canManage ? (
             <button
               onClick={() => setCreateModalOpen(true)}
               className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium rounded-lg transition-all flex items-center gap-2"
@@ -184,7 +185,7 @@ export default function AdminUsersPage() {
                           : 'Never'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {isAdmin ? (
+                        {canManage ? (
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => setResetPasswordModal({ open: true, user })}
