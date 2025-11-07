@@ -9,7 +9,7 @@ import { getAllAdminEmails } from '@/lib/admin-emails';
 import { api } from '@/lib/api';
 import { isPlatformUser, isPlatformAdmin, type UserData } from '@/lib/auth/access-control';
 import { useAuth } from '@/contexts/AuthContext';
-import { ViewingAsBadge } from '@/components/RoleBadge';
+import { ContextBadges } from '@/components/ContextBadges';
 
 interface Tenant {
   id: string;
@@ -429,28 +429,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Context Badges */}
-        <div className="flex items-center gap-3 pb-4 border-b border-neutral-200 dark:border-neutral-700">
-          <ViewingAsBadge tenantId={tenant?.id} showPlatformRole={!tenant} />
-          {tenant && (
-            <div className="inline-flex items-center gap-3 px-3 py-1.5 bg-white dark:bg-neutral-800 rounded-lg border-2 border-neutral-300 dark:border-neutral-600 shadow-sm">
-              {tenant.metadata?.branding?.logoUrl && (
-                <img 
-                  src={tenant.metadata.branding.logoUrl} 
-                  alt={`${tenant.name} logo`}
-                  className="h-8 w-8 object-contain rounded"
-                />
-              )}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
-                  Subscription:
-                </span>
-                <span className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-                  {tenant.name}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
+        <ContextBadges tenant={tenant || undefined} showPlatformRole={!tenant} />
         
         {/* Current Plan */}
         {/* SKU Overage Alert */}
