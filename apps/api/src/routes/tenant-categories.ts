@@ -41,6 +41,59 @@ function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+/**
+ * Middleware to check if user can manage tenant (owner/admin)
+ * Used for tenant-level operations like creating/editing categories
+ * Platform support can also perform these operations
+ */
+async function requireTenantManagement(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  const userId = user?.userId;
+  const tenantId = req.params.tenantId;
+
+  if (!user || !userId) {
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized',
+      message: 'Authentication required',
+    });
+  }
+
+  // Platform support can manage any tenant
+  if (canPerformSupportActions(user)) {
+    return next();
+  }
+
+  // Check tenant-level permissions
+  try {
+    const { prisma: prismaClient } = await import('../prisma');
+    const userTenant = await prismaClient.userTenant.findUnique({
+      where: {
+        userId_tenantId: {
+          userId: userId,
+          tenantId: tenantId,
+        },
+      },
+    });
+
+    if (userTenant && (userTenant.role === 'OWNER' || userTenant.role === 'ADMIN')) {
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      error: 'Forbidden',
+      message: 'Tenant owner or admin access required for this operation',
+    });
+  } catch (error) {
+    console.error('[requireTenantManagement] Error checking permissions:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to check permissions',
+    });
+  }
+}
+
 // Validation schemas
 const createCategorySchema = z.object({
   tenantId: z.string().cuid(),
@@ -226,8 +279,9 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
 /**
  * POST /api/v1/tenants/:tenantId/categories
  * Create a new category
+ * Permission: Platform support OR tenant owner/admin
  */
-router.post('/:tenantId/categories', async (req, res) => {
+router.post('/:tenantId/categories', requireTenantManagement, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const body = createCategorySchema.parse({ ...req.body, tenantId });
@@ -296,8 +350,9 @@ router.post('/:tenantId/categories', async (req, res) => {
 /**
  * PUT /api/v1/tenants/:tenantId/categories/:id
  * Update a category
+ * Permission: Platform support OR tenant owner/admin
  */
-router.put('/:tenantId/categories/:id', async (req, res) => {
+router.put('/:tenantId/categories/:id', requireTenantManagement, async (req, res) => {
   try {
     const { tenantId, id } = req.params;
     const body = updateCategorySchema.parse(req.body);
@@ -383,8 +438,9 @@ router.put('/:tenantId/categories/:id', async (req, res) => {
 /**
  * DELETE /api/v1/tenants/:tenantId/categories/:id
  * Delete a category (soft delete)
+ * Permission: Platform support OR tenant owner/admin
  */
-router.delete('/:tenantId/categories/:id', async (req, res) => {
+router.delete('/:tenantId/categories/:id', requireTenantManagement, async (req, res) => {
   try {
     const { tenantId, id } = req.params;
 
@@ -452,9 +508,10 @@ router.delete('/:tenantId/categories/:id', async (req, res) => {
 
 /**
  * POST /api/v1/tenants/:tenantId/categories/:id/align
- * Align category to Google taxonomy
+ * Align category to Google taxonomy (GBP category management)
+ * Permission: Platform support OR tenant owner/admin
  */
-router.post('/:tenantId/categories/:id/align', async (req, res) => {
+router.post('/:tenantId/categories/:id/align', requireTenantManagement, async (req, res) => {
   try {
     const { tenantId, id } = req.params;
     const body = alignCategorySchema.parse(req.body);
