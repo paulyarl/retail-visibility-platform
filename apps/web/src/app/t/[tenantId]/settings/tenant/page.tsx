@@ -14,10 +14,10 @@ export default function TenantBusinessProfilePage() {
   const params = useParams();
   const tenantId = params.tenantId as string;
   
-  // Centralized access control - Tenant Admin required
+  // Centralized access control - Platform Support or Tenant Admin
   const { hasAccess, loading: accessLoading, tenantRole } = useAccessControl(
     tenantId,
-    AccessPresets.TENANT_ADMIN
+    AccessPresets.SUPPORT_OR_TENANT_ADMIN
   );
   
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
