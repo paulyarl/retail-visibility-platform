@@ -370,9 +370,15 @@ export function checkAccess(
  * Pre-configured access control presets for common scenarios
  */
 export const AccessPresets = {
-  /** Platform administrators only (strict - no override) */
+  /** Platform admin only (no tenant override) */
   PLATFORM_ADMIN_ONLY: {
-    requirePlatformAdmin: true,
+    requirePlatformRole: ['PLATFORM_ADMIN', 'ADMIN'],
+    allowPlatformAdminOverride: false,
+  } as AccessControlOptions,
+
+  /** Platform staff (admin + support) for read-only admin access */
+  PLATFORM_STAFF: {
+    requirePlatformRole: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'ADMIN'],
     allowPlatformAdminOverride: false,
   } as AccessControlOptions,
 
