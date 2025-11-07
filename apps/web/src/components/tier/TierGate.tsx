@@ -30,7 +30,7 @@
 
 import React from 'react';
 import { useTierAccess } from '@/lib/tiers/useTierAccess';
-import { FEATURE_DISPLAY_NAMES, TIER_DISPLAY_NAMES } from '@/lib/tiers';
+import { FEATURE_DISPLAY_NAMES, TIER_DISPLAY_NAMES } from '@/lib/tiers/tier-features';
 import Link from 'next/link';
 
 interface TierGateProps {
