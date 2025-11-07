@@ -380,8 +380,8 @@ VALUES
 INSERT INTO organization (id, name, "ownerId", "createdAt", "updatedAt")
 VALUES ('org-001', 'Carol''s Coffee Chain', (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), NOW(), NOW());
 
--- Create tenants (note: Tenant model doesn't have owner_id, ownership is via UserTenant with OWNER role)
-INSERT INTO "Tenant" (id, name, organization_id, created_at)
+-- Create tenants (note: Tenant uses camelCase columns, ownership is via UserTenant with OWNER role)
+INSERT INTO "Tenant" (id, name, "organizationId", "createdAt")
 VALUES 
   ('tenant-001', 'Carol''s Coffee - Downtown', 'org-001', NOW()),
   ('tenant-002', 'Carol''s Coffee - Uptown', 'org-001', NOW()),
