@@ -604,9 +604,10 @@ model User {
 
 // User roles enum
 enum UserRole {
-  ADMIN // Platform admin
-  OWNER // Business owner
-  USER // Regular user
+  PLATFORM_ADMIN // Platform-wide admin (explicit, no ambiguity)
+  ADMIN          // Deprecated - use PLATFORM_ADMIN or UserTenantRole.ADMIN
+  OWNER          // Business owner
+  USER           // Regular user
 
   @@map("user_role")
 }

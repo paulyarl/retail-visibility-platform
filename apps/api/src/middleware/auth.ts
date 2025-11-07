@@ -74,10 +74,30 @@ export function authorize(...roles: UserRole[]) {
 }
 
 /**
- * Admin-only middleware
+ * Platform admin-only middleware (explicit)
+ */
+export function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
+  }
+
+  // Check for explicit PLATFORM_ADMIN role, or legacy ADMIN role
+  if (req.user.role !== UserRole.PLATFORM_ADMIN && req.user.role !== UserRole.ADMIN) {
+    return res.status(403).json({ 
+      error: 'platform_admin_required', 
+      message: 'Platform administrator access required' 
+    });
+  }
+
+  next();
+}
+
+/**
+ * Admin-only middleware (legacy - use requirePlatformAdmin instead)
+ * @deprecated Use requirePlatformAdmin for platform-wide admin access
  */
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  return authorize(UserRole.ADMIN)(req, res, next);
+  return requirePlatformAdmin(req, res, next);
 }
 
 /**
@@ -88,8 +108,8 @@ export function checkTenantAccess(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
   }
 
-  // Admin users have access to all tenants
-  if (req.user.role === UserRole.ADMIN) {
+  // Platform admin users have access to all tenants
+  if (req.user.role === UserRole.PLATFORM_ADMIN || req.user.role === UserRole.ADMIN) {
     return next();
   }
 
@@ -147,7 +167,7 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
   }
 
   // Platform admins can manage any tenant
-  if (req.user.role === UserRole.ADMIN) {
+  if (req.user.role === UserRole.PLATFORM_ADMIN || req.user.role === UserRole.ADMIN) {
     return next();
   }
 

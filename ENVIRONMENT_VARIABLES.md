@@ -16,9 +16,12 @@
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Vercel (Web) | ✅ Yes | Supabase anon key (client-side) |
 | `NEXT_PUBLIC_API_BASE_URL` | Vercel (Web) | ✅ Yes | API server URL |
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Vercel (Web) | ⚠️ **NEW!** | Google Maps for storefront |
-| `GOOGLE_CLIENT_ID` | Railway (API) | ✅ Yes | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Railway (API) | ✅ Yes | Google OAuth client secret |
-| `GOOGLE_REDIRECT_URI` | Railway (API) | ✅ Yes | OAuth callback URL |
+| `GOOGLE_CLIENT_ID` | Railway (API) | ✅ Yes | Google Merchant Center OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Railway (API) | ✅ Yes | Google Merchant Center OAuth client secret |
+| `GOOGLE_REDIRECT_URI` | Railway (API) | ✅ Yes | Merchant Center OAuth callback URL |
+| `GOOGLE_BUSINESS_CLIENT_ID` | Railway (API) | ✅ Yes | Google My Business OAuth client ID |
+| `GOOGLE_BUSINESS_CLIENT_SECRET` | Railway (API) | ✅ Yes | Google My Business OAuth client secret |
+| `GOOGLE_BUSINESS_REDIRECT_URI` | Railway (API) | ✅ Yes | GMB OAuth callback URL |
 | `OAUTH_ENCRYPTION_KEY` | Railway (API) | ✅ Yes | Token encryption key (32-byte hex) |
 | `WEB_URL` | Railway (API) | ✅ Yes | Frontend URL for redirects |
 | `NODE_ENV` | Both | ⚙️ Auto | Environment (production/development) |
@@ -68,18 +71,46 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-#### Google OAuth
+#### Google OAuth (Two Separate Integrations)
+
+**Google Merchant Center OAuth:**
 ```bash
 GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
 GOOGLE_REDIRECT_URI=https://your-api.railway.app/google/callback
+```
+**Used in:**
+- `apps/api/src/lib/google/oauth.ts` - Merchant Center OAuth flow
+- `apps/api/src/index.ts` - OAuth routes (/google/auth, /google/callback)
+
+**Purpose:** Google OAuth 2.0 for Merchant Center integration
+
+---
+
+**Google My Business (GMB/GBP) OAuth:**
+```bash
+GOOGLE_BUSINESS_CLIENT_ID=xxxxx.apps.googleusercontent.com
+GOOGLE_BUSINESS_CLIENT_SECRET=GOCSPX-xxxxx
+GOOGLE_BUSINESS_REDIRECT_URI=https://your-api.railway.app/google-business/callback
+```
+**Used in:**
+- `apps/api/src/routes/google-business-oauth.ts` - GMB OAuth flow
+- `apps/api/src/routes/test-gbp.ts` - GMB testing endpoints
+
+**Purpose:** Google OAuth 2.0 for Google Business Profile (GMB) integration
+
+**Scopes:**
+- Merchant Center: `https://www.googleapis.com/auth/content`
+- Business Profile: `https://www.googleapis.com/auth/business.manage`
+
+---
+
+**OAuth Encryption Key (Shared):**
+```bash
 OAUTH_ENCRYPTION_KEY=64_character_hex_string_for_token_encryption
 ```
 **Used in:**
-- `apps/api/src/lib/google/oauth.ts` - OAuth flow implementation
-- `apps/api/src/index.ts` - OAuth routes (/google/auth, /google/callback)
-
-**Purpose:** Google OAuth 2.0 for Merchant Center + Business Profile integration
+- Both OAuth flows for encrypting/decrypting tokens
 
 **How to generate OAUTH_ENCRYPTION_KEY:**
 ```bash

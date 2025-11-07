@@ -15,14 +15,14 @@
  * 7. Regular User - No tenant access
  */
 
-export type UserRole = 'OWNER' | 'ADMIN' | 'MEMBER';
-export type PlatformRole = 'ADMIN' | 'USER';
+export type UserRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+export type PlatformRole = 'PLATFORM_ADMIN' | 'ADMIN' | 'OWNER' | 'USER';
 
 export interface UserData {
   id: string;
   email: string;
   role?: PlatformRole;
-  isPlatformAdmin?: boolean;
+  isPlatformAdmin?: boolean; // Deprecated - use role === 'PLATFORM_ADMIN'
   tenants?: Array<{
     tenantId: string;
     role: UserRole;
@@ -81,9 +81,11 @@ export interface AccessControlOptions {
 }
 
 export function isPlatformAdmin(user: UserData): boolean {
-  // Platform admin is determined by role === 'ADMIN'
-  // isPlatformAdmin field doesn't exist in schema, kept in interface for backwards compatibility
-  return user.role === 'ADMIN' || user.isPlatformAdmin === true;
+  // Platform admin is determined by role === 'PLATFORM_ADMIN' (explicit)
+  // Also check legacy 'ADMIN' role and isPlatformAdmin flag for backwards compatibility
+  return user.role === 'PLATFORM_ADMIN' || 
+         user.role === 'ADMIN' || 
+         user.isPlatformAdmin === true;
 }
 
 export function getTenantRole(user: UserData, tenantId: string): UserRole | null {
