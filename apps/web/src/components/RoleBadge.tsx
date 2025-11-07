@@ -102,12 +102,12 @@ export function ViewingAsBadge({ tenantId, showPlatformRole = false }: RoleBadge
   if (!user) return null;
 
   // Determine viewing context
-  let viewingAs: string;
+  let viewingAs: string = 'User';
   let variant: 'default' | 'success' | 'warning' | 'error' | 'info' = 'default';
 
   if (showPlatformRole || !tenantId) {
     // Viewing as platform user
-    const role = user.role;
+    const role = user.role as string;
     if (role === 'PLATFORM_ADMIN' || role === 'ADMIN') {
       viewingAs = 'Platform Admin';
       variant = 'error';
