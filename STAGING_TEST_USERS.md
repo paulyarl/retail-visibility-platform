@@ -376,8 +376,8 @@ VALUES
 ### Step 3: Create Test Tenants and Organizations
 
 ```sql
--- Create organization for Carol (lowercase table name)
-INSERT INTO organization (id, name, owner_id, created_at, updated_at)
+-- Create organization for Carol (lowercase table name, camelCase column names)
+INSERT INTO organization (id, name, "ownerId", "createdAt", "updatedAt")
 VALUES ('org-001', 'Carol''s Coffee Chain', (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), NOW(), NOW());
 
 -- Create tenants (note: Tenant model doesn't have owner_id, ownership is via UserTenant with OWNER role)
