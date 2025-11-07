@@ -53,7 +53,8 @@ export default function TierMatrixPage() {
   const tierHasFeature = (tier: TierName, feature: string): boolean => {
     const tierFeatures = TIER_FEATURES[tier];
     if (!tierFeatures) return false;
-    return tierFeatures.includes(feature as any) || false;
+    // Type assertion needed because feature is a string but tierFeatures is a readonly tuple
+    return (tierFeatures as readonly string[]).includes(feature);
   };
 
   // Get tier color
