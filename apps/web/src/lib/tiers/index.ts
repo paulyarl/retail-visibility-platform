@@ -12,11 +12,13 @@ export {
   TIER_DISPLAY_NAMES,
   FEATURE_DISPLAY_NAMES,
   TIER_PRICING,
+  TIER_FEATURE_LIMITS,
   checkTierFeature,
   getRequiredTier,
   getTierDisplayName,
   getTierPricing,
   getTierFeatures,
+  getFeatureLimits,
   calculateUpgradeRequirements,
 } from './tier-features';
 

@@ -19,6 +19,7 @@ export const TIER_FEATURES = {
     'basic_product_pages',
     'qr_codes_512',
     'performance_analytics',
+    'quick_start_wizard',        // LIMITED: Max 25 SKUs, once per 7 days (taste test)
     // NOTE: No 'storefront' feature - this is the key differentiator
   ],
   starter: [
@@ -168,6 +169,8 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
   // Core features
   'storefront': 'Public Storefront',
   'quick_start_wizard': 'Quick Start Wizard',
+  'quick_start_wizard_limited': 'Quick Start Wizard (Limited)',
+  'quick_start_wizard_full': 'Quick Start Wizard (Full Access)',
   'product_scanning': 'Product Scanning',
   'gbp_integration': 'Google Business Profile Integration',
   'api_access': 'API Access',
@@ -254,6 +257,37 @@ export const TIER_PRICING: Record<string, number> = {
 };
 
 /**
+ * Feature-specific limits per tier
+ * Used to restrict "taste test" features for lower tiers
+ */
+export const TIER_FEATURE_LIMITS: Record<string, Record<string, any>> = {
+  google_only: {
+    quick_start_wizard: {
+      maxProducts: 25,           // Limited to 25 products (vs 100 for Professional)
+      rateLimitDays: 7,          // Once per 7 days (vs 1 day for Professional)
+      scenarios: ['grocery'],    // Only 1 scenario available (vs all 4)
+      message: 'Google-Only tier includes a limited Quick Start to help you get started. Upgrade to Professional for unlimited access with up to 100 products and all scenarios.',
+    },
+  },
+  professional: {
+    quick_start_wizard: {
+      maxProducts: 100,          // Full access: up to 100 products
+      rateLimitDays: 1,          // Once per day
+      scenarios: ['grocery', 'fashion', 'electronics', 'general'], // All scenarios
+      message: null,             // No restrictions
+    },
+  },
+  enterprise: {
+    quick_start_wizard: {
+      maxProducts: 100,
+      rateLimitDays: 1,
+      scenarios: ['grocery', 'fashion', 'electronics', 'general'],
+      message: null,
+    },
+  },
+};
+
+/**
  * Check if a tier has access to a feature
  */
 export function checkTierFeature(tier: string, feature: string): boolean {
@@ -316,6 +350,17 @@ export function getTierFeatures(tier: string): string[] {
   }
   
   return Array.from(features);
+}
+
+/**
+ * Get feature limits for a specific tier and feature
+ * Returns null if no limits apply (full access)
+ */
+export function getFeatureLimits(tier: string, feature: string): any | null {
+  const tierLimits = TIER_FEATURE_LIMITS[tier];
+  if (!tierLimits) return null;
+  
+  return tierLimits[feature] || null;
 }
 
 /**
