@@ -1,18 +1,19 @@
 # Platform Roles Access Control Audit
 
 **Date:** November 7, 2025  
-**Status:** 🔴 Needs Updates  
+**Status:** ✅ Complete  
 **Objective:** Ensure new platform roles (SUPPORT, VIEWER) have appropriate access
 
 ---
 
 ## 🎯 Summary
 
-The new `PLATFORM_SUPPORT` and `PLATFORM_VIEWER` roles are **partially integrated** but need refinement:
+The new `PLATFORM_SUPPORT` and `PLATFORM_VIEWER` roles are **fully integrated** with proper access control:
 
-✅ **Working:** `checkTenantAccess()` - All platform users can view all tenants  
-⚠️ **Needs Update:** Many endpoints use `isPlatformAdmin()` for **viewing** operations that should allow SUPPORT/VIEWER  
-❌ **Missing:** Distinction between view-only and modify operations
+✅ **Complete:** All middleware updated to support 3 platform roles  
+✅ **Complete:** View-only endpoints allow SUPPORT + VIEWER  
+✅ **Complete:** Modify operations remain PLATFORM_ADMIN only  
+✅ **Complete:** Clear distinction between view and modify operations
 
 ---
 
@@ -20,36 +21,37 @@ The new `PLATFORM_SUPPORT` and `PLATFORM_VIEWER` roles are **partially integrate
 
 ### Middleware Status
 
-| Middleware | Current Behavior | Should Allow |
-|------------|------------------|--------------|
-| `checkTenantAccess()` | ✅ All platform roles | ✅ Correct |
-| `requirePlatformAdmin()` | ❌ Only ADMIN | ❌ Too restrictive |
-| `requireTenantOwner()` | ❌ Only ADMIN | ❌ Too restrictive |
+| Middleware | Implementation | Status |
+|------------|----------------|--------|
+| `checkTenantAccess()` | ✅ All platform roles | ✅ Complete |
+| `requirePlatformAdmin()` | ✅ Only ADMIN (correct for modify) | ✅ Complete |
+| `requirePlatformUser()` | ✅ All platform roles (NEW) | ✅ Complete |
+| `requireTenantOwner()` | ✅ Uses `isPlatformAdmin()` helper | ✅ Complete |
 
 ### Route Checks Status
 
-| Route | Operation | Current Check | Should Be |
-|-------|-----------|---------------|-----------|
+| Route | Operation | Implementation | Status |
+|-------|-----------|----------------|--------|
 | **scan.ts** |
-| `hasAccessToTenant()` | View tenant data | `isPlatformAdmin()` | ✅ Correct (modify only) |
-| `/admin/enrichment/cache-stats` | View stats | `isPlatformAdmin()` | `canViewAllTenants()` |
-| `/admin/enrichment/rate-limits` | View limits | `isPlatformAdmin()` | `canViewAllTenants()` |
-| `/admin/enrichment/clear-cache` | Clear cache | `isPlatformAdmin()` | ✅ Correct (modify) |
-| `/admin/enrichment/analytics` | View analytics | `isPlatformAdmin()` | `canViewAllTenants()` |
-| `/admin/enrichment/search` | Search products | `isPlatformAdmin()` | `canViewAllTenants()` |
-| `/admin/enrichment/:barcode` | View product | `isPlatformAdmin()` | `canViewAllTenants()` |
-| Tenant analytics | View analytics | `isPlatformAdmin()` | ✅ Correct (in hasAccessToTenant) |
+| `hasAccessToTenant()` | View tenant data | `isPlatformAdmin()` | ✅ Complete |
+| `/admin/enrichment/cache-stats` | View stats | `canViewAllTenants()` | ✅ Complete |
+| `/admin/enrichment/rate-limits` | View limits | `canViewAllTenants()` | ✅ Complete |
+| `/admin/enrichment/clear-cache` | Clear cache | `isPlatformAdmin()` | ✅ Complete |
+| `/admin/enrichment/analytics` | View analytics | `canViewAllTenants()` | ✅ Complete |
+| `/admin/enrichment/search` | Search products | `canViewAllTenants()` | ✅ Complete |
+| `/admin/enrichment/:barcode` | View product | `canViewAllTenants()` | ✅ Complete |
+| Tenant analytics | View analytics | Via `hasAccessToTenant()` | ✅ Complete |
 | **scan-metrics.ts** |
-| `/admin/scan-metrics` | View metrics | `isPlatformAdmin()` | `canViewAllTenants()` |
-| `/admin/scan-metrics/timeseries` | View timeseries | `isPlatformAdmin()` | `canViewAllTenants()` |
+| `/admin/scan-metrics` | View metrics | `canViewAllTenants()` | ✅ Complete |
+| `/admin/scan-metrics/timeseries` | View timeseries | `canViewAllTenants()` | ✅ Complete |
 | **quick-start.ts** |
-| POST `/quick-start/:tenantId` | Create products | `isPlatformAdmin()` | ✅ Correct (modify) |
-| GET `/quick-start/:tenantId/eligibility` | View eligibility | `isPlatformAdmin()` | `canViewAllTenants()` |
-| POST `/quick-start/:tenantId/categories` | Create categories | `isPlatformAdmin()` | ✅ Correct (modify) |
+| POST `/quick-start/:tenantId` | Create products | `isPlatformAdmin()` | ✅ Complete |
+| GET `/quick-start/:tenantId/eligibility` | View eligibility | `canViewAllTenants()` | ✅ Complete |
+| POST `/quick-start/:tenantId/categories` | Create categories | `isPlatformAdmin()` | ✅ Complete |
 | **permissions.ts** |
-| `requireTenantRole()` | Check tenant role | `isPlatformAdmin()` | ✅ Correct (bypass) |
-| `requireTenantOwnership()` | Create tenant | `isPlatformAdmin()` | ✅ Correct (bypass) |
-| `requireTenantDeletion()` | Delete tenant | `isPlatformAdmin()` | ✅ Correct (modify) |
+| `requireTenantRole()` | Check tenant role | `isPlatformAdmin()` | ✅ Complete |
+| `requireTenantOwnership()` | Create tenant | `isPlatformAdmin()` | ✅ Complete |
+| `requireTenantDeletion()` | Delete tenant | `isPlatformAdmin()` | ✅ Complete |
 
 ---
 
