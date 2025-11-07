@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { requireTenantAdmin } from '../middleware/permissions';
 import { UserTenantRole } from '@prisma/client';
 
@@ -14,9 +14,9 @@ router.use(authenticateToken);
 
 /**
  * GET /tenants/:tenantId/users - List all users in a tenant
- * Requires: TENANT_OWNER or TENANT_ADMIN role
+ * Requires: Tenant access (platform users bypass) using checkTenantAccess
  */
-router.get('/:tenantId/users', requireTenantAdmin, async (req, res) => {
+router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
