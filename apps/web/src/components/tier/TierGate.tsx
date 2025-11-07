@@ -155,7 +155,7 @@ function TierUpgradePrompt({ feature, currentTier, upgrade, tenantId, className 
               </div>
               <div className="flex justify-between">
                 <span className="text-neutral-600 dark:text-neutral-400">Required Tier:</span>
-                <span className="font-semibold text-primary-600 dark:text-primary-400">{upgrade.targetTierDisplay}</span>
+                <span className="font-semibold text-amber-700 dark:text-amber-400">{upgrade.targetTierDisplay}</span>
               </div>
             </div>
           </div>
