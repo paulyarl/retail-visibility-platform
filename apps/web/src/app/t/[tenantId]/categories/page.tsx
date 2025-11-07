@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { api, API_BASE_URL } from '@/lib/api'
 import { Pagination } from '@/components/ui'
+import { ContextBadges } from '@/components/ContextBadges'
 
 interface Category {
   id: string
@@ -322,6 +323,11 @@ export default function CategoriesPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
+      {/* Context Badges */}
+      <ContextBadges 
+        tenant={{ id: tenantId, name: '' }}
+        contextLabel="Categories"
+      />
       {/* Breadcrumb */}
       <nav className="text-sm text-gray-600 mb-4">
         <Link href={`/t/${tenantId}/settings`} className="hover:text-gray-900">Settings</Link>

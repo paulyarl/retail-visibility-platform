@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { api, API_BASE_URL } from '@/lib/api'
+import { ContextBadges } from '@/components/ContextBadges'
 
 interface ValidationError {
   id: string
@@ -110,6 +111,11 @@ export default function FeedValidationPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
+      {/* Context Badges */}
+      <ContextBadges 
+        tenant={{ id: tenantId, name: '' }}
+        contextLabel="Feed Validation"
+      />
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Feed Validation Report</h1>
         <div className="flex items-center gap-3">

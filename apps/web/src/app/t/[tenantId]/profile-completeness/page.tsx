@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { ContextBadges } from '@/components/ContextBadges'
 import { API_BASE_URL } from '@/lib/api'
 
 interface CompletenessData {
@@ -120,6 +121,11 @@ export default function ProfileCompletenessPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
+      {/* Context Badges */}
+      <ContextBadges 
+        tenant={{ id: tenantId, name: '' }}
+        contextLabel="Profile"
+      />
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Business Profile Completeness</h1>
         <p className="text-gray-600">Complete your profile to improve visibility and trust</p>
