@@ -286,7 +286,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                     <div className="mt-3 flex flex-wrap gap-2">
                       <a
                         href={`/t/${id}/onboarding`}
-                        className="inline-flex items-center px-3 py-1.5 rounded bg-primary-600 text-white text-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-1"
+                        className="inline-flex items-center px-3 py-1.5 rounded bg-primary-600 text-white text-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-1 no-underline"
+                        style={{ color: 'white' }}
                       >
                         Edit Branding
                       </a>
