@@ -16,7 +16,7 @@
  */
 
 export type UserRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
-export type PlatformRole = 'PLATFORM_ADMIN' | 'ADMIN' | 'OWNER' | 'USER';
+export type PlatformRole = 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER';
 
 export interface UserData {
   id: string;
@@ -86,6 +86,24 @@ export function isPlatformAdmin(user: UserData): boolean {
   return user.role === 'PLATFORM_ADMIN' || 
          user.role === 'ADMIN' || 
          user.isPlatformAdmin === true;
+}
+
+export function isPlatformUser(user: UserData): boolean {
+  // Check if user has any platform-level access (admin, support, or viewer)
+  return user.role === 'PLATFORM_ADMIN' ||
+         user.role === 'PLATFORM_SUPPORT' ||
+         user.role === 'PLATFORM_VIEWER' ||
+         user.role === 'ADMIN'; // Legacy
+}
+
+export function canViewAllTenants(user: UserData): boolean {
+  // Any platform user can view all tenants
+  return isPlatformUser(user);
+}
+
+export function canModifyTenants(user: UserData): boolean {
+  // Only platform admins can modify tenants
+  return isPlatformAdmin(user);
 }
 
 export function getTenantRole(user: UserData, tenantId: string): UserRole | null {

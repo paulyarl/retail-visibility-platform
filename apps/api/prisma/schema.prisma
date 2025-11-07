@@ -604,10 +604,12 @@ model User {
 
 // User roles enum
 enum UserRole {
-  PLATFORM_ADMIN // Platform-wide admin (explicit, no ambiguity)
-  ADMIN          // Deprecated - use PLATFORM_ADMIN or UserTenantRole.ADMIN
-  OWNER          // Business owner
-  USER           // Regular user
+  PLATFORM_ADMIN   // Platform-wide admin (full control)
+  PLATFORM_SUPPORT // Platform support (view all tenants + limited actions like password resets)
+  PLATFORM_VIEWER  // Platform viewer (read-only access to all tenants for analytics/sales/legal)
+  ADMIN            // Deprecated - use PLATFORM_ADMIN or UserTenantRole.ADMIN
+  OWNER            // Business owner (can own multiple tenants)
+  USER             // Regular user (default)
 
   @@map("user_role")
 }

@@ -10,21 +10,23 @@
 
 | Email Address | Password | Full Name | User Role | Scope |
 |--------------|----------|-----------|-----------|-------|
-| alice.platformadmin@testing.app | TestPass123! | Alice PlatformAdmin | PLATFORM_ADMIN | Platform-wide |
-| bob.platformadmin@testing.app | TestPass123! | Bob PlatformAdmin | PLATFORM_ADMIN | Platform-wide |
+| alice.platformadmin@testing.app | TestPass123! | Alice PlatformAdmin | PLATFORM_ADMIN | Platform-wide (full control) |
+| bob.platformadmin@testing.app | TestPass123! | Bob PlatformAdmin | PLATFORM_ADMIN | Platform-wide (full control) |
+| charlie.support@testing.app | TestPass123! | Charlie Support | PLATFORM_SUPPORT | Platform-wide (view + support actions) |
+| diana.analytics@testing.app | TestPass123! | Diana Analytics | PLATFORM_VIEWER | Platform-wide (read-only) |
 | carol.owner@testing.app | TestPass123! | Carol Owner | OWNER | Own tenants |
 | david.owner@testing.app | TestPass123! | David Owner | OWNER | Own tenants |
 | emma.owner@testing.app | TestPass123! | Emma Owner | OWNER | Own tenants |
-| frank.tenantadmin@testing.app | TestPass123! | Frank TenantAdmin | ADMIN | Assigned tenants |
-| grace.tenantadmin@testing.app | TestPass123! | Grace TenantAdmin | ADMIN | Assigned tenants |
-| henry.member@testing.app | TestPass123! | Henry Member | MEMBER | Assigned tenants |
-| iris.member@testing.app | TestPass123! | Iris Member | MEMBER | Assigned tenants |
-| jack.viewer@testing.app | TestPass123! | Jack Viewer | VIEWER | Assigned tenants |
-| kate.viewer@testing.app | TestPass123! | Kate Viewer | VIEWER | Assigned tenants |
+| frank.tenantadmin@testing.app | TestPass123! | Frank TenantAdmin | USER | Assigned tenants (via UserTenant.ADMIN) |
+| grace.tenantadmin@testing.app | TestPass123! | Grace TenantAdmin | USER | Assigned tenants (via UserTenant.ADMIN) |
+| henry.member@testing.app | TestPass123! | Henry Member | USER | Assigned tenants (via UserTenant.MEMBER) |
+| iris.member@testing.app | TestPass123! | Iris Member | USER | Assigned tenants (via UserTenant.MEMBER) |
+| jack.viewer@testing.app | TestPass123! | Jack Viewer | USER | Assigned tenants (via UserTenant.VIEWER) |
+| kate.viewer@testing.app | TestPass123! | Kate Viewer | USER | Assigned tenants (via UserTenant.VIEWER) |
 | leo.owner@testing.app | TestPass123! | Leo Owner | OWNER | Own tenants |
-| maya.tenantadmin@testing.app | TestPass123! | Maya TenantAdmin | ADMIN | Assigned tenants |
-| noah.member@testing.app | TestPass123! | Noah Member | MEMBER | Assigned tenants |
-| olivia.viewer@testing.app | TestPass123! | Olivia Viewer | VIEWER | Assigned tenants |
+| maya.tenantadmin@testing.app | TestPass123! | Maya TenantAdmin | USER | Assigned tenants (via UserTenant.ADMIN) |
+| noah.member@testing.app | TestPass123! | Noah Member | USER | Assigned tenants (via UserTenant.MEMBER) |
+| olivia.viewer@testing.app | TestPass123! | Olivia Viewer | USER | Assigned tenants (via UserTenant.VIEWER) |
 
 ---
 
@@ -34,46 +36,71 @@
 
 The platform uses **explicit role names** to avoid ambiguity:
 
-#### 1. PLATFORM_ADMIN (Global Scope)
+#### 1. PLATFORM_ADMIN (Platform-wide Full Control)
 **Users:** Alice PlatformAdmin, Bob PlatformAdmin  
 **Database:** `User.role = 'PLATFORM_ADMIN'`  
 **Access:**
-- ✅ Platform-wide access to ALL tenants
+- ✅ Full platform-wide access to ALL tenants
+- ✅ Can create, update, delete tenants
 - ✅ Access to `/settings/admin`
 - ✅ Can manage all users
 - ✅ Can manage feature flags
 - ✅ Can create organizations
 - ✅ Can view system metrics
+- ✅ Can modify platform settings
 - ✅ No tenant assignments needed
 
-**How to identify in code:**
-```typescript
-// Platform Admin = explicit PLATFORM_ADMIN role
-const isPlatformAdmin = user.role === 'PLATFORM_ADMIN';
-```
+**Use Case:** Platform administrators, DevOps, founders
 
-#### 2. ADMIN (Tenant Scope)
-**Users:** Frank TenantAdmin, Grace TenantAdmin, Maya TenantAdmin  
-**Database:** `User.role = 'ADMIN'` + Assigned to specific tenants via `UserTenant`  
+#### 2. PLATFORM_SUPPORT (Platform-wide View + Support Actions)
+**Users:** Charlie Support  
+**Database:** `User.role = 'PLATFORM_SUPPORT'`  
 **Access:**
-- ✅ Admin access to ASSIGNED tenants only
-- ✅ Can manage inventory for assigned tenants
-- ✅ Can edit tenant settings for assigned tenants
-- ✅ Can manage users for assigned tenants (if permission granted)
+- ✅ View ALL tenants (read-only)
+- ✅ View all users
+- ✅ Reset user passwords
+- ✅ Unlock accounts
+- ✅ View logs and metrics
+- ✅ Access support tools
+- ❌ Cannot delete tenants
+- ❌ Cannot modify platform settings
+- ❌ Cannot change billing
+- ❌ Cannot modify tenant data
+
+**Use Case:** Customer support team, technical support
+
+#### 3. PLATFORM_VIEWER (Platform-wide Read-Only)
+**Users:** Diana Analytics  
+**Database:** `User.role = 'PLATFORM_VIEWER'`  
+**Access:**
+- ✅ View ALL tenants (read-only)
+- ✅ View metrics and analytics
+- ✅ Export reports
+- ✅ View dashboards
+- ❌ Cannot modify ANY data
+- ❌ Cannot perform ANY actions
+- ❌ Cannot access admin tools
+- ❌ Cannot change settings
+
+**Use Case:** Analytics team, sales team, legal/compliance, executives
+
+#### 4. OWNER (Business Owner)
+**Users:** Carol, David, Emma, Leo  
+**Database:** `User.role = 'OWNER'`  
+**Access:**
+- ✅ Owns one or more tenants
+- ✅ Full control over owned tenants
+- ✅ Can create new tenants (up to limit)
+- ❌ Cannot access other tenants
+
+#### 5. Tenant-Scoped Roles (via UserTenant)
+**Users:** Frank, Grace, Maya (ADMIN), Henry, Iris, Noah (MEMBER), Jack, Kate, Olivia (VIEWER)  
+**Database:** `User.role = 'USER'` + `UserTenant.role = 'ADMIN'|'MEMBER'|'VIEWER'`  
+**Access:**
+- ✅ Access to ASSIGNED tenants only
+- ✅ Permissions based on UserTenant.role
 - ❌ Cannot access unassigned tenants
-- ❌ Cannot access `/settings/admin`
-- ❌ Cannot manage feature flags
-
-**How to identify in code:**
-```typescript
-// Tenant Admin = ADMIN role (scoped to assigned tenants)
-const isTenantAdmin = user.role === 'ADMIN';
-```
-
-#### 3. Other Roles
-- **OWNER** - Owns one or more tenants
-- **MEMBER** - Read/write access to assigned tenants
-- **VIEWER** - Read-only access to assigned tenants
+- ❌ Cannot access platform admin features
 
 ---
 

@@ -108,8 +108,11 @@ export function checkTenantAccess(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
   }
 
-  // Platform admin users have access to all tenants
-  if (req.user.role === UserRole.PLATFORM_ADMIN || req.user.role === UserRole.ADMIN) {
+  // Platform users (admin, support, viewer) have access to all tenants
+  if (req.user.role === UserRole.PLATFORM_ADMIN || 
+      req.user.role === UserRole.PLATFORM_SUPPORT ||
+      req.user.role === UserRole.PLATFORM_VIEWER ||
+      req.user.role === UserRole.ADMIN) {
     return next();
   }
 
