@@ -97,13 +97,16 @@ export default function FeatureOverridesPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Convert datetime-local to ISO 8601 format
+      const payload = {
+        ...formData,
+        expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : undefined,
+      };
+
       const res = await fetch('/api/admin/feature-overrides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          expiresAt: formData.expiresAt || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -130,14 +133,17 @@ export default function FeatureOverridesPage() {
     if (!editingOverride) return;
 
     try {
+      // Convert datetime-local to ISO 8601 format
+      const payload = {
+        granted: formData.granted,
+        reason: formData.reason,
+        expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
+      };
+
       const res = await fetch(`/api/admin/feature-overrides/${editingOverride.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          granted: formData.granted,
-          reason: formData.reason,
-          expiresAt: formData.expiresAt || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
