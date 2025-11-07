@@ -10,6 +10,7 @@ import ItemPhotoGallery from "./ItemPhotoGallery";
 import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { ViewingAsBadge } from "@/components/RoleBadge";
 import ItemsGridV2 from "./ItemsGridV2";
 import AssignCategoryModal from "./AssignCategoryModal";
 import QuickStartEmptyState from "./QuickStartEmptyState";
@@ -531,6 +532,7 @@ export default function ItemsClient({
         title="Inventory"
         description="Manage your catalog and stock levels"
         icon={Icons.Inventory}
+        badge={tenantId ? <ViewingAsBadge tenantId={tenantId} /> : <ViewingAsBadge showPlatformRole />}
         actions={
           <div className="flex gap-3">
             {tenantId && (

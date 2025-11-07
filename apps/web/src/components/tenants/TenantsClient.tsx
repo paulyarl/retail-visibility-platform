@@ -8,6 +8,7 @@ import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { canEditTenant, canDeleteTenant, canRenameTenant } from "@/lib/auth/access-control";
+import { ViewingAsBadge } from "@/components/RoleBadge";
 
 type Tenant = { 
   id: string; 
@@ -155,6 +156,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
         title="Locations"
         description="Manage your stores and business locations"
         icon={Icons.Tenants}
+        badge={<ViewingAsBadge showPlatformRole />}
         actions={
           <div className="flex gap-3">
             <Button 

@@ -12,6 +12,7 @@ interface PageHeaderProps {
     label: string;
   };
   actions?: React.ReactNode;
+  badge?: React.ReactNode;
 }
 
 export default function PageHeader({
@@ -20,6 +21,7 @@ export default function PageHeader({
   icon,
   backLink,
   actions,
+  badge,
 }: PageHeaderProps) {
   const router = useRouter();
 
@@ -39,9 +41,16 @@ export default function PageHeader({
             
             {/* Title & Description */}
             <div>
-              <h1 className="text-3xl font-bold text-neutral-900">
-                {title}
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-neutral-900">
+                  {title}
+                </h1>
+                {badge && (
+                  <div className="flex items-center">
+                    {badge}
+                  </div>
+                )}
+              </div>
               {description && (
                 <p className="text-neutral-600 mt-1">
                   {description}
