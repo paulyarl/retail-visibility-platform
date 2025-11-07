@@ -15,11 +15,7 @@ type SettingCard = {
   href: string;
   color: string;
   badge?: string;
-  // Legacy boolean flags (will be replaced with accessOptions)
-  adminOnly?: boolean;
-  platformAdminOnly?: boolean;
-  personalOnly?: boolean;
-  // New centralized access control
+  // Centralized access control
   accessOptions?: AccessControlOptions;
   fetchOrganization?: boolean;
 };
@@ -27,7 +23,6 @@ type SettingCard = {
 type SettingsGroup = {
   title: string;
   description: string;
-  adminOnly?: boolean;
   cards: SettingCard[];
 };
 
@@ -60,7 +55,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: '/settings/appearance',
           color: 'bg-indigo-500',
-          personalOnly: true,
         },
         {
           title: 'Language & Region',
@@ -72,7 +66,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: '/settings/language',
           color: 'bg-teal-500',
-          personalOnly: true,
         },
       ],
     },
@@ -277,7 +270,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
     {
       title: 'User Administration',
       description: 'Manage platform users and permissions',
-      adminOnly: true,
       cards: [
         {
           title: 'Test User Management',
@@ -308,7 +300,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
     {
       title: 'Platform Administration',
       description: 'Platform-level tools, analytics, and system controls',
-      adminOnly: true,
       cards: [
         {
           title: 'Admin Dashboard',
@@ -347,7 +338,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
 
   // No manual filtering needed - ProtectedCard handles visibility
   const displayGroups = settingsGroups
-    .filter(g => hideAdmin ? !g.adminOnly : true)
     .filter(group => group.cards.length > 0); // Remove empty groups
 
   return (
@@ -373,11 +363,6 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
                   <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
                     {group.title}
                   </h2>
-                  {group.adminOnly && (
-                    <span className="px-3 py-1 text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded-full">
-                      Admin Only
-                    </span>
-                  )}
                 </div>
                 <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
                   {group.description}
