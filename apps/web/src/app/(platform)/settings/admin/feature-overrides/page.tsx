@@ -87,7 +87,8 @@ export default function FeatureOverridesPage() {
       if (!res.ok) throw new Error('Failed to fetch tenants');
       
       const data = await res.json();
-      setTenants(data.tenants || []);
+      // Backend returns array directly, not wrapped in { tenants: [] }
+      setTenants(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error('Failed to fetch tenants:', err);
     }
