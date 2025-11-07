@@ -373,57 +373,68 @@ VALUES
   (gen_random_uuid(), 'olivia.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Olivia', 'Viewer', 'USER', true, NOW(), NOW());
 ```
 
-### Step 3: Create Test Tenants
+### Step 3: Create Test Tenants and Organizations
 
 ```sql
--- Create organization for Carol
-INSERT INTO "Organization" (id, name, created_at, updated_at)
-VALUES ('org-001', 'Carol''s Coffee Chain', NOW(), NOW());
+-- Create organization for Carol (lowercase table name)
+INSERT INTO organization (id, name, owner_id, created_at, updated_at)
+VALUES ('org-001', 'Carol''s Coffee Chain', (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), NOW(), NOW());
 
--- Create tenants
-INSERT INTO "Tenant" (id, name, owner_id, organization_id, created_at, updated_at)
+-- Create tenants (note: Tenant model doesn't have owner_id, ownership is via UserTenant with OWNER role)
+INSERT INTO "Tenant" (id, name, organization_id, created_at)
 VALUES 
-  ('tenant-001', 'Carol''s Coffee - Downtown', (SELECT id FROM "User" WHERE email = 'carol.owner@testing.app'), 'org-001', NOW(), NOW()),
-  ('tenant-002', 'Carol''s Coffee - Uptown', (SELECT id FROM "User" WHERE email = 'carol.owner@testing.app'), 'org-001', NOW(), NOW()),
-  ('tenant-003', 'Carol''s Coffee - Westside', (SELECT id FROM "User" WHERE email = 'carol.owner@testing.app'), 'org-001', NOW(), NOW()),
-  ('tenant-004', 'Emma''s Boutique', (SELECT id FROM "User" WHERE email = 'emma.owner@testing.app'), NULL, NOW(), NOW());
+  ('tenant-001', 'Carol''s Coffee - Downtown', 'org-001', NOW()),
+  ('tenant-002', 'Carol''s Coffee - Uptown', 'org-001', NOW()),
+  ('tenant-003', 'Carol''s Coffee - Westside', 'org-001', NOW()),
+  ('tenant-004', 'Emma''s Boutique', NULL, NOW());
 ```
 
-### Step 4: Assign Users to Tenants
+### Step 4: Assign Users to Tenants (via user_tenants table)
 
 ```sql
--- Assign Frank (Tenant Admin) to tenant-001 and tenant-004
--- NOTE: User.role = 'ADMIN' but scoped to these tenants only
-INSERT INTO "UserTenant" (user_id, tenant_id, role, created_at, updated_at)
+-- First, assign OWNERS to their tenants (Carol owns all 3 coffee shops)
+INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  ((SELECT id FROM "User" WHERE email = 'frank.tenantadmin@testing.app'), 'tenant-001', 'ADMIN', NOW(), NOW()),
-  ((SELECT id FROM "User" WHERE email = 'frank.tenantadmin@testing.app'), 'tenant-004', 'ADMIN', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), 'tenant-001', 'OWNER', NOW(), NOW()),
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), 'tenant-002', 'OWNER', NOW(), NOW()),
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), 'tenant-003', 'OWNER', NOW(), NOW());
+
+-- Emma owns her boutique
+INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
+VALUES 
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'emma.owner@testing.app'), 'tenant-004', 'OWNER', NOW(), NOW());
+
+-- Assign Frank (Tenant Admin) to tenant-001 and tenant-004
+-- NOTE: UserTenant.role = 'ADMIN' (tenant-scoped admin)
+INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
+VALUES 
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'frank.tenantadmin@testing.app'), 'tenant-001', 'ADMIN', NOW(), NOW()),
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'frank.tenantadmin@testing.app'), 'tenant-004', 'ADMIN', NOW(), NOW());
 
 -- Assign Grace (Tenant Admin) to tenant-002
--- NOTE: User.role = 'ADMIN' but scoped to this tenant only
-INSERT INTO "UserTenant" (user_id, tenant_id, role, created_at, updated_at)
+INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  ((SELECT id FROM "User" WHERE email = 'grace.tenantadmin@testing.app'), 'tenant-002', 'ADMIN', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'grace.tenantadmin@testing.app'), 'tenant-002', 'ADMIN', NOW(), NOW());
 
 -- Assign Henry (Member) to tenant-002
-INSERT INTO "UserTenant" (user_id, tenant_id, role, created_at, updated_at)
+INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  ((SELECT id FROM "User" WHERE email = 'henry.member@testing.app'), 'tenant-002', 'MEMBER', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'henry.member@testing.app'), 'tenant-002', 'MEMBER', NOW(), NOW());
 
 -- Assign Iris (Member) to tenant-003
-INSERT INTO "UserTenant" (user_id, tenant_id, role, created_at, updated_at)
+INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  ((SELECT id FROM "User" WHERE email = 'iris.member@testing.app'), 'tenant-003', 'MEMBER', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'iris.member@testing.app'), 'tenant-003', 'MEMBER', NOW(), NOW());
 
 -- Assign Jack (Viewer) to tenant-003
-INSERT INTO "UserTenant" (user_id, tenant_id, role, created_at, updated_at)
+INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  ((SELECT id FROM "User" WHERE email = 'jack.viewer@testing.app'), 'tenant-003', 'VIEWER', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'jack.viewer@testing.app'), 'tenant-003', 'VIEWER', NOW(), NOW());
 
 -- Assign Kate (Viewer) to tenant-001
-INSERT INTO "UserTenant" (user_id, tenant_id, role, created_at, updated_at)
+INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  ((SELECT id FROM "User" WHERE email = 'kate.viewer@testing.app'), 'tenant-001', 'VIEWER', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'kate.viewer@testing.app'), 'tenant-001', 'VIEWER', NOW(), NOW());
 ```
 
 ---
