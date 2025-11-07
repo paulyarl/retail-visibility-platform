@@ -24,7 +24,8 @@ export interface UserData {
   role?: PlatformRole;
   isPlatformAdmin?: boolean; // Deprecated - use role === 'PLATFORM_ADMIN'
   tenants?: Array<{
-    tenantId: string;
+    tenantId?: string; // New format
+    id?: string; // Legacy format from AuthContext
     role: UserRole;
   }>;
 }
@@ -106,8 +107,130 @@ export function canModifyTenants(user: UserData): boolean {
   return isPlatformAdmin(user);
 }
 
+/**
+ * Tenant Permission Helpers
+ * These functions centralize all tenant-level permission logic
+ * Use these instead of checking roles directly in components
+ */
+
+/**
+ * Check if user can view a specific tenant
+ * Platform users (admin, support, viewer) can view all tenants
+ * Regular users can only view tenants they're members of
+ */
+export function canViewTenant(user: UserData, tenantId: string): boolean {
+  // Platform users can view all tenants
+  if (isPlatformUser(user)) return true;
+  
+  // Check if user is a member of this tenant (any role)
+  const memberRole = getTenantRole(user, tenantId);
+  return memberRole !== null;
+}
+
+/**
+ * Check if user can edit a specific tenant
+ * Platform admins can edit any tenant
+ * Tenant owners and admins can edit their tenant
+ */
+export function canEditTenant(user: UserData, tenantId: string): boolean {
+  // Platform admins can edit any tenant
+  if (isPlatformAdmin(user)) return true;
+  
+  // Tenant owners and admins can edit their tenant
+  const memberRole = getTenantRole(user, tenantId);
+  return memberRole === 'OWNER' || memberRole === 'ADMIN';
+}
+
+/**
+ * Check if user can delete a specific tenant
+ * Platform admins can delete any tenant
+ * Only tenant owners can delete their tenant
+ */
+export function canDeleteTenant(user: UserData, tenantId: string): boolean {
+  // Platform admins can delete any tenant
+  if (isPlatformAdmin(user)) return true;
+  
+  // Only tenant owners can delete
+  const memberRole = getTenantRole(user, tenantId);
+  return memberRole === 'OWNER';
+}
+
+/**
+ * Check if user can rename a specific tenant
+ * Same as canEditTenant - owners and admins can rename
+ */
+export function canRenameTenant(user: UserData, tenantId: string): boolean {
+  return canEditTenant(user, tenantId);
+}
+
+/**
+ * Check if user can manage tenant settings (branding, hours, etc.)
+ * Platform admins can manage any tenant
+ * Tenant owners and admins can manage their tenant
+ */
+export function canManageTenantSettings(user: UserData, tenantId: string): boolean {
+  return canEditTenant(user, tenantId);
+}
+
+/**
+ * Check if user can manage tenant inventory
+ * Platform admins can manage any tenant's inventory
+ * Tenant owners, admins, and members can manage their tenant's inventory
+ */
+export function canManageTenantInventory(user: UserData, tenantId: string): boolean {
+  // Platform admins can manage any tenant
+  if (isPlatformAdmin(user)) return true;
+  
+  // Tenant owners, admins, and members can manage inventory
+  const memberRole = getTenantRole(user, tenantId);
+  return memberRole === 'OWNER' || memberRole === 'ADMIN' || memberRole === 'MEMBER';
+}
+
+/**
+ * Check if user can view tenant analytics
+ * Platform users can view all tenant analytics
+ * Tenant members (any role) can view their tenant's analytics
+ */
+export function canViewTenantAnalytics(user: UserData, tenantId: string): boolean {
+  // Platform users can view all analytics
+  if (isPlatformUser(user)) return true;
+  
+  // Any tenant member can view analytics
+  const memberRole = getTenantRole(user, tenantId);
+  return memberRole !== null;
+}
+
+/**
+ * Check if user can create new tenants
+ * Platform admins can always create tenants
+ * Regular users can create tenants (subject to subscription limits)
+ */
+export function canCreateTenant(user: UserData): boolean {
+  // Platform admins can always create tenants
+  if (isPlatformAdmin(user)) return true;
+  
+  // Regular authenticated users can create tenants
+  // (actual creation is subject to subscription limits checked elsewhere)
+  return true;
+}
+
+/**
+ * Check if user can switch to a specific tenant
+ * Platform users can switch to any tenant
+ * Regular users can only switch to tenants they're members of
+ */
+export function canSwitchToTenant(user: UserData, tenantId: string): boolean {
+  // Platform users can switch to any tenant
+  if (isPlatformUser(user)) return true;
+  
+  // Check if user is a member of this tenant
+  const memberRole = getTenantRole(user, tenantId);
+  return memberRole !== null;
+}
+
 export function getTenantRole(user: UserData, tenantId: string): UserRole | null {
-  const tenantRole = user.tenants?.find(t => t.tenantId === tenantId);
+  // Support both tenantId (new format) and id (legacy format from AuthContext)
+  const tenantRole = user.tenants?.find(t => t.tenantId === tenantId || t.id === tenantId);
   return tenantRole?.role || null;
 }
 

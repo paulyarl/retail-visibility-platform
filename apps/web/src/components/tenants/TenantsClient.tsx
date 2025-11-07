@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import PageHeader, { Icons } from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { canEditTenant, canDeleteTenant, canRenameTenant } from "@/lib/auth/access-control";
 
 type Tenant = { 
   id: string; 
@@ -387,13 +388,11 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
             ) : (
               <div className={viewMode === 'list' ? 'space-y-3' : 'grid grid-cols-1 lg:grid-cols-2 gap-4'}>
                 {paginatedTenants.map((t, index) => {
-                  const memberRoleRaw = user?.tenants?.find(x => x.id === t.id)?.role;
-                  const memberRole = typeof memberRoleRaw === 'string' ? memberRoleRaw.toUpperCase() : null;
-                  const userRole = typeof user?.role === 'string' ? user.role.toUpperCase() : null;
-                  const isAdmin = userRole === 'ADMIN';
-                  const canEdit = isAdmin || memberRole === 'OWNER' || memberRole === 'ADMIN';
-                  const canDelete = isAdmin || memberRole === 'OWNER';
-                  const canRename = canEdit;
+                  // Use centralized permission helpers
+                  const canEdit = user ? canEditTenant(user, t.id) : false;
+                  const canDelete = user ? canDeleteTenant(user, t.id) : false;
+                  const canRename = user ? canRenameTenant(user, t.id) : false;
+                  
                   return (
                   <TenantRow 
                     key={t.id} 
@@ -403,9 +402,9 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     onEditProfile={() => router.push(`/t/${encodeURIComponent(t.id)}/onboarding`)}
                     onRename={onRename}
                     onDelete={() => onDelete(t.id)}
-                    canEdit={!!canEdit}
-                    canDelete={!!canDelete}
-                    canRename={!!canRename}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
+                    canRename={canRename}
                   />
                 )})}
               </div>

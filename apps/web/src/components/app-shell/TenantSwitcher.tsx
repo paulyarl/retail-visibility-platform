@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { useAuth } from "@/contexts/AuthContext";
+import { canSwitchToTenant } from "@/lib/auth/access-control";
 
 type Tenant = { id: string; name: string };
 
@@ -46,11 +47,8 @@ export default function TenantSwitcher() {
     if (typeof window === "undefined") return;
     localStorage.setItem("tenantId", tenantId);
 
-    // Gate by membership: allow ADMIN or membership in selected tenant (any role)
-    const isAdmin = user?.role === 'ADMIN';
-    const isMember = !!user?.tenants?.find(t => t.id === tenantId);
-    const allowed = isAdmin || isMember;
-    if (!allowed) {
+    // Gate by membership: use centralized permission helper
+    if (!user || !canSwitchToTenant(user, tenantId)) {
       window.location.href = '/tenants';
       return;
     }
