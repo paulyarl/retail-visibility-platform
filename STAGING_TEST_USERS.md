@@ -340,64 +340,83 @@ Role: VIEWER (read-only)
 -- Run in Supabase SQL Editor
 -- Note: Supabase Auth uses magic links, so these users will need to verify email
 -- For testing, you may want to use Supabase's test email feature
--- Note: These queries are idempotent - safe to run multiple times
+-- Note: For auth.users, manually check if users exist before running, or delete and re-run
 
 -- Platform Admins (PLATFORM_ADMIN role)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
-VALUES 
-  (gen_random_uuid(), 'alice.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
-ON CONFLICT (email) DO NOTHING;
+SELECT gen_random_uuid(), 'alice.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'alice.platformadmin@testing.app');
+
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+SELECT gen_random_uuid(), 'bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'bob.platformadmin@testing.app');
 
 -- Platform Support (PLATFORM_SUPPORT role)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
-VALUES 
-  (gen_random_uuid(), 'charlie.support@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
-ON CONFLICT (email) DO NOTHING;
+SELECT gen_random_uuid(), 'charlie.support@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'charlie.support@testing.app');
 
 -- Platform Viewer (PLATFORM_VIEWER role)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
-VALUES 
-  (gen_random_uuid(), 'diana.analytics@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
-ON CONFLICT (email) DO NOTHING;
+SELECT gen_random_uuid(), 'diana.analytics@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'diana.analytics@testing.app');
 
 -- Organization Owners
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
-VALUES 
-  (gen_random_uuid(), 'carol.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'david.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
-ON CONFLICT (email) DO NOTHING;
+SELECT gen_random_uuid(), 'carol.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'carol.owner@testing.app');
+
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+SELECT gen_random_uuid(), 'david.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'david.owner@testing.app');
 
 -- Independent Owners
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
-VALUES 
-  (gen_random_uuid(), 'emma.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'leo.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
-ON CONFLICT (email) DO NOTHING;
+SELECT gen_random_uuid(), 'emma.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'emma.owner@testing.app');
+
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+SELECT gen_random_uuid(), 'leo.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'leo.owner@testing.app');
 
 -- Tenant Admins (ADMIN role, WITH tenant assignments)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
-VALUES 
-  (gen_random_uuid(), 'frank.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'grace.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'maya.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
-ON CONFLICT (email) DO NOTHING;
+SELECT gen_random_uuid(), 'frank.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'frank.tenantadmin@testing.app');
+
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+SELECT gen_random_uuid(), 'grace.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'grace.tenantadmin@testing.app');
+
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+SELECT gen_random_uuid(), 'maya.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'maya.tenantadmin@testing.app');
 
 -- Tenant Members
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
-VALUES 
-  (gen_random_uuid(), 'henry.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'iris.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'noah.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
-ON CONFLICT (email) DO NOTHING;
+SELECT gen_random_uuid(), 'henry.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'henry.member@testing.app');
+
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+SELECT gen_random_uuid(), 'iris.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'iris.member@testing.app');
+
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+SELECT gen_random_uuid(), 'noah.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'noah.member@testing.app');
 
 -- Tenant Viewers
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
-VALUES 
-  (gen_random_uuid(), 'jack.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'kate.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'olivia.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
-ON CONFLICT (email) DO NOTHING;
+SELECT gen_random_uuid(), 'jack.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'jack.viewer@testing.app');
+
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+SELECT gen_random_uuid(), 'kate.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'kate.viewer@testing.app');
+
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
+SELECT gen_random_uuid(), 'olivia.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'
+WHERE NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'olivia.viewer@testing.app');
 ```
 
 ### Step 2: Create User Records in Application Database
