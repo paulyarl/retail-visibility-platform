@@ -161,6 +161,85 @@ export const TIER_DISPLAY_NAMES: Record<string, string> = {
   chain_enterprise: 'Chain Enterprise',
 };
 
+/**
+ * Human-readable feature names for display in UI
+ */
+export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
+  // Core features
+  'storefront': 'Public Storefront',
+  'quick_start_wizard': 'Quick Start Wizard',
+  'product_scanning': 'Product Scanning',
+  'gbp_integration': 'Google Business Profile Integration',
+  'api_access': 'API Access',
+  'white_label': 'White Label Branding',
+  'custom_domain': 'Custom Domain',
+  'advanced_analytics': 'Advanced Analytics',
+  
+  // Product features
+  'product_search': 'Product Search',
+  'basic_product_pages': 'Basic Product Pages',
+  'image_gallery_5': '5-Image Gallery',
+  'image_gallery_10': '10-Image Gallery',
+  
+  // Branding
+  'custom_branding': 'Custom Branding',
+  'business_logo': 'Business Logo',
+  'custom_marketing_copy': 'Custom Marketing Copy',
+  
+  // Categories
+  'basic_categories': 'Basic Categories',
+  
+  // QR Codes
+  'qr_codes_512': 'QR Codes (512px)',
+  'qr_codes_1024': 'QR Codes (1024px)',
+  'qr_codes_2048': 'QR Codes (2048px)',
+  
+  // Google features
+  'google_shopping': 'Google Shopping Feed',
+  'google_merchant_center': 'Google Merchant Center',
+  
+  // UI features
+  'mobile_responsive': 'Mobile-Responsive Design',
+  'enhanced_seo': 'Enhanced SEO',
+  'interactive_maps': 'Interactive Maps',
+  'privacy_mode': 'Privacy Mode',
+  
+  // Support
+  'priority_support': 'Priority Support',
+  'dedicated_account_manager': 'Dedicated Account Manager',
+  'sla_guarantee': 'SLA Guarantee',
+  
+  // Analytics
+  'performance_analytics': 'Performance Analytics',
+  
+  // SKU limits
+  'unlimited_skus': 'Unlimited SKUs',
+  
+  // Integrations
+  'custom_integrations': 'Custom Integrations',
+  
+  // Multi-location
+  'multi_location_5': '5 Locations',
+  'multi_location_25': '25 Locations',
+  'unlimited_locations': 'Unlimited Locations',
+  
+  // Organization features
+  'propagation_products': 'Product Propagation',
+  'propagation_categories': 'Category Propagation',
+  'propagation_gbp_sync': 'GBP Sync Propagation',
+  'propagation_hours': 'Hours Propagation',
+  'propagation_profile': 'Profile Propagation',
+  'propagation_flags': 'Flag Propagation',
+  'propagation_roles': 'Role Propagation',
+  'propagation_brand': 'Brand Propagation',
+  'organization_dashboard': 'Organization Dashboard',
+  'hero_location': 'Hero Location',
+  'strategic_testing': 'Strategic Testing',
+  'shared_sku_pool': 'Shared SKU Pool',
+  'centralized_control': 'Centralized Control',
+  'basic_propagation': 'Basic Propagation',
+};
+
 // Tier pricing (monthly)
 export const TIER_PRICING: Record<string, number> = {
   trial: 0,

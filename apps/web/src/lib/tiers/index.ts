@@ -10,6 +10,7 @@ export {
   TIER_HIERARCHY,
   FEATURE_TIER_MAP,
   TIER_DISPLAY_NAMES,
+  FEATURE_DISPLAY_NAMES,
   TIER_PRICING,
   checkTierFeature,
   getRequiredTier,

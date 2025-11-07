@@ -30,6 +30,7 @@
 
 import React from 'react';
 import { useTierAccess } from '@/lib/tiers/useTierAccess';
+import { FEATURE_DISPLAY_NAMES, TIER_DISPLAY_NAMES } from '@/lib/tiers';
 import Link from 'next/link';
 
 interface TierGateProps {
@@ -85,6 +86,7 @@ export function TierGate({
     return (
       <TierUpgradePrompt 
         feature={feature}
+        currentTier={tier}
         upgrade={upgradeData}
         tenantId={tenantId}
         className={className}
@@ -98,6 +100,7 @@ export function TierGate({
 
 interface TierUpgradePromptProps {
   feature: string;
+  currentTier: string | null | undefined;
   upgrade: {
     required: boolean;
     targetTier?: string;
@@ -113,7 +116,7 @@ interface TierUpgradePromptProps {
 /**
  * Default upgrade prompt shown when feature is not available
  */
-function TierUpgradePrompt({ feature, upgrade, tenantId, className }: TierUpgradePromptProps) {
+function TierUpgradePrompt({ feature, currentTier, upgrade, tenantId, className }: TierUpgradePromptProps) {
   const upgradeUrl = tenantId 
     ? `/t/${tenantId}/settings/subscription`
     : '/settings/subscription';
@@ -121,6 +124,9 @@ function TierUpgradePrompt({ feature, upgrade, tenantId, className }: TierUpgrad
   const dashboardUrl = tenantId
     ? `/t/${tenantId}/dashboard`
     : '/';
+  
+  const featureDisplayName = FEATURE_DISPLAY_NAMES[feature] || feature;
+  const currentTierDisplay = currentTier ? TIER_DISPLAY_NAMES[currentTier] || currentTier : 'Unknown';
   
   return (
     <div className={className || "min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center p-4"}>
@@ -136,9 +142,23 @@ function TierUpgradePrompt({ feature, upgrade, tenantId, className }: TierUpgrad
             Feature Not Available
           </h1>
           
-          <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-            This feature requires <span className="font-semibold">{upgrade.targetTierDisplay}</span> tier or higher.
-          </p>
+          {/* Feature and Tier Information Box */}
+          <div className="bg-neutral-100 dark:bg-neutral-700 rounded-lg p-4 mb-6 text-left">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-neutral-600 dark:text-neutral-400">Feature:</span>
+                <span className="font-semibold text-neutral-900 dark:text-white">{featureDisplayName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-600 dark:text-neutral-400">Current Tier:</span>
+                <span className="font-semibold text-neutral-900 dark:text-white">{currentTierDisplay}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-600 dark:text-neutral-400">Required Tier:</span>
+                <span className="font-semibold text-primary-600 dark:text-primary-400">{upgrade.targetTierDisplay}</span>
+              </div>
+            </div>
+          </div>
           
           {upgrade.targetPrice && (
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 text-left">
