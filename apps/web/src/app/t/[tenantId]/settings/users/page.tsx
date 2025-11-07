@@ -5,6 +5,9 @@ import { useParams } from 'next/navigation';
 import { Users, UserPlus, Key, Trash2, Mail } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
+import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
+import AccessDenied from '@/components/AccessDenied';
+import { Spinner } from '@/components/ui';
 
 interface TenantUser {
   id: string;
@@ -19,6 +22,12 @@ interface TenantUser {
 export default function TenantUsersPage() {
   const params = useParams();
   const tenantId = params.tenantId as string;
+  
+  // Centralized access control - Platform Support or Tenant Admin
+  const { hasAccess, loading: accessLoading, tenantRole } = useAccessControl(
+    tenantId,
+    AccessPresets.SUPPORT_OR_TENANT_ADMIN
+  );
   
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +123,26 @@ export default function TenantUsersPage() {
       alert('Failed to remove user');
     }
   };
+
+  // Access control checks
+  if (accessLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <AccessDenied
+        title="Admin Access Required"
+        message="You need tenant administrator privileges to manage team members."
+        userRole={tenantRole}
+        backLink={{ href: `/t/${tenantId}/settings`, label: 'Back to Settings' }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
