@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badg
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import { Flags } from '@/lib/flags';
+import { ContextBadges } from '@/components/ContextBadges';
 
 interface ScanSession {
   id: string;
@@ -159,6 +160,11 @@ export default function TenantScanPage() {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Context Badges */}
+        <ContextBadges 
+          tenant={{ id: tenantId, name: '' }}
+          contextLabel="Scanning"
+        />
         {/* Feature Flag Check */}
         {!Flags.SKU_SCANNING && (
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
