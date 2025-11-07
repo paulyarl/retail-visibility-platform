@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
-import { isPlatformAdmin } from '../utils/platform-admin';
+import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
 import { requireTierFeature } from '../middleware/tier-access';
@@ -221,6 +221,7 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
     // Check if user is a platform admin (admins bypass all limits)
     const user = (req as any).user;
     const userIsPlatformAdmin = isPlatformAdmin(user);
+    const userCanView = canViewAllTenants(user);
 
     // Check rate limit (platform admins bypass this)
     const rateLimit = userIsPlatformAdmin ? { allowed: true } : checkRateLimit(tenantId);
@@ -240,10 +241,13 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
       productCount,
       productLimit,
       isPlatformAdmin: userIsPlatformAdmin,
+      canView: userCanView,
       rateLimitReached: !rateLimit.allowed,
       resetAt: rateLimit.resetAt,
       recommendation: userIsPlatformAdmin
         ? 'Platform Admin: All limits bypassed. You can use Quick Start anytime.'
+        : userCanView
+        ? 'Platform User: You can view eligibility but cannot create products.'
         : productCount === 0
         ? 'Quick Start is perfect for you! Get started with pre-built products.'
         : productCount < 50

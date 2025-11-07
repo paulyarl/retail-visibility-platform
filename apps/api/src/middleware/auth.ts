@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../auth/auth.service';
 import { UserRole } from '@prisma/client';
+import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 
 // JWT Payload interface
 export interface JWTPayload {
@@ -101,6 +102,25 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
+ * Platform user middleware (admin, support, or viewer)
+ * Use for view-only operations that should be accessible to all platform roles
+ */
+export function requirePlatformUser(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
+  }
+
+  if (!isPlatformUser(req.user)) {
+    return res.status(403).json({ 
+      error: 'platform_access_required', 
+      message: 'Platform-level access required' 
+    });
+  }
+
+  next();
+}
+
+/**
  * Middleware to check if user has access to a specific tenant
  */
 export function checkTenantAccess(req: Request, res: Response, next: NextFunction) {
@@ -170,7 +190,7 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
   }
 
   // Platform admins can manage any tenant
-  if (req.user.role === UserRole.PLATFORM_ADMIN || req.user.role === UserRole.ADMIN) {
+  if (isPlatformAdmin(req.user)) {
     return next();
   }
 

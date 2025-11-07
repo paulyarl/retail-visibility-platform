@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { UserRole, Prisma } from '@prisma/client';
 import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
 import { imageEnrichmentService } from '../services/ImageEnrichmentService';
-import { isPlatformAdmin } from '../utils/platform-admin';
+import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
 import {
   scanSessionStarted,
   scanSessionCompleted,
@@ -634,8 +634,8 @@ router.post('/api/scan/cleanup-idle-sessions', async (req: Request, res: Respons
 // Admin endpoints for enrichment stats
 router.get('/api/admin/enrichment/cache-stats', authenticateToken, async (req: Request, res: Response) => {
   try {
-    if (!isPlatformAdmin(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_admin_required' });
+    if (!canViewAllTenants(req.user as any)) {
+      return res.status(403).json({ success: false, error: 'platform_access_required' });
     }
 
     const stats = barcodeEnrichmentService.getCacheStats();
@@ -648,8 +648,8 @@ router.get('/api/admin/enrichment/cache-stats', authenticateToken, async (req: R
 
 router.get('/api/admin/enrichment/rate-limits', authenticateToken, async (req: Request, res: Response) => {
   try {
-    if (!isPlatformAdmin(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_admin_required' });
+    if (!canViewAllTenants(req.user as any)) {
+      return res.status(403).json({ success: false, error: 'platform_access_required' });
     }
 
     const stats = barcodeEnrichmentService.getRateLimitStats();
@@ -682,8 +682,8 @@ router.post('/api/admin/enrichment/clear-cache', authenticateToken, async (req: 
 // Comprehensive enrichment analytics
 router.get('/api/admin/enrichment/analytics', authenticateToken, async (req: Request, res: Response) => {
   try {
-    if (!isPlatformAdmin(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_admin_required' });
+    if (!canViewAllTenants(req.user as any)) {
+      return res.status(403).json({ success: false, error: 'platform_access_required' });
     }
 
     // Get total cached products
@@ -779,8 +779,8 @@ router.get('/api/admin/enrichment/analytics', authenticateToken, async (req: Req
 // Search and browse cached products
 router.get('/api/admin/enrichment/search', authenticateToken, async (req: Request, res: Response) => {
   try {
-    if (!isPlatformAdmin(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_admin_required' });
+    if (!canViewAllTenants(req.user as any)) {
+      return res.status(403).json({ success: false, error: 'platform_access_required' });
     }
 
     const { query, source, page = '1', limit = '20' } = req.query;
@@ -842,8 +842,8 @@ router.get('/api/admin/enrichment/search', authenticateToken, async (req: Reques
 // Get detailed product enrichment data
 router.get('/api/admin/enrichment/:barcode', authenticateToken, async (req: Request, res: Response) => {
   try {
-    if (!isPlatformAdmin(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_admin_required' });
+    if (!canViewAllTenants(req.user as any)) {
+      return res.status(403).json({ success: false, error: 'platform_access_required' });
     }
 
     const { barcode } = req.params;
