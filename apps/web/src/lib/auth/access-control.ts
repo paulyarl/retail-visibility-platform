@@ -432,11 +432,28 @@ export const AccessPresets = {
     allowPlatformAdminOverride: true,
   } as AccessControlOptions,
 
-  /** Organization member (owner/admin of any location), or platform admin */
+  /** Organization member (owner/admin of any location), or platform support */
   ORGANIZATION_MEMBER: {
     requireOrganization: true,
-    requireOrganizationMember: true,
-    allowPlatformAdminOverride: true,
+    customCheck: (user, context) => {
+      // Platform support/admin can view organization data
+      if (user.role === 'PLATFORM_ADMIN' || 
+          user.role === 'PLATFORM_SUPPORT' ||
+          user.role === 'ADMIN') {
+        return true;
+      }
+      // Check if user is a member of the organization
+      if (context?.organizationData) {
+        return user.tenants?.some(t => 
+          context.organizationData!.tenants.some(orgTenant => 
+            (t.tenantId === orgTenant.id || t.id === orgTenant.id) &&
+            (t.role === 'OWNER' || t.role === 'ADMIN')
+          )
+        ) || false;
+      }
+      return false;
+    },
+    allowPlatformAdminOverride: false,
   } as AccessControlOptions,
 
   /** Hero location admin (must be hero + owner/admin), or platform admin */
