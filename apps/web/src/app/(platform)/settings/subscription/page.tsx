@@ -56,15 +56,16 @@ export default function SubscriptionPage() {
         const userData = await userRes.json();
         setUser(userData);
         
-        // Platform users don't have subscriptions - show catalog view
-        if (isPlatformUser(userData)) {
+        // Get current tenant from localStorage (try both keys for compatibility)
+        const tenantId = localStorage.getItem('current_tenant_id') || localStorage.getItem('tenantId');
+        
+        // Platform users viewing without tenant context - show catalog view
+        if (isPlatformUser(userData) && !tenantId) {
           setLoading(false);
           return;
         }
         
-        // For store owners, load their tenant subscription
-        // Get current tenant from localStorage (try both keys for compatibility)
-        const tenantId = localStorage.getItem('current_tenant_id') || localStorage.getItem('tenantId');
+        // If no tenant context at all, can't show subscription
         if (!tenantId) {
           setLoading(false);
           return;
@@ -124,8 +125,8 @@ export default function SubscriptionPage() {
     );
   }
 
-  // Platform users see catalog view (no personal subscription)
-  if (user && isPlatformUser(user)) {
+  // Platform users see catalog view only if no tenant context
+  if (user && isPlatformUser(user) && !tenant) {
     return (
       <div className="min-h-screen bg-neutral-50">
         <PageHeader

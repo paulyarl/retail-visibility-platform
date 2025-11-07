@@ -96,6 +96,8 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           href: tenantId ? `/t/${tenantId}/settings/subscription` : '/settings/subscription',
           color: 'bg-primary-500',
           badge: 'Manage',
+          // Platform support/admin OR tenant owner/admin can view subscriptions
+          accessOptions: tenantId ? AccessPresets.SUPPORT_OR_TENANT_ADMIN : undefined,
         },
       ],
     },
