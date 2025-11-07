@@ -468,14 +468,43 @@ app.get("/public/tenant/:tenantId", async (req, res) => {
     const { tenantId } = req.params;
     if (!tenantId) return res.status(400).json({ error: "tenant_required" });
     
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    const tenant = await prisma.tenant.findUnique({ 
+      where: { id: tenantId },
+      include: {
+        featureOverrides: {
+          where: {
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: new Date() } }
+            ]
+          }
+        }
+      }
+    });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
 
-    // Return basic public tenant information
+    // Check if tenant has storefront access (tier + overrides)
+    const tier = tenant.subscriptionTier || 'trial';
+    const hasStorefrontByTier = tier !== 'google_only'; // google_only doesn't have storefront
+    
+    // Check for storefront override
+    const storefrontOverride = tenant.featureOverrides.find(
+      (override: any) => override.feature === 'storefront'
+    );
+    
+    const hasStorefrontAccess = storefrontOverride 
+      ? storefrontOverride.granted 
+      : hasStorefrontByTier;
+
+    // Return basic public tenant information with access status
     return res.json({
       id: tenant.id,
       name: tenant.name,
+      subscriptionTier: tenant.subscriptionTier,
       metadata: tenant.metadata,
+      access: {
+        storefront: hasStorefrontAccess,
+      }
     });
   } catch (e: any) {
     console.error("[GET /public/tenant/:tenantId] Error:", e);

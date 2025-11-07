@@ -65,7 +65,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       return null;
     }
 
-    const tenant: Tenant = await tenantRes.json();
+    const tenant: Tenant & { access?: { storefront: boolean } } = await tenantRes.json();
 
     // Fetch business profile
     let hasHours = false;
@@ -194,8 +194,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const tier = tenant.subscriptionTier || 'trial';
   const features = getLandingPageFeatures(tier);
 
-  // Tier gate: google_only tier does not have storefront access
-  if (tier === 'google_only') {
+  // Tier gate: Check backend access status (respects overrides)
+  if (tenant.access && !tenant.access.storefront) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center p-4">
         <div className="max-w-2xl w-full bg-white dark:bg-neutral-800 rounded-lg shadow-lg p-8">
