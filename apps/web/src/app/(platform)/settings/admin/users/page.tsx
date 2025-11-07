@@ -69,14 +69,14 @@ export default function UsersManagementPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get('/api/users');
+      const res = await api.get('/api/admin/users');
       const data = await res.json();
       
       if (!res.ok) {
         throw new Error(data.error || 'Failed to load users');
       }
 
-      setUsers(Array.isArray(data) ? data : []);
+      setUsers(Array.isArray(data?.users) ? data.users : (Array.isArray(data) ? data : []));
     } catch (err) {
       console.error('[Users] Load error:', err);
       setError(err instanceof Error ? err.message : 'Failed to load users');
@@ -219,7 +219,7 @@ export default function UsersManagementPage() {
 
   if (loading) {
     return (
-      <ProtectedRoute requiredRole="ADMIN">
+      <ProtectedRoute>
         <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
           <PageHeader
             title="User Management"
@@ -237,7 +237,7 @@ export default function UsersManagementPage() {
   }
 
   return (
-    <ProtectedRoute requiredRole="ADMIN">
+    <ProtectedRoute>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
         title="User Management"

@@ -2140,6 +2140,7 @@ app.use('/admin', authenticateToken, tenantFlagsRoutes);
 app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
 // Admin tools and users - these are more generic and should come after specific routes
 app.use('/api/admin/tools', authenticateToken, requireAdmin, adminToolsRoutes);
+app.use('/admin', authenticateToken, adminUsersRoutes);
 app.use('/api/admin', authenticateToken, adminUsersRoutes);
 app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
 app.use('/api', feedValidationRoutes);
