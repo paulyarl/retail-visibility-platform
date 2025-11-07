@@ -288,9 +288,10 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
       });
     }
 
-    // Check if user is a platform admin (admins can use Quick Start on any tenant)
+    // Check if user is a platform user (platform users can use Quick Start on any tenant)
     const user = (req as any).user;
     const userIsPlatformAdmin = isPlatformAdmin(user);
+    const userIsPlatformUser = isPlatformUser(user);
 
     // Verify tenant exists and user has access
     const tenant = await prisma.tenant.findUnique({
@@ -308,8 +309,8 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
     }
 
     // Check if user has access to this tenant's organization
-    // Platform admins bypass this check
-    if (!userIsPlatformAdmin && tenant.organizationId) {
+    // Platform users bypass this check
+    if (!userIsPlatformUser && tenant.organizationId) {
       const organization = await prisma.organization.findUnique({
         where: { id: tenant.organizationId },
         select: { ownerId: true },
@@ -318,7 +319,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
       if (!organization || organization.ownerId !== userId) {
         return res.status(403).json({
           error: 'Forbidden',
-          message: 'You do not have permission to manage this tenant. Only the organization owner or platform admins can use Category Quick Start.',
+          message: 'You do not have permission to manage this tenant. Only the organization owner or platform users can use Category Quick Start.',
         });
       }
     }
@@ -339,8 +340,8 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
       where: { tenantId },
     });
 
-    // Platform admins bypass category limit
-    if (!userIsPlatformAdmin && existingCategoryCount > 50) {
+    // Platform users bypass category limit
+    if (!userIsPlatformUser && existingCategoryCount > 50) {
       return res.status(400).json({
         error: 'Too many categories',
         message: 'You already have 50+ categories. Category Quick Start is designed for new stores.',
