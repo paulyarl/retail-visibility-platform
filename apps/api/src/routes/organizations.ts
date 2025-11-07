@@ -1,14 +1,46 @@
 // Organization Management API Routes
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma, basePrisma } from '../prisma';
 import { generateQuickStartProducts } from '../lib/quick-start';
 import { validateOrganizationTier, validateOrganizationLimits, validateOrganizationTierChange } from '../middleware/organization-validation';
+import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 
 const router = Router();
 
+/**
+ * Middleware to check if user can perform support actions (admin/support)
+ * Used for organization management operations
+ */
+function requireSupportActions(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (!user || !canPerformSupportActions(user)) {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Platform admin or support access required for organization management',
+    });
+  }
+  next();
+}
+
+/**
+ * Middleware to check if user is platform admin
+ * Used for high-risk organization operations
+ */
+function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (!user || !isPlatformAdmin(user)) {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Platform administrator access required for this operation',
+    });
+  }
+  next();
+}
+
 // GET /organizations - List all organizations
-router.get('/', async (req, res) => {
+// Permission: Platform support (view-only operation)
+router.get('/', requireSupportActions, async (req, res) => {
   try {
     const organizations = await prisma.organization.findMany({
       include: {
@@ -53,7 +85,8 @@ router.get('/', async (req, res) => {
 });
 
 // GET /organizations/:id - Get single organization
-router.get('/:id', async (req, res) => {
+// Permission: Platform support (view-only operation)
+router.get('/:id', requireSupportActions, async (req, res) => {
   try {
     const organization = await prisma.organization.findUnique({
       where: { id: req.params.id },
@@ -98,7 +131,9 @@ const createOrgSchema = z.object({
   maxTotalSKUs: z.number().int().positive().default(2500),
 });
 
-router.post('/', validateOrganizationTier, validateOrganizationLimits, async (req, res) => {
+// POST /organizations - Create organization
+// Permission: Platform admin only (creates org structure)
+router.post('/', requirePlatformAdmin, validateOrganizationTier, validateOrganizationLimits, async (req, res) => {
   try {
     const parsed = createOrgSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -133,7 +168,9 @@ const updateOrgSchema = z.object({
   subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
 });
 
-router.put('/:id', validateOrganizationTier, validateOrganizationLimits, validateOrganizationTierChange, async (req, res) => {
+// PUT /organizations/:id - Update organization
+// Permission: Platform admin only (modifies org structure)
+router.put('/:id', requirePlatformAdmin, validateOrganizationTier, validateOrganizationLimits, validateOrganizationTierChange, async (req, res) => {
   try {
     const parsed = updateOrgSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -153,7 +190,8 @@ router.put('/:id', validateOrganizationTier, validateOrganizationLimits, validat
 });
 
 // DELETE /organizations/:id - Delete organization
-router.delete('/:id', async (req, res) => {
+// Permission: Platform admin only (destructive operation)
+router.delete('/:id', requirePlatformAdmin, async (req, res) => {
   try {
     // First, unlink all tenants from this organization
     await prisma.tenant.updateMany({
@@ -178,7 +216,9 @@ const addTenantSchema = z.object({
   tenantId: z.string().min(1),
 });
 
-router.post('/:id/tenants', async (req, res) => {
+// POST /organizations/:id/tenants - Add tenant to organization
+// Permission: Platform admin only (modifies org structure)
+router.post('/:id/tenants', requirePlatformAdmin, async (req, res) => {
   try {
     const parsed = addTenantSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -202,7 +242,8 @@ router.post('/:id/tenants', async (req, res) => {
 });
 
 // DELETE /organizations/:id/tenants/:tenantId - Remove tenant from organization
-router.delete('/:id/tenants/:tenantId', async (req, res) => {
+// Permission: Platform admin only (modifies org structure)
+router.delete('/:id/tenants/:tenantId', requirePlatformAdmin, async (req, res) => {
   try {
     const tenant = await prisma.tenant.update({
       where: { id: req.params.tenantId },
@@ -229,7 +270,9 @@ const propagateSchema = z.object({
   }).optional(),
 });
 
-router.post('/:id/items/propagate', async (req, res) => {
+// POST /organizations/:id/items/propagate - Propagate item to tenants
+// Permission: Platform support (helping customers with inventory)
+router.post('/:id/items/propagate', requireSupportActions, async (req, res) => {
   try {
     const parsed = propagateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -476,7 +519,9 @@ const propagateBulkSchema = z.object({
   }).optional(),
 });
 
-router.post('/:id/items/propagate-bulk', async (req, res) => {
+// POST /organizations/:id/items/propagate-bulk - Bulk propagate items
+// Permission: Platform support (helping customers with inventory)
+router.post('/:id/items/propagate-bulk', requireSupportActions, async (req, res) => {
   try {
     const parsed = propagateBulkSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -667,7 +712,9 @@ const setHeroLocationSchema = z.object({
   tenantId: z.string().min(1),
 });
 
-router.put('/:id/hero-location', async (req, res) => {
+// PUT /organizations/:id/hero-location - Set hero location
+// Permission: Platform admin only (critical org configuration)
+router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
   try {
     const parsed = setHeroLocationSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -729,8 +776,9 @@ router.put('/:id/hero-location', async (req, res) => {
   }
 });
 
-// POST /organizations/:id/sync-from-hero - Sync all items from hero location to all other locations
-router.post('/:id/sync-from-hero', async (req, res) => {
+// POST /organizations/:id/sync-from-hero - Sync all items from hero location
+// Permission: Platform support (helping customers sync inventory)
+router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
   try {
     // Verify organization exists
     const organization = await prisma.organization.findUnique({
