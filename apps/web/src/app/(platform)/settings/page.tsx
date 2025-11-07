@@ -269,6 +269,26 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
         },
       ] as SettingCard[],
     }] : []),
+    // Integrations (only when tenantId is provided)
+    ...(tenantId ? [{
+      title: 'Integrations',
+      description: 'Connect your POS and other systems',
+      cards: [
+        {
+          title: 'POS Integrations',
+          description: 'Connect Clover, Square, and other POS systems',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/integrations`,
+          color: 'bg-green-500',
+          badge: 'NEW',
+          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+        },
+      ] as SettingCard[],
+    }] : []),
     {
       title: 'User Administration',
       description: 'Manage platform users and permissions',
