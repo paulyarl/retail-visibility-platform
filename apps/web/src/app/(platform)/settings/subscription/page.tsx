@@ -9,6 +9,7 @@ import { getAllAdminEmails } from '@/lib/admin-emails';
 import { api } from '@/lib/api';
 import { isPlatformUser, isPlatformAdmin, type UserData } from '@/lib/auth/access-control';
 import { useAuth } from '@/contexts/AuthContext';
+import { ViewingAsBadge } from '@/components/RoleBadge';
 
 interface Tenant {
   id: string;
@@ -114,7 +115,8 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
     loadSubscription();
   }, [propTenantId, user]);
 
-  if (loading) {
+  // Show loading while user or tenant data is being fetched
+  if (loading || !user) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <div className="text-neutral-600">Loading subscription details...</div>
@@ -123,7 +125,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   }
 
   // Platform users see catalog view only if no tenant context
-  if (user && isPlatformUser(user) && !tenant) {
+  if (isPlatformUser(user) && !tenant && !propTenantId) {
     return (
       <div className="min-h-screen bg-neutral-50">
         <PageHeader
@@ -419,6 +421,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
         title="Subscription"
         description="Manage your subscription plan and view features"
         icon={Icons.Settings}
+        badge={tenant?.id ? <ViewingAsBadge tenantId={tenant.id} /> : <ViewingAsBadge showPlatformRole />}
         backLink={{
           href: '/settings',
           label: 'Back to Settings'
