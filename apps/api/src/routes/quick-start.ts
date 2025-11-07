@@ -96,7 +96,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireTierFeat
       });
     }
 
-    // Check if user can perform support actions (admin/support, but not viewer)
+    // Check permissions: platform support OR tenant owner/admin
     const user = (req as any).user;
     const userIsPlatformAdmin = isPlatformAdmin(user);
     const userCanPerformSupport = canPerformSupportActions(user);
@@ -116,18 +116,41 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireTierFeat
       });
     }
 
-    // Check if user has access to this tenant's organization
-    // Platform admin/support bypass this check (viewer cannot create)
-    if (!userCanPerformSupport && tenant.organizationId) {
-      const organization = await prisma.organization.findUnique({
-        where: { id: tenant.organizationId },
-        select: { ownerId: true },
+    // Platform admin/support can use Quick Start on any tenant
+    if (userCanPerformSupport) {
+      // Allowed - platform-level support
+    }
+    // Check tenant-level permissions (owner or admin)
+    else {
+      const { prisma: prismaClient } = await import('../prisma');
+      const userTenant = await prismaClient.userTenant.findUnique({
+        where: {
+          userId_tenantId: {
+            userId: userId,
+            tenantId: tenantId,
+          },
+        },
       });
 
-      if (!organization || organization.ownerId !== userId) {
+      const isTenantOwnerOrAdmin = userTenant && (userTenant.role === 'OWNER' || userTenant.role === 'ADMIN');
+
+      // If not tenant owner/admin, check org ownership (legacy)
+      if (!isTenantOwnerOrAdmin && tenant.organizationId) {
+        const organization = await prismaClient.organization.findUnique({
+          where: { id: tenant.organizationId },
+          select: { ownerId: true },
+        });
+
+        if (!organization || organization.ownerId !== userId) {
+          return res.status(403).json({
+            error: 'Forbidden',
+            message: 'You do not have permission to use Quick Start. Only platform support, tenant owners, or tenant admins can use this feature.',
+          });
+        }
+      } else if (!isTenantOwnerOrAdmin) {
         return res.status(403).json({
           error: 'Forbidden',
-          message: 'You do not have permission to manage this tenant. Only the organization owner, platform admins, or platform support can use Quick Start.',
+          message: 'You do not have permission to use Quick Start. Only platform support, tenant owners, or tenant admins can use this feature.',
         });
       }
     }
@@ -145,7 +168,8 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireTierFeat
 
     const { scenario, productCount, assignCategories, createAsDrafts} = parsed.data;
 
-    // Check rate limit (admin/support bypass this - they're helping customers)
+    // Check rate limit (platform support bypasses - they're helping multiple customers)
+    // Tenant owners/admins are subject to rate limits on their own tenant
     if (!userCanPerformSupport) {
       const rateLimit = checkRateLimit(tenantId);
       if (!rateLimit.allowed) {
@@ -289,7 +313,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
       });
     }
 
-    // Check if user can perform support actions (admin/support, but not viewer)
+    // Check permissions: platform support OR tenant owner/admin
     const user = (req as any).user;
     const userIsPlatformAdmin = isPlatformAdmin(user);
     const userCanPerformSupport = canPerformSupportActions(user);
@@ -309,18 +333,41 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
       });
     }
 
-    // Check if user has access to this tenant's organization
-    // Platform admin/support bypass this check (viewer cannot create)
-    if (!userCanPerformSupport && tenant.organizationId) {
-      const organization = await prisma.organization.findUnique({
-        where: { id: tenant.organizationId },
-        select: { ownerId: true },
+    // Platform admin/support can use Category Quick Start on any tenant
+    if (userCanPerformSupport) {
+      // Allowed - platform-level support
+    }
+    // Check tenant-level permissions (owner or admin)
+    else {
+      const { prisma: prismaClient } = await import('../prisma');
+      const userTenant = await prismaClient.userTenant.findUnique({
+        where: {
+          userId_tenantId: {
+            userId: userId,
+            tenantId: tenantId,
+          },
+        },
       });
 
-      if (!organization || organization.ownerId !== userId) {
+      const isTenantOwnerOrAdmin = userTenant && (userTenant.role === 'OWNER' || userTenant.role === 'ADMIN');
+
+      // If not tenant owner/admin, check org ownership (legacy)
+      if (!isTenantOwnerOrAdmin && tenant.organizationId) {
+        const organization = await prismaClient.organization.findUnique({
+          where: { id: tenant.organizationId },
+          select: { ownerId: true },
+        });
+
+        if (!organization || organization.ownerId !== userId) {
+          return res.status(403).json({
+            error: 'Forbidden',
+            message: 'You do not have permission to use Category Quick Start. Only platform support, tenant owners, or tenant admins can use this feature.',
+          });
+        }
+      } else if (!isTenantOwnerOrAdmin) {
         return res.status(403).json({
           error: 'Forbidden',
-          message: 'You do not have permission to manage this tenant. Only the organization owner, platform admins, or platform support can use Category Quick Start.',
+          message: 'You do not have permission to use Category Quick Start. Only platform support, tenant owners, or tenant admins can use this feature.',
         });
       }
     }
