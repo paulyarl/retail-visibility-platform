@@ -5,11 +5,12 @@
  * starter products for new tenants.
  */
 
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
+import { isPlatformAdmin } from '../utils/platform-admin';
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
 import { requireTierFeature } from '../middleware/tier-access';
@@ -97,7 +98,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireTierFeat
 
     // Check if user is a platform admin (admins can use Quick Start on any tenant)
     const user = (req as any).user;
-    const isPlatformAdmin = user?.role === UserRole.ADMIN;
+    const userIsPlatformAdmin = isPlatformAdmin(user);
 
     // Verify tenant exists and user has access
     const tenant = await prisma.tenant.findUnique({
@@ -116,7 +117,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireTierFeat
 
     // Check if user has access to this tenant's organization
     // Platform admins bypass this check
-    if (!isPlatformAdmin && tenant.organizationId) {
+    if (!userIsPlatformAdmin && tenant.organizationId) {
       const organization = await prisma.organization.findUnique({
         where: { id: tenant.organizationId },
         select: { ownerId: true },
@@ -144,7 +145,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireTierFeat
     const { scenario, productCount, assignCategories, createAsDrafts } = parsed.data;
 
     // Check rate limit (platform admins bypass this)
-    if (!isPlatformAdmin) {
+    if (!userIsPlatformAdmin) {
       const rateLimit = checkRateLimit(tenantId);
       if (!rateLimit.allowed) {
         const hoursRemaining = Math.ceil((rateLimit.resetAt! - Date.now()) / (1000 * 60 * 60));
@@ -219,10 +220,10 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
 
     // Check if user is a platform admin (admins bypass all limits)
     const user = (req as any).user;
-    const isPlatformAdmin = user?.role === UserRole.ADMIN;
+    const userIsPlatformAdmin = isPlatformAdmin(user);
 
     // Check rate limit (platform admins bypass this)
-    const rateLimit = isPlatformAdmin ? { allowed: true } : checkRateLimit(tenantId);
+    const rateLimit = userIsPlatformAdmin ? { allowed: true } : checkRateLimit(tenantId);
     
     // Check existing product count
     const productCount = await prisma.inventoryItem.count({
@@ -232,16 +233,16 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
     // Configurable product limit (default: 500, allows testing multiple scenarios)
     // Platform admins bypass this limit to help multiple stores
     const productLimit = parseInt(process.env.QUICK_START_PRODUCT_LIMIT || '500', 10);
-    const eligible = isPlatformAdmin || (rateLimit.allowed && productCount < productLimit);
+    const eligible = userIsPlatformAdmin || (rateLimit.allowed && productCount < productLimit);
 
     res.json({
       eligible,
       productCount,
       productLimit,
-      isPlatformAdmin,
+      isPlatformAdmin: userIsPlatformAdmin,
       rateLimitReached: !rateLimit.allowed,
       resetAt: rateLimit.resetAt,
-      recommendation: isPlatformAdmin
+      recommendation: userIsPlatformAdmin
         ? 'Platform Admin: All limits bypassed. You can use Quick Start anytime.'
         : productCount === 0
         ? 'Quick Start is perfect for you! Get started with pre-built products.'
@@ -281,7 +282,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
 
     // Check if user is a platform admin (admins can use Quick Start on any tenant)
     const user = (req as any).user;
-    const isPlatformAdmin = user?.role === UserRole.ADMIN;
+    const userIsPlatformAdmin = isPlatformAdmin(user);
 
     // Verify tenant exists and user has access
     const tenant = await prisma.tenant.findUnique({
@@ -300,7 +301,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
 
     // Check if user has access to this tenant's organization
     // Platform admins bypass this check
-    if (!isPlatformAdmin && tenant.organizationId) {
+    if (!userIsPlatformAdmin && tenant.organizationId) {
       const organization = await prisma.organization.findUnique({
         where: { id: tenant.organizationId },
         select: { ownerId: true },
@@ -331,7 +332,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
     });
 
     // Platform admins bypass category limit
-    if (!isPlatformAdmin && existingCategoryCount > 50) {
+    if (!userIsPlatformAdmin && existingCategoryCount > 50) {
       return res.status(400).json({
         error: 'Too many categories',
         message: 'You already have 50+ categories. Category Quick Start is designed for new stores.',

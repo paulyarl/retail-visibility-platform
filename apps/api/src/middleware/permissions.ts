@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { UserRole, UserTenantRole } from '@prisma/client';
+import { isPlatformAdmin } from '../utils/platform-admin';
 
 /**
  * Get tenant ID from request
@@ -49,7 +50,7 @@ export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
       }
 
       // Platform admins bypass tenant role checks
-      if (req.user.role === UserRole.ADMIN) {
+      if (isPlatformAdmin(req.user)) {
         return next();
       }
 
@@ -117,7 +118,7 @@ export async function checkTenantCreationLimit(
     }
 
     // Platform admins can create unlimited tenants
-    if (req.user.role === UserRole.ADMIN) {
+    if (isPlatformAdmin(req.user)) {
       return next();
     }
 
@@ -180,7 +181,7 @@ export async function requireTenantOwner(
     }
 
     // Platform admins can delete any tenant
-    if (req.user.role === UserRole.ADMIN) {
+    if (isPlatformAdmin(req.user)) {
       return next();
     }
 

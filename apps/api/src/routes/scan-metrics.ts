@@ -2,14 +2,15 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { UserRole } from '@prisma/client';
+import { isPlatformAdmin } from '../utils/platform-admin';
 
 const router = Router();
 
 // GET /api/admin/scan-metrics - Get scan activity metrics
 router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, res: Response) => {
   try {
-    if ((req.user as any)?.role !== UserRole.ADMIN) {
-      return res.status(403).json({ success: false, error: 'admin_required' });
+    if (!isPlatformAdmin(req.user as any)) {
+      return res.status(403).json({ success: false, error: 'platform_admin_required' });
     }
 
     const { timeRange = '24h' } = req.query;
@@ -187,8 +188,8 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
 // GET /api/admin/scan-metrics/timeseries - Get time-series data for charts
 router.get('/api/admin/scan-metrics/timeseries', authenticateToken, async (req: Request, res: Response) => {
   try {
-    if ((req.user as any)?.role !== UserRole.ADMIN) {
-      return res.status(403).json({ success: false, error: 'admin_required' });
+    if (!isPlatformAdmin(req.user as any)) {
+      return res.status(403).json({ success: false, error: 'platform_admin_required' });
     }
 
     const { timeRange = '24h', interval = '1h' } = req.query;
