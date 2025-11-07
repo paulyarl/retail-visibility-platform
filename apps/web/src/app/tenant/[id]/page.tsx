@@ -243,7 +243,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <a
                 href={`/t/${id}/settings/subscription`}
-                className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition-colors"
+                className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition-colors" style={{ color: '#ffffff' }}
               >
                 Upgrade Plan
               </a>
