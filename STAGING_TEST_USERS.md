@@ -340,55 +340,64 @@ Role: VIEWER (read-only)
 -- Run in Supabase SQL Editor
 -- Note: Supabase Auth uses magic links, so these users will need to verify email
 -- For testing, you may want to use Supabase's test email feature
+-- Note: These queries are idempotent - safe to run multiple times
 
 -- Platform Admins (PLATFORM_ADMIN role)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
   (gen_random_uuid(), 'alice.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
+ON CONFLICT (email) DO NOTHING;
 
 -- Platform Support (PLATFORM_SUPPORT role)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
-  (gen_random_uuid(), 'charlie.support@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'charlie.support@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
+ON CONFLICT (email) DO NOTHING;
 
 -- Platform Viewer (PLATFORM_VIEWER role)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
-  (gen_random_uuid(), 'diana.analytics@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'diana.analytics@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
+ON CONFLICT (email) DO NOTHING;
 
 -- Organization Owners
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
   (gen_random_uuid(), 'carol.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'david.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'david.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
+ON CONFLICT (email) DO NOTHING;
 
 -- Independent Owners
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
   (gen_random_uuid(), 'emma.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'leo.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'leo.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
+ON CONFLICT (email) DO NOTHING;
 
 -- Tenant Admins (ADMIN role, WITH tenant assignments)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
   (gen_random_uuid(), 'frank.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
   (gen_random_uuid(), 'grace.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'maya.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'maya.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
+ON CONFLICT (email) DO NOTHING;
 
 -- Tenant Members
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
   (gen_random_uuid(), 'henry.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
   (gen_random_uuid(), 'iris.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'noah.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'noah.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
+ON CONFLICT (email) DO NOTHING;
 
 -- Tenant Viewers
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
   (gen_random_uuid(), 'jack.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
   (gen_random_uuid(), 'kate.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  (gen_random_uuid(), 'olivia.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'olivia.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated')
+ON CONFLICT (email) DO NOTHING;
 ```
 
 ### Step 2: Create User Records in Application Database
@@ -397,63 +406,75 @@ VALUES
 -- Create User records in the "users" table (note: lowercase table name)
 -- Note: User model uses first_name and last_name, not a single name field
 -- Note: User model uses cuid() by default, but we're using UUIDs for consistency
+-- Note: These queries are idempotent - safe to run multiple times
 
 -- Platform Admins (PLATFORM_ADMIN role - explicit, no ambiguity)
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
   (gen_random_uuid(), 'alice.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Alice', 'PlatformAdmin', 'PLATFORM_ADMIN', true, NOW(), NOW()),
-  (gen_random_uuid(), 'bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Bob', 'PlatformAdmin', 'PLATFORM_ADMIN', true, NOW(), NOW());
+  (gen_random_uuid(), 'bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Bob', 'PlatformAdmin', 'PLATFORM_ADMIN', true, NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
 
 -- Platform Support (PLATFORM_SUPPORT role - view all + support actions)
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), 'charlie.support@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Charlie', 'Support', 'PLATFORM_SUPPORT', true, NOW(), NOW());
+  (gen_random_uuid(), 'charlie.support@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Charlie', 'Support', 'PLATFORM_SUPPORT', true, NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
 
 -- Platform Viewer (PLATFORM_VIEWER role - read-only all)
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), 'diana.analytics@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Diana', 'Analytics', 'PLATFORM_VIEWER', true, NOW(), NOW());
+  (gen_random_uuid(), 'diana.analytics@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Diana', 'Analytics', 'PLATFORM_VIEWER', true, NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
 
 -- Organization Owners
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
   (gen_random_uuid(), 'carol.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Carol', 'Owner', 'OWNER', true, NOW(), NOW()),
-  (gen_random_uuid(), 'david.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), 'David', 'Owner', 'OWNER', true, NOW(), NOW());
+  (gen_random_uuid(), 'david.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), 'David', 'Owner', 'OWNER', true, NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
 
 -- Independent Owners
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
   (gen_random_uuid(), 'emma.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Emma', 'Owner', 'OWNER', true, NOW(), NOW()),
-  (gen_random_uuid(), 'leo.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Leo', 'Owner', 'OWNER', true, NOW(), NOW());
+  (gen_random_uuid(), 'leo.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Leo', 'Owner', 'OWNER', true, NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
 
 -- Tenant Admins (USER role - they get ADMIN via UserTenant.role)
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
   (gen_random_uuid(), 'frank.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Frank', 'TenantAdmin', 'USER', true, NOW(), NOW()),
   (gen_random_uuid(), 'grace.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Grace', 'TenantAdmin', 'USER', true, NOW(), NOW()),
-  (gen_random_uuid(), 'maya.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Maya', 'TenantAdmin', 'USER', true, NOW(), NOW());
+  (gen_random_uuid(), 'maya.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Maya', 'TenantAdmin', 'USER', true, NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
 
 -- Tenant Members
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
   (gen_random_uuid(), 'henry.member@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Henry', 'Member', 'USER', true, NOW(), NOW()),
   (gen_random_uuid(), 'iris.member@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Iris', 'Member', 'USER', true, NOW(), NOW()),
-  (gen_random_uuid(), 'noah.member@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Noah', 'Member', 'USER', true, NOW(), NOW());
+  (gen_random_uuid(), 'noah.member@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Noah', 'Member', 'USER', true, NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
 
 -- Tenant Viewers
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, email_verified, created_at, updated_at)
 VALUES 
   (gen_random_uuid(), 'jack.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Jack', 'Viewer', 'USER', true, NOW(), NOW()),
   (gen_random_uuid(), 'kate.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Kate', 'Viewer', 'USER', true, NOW(), NOW()),
-  (gen_random_uuid(), 'olivia.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Olivia', 'Viewer', 'USER', true, NOW(), NOW());
+  (gen_random_uuid(), 'olivia.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), 'Olivia', 'Viewer', 'USER', true, NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
 ```
 
 ### Step 3: Create Test Tenants and Organizations
 
 ```sql
+-- Note: These queries are idempotent - safe to run multiple times
+
 -- Create organization for Carol (lowercase table name, camelCase column names)
 INSERT INTO organization (id, name, "ownerId", "createdAt", "updatedAt")
-VALUES ('org-001', 'Carol''s Coffee Chain', (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), NOW(), NOW());
+VALUES ('org-001', 'Carol''s Coffee Chain', (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
 
 -- Create tenants (note: Tenant uses camelCase columns, ownership is via UserTenant with OWNER role)
 INSERT INTO "Tenant" (id, name, "organizationId", "createdAt")
@@ -461,55 +482,67 @@ VALUES
   ('tenant-001', 'Carol''s Coffee - Downtown', 'org-001', NOW()),
   ('tenant-002', 'Carol''s Coffee - Uptown', 'org-001', NOW()),
   ('tenant-003', 'Carol''s Coffee - Westside', 'org-001', NOW()),
-  ('tenant-004', 'Emma''s Boutique', NULL, NOW());
+  ('tenant-004', 'Emma''s Boutique', NULL, NOW())
+ON CONFLICT (id) DO NOTHING;
 ```
 
 ### Step 4: Assign Users to Tenants (via user_tenants table)
 
 ```sql
+-- Note: These queries are idempotent - safe to run multiple times
+-- user_tenants has a unique constraint on (user_id, tenant_id)
+
 -- First, assign OWNERS to their tenants (Carol owns all 3 coffee shops)
 INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
   (gen_random_uuid(), (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), 'tenant-001', 'OWNER', NOW(), NOW()),
   (gen_random_uuid(), (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), 'tenant-002', 'OWNER', NOW(), NOW()),
-  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), 'tenant-003', 'OWNER', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'carol.owner@testing.app'), 'tenant-003', 'OWNER', NOW(), NOW())
+ON CONFLICT (user_id, tenant_id) DO NOTHING;
 
 -- Emma owns her boutique
 INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'emma.owner@testing.app'), 'tenant-004', 'OWNER', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'emma.owner@testing.app'), 'tenant-004', 'OWNER', NOW(), NOW())
+ON CONFLICT (user_id, tenant_id) DO NOTHING;
 
 -- Assign Frank (Tenant Admin) to tenant-001 and tenant-004
 -- NOTE: UserTenant.role = 'ADMIN' (tenant-scoped admin)
 INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
   (gen_random_uuid(), (SELECT id FROM users WHERE email = 'frank.tenantadmin@testing.app'), 'tenant-001', 'ADMIN', NOW(), NOW()),
-  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'frank.tenantadmin@testing.app'), 'tenant-004', 'ADMIN', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'frank.tenantadmin@testing.app'), 'tenant-004', 'ADMIN', NOW(), NOW())
+ON CONFLICT (user_id, tenant_id) DO NOTHING;
 
 -- Assign Grace (Tenant Admin) to tenant-002
 INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'grace.tenantadmin@testing.app'), 'tenant-002', 'ADMIN', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'grace.tenantadmin@testing.app'), 'tenant-002', 'ADMIN', NOW(), NOW())
+ON CONFLICT (user_id, tenant_id) DO NOTHING;
 
 -- Assign Henry (Member) to tenant-002
 INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'henry.member@testing.app'), 'tenant-002', 'MEMBER', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'henry.member@testing.app'), 'tenant-002', 'MEMBER', NOW(), NOW())
+ON CONFLICT (user_id, tenant_id) DO NOTHING;
 
 -- Assign Iris (Member) to tenant-003
 INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'iris.member@testing.app'), 'tenant-003', 'MEMBER', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'iris.member@testing.app'), 'tenant-003', 'MEMBER', NOW(), NOW())
+ON CONFLICT (user_id, tenant_id) DO NOTHING;
 
 -- Assign Jack (Viewer) to tenant-003
 INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'jack.viewer@testing.app'), 'tenant-003', 'VIEWER', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'jack.viewer@testing.app'), 'tenant-003', 'VIEWER', NOW(), NOW())
+ON CONFLICT (user_id, tenant_id) DO NOTHING;
 
 -- Assign Kate (Viewer) to tenant-001
 INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
 VALUES 
-  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'kate.viewer@testing.app'), 'tenant-001', 'VIEWER', NOW(), NOW());
+  (gen_random_uuid(), (SELECT id FROM users WHERE email = 'kate.viewer@testing.app'), 'tenant-001', 'VIEWER', NOW(), NOW())
+ON CONFLICT (user_id, tenant_id) DO NOTHING;
 ```
 
 ---
