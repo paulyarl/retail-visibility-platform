@@ -423,13 +423,22 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
         icon={Icons.Settings}
         badge={
           tenant ? (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-neutral-800 rounded-lg border-2 border-neutral-300 dark:border-neutral-600 shadow-sm">
-              <span className="text-xs text-neutral-700 dark:text-neutral-300 font-semibold uppercase tracking-wide">
-                Viewing Subscription For:
-              </span>
-              <Badge variant="info" className="text-xs font-bold">
-                {tenant.name}
-              </Badge>
+            <div className="inline-flex items-center gap-3 px-3 py-1.5 bg-white dark:bg-neutral-800 rounded-lg border-2 border-neutral-300 dark:border-neutral-600 shadow-sm">
+              {tenant.metadata?.branding?.logoUrl && (
+                <img 
+                  src={tenant.metadata.branding.logoUrl} 
+                  alt={`${tenant.name} logo`}
+                  className="h-8 w-8 object-contain rounded"
+                />
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                  Subscription:
+                </span>
+                <span className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
+                  {tenant.name}
+                </span>
+              </div>
             </div>
           ) : (
             <ViewingAsBadge showPlatformRole />
