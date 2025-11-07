@@ -20,6 +20,8 @@ interface ContextBadgesProps {
   className?: string;
   /** Show border bottom separator */
   showBorder?: boolean;
+  /** Context label (e.g., "Subscription", "Tenant", "Item", "Analytics") */
+  contextLabel?: string;
 }
 
 /**
@@ -37,20 +39,24 @@ interface ContextBadgesProps {
  * - Any page where context clarity is important
  * 
  * @example
- * // With tenant context
- * <ContextBadges tenant={tenant} showBorder />
+ * // Subscription page
+ * <ContextBadges tenant={tenant} contextLabel="Subscription" showBorder />
  * 
- * // Platform user without tenant
- * <ContextBadges showPlatformRole showBorder />
+ * // Tenant settings
+ * <ContextBadges tenant={tenant} contextLabel="Tenant" showBorder />
  * 
- * // Custom styling
- * <ContextBadges tenant={tenant} className="my-4" />
+ * // Item details
+ * <ContextBadges tenant={tenant} contextLabel="Item" showBorder />
+ * 
+ * // Analytics page
+ * <ContextBadges tenant={tenant} contextLabel="Analytics" showBorder />
  */
 export function ContextBadges({ 
   tenant, 
   showPlatformRole = false, 
   className = "",
-  showBorder = true 
+  showBorder = true,
+  contextLabel = "Subscription"
 }: ContextBadgesProps) {
   const containerClasses = `flex items-center gap-3 ${showBorder ? 'pb-4 border-b border-neutral-200 dark:border-neutral-700' : ''} ${className}`;
 
@@ -77,7 +83,7 @@ export function ContextBadges({
           {/* Tenant Name */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
-              Subscription:
+              {contextLabel}:
             </span>
             <span className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
               {tenant.name}

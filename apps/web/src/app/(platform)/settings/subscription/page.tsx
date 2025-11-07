@@ -429,7 +429,11 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Context Badges */}
-        <ContextBadges tenant={tenant || undefined} showPlatformRole={!tenant} />
+        <ContextBadges 
+          tenant={tenant || undefined} 
+          showPlatformRole={!tenant}
+          contextLabel="Subscription"
+        />
         
         {/* Current Plan */}
         {/* SKU Overage Alert */}
