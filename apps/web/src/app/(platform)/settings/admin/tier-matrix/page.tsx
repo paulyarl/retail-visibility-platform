@@ -7,7 +7,7 @@ import { TIER_FEATURES, TIER_HIERARCHY, FEATURE_DISPLAY_NAMES, TIER_DISPLAY_NAME
 type TierName = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise';
 
 export default function TierMatrixPage() {
-  const { isPlatformAdmin, loading: accessLoading } = useAccessControl(null);
+  const { user, isPlatformAdmin, loading: accessLoading } = useAccessControl(null);
   const [selectedView, setSelectedView] = useState<'matrix' | 'details'>('matrix');
 
   // Show loading state while checking access
@@ -22,16 +22,29 @@ export default function TierMatrixPage() {
     );
   }
 
+  // Allow access to platform staff and tenant decision-makers
+  const hasAccess = user && (
+    isPlatformAdmin ||
+    user.role === 'PLATFORM_SUPPORT' ||
+    user.role === 'PLATFORM_VIEWER' ||
+    user.role === 'OWNER' ||
+    user.role === 'ADMIN'
+  );
+
   // Show access denied after loading completes
-  if (!isPlatformAdmin) {
+  if (!hasAccess) {
     return (
       <div className="p-6">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-red-800 dark:text-red-200">Access denied. Platform admin access required.</p>
+          <p className="text-red-800 dark:text-red-200">
+            Access denied. This page is available to platform staff and tenant administrators.
+          </p>
         </div>
       </div>
     );
   }
+
+  const isReadOnly = !isPlatformAdmin;
 
   const tiers: TierName[] = ['trial', 'google_only', 'starter', 'professional', 'enterprise'];
   const features = Object.keys(FEATURE_DISPLAY_NAMES);
@@ -78,6 +91,28 @@ export default function TierMatrixPage() {
           Live view of all subscription tiers and their feature access
         </p>
       </div>
+
+      {/* Info Banner for Non-Admins */}
+      {isReadOnly && (
+        <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                Tier Reference Guide
+              </h3>
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                This page shows what features are included in each subscription tier. 
+                {user?.role === 'OWNER' || user?.role === 'ADMIN' 
+                  ? ' Use this to understand what you can access and what you would gain by upgrading.'
+                  : ' Use this as a reference when helping customers understand tier capabilities.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* View Toggle */}
       <div className="mb-6 flex gap-2">
