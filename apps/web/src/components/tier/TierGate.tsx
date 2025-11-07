@@ -166,11 +166,11 @@ function TierUpgradePrompt({ feature, currentTier, upgrade, tenantId, className 
                 Upgrade to {upgrade.targetTierDisplay} (${upgrade.targetPrice}/mo)
               </h3>
               {upgrade.upgradeCost && upgrade.upgradeCost > 0 && (
-                <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                <p className="text-sm text-neutral-700 dark:text-blue-200 mb-2">
                   Additional ${upgrade.upgradeCost}/month from your current plan
                 </p>
               )}
-              <p className="text-sm text-blue-800 dark:text-blue-200">
+              <p className="text-sm text-neutral-700 dark:text-blue-200">
                 Unlock this feature and many more premium capabilities.
               </p>
             </div>
