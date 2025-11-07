@@ -131,9 +131,12 @@ export async function checkTenantCreationLimit(
 
     // Get user's tenant limit from their subscription
     // For now, default limits by role:
+    // PLATFORM_ADMIN: Unlimited
+    // ADMIN: Unlimited (legacy)
     // OWNER: 10 tenants
     // USER: 3 tenants
     const limits: Record<UserRole, number> = {
+      [UserRole.PLATFORM_ADMIN]: Infinity,
       [UserRole.ADMIN]: Infinity,
       [UserRole.OWNER]: 10,
       [UserRole.USER]: 3,
