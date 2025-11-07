@@ -122,6 +122,8 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           href: `/t/${tenantId}/settings/organization`,
           color: 'bg-orange-500',
           badge: 'Chain',
+          accessOptions: AccessPresets.ORGANIZATION_MEMBER,
+          fetchOrganization: true,
         },
         {
           title: 'Propagation Control Panel',
@@ -134,6 +136,8 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           href: `/t/${tenantId}/settings/propagation`,
           color: 'bg-indigo-500',
           badge: 'Chain',
+          accessOptions: AccessPresets.CHAIN_PROPAGATION,
+          fetchOrganization: true,
         },
       ] as SettingCard[],
     }] : []),
@@ -175,6 +179,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: `/t/${tenantId}/settings/tenant`,
           color: 'bg-teal-500',
+          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
         },
         {
           title: 'Branding',
@@ -186,6 +191,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: `/t/${tenantId}/settings/branding`,
           color: 'bg-purple-500',
+          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
         }] as SettingCard[] : []),
         // Tenant Administration cards (only when tenantId is provided)
         ...(tenantId ? [
@@ -219,6 +225,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: tenantId ? `/t/${tenantId}/settings/users` : '/tenants/users',
           color: 'bg-cyan-500',
+          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
         },
       ],
     },
@@ -238,6 +245,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           href: `/t/${tenantId}/settings/hours`,
           color: 'bg-green-500',
           badge: 'Auto-Sync',
+          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
         },
         {
           title: 'Business Category',
@@ -250,6 +258,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           href: `/t/${tenantId}/settings/gbp-category`,
           color: 'bg-amber-500',
           badge: 'M3',
+          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
         },
         {
           title: 'Product Categories',
@@ -261,6 +270,7 @@ export default function SettingsPage({ hideAdmin = false, tenantId }: { hideAdmi
           ),
           href: `/t/${tenantId}/categories`,
           color: 'bg-indigo-500',
+          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
         },
       ] as SettingCard[],
     }] : []),
