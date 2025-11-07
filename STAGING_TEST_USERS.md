@@ -287,43 +287,43 @@ Role: VIEWER (read-only)
 -- For testing, you may want to use Supabase's test email feature
 
 -- Platform Admins (PLATFORM_ADMIN role)
-INSERT INTO auth.users (email, encrypted_password, email_confirmed_at, role)
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
-  ('alice.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  ('bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'alice.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
+  (gen_random_uuid(), 'bob.platformadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
 
 -- Organization Owners
-INSERT INTO auth.users (email, encrypted_password, email_confirmed_at, role)
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
-  ('carol.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  ('david.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'carol.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
+  (gen_random_uuid(), 'david.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
 
 -- Independent Owners
-INSERT INTO auth.users (email, encrypted_password, email_confirmed_at, role)
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
-  ('emma.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  ('leo.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'emma.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
+  (gen_random_uuid(), 'leo.owner@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
 
 -- Tenant Admins (ADMIN role, WITH tenant assignments)
-INSERT INTO auth.users (email, encrypted_password, email_confirmed_at, role)
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
-  ('frank.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  ('grace.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  ('maya.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'frank.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
+  (gen_random_uuid(), 'grace.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
+  (gen_random_uuid(), 'maya.tenantadmin@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
 
 -- Tenant Members
-INSERT INTO auth.users (email, encrypted_password, email_confirmed_at, role)
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
-  ('henry.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  ('iris.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  ('noah.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'henry.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
+  (gen_random_uuid(), 'iris.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
+  (gen_random_uuid(), 'noah.member@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
 
 -- Tenant Viewers
-INSERT INTO auth.users (email, encrypted_password, email_confirmed_at, role)
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
 VALUES 
-  ('jack.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  ('kate.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
-  ('olivia.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
+  (gen_random_uuid(), 'jack.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
+  (gen_random_uuid(), 'kate.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated'),
+  (gen_random_uuid(), 'olivia.viewer@testing.app', crypt('TestPass123!', gen_salt('bf')), NOW(), 'authenticated');
 ```
 
 ### Step 2: Create User Records in Application Database
