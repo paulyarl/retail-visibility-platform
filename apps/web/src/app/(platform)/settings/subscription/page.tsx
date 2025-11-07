@@ -7,6 +7,7 @@ import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 import { getAllAdminEmails } from '@/lib/admin-emails';
 import { api } from '@/lib/api';
+import { isPlatformUser, isPlatformAdmin, type UserData } from '@/lib/auth/access-control';
 
 interface Tenant {
   id: string;
@@ -33,6 +34,7 @@ interface PendingRequest {
 }
 
 export default function SubscriptionPage() {
+  const [user, setUser] = useState<UserData | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | ChainTier | null>(null);
@@ -42,8 +44,25 @@ export default function SubscriptionPage() {
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
-    const loadTenant = async () => {
+    const loadUserAndSubscription = async () => {
       try {
+        // First, get the current user
+        const userRes = await api.get('/api/auth/me');
+        if (!userRes.ok) {
+          setLoading(false);
+          return;
+        }
+        
+        const userData = await userRes.json();
+        setUser(userData);
+        
+        // Platform users don't have subscriptions - show catalog view
+        if (isPlatformUser(userData)) {
+          setLoading(false);
+          return;
+        }
+        
+        // For store owners, load their tenant subscription
         // Get current tenant from localStorage (try both keys for compatibility)
         const tenantId = localStorage.getItem('current_tenant_id') || localStorage.getItem('tenantId');
         if (!tenantId) {
@@ -89,12 +108,12 @@ export default function SubscriptionPage() {
           });
         }
       } catch (error) {
-        console.error('Failed to load tenant:', error);
+        console.error('Failed to load user and subscription:', error);
       } finally {
         setLoading(false);
       }
     };
-    loadTenant();
+    loadUserAndSubscription();
   }, []);
 
   if (loading) {
@@ -105,10 +124,194 @@ export default function SubscriptionPage() {
     );
   }
 
+  // Platform users see catalog view (no personal subscription)
+  if (user && isPlatformUser(user)) {
+    return (
+      <div className="min-h-screen bg-neutral-50">
+        <PageHeader
+          title="Subscription Tiers"
+          description="Platform user view - Available subscription tiers"
+          icon={Icons.Settings}
+          backLink={{
+            href: '/settings',
+            label: 'Back to Settings'
+          }}
+        />
+
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+          {/* Platform User Info */}
+          <Card className="border-2 border-purple-500 bg-purple-50">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
+                  {user.role === 'PLATFORM_ADMIN' && <span className="text-white text-xl">👑</span>}
+                  {user.role === 'PLATFORM_SUPPORT' && <span className="text-white text-xl">🛠️</span>}
+                  {user.role === 'PLATFORM_VIEWER' && <span className="text-white text-xl">👁️</span>}
+                </div>
+                <div className="flex-1">
+                  <CardTitle className="text-purple-900">
+                    {user.role === 'PLATFORM_ADMIN' && '👑 Platform Administrator'}
+                    {user.role === 'PLATFORM_SUPPORT' && '🛠️ Platform Support'}
+                    {user.role === 'PLATFORM_VIEWER' && '👁️ Platform Viewer'}
+                  </CardTitle>
+                  <p className="text-sm text-purple-800 mt-1">
+                    You have platform-level access. You don't have a personal subscription.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-white rounded-lg p-4 border border-purple-200">
+                <h4 className="font-semibold text-purple-900 mb-2">Your Access:</h4>
+                <ul className="space-y-2 text-sm text-purple-800">
+                  {user.role === 'PLATFORM_ADMIN' && (
+                    <>
+                      <li className="flex items-start gap-2">
+                        <span className="text-purple-500 font-bold">✓</span>
+                        <span>View all tenant subscriptions</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-purple-500 font-bold">✓</span>
+                        <span>Create and assign subscriptions to store owners</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-purple-500 font-bold">✓</span>
+                        <span>Modify platform settings</span>
+                      </li>
+                    </>
+                  )}
+                  {user.role === 'PLATFORM_SUPPORT' && (
+                    <>
+                      <li className="flex items-start gap-2">
+                        <span className="text-purple-500 font-bold">✓</span>
+                        <span>View all tenant subscriptions</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-purple-500 font-bold">✓</span>
+                        <span>Assist customers with subscription questions</span>
+                      </li>
+                    </>
+                  )}
+                  {user.role === 'PLATFORM_VIEWER' && (
+                    <>
+                      <li className="flex items-start gap-2">
+                        <span className="text-purple-500 font-bold">✓</span>
+                        <span>View all tenant subscriptions (read-only)</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-purple-500 font-bold">✓</span>
+                        <span>Access analytics and reporting</span>
+                      </li>
+                    </>
+                  )}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Available Tiers Catalog */}
+          <div>
+            <h2 className="text-xl font-bold text-neutral-900 mb-4">Available Subscription Tiers</h2>
+            <p className="text-neutral-600 mb-6">
+              {isPlatformAdmin(user) 
+                ? 'You can create and assign these subscriptions to store owners.'
+                : 'View available subscription tiers for reference.'}
+            </p>
+
+            {/* Individual Plans */}
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">Individual Location Plans</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {(['google_only', 'starter', 'professional', 'enterprise'] as SubscriptionTier[]).map((tier) => {
+                const info = TIER_LIMITS[tier];
+                return (
+                  <Card key={tier} className="border-2 border-neutral-200">
+                    <CardHeader>
+                      <CardTitle className="text-lg">{info.name}</CardTitle>
+                      <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-neutral-600 mb-4">{info.description}</p>
+                      <div className="space-y-2 mb-4">
+                        <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                          <span className="font-semibold text-orange-900">SKUs:</span>{' '}
+                          <span className="text-orange-700 font-medium">
+                            {info.maxSKUs === Infinity ? 'Unlimited' : info.maxSKUs.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <ul className="space-y-1.5 text-xs">
+                        {info.features.slice(0, 4).map((feature, idx) => (
+                          <li key={idx} className="flex items-start gap-1.5">
+                            <span className="text-green-500 mt-0.5">✓</span>
+                            <span className="text-neutral-700">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Chain Plans */}
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">Multi-Location Chain Plans</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {(['chain_starter', 'chain_professional', 'chain_enterprise'] as ChainTier[]).map((tier) => {
+                const info = CHAIN_TIERS[tier];
+                return (
+                  <Card key={tier} className="border-2 border-neutral-200">
+                    <CardHeader>
+                      <CardTitle className="text-lg">{info.name}</CardTitle>
+                      <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 mb-4">
+                        <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                          <span className="font-semibold text-amber-900">Locations:</span>{' '}
+                          <span className="text-amber-700 font-medium">
+                            {info.maxLocations === Infinity ? 'Unlimited' : info.maxLocations}
+                          </span>
+                        </div>
+                        <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                          <span className="font-semibold text-orange-900">Total SKUs:</span>{' '}
+                          <span className="text-orange-700 font-medium">
+                            {info.maxTotalSKUs === Infinity ? 'Unlimited' : info.maxTotalSKUs.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <ul className="space-y-1.5 text-xs">
+                        {info.features.slice(0, 4).map((feature, idx) => (
+                          <li key={idx} className="flex items-start gap-1.5">
+                            <span className="text-green-500 mt-0.5">✓</span>
+                            <span className="text-neutral-700">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Store owners need a tenant to view subscription
   if (!tenant) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
-        <div className="text-neutral-600">Unable to load subscription information</div>
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>No Subscription Found</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-neutral-700 mb-4">
+              You don't have an active subscription. Please select a store or contact support.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
