@@ -72,6 +72,7 @@ import businessProfileValidationRoutes from './routes/business-profile-validatio
 // Authentication
 import authRoutes from './auth/auth.routes';
 import { authenticateToken, checkTenantAccess, requireAdmin } from './middleware/auth';
+import { isPlatformAdmin } from './utils/platform-admin';
 import { 
   requireTenantAdmin, 
   requireInventoryAccess, 
@@ -1282,7 +1283,7 @@ app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
   
   // Check tenant access
   const tenantId = parsed.data.tenantId;
-  const isAdmin = req.user?.role === 'ADMIN';
+  const isAdmin = isPlatformAdmin(req.user);
   const hasAccess = isAdmin || req.user?.tenantIds.includes(tenantId);
   
   if (!hasAccess) {

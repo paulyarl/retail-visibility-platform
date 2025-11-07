@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService, JWTPayload } from './auth.service';
+import { isPlatformAdmin } from '../utils/platform-admin';
 
 // Extend Express Request to include user
 declare global {
@@ -66,8 +67,8 @@ export const checkTenantAccess = (req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
   }
 
-  // Admin users have access to all tenants
-  if (req.user.role === 'ADMIN') {
+  // Platform admin users have access to all tenants
+  if (isPlatformAdmin(req.user)) {
     return next();
   }
 
