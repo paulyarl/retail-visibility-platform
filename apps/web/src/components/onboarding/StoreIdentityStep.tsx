@@ -13,12 +13,27 @@ interface StoreIdentityStepProps {
   onValidationChange: (isValid: boolean) => void;
 }
 
+// Helper to sanitize data - treat whitespace-only strings as empty
+const sanitizeData = (data: Partial<BusinessProfile>): Partial<BusinessProfile> => {
+  const sanitized: Partial<BusinessProfile> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === 'string' && value.trim() === '') {
+      sanitized[key as keyof BusinessProfile] = '' as any;
+    } else {
+      sanitized[key as keyof BusinessProfile] = value as any;
+    }
+  }
+  return sanitized;
+};
+
 export default function StoreIdentityStep({ 
   initialData = {}, 
   onDataChange,
   onValidationChange 
 }: StoreIdentityStepProps) {
-  const [formData, setFormData] = useState<Partial<BusinessProfile>>(initialData);
+  // Sanitize initial data to prevent hydration mismatches
+  const sanitizedInitialData = sanitizeData(initialData);
+  const [formData, setFormData] = useState<Partial<BusinessProfile>>(sanitizedInitialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -26,7 +41,8 @@ export default function StoreIdentityStep({
   useEffect(() => {
     if (Object.keys(initialData).length > 0) {
       console.log('[StoreIdentityStep] Updating formData with initialData:', initialData);
-      setFormData(initialData);
+      const sanitized = sanitizeData(initialData);
+      setFormData(sanitized);
       
       // Validate the pre-populated data but be lenient with phone format
       // This allows users to proceed with existing data even if format is slightly off
