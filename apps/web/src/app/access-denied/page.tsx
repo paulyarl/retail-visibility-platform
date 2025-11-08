@@ -13,6 +13,13 @@ export default function AccessDeniedPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
+    // Log access denied with context for debugging
+    console.warn('[Access Denied]', {
+      attemptedPath,
+      timestamp,
+      url: window.location.href,
+    });
+
     // Fetch current user info for debugging
     const fetchUser = async () => {
       try {
@@ -22,13 +29,20 @@ export default function AccessDeniedPage() {
           const data = await res.json();
           const user = data.user || data;
           setUserEmail(user.email);
+          
+          // Log with user context
+          console.warn('[Access Denied] User context:', {
+            user: user.email,
+            role: user.role,
+            attemptedPath,
+          });
         }
       } catch (error) {
         console.error('Failed to fetch user:', error);
       }
     };
     fetchUser();
-  }, []);
+  }, [attemptedPath, timestamp]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4">
