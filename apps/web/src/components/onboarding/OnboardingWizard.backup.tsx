@@ -6,12 +6,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button, AnimatedCard, Alert } from '@/components/ui';
 import ProgressSteps, { Step } from './ProgressSteps';
 import StoreIdentityStep from './StoreIdentityStep';
-import { BusinessProfile } from '@/lib/validation/businessProfile';
+import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
 import { isFeatureEnabled } from '@/lib/featureFlags';
+import { api } from '@/lib/api';
 import { ContextBadges } from '@/components/ContextBadges';
-import { useOnboardingData } from '@/hooks/useOnboardingData';
-import { useOnboardingSteps } from '@/hooks/useOnboardingSteps';
-import { useOnboardingSave } from '@/hooks/useOnboardingSave';
 
 interface OnboardingWizardProps {
   tenantId: string;
@@ -39,58 +37,25 @@ const steps: Step[] = [
 
 export default function OnboardingWizard({ 
   tenantId,
-  initialStep = 1,
+  initialStep = 1, // Start at Store Identity (account already created)
   onComplete 
 }: OnboardingWizardProps) {
   const router = useRouter();
   const search = useSearchParams();
-  
-  // Parse URL params
+  const stepParam = (search?.get('step') || '').toLowerCase();
   const forceParam = search?.get('force');
   const forced = forceParam === '1' || forceParam === 'true';
-  
-  // Load onboarding data
-  const { 
-    data: businessData, 
-    setData: setBusinessData, 
-    loading, 
-    error: loadError,
-    initialStep: loadedStep,
-  } = useOnboardingData({ 
-    tenantId, 
-    forced, 
-    initialStep 
-  });
-  
-  // Manage step navigation
-  const { 
-    currentStep, 
-    goNext, 
-    goBack, 
-    setStep 
-  } = useOnboardingSteps({ 
-    tenantId, 
-    initialStep: loadedStep, 
-    businessData, 
-    forced 
-  });
-  
-  // Handle saving
-  const { 
-    save, 
-    saving, 
-    error: saveError 
-  } = useOnboardingSave({ 
-    tenantId,
-    onSuccess: () => setStep(2),
-  });
-  
-  // Validation state
+  const stepMap: Record<string, number> = { account: 0, store: 1, profile: 1, complete: 2, hours: 1 };
+  const requestedStep = stepMap[stepParam] ?? initialStep;
+  const [currentStep, setCurrentStep] = useState(initialStep);
+  const [businessData, setBusinessData] = useState<Partial<BusinessProfile>>({});
   const [isValid, setIsValid] = useState(false);
-  
-  // Feature flags
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [ffCategory, setFfCategory] = useState(false);
-  
+
+  // Evaluate feature flag for Categories (client-side)
   useEffect(() => {
     try {
       const on = isFeatureEnabled('FF_CATEGORY_MANAGEMENT_PAGE' as any, tenantId as any);
@@ -99,27 +64,176 @@ export default function OnboardingWizard({
       setFfCategory(false);
     }
   }, [tenantId]);
-  
-  // Combined error state
-  const error = loadError || saveError;
-  
-  // Handlers
+
+  // Load existing tenant data and saved progress from localStorage (unless forced)
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        // First, fetch existing tenant data from API
+        let apiData: Partial<BusinessProfile> = {};
+        try {
+          const response = await api.get(`/api/tenants/${tenantId}`);
+          if (response.ok) {
+            const tenant = await response.json();
+
+            // Extract business data from existing tenant
+            if (tenant.name) {
+              apiData.business_name = tenant.name;
+              console.log('[OnboardingWizard] Set business_name from tenant.name:', tenant.name);
+            }
+
+            // Always attempt to enrich from tenant profile for remaining fields
+            try {
+              const resp2 = await api.get(`/api/tenant/profile?tenant_id=${tenantId}`);
+              if (resp2.ok) {
+                const prof = await resp2.json();
+                const p = prof?.data || prof || {};
+                if (p.business_name && !apiData.business_name) apiData.business_name = p.business_name;
+                if (p.address_line1) apiData.address_line1 = p.address_line1;
+                if (p.address_line2) apiData.address_line2 = p.address_line2;
+                if (p.city) apiData.city = p.city;
+                if (p.state) apiData.state = p.state;
+                if (p.postal_code) apiData.postal_code = p.postal_code;
+                if (p.country_code) apiData.country_code = p.country_code;
+                if (p.phone_number || p.phone) apiData.phone_number = normalizePhoneInput(p.phone_number || p.phone);
+                if (p.email) apiData.email = p.email;
+                if (p.website) apiData.website = p.website;
+                if (p.contact_person) apiData.contact_person = p.contact_person;
+              }
+            } catch (e) {
+              // ignore
+            }
+
+            // Also enrich from tenant.metadata if present
+            if (tenant.metadata) {
+              const metadata = tenant.metadata as any;
+              if (metadata.business_name) apiData.business_name = metadata.business_name;
+              if (metadata.address_line1) apiData.address_line1 = metadata.address_line1;
+              if (metadata.address_line2) apiData.address_line2 = metadata.address_line2;
+              if (metadata.city) apiData.city = metadata.city;
+              if (metadata.state) apiData.state = metadata.state;
+              if (metadata.postal_code) apiData.postal_code = metadata.postal_code;
+              if (metadata.country_code) apiData.country_code = metadata.country_code;
+              if (metadata.phone_number || metadata.phone) apiData.phone_number = normalizePhoneInput(metadata.phone_number || metadata.phone);
+              if (metadata.email) apiData.email = metadata.email;
+              if (metadata.website) apiData.website = metadata.website;
+              if (metadata.contact_person) apiData.contact_person = metadata.contact_person;
+            }
+          }
+
+        } catch (error) {
+          console.error('Failed to fetch tenant data:', error);
+        }
+
+        // Then load saved progress from localStorage (should override API data if it exists)
+        const saved = !forced ? localStorage.getItem(`onboarding_${tenantId}`) : null;
+        let localData: Partial<BusinessProfile> = {};
+        let savedStep = forced ? requestedStep : initialStep;
+        
+        if (saved) {
+          try {
+            const data = JSON.parse(saved);
+            localData = data.businessData || {};
+            savedStep = data.currentStep || initialStep;
+          } catch (e) {
+            console.error('Failed to load onboarding progress:', e);
+          }
+        }
+
+        // Merge: API data as base, localStorage data overrides (for new/unsaved changes)
+        const mergedData = { ...apiData, ...localData };
+        
+        // Sanitize: treat whitespace-only strings as empty
+        const sanitized = Object.entries(mergedData).reduce((acc, [key, value]) => {
+          if (typeof value === 'string' && value.trim() === '') {
+            acc[key] = '';
+          } else {
+            acc[key] = value;
+          }
+          return acc;
+        }, {} as any);
+        
+        // Provide defaults so validation schema receives strings instead of undefined
+        const normalizedMerged = {
+          business_name: '',
+          address_line1: '',
+          address_line2: '',
+          city: '',
+          state: '',
+          postal_code: '',
+          country_code: 'US',
+          phone_number: '',
+          email: '',
+          website: '',
+          contact_person: '',
+          ...sanitized,
+        } as Partial<BusinessProfile>;
+        console.log('[OnboardingWizard] API data:', apiData);
+        console.log('[OnboardingWizard] localStorage data:', localData);
+        console.log('[OnboardingWizard] Merged data:', normalizedMerged);
+        setBusinessData(normalizedMerged);
+        setCurrentStep(savedStep);
+      } catch (error) {
+        console.error('Failed to load initial data:', error);
+      }
+    };
+
+    loadInitialData();
+  }, [tenantId, initialStep, forced, requestedStep]);
+
+  // Save progress to localStorage (skip when in forced mode)
+  useEffect(() => {
+    if (!forced && Object.keys(businessData).length > 0) {
+      localStorage.setItem(`onboarding_${tenantId}`, JSON.stringify({
+        currentStep,
+        businessData,
+      }));
+    }
+  }, [currentStep, businessData, tenantId, forced]);
+
   const handleNext = async () => {
     if (currentStep === 1) {
-      await save(businessData);
+      // Save business profile
+      setSaving(true);
+      setError(null);
+
+      try {
+        const response = await api.post('/api/tenant/profile', {
+          tenant_id: tenantId,
+          ...businessData,
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({} as any));
+          throw new Error((errorData as any)?.error || 'Failed to save business profile');
+        }
+
+        setSuccess(true);
+        setCurrentStep(2);
+        
+        // Clear saved progress
+        localStorage.removeItem(`onboarding_${tenantId}`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setSaving(false);
+      }
     } else if (currentStep === 2) {
-      handleComplete();
+      // Complete onboarding
+      if (onComplete) {
+        onComplete(businessData);
+      } else {
+        // Default to tenant-scoped dashboard
+        router.push(`/t/${tenantId}/dashboard`);
+      }
     }
   };
-  
-  const handleComplete = () => {
-    if (onComplete) {
-      onComplete(businessData);
-    } else {
-      router.push(`/t/${tenantId}/dashboard`);
+
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
     }
   };
-  
+
   const handleSkip = () => {
     if (onComplete) {
       onComplete(businessData);
@@ -127,21 +241,9 @@ export default function OnboardingWizard({
       router.push('/tenants');
     }
   };
-  
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4" />
-          <p className="text-neutral-600">Loading your onboarding...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4" suppressHydrationWarning>
       {/* Context Badges */}
       <div className="absolute top-4 left-4 right-4 z-10">
         <ContextBadges 
@@ -188,7 +290,7 @@ export default function OnboardingWizard({
         {/* Main Card */}
         <AnimatedCard delay={0.3} hover={false} className="p-8">
           {error && (
-            <Alert variant="error" title="Error" onClose={() => {}} className="mb-6">
+            <Alert variant="error" title="Error" onClose={() => setError(null)} className="mb-6">
               {error}
             </Alert>
           )}
@@ -273,7 +375,7 @@ export default function OnboardingWizard({
             
             <div className="flex items-center gap-3">
               {currentStep > 0 && currentStep < 2 && (
-                <Button variant="secondary" onClick={goBack} disabled={saving}>
+                <Button variant="secondary" onClick={handleBack} disabled={saving}>
                   <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
@@ -304,7 +406,6 @@ export default function OnboardingWizard({
               )}
             </div>
           </div>
-          
           {currentStep === 2 && (
             <div className="mt-8">
               {/* Primary Actions */}
@@ -322,7 +423,7 @@ export default function OnboardingWizard({
               
               {/* Secondary Actions - Responsive Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                <Button variant="secondary" size="sm" onClick={() => router.push('/')}>
+                <Button variant="secondary" size="sm" onClick={() => router.push('/') }>
                   Platform
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/settings/branding`)}>
