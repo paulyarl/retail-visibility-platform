@@ -7,11 +7,14 @@
  * 3. Tier changes validate current SKU count
  * 
  * Fix once, apply everywhere!
+ * 
+ * MIGRATION NOTE: Now uses TierService for database-driven SKU limits.
  */
 
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { getSKULimit } from '../utils/tier-limits';
+import TierService from '../services/TierService';
 
 /**
  * Validate SKU limits for product creation/import
@@ -49,8 +52,9 @@ export async function validateSKULimits(
       });
     }
 
-    const tier = tenant.subscriptionTier || 'trial';
-    const skuLimit = getSKULimit(tier);
+    const tier = tenant.subscriptionTier || 'starter';
+    // Try database-driven limit first, fallback to utility function
+    const skuLimit = await TierService.getTierSKULimit(tier).catch(() => getSKULimit(tier));
     const currentCount = tenant._count.items;
     const totalAfter = currentCount + productCount;
 
@@ -112,7 +116,8 @@ export async function validateTierSKUCompatibility(
       });
     }
 
-    const newLimit = getSKULimit(subscriptionTier);
+    // Try database-driven limit first, fallback to utility function
+    const newLimit = await TierService.getTierSKULimit(subscriptionTier).catch(() => getSKULimit(subscriptionTier));
     const currentCount = tenant._count.items;
 
     // Check if current SKU count exceeds new tier limit

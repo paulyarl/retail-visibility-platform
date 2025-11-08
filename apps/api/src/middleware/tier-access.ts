@@ -1,17 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
+import TierService from '../services/TierService';
 
 /**
  * Tier-Based Feature Access Control
  * 
  * This middleware enforces feature access based on subscription tiers.
- * Features are cumulative - higher tiers inherit lower tier features.
+ * Now uses database-driven tier system via TierService.
  * 
  * CRITICAL: This protects revenue by ensuring customers must upgrade
  * to access premium features like Quick Start, Scanning, and GBP Integration.
+ * 
+ * MIGRATION NOTE: This middleware now uses TierService for database-driven tiers.
+ * Hardcoded TIER_FEATURES below are kept for backward compatibility and fallback.
  */
 
-// Define features available at each tier (cumulative)
+// LEGACY: Define features available at each tier (cumulative)
+// NOTE: These are now loaded from database via TierService, but kept as fallback
 // NOTE: 'trial' is not a tier - it's a time-limited status that can apply to any tier
 export const TIER_FEATURES = {
   google_only: [
@@ -144,26 +149,33 @@ const FEATURE_TIER_MAP: Record<string, string> = {
 
 /**
  * Check if a tier has access to a feature
+ * Now uses database-driven tiers with fallback to hardcoded values
  */
-export function checkTierAccess(tier: string, feature: string): boolean {
-  // Get features for this tier
-  const tierFeatures = TIER_FEATURES[tier as keyof typeof TIER_FEATURES] || [];
-  
-  // Check if feature is in this tier
-  if ((tierFeatures as readonly string[]).includes(feature)) {
-    return true;
-  }
-  
-  // Check inherited tiers
-  const inheritedTiers = TIER_HIERARCHY[tier] || [];
-  for (const inheritedTier of inheritedTiers) {
-    const inheritedFeatures = TIER_FEATURES[inheritedTier as keyof typeof TIER_FEATURES] || [];
-    if ((inheritedFeatures as readonly string[]).includes(feature)) {
+export async function checkTierAccess(tier: string, feature: string): Promise<boolean> {
+  try {
+    // Try database first
+    const hasAccess = await TierService.checkTierFeatureAccess(tier, feature);
+    return hasAccess;
+  } catch (error) {
+    console.warn('[checkTierAccess] Database lookup failed, using fallback:', error);
+    
+    // Fallback to hardcoded values
+    const tierFeatures = TIER_FEATURES[tier as keyof typeof TIER_FEATURES] || [];
+    
+    if ((tierFeatures as readonly string[]).includes(feature)) {
       return true;
     }
+    
+    const inheritedTiers = TIER_HIERARCHY[tier] || [];
+    for (const inheritedTier of inheritedTiers) {
+      const inheritedFeatures = TIER_FEATURES[inheritedTier as keyof typeof TIER_FEATURES] || [];
+      if ((inheritedFeatures as readonly string[]).includes(feature)) {
+        return true;
+      }
+    }
+    
+    return false;
   }
-  
-  return false;
 }
 
 /**
@@ -212,60 +224,14 @@ export function getTierPricing(tier: string): number {
 /**
  * Check if a tenant has access to a feature (including overrides)
  * Returns the access status and source (tier, override, or none)
+ * Now uses TierService for database-driven tier lookups
  */
 export async function checkTierAccessWithOverrides(
   tenantId: string,
   feature: string
 ): Promise<{ hasAccess: boolean; source: 'tier' | 'override' | 'none'; override?: any }> {
-  try {
-    // Get tenant with overrides
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { 
-        subscriptionTier: true,
-        featureOverrides: {
-          where: {
-            feature,
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } }
-            ]
-          }
-        }
-      },
-    });
-
-    if (!tenant) {
-      return { hasAccess: false, source: 'none' };
-    }
-
-    // 1. Check for active override first (highest priority)
-    const override = tenant.featureOverrides[0];
-    if (override) {
-      return { 
-        hasAccess: override.granted, 
-        source: 'override',
-        override: {
-          id: override.id,
-          reason: override.reason,
-          expiresAt: override.expiresAt,
-          grantedBy: override.grantedBy,
-        }
-      };
-    }
-
-    // 2. Fall back to tier-based access
-    const tier = tenant.subscriptionTier || 'trial';
-    const tierAccess = checkTierAccess(tier, feature);
-    
-    return { 
-      hasAccess: tierAccess, 
-      source: tierAccess ? 'tier' : 'none' 
-    };
-  } catch (error) {
-    console.error('[checkTierAccessWithOverrides] Error:', error);
-    return { hasAccess: false, source: 'none' };
-  }
+  // Use TierService which already handles overrides
+  return await TierService.checkTenantFeatureAccess(tenantId, feature);
 }
 
 /**

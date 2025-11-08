@@ -2,18 +2,22 @@
  * Tier Validation Middleware
  * 
  * Centralized tier validation to ensure:
- * 1. Only valid tiers can be assigned
+ * 1. Only valid tiers can be assigned (now database-driven)
  * 2. Organization tier requires an organization
  * 3. Organization exists and is valid
  * 
  * Fix once, apply everywhere!
+ * 
+ * MIGRATION NOTE: Now uses TierService for database-driven tier validation.
  */
 
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
+import TierService from '../services/TierService';
 
 type SubscriptionTier = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
 
+// LEGACY: Kept for fallback only
 const VALID_TIERS: SubscriptionTier[] = [
   'trial',
   'google_only',
@@ -40,12 +44,17 @@ export async function validateTierAssignment(
       return next();
     }
 
-    // Validate tier exists
-    if (!VALID_TIERS.includes(subscriptionTier)) {
+    // Validate tier exists (database-driven with fallback)
+    const isValid = await TierService.isValidTier(subscriptionTier).catch(() => 
+      VALID_TIERS.includes(subscriptionTier)
+    );
+    
+    if (!isValid) {
+      const validTiers = await TierService.getValidTierKeys().catch(() => VALID_TIERS);
       return res.status(400).json({
         error: 'invalid_tier',
         message: `Invalid subscription tier: ${subscriptionTier}`,
-        validTiers: VALID_TIERS,
+        validTiers,
       });
     }
 

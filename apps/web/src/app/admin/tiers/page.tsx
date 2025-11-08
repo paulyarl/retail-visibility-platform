@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Alert, Spinner } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
-import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
 
 type Tenant = {
   id: string;
@@ -26,19 +25,17 @@ type Tenant = {
   } | null;
 };
 
-// Generate tier list from centralized definitions
-const TIER_KEYS = ['google_only', 'starter', 'professional', 'enterprise', 'organization'] as const;
-const TIERS = TIER_KEYS.map(key => ({
-  value: key,
-  label: `${TIER_DISPLAY_NAMES[key]} ($${TIER_PRICING[key]}/mo)`,
-  color: {
-    google_only: 'bg-green-100 text-green-800',
-    starter: 'bg-blue-100 text-blue-800',
-    professional: 'bg-purple-100 text-purple-800',
-    enterprise: 'bg-amber-100 text-amber-800',
-    organization: 'bg-gradient-to-r from-purple-500 to-pink-600 text-white',
-  }[key],
-}));
+interface DbTier {
+  id: string;
+  tierKey: string;
+  displayName: string;
+  priceMonthly: number;
+  maxSKUs: number | null;
+  maxLocations: number | null;
+  tierType: string;
+  isActive: boolean;
+  sortOrder: number;
+}
 
 const STATUSES = [
   { value: 'trial', label: 'Trial', color: 'bg-neutral-100 text-neutral-800' },
@@ -51,7 +48,9 @@ const ITEMS_PER_PAGE = 10;
 
 export default function AdminTiersPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [dbTiers, setDbTiers] = useState<DbTier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tiersLoading, setTiersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -59,7 +58,24 @@ export default function AdminTiersPage() {
 
   useEffect(() => {
     loadTenants();
+    loadTiers();
   }, []);
+
+  const loadTiers = async () => {
+    try {
+      setTiersLoading(true);
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const res = await api.get(`${apiBaseUrl}/api/admin/tier-system/tiers`);
+      if (res.ok) {
+        const data = await res.json();
+        setDbTiers(data.tiers || []);
+      }
+    } catch (e) {
+      console.error('Failed to load tiers:', e);
+    } finally {
+      setTiersLoading(false);
+    }
+  };
 
   const loadTenants = async () => {
     try {
@@ -104,15 +120,45 @@ export default function AdminTiersPage() {
     }
   };
 
-  const getTierInfo = (tier?: string) => {
-    return TIERS.find(t => t.value === tier) || TIERS[0];
+  // Generate tier options from database
+  const getTierOptions = () => {
+    return dbTiers.map(tier => ({
+      value: tier.tierKey,
+      label: `${tier.displayName} ($${(tier.priceMonthly / 100).toFixed(0)}/mo)`,
+      color: getTierColor(tier.tierType, tier.tierKey),
+      tier: tier,
+    }));
+  };
+
+  const getTierColor = (tierType: string, tierKey: string) => {
+    if (tierType === 'organization') {
+      return 'bg-gradient-to-r from-purple-500 to-pink-600 text-white';
+    }
+    const colors: Record<string, string> = {
+      google_only: 'bg-green-100 text-green-800',
+      starter: 'bg-blue-100 text-blue-800',
+      professional: 'bg-purple-100 text-purple-800',
+      enterprise: 'bg-amber-100 text-amber-800',
+    };
+    return colors[tierKey] || 'bg-neutral-100 text-neutral-800';
+  };
+
+  const getTierInfo = (tierKey?: string) => {
+    const tier = dbTiers.find(t => t.tierKey === tierKey);
+    if (!tier) return null;
+    return {
+      value: tier.tierKey,
+      label: `${tier.displayName} ($${(tier.priceMonthly / 100).toFixed(0)}/mo)`,
+      color: getTierColor(tier.tierType, tier.tierKey),
+      tier: tier,
+    };
   };
 
   const getStatusInfo = (status?: string) => {
     return STATUSES.find(s => s.value === status) || STATUSES[0];
   };
 
-  if (loading) {
+  if (loading || tiersLoading) {
     return (
       <div className="min-h-screen bg-neutral-50">
         <PageHeader
@@ -157,31 +203,27 @@ export default function AdminTiersPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {/* Tier Information */}
+              {/* Tier Information - Database Driven */}
               <div>
                 <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Subscription Tiers</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                  {TIERS.map(tier => (
-                    <div key={tier.value} className="p-4 border border-neutral-200 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {getTierOptions().map(tierOption => (
+                    <div key={tierOption.value} className="p-4 border border-neutral-200 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-2xl">
-                          {tier.value === 'trial' && '🆓'}
-                          {tier.value === 'google_only' && '🔍'}
-                          {tier.value === 'starter' && '🥉'}
-                          {tier.value === 'professional' && '🥈'}
-                          {tier.value === 'enterprise' && '🥇'}
-                          {tier.value === 'organization' && '🏢'}
+                          {tierOption.value === 'google_only' && '🔍'}
+                          {tierOption.value === 'starter' && '🥉'}
+                          {tierOption.value === 'professional' && '🥈'}
+                          {tierOption.value === 'enterprise' && '🥇'}
+                          {tierOption.tier.tierType === 'organization' && '🏢'}
                         </span>
-                        <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${tier.color}`}>
-                          {tier.label}
+                        <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${tierOption.color}`}>
+                          {tierOption.tier.displayName}
                         </div>
                       </div>
                       <div className="text-sm text-neutral-600">
-                        {tier.value === 'google_only' && '250 SKUs, Google only'}
-                        {tier.value === 'starter' && '500 SKUs, basic QR codes'}
-                        {tier.value === 'professional' && '5,000 SKUs, branded QR codes'}
-                        {tier.value === 'enterprise' && 'Unlimited SKUs, white-label'}
-                        {tier.value === 'organization' && '10K shared SKUs, 8 propagation types'}
+                        {tierOption.tier.maxSKUs ? `${tierOption.tier.maxSKUs.toLocaleString()} SKUs` : 'Unlimited SKUs'}
+                        {tierOption.tier.maxLocations && `, ${tierOption.tier.maxLocations} locations`}
                       </div>
                     </div>
                   ))}
@@ -268,9 +310,11 @@ export default function AdminTiersPage() {
                                 <span className="text-primary-600 dark:text-primary-400">→</span>
                               </h3>
                             </div>
-                            <Badge variant="default" className={tierInfo.color}>
-                              {tierInfo.label}
-                            </Badge>
+                            {tierInfo && (
+                              <Badge variant="default" className={tierInfo.color}>
+                                {tierInfo.label}
+                              </Badge>
+                            )}
                             <Badge variant="default" className={statusInfo.color}>
                               {statusInfo.label}
                             </Badge>
@@ -297,45 +341,56 @@ export default function AdminTiersPage() {
                           </div>
                         </div>
 
-                        {/* Tier Controls */}
-                        <div className="flex-shrink-0">
-                          <div className="flex flex-col gap-2">
-                            <label className="text-xs font-medium text-neutral-700">Change Tier:</label>
-                            <div className="flex gap-2">
-                              {TIERS.map(tier => (
-                                <Button
-                                  key={tier.value}
-                                  size="sm"
-                                  variant={tenant.subscriptionTier === tier.value ? 'primary' : 'ghost'}
-                                  onClick={() => updateTier(tenant.id, tier.value, tenant.subscriptionStatus || 'active')}
-                                  disabled={isUpdating}
-                                  title={tier.label}
-                                  className="relative group"
-                                >
-                                  {tier.value === 'google_only' && '🔍'}
-                                  {tier.value === 'starter' && '🥉'}
-                                  {tier.value === 'professional' && '🥈'}
-                                  {tier.value === 'enterprise' && '🥇'}
-                                  {tier.value === 'organization' && '🏢'}
-                                </Button>
+                        {/* Quick Actions - Cleaner Dropdown Approach */}
+                        <div className="flex-shrink-0 flex flex-col gap-2">
+                          {/* Tier Dropdown */}
+                          <div className="min-w-[200px]">
+                            <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 block">
+                              Subscription Tier
+                            </label>
+                            <select
+                              value={tenant.subscriptionTier || 'starter'}
+                              onChange={(e) => updateTier(tenant.id, e.target.value, tenant.subscriptionStatus || 'active')}
+                              disabled={isUpdating}
+                              className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
+                            >
+                              {getTierOptions().map(tierOption => (
+                                <option key={tierOption.value} value={tierOption.value}>
+                                  {tierOption.tier.displayName} (${(tierOption.tier.priceMonthly / 100).toFixed(0)}/mo)
+                                </option>
                               ))}
-                            </div>
-                            
-                            <label className="text-xs font-medium text-neutral-700 mt-2">Change Status:</label>
-                            <div className="flex gap-2">
-                              {STATUSES.map(status => (
-                                <Button
-                                  key={status.value}
-                                  size="sm"
-                                  variant={tenant.subscriptionStatus === status.value ? 'primary' : 'ghost'}
-                                  onClick={() => updateTier(tenant.id, tenant.subscriptionTier || 'starter', status.value)}
-                                  disabled={isUpdating}
-                                >
-                                  {status.label}
-                                </Button>
-                              ))}
-                            </div>
+                            </select>
                           </div>
+
+                          {/* Status Dropdown */}
+                          <div className="min-w-[200px]">
+                            <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 block">
+                              Status
+                            </label>
+                            <select
+                              value={tenant.subscriptionStatus || 'active'}
+                              onChange={(e) => updateTier(tenant.id, tenant.subscriptionTier || 'starter', e.target.value)}
+                              disabled={isUpdating}
+                              className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
+                            >
+                              {STATUSES.map(status => (
+                                <option key={status.value} value={status.value}>
+                                  {status.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Loading Indicator */}
+                          {isUpdating && (
+                            <div className="flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400">
+                              <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Updating...
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

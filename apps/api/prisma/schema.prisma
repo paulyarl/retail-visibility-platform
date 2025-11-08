@@ -1143,3 +1143,74 @@ model CloverDemoSnapshot {
   @@index([expiresAt])
   @@map("clover_demo_snapshots")
 }
+
+// ===== Tier System Management =====
+
+// Subscription Tier Definitions - Database-driven tier system
+model SubscriptionTier {
+  id              String         @id @default(cuid())
+  tierKey         String         @unique @map("tier_key") // e.g., 'starter', 'professional'
+  name            String         // Display name
+  displayName     String         @map("display_name")
+  description     String?
+  priceMonthly    Int            @map("price_monthly") // Price in cents
+  maxSKUs         Int?           @map("max_skus") // NULL = unlimited
+  maxLocations    Int?           @map("max_locations") // For chain tiers
+  tierType        String         @default("individual") @map("tier_type") // 'individual' or 'organization'
+  isActive        Boolean        @default(true) @map("is_active")
+  sortOrder       Int            @default(0) @map("sort_order") // Display order
+  metadata        Json?          // Additional tier configuration
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  createdBy       String?        @map("created_by") // Admin user ID
+  updatedBy       String?        @map("updated_by") // Admin user ID
+  
+  features        TierFeature[]
+  
+  @@index([tierKey])
+  @@index([isActive, sortOrder])
+  @@index([tierType])
+  @@map("subscription_tiers")
+}
+
+// Tier Features - Features available in each tier
+model TierFeature {
+  id              String           @id @default(cuid())
+  tierId          String           @map("tier_id")
+  featureKey      String           @map("feature_key") // e.g., 'storefront', 'product_scanning'
+  featureName     String           @map("feature_name") // Display name
+  isEnabled       Boolean          @default(true) @map("is_enabled")
+  isInherited     Boolean          @default(false) @map("is_inherited") // Inherited from lower tier
+  metadata        Json?            // Feature-specific config
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  
+  tier            SubscriptionTier @relation(fields: [tierId], references: [id], onDelete: Cascade)
+  
+  @@unique([tierId, featureKey])
+  @@index([tierId])
+  @@index([featureKey])
+  @@map("tier_features")
+}
+
+// Tier Change Audit Log - Track all tier modifications
+model TierChangeLog {
+  id              String   @id @default(cuid())
+  entityType      String   @map("entity_type") // 'tier' or 'feature'
+  entityId        String   @map("entity_id")
+  action          String   // 'create', 'update', 'delete'
+  changeType      String   @map("change_type") // 'tier_created', 'feature_added', 'price_changed', etc.
+  beforeState     Json?    @map("before_state")
+  afterState      Json?    @map("after_state")
+  changedBy       String   @map("changed_by") // Admin user ID
+  changedByEmail  String?  @map("changed_by_email")
+  reason          String?  // Optional reason for change
+  ipAddress       String?  @map("ip_address")
+  userAgent       String?  @map("user_agent")
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@index([entityType, entityId])
+  @@index([changedBy])
+  @@index([createdAt])
+  @@map("tier_change_logs")
+}

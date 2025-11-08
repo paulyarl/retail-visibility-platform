@@ -104,6 +104,8 @@ import quickStartRoutes from './routes/quick-start';
 import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
 import featureOverridesRoutes from './routes/admin/feature-overrides';
+import tierManagementRoutes from './routes/admin/tier-management';
+import tierSystemRoutes from './routes/admin/tier-system';
 import testGbpRoutes from './routes/test-gbp';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 import cloverRoutes from './routes/integrations/clover';
@@ -2172,6 +2174,8 @@ app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
 // Admin tools and users - these are more generic and should come after specific routes
 app.use('/api/admin/tools', authenticateToken, requireAdmin, adminToolsRoutes);
 app.use('/api/admin/feature-overrides', featureOverridesRoutes); // Feature overrides (admin-only, auth handled in route)
+app.use('/api/admin/tier-management', tierManagementRoutes); // Tier management (admin-only, auth handled in route)
+app.use('/api/admin/tier-system', tierSystemRoutes); // Tier system CRUD (platform staff, auth handled in route)
 app.use('/api/integrations', cloverRoutes); // Clover POS integration (auth handled in route)
 app.use('/admin', authenticateToken, adminUsersRoutes);
 app.use('/api/admin', authenticateToken, adminUsersRoutes);

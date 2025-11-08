@@ -3,12 +3,62 @@
 import { useState, useEffect } from 'react';
 import { useAccessControl } from '@/lib/auth/useAccessControl';
 import { FEATURE_DISPLAY_NAMES, TIER_DISPLAY_NAMES, TIER_PRICING, checkTierFeature, getTierFeatures } from '@/lib/tiers/tier-features';
+import { api } from '@/lib/api';
 
-type TierName = 'google_only' | 'starter' | 'professional' | 'enterprise';
+interface TierFeature {
+  id: string;
+  featureKey: string;
+  featureName: string;
+  isEnabled: boolean;
+  isInherited: boolean;
+}
+
+interface Tier {
+  id: string;
+  tierKey: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  priceMonthly: number;
+  maxSKUs?: number;
+  maxLocations?: number;
+  tierType: string;
+  isActive: boolean;
+  sortOrder: number;
+  features: TierFeature[];
+}
 
 export default function TierMatrixPage() {
   const { user, isPlatformAdmin, loading: accessLoading } = useAccessControl(null);
   const [selectedView, setSelectedView] = useState<'matrix' | 'details'>('matrix');
+  const [dbTiers, setDbTiers] = useState<Tier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load tiers from database
+  useEffect(() => {
+    async function loadTiers() {
+      try {
+        setLoading(true);
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const res = await api.get(`${apiBaseUrl}/api/admin/tier-system/tiers`);
+        if (res.ok) {
+          const data = await res.json();
+          setDbTiers(data.tiers || []);
+        } else {
+          setError('Failed to load tiers');
+        }
+      } catch (e) {
+        console.error('Failed to load tiers:', e);
+        setError('Failed to load tiers');
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (user) {
+      loadTiers();
+    }
+  }, [user]);
 
   // Show loading state while checking access
   if (accessLoading) {
@@ -46,61 +96,101 @@ export default function TierMatrixPage() {
 
   const isReadOnly = !isPlatformAdmin;
 
-  const tiers: TierName[] = ['google_only', 'starter', 'professional', 'enterprise'];
+  // Show loading while fetching tiers
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-neutral-600 dark:text-neutral-400">Loading tiers...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if failed to load
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <p className="text-red-800 dark:text-red-200">{error}</p>
+        </div>
+      </div>
+    );
+  }
   
-  // Sort features by commonality (most common to least common)
-  const features = Object.keys(FEATURE_DISPLAY_NAMES).sort((a, b) => {
-    // Count how many tiers have each feature
-    const countA = tiers.filter(tier => checkTierFeature(tier, a)).length;
-    const countB = tiers.filter(tier => checkTierFeature(tier, b)).length;
-    
-    // Sort descending (most common first)
-    if (countB !== countA) {
-      return countB - countA;
-    }
-    
-    // If same count, sort alphabetically by display name
-    return (FEATURE_DISPLAY_NAMES[a] || a).localeCompare(FEATURE_DISPLAY_NAMES[b] || b);
+  // Get all unique features from database tiers
+  const allFeatures = new Map<string, string>();
+  dbTiers.forEach(tier => {
+    tier.features.forEach(feature => {
+      if (!allFeatures.has(feature.featureKey)) {
+        allFeatures.set(feature.featureKey, feature.featureName);
+      }
+    });
   });
 
-  // Check if a tier has a feature (including inherited features)
-  const tierHasFeature = (tier: TierName, feature: string): boolean => {
-    return checkTierFeature(tier, feature);
+  // Sort features by commonality
+  const features = Array.from(allFeatures.keys()).sort((a, b) => {
+    const countA = dbTiers.filter(tier => 
+      tier.features.some(f => f.featureKey === a && f.isEnabled)
+    ).length;
+    const countB = dbTiers.filter(tier => 
+      tier.features.some(f => f.featureKey === b && f.isEnabled)
+    ).length;
+    
+    if (countB !== countA) return countB - countA;
+    return (allFeatures.get(a) || a).localeCompare(allFeatures.get(b) || b);
+  });
+
+  // Check if a tier has a feature
+  const tierHasFeature = (tier: Tier, featureKey: string): boolean => {
+    return tier.features.some(f => f.featureKey === featureKey && f.isEnabled);
   };
 
-  // Get tier color
-  const getTierColor = (tier: TierName): string => {
-    const colors: Record<TierName, string> = {
+  // Get tier color based on tier type
+  const getTierColor = (tier: Tier): string => {
+    if (tier.tierType === 'organization') {
+      return 'bg-purple-100 dark:bg-purple-900/30 text-purple-900 dark:text-purple-100';
+    }
+    const colors: Record<string, string> = {
       google_only: 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100',
       starter: 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100',
-      professional: 'bg-purple-100 dark:bg-purple-900/30 text-purple-900 dark:text-purple-100',
+      professional: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-100',
       enterprise: 'bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100',
     };
-    return colors[tier];
+    return colors[tier.tierKey] || 'bg-neutral-100 dark:bg-neutral-900/30 text-neutral-900 dark:text-neutral-100';
   };
 
   // Get tier badge color
-  const getTierBadgeColor = (tier: TierName): string => {
-    const colors: Record<TierName, string> = {
+  const getTierBadgeColor = (tier: Tier): string => {
+    if (tier.tierType === 'organization') {
+      return 'bg-purple-500';
+    }
+    const colors: Record<string, string> = {
       google_only: 'bg-blue-500',
       starter: 'bg-green-500',
-      professional: 'bg-purple-500',
+      professional: 'bg-indigo-500',
       enterprise: 'bg-amber-500',
     };
-    return colors[tier];
+    return colors[tier.tierKey] || 'bg-neutral-500';
   };
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
-          Tier & Feature Matrix
-        </h1>
-        <p className="text-neutral-600 dark:text-neutral-400">
-          Live view of all subscription tiers and their feature access
-        </p>
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      {/* Fixed Header - Mobile Optimized */}
+      <div className="sticky top-0 z-20 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm">
+        <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
+          <h1 className="text-xl md:text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-1">
+            Tier & Feature Matrix
+          </h1>
+          <p className="text-sm md:text-base text-neutral-600 dark:text-neutral-400">
+            Live view of all subscription tiers and their feature access
+          </p>
+        </div>
       </div>
+
+      {/* Main Content */}
+      <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
 
       {/* Info Banner for Non-Admins */}
       {isReadOnly && (
@@ -124,48 +214,47 @@ export default function TierMatrixPage() {
         </div>
       )}
 
-      {/* View Toggle */}
-      <div className="mb-6 flex gap-2">
+      {/* View Toggle - Mobile Optimized */}
+      <div className="mb-4 md:mb-6 flex gap-2">
         <button
           onClick={() => setSelectedView('matrix')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-lg font-medium text-sm md:text-base transition-colors ${
             selectedView === 'matrix'
               ? 'bg-primary-600 text-white'
               : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
           }`}
         >
-          Matrix View
+          Matrix
         </button>
         <button
           onClick={() => setSelectedView('details')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-lg font-medium text-sm md:text-base transition-colors ${
             selectedView === 'details'
               ? 'bg-primary-600 text-white'
               : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
           }`}
         >
-          Details View
+          Details
         </button>
       </div>
 
       {selectedView === 'matrix' ? (
         <>
           {/* Tier Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-            {tiers.map((tier) => {
-              const allFeatures = getTierFeatures(tier);
-              const featureCount = allFeatures.length;
-              const price = TIER_PRICING[tier] || 0;
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {dbTiers.map((tier) => {
+              const featureCount = tier.features.filter(f => f.isEnabled).length;
+              const price = tier.priceMonthly / 100;
               
               return (
                 <div
-                  key={tier}
+                  key={tier.id}
                   className={`p-4 rounded-lg border-2 ${getTierColor(tier)}`}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <div className={`w-3 h-3 rounded-full ${getTierBadgeColor(tier)}`}></div>
                     <h3 className="font-bold text-lg">
-                      {TIER_DISPLAY_NAMES[tier]}
+                      {tier.displayName}
                     </h3>
                   </div>
                   <p className="text-2xl font-bold mb-1">
@@ -179,25 +268,28 @@ export default function TierMatrixPage() {
             })}
           </div>
 
-          {/* Feature Matrix Table */}
+          {/* Feature Matrix Table - Mobile Optimized */}
           <div className="bg-white dark:bg-neutral-800 rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-neutral-50 dark:bg-neutral-700 border-b border-neutral-200 dark:border-neutral-600">
+            {/* Mobile: Horizontal scroll with momentum */}
+            <div className="overflow-x-auto -webkit-overflow-scrolling-touch overscroll-x-contain">
+              <table className="w-full min-w-max">
+                {/* Sticky Header */}
+                <thead className="bg-neutral-50 dark:bg-neutral-700 border-b border-neutral-200 dark:border-neutral-600 sticky top-0 z-10">
                   <tr>
-                    <th className="text-left p-4 font-semibold text-neutral-900 dark:text-neutral-100 sticky left-0 bg-neutral-50 dark:bg-neutral-700 z-10">
-                      Feature
+                    {/* Sticky First Column */}
+                    <th className="text-left p-2 md:p-4 font-semibold text-neutral-900 dark:text-neutral-100 sticky left-0 bg-neutral-50 dark:bg-neutral-700 z-20 shadow-[2px_0_4px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_rgba(0,0,0,0.3)] min-w-[140px] md:min-w-[200px]">
+                      <span className="text-xs md:text-base">Feature</span>
                     </th>
-                    {tiers.map((tier) => (
+                    {dbTiers.map((tier) => (
                       <th
-                        key={tier}
-                        className="text-center p-4 font-semibold text-neutral-900 dark:text-neutral-100 min-w-[120px]"
+                        key={tier.id}
+                        className="text-center p-2 md:p-4 font-semibold text-neutral-900 dark:text-neutral-100 min-w-[80px] md:min-w-[120px]"
                       >
-                        <div className="flex flex-col items-center gap-1">
-                          <div className={`w-3 h-3 rounded-full ${getTierBadgeColor(tier)}`}></div>
-                          <span>{TIER_DISPLAY_NAMES[tier]}</span>
-                          <span className="text-xs font-normal opacity-75">
-                            {TIER_PRICING[tier] === 0 ? 'Free' : `$${TIER_PRICING[tier]}/mo`}
+                        <div className="flex flex-col items-center gap-0.5 md:gap-1">
+                          <div className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${getTierBadgeColor(tier)}`}></div>
+                          <span className="text-xs md:text-base leading-tight">{tier.displayName}</span>
+                          <span className="text-[10px] md:text-xs font-normal opacity-75">
+                            ${(tier.priceMonthly / 100).toFixed(0)}/mo
                           </span>
                         </div>
                       </th>
@@ -205,19 +297,20 @@ export default function TierMatrixPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
-                  {features.map((feature) => (
-                    <tr key={feature} className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50">
-                      <td className="p-4 font-medium text-neutral-900 dark:text-neutral-100 sticky left-0 bg-white dark:bg-neutral-800 z-10">
-                        {FEATURE_DISPLAY_NAMES[feature]}
+                  {features.map((featureKey) => (
+                    <tr key={featureKey} className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-colors">
+                      {/* Sticky First Column */}
+                      <td className="p-2 md:p-4 text-xs md:text-base font-medium text-neutral-900 dark:text-neutral-100 sticky left-0 bg-white dark:bg-neutral-800 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.05)] dark:shadow-[2px_0_4px_rgba(0,0,0,0.2)]">
+                        {allFeatures.get(featureKey) || featureKey}
                       </td>
-                      {tiers.map((tier) => {
-                        const hasFeature = tierHasFeature(tier, feature);
+                      {dbTiers.map((tier) => {
+                        const hasFeature = tierHasFeature(tier, featureKey);
                         return (
-                          <td key={tier} className="p-4 text-center">
+                          <td key={tier.id} className="p-2 md:p-4 text-center">
                             {hasFeature ? (
                               <div className="flex justify-center">
                                 <svg
-                                  className="w-6 h-6 text-green-600 dark:text-green-400"
+                                  className="w-4 h-4 md:w-6 md:h-6 text-green-600 dark:text-green-400"
                                   fill="none"
                                   viewBox="0 0 24 24"
                                   stroke="currentColor"
@@ -233,7 +326,7 @@ export default function TierMatrixPage() {
                             ) : (
                               <div className="flex justify-center">
                                 <svg
-                                  className="w-6 h-6 text-neutral-300 dark:text-neutral-600"
+                                  className="w-4 h-4 md:w-6 md:h-6 text-neutral-300 dark:text-neutral-600"
                                   fill="none"
                                   viewBox="0 0 24 24"
                                   stroke="currentColor"
@@ -254,6 +347,13 @@ export default function TierMatrixPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            
+            {/* Mobile Scroll Hint */}
+            <div className="md:hidden bg-neutral-100 dark:bg-neutral-700 px-3 py-2 text-center">
+              <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                ← Swipe to see all tiers →
+              </p>
             </div>
           </div>
 
@@ -282,23 +382,23 @@ export default function TierMatrixPage() {
       ) : (
         /* Details View */
         <div className="space-y-6">
-          {tiers.map((tier) => {
-            const tierFeatures = getTierFeatures(tier);
-            const price = TIER_PRICING[tier];
+          {dbTiers.map((tier) => {
+            const tierFeatures = tier.features.filter(f => f.isEnabled);
+            const price = tier.priceMonthly / 100;
             
             return (
               <div
-                key={tier}
+                key={tier.id}
                 className="bg-white dark:bg-neutral-800 rounded-lg shadow overflow-hidden"
               >
                 <div className={`p-6 border-l-4 ${getTierBadgeColor(tier)}`}>
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-1">
-                        {TIER_DISPLAY_NAMES[tier]}
+                        {tier.displayName}
                       </h2>
                       <p className="text-xl font-semibold text-neutral-700 dark:text-neutral-300">
-                        {price === 0 ? 'Free Trial' : `$${price}/month`}
+                        ${price.toFixed(2)}/month
                       </p>
                     </div>
                     <div className="text-right">
@@ -314,7 +414,7 @@ export default function TierMatrixPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {tierFeatures.map((feature) => (
                       <div
-                        key={feature}
+                        key={feature.id}
                         className="flex items-center gap-2 p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg"
                       >
                         <svg
@@ -331,13 +431,14 @@ export default function TierMatrixPage() {
                           />
                         </svg>
                         <span className="text-neutral-900 dark:text-neutral-100 font-medium">
-                          {FEATURE_DISPLAY_NAMES[feature]}
+                          {feature.featureName}
+                          {feature.isInherited && <span className="ml-1 text-xs text-neutral-500">↑</span>}
                         </span>
                       </div>
                     ))}
                   </div>
 
-                  {!tierFeatures && (
+                  {tierFeatures.length === 0 && (
                     <p className="text-neutral-600 dark:text-neutral-400 italic">
                       No features configured for this tier
                     </p>
@@ -349,29 +450,39 @@ export default function TierMatrixPage() {
         </div>
       )}
 
-      {/* Quick Actions */}
-      <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Quick Actions</h3>
-        <div className="flex flex-wrap gap-3">
+      {/* Quick Actions - Mobile Optimized */}
+      <div className="mt-4 md:mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 md:p-4">
+        <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 text-sm md:text-base">Quick Actions</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 md:gap-3">
+          {isPlatformAdmin && (
+            <a
+              href="/settings/admin/tier-system"
+              className="px-3 md:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-colors font-medium text-sm md:text-base text-center"
+            >
+              Manage Tier System
+            </a>
+          )}
           <a
             href="/settings/admin/feature-overrides"
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+            className="px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors font-medium text-sm md:text-base text-center"
           >
-            Manage Feature Overrides
+            Feature Overrides
           </a>
           <a
             href="/settings/admin/tenants"
-            className="px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors font-medium"
+            className="px-3 md:px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 active:bg-neutral-300 dark:active:bg-neutral-500 transition-colors font-medium text-sm md:text-base text-center"
           >
-            View All Tenants
+            View Tenants
           </a>
           <a
             href="/settings/offerings"
-            className="px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors font-medium"
+            className="px-3 md:px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 active:bg-neutral-300 dark:active:bg-neutral-500 transition-colors font-medium text-sm md:text-base text-center"
           >
-            Platform Offerings
+            Offerings
           </a>
         </div>
+      </div>
+
       </div>
     </div>
   );
