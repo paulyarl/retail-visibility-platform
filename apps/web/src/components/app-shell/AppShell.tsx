@@ -25,14 +25,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [restoreToast, setRestoreToast] = useState<string | null>(null);
   const { user, logout, isAuthenticated } = useAuth();
 
-  // DEBUG: Render signature (client render only)
-  console.log('[AppShell] Render signature:', {
-    hydrated,
-    links,
-    tenantScopedLinksOn,
-    hasUser: !!user,
-  });
-
   useEffect(() => {
     // Wait for client-side hydration before reading localStorage
     if (typeof window === 'undefined') return;
@@ -65,14 +57,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     setHydrated(true);
-
-    // DEBUG: Post-hydration signature
-    console.log('[AppShell] Post-hydration signature:', {
-      linksAfterHydration: links,
-      tenantScopedLinksOn,
-      tenantName,
-      hasUser: !!user,
-    });
   }, [user]);
 
   // Show a subtle toast when session was restored after login

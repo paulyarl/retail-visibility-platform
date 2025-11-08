@@ -41,15 +41,7 @@ export function useItemsData({
   const [pageSize, setPageSize] = useState(25);
 
   // Calculate stats from current items (memoized to prevent hydration issues)
-  const stats = useMemo(() => {
-    const calculated = itemsDataService.calculateStats(items);
-    console.log('[useItemsData] Stats calculated:', {
-      itemsCount: items.length,
-      stats: calculated,
-      isServer: typeof window === 'undefined',
-    });
-    return calculated;
-  }, [items]);
+  const stats = useMemo(() => itemsDataService.calculateStats(items), [items]);
 
   const fetchItems = useCallback(async (
     filters: ItemFilters = {},
@@ -66,11 +58,6 @@ export function useItemsData({
         filters,
         paginationParams
       );
-
-      console.log('[useItemsData] Items fetched:', {
-        itemsCount: response.items.length,
-        pagination: response.pagination,
-      });
 
       setItems(response.items);
       setPagination(response.pagination);

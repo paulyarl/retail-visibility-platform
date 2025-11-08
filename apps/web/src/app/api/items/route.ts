@@ -6,20 +6,8 @@ export async function GET(req: NextRequest) {
   
   // Forward all query params to backend
   const queryString = searchParams.toString();
-  // DEBUG: Log the forwarded query string (redact obvious secrets if any)
-  console.log('[API /items] Forwarding to backend with query:', queryString || '<empty>');
-  
   const res = await proxyGet(req, `/items?${queryString}`);
   const data = await res.json();
-  // DEBUG: Log response shape without dumping large payloads
-  try {
-    const shape = Array.isArray(data)
-      ? { type: 'array', length: data.length }
-      : (data && typeof data === 'object')
-        ? { type: 'object', keys: Object.keys(data).slice(0, 8), itemsLen: Array.isArray((data as any).items) ? (data as any).items.length : undefined }
-        : { type: typeof data };
-    console.log('[API /items] Backend response:', { status: res.status, shape });
-  } catch {}
   
   // Handle both old (array) and new (paginated object) response formats
   if (!res.ok) {
