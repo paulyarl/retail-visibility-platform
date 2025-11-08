@@ -1148,16 +1148,16 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      {/* 30-Day Trial Section */}
+      {/* 14-Day Trial Section */}
       <section className="py-16 bg-gradient-to-r from-green-50 to-emerald-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-white border-2 border-green-200 rounded-xl p-8 shadow-lg">
             <div className="flex items-start gap-6">
               <div className="text-6xl">🆓</div>
               <div className="flex-1">
-                <h2 className="text-3xl font-bold text-neutral-900 mb-3">30-Day Free Trial</h2>
+                <h2 className="text-3xl font-bold text-neutral-900 mb-3">14-Day Free Trial</h2>
                 <p className="text-lg text-neutral-700 mb-6">
-                  Try our platform risk-free with full access to all Professional features. No credit card required.
+                  Try any tier risk-free with full access to all features. No credit card required.
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -1166,27 +1166,27 @@ export default function FeaturesPage() {
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Full access to all Professional features</span>
+                        <span>Trial any tier (Starter, Professional, or Enterprise)</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>5,000 SKU limit</span>
+                        <span>Full access to all tier features</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>1024px QR codes</span>
+                        <span>Quick Start Wizard (Professional+)</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Enhanced landing pages</span>
+                        <span>Product Scanning (Professional+)</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Google Shopping integration</span>
+                        <span>Google Shopping & GBP integration</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Google Business Profile sync</span>
+                        <span>Test before you commit</span>
                       </li>
                     </ul>
                   </div>
@@ -1196,7 +1196,7 @@ export default function FeaturesPage() {
                     <ul className="space-y-2 text-sm text-neutral-700">
                       <li className="flex items-start gap-2">
                         <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>30 days from account creation</span>
+                        <span>14 days from account creation</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-neutral-400 mt-0.5">•</span>
@@ -1204,11 +1204,11 @@ export default function FeaturesPage() {
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>Automatically converts to Starter plan after trial</span>
+                        <span>Choose your tier at signup</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>You can upgrade to any paid plan during trial</span>
+                        <span>Add payment before trial ends to continue</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-neutral-400 mt-0.5">•</span>
@@ -1246,7 +1246,7 @@ export default function FeaturesPage() {
                 <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-sm font-medium text-neutral-900">30-Day Free Trial</span>
+                <span className="text-sm font-medium text-neutral-900">14-Day Free Trial</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
