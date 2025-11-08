@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Spinner } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
-import { useAccessControl } from '@/hooks/useAccessControl';
+import { useAccessControl } from '@/lib/auth/useAccessControl';
 
 interface Tenant {
   id: string;
