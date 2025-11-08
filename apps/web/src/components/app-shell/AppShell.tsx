@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import TenantSwitcher from "./TenantSwitcher";
 import SettingsSwitcher from "./SettingsSwitcher";
-import { isFeatureEnabled } from "@/lib/featureFlags";
+import NavLinks from "./NavLinks";
+import { useAppNavigation } from "./hooks/useAppNavigation";
+import { useSessionRestore } from "./hooks/useSessionRestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import Link from "next/link";
@@ -11,75 +13,30 @@ import { Button } from "@/components/ui";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { settings } = usePlatformSettings();
-  const [enabled, setEnabled] = useState<boolean>(true);
+  const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [links, setLinks] = useState<{ dashboard: string; inventory: string; tenants: string; settings: string }>({
-    dashboard: "/",
-    inventory: "/items",
-    tenants: "/tenants",
-    settings: "/settings",
-  });
-  const [tenantScopedLinksOn, setTenantScopedLinksOn] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
   const [tenantName, setTenantName] = useState<string | null>(null);
-  const [restoreToast, setRestoreToast] = useState<string | null>(null);
-  const { user, logout, isAuthenticated } = useAuth();
-
+  
+  // Get current tenant ID from localStorage
+  const [tenantId, setTenantId] = useState<string | null>(null);
   useEffect(() => {
-    // Wait for client-side hydration before reading localStorage
-    if (typeof window === 'undefined') return;
-    
-    // Evaluate FF on client, using tenantId hint from localStorage
-    const tenantId = localStorage.getItem("tenantId") || undefined;
-    // AppShell is always visible on platform routes, including logged-out visitors
-    setEnabled(true);
-
-    // Compute tenant-scoped links when FF_TENANT_URLS is enabled
-    const tenantUrlsOverride = localStorage.getItem('ff_tenant_urls') === 'on';
-    const tenantUrlsOn = tenantUrlsOverride || isFeatureEnabled("FF_TENANT_URLS", tenantId);
-    if (tenantUrlsOn && tenantId) {
-      setLinks({
-        dashboard: `/t/${tenantId}/dashboard`,
-        inventory: `/t/${tenantId}/items`,
-        tenants: "/tenants",
-        settings: `/t/${tenantId}/settings`,
-      });
-      setTenantScopedLinksOn(true);
-    } else {
-      setLinks({ dashboard: "/", inventory: "/items", tenants: "/tenants", settings: "/settings" });
-      setTenantScopedLinksOn(false);
+    if (typeof window !== 'undefined') {
+      setTenantId(localStorage.getItem('tenantId'));
     }
+  }, [user]);
+  
+  // Use extracted hooks for navigation and session restore
+  const { links, tenantScopedLinksOn, hydrated } = useAppNavigation(tenantId);
+  const restoreToast = useSessionRestore(tenantName);
 
-    // Resolve current tenant name from user context
+  // Resolve current tenant name from user context
+  useEffect(() => {
     if (tenantId && user?.tenants) {
       const found = user.tenants.find((t: any) => t.id === tenantId);
       if (found?.name) setTenantName(found.name);
     }
+  }, [tenantId, user]);
 
-    setHydrated(true);
-  }, [user]);
-
-  // Show a subtle toast when session was restored after login
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const data = sessionStorage.getItem('restored_from_login');
-    if (data) {
-      try {
-        const parsed = JSON.parse(data) as { path?: string; tenantId?: string };
-        setRestoreToast(`Restored session${tenantName ? ` · ${tenantName}` : ''}${parsed?.path ? ` → ${parsed.path}` : ''}`);
-      } catch {
-        setRestoreToast('Session restored');
-      }
-      sessionStorage.removeItem('restored_from_login');
-      const t = setTimeout(() => setRestoreToast(null), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [tenantName]);
-
-  // Don't show AppShell if explicitly disabled
-  if (!enabled) {
-    return <>{children}</>;
-  }
 
   return (
     <div className="min-h-dvh flex flex-col bg-neutral-50">
@@ -96,12 +53,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             ) : (
               <span className="h-4 w-24 bg-neutral-200 rounded animate-pulse hidden sm:inline-block" />
             )}
-            <nav className="hidden md:flex items-center gap-3 lg:gap-4 text-xs lg:text-sm text-neutral-600">
-              <a className="hover:text-neutral-900 whitespace-nowrap" href={links.dashboard}>Dashboard</a>
-              <a className="hover:text-neutral-900 whitespace-nowrap" href={links.inventory}>Inventory</a>
-              <a className="hover:text-neutral-900 whitespace-nowrap" href={links.tenants}>Tenants</a>
-              <a className="hover:text-neutral-900 whitespace-nowrap" href={links.settings}>{hydrated && tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}</a>
-            </nav>
+            {hydrated && (
+              <NavLinks
+                links={links}
+                tenantScopedLinksOn={tenantScopedLinksOn}
+                className="hidden md:flex items-center gap-3 lg:gap-4 text-xs lg:text-sm text-neutral-600"
+                itemClassName="hover:text-neutral-900 whitespace-nowrap"
+              />
+            )}
           </div>
           
           {/* Desktop Actions */}
@@ -152,36 +111,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="md:hidden border-t border-neutral-200 bg-white">
             <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 space-y-2">
               {/* Mobile Navigation */}
-              <nav className="space-y-1">
-                <a 
-                  className="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium" 
-                  href={links.dashboard}
+              {hydrated && (
+                <NavLinks
+                  links={links}
+                  tenantScopedLinksOn={tenantScopedLinksOn}
+                  className="space-y-1"
+                  itemClassName="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium"
                   onClick={() => setMobileMenuOpen(false)}
-                >
-                  Dashboard
-                </a>
-                <a 
-                  className="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium" 
-                  href={links.inventory}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Inventory
-                </a>
-                <a 
-                  className="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium" 
-                  href={links.tenants}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Tenants
-                </a>
-                <a 
-                  className="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium" 
-                  href={links.settings}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {hydrated && tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}
-                </a>
-              </nav>
+                />
+              )}
 
               {/* Mobile Tenant & Settings Switchers */}
               {hydrated && user && (
