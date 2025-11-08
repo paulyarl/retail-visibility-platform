@@ -47,7 +47,21 @@ export default function TierMatrixPage() {
   const isReadOnly = !isPlatformAdmin;
 
   const tiers: TierName[] = ['google_only', 'starter', 'professional', 'enterprise'];
-  const features = Object.keys(FEATURE_DISPLAY_NAMES);
+  
+  // Sort features by commonality (most common to least common)
+  const features = Object.keys(FEATURE_DISPLAY_NAMES).sort((a, b) => {
+    // Count how many tiers have each feature
+    const countA = tiers.filter(tier => checkTierFeature(tier, a)).length;
+    const countB = tiers.filter(tier => checkTierFeature(tier, b)).length;
+    
+    // Sort descending (most common first)
+    if (countB !== countA) {
+      return countB - countA;
+    }
+    
+    // If same count, sort alphabetically by display name
+    return (FEATURE_DISPLAY_NAMES[a] || a).localeCompare(FEATURE_DISPLAY_NAMES[b] || b);
+  });
 
   // Check if a tier has a feature (including inherited features)
   const tierHasFeature = (tier: TierName, feature: string): boolean => {
