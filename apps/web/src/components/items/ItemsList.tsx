@@ -33,7 +33,7 @@ export default function ItemsList({
   }
 
   return (
-    <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden mb-6">
+    <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden mb-6" suppressHydrationWarning>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-700">
