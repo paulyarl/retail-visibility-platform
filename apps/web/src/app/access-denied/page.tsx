@@ -1,9 +1,35 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, Button } from '@/components/ui';
+import { api } from '@/lib/api';
 
 export default function AccessDeniedPage() {
+  const searchParams = useSearchParams();
+  const attemptedPath = searchParams.get('path');
+  const timestamp = searchParams.get('timestamp');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fetch current user info for debugging
+    const fetchUser = async () => {
+      try {
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const res = await api.get(`${apiBaseUrl}/auth/me`);
+        if (res.ok) {
+          const data = await res.json();
+          const user = data.user || data;
+          setUserEmail(user.email);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+      }
+    };
+    fetchUser();
+  }, []);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4">
       <Card className="max-w-md w-full">
@@ -54,6 +80,38 @@ export default function AccessDeniedPage() {
           <p className="mt-6 text-sm text-neutral-500">
             If you believe you should have access, please contact your administrator.
           </p>
+
+          {/* Debug Info */}
+          {(attemptedPath || userEmail || timestamp) && (
+            <div className="mt-6 pt-6 border-t border-neutral-200">
+              <p className="text-xs font-semibold text-neutral-700 mb-2">Debug Information:</p>
+              <div className="text-xs text-left bg-neutral-100 rounded p-3 space-y-1 font-mono">
+                {userEmail && (
+                  <div>
+                    <span className="text-neutral-500">User:</span>{' '}
+                    <span className="text-neutral-900">{userEmail}</span>
+                  </div>
+                )}
+                {attemptedPath && (
+                  <div>
+                    <span className="text-neutral-500">Attempted Path:</span>{' '}
+                    <span className="text-neutral-900">{attemptedPath}</span>
+                  </div>
+                )}
+                {timestamp && (
+                  <div>
+                    <span className="text-neutral-500">Time:</span>{' '}
+                    <span className="text-neutral-900">
+                      {new Date(timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-neutral-500 mt-2">
+                Include this information when contacting support.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

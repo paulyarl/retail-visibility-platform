@@ -67,8 +67,11 @@ export async function middleware(req: NextRequest) {
     });
     
     if (!isAdmin) {
-      // Redirect to access denied page
-      return NextResponse.redirect(new URL('/access-denied', req.url));
+      // Redirect to access denied page with context
+      const deniedUrl = new URL('/access-denied', req.url);
+      deniedUrl.searchParams.set('path', pathname);
+      deniedUrl.searchParams.set('timestamp', new Date().toISOString());
+      return NextResponse.redirect(deniedUrl);
     }
   }
 
