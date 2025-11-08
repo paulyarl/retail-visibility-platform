@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -21,6 +21,11 @@ import SettingsFooter from '@/components/SettingsFooter';
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const navItems = [
     { href: '/admin/tools', label: 'Control Panel', icon: Rocket },
@@ -79,7 +84,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <nav className="p-4 space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+              const isActive = mounted && (pathname === item.href || pathname?.startsWith(item.href + '/'));
               
               return (
                 <Link
@@ -117,7 +122,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <nav className="p-3 space-y-1 overflow-auto h-[calc(100%-60px)]">
                 {navItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+                  const isActive = mounted && (pathname === item.href || pathname?.startsWith(item.href + '/'));
                   
                   return (
                     <Link
