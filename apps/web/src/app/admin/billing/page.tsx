@@ -30,7 +30,7 @@ interface DbTier {
 const ITEMS_PER_PAGE = 25;
 
 export default function AdminBillingPage() {
-  const { isPlatformStaff, loading: accessLoading } = useAccessControl({ requirePlatformStaff: true });
+  const { hasAccess, loading: accessLoading, isPlatformAdmin } = useAccessControl(null, { requirePlatformAdmin: true });
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [dbTiers, setDbTiers] = useState<DbTier[]>([]);
   const [loading, setLoading] = useState(true);
