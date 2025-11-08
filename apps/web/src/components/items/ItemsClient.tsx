@@ -162,17 +162,21 @@ export default function ItemsClient({
 
   const [isV2, setIsV2] = useState(false);
   
-  // View mode toggle for default (non-V2) view
-  const getInitialView = (): 'grid' | 'list' => {
-    if (typeof window === 'undefined') return 'grid';
+  // View mode toggle for default (non-V2) view - always start with 'grid' to prevent hydration mismatch
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // Load saved view mode from localStorage after mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
       const saved = localStorage.getItem('items_view_mode');
-      if (saved === 'grid' || saved === 'list') return saved as 'grid' | 'list';
+      if (saved === 'grid' || saved === 'list') {
+        setViewMode(saved as 'grid' | 'list');
+      }
     } catch {}
-    return 'grid';
-  };
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(getInitialView);
+  }, []);
 
+  // Save view mode to localStorage when it changes
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
