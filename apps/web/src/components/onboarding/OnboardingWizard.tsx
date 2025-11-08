@@ -142,6 +142,17 @@ export default function OnboardingWizard({
 
         // Merge: API data as base, localStorage data overrides (for new/unsaved changes)
         const mergedData = { ...apiData, ...localData };
+        
+        // Sanitize: treat whitespace-only strings as empty
+        const sanitized = Object.entries(mergedData).reduce((acc, [key, value]) => {
+          if (typeof value === 'string' && value.trim() === '') {
+            acc[key] = '';
+          } else {
+            acc[key] = value;
+          }
+          return acc;
+        }, {} as any);
+        
         // Provide defaults so validation schema receives strings instead of undefined
         const normalizedMerged = {
           business_name: '',
@@ -155,7 +166,7 @@ export default function OnboardingWizard({
           email: '',
           website: '',
           contact_person: '',
-          ...mergedData,
+          ...sanitized,
         } as Partial<BusinessProfile>;
         console.log('[OnboardingWizard] API data:', apiData);
         console.log('[OnboardingWizard] localStorage data:', localData);
