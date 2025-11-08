@@ -531,7 +531,7 @@ export default function ItemsClient({
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900" suppressHydrationWarning>
       <PageHeader
         title="Inventory"
         description="Manage your catalog and stock levels"
