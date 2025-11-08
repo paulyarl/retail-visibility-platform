@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Spinner } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
+import { useAccessControl } from '@/hooks/useAccessControl';
 
 interface Tenant {
   id: string;
@@ -29,6 +30,7 @@ interface DbTier {
 const ITEMS_PER_PAGE = 25;
 
 export default function AdminBillingPage() {
+  const { isPlatformStaff, loading: accessLoading } = useAccessControl({ requirePlatformStaff: true });
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [dbTiers, setDbTiers] = useState<DbTier[]>([]);
   const [loading, setLoading] = useState(true);
