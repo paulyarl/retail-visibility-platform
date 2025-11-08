@@ -36,8 +36,10 @@ export default function AdminBillingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTierFilter, setSelectedTierFilter] = useState<string>('all');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     loadTenants();
     loadTiers();
   }, []);
@@ -140,6 +142,11 @@ export default function AdminBillingPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedTierFilter]);
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="container mx-auto p-6">
