@@ -315,7 +315,9 @@ export default function ItemsClient({
 
       {showQRModal && qrItem && (
         <QRCodeModal
-          item={qrItem}
+          isOpen={showQRModal}
+          productUrl={`/tenant/${initialTenantId}/product/${qrItem.id}`}
+          productName={qrItem.name}
           onClose={closeQRModal}
         />
       )}
@@ -331,7 +333,8 @@ export default function ItemsClient({
       {showPhotoGallery && galleryItem && (
         <ItemPhotoGallery
           item={galleryItem}
-          onUpload={(files: File[]) => handlePhotoUpload(galleryItem.id, files)}
+          tenantId={initialTenantId}
+          onUpdate={refresh}
         />
       )}
 
