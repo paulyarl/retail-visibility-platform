@@ -118,19 +118,41 @@
 
 ### Pending Items
 
-- [ ] **Dashboard Refactor** 🚨 CRITICAL
-  - Current: 1,039 lines, 10 hooks
+- [ ] **Dashboard Refactor** 🚨 CRITICAL (PHASED APPROACH)
+  - Current: 1,039 lines, 10 hooks, 5 useEffect
   - Target: ~400 lines total (60% reduction)
   - Priority: **P0** (Highest complexity, main entry point)
-  - Estimated: 2-3 hours
-  - Plan:
-    - Extract `useDashboardData.ts` - Tenant data & stats
-    - Extract `usePlatformStats.ts` - Public stats
-    - Extract `useShowcaseMode.ts` - Showcase config
-    - Create `DashboardStats.tsx` - Stats cards
-    - Create `QuickActions.tsx` - Action buttons
-    - Create `TenantInfo.tsx` - Tenant header
-    - Create `PlatformStatsSection.tsx` - Visitor stats
+  - Total Estimated: 3-4 hours (across multiple sessions)
+  
+  **Phase 1: Extract Hooks** (~1 hour) - Session 1
+  - [ ] Create `dashboard/types.ts` - Shared interfaces
+  - [ ] Extract `useDashboardData.ts` - Tenant data & stats fetching
+  - [ ] Extract `usePlatformStats.ts` - Public platform stats
+  - [ ] Extract `useShowcaseMode.ts` - Showcase configuration
+  - [ ] Extract `useScopedLinks.ts` - Tenant URL computation
+  - Goal: Reduce hooks from 10 → ~5, isolate business logic
+  
+  **Phase 2: Extract Components** (~1.5 hours) - Session 2
+  - [ ] Create `DashboardStats.tsx` - Stats cards display
+  - [ ] Create `QuickActions.tsx` - Action buttons section
+  - [ ] Create `TenantInfo.tsx` - Tenant header/banner
+  - [ ] Create `PlatformStatsSection.tsx` - Visitor stats
+  - [ ] Create `DashboardHeader.tsx` - Top navigation
+  - Goal: Extract presentational components
+  
+  **Phase 3: Refactor Main Page** (~1 hour) - Session 3
+  - [ ] Refactor `page.tsx` to use extracted hooks/components
+  - [ ] Add comprehensive logging
+  - [ ] Test all user flows (visitor, authenticated, tenant-scoped)
+  - [ ] Verify no hydration errors
+  - Goal: Clean orchestration layer (~150 lines)
+  
+  **Phase 4: Polish & Optimize** (~30 min) - Session 4
+  - [ ] Add loading states
+  - [ ] Optimize re-renders
+  - [ ] Add error boundaries
+  - [ ] Update documentation
+  - Goal: Production-ready, maintainable code
 
 - [ ] **Admin Tools Page**
   - Current: Unknown
@@ -245,12 +267,31 @@
 
 **Week of 2025-11-08:**
 
-### Top Priority
-1. 🚨 **Dashboard Refactor** (1,039 lines → ~400 lines)
-   - Highest complexity
-   - Main entry point
-   - Likely hydration issues
-   - Estimated: 2-3 hours
+### Session Tracker
+
+**Session 1 (2025-11-08)** ✅ COMPLETE
+- ✅ Fixed 403/401 admin access errors
+- ✅ Refactored AppShell (237 → 180 lines)
+- ✅ Refactored Billing Page (335 → 145 lines)
+- ✅ Created refactoring roadmap
+- **Next:** Dashboard Phase 1 (Extract Hooks)
+
+**Session 2** ⏸️ PENDING
+- Dashboard Phase 1: Extract Hooks (~1 hour)
+- Dashboard Phase 2: Extract Components (~1.5 hours)
+- **Or:** Admin Pages Assessment if dashboard complete
+
+**Session 3** ⏸️ PENDING
+- Dashboard Phase 3: Refactor Main Page (~1 hour)
+- Dashboard Phase 4: Polish & Optimize (~30 min)
+- **Or:** Next admin page refactor
+
+### Top Priority (Next Session)
+1. 🚨 **Dashboard Phase 1: Extract Hooks**
+   - Create types.ts
+   - Extract 4-5 custom hooks
+   - Reduce complexity by 50%
+   - Estimated: 1 hour
 
 ### Secondary Priority
 2. **Admin Pages Assessment**
