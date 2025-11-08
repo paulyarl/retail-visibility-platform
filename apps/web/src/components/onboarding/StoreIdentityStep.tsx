@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Input, Select, Alert } from '@/components/ui';
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
+import { addressParser } from '@/lib/address-parser';
 import { z } from 'zod';
 
 interface StoreIdentityStepProps {
@@ -118,63 +119,13 @@ export default function StoreIdentityStep({
     handleChange('phone_number', normalized);
   };
 
-  // Smart address parser for Google Maps format: "7460 Rockville Rd, Indianapolis, IN 46214"
-  const parseAddress = (fullAddress: string): Partial<BusinessProfile> => {
-    const parsed: Partial<BusinessProfile> = {};
-    
-    // Remove extra whitespace
-    const cleaned = fullAddress.trim().replace(/\s+/g, ' ');
-    
-    // Try to match common address formats
-    // Format 1: "Street Address, City, State ZIP"
-    const match1 = cleaned.match(/^(.+?),\s*([^,]+?),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i);
-    if (match1) {
-      parsed.address_line1 = match1[1].trim();
-      parsed.city = match1[2].trim();
-      parsed.state = match1[3].toUpperCase();
-      parsed.postal_code = match1[4].trim();
-      return parsed;
-    }
-    
-    // Format 2: "Street Address, City State ZIP"
-    const match2 = cleaned.match(/^(.+?),\s*([^,]+?)\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i);
-    if (match2) {
-      parsed.address_line1 = match2[1].trim();
-      parsed.city = match2[2].trim();
-      parsed.state = match2[3].toUpperCase();
-      parsed.postal_code = match2[4].trim();
-      return parsed;
-    }
-    
-    // Format 3: "Street Address City, State ZIP" (no comma after street)
-    const match3 = cleaned.match(/^(.+?)\s+([^,]+?),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i);
-    if (match3) {
-      // Try to split street from city intelligently
-      const parts = match3[1].split(/\s+/);
-      if (parts.length > 2) {
-        // Assume last word before city is part of street
-        parsed.address_line1 = match3[1].trim();
-      } else {
-        parsed.address_line1 = match3[1].trim();
-      }
-      parsed.city = match3[2].trim();
-      parsed.state = match3[3].toUpperCase();
-      parsed.postal_code = match3[4].trim();
-      return parsed;
-    }
-    
-    // If no pattern matches, just use the input as address_line1
-    parsed.address_line1 = cleaned;
-    return parsed;
-  };
-
   const handleAddressChange = (value: string) => {
-    // Check if this looks like a full address (contains comma and state/zip pattern)
-    const looksLikeFullAddress = /,.*[A-Z]{2}\s+\d{5}/.test(value);
+    // Check if this looks like a full address using the middleware
+    const looksLikeFullAddress = addressParser.canParse(value);
     
     if (looksLikeFullAddress) {
-      // Parse the full address
-      const parsed = parseAddress(value);
+      // Parse the full address using the middleware
+      const parsed = addressParser.parse(value);
       
       // Update all fields at once
       const newData = { ...formData, ...parsed };
@@ -257,7 +208,7 @@ export default function StoreIdentityStep({
           onChange={(e) => handleAddressChange(e.target.value)}
           onBlur={() => handleBlur('address_line1')}
           error={touched.address_line1 ? errors.address_line1 : undefined}
-          helperText="💡 Tip: Paste a full address (e.g., '7460 Rockville Rd, Indianapolis, IN 46214') to auto-fill all fields"
+          helperText="💡 Tip: Paste a full address to auto-fill all fields (supports US, UK, Canada formats)"
           required
         />
 
