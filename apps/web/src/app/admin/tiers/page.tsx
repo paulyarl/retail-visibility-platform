@@ -342,16 +342,15 @@ export default function AdminTiersPage() {
                         </div>
 
                         {/* Quick Actions - Cleaner Dropdown Approach */}
-                        <div className="flex-shrink-0 flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex-shrink-0 flex flex-col gap-2">
                           {/* Tier Dropdown */}
-                          <div className="min-w-[200px]">
+                          <div className="min-w-[200px]" onClick={(e) => e.stopPropagation()}>
                             <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 block">
                               Subscription Tier
                             </label>
                             <select
                               value={tenant.subscriptionTier || 'starter'}
                               onChange={(e) => updateTier(tenant.id, e.target.value, tenant.subscriptionStatus || 'active')}
-                              onClick={(e) => e.stopPropagation()}
                               disabled={isUpdating}
                               className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
                             >
@@ -364,14 +363,13 @@ export default function AdminTiersPage() {
                           </div>
 
                           {/* Status Dropdown */}
-                          <div className="min-w-[200px]">
+                          <div className="min-w-[200px]" onClick={(e) => e.stopPropagation()}>
                             <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 block">
                               Status
                             </label>
                             <select
                               value={tenant.subscriptionStatus || 'active'}
                               onChange={(e) => updateTier(tenant.id, tenant.subscriptionTier || 'starter', e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
                               disabled={isUpdating}
                               className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
                             >
