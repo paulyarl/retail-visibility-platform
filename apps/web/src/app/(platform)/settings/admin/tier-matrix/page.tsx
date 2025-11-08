@@ -40,8 +40,9 @@ export default function TierMatrixPage() {
     async function loadTiers() {
       try {
         setLoading(true);
-        // Use relative URL to go through Next.js (same-origin, cookies work)
-        const res = await api.get('/api/admin/tier-system/tiers');
+        // Call Railway API directly - api.get() will include auth token from cookies
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const res = await api.get(`${apiBaseUrl}/api/admin/tier-system/tiers`);
         if (res.ok) {
           const data = await res.json();
           setDbTiers(data.tiers || []);
