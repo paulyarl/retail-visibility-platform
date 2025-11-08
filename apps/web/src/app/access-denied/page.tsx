@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, Button } from '@/components/ui';
 import { api } from '@/lib/api';
 
-export default function AccessDeniedPage() {
+function AccessDeniedContent() {
   const searchParams = useSearchParams();
   const attemptedPath = searchParams.get('path');
   const timestamp = searchParams.get('timestamp');
@@ -129,5 +129,17 @@ export default function AccessDeniedPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AccessDeniedPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="text-neutral-600">Loading...</div>
+      </div>
+    }>
+      <AccessDeniedContent />
+    </Suspense>
   );
 }
