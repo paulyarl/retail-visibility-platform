@@ -302,13 +302,16 @@ export default function ItemsClient({
       </div>
 
       {/* Modals */}
-      {showEditModal && editingItem && (
-        <EditItemModal
-          item={editingItem}
-          onSave={(data) => handleUpdate(editingItem.id, data)}
-          onClose={closeEditModal}
-        />
-      )}
+      <EditItemModal
+        isOpen={showEditModal}
+        item={editingItem}
+        onSave={async (data) => {
+          if (editingItem) {
+            await handleUpdate(editingItem.id, data);
+          }
+        }}
+        onClose={closeEditModal}
+      />
 
       {showQRModal && qrItem && (
         <QRCodeModal
@@ -328,8 +331,7 @@ export default function ItemsClient({
       {showPhotoGallery && galleryItem && (
         <ItemPhotoGallery
           item={galleryItem}
-          onClose={closePhotoGallery}
-          onUpload={(files) => handlePhotoUpload(galleryItem.id, files)}
+          onUpload={(files: File[]) => handlePhotoUpload(galleryItem.id, files)}
         />
       )}
 
