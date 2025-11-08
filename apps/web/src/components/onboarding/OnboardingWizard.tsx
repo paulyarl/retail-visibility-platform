@@ -243,7 +243,7 @@ export default function OnboardingWizard({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4" suppressHydrationWarning>
       {/* Context Badges */}
       <div className="absolute top-4 left-4 right-4 z-10">
         <ContextBadges 
