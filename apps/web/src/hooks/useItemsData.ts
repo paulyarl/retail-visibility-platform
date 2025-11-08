@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { itemsDataService, Item, ItemFilters, PaginationParams, ItemsResponse } from '@/services/itemsDataService';
 
 interface UseItemsDataOptions {
@@ -40,8 +40,8 @@ export function useItemsData({
   const [currentFilters, setCurrentFilters] = useState<ItemFilters>({});
   const [pageSize, setPageSize] = useState(25);
 
-  // Calculate stats from current items
-  const stats = itemsDataService.calculateStats(items);
+  // Calculate stats from current items (memoized to prevent hydration issues)
+  const stats = useMemo(() => itemsDataService.calculateStats(items), [items]);
 
   const fetchItems = useCallback(async (
     filters: ItemFilters = {},
