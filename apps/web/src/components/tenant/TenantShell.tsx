@@ -30,7 +30,7 @@ export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, 
           {settings?.logoUrl ? (
             <Image src={settings.logoUrl} alt={settings.platformName || 'Platform Logo'} width={140} height={32} className="h-8 w-auto object-contain" />
           ) : (
-            <span className="font-semibold text-gray-900 hover:text-blue-600">{settings?.platformName || 'Visible Shelf'}</span>
+            <span className="font-semibold text-gray-900 hover:text-blue-600" suppressHydrationWarning>{settings?.platformName || 'Visible Shelf'}</span>
           )}
         </Link>
         <div className="flex items-center gap-3">
@@ -51,7 +51,7 @@ export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, 
           </svg>
           <span className="text-sm font-medium">Menu</span>
         </button>
-        <Link href="/" aria-label="Platform Dashboard" className="text-xs sm:text-sm text-gray-700 hover:text-blue-600 font-medium truncate max-w-[100px] sm:max-w-none">
+        <Link href="/" aria-label="Platform Dashboard" className="text-xs sm:text-sm text-gray-700 hover:text-blue-600 font-medium truncate max-w-[100px] sm:max-w-none" suppressHydrationWarning>
           {settings?.platformName || 'Platform'}
         </Link>
         <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
