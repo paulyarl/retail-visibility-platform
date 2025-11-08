@@ -54,29 +54,25 @@ export async function requireActiveSubscription(
       });
     }
 
-    // Check if trial has expired - automatically convert to starter
+    // Check if trial has expired - convert to active status (keep same tier)
     if (
       tenant.subscriptionStatus === "trial" &&
       tenant.trialEndsAt &&
       tenant.trialEndsAt < now
     ) {
-      // Automatically downgrade to starter plan
-      console.log(`[Subscription Check] Trial expired for tenant ${tenant.id}. Auto-converting to starter plan.`);
+      // Trial expired - require payment to continue
+      console.log(`[Subscription Check] Trial expired for tenant ${tenant.id} (${tenant.subscriptionTier} tier).`);
       
-      await prisma.tenant.update({
-        where: { id: tenant.id },
-        data: {
-          subscriptionTier: "starter",
-          subscriptionStatus: "active",
-          // Set subscription to end in 30 days from now
-          subscriptionEndsAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+      return res.status(402).json({
+        error: "trial_expired",
+        message: `Your 14-day trial of the ${tenant.subscriptionTier} plan has expired. Please add payment to continue.`,
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          tier: tenant.subscriptionTier,
+          trialEndsAt: tenant.trialEndsAt,
         },
       });
-
-      // Continue with the request - tenant is now on starter plan
-      console.log(`[Subscription Check] Tenant ${tenant.id} successfully converted to starter plan.`);
-      next();
-      return;
     }
 
     // Check if subscription has expired
@@ -204,14 +200,14 @@ export async function checkSubscriptionLimits(
     // INDIVIDUAL TENANT LIMIT ENFORCEMENT
     // Define limits per tier for standalone tenants
     const limits: Record<string, { items: number }> = {
-      trial: { items: 500 },
+      google_only: { items: 500 },
       starter: { items: 500 },
       professional: { items: 5000 },
       enterprise: { items: Infinity },
     };
 
-    const tier = tenant.subscriptionTier || "trial";
-    const limit = limits[tier] || limits.trial;
+    const tier = tenant.subscriptionTier || "starter";
+    const limit = limits[tier] || limits.starter;
 
     // Check if creating new item would exceed limit
     if (req.method === "POST" && tenant._count.items >= limit.items) {

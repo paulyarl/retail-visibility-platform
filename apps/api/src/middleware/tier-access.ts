@@ -12,12 +12,8 @@ import { prisma } from '../prisma';
  */
 
 // Define features available at each tier (cumulative)
+// NOTE: 'trial' is not a tier - it's a time-limited status that can apply to any tier
 export const TIER_FEATURES = {
-  trial: [
-    'google_shopping',
-    'basic_product_pages',
-    'qr_codes_512',
-  ],
   google_only: [
     'google_shopping',
     'google_merchant_center',
@@ -108,16 +104,16 @@ export const TIER_FEATURES = {
 } as const;
 
 // Tier hierarchy for inheritance (lower tiers inherit from higher)
+// NOTE: 'trial' is not a tier - it's a subscription status that can apply to any tier
 const TIER_HIERARCHY: Record<string, string[]> = {
-  trial: [],
-  google_only: ['trial'],
-  starter: ['google_only', 'trial'],
-  professional: ['starter', 'google_only', 'trial'],
-  enterprise: ['professional', 'starter', 'google_only', 'trial'],
-  organization: ['professional', 'starter', 'google_only', 'trial'],
-  chain_starter: ['starter', 'google_only', 'trial'],
-  chain_professional: ['professional', 'starter', 'google_only', 'trial'],
-  chain_enterprise: ['enterprise', 'professional', 'starter', 'google_only', 'trial'],
+  google_only: [],
+  starter: ['google_only'],
+  professional: ['starter', 'google_only'],
+  enterprise: ['professional', 'starter', 'google_only'],
+  organization: ['professional', 'starter', 'google_only'],
+  chain_starter: ['starter', 'google_only'],
+  chain_professional: ['professional', 'starter', 'google_only'],
+  chain_enterprise: ['enterprise', 'professional', 'starter', 'google_only'],
 };
 
 // Feature to minimum required tier mapping

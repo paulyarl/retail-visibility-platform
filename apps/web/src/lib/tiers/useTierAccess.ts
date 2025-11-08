@@ -61,9 +61,11 @@ export interface TierAccessResult {
  * 
  * @param tenantTier - The tenant's subscription tier (e.g., 'starter', 'professional')
  * @returns Object with tier access utilities
+ * 
+ * NOTE: 'trial' is not a tier - it's a subscription status. Pass the actual tier (e.g., 'starter')
  */
 export function useTierAccess(tenantTier: string | null | undefined): TierAccessResult {
-  const tier = tenantTier || 'trial';
+  const tier = tenantTier || 'starter';
   
   return useMemo(() => {
     const tierDisplay = getTierDisplayName(tier);

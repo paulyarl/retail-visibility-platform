@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAccessControl } from '@/lib/auth/useAccessControl';
 import { FEATURE_DISPLAY_NAMES, TIER_DISPLAY_NAMES, TIER_PRICING, checkTierFeature, getTierFeatures } from '@/lib/tiers/tier-features';
 
-type TierName = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise';
+type TierName = 'google_only' | 'starter' | 'professional' | 'enterprise';
 
 export default function TierMatrixPage() {
   const { user, isPlatformAdmin, loading: accessLoading } = useAccessControl(null);
@@ -46,7 +46,7 @@ export default function TierMatrixPage() {
 
   const isReadOnly = !isPlatformAdmin;
 
-  const tiers: TierName[] = ['trial', 'google_only', 'starter', 'professional', 'enterprise'];
+  const tiers: TierName[] = ['google_only', 'starter', 'professional', 'enterprise'];
   const features = Object.keys(FEATURE_DISPLAY_NAMES);
 
   // Check if a tier has a feature (including inherited features)
@@ -57,7 +57,6 @@ export default function TierMatrixPage() {
   // Get tier color
   const getTierColor = (tier: TierName): string => {
     const colors: Record<TierName, string> = {
-      trial: 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100',
       google_only: 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100',
       starter: 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100',
       professional: 'bg-purple-100 dark:bg-purple-900/30 text-purple-900 dark:text-purple-100',
@@ -69,7 +68,6 @@ export default function TierMatrixPage() {
   // Get tier badge color
   const getTierBadgeColor = (tier: TierName): string => {
     const colors: Record<TierName, string> = {
-      trial: 'bg-neutral-500',
       google_only: 'bg-blue-500',
       starter: 'bg-green-500',
       professional: 'bg-purple-500',

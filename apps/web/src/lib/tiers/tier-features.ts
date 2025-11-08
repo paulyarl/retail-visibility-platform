@@ -8,11 +8,6 @@
  */
 
 export const TIER_FEATURES = {
-  trial: [
-    'google_shopping',
-    'basic_product_pages',
-    'qr_codes_512',
-  ],
   google_only: [
     'google_shopping',
     'google_merchant_center',
@@ -105,16 +100,16 @@ export const TIER_FEATURES = {
 } as const;
 
 // Tier hierarchy for inheritance (lower tiers inherit from higher)
+// NOTE: 'trial' is not a tier - it's a time-limited status that can apply to any tier
 export const TIER_HIERARCHY: Record<string, string[]> = {
-  trial: [],
-  google_only: ['trial'],
-  starter: ['google_only', 'trial'],
-  professional: ['starter', 'google_only', 'trial'],
-  enterprise: ['professional', 'starter', 'google_only', 'trial'],
-  organization: ['professional', 'starter', 'google_only', 'trial'],
-  chain_starter: ['starter', 'google_only', 'trial'],
-  chain_professional: ['professional', 'starter', 'google_only', 'trial'],
-  chain_enterprise: ['enterprise', 'professional', 'starter', 'google_only', 'trial'],
+  google_only: [],
+  starter: ['google_only'],
+  professional: ['starter', 'google_only'],
+  enterprise: ['professional', 'starter', 'google_only'],
+  organization: ['professional', 'starter', 'google_only'],
+  chain_starter: ['starter', 'google_only'],
+  chain_professional: ['professional', 'starter', 'google_only'],
+  chain_enterprise: ['enterprise', 'professional', 'starter', 'google_only'],
 };
 
 // Feature to minimum required tier mapping
@@ -150,8 +145,8 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
 };
 
 // Tier display names
+// NOTE: 'trial' is not a tier - it's a subscription status (trial, active, past_due, canceled)
 export const TIER_DISPLAY_NAMES: Record<string, string> = {
-  trial: 'Trial',
   google_only: 'Google-Only',
   starter: 'Starter',
   professional: 'Professional',
@@ -244,8 +239,8 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
 };
 
 // Tier pricing (monthly)
+// NOTE: All tiers can be trialed for 14 days before payment is required
 export const TIER_PRICING: Record<string, number> = {
-  trial: 0,
   google_only: 29,
   starter: 49,
   professional: 499,
