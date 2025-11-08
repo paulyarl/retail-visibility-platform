@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAccessControl } from '@/lib/auth/useAccessControl';
-import { TIER_FEATURES, TIER_HIERARCHY, FEATURE_DISPLAY_NAMES, TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
+import { FEATURE_DISPLAY_NAMES, TIER_DISPLAY_NAMES, TIER_PRICING, checkTierFeature, getTierFeatures } from '@/lib/tiers/tier-features';
 
 type TierName = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise';
 
@@ -51,10 +51,7 @@ export default function TierMatrixPage() {
 
   // Check if a tier has a feature (including inherited features)
   const tierHasFeature = (tier: TierName, feature: string): boolean => {
-    const tierFeatures = TIER_FEATURES[tier];
-    if (!tierFeatures) return false;
-    // Type assertion needed because feature is a string but tierFeatures is a readonly tuple
-    return (tierFeatures as readonly string[]).includes(feature);
+    return checkTierFeature(tier, feature);
   };
 
   // Get tier color
@@ -144,8 +141,8 @@ export default function TierMatrixPage() {
           {/* Tier Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             {tiers.map((tier) => {
-              const tierFeatures = TIER_FEATURES[tier];
-              const featureCount = tierFeatures ? tierFeatures.length : 0;
+              const allFeatures = getTierFeatures(tier);
+              const featureCount = allFeatures.length;
               const price = TIER_PRICING[tier] || 0;
               
               return (
@@ -274,7 +271,7 @@ export default function TierMatrixPage() {
         /* Details View */
         <div className="space-y-6">
           {tiers.map((tier) => {
-            const tierFeatures = TIER_FEATURES[tier] || [];
+            const tierFeatures = getTierFeatures(tier);
             const price = TIER_PRICING[tier];
             
             return (
