@@ -588,7 +588,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                     })()}
                   </div>
                 )}
-              </div>
             </div>
 
             {/* Quick Links */}
