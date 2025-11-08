@@ -71,6 +71,7 @@ export default function SettingsSwitcher() {
         className="px-2 py-1 border border-neutral-300 rounded-md text-sm bg-white hover:bg-neutral-50 transition-colors cursor-pointer"
         value={currentScope}
         onChange={(e) => onChange(e.target.value as SettingsScope)}
+        suppressHydrationWarning
       >
         <option value="platform">Platform</option>
         <option value="tenant">Tenant</option>
