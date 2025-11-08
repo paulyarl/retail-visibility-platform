@@ -143,9 +143,21 @@ export default function AdminBillingPage() {
     setCurrentPage(1);
   }, [searchQuery, selectedTierFilter]);
 
-  // Prevent hydration mismatch
+  // Prevent hydration mismatch - show loading state during mount
   if (!mounted) {
-    return null;
+    return (
+      <div className="container mx-auto p-6">
+        <PageHeader
+          title="Billing Dashboard"
+          description="View SKU usage, limits, and billing status across all tenants"
+          icon={Icons.Settings}
+          backLink={{ href: '/settings/admin', label: 'Back to Admin' }}
+        />
+        <div className="mt-6 flex items-center justify-center">
+          <Spinner size="lg" />
+        </div>
+      </div>
+    );
   }
 
   return (
