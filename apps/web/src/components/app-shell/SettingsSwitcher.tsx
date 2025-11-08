@@ -11,7 +11,15 @@ export default function SettingsSwitcher() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, currentTenantId } = useAuth();
-  const [currentScope, setCurrentScope] = useState<SettingsScope>("platform");
+  
+  // Determine initial scope from pathname to prevent hydration mismatch
+  const getInitialScope = (): SettingsScope => {
+    if (pathname?.startsWith('/t/')) return "tenant";
+    if (pathname?.startsWith('/settings')) return "platform";
+    return "platform";
+  };
+  
+  const [currentScope, setCurrentScope] = useState<SettingsScope>(getInitialScope);
 
   // Determine if user is a platform user (admin, support, or viewer)
   const showSwitcher = user ? isPlatformUser(user) : false;
@@ -19,14 +27,13 @@ export default function SettingsSwitcher() {
   // Only show for platform users
   if (!showSwitcher) return null;
 
-  // Determine current scope from pathname
+  // Update scope when pathname changes
   useEffect(() => {
-    if (pathname?.startsWith('/t/')) {
-      setCurrentScope("tenant");
-    } else if (pathname?.startsWith('/settings')) {
-      setCurrentScope("platform");
+    const newScope = getInitialScope();
+    if (newScope !== currentScope) {
+      setCurrentScope(newScope);
     }
-  }, [pathname]);
+  }, [pathname, currentScope]);
 
   const onChange = (scope: SettingsScope) => {
     setCurrentScope(scope);
