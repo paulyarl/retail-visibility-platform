@@ -12,6 +12,16 @@ export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, 
   const [open, setOpen] = useState(false)
   const { settings } = usePlatformSettings()
 
+  // DEBUG: Render signature (TenantShell)
+  console.log('[TenantShell] Render:', {
+    tenantId,
+    tenantName,
+    hasLogoUrl: !!settings?.logoUrl,
+    platformName: settings?.platformName,
+    navLen: nav?.length,
+    tenantsLen: tenants?.length,
+  })
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top header (desktop) */}
