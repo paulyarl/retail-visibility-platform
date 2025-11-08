@@ -27,12 +27,13 @@ function setCookie(res: NextResponse, name: string, value: string, maxAgeSec = 6
  */
 async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
   try {
-    const authToken = getCookie(req, 'auth_token');
+    // Check both auth_token (legacy) and access_token (current)
+    const authToken = getCookie(req, 'auth_token') || getCookie(req, 'access_token');
     if (!authToken) return false;
 
     const response = await fetch(`${API_BASE_URL}/auth/me`, {
       headers: {
-        'Cookie': `auth_token=${authToken}`,
+        'Authorization': `Bearer ${authToken}`,
       },
     });
 
