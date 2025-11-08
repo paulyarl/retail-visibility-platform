@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { isPlatformAdmin } from "@/lib/auth/access-control";
+import { isPlatformUser } from "@/lib/auth/access-control";
 
 type SettingsScope = "platform" | "tenant";
 
@@ -13,11 +13,11 @@ export default function SettingsSwitcher() {
   const { user, currentTenantId } = useAuth();
   const [currentScope, setCurrentScope] = useState<SettingsScope>("platform");
 
-  // Determine if user is a platform user (admin or support)
-  const isPlatformUser = user ? isPlatformAdmin(user) : false;
+  // Determine if user is a platform user (admin, support, or viewer)
+  const showSwitcher = user ? isPlatformUser(user) : false;
 
   // Only show for platform users
-  if (!isPlatformUser) return null;
+  if (!showSwitcher) return null;
 
   // Determine current scope from pathname
   useEffect(() => {
