@@ -484,12 +484,12 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
                 {/* Hours Schedule */}
                 {businessHours && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
+                  <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                    <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
                       <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Regular Hours
+                      Business Hours
                     </h4>
                     <div className="space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
                       {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
