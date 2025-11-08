@@ -458,9 +458,9 @@ export default function OfferingsPage() {
             <div className="flex items-start gap-4">
               <div className="text-5xl">🆓</div>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-neutral-900 mb-2">30-Day Free Trial</h2>
+                <h2 className="text-2xl font-bold text-neutral-900 mb-2">14-Day Free Trial</h2>
                 <p className="text-neutral-700 mb-4">
-                  Try our platform risk-free with full access to all features. No credit card required.
+                  Try any tier risk-free with full access to all features. No credit card required.
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -469,23 +469,23 @@ export default function OfferingsPage() {
                     <ul className="space-y-1 text-sm">
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Full access to all Professional features</span>
+                        <span>Trial any tier (Starter, Professional, or Enterprise)</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>5,000 SKU limit</span>
+                        <span>Full access to all tier features</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>1024px QR codes</span>
+                        <span>Quick Start Wizard (Professional+)</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Enhanced landing pages</span>
+                        <span>Product Scanning (Professional+)</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Google Shopping integration</span>
+                        <span>Google Shopping & GBP integration</span>
                       </li>
                     </ul>
                   </div>
@@ -495,7 +495,7 @@ export default function OfferingsPage() {
                     <ul className="space-y-1 text-sm text-neutral-700">
                       <li className="flex items-start gap-2">
                         <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>30 days from account creation</span>
+                        <span>14 days from account creation</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-neutral-400 mt-0.5">•</span>
@@ -503,11 +503,11 @@ export default function OfferingsPage() {
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>Automatically converts to Starter plan after trial</span>
+                        <span>Choose your tier at signup</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>You can upgrade to any paid plan during trial</span>
+                        <span>Add payment before trial ends to continue</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-neutral-400 mt-0.5">•</span>
@@ -627,7 +627,7 @@ export default function OfferingsPage() {
               <CardHeader>
                 <div className="flex items-center justify-between mb-2">
                   <CardTitle>Professional</CardTitle>
-                  <Badge variant="default" className="bg-purple-100 text-purple-800">$149/mo</Badge>
+                  <Badge variant="default" className="bg-purple-100 text-purple-800">$499/mo</Badge>
                 </div>
                 <p className="text-sm text-neutral-600">Enhanced features for growth</p>
               </CardHeader>
@@ -682,7 +682,7 @@ export default function OfferingsPage() {
               <CardHeader>
                 <div className="flex items-center justify-between mb-2">
                   <CardTitle>Enterprise</CardTitle>
-                  <Badge variant="default" className="bg-amber-100 text-amber-800">$499/mo</Badge>
+                  <Badge variant="default" className="bg-amber-100 text-amber-800">$999/mo</Badge>
                 </div>
                 <p className="text-sm text-neutral-600">Full customization & white-label</p>
               </CardHeader>
