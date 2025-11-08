@@ -70,7 +70,8 @@ export class ItemsDataService {
       if (filters.status && filters.status !== 'all') params.append('status', filters.status);
       if (filters.visibility && filters.visibility !== 'all') params.append('visibility', filters.visibility);
 
-      // Add tenantId to params
+      // Add tenant identifiers (snake_case preferred by backend; camelCase kept for compatibility)
+      params.append('tenant_id', tenantId);
       params.append('tenantId', tenantId);
       
       const response = await api.get(`/api/items?${params.toString()}`);
