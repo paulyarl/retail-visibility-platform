@@ -39,39 +39,49 @@
   --ring: #4285f4;
 }
 
-@theme inline {
-  /* Color Tokens */
-  --color-primary-50: var(--primary-50);
-  --color-primary-100: var(--primary-100);
-  --color-primary-200: var(--primary-200);
-  --color-primary-300: var(--primary-300);
-  --color-primary-400: var(--primary-400);
-  --color-primary-500: var(--primary-500);
-  --color-primary-600: var(--primary-600);
-  --color-primary-700: var(--primary-700);
-  --color-primary-800: var(--primary-800);
-  --color-primary-900: var(--primary-900);
+@theme {
+  /* Primary Colors (Google Blue) */
+  --color-primary-50: #e8f0fe;
+  --color-primary-100: #d2e3fc;
+  --color-primary-200: #aecbfa;
+  --color-primary-300: #8ab4f8;
+  --color-primary-400: #669df6;
+  --color-primary-500: #4285f4;
+  --color-primary-600: #1a73e8;
+  --color-primary-700: #1967d2;
+  --color-primary-800: #185abc;
+  --color-primary-900: #174ea6;
 
-  --color-neutral-50: var(--neutral-50);
-  --color-neutral-100: var(--neutral-100);
-  --color-neutral-200: var(--neutral-200);
-  --color-neutral-300: var(--neutral-300);
-  --color-neutral-400: var(--neutral-400);
-  --color-neutral-500: var(--neutral-500);
-  --color-neutral-600: var(--neutral-600);
-  --color-neutral-700: var(--neutral-700);
-  --color-neutral-800: var(--neutral-800);
-  --color-neutral-900: var(--neutral-900);
+  /* Neutral Colors */
+  --color-neutral-50: #fafafa;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
 
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-error: var(--error);
-  --color-info: var(--info);
+  /* Semantic Colors */
+  --color-success: #34a853;
+  --color-warning: #fbbc04;
+  --color-error: #ea4335;
+  --color-info: #4285f4;
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-border: var(--border);
-  --color-ring: var(--ring);
+  /* Indigo for secondary actions */
+  --color-indigo-600: #4f46e5;
+  --color-indigo-700: #4338ca;
+  --color-indigo-800: #3730a3;
+
+  /* Green for success states */
+  --color-green-600: #16a34a;
+  --color-green-400: #4ade80;
+
+  /* Red for errors */
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
 
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
