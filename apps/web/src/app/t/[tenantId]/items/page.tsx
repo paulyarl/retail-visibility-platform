@@ -1,5 +1,5 @@
 import SetTenantId from "@/components/client/SetTenantId";
-import ItemsClient from "@/components/items/ItemsClient";
+import ItemsClient from "@/components/items/ItemsClientWrapper";
 
 export default async function TenantScopedItemsPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
