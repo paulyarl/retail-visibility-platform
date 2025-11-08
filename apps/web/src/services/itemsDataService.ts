@@ -70,7 +70,10 @@ export class ItemsDataService {
       if (filters.status && filters.status !== 'all') params.append('status', filters.status);
       if (filters.visibility && filters.visibility !== 'all') params.append('visibility', filters.visibility);
 
-      const response = await api.get(`/t/${tenantId}/items?${params.toString()}`);
+      // Add tenantId to params
+      params.append('tenantId', tenantId);
+      
+      const response = await api.get(`/api/items?${params.toString()}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch items');
