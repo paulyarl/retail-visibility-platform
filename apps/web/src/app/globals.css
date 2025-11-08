@@ -104,6 +104,7 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
+/* Dark mode disabled - force light mode only
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -111,6 +112,7 @@
     --border: #262626;
   }
 }
+*/
 
 body {
   background: var(--background);
@@ -167,7 +169,7 @@ select:focus {
   color: var(--neutral-900) !important;
 }
 
-/* Dark mode adjustments */
+/* Dark mode adjustments - DISABLED
 @media (prefers-color-scheme: dark) {
   input[type="text"],
   input[type="email"],
@@ -186,6 +188,7 @@ select:focus {
     color: var(--neutral-500) !important;
   }
 }
+*/
 
 /* Global Text Visibility - Ensure all text has proper contrast */
 li span:not([class*="text-"]) {
