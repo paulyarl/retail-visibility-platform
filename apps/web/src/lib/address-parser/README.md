@@ -4,19 +4,51 @@ Intelligent international address parsing system that automatically detects coun
 
 ## Features
 
-- 🌍 **Multi-Country Support**: US, UK, Canada (easily extensible)
+- 🌍 **Multi-Country Support**: 24 countries across 5 continents
 - 🤖 **Auto-Detection**: Automatically detects country from address format
 - 📦 **Modular Architecture**: Plugin-based parser system
 - ✅ **Validation**: Optional strict validation for parsed addresses
 - 🔧 **Extensible**: Easy to add new country parsers
 
-## Supported Countries
+## Supported Countries (24 Total)
 
+### North America (2)
 | Country | Code | Example Format |
 |---------|------|----------------|
 | United States | US | `7460 Rockville Rd, Indianapolis, IN 46214` |
-| United Kingdom | GB | `10 Downing Street, Westminster, London, SW1A 2AA` |
 | Canada | CA | `123 Main St, Toronto, ON M5H 2N2` |
+
+### Europe (21)
+| Country | Code | Example Format |
+|---------|------|----------------|
+| United Kingdom | GB | `10 Downing Street, Westminster, London, SW1A 2AA` |
+| Germany | DE | `Hauptstraße 1, 10115 Berlin` |
+| France | FR | `1 Rue de la Paix, 75002 Paris` |
+| Spain | ES | `Calle Mayor 1, 28013 Madrid` |
+| Italy | IT | `Via Roma 1, 00118 Roma` |
+| Netherlands | NL | `Damrak 1, 1012 AB Amsterdam` |
+| Belgium | BE | `Rue de la Loi 1, 1000 Brussels` |
+| Austria | AT | `Ringstraße 1, 1010 Vienna` |
+| Switzerland | CH | `Bahnhofstrasse 1, 8001 Zurich` |
+| Ireland | IE | `O'Connell Street, Dublin, D02 AF30` |
+| Denmark | DK | `Strøget 1, 1050 Copenhagen` |
+| Sweden | SE | `Drottninggatan 1, 100 05 Stockholm` |
+| Norway | NO | `Karl Johans gate 1, 0001 Oslo` |
+| Finland | FI | `Mannerheimintie 1, 00100 Helsinki` |
+| Portugal | PT | `Rua Augusta 1, 1000-001 Lisbon` |
+| Poland | PL | `Marszałkowska 1, 00-950 Warsaw` |
+| Czech Republic | CZ | `Václavské náměstí 1, 110 00 Prague` |
+| Hungary | HU | `Andrássy út 1, 1011 Budapest` |
+| Romania | RO | `Calea Victoriei 1, 010011 Bucharest` |
+| Slovakia | SK | `Hlavná 1, 811 01 Bratislava` |
+| Iceland | IS | `Laugavegur 1, 101 Reykjavik` |
+| Luxembourg | LU | `Grand Rue 1, 1009 Luxembourg` |
+
+### Asia-Pacific (2)
+| Country | Code | Example Format |
+|---------|------|----------------|
+| Australia | AU | `42 Wallaby Way, Sydney NSW 2000` |
+| New Zealand | NZ | `123 Queen Street, Auckland 1010` |
 
 ## Usage
 

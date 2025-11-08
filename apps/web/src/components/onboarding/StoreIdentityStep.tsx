@@ -208,7 +208,7 @@ export default function StoreIdentityStep({
           onChange={(e) => handleAddressChange(e.target.value)}
           onBlur={() => handleBlur('address_line1')}
           error={touched.address_line1 ? errors.address_line1 : undefined}
-          helperText="💡 Tip: Paste a full address to auto-fill all fields (supports US, UK, Canada formats)"
+          helperText="💡 Tip: Paste a full address to auto-fill all fields (supports 24 countries including US, UK, Canada, EU, Australia)"
           required
         />
 

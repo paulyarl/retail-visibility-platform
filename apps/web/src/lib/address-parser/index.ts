@@ -16,6 +16,8 @@ import { AddressParser, ParsedAddress, AddressParserConfig } from './types';
 import { USAddressParser } from './parsers/us';
 import { UKAddressParser } from './parsers/uk';
 import { CanadaAddressParser } from './parsers/ca';
+import { EuropeanAddressParser } from './parsers/eu';
+import { AustraliaNewZealandParser } from './parsers/au-nz';
 
 export class AddressParserMiddleware {
   private parsers: AddressParser[];
@@ -29,10 +31,13 @@ export class AddressParserMiddleware {
     };
 
     // Register all available parsers
+    // Order matters: more specific parsers first
     this.parsers = [
       new USAddressParser(),
-      new UKAddressParser(),
       new CanadaAddressParser(),
+      new UKAddressParser(),
+      new AustraliaNewZealandParser(),
+      new EuropeanAddressParser(), // Last as it's most generic
     ];
   }
 
@@ -116,3 +121,5 @@ export * from './types';
 export { USAddressParser } from './parsers/us';
 export { UKAddressParser } from './parsers/uk';
 export { CanadaAddressParser } from './parsers/ca';
+export { EuropeanAddressParser } from './parsers/eu';
+export { AustraliaNewZealandParser } from './parsers/au-nz';
