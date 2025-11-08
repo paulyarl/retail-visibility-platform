@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Alert, Spinner } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
+import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
 
 type Tenant = {
   id: string;
@@ -25,13 +26,19 @@ type Tenant = {
   } | null;
 };
 
-const TIERS = [
-  { value: 'google_only', label: 'Google-Only ($29/mo)', color: 'bg-green-100 text-green-800' },
-  { value: 'starter', label: 'Starter ($49/mo)', color: 'bg-blue-100 text-blue-800' },
-  { value: 'professional', label: 'Professional ($499/mo)', color: 'bg-purple-100 text-purple-800' },
-  { value: 'enterprise', label: 'Enterprise ($999/mo)', color: 'bg-amber-100 text-amber-800' },
-  { value: 'organization', label: 'Organization ($999/mo)', color: 'bg-gradient-to-r from-purple-500 to-pink-600 text-white' },
-];
+// Generate tier list from centralized definitions
+const TIER_KEYS = ['google_only', 'starter', 'professional', 'enterprise', 'organization'] as const;
+const TIERS = TIER_KEYS.map(key => ({
+  value: key,
+  label: `${TIER_DISPLAY_NAMES[key]} ($${TIER_PRICING[key]}/mo)`,
+  color: {
+    google_only: 'bg-green-100 text-green-800',
+    starter: 'bg-blue-100 text-blue-800',
+    professional: 'bg-purple-100 text-purple-800',
+    enterprise: 'bg-amber-100 text-amber-800',
+    organization: 'bg-gradient-to-r from-purple-500 to-pink-600 text-white',
+  }[key],
+}));
 
 const STATUSES = [
   { value: 'trial', label: 'Trial', color: 'bg-neutral-100 text-neutral-800' },
