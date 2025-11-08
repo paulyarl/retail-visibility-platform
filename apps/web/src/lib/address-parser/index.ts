@@ -18,6 +18,8 @@ import { UKAddressParser } from './parsers/uk';
 import { CanadaAddressParser } from './parsers/ca';
 import { EuropeanAddressParser } from './parsers/eu';
 import { AustraliaNewZealandParser } from './parsers/au-nz';
+import { AsiaAddressParser } from './parsers/asia';
+import { LatinAmericaAddressParser } from './parsers/latam';
 
 export class AddressParserMiddleware {
   private parsers: AddressParser[];
@@ -37,6 +39,8 @@ export class AddressParserMiddleware {
       new CanadaAddressParser(),
       new UKAddressParser(),
       new AustraliaNewZealandParser(),
+      new AsiaAddressParser(),
+      new LatinAmericaAddressParser(),
       new EuropeanAddressParser(), // Last as it's most generic
     ];
   }
@@ -123,3 +127,5 @@ export { UKAddressParser } from './parsers/uk';
 export { CanadaAddressParser } from './parsers/ca';
 export { EuropeanAddressParser } from './parsers/eu';
 export { AustraliaNewZealandParser } from './parsers/au-nz';
+export { AsiaAddressParser } from './parsers/asia';
+export { LatinAmericaAddressParser } from './parsers/latam';

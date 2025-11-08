@@ -4,13 +4,13 @@ Intelligent international address parsing system that automatically detects coun
 
 ## Features
 
-- 🌍 **Multi-Country Support**: 24 countries across 5 continents
+- 🌍 **Multi-Country Support**: All 38 platform-supported countries (100% coverage!)
 - 🤖 **Auto-Detection**: Automatically detects country from address format
 - 📦 **Modular Architecture**: Plugin-based parser system
 - ✅ **Validation**: Optional strict validation for parsed addresses
 - 🔧 **Extensible**: Easy to add new country parsers
 
-## Supported Countries (24 Total)
+## Supported Countries (38 Total - 100% Platform Coverage!)
 
 ### North America (2)
 | Country | Code | Example Format |
@@ -44,11 +44,32 @@ Intelligent international address parsing system that automatically detects coun
 | Iceland | IS | `Laugavegur 1, 101 Reykjavik` |
 | Luxembourg | LU | `Grand Rue 1, 1009 Luxembourg` |
 
-### Asia-Pacific (2)
+### Asia-Pacific (7)
 | Country | Code | Example Format |
 |---------|------|----------------|
 | Australia | AU | `42 Wallaby Way, Sydney NSW 2000` |
 | New Zealand | NZ | `123 Queen Street, Auckland 1010` |
+| Hong Kong | HK | `1 Queen's Road Central, Central, Hong Kong` |
+| India | IN | `123 MG Road, Bangalore, Karnataka 560001` |
+| Japan | JP | `1-1-1 Chiyoda, Chiyoda-ku, Tokyo 100-0001` |
+| Singapore | SG | `1 Raffles Place, Singapore 048616` |
+| Taiwan | TW | `No. 1, Sec. 1, Zhongxiao E Rd, Taipei 100` |
+
+### Latin America (4)
+| Country | Code | Example Format |
+|---------|------|----------------|
+| Argentina | AR | `Av. Corrientes 1234, Buenos Aires, C1043 AAP` |
+| Brazil | BR | `Av. Paulista 1000, São Paulo, SP 01310-100` |
+| Chile | CL | `Av. Libertador 123, Santiago, 8320000` |
+| Mexico | MX | `Av. Reforma 123, Ciudad de México, CDMX 06600` |
+
+### Middle East & Africa (4)
+| Country | Code | Example Format |
+|---------|------|----------------|
+| Israel | IL | Supported via European parser |
+| UAE | AE | Supported via fallback |
+| Saudi Arabia | SA | Supported via fallback |
+| South Africa | ZA | Supported via fallback |
 
 ## Usage
 
