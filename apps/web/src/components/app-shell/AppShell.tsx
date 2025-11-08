@@ -26,13 +26,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout, isAuthenticated } = useAuth();
 
   useEffect(() => {
+    // Wait for client-side hydration before reading localStorage
+    if (typeof window === 'undefined') return;
+    
     // Evaluate FF on client, using tenantId hint from localStorage
-    const tenantId = typeof window !== "undefined" ? localStorage.getItem("tenantId") || undefined : undefined;
+    const tenantId = localStorage.getItem("tenantId") || undefined;
     // AppShell is always visible on platform routes, including logged-out visitors
     setEnabled(true);
 
     // Compute tenant-scoped links when FF_TENANT_URLS is enabled
-    const tenantUrlsOverride = typeof window !== 'undefined' ? localStorage.getItem('ff_tenant_urls') === 'on' : false;
+    const tenantUrlsOverride = localStorage.getItem('ff_tenant_urls') === 'on';
     const tenantUrlsOn = tenantUrlsOverride || isFeatureEnabled("FF_TENANT_URLS", tenantId);
     if (tenantUrlsOn && tenantId) {
       setLinks({

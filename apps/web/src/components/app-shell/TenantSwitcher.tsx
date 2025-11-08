@@ -16,10 +16,10 @@ export default function TenantSwitcher() {
   useEffect(() => {
     const load = async () => {
       // Skip if unauthenticated
-      if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('access_token');
-        if (!token) return;
-      }
+      if (typeof window === 'undefined') return;
+      
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
       try {
         const res = await api.get("/api/tenants", { skipAuthRedirect: true });
         if (!res.ok) return;
