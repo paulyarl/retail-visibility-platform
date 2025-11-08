@@ -26,7 +26,7 @@ export default function ItemsHeader({
   tenantId,
 }: ItemsHeaderProps) {
   return (
-    <div className="mb-6">
+    <div className="mb-6" suppressHydrationWarning>
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
         <div className="bg-white dark:bg-neutral-800 p-4 rounded-lg border border-neutral-200 dark:border-neutral-700">
