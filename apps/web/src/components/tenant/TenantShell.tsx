@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import TenantSidebar from './TenantSidebar'
 import TenantSwitcher, { TenantOption } from './TenantSwitcher'
+import SettingsSwitcher from '../app-shell/SettingsSwitcher'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext'
@@ -22,7 +23,10 @@ export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, 
             <span className="font-semibold text-gray-900 hover:text-blue-600">{settings?.platformName || 'Visible Shelf'}</span>
           )}
         </Link>
-        <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
+        <div className="flex items-center gap-3">
+          <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
+          <SettingsSwitcher />
+        </div>
       </div>
 
       {/* Mobile header */}
@@ -68,6 +72,10 @@ export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, 
               </button>
             </div>
             <div className="h-[calc(100%-60px)] overflow-auto">
+              <div className="p-4 space-y-2 border-b border-gray-200">
+                <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
+                <SettingsSwitcher />
+              </div>
               <TenantSidebar tenantId={tenantId} tenantName={tenantName} tenantLogoUrl={tenantLogoUrl} nav={nav} isMobile={true} />
             </div>
           </div>

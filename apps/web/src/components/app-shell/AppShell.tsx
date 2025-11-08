@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import TenantSwitcher from "./TenantSwitcher";
+import SettingsSwitcher from "./SettingsSwitcher";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
@@ -103,6 +104,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-2 lg:gap-3">
             {user && <TenantSwitcher />}
+            {user && <SettingsSwitcher />}
             {user ? (
               <>
                 <Link href="/settings">
@@ -178,10 +180,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </a>
               </nav>
 
-              {/* Mobile Tenant Switcher */}
+              {/* Mobile Tenant & Settings Switchers */}
               {user && (
-                <div className="pt-2 border-t border-neutral-200">
+                <div className="pt-2 border-t border-neutral-200 space-y-2">
                   <TenantSwitcher />
+                  <SettingsSwitcher />
                 </div>
               )}
 
