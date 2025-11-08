@@ -15,12 +15,20 @@ async function main() {
     where: { tierKey: 'organization' },
   });
 
-  // Find chain tier  
-  const chainTier = await prisma.subscriptionTier.findFirst({
-    where: { tierKey: 'chain' },
+  // Find chain tiers
+  const chainStarterTier = await prisma.subscriptionTier.findFirst({
+    where: { tierKey: 'chain_starter' },
+  });
+  
+  const chainProfessionalTier = await prisma.subscriptionTier.findFirst({
+    where: { tierKey: 'chain_professional' },
+  });
+  
+  const chainEnterpriseTier = await prisma.subscriptionTier.findFirst({
+    where: { tierKey: 'chain_enterprise' },
   });
 
-  if (!orgTier && !chainTier) {
+  if (!orgTier && !chainStarterTier && !chainProfessionalTier && !chainEnterpriseTier) {
     console.log('⚠️  No organization or chain tiers found. Creating them...');
     
     // Create organization tier
@@ -40,22 +48,54 @@ async function main() {
     });
     console.log(`✓ Created organization tier: ${newOrgTier.id}`);
 
-    // Create chain tier
-    const newChainTier = await prisma.subscriptionTier.create({
+    // Create chain tiers (mirror individual tiers)
+    const newChainStarter = await prisma.subscriptionTier.create({
       data: {
-        tierKey: 'chain',
-        name: 'Chain',
-        displayName: 'Chain',
-        description: 'For retail chains with multiple locations under one brand',
-        priceMonthly: 0, // Custom pricing
-        maxSKUs: null, // Unlimited
-        maxLocations: null, // Unlimited
+        tierKey: 'chain_starter',
+        name: 'Chain Starter',
+        displayName: 'Chain Starter',
+        description: 'Starter tier for retail chains',
+        priceMonthly: 19900, // $199/mo
+        maxSKUs: 500,
+        maxLocations: null,
         tierType: 'organization',
         isActive: true,
         sortOrder: 6,
       },
     });
-    console.log(`✓ Created chain tier: ${newChainTier.id}`);
+    console.log(`✓ Created chain starter tier: ${newChainStarter.id}`);
+
+    const newChainProfessional = await prisma.subscriptionTier.create({
+      data: {
+        tierKey: 'chain_professional',
+        name: 'Chain Professional',
+        displayName: 'Chain Professional',
+        description: 'Professional tier for retail chains',
+        priceMonthly: 199900, // $1,999/mo
+        maxSKUs: 5000,
+        maxLocations: null,
+        tierType: 'organization',
+        isActive: true,
+        sortOrder: 7,
+      },
+    });
+    console.log(`✓ Created chain professional tier: ${newChainProfessional.id}`);
+
+    const newChainEnterprise = await prisma.subscriptionTier.create({
+      data: {
+        tierKey: 'chain_enterprise',
+        name: 'Chain Enterprise',
+        displayName: 'Chain Enterprise',
+        description: 'Enterprise tier for retail chains',
+        priceMonthly: 499900, // $4,999/mo
+        maxSKUs: null,
+        maxLocations: null,
+        tierType: 'organization',
+        isActive: true,
+        sortOrder: 8,
+      },
+    });
+    console.log(`✓ Created chain enterprise tier: ${newChainEnterprise.id}`);
   }
 
   // Re-fetch to ensure we have the IDs
@@ -64,8 +104,18 @@ async function main() {
     include: { features: true },
   });
 
-  const chainTierFinal = await prisma.subscriptionTier.findFirst({
-    where: { tierKey: 'chain' },
+  const chainStarterFinal = await prisma.subscriptionTier.findFirst({
+    where: { tierKey: 'chain_starter' },
+    include: { features: true },
+  });
+
+  const chainProfessionalFinal = await prisma.subscriptionTier.findFirst({
+    where: { tierKey: 'chain_professional' },
+    include: { features: true },
+  });
+
+  const chainEnterpriseFinal = await prisma.subscriptionTier.findFirst({
+    where: { tierKey: 'chain_enterprise' },
     include: { features: true },
   });
 
@@ -114,57 +164,125 @@ async function main() {
     }
   }
 
-  // Chain Tier Features (inherits all Organization features + adds chain-specific)
-  if (chainTierFinal) {
-    if (chainTierFinal.features.length === 0) {
-      console.log('Adding features to Chain tier...');
-      
-      const chainFeatures = [
-        // Inherited from Organization
-        { featureKey: 'google_shopping', featureName: 'Google Shopping', isInherited: true },
-        { featureKey: 'storefront', featureName: 'Public Storefront', isInherited: true },
-        { featureKey: 'product_scanning', featureName: 'Product Scanning', isInherited: true },
-        { featureKey: 'custom_branding', featureName: 'Custom Branding', isInherited: true },
-        { featureKey: 'unlimited_skus', featureName: 'Unlimited SKUs', isInherited: true },
-        { featureKey: 'white_label', featureName: 'White Label Branding', isInherited: true },
-        { featureKey: 'custom_domain', featureName: 'Custom Domain', isInherited: true },
-        { featureKey: 'api_access', featureName: 'API Access', isInherited: true },
-        { featureKey: 'advanced_analytics', featureName: 'Advanced Analytics', isInherited: true },
-        { featureKey: 'dedicated_account_manager', featureName: 'Dedicated Account Manager', isInherited: true },
-        { featureKey: 'sla_guarantee', featureName: 'SLA Guarantee', isInherited: true },
-        { featureKey: 'multi_location', featureName: 'Multi-Location Management', isInherited: true },
-        { featureKey: 'centralized_inventory', featureName: 'Centralized Inventory', isInherited: true },
-        { featureKey: 'location_groups', featureName: 'Location Groups', isInherited: true },
-        { featureKey: 'bulk_operations', featureName: 'Bulk Operations', isInherited: true },
-        { featureKey: 'role_based_access', featureName: 'Role-Based Access Control', isInherited: true },
-        { featureKey: 'organization_dashboard', featureName: 'Organization Dashboard', isInherited: true },
-        { featureKey: 'cross_location_reporting', featureName: 'Cross-Location Reporting', isInherited: true },
-        { featureKey: 'custom_pricing', featureName: 'Custom Pricing', isInherited: true },
-        
-        // Chain-specific features
-        { featureKey: 'chain_branding', featureName: 'Chain-Wide Branding', isInherited: false },
-        { featureKey: 'franchise_management', featureName: 'Franchise Management', isInherited: false },
-        { featureKey: 'chain_analytics', featureName: 'Chain-Wide Analytics', isInherited: false },
-        { featureKey: 'regional_management', featureName: 'Regional Management', isInherited: false },
-        { featureKey: 'chain_promotions', featureName: 'Chain-Wide Promotions', isInherited: false },
-        { featureKey: 'master_catalog', featureName: 'Master Product Catalog', isInherited: false },
-        { featureKey: 'location_templates', featureName: 'Location Templates', isInherited: false },
-        { featureKey: 'enterprise_sso', featureName: 'Enterprise SSO', isInherited: false },
-      ];
+  // Chain-specific features (added to all chain tiers)
+  const chainSpecificFeatures = [
+    { featureKey: 'chain_branding', featureName: 'Chain-Wide Branding', isInherited: false },
+    { featureKey: 'franchise_management', featureName: 'Franchise Management', isInherited: false },
+    { featureKey: 'chain_analytics', featureName: 'Chain-Wide Analytics', isInherited: false },
+    { featureKey: 'regional_management', featureName: 'Regional Management', isInherited: false },
+    { featureKey: 'chain_promotions', featureName: 'Chain-Wide Promotions', isInherited: false },
+    { featureKey: 'master_catalog', featureName: 'Master Product Catalog', isInherited: false },
+    { featureKey: 'location_templates', featureName: 'Location Templates', isInherited: false },
+  ];
 
-      for (const feature of chainFeatures) {
-        await prisma.tierFeature.create({
-          data: {
-            tierId: chainTierFinal.id,
-            ...feature,
-            isEnabled: true,
-          },
-        });
-      }
-      console.log(`✓ Added ${chainFeatures.length} features to Chain tier`);
-    } else {
-      console.log(`✓ Chain tier already has ${chainTierFinal.features.length} features`);
+  // Chain Starter Features (mirrors Starter + chain features)
+  if (chainStarterFinal && chainStarterFinal.features.length === 0) {
+    console.log('Adding features to Chain Starter tier...');
+    
+    const chainStarterFeatures = [
+      // Inherited from Starter
+      { featureKey: 'google_shopping', featureName: 'Google Shopping', isInherited: true },
+      { featureKey: 'google_merchant_center', featureName: 'Google Merchant Center', isInherited: true },
+      { featureKey: 'basic_product_pages', featureName: 'Basic Product Pages', isInherited: true },
+      { featureKey: 'qr_codes_512', featureName: 'QR Codes (512px)', isInherited: true },
+      { featureKey: 'performance_analytics', featureName: 'Performance Analytics', isInherited: true },
+      { featureKey: 'storefront', featureName: 'Public Storefront', isInherited: true },
+      { featureKey: 'product_search', featureName: 'Product Search', isInherited: true },
+      { featureKey: 'mobile_responsive', featureName: 'Mobile-Responsive Design', isInherited: true },
+      { featureKey: 'enhanced_seo', featureName: 'Enhanced SEO', isInherited: true },
+      { featureKey: 'basic_categories', featureName: 'Basic Categories', isInherited: true },
+      ...chainSpecificFeatures,
+    ];
+
+    for (const feature of chainStarterFeatures) {
+      await prisma.tierFeature.create({
+        data: {
+          tierId: chainStarterFinal.id,
+          ...feature,
+          isEnabled: true,
+        },
+      });
     }
+    console.log(`✓ Added ${chainStarterFeatures.length} features to Chain Starter tier`);
+  }
+
+  // Chain Professional Features (mirrors Professional + chain features)
+  if (chainProfessionalFinal && chainProfessionalFinal.features.length === 0) {
+    console.log('Adding features to Chain Professional tier...');
+    
+    const chainProfessionalFeatures = [
+      // Inherited from Professional
+      { featureKey: 'google_shopping', featureName: 'Google Shopping', isInherited: true },
+      { featureKey: 'google_merchant_center', featureName: 'Google Merchant Center', isInherited: true },
+      { featureKey: 'basic_product_pages', featureName: 'Basic Product Pages', isInherited: true },
+      { featureKey: 'qr_codes_512', featureName: 'QR Codes (512px)', isInherited: true },
+      { featureKey: 'performance_analytics', featureName: 'Performance Analytics', isInherited: true },
+      { featureKey: 'storefront', featureName: 'Public Storefront', isInherited: true },
+      { featureKey: 'product_search', featureName: 'Product Search', isInherited: true },
+      { featureKey: 'mobile_responsive', featureName: 'Mobile-Responsive Design', isInherited: true },
+      { featureKey: 'enhanced_seo', featureName: 'Enhanced SEO', isInherited: true },
+      { featureKey: 'basic_categories', featureName: 'Basic Categories', isInherited: true },
+      { featureKey: 'quick_start_wizard_full', featureName: 'Quick Start Wizard (Full)', isInherited: true },
+      { featureKey: 'product_scanning', featureName: 'Product Scanning', isInherited: true },
+      { featureKey: 'gbp_integration', featureName: 'Google Business Profile Integration', isInherited: true },
+      { featureKey: 'custom_branding', featureName: 'Custom Branding', isInherited: true },
+      { featureKey: 'business_logo', featureName: 'Business Logo', isInherited: true },
+      { featureKey: 'qr_codes_1024', featureName: 'QR Codes (1024px)', isInherited: true },
+      { featureKey: 'image_gallery_5', featureName: '5-Image Gallery', isInherited: true },
+      { featureKey: 'interactive_maps', featureName: 'Interactive Maps', isInherited: true },
+      { featureKey: 'privacy_mode', featureName: 'Privacy Mode', isInherited: true },
+      { featureKey: 'custom_marketing_copy', featureName: 'Custom Marketing Copy', isInherited: true },
+      { featureKey: 'priority_support', featureName: 'Priority Support', isInherited: true },
+      ...chainSpecificFeatures,
+    ];
+
+    for (const feature of chainProfessionalFeatures) {
+      await prisma.tierFeature.create({
+        data: {
+          tierId: chainProfessionalFinal.id,
+          ...feature,
+          isEnabled: true,
+        },
+      });
+    }
+    console.log(`✓ Added ${chainProfessionalFeatures.length} features to Chain Professional tier`);
+  }
+
+  // Chain Enterprise Features (mirrors Enterprise + chain features + enterprise SSO)
+  if (chainEnterpriseFinal && chainEnterpriseFinal.features.length === 0) {
+    console.log('Adding features to Chain Enterprise tier...');
+    
+    const chainEnterpriseFeatures = [
+      // Inherited from Enterprise
+      { featureKey: 'google_shopping', featureName: 'Google Shopping', isInherited: true },
+      { featureKey: 'storefront', featureName: 'Public Storefront', isInherited: true },
+      { featureKey: 'product_scanning', featureName: 'Product Scanning', isInherited: true },
+      { featureKey: 'custom_branding', featureName: 'Custom Branding', isInherited: true },
+      { featureKey: 'unlimited_skus', featureName: 'Unlimited SKUs', isInherited: true },
+      { featureKey: 'white_label', featureName: 'White Label Branding', isInherited: true },
+      { featureKey: 'custom_domain', featureName: 'Custom Domain', isInherited: true },
+      { featureKey: 'qr_codes_2048', featureName: 'QR Codes (2048px)', isInherited: true },
+      { featureKey: 'image_gallery_10', featureName: '10-Image Gallery', isInherited: true },
+      { featureKey: 'api_access', featureName: 'API Access', isInherited: true },
+      { featureKey: 'advanced_analytics', featureName: 'Advanced Analytics', isInherited: true },
+      { featureKey: 'dedicated_account_manager', featureName: 'Dedicated Account Manager', isInherited: true },
+      { featureKey: 'sla_guarantee', featureName: 'SLA Guarantee', isInherited: true },
+      { featureKey: 'custom_integrations', featureName: 'Custom Integrations', isInherited: true },
+      ...chainSpecificFeatures,
+      // Enterprise-only chain feature
+      { featureKey: 'enterprise_sso', featureName: 'Enterprise SSO', isInherited: false },
+    ];
+
+    for (const feature of chainEnterpriseFeatures) {
+      await prisma.tierFeature.create({
+        data: {
+          tierId: chainEnterpriseFinal.id,
+          ...feature,
+          isEnabled: true,
+        },
+      });
+    }
+    console.log(`✓ Added ${chainEnterpriseFeatures.length} features to Chain Enterprise tier`);
   }
 
   console.log('✅ Organization and Chain tiers updated successfully!');
