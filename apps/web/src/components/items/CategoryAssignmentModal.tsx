@@ -1,0 +1,148 @@
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui';
+import { Item } from '@/services/itemsDataService';
+
+interface CategoryAssignmentModalProps {
+  item: Item;
+  onSave: (itemId: string, categoryPath: string[]) => Promise<void>;
+  onClose: () => void;
+}
+
+/**
+ * Modal for assigning categories to items
+ * Allows selection of category hierarchy
+ */
+export default function CategoryAssignmentModal({
+  item,
+  onSave,
+  onClose,
+}: CategoryAssignmentModalProps) {
+  const [selectedPath, setSelectedPath] = useState<string[]>(item.categoryPath || []);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Mock categories - in real implementation, fetch from API
+  const mockCategories = [
+    { id: '1', name: 'Electronics', children: ['Phones', 'Laptops', 'Tablets'] },
+    { id: '2', name: 'Clothing', children: ['Shirts', 'Pants', 'Shoes'] },
+    { id: '3', name: 'Home & Garden', children: ['Furniture', 'Decor', 'Tools'] },
+  ];
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+
+    try {
+      await onSave(item.id, selectedPath);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to assign category');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-md w-full">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
+          <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
+            Assign Category
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <div className="mb-4">
+            <div className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Item: {item.name}
+            </div>
+            <div className="text-xs text-neutral-500">
+              SKU: {item.sku}
+            </div>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-error/10 border border-error/20 rounded-lg text-error text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Category Selection */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+              Select Category
+            </label>
+            
+            {mockCategories.map((category) => (
+              <div key={category.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-3">
+                <button
+                  onClick={() => setSelectedPath([category.name])}
+                  className={`w-full text-left font-medium mb-2 ${
+                    selectedPath[0] === category.name
+                      ? 'text-primary-600'
+                      : 'text-neutral-900 dark:text-white'
+                  }`}
+                >
+                  {category.name}
+                </button>
+                
+                {selectedPath[0] === category.name && (
+                  <div className="pl-4 space-y-1">
+                    {category.children.map((child) => (
+                      <button
+                        key={child}
+                        onClick={() => setSelectedPath([category.name, child])}
+                        className={`block w-full text-left text-sm py-1 ${
+                          selectedPath[1] === child
+                            ? 'text-primary-600 font-medium'
+                            : 'text-neutral-600 dark:text-neutral-400'
+                        }`}
+                      >
+                        {child}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Selected Path Display */}
+          {selectedPath.length > 0 && (
+            <div className="mt-4 p-3 bg-neutral-50 dark:bg-neutral-900 rounded-lg">
+              <div className="text-xs text-neutral-500 mb-1">Selected:</div>
+              <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                {selectedPath.join(' > ')}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-neutral-200 dark:border-neutral-700">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleSave}
+            disabled={selectedPath.length === 0 || saving}
+            loading={saving}
+          >
+            {saving ? 'Saving...' : 'Assign Category'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
