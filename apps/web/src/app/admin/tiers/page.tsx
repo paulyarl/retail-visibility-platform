@@ -26,12 +26,11 @@ type Tenant = {
 };
 
 const TIERS = [
-  { value: 'trial', label: 'Trial', color: 'bg-neutral-100 text-neutral-800' },
   { value: 'google_only', label: 'Google-Only ($29/mo)', color: 'bg-green-100 text-green-800' },
   { value: 'starter', label: 'Starter ($49/mo)', color: 'bg-blue-100 text-blue-800' },
-  { value: 'professional', label: 'Professional ($149/mo)', color: 'bg-purple-100 text-purple-800' },
-  { value: 'enterprise', label: 'Enterprise ($299/mo)', color: 'bg-amber-100 text-amber-800' },
-  { value: 'organization', label: 'Organization ($500/mo)', color: 'bg-gradient-to-r from-purple-500 to-pink-600 text-white' },
+  { value: 'professional', label: 'Professional ($499/mo)', color: 'bg-purple-100 text-purple-800' },
+  { value: 'enterprise', label: 'Enterprise ($999/mo)', color: 'bg-amber-100 text-amber-800' },
+  { value: 'organization', label: 'Organization ($999/mo)', color: 'bg-gradient-to-r from-purple-500 to-pink-600 text-white' },
 ];
 
 const STATUSES = [
@@ -171,7 +170,6 @@ export default function AdminTiersPage() {
                         </div>
                       </div>
                       <div className="text-sm text-neutral-600">
-                        {tier.value === 'trial' && '30-day trial, all features'}
                         {tier.value === 'google_only' && '250 SKUs, Google only'}
                         {tier.value === 'starter' && '500 SKUs, basic QR codes'}
                         {tier.value === 'professional' && '5,000 SKUs, branded QR codes'}
@@ -189,14 +187,15 @@ export default function AdminTiersPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-start gap-3">
                     <div className="flex gap-1 mt-1">
-                      <span className="text-xl">🆓</span>
+                      <span className="text-xl">🔍</span>
                       <span className="text-xl">🥉</span>
                       <span className="text-xl">🥈</span>
                       <span className="text-xl">🥇</span>
+                      <span className="text-xl">🏢</span>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Tier Buttons</p>
-                      <p className="text-xs text-neutral-600">Click to change location's subscription tier. Hover for tier name.</p>
+                      <p className="text-xs text-neutral-600">Click to change location's subscription tier. Trial status is separate below.</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -301,15 +300,16 @@ export default function AdminTiersPage() {
                                   key={tier.value}
                                   size="sm"
                                   variant={tenant.subscriptionTier === tier.value ? 'primary' : 'ghost'}
-                                  onClick={() => updateTier(tenant.id, tier.value, tier.value === 'trial' ? 'trial' : 'active')}
+                                  onClick={() => updateTier(tenant.id, tier.value, tenant.subscriptionStatus || 'active')}
                                   disabled={isUpdating}
                                   title={tier.label}
                                   className="relative group"
                                 >
-                                  {tier.value === 'trial' && '🆓'}
+                                  {tier.value === 'google_only' && '🔍'}
                                   {tier.value === 'starter' && '🥉'}
                                   {tier.value === 'professional' && '🥈'}
                                   {tier.value === 'enterprise' && '🥇'}
+                                  {tier.value === 'organization' && '🏢'}
                                 </Button>
                               ))}
                             </div>
@@ -321,7 +321,7 @@ export default function AdminTiersPage() {
                                   key={status.value}
                                   size="sm"
                                   variant={tenant.subscriptionStatus === status.value ? 'primary' : 'ghost'}
-                                  onClick={() => updateTier(tenant.id, tenant.subscriptionTier || 'trial', status.value)}
+                                  onClick={() => updateTier(tenant.id, tenant.subscriptionTier || 'starter', status.value)}
                                   disabled={isUpdating}
                                 >
                                   {status.label}
