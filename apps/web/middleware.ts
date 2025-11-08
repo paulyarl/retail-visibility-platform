@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Flags (read at edge)
 const FF_TENANT_URLS = String(process.env.FF_TENANT_URLS || process.env.NEXT_PUBLIC_FF_TENANT_URLS || 'false').toLowerCase() === 'true';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
 function getCookie(req: NextRequest, name: string): string | undefined {
   try {
@@ -21,10 +22,48 @@ function setCookie(res: NextResponse, name: string, value: string, maxAgeSec = 6
   });
 }
 
-export function middleware(req: NextRequest) {
-  if (!FF_TENANT_URLS) return NextResponse.next();
+/**
+ * Check if user is platform admin by calling the API
+ */
+async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
+  try {
+    const authToken = getCookie(req, 'auth_token');
+    if (!authToken) return false;
 
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: {
+        'Cookie': `auth_token=${authToken}`,
+      },
+    });
+
+    if (!response.ok) return false;
+
+    const data = await response.json();
+    const user = data.user || data;
+    
+    // Check if user is platform admin
+    return user.role === 'PLATFORM_ADMIN' || 
+           user.role === 'ADMIN' || 
+           user.isPlatformAdmin === true;
+  } catch (error) {
+    console.error('[Middleware] Error checking platform admin:', error);
+    return false;
+  }
+}
+
+export async function middleware(req: NextRequest) {
   const { pathname, searchParams } = new URL(req.url);
+
+  // Protect /admin/* routes - require platform admin
+  if (pathname.startsWith('/admin')) {
+    const isAdmin = await isPlatformAdmin(req);
+    if (!isAdmin) {
+      // Redirect to access denied page
+      return NextResponse.redirect(new URL('/access-denied', req.url));
+    }
+  }
+
+  if (!FF_TENANT_URLS) return NextResponse.next();
 
   // Best-effort tenant resolution from cookie or query
   const cookieTenant = getCookie(req, 'lastTenantId');
@@ -75,6 +114,7 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
+    '/admin/:path*',
     '/items/:path*',
     '/settings/:path*',
     '/tenants/:path*',

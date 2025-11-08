@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Alert, Spinner } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
-import { useAccessControl } from '@/lib/auth/useAccessControl';
 
 type Tenant = {
   id: string;
@@ -48,7 +47,6 @@ const STATUSES = [
 const ITEMS_PER_PAGE = 10;
 
 export default function AdminTiersPage() {
-  const { hasAccess, loading: accessLoading } = useAccessControl(null, { requirePlatformAdmin: true });
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [dbTiers, setDbTiers] = useState<DbTier[]>([]);
   const [loading, setLoading] = useState(true);
