@@ -52,6 +52,14 @@ export default function ItemsClient({
   initialItems = [],
   initialTenantId = '',
 }: ItemsClientProps) {
+  // DEBUG: Log render environment and initial state
+  console.log('[ItemsClient] Render:', {
+    isServer: typeof window === 'undefined',
+    initialItemsCount: initialItems.length,
+    initialTenantId,
+    timestamp: new Date().toISOString(),
+  });
+
   const searchParams = useSearchParams();
 
   // Data & Loading
