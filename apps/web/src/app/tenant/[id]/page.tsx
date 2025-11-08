@@ -446,7 +446,14 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
               </h3>
               
               {/* Contact Information */}
-              <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
+              <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700 mb-4">
+                <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
+                  <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Contact Information
+                </h4>
+                <div className="space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
                 {/* Phone */}
                 {tenant.metadata?.phone && (
                   <p className="flex items-center gap-2">
@@ -481,8 +488,10 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                     <span>{tenant.metadata.address}</span>
                   </p>
                 )}
+                </div>
+              </div>
 
-                {/* Hours Schedule */}
+              {/* Hours Schedule */}
                 {businessHours && (
                   <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
                     <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
