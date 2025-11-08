@@ -10,10 +10,17 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies();
+    
+    // Debug: Log all cookies
+    const allCookies = cookieStore.getAll();
+    console.log('[Tier Proxy] All cookies:', allCookies.map(c => c.name));
+    
     const authToken = cookieStore.get('auth_token')?.value;
+    console.log('[Tier Proxy] Auth token present:', !!authToken);
 
     if (!authToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.log('[Tier Proxy] No auth token found in cookies');
+      return NextResponse.json({ error: 'Unauthorized - No auth token' }, { status: 401 });
     }
 
     const url = new URL(request.url);
