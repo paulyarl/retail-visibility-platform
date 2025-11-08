@@ -100,15 +100,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <a className="hover:text-neutral-900 whitespace-nowrap" href={links.dashboard}>Dashboard</a>
               <a className="hover:text-neutral-900 whitespace-nowrap" href={links.inventory}>Inventory</a>
               <a className="hover:text-neutral-900 whitespace-nowrap" href={links.tenants}>Tenants</a>
-              <a className="hover:text-neutral-900 whitespace-nowrap" href={links.settings}>{tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}</a>
+              <a className="hover:text-neutral-900 whitespace-nowrap" href={links.settings}>{hydrated && tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}</a>
             </nav>
           </div>
           
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-2 lg:gap-3">
-            {user && <TenantSwitcher />}
-            {user && <SettingsSwitcher />}
-            {user ? (
+            {hydrated && user && <TenantSwitcher />}
+            {hydrated && user && <SettingsSwitcher />}
+            {hydrated && user ? (
               <>
                 <Link href="/settings">
                   <Button variant="ghost" size="sm">Account</Button>
@@ -179,12 +179,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   href={links.settings}
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  {tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}
+                  {hydrated && tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}
                 </a>
               </nav>
 
               {/* Mobile Tenant & Settings Switchers */}
-              {user && (
+              {hydrated && user && (
                 <div className="pt-2 border-t border-neutral-200 space-y-2">
                   <TenantSwitcher />
                   <SettingsSwitcher />
@@ -193,7 +193,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
               {/* Mobile Actions */}
               <div className="pt-2 border-t border-neutral-200 space-y-2">
-                {user ? (
+                {hydrated && user ? (
                   <>
                     <Link href="/settings" className="block" onClick={() => setMobileMenuOpen(false)}>
                       <Button variant="ghost" className="w-full justify-start" size="md">Account</Button>
