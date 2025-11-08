@@ -57,6 +57,15 @@ export async function middleware(req: NextRequest) {
   // Protect /admin/* routes - require platform admin
   if (pathname.startsWith('/admin')) {
     const isAdmin = await isPlatformAdmin(req);
+    
+    // Log all admin access attempts
+    console.log('[Middleware] Admin access attempt:', {
+      path: pathname,
+      allowed: isAdmin,
+      timestamp: new Date().toISOString(),
+      ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
+    });
+    
     if (!isAdmin) {
       // Redirect to access denied page
       return NextResponse.redirect(new URL('/access-denied', req.url));
