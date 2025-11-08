@@ -83,6 +83,17 @@
   --color-red-500: #ef4444;
   --color-red-600: #dc2626;
 
+  /* Blue shades */
+  --color-blue-50: #eff6ff;
+  --color-blue-200: #bfdbfe;
+  --color-blue-600: #2563eb;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+
+  /* White and Black for text */
+  --color-white: #ffffff;
+  --color-black: #000000;
+
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
@@ -143,13 +154,18 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.25;
 }
 
-a {
+a:not([class*="bg-"]):not([class*="text-white"]) {
   color: var(--primary-600);
   text-decoration: none;
 }
 
-a:hover {
+a:not([class*="bg-"]):not([class*="text-white"]):hover {
   text-decoration: underline;
+}
+
+/* Ensure text-white links stay white */
+a.text-white {
+  color: #ffffff !important;
 }
 
 /* Form Input Styles - Better Visibility */
@@ -233,6 +249,12 @@ label:not([class*="text-"]) {
 /* Button text visibility */
 button:not([class*="text-"]) {
   color: var(--neutral-900);
+}
+
+/* Force white text on buttons with text-white class */
+button.text-white,
+a.text-white {
+  color: #ffffff !important;
 }
 
 /* Ensure all headings are dark */
