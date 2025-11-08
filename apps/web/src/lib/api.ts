@@ -7,11 +7,17 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
 /**
- * Get access token from localStorage
+ * Get access token from localStorage or cookies
  */
 function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('access_token');
+  
+  // Try localStorage first (legacy)
+  const localToken = localStorage.getItem('access_token');
+  if (localToken) return localToken;
+  
+  // Fall back to cookie (current auth system)
+  return getCookie('auth_token');
 }
 
 function getLastTenantId(): string | null {
