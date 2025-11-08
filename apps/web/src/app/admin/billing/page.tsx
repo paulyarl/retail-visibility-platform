@@ -30,8 +30,19 @@ export default function AdminBillingPage() {
   } = useBillingFilters(tenants, tiers);
 
   useEffect(() => {
+    console.log('[Billing Page] Mounting on client');
     setMounted(true);
   }, []);
+
+  // Log render state for debugging hydration
+  console.log('[Billing Page] Render:', {
+    mounted,
+    loading,
+    tiersLoading,
+    tenantsCount: tenants.length,
+    tiersCount: tiers.length,
+    filteredCount: stats.filteredCount,
+  });
 
   const handleClearFilters = () => {
     setSearchQuery('');

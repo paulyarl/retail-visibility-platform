@@ -31,6 +31,10 @@ export function useBillingFilters(
 
   // Reset to page 1 when filters change
   useEffect(() => {
+    console.log('[useBillingFilters] Filters changed, resetting to page 1:', {
+      searchQuery,
+      selectedTierFilter,
+    });
     setCurrentPage(1);
   }, [searchQuery, selectedTierFilter]);
 
