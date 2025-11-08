@@ -30,8 +30,10 @@ export function useBillingData(): UseBillingDataResult {
         const res = await api.get('/api/tenants');
         if (res.ok) {
           const data = await res.json();
-          console.log('[useBillingData] Tenants loaded:', data.tenants?.length || 0);
-          setTenants(data.tenants || []);
+          // API returns array directly, not { tenants: [...] }
+          const tenantsArray = Array.isArray(data) ? data : (data.tenants || []);
+          console.log('[useBillingData] Tenants loaded:', tenantsArray.length);
+          setTenants(tenantsArray);
         } else {
           console.error('[useBillingData] Failed to load tenants:', res.status);
           setError('Failed to load tenants');
