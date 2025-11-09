@@ -1179,6 +1179,32 @@
 
 ## 🐛 Bug Tracking
 
+## Real-World Example for template
+
+Bug #042: Item deletion leaves orphaned photos
+
+ENVIRONMENT:
+- URL: https://retail-visibility-platform-web.vercel.app/tenants/clx123abc/items/clx456def
+- Tenant ID: clx123abc
+- User Role: Tenant Owner
+- Browser: Chrome 120.0.6099.109
+- Timestamp: 2025-11-07 01:45:32
+
+SITUATION: Viewing item detail page with 3 attached photos
+
+TASK: Delete item and all associated photos
+
+ACTION: 
+1. Navigated to /tenants/clx123abc/items
+2. Clicked item SKU "TEST-001" 
+3. Clicked "Delete Item" button
+4. Confirmed deletion in modal
+
+RESULT: 
+Item deleted from database but photos remained in storage.
+Expected: Photos deleted with item.
+Console: No errors shown.
+
 ### How to Report Bugs (STAR Format)
 
 Use this template for every bug:

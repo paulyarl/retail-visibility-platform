@@ -1384,7 +1384,7 @@ export default function OrganizationPage() {
                     variant="primary"
                     size="sm"
                     onClick={() => window.location.href = '/settings/subscription'}
-                    className="mt-4"
+                    className="mt-4" style={{ color: '#ffffff' }}
                   >
                     Upgrade Plan
                   </Button>
