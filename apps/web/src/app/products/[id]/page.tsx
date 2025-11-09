@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 import ProductGallery from '@/components/products/ProductGallery';
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
 import { BackToInventoryButton } from '@/components/products/BackToInventoryButton';
+import { computeStoreStatus } from '@/lib/hours-utils';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';
@@ -110,7 +111,7 @@ interface Tenant {
   };
 }
 
-async function getProduct(id: string): Promise<{ product: Product; tenant: Tenant } | null> {
+async function getProduct(id: string): Promise<{ product: Product; tenant: Tenant; storeStatus?: any } | null> {
   try {
     const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
     
@@ -158,7 +159,22 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
       console.error('Failed to fetch business profile:', e);
     }
 
-    return { product, tenant };
+    // Fetch business hours for store status
+    let storeStatus = null;
+    try {
+      const hoursRes = await fetch(`${apiBaseUrl}/public/tenant/${product.tenantId}/hours`, {
+        cache: 'no-store',
+      });
+      if (hoursRes.ok) {
+        const businessHours = await hoursRes.json();
+        storeStatus = computeStoreStatus(businessHours);
+      }
+    } catch (e) {
+      // Hours fetch failed, continue without it
+      console.error('Failed to fetch business hours:', e);
+    }
+
+    return { product, tenant, storeStatus };
   } catch (error) {
     console.error('Error fetching product:', error);
     return null;
@@ -227,7 +243,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     notFound();
   }
 
-  const { product, tenant } = data;
+  const { product, tenant, storeStatus } = data;
   const businessName = tenant.metadata?.businessName || tenant.name;
 
   // Build image gallery: try photos endpoint; fall back to product.imageUrl
@@ -280,6 +296,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <TierBasedLandingPage 
         product={product} 
         tenant={tenant}
+        storeStatus={storeStatus}
         gallery={gallery.length > 1 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
       />
     </>

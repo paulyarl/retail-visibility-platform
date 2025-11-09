@@ -7,6 +7,7 @@ import { SafeImage } from '@/components/SafeImage';
 
 interface Product {
   id: string;
+  tenantId: string;
   name: string;
   title: string;
   brand: string;
@@ -103,10 +104,11 @@ interface Tenant {
 interface TierBasedLandingPageProps {
   product: Product;
   tenant: Tenant;
+  storeStatus?: any;
   gallery?: React.ReactNode;
 }
 
-export function TierBasedLandingPage({ product, tenant, gallery }: TierBasedLandingPageProps) {
+export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: TierBasedLandingPageProps) {
   const { settings: platformSettings } = usePlatformSettings();
   const tier = tenant.subscriptionTier || 'trial';
   const features = getLandingPageFeatures(tier);
@@ -242,7 +244,7 @@ export function TierBasedLandingPage({ product, tenant, gallery }: TierBasedLand
                 </p>
               </div>
               <a
-                href={`/tenant/${product.tenantId}`}
+                href={`/tenant/${tenant.id}`}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm whitespace-nowrap"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -513,7 +515,17 @@ export function TierBasedLandingPage({ product, tenant, gallery }: TierBasedLand
           {/* Interactive Map */}
           {metadata?.address && (
             <div className="mt-6">
-              <h3 className="text-lg font-semibold text-neutral-900 mb-3">Find Us</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-neutral-900">Find Us</h3>
+                {storeStatus && (
+                  <span className="flex items-center gap-2 text-sm">
+                    <span className={`inline-block w-2 h-2 rounded-full ${storeStatus.isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                    <span className={storeStatus.isOpen ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
+                      {storeStatus.label}
+                    </span>
+                  </span>
+                )}
+              </div>
               <div className="w-full h-64 sm:h-80 rounded-lg overflow-hidden border border-neutral-200">
                 <iframe
                   width="100%"
