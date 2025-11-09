@@ -135,7 +135,7 @@ export default function PermissionsPage() {
       <ProtectedRoute requiredRole="ADMIN">
         <div className="min-h-screen bg-neutral-50">
           <PageHeader
-            title="Permission Matrix"
+            title="Tenant Permission Matrix"
             description="Loading..."
             icon={Icons.Settings}
           />
@@ -153,7 +153,7 @@ export default function PermissionsPage() {
     <ProtectedRoute requiredRole="ADMIN">
       <div className="min-h-screen bg-neutral-50">
         <PageHeader
-          title="Permission Matrix"
+          title="Platform Permission Matrix"
           description="Manage role-based permissions across the platform"
           icon={Icons.Settings}
           backLink={{

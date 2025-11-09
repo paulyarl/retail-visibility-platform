@@ -89,7 +89,7 @@ export default function AdminToolsPage() {
       id: 'permissions',
       href: '/settings/admin/permissions',
       icon: Shield,
-      title: 'Permission Matrix',
+      title: 'Platform Permission Matrix',
       description: 'Configure role-based permissions across the platform',
       color: 'from-red-500 to-pink-600',
       stats: 'Access Control',
