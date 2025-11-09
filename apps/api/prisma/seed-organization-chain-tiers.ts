@@ -128,7 +128,7 @@ async function main() {
         // Inherited from Enterprise
         { featureKey: 'google_shopping', featureName: 'Google Shopping', isInherited: true },
         { featureKey: 'storefront', featureName: 'Public Storefront', isInherited: true },
-        { featureKey: 'product_scanning', featureName: 'Product Scanning', isInherited: true },
+        { featureKey: 'barcode_scan', featureName: 'Smart Barcode Scanner', isInherited: true },
         { featureKey: 'custom_branding', featureName: 'Custom Branding', isInherited: true },
         { featureKey: 'unlimited_skus', featureName: 'Unlimited SKUs', isInherited: true },
         { featureKey: 'white_label', featureName: 'White Label Branding', isInherited: true },
@@ -223,7 +223,7 @@ async function main() {
       { featureKey: 'enhanced_seo', featureName: 'Enhanced SEO', isInherited: true },
       { featureKey: 'basic_categories', featureName: 'Basic Categories', isInherited: true },
       { featureKey: 'quick_start_wizard_full', featureName: 'Quick Start Wizard (Full)', isInherited: true },
-      { featureKey: 'product_scanning', featureName: 'Product Scanning', isInherited: true },
+      { featureKey: 'barcode_scan', featureName: 'Smart Barcode Scanner', isInherited: true },
       { featureKey: 'gbp_integration', featureName: 'Google Business Profile Integration', isInherited: true },
       { featureKey: 'custom_branding', featureName: 'Custom Branding', isInherited: true },
       { featureKey: 'business_logo', featureName: 'Business Logo', isInherited: true },
@@ -256,7 +256,7 @@ async function main() {
       // Inherited from Enterprise
       { featureKey: 'google_shopping', featureName: 'Google Shopping', isInherited: true },
       { featureKey: 'storefront', featureName: 'Public Storefront', isInherited: true },
-      { featureKey: 'product_scanning', featureName: 'Product Scanning', isInherited: true },
+      { featureKey: 'barcode_scan', featureName: 'Smart Barcode Scanner', isInherited: true },
       { featureKey: 'custom_branding', featureName: 'Custom Branding', isInherited: true },
       { featureKey: 'unlimited_skus', featureName: 'Unlimited SKUs', isInherited: true },
       { featureKey: 'white_label', featureName: 'White Label Branding', isInherited: true },

@@ -52,16 +52,25 @@ declare global {
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers['authorization'];
+    console.log('[Auth Middleware] Authorization header:', authHeader ? 'PRESENT' : 'MISSING');
+    
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    console.log('[Auth Middleware] Token extracted:', token ? 'PRESENT' : 'MISSING');
 
     if (!token) {
+      console.log('[Auth Middleware] No token found, returning 401');
       return res.status(401).json({ error: 'authentication_required', message: 'No token provided' });
     }
 
+    console.log('[Auth Middleware] Verifying token...');
     const payload = authService.verifyAccessToken(token);
+    console.log('[Auth Middleware] Token verified, payload:', payload);
+    
     req.user = payload;
+    console.log('[Auth Middleware] User attached to request:', req.user);
     next();
   } catch (error) {
+    console.log('[Auth Middleware] Token verification failed:', error);
     if (error instanceof Error) {
       if (error.name === 'TokenExpiredError') {
         return res.status(401).json({ error: 'token_expired', message: 'Token has expired' });

@@ -8,6 +8,7 @@ export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { Spinner, type SpinnerProps } from './Spinner';
 export { Select, type SelectProps } from './Select';
 export { Modal, ModalFooter, type ModalProps } from './Modal';
+export { default as ConfirmDialog } from './ConfirmDialog';
 export { Tooltip, type TooltipProps } from './Tooltip';
 export { Tabs, type TabsProps, type Tab } from './Tabs';
 export { Toast, ToastContainer, type ToastProps } from './Toast';

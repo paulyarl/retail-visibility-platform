@@ -8,6 +8,7 @@ export interface Item {
   price: number;
   stock: number;
   status: 'active' | 'inactive' | 'syncing';
+  itemStatus?: 'active' | 'inactive' | 'syncing'; // Backend field name
   visibility: 'public' | 'private';
   categoryPath?: string[];
   images?: string[];
@@ -82,12 +83,21 @@ export class ItemsDataService {
 
       const data = await response.json();
 
+      // Normalize itemStatus to status for all items
+      const normalizeItem = (item: any): Item => ({
+        ...item,
+        status: item.itemStatus || item.status || 'inactive',
+      });
+
       // Handle both paginated and non-paginated responses
       if (data.items && data.pagination) {
-        return data as ItemsResponse;
+        return {
+          items: data.items.map(normalizeItem),
+          pagination: data.pagination,
+        };
       } else if (Array.isArray(data)) {
         return {
-          items: data,
+          items: data.map(normalizeItem),
           pagination: {
             page: 1,
             limit: data.length,

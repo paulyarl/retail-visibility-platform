@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { isFeatureEnabled } from "@/lib/featureFlags";
 import { useAuth } from "@/contexts/AuthContext";
 import { canSwitchToTenant } from "@/lib/auth/access-control";
+import { navigateToTenant } from "@/lib/tenant-navigation";
 
 type Tenant = { id: string; name: string };
 
@@ -45,7 +45,6 @@ export default function TenantSwitcher() {
   const onChange = async (tenantId: string) => {
     setCurrent(tenantId);
     if (typeof window === "undefined") return;
-    localStorage.setItem("tenantId", tenantId);
 
     // Gate by membership: use centralized permission helper
     if (!user || !canSwitchToTenant(user, tenantId)) {
@@ -53,30 +52,12 @@ export default function TenantSwitcher() {
       return;
     }
 
-    // Onboarding-first: fetch profile to determine completeness
-    try {
-      const res = await api.get(`/api/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`, { skipAuthRedirect: true });
-      if (res.ok) {
-        const p = await res.json();
-        const nameOk = !!(p.business_name && String(p.business_name).trim().length >= 2);
-        const addrOk = !!(p.address_line1 && String(p.address_line1).trim().length >= 3);
-        const cityOk = !!(p.city && String(p.city).trim().length >= 2);
-        const postalOk = !!(p.postal_code && String(p.postal_code).trim().length >= 3);
-        const countryOk = !!(p.country_code && String(p.country_code).trim().length === 2);
-        const emailOk = !!(p.email && String(p.email).includes('@'));
-
-        const needsOnboarding = !(nameOk && addrOk && cityOk && postalOk && countryOk && emailOk);
-        if (needsOnboarding) {
-          window.location.href = `/onboarding?tenantId=${encodeURIComponent(tenantId)}`;
-          return;
-        }
+    // Use centralized navigation utility
+    await navigateToTenant(tenantId, {
+      navigate: (url) => {
+        window.location.href = url;
       }
-    } catch {
-      // Ignore errors and fall through to settings
-    }
-
-    // Default destination: tenant-scoped settings
-    window.location.href = `/t/${encodeURIComponent(tenantId)}/settings`;
+    });
   };
 
   // Render container consistently for tests and UX

@@ -83,7 +83,7 @@ async function main() {
         { featureKey: 'enhanced_seo', featureName: 'Enhanced SEO', isInherited: true },
         { featureKey: 'basic_categories', featureName: 'Basic Categories', isInherited: true },
         { featureKey: 'quick_start_wizard_full', featureName: 'Quick Start Wizard (Full)', isInherited: false },
-        { featureKey: 'product_scanning', featureName: 'Product Scanning', isInherited: false },
+        { featureKey: 'barcode_scan', featureName: 'Smart Barcode Scanner', isInherited: false },
         { featureKey: 'gbp_integration', featureName: 'Google Business Profile Integration', isInherited: false },
         { featureKey: 'custom_branding', featureName: 'Custom Branding', isInherited: false },
         { featureKey: 'business_logo', featureName: 'Business Logo', isInherited: false },

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, AnimatedCard } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
+import { useDashboardData } from "@/hooks/useDashboardData";
 import { motion } from "framer-motion";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,6 +25,10 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   const { settings } = usePlatformSettings();
   const { isAuthenticated, isLoading: authLoading, logout, user } = useAuth();
   const router = useRouter();
+  
+  // Use optimized dashboard data hook
+  const { data: dashboardData, loading, error } = useDashboardData(isAuthenticated, authLoading);
+  
   const [scopedLinks, setScopedLinks] = useState<{ items: string; createItem: string; tenants: string; settingsTenant: string }>({
     items: "/items",
     createItem: "/items?create=true",
@@ -31,17 +36,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     settingsTenant: "/settings",
   });
   const [hoursInfo, setHoursInfo] = useState<{ hasHours: boolean; today?: string } | null>(null);
-  const [stats, setStats] = useState({ 
-    total: 0, 
-    active: 0, 
-    syncIssues: 0,
-    locations: 0,
-    isChain: false,
-    organizationName: null as string | null,
-  });
-  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [tenantData, setTenantData] = useState<{ name: string; logoUrl?: string; bannerUrl?: string } | null>(null);
-  const [loading, setLoading] = useState(true);
   const [showcaseMode, setShowcaseMode] = useState<ShowcaseMode>('hybrid');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [platformStats, setPlatformStats] = useState({
@@ -54,6 +49,17 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     platformUptime: 99.9,
     platformUptimeFormatted: '99.9%',
   });
+  
+  // Extract stats from dashboard data
+  const stats = {
+    total: dashboardData?.stats?.totalItems || 0,
+    active: dashboardData?.stats?.activeItems || 0,
+    syncIssues: dashboardData?.stats?.syncIssues || 0,
+    locations: dashboardData?.stats?.locations || 0,
+    isChain: dashboardData?.isChain || false,
+    organizationName: dashboardData?.organizationName || null,
+  };
+  const selectedTenantId = dashboardData?.tenant?.id || null;
   
   // Fetch public platform stats for visitors
   useEffect(() => {
@@ -68,7 +74,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
             setPlatformStats(data);
           }
         } catch (error) {
-          console.error('[Home] Failed to fetch platform stats:', error);
+          // Silently fail - platform stats are non-critical for user experience
+          console.warn('[Platform Stats] Failed to load public stats, using defaults');
         }
       };
       fetchPlatformStats();
@@ -97,8 +104,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           setShowcaseMode(data.mode || 'hybrid');
         }
       } catch (error) {
-        console.error('[Home] Failed to fetch showcase config:', error);
-        // Default to hybrid mode on error
+        // Silently fail - showcase config is non-critical, defaults to 'hybrid'
+        console.warn('[Showcase Config] Failed to load config, using hybrid mode');
         setShowcaseMode('hybrid');
       }
     };
@@ -131,67 +138,30 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     fetchHours();
   }, [selectedTenantId]);
   
+  // Fetch tenant details (logo/banner) when tenant ID is available
   useEffect(() => {
-    // Only fetch stats if authenticated
-    if (!isAuthenticated || authLoading) {
-      setLoading(false);
-      return;
-    }
-    
-    // Fetch comprehensive dashboard stats from optimized endpoint
-    const fetchStats = async () => {
+    const fetchTenantDetails = async () => {
+      if (!selectedTenantId) return;
+      
       try {
-        const dashboardRes = await api.get('/api/dashboard');
-        
-        if (!dashboardRes.ok) {
-          console.error('[Dashboard] Dashboard API returned error:', dashboardRes.status);
-          setLoading(false);
-          return;
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const tenantRes = await api.get(`${apiBaseUrl}/tenants/${selectedTenantId}`);
+        if (tenantRes.ok) {
+          const tenantInfo = await tenantRes.json();
+          setTenantData({
+            name: tenantInfo.name,
+            logoUrl: tenantInfo.metadata?.logo_url,
+            bannerUrl: tenantInfo.metadata?.banner_url,
+          });
         }
-        
-        const data = await dashboardRes.json();
-        
-        if (data.tenant) {
-          setSelectedTenantId(data.tenant.id);
-          // Fetch tenant details for logo
-          try {
-            const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const tenantRes = await api.get(`${apiBaseUrl}/tenants/${data.tenant.id}`);
-            if (tenantRes.ok) {
-              const tenantInfo = await tenantRes.json();
-              setTenantData({
-                name: tenantInfo.name,
-                logoUrl: tenantInfo.metadata?.logo_url,
-                bannerUrl: tenantInfo.metadata?.banner_url,
-              });
-            }
-          } catch (tenantError) {
-            console.error('[Dashboard] Failed to fetch tenant details:', tenantError);
-            // Continue without logo - non-critical
-          }
-        }
-        
-        setStats({
-          total: data.stats.totalItems,
-          active: data.stats.activeItems,
-          syncIssues: data.stats.syncIssues,
-          locations: data.stats.locations,
-          isChain: data.isChain,
-          organizationName: data.organizationName,
-        });
       } catch (error) {
-        console.error('[Dashboard] Failed to fetch stats:', error);
-        // Check if it's a network error
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-          console.error('[Dashboard] Network error - is the backend running?');
-        }
-      } finally {
-        setLoading(false);
+        // Silently fail - tenant details are non-critical for dashboard
+        console.warn('[Tenant Details] Failed to load logo/banner, continuing without them');
       }
     };
     
-    fetchStats();
-  }, [isAuthenticated, authLoading]);
+    fetchTenantDetails();
+  }, [selectedTenantId]);
 
   // Compute tenant-scoped quick action links independently for faster UI readiness
   useLayoutEffect(() => {

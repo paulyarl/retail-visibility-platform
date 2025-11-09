@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { navigateToTenant } from '@/lib/tenant-navigation'
 
 export type TenantOption = { id: string; name: string }
 
@@ -9,13 +10,15 @@ export default function TenantSwitcher({ currentTenantId, tenants }: { currentTe
   const router = useRouter()
   const [value, setValue] = useState(currentTenantId)
 
-  const onChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const onChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const tid = e.target.value
     setValue(tid)
-    try {
-      localStorage.setItem('lastTenantId', tid)
-    } catch {}
-    router.push(`/t/${tid}`)
+    
+    // Use centralized navigation utility
+    await navigateToTenant(tid, {
+      skipOnboarding: true, // Skip onboarding check when already in tenant context
+      navigate: (url) => router.push(url)
+    })
   }
 
   if (!tenants || tenants.length === 0) return null

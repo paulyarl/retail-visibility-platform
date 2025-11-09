@@ -11,6 +11,117 @@ const router = Router();
 router.use(authenticateToken);
 
 /**
+ * GET /user/profile - Get current user's profile
+ * Returns comprehensive profile data including roles, permissions, and tenant access
+ */
+router.get('/profile', async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    // Fetch user with all related data
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        tenants: {
+          include: {
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                organizationId: true,
+                organization: {
+                  select: {
+                    id: true,
+                    name: true,
+                    _count: {
+                      select: { tenants: true }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'user_not_found' });
+    }
+
+    // Determine role context
+    const isPlatformAdmin = user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN';
+    const primaryTenant = user.tenants[0];
+    const organization = primaryTenant?.tenant.organization;
+    
+    // Check if user is org admin (has OWNER/ADMIN role in any tenant of an org)
+    const isOrgAdmin = user.tenants.some(ut => 
+      (ut.role === 'OWNER' || ut.role === 'ADMIN') && 
+      ut.tenant.organizationId
+    );
+
+    // Calculate permissions
+    const canManageOrganization = isPlatformAdmin || isOrgAdmin;
+    const canManageTenants = isPlatformAdmin || isOrgAdmin || 
+      user.tenants.some(ut => ut.role === 'OWNER' || ut.role === 'ADMIN');
+    const canManageUsers = canManageTenants;
+
+    // Build profile response
+    const profile = {
+      id: user.id,
+      email: user.email,
+      name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      
+      // Platform context
+      isPlatformAdmin,
+      
+      // Organization context
+      organizationId: organization?.id,
+      organizationName: organization?.name,
+      isOrgAdmin,
+      
+      // Tenant context
+      tenantsCount: user.tenants.length,
+      locationsServed: organization?._count.tenants || user.tenants.length,
+      primaryTenantId: primaryTenant?.tenantId,
+      primaryTenantName: primaryTenant?.tenant.name,
+      
+      // Tenant memberships
+      tenantMemberships: user.tenants.map(ut => ({
+        tenantId: ut.tenantId,
+        tenantName: ut.tenant.name,
+        role: ut.role,
+        organizationId: ut.tenant.organizationId,
+        organizationName: ut.tenant.organization?.name
+      })),
+      
+      // Permissions
+      canManageOrganization,
+      canManageTenants,
+      canManageUsers,
+      
+      // Activity
+      lastActive: user.lastLogin,
+      memberSince: user.createdAt,
+      emailVerified: user.emailVerified,
+      isActive: user.isActive
+    };
+
+    res.json(profile);
+  } catch (error) {
+    console.error('[GET /user/profile] Error:', error);
+    res.status(500).json({ error: 'failed_to_fetch_profile' });
+  }
+});
+
+/**
  * GET /users - List all users (admin only)
  */
 router.get('/', requireAdmin, async (req, res) => {

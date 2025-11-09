@@ -5,6 +5,7 @@ interface AppLinks {
   dashboard: string;
   inventory: string;
   tenants: string;
+  propagation?: string;
   settings: string;
 }
 
@@ -23,6 +24,7 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
     dashboard: '/',
     inventory: '/items',
     tenants: '/tenants',
+    propagation: undefined,
     settings: '/settings',
   });
   const [tenantScopedLinksOn, setTenantScopedLinksOn] = useState(false);
@@ -40,6 +42,7 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
         dashboard: `/t/${tenantId}/dashboard`,
         inventory: `/t/${tenantId}/items`,
         tenants: '/tenants',
+        propagation: `/t/${tenantId}/propagation`,
         settings: `/t/${tenantId}/settings`,
       });
       setTenantScopedLinksOn(true);
@@ -48,6 +51,7 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
         dashboard: '/',
         inventory: '/items',
         tenants: '/tenants',
+        propagation: undefined,
         settings: '/settings',
       });
       setTenantScopedLinksOn(false);

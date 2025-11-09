@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Card, Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
+import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 
 type BusinessType = 'grocery' | 'fashion' | 'electronics' | 'general';
 
@@ -46,6 +47,11 @@ export default function CategoryQuickStartPage() {
   const params = useParams();
   const router = useRouter();
   const tenantId = params?.tenantId as string;
+
+  // Check tier AND role access for category quick start (Starter+ tier, MANAGER+ role)
+  const { canAccess, getFeatureBadgeWithPermission } = useTenantTier(tenantId);
+  const hasCategoryQuickStart = canAccess('category_quick_start', 'canManage');
+  const quickStartBadge = getFeatureBadgeWithPermission('category_quick_start', 'canManage', 'generate categories');
 
   const [selectedType, setSelectedType] = useState<BusinessType | null>(null);
   const [categoryCount, setCategoryCount] = useState<number>(15);
@@ -111,6 +117,74 @@ export default function CategoryQuickStartPage() {
       setIsGenerating(false);
     }
   };
+
+  // Show tier gate for Google-Only users
+  if (quickStartBadge) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="max-w-2xl w-full"
+        >
+          <Card className="p-8 border-2 border-blue-200">
+            <div className="text-6xl mb-4 text-center">🔒</div>
+            <h1 className="text-3xl font-bold text-center mb-4 text-gray-900">
+              Category Quick Start
+              <span className={`ml-3 text-sm px-3 py-1 rounded ${quickStartBadge.colorClass} text-white font-semibold`}>
+                {quickStartBadge.text}
+              </span>
+            </h1>
+            
+            <div className="bg-blue-50 rounded-lg p-6 mb-6">
+              <p className="text-center text-gray-700 text-lg">
+                {quickStartBadge.tooltip}
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3">
+                What you get when you upgrade:
+              </h3>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-0.5">✓</span>
+                  <span><strong>AI Category Generation:</strong> Instantly create categories for your business type</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-0.5">✓</span>
+                  <span><strong>Public Storefront:</strong> Share your products with customers online</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-0.5">✓</span>
+                  <span><strong>Enhanced SEO:</strong> Better visibility on search engines</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-0.5">✓</span>
+                  <span><strong>Mobile-Responsive Design:</strong> Perfect on any device</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <Button
+                onClick={() => router.push(`/t/${tenantId}/categories`)}
+                variant="secondary"
+              >
+                Add Categories Manually
+              </Button>
+              <Button
+                onClick={() => router.push(`/t/${tenantId}/settings`)}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              >
+                View Upgrade Options
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
 
   // Show blocked state if there's an error
   if (error && !isGenerating && !success) {

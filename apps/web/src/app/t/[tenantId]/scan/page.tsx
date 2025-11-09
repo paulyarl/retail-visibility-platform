@@ -7,6 +7,8 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import { Flags } from '@/lib/flags';
 import { ContextBadges } from '@/components/ContextBadges';
+import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { TierGate } from '@/components/tier/TierGate';
 
 interface ScanSession {
   id: string;
@@ -24,10 +26,16 @@ export default function TenantScanPage() {
   const router = useRouter();
   const tenantId = params.tenantId as string;
   
+  // Check tier AND role access for camera/USB scanning (Professional+ tier, MEMBER+ role)
+  const { canAccess, getFeatureBadgeWithPermission, tier, loading: tierLoading } = useTenantTier(tenantId);
+  const hasScannerAccess = canAccess('barcode_scan', 'canEdit');
+  const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
+  
+  
   const [sessions, setSessions] = useState<ScanSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<'usb' | 'camera' | 'manual'>('usb');
+  const [selectedDevice, setSelectedDevice] = useState<'usb' | 'camera' | 'manual'>('manual'); // Default to manual for all tiers
   const [rateLimitError, setRateLimitError] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
 
@@ -154,8 +162,8 @@ export default function TenantScanPage() {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
-        title="SKU Scanning"
-        description="Scan barcodes to quickly add products to your inventory"
+        title="Barcode Products"
+        description="Scan or enter barcodes to quickly add products with auto-filled details"
         icon={Icons.Inventory}
       />
 
@@ -163,7 +171,7 @@ export default function TenantScanPage() {
         {/* Context Badges */}
         <ContextBadges 
           tenant={{ id: tenantId, name: '' }}
-          contextLabel="Scanning"
+          contextLabel="Barcode Entry"
         />
         {/* Feature Flag Check */}
         {!Flags.SKU_SCANNING && (
@@ -200,15 +208,15 @@ export default function TenantScanPage() {
                   Scanning Method
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* USB Scanner */}
+                  {/* USB Scanner - Professional+ tier required */}
                   <button
                     onClick={() => setSelectedDevice('usb')}
-                    disabled={!Flags.SCAN_USB}
+                    disabled={!Flags.SCAN_USB || !hasScannerAccess}
                     className={`p-4 border-2 rounded-lg transition-all ${
                       selectedDevice === 'usb'
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-                    } ${!Flags.SCAN_USB ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    } ${!Flags.SCAN_USB || !hasScannerAccess ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="flex flex-col items-center text-center">
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -218,21 +226,24 @@ export default function TenantScanPage() {
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Fast and reliable
                       </p>
-                      {selectedDevice === 'usb' && (
+                      {!hasScannerAccess && (
+                        <Badge variant="default" className="mt-2 text-xs bg-amber-100 text-amber-800">Pro+</Badge>
+                      )}
+                      {hasScannerAccess && selectedDevice === 'usb' && (
                         <Badge variant="success" className="mt-2 text-xs">Selected</Badge>
                       )}
                     </div>
                   </button>
 
-                  {/* Camera */}
+                  {/* Camera - Professional+ tier required */}
                   <button
                     onClick={() => setSelectedDevice('camera')}
-                    disabled={!Flags.SCAN_CAMERA}
+                    disabled={!Flags.SCAN_CAMERA || !hasScannerAccess}
                     className={`p-4 border-2 rounded-lg transition-all ${
                       selectedDevice === 'camera'
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-                    } ${!Flags.SCAN_CAMERA ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    } ${!Flags.SCAN_CAMERA || !hasScannerAccess ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="flex flex-col items-center text-center">
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -243,10 +254,10 @@ export default function TenantScanPage() {
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Use device camera
                       </p>
-                      {!Flags.SCAN_CAMERA && (
-                        <Badge variant="default" className="mt-2 text-xs">Disabled</Badge>
+                      {!hasScannerAccess && (
+                        <Badge variant="default" className="mt-2 text-xs bg-amber-100 text-amber-800">Pro+</Badge>
                       )}
-                      {selectedDevice === 'camera' && Flags.SCAN_CAMERA && (
+                      {hasScannerAccess && selectedDevice === 'camera' && Flags.SCAN_CAMERA && (
                         <Badge variant="success" className="mt-2 text-xs">Selected</Badge>
                       )}
                     </div>

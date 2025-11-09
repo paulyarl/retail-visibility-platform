@@ -13,6 +13,7 @@ interface Item {
   priceCents?: number;
   stock?: number;
   description?: string;
+  status?: 'active' | 'inactive' | 'syncing';
 }
 
 interface EditItemModalProps {
@@ -29,7 +30,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [manufacturer, setManufacturer] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [description, setDescription] = useState('');  
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<'active' | 'inactive'>('active');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +64,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setPrice(item.priceCents ? (item.priceCents / 100).toFixed(2) : '');
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
+      setStatus((item.status === 'active' || item.status === 'inactive') ? item.status : 'active');
     }
   }, [item]);
 
@@ -107,7 +110,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
     setError(null);
 
     try {
-      const updatedItem: Item = {
+      const updatedItem = {
         ...item,
         sku: sku.trim(),
         name: name.trim(),
@@ -116,7 +119,9 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         priceCents: price ? Math.round(parseFloat(price) * 100) : undefined,
         stock: stock ? parseInt(stock) : undefined,
         description: description.trim() || undefined,
-      };
+        status,
+        itemStatus: status, // Backend uses itemStatus field
+      } as Item;
 
       await onSave(updatedItem);
       onClose();
@@ -150,6 +155,54 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             {error}
           </Alert>
         )}
+
+        {/* Status Toggle */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Item Status
+          </label>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setStatus('active')}
+              disabled={saving}
+              className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+                status === 'active'
+                  ? 'border-green-600 bg-green-600 text-white'
+                  : 'border-neutral-300 dark:border-neutral-600 hover:border-neutral-400 bg-white dark:bg-neutral-800'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="font-medium">Active</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatus('inactive')}
+              disabled={saving}
+              className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+                status === 'inactive'
+                  ? 'border-red-600 bg-red-600 text-white'
+                  : 'border-neutral-300 dark:border-neutral-600 hover:border-neutral-400 bg-white dark:bg-neutral-800'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <span className="font-medium">Inactive</span>
+              </div>
+            </button>
+          </div>
+          <p className="text-xs text-neutral-500 mt-2">
+            {status === 'active' 
+              ? '✓ Item will sync to Google if public and has a category' 
+              : '✗ Item will not sync to Google (inactive items are hidden)'}
+          </p>
+        </div>
 
         {/* SKU Field */}
         <div>

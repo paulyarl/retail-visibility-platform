@@ -21,12 +21,6 @@ export default function SettingsSwitcher() {
   
   const [currentScope, setCurrentScope] = useState<SettingsScope>(getInitialScope);
 
-  // Determine if user is a platform user (admin, support, or viewer)
-  const showSwitcher = user ? isPlatformUser(user) : false;
-
-  // Only show for platform users
-  if (!showSwitcher) return null;
-
   // Update scope when pathname changes
   useEffect(() => {
     const newScope = getInitialScope();
@@ -34,6 +28,12 @@ export default function SettingsSwitcher() {
       setCurrentScope(newScope);
     }
   }, [pathname, currentScope]);
+
+  // Determine if user is a platform user (admin, support, or viewer)
+  const showSwitcher = user ? isPlatformUser(user) : false;
+
+  // Only show for platform users - early return AFTER all hooks
+  if (!showSwitcher) return null;
 
   const onChange = (scope: SettingsScope) => {
     setCurrentScope(scope);

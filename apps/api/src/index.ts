@@ -109,6 +109,8 @@ import tierSystemRoutes from './routes/admin/tier-system';
 import testGbpRoutes from './routes/test-gbp';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 import cloverRoutes from './routes/integrations/clover';
+import dashboardRoutes from './routes/dashboard'; // FIXED VERSION
+import tenantTierRoutes from './routes/tenant-tier';
 
 const app = express();
 
@@ -1453,6 +1455,9 @@ const createItemSchema = z.object({
   price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
   currency: z.string().length(3).optional(),
   availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
+  // Item status and visibility
+  itemStatus: z.enum(['active', 'inactive', 'archived']).optional(),
+  visibility: z.enum(['public', 'private']).optional(),
 });
 
 app.post(["/items", "/inventory"], checkSubscriptionLimits, enforcePolicyCompliance, async (req, res) => {
@@ -2160,6 +2165,9 @@ app.use('/tenants', tenantUserRoutes);
 app.use('/api/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
 app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
+app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
+console.log('✅ Dashboard routes mounted');
+app.use(tenantTierRoutes); // Tenant tier and usage endpoints
 
 /* ------------------------------ v3.6.2-prep APIs ------------------------------ */
 app.use('/api/feed-jobs', feedJobsRoutes);

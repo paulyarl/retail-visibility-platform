@@ -14,37 +14,55 @@ export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top header (desktop) */}
-      <div className="hidden md:flex sticky top-0 z-40 bg-white border-b border-gray-200 items-center justify-between px-6 h-14">
-        <Link href="/" className="flex items-center gap-3" aria-label="Platform Dashboard">
-          {settings?.logoUrl ? (
-            <Image src={settings.logoUrl} alt={settings.platformName || 'Platform Logo'} width={140} height={32} className="h-8 w-auto object-contain" />
-          ) : (
-            <span className="font-semibold text-gray-900 hover:text-blue-600" suppressHydrationWarning>{settings?.platformName || 'Visible Shelf'}</span>
-          )}
-        </Link>
-        <div className="flex items-center gap-3">
-          <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
-          <SettingsSwitcher />
+      {/* Desktop header */}
+      <div className="hidden md:block sticky top-0 z-40 bg-white border-b border-gray-200">
+        {/* Main Header Row */}
+        <div className="flex items-center justify-between px-6 h-14">
+          <Link href="/" className="flex items-center gap-3" aria-label="Platform Dashboard">
+            {settings?.logoUrl ? (
+              <Image src={settings.logoUrl} alt={settings.platformName || 'Platform Logo'} width={140} height={32} className="h-8 w-auto object-contain" />
+            ) : (
+              <span className="font-semibold text-gray-900 hover:text-blue-600" suppressHydrationWarning>{settings?.platformName || 'Visible Shelf'}</span>
+            )}
+          </Link>
+        </div>
+
+        {/* Switcher Row */}
+        <div className="border-t border-gray-200 bg-gray-50">
+          <div className="px-6 py-2 flex items-center justify-end gap-3 overflow-x-auto">
+            <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
+            <SettingsSwitcher />
+          </div>
         </div>
       </div>
 
-      {/* Mobile header */}
-      <div className="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200 flex items-center justify-between px-3 sm:px-4 py-3">
-        <button
-          onClick={() => setOpen(true)}
-          aria-label="Open menu"
-          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-          <span className="text-sm font-medium">Menu</span>
-        </button>
-        <Link href="/" aria-label="Platform Dashboard" className="text-xs sm:text-sm text-gray-700 hover:text-blue-600 font-medium truncate max-w-[100px] sm:max-w-none" suppressHydrationWarning>
-          {settings?.platformName || 'Platform'}
-        </Link>
-        <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
+      {/* Mobile/Tablet header */}
+      <div className="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
+        {/* Main Header Row */}
+        <div className="flex items-center justify-between px-3 sm:px-4 py-3">
+          <button
+            onClick={() => setOpen(true)}
+            aria-label="Open menu"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            <span className="text-sm font-medium">Menu</span>
+          </button>
+          <Link href="/" aria-label="Platform Dashboard" className="text-xs sm:text-sm text-gray-700 hover:text-blue-600 font-medium truncate max-w-[100px] sm:max-w-none" suppressHydrationWarning>
+            {settings?.platformName || 'Platform'}
+          </Link>
+          <div className="w-[100px]" /> {/* Spacer for balance */}
+        </div>
+
+        {/* Switcher Row */}
+        <div className="border-t border-gray-200 bg-gray-50">
+          <div className="px-3 sm:px-4 py-2 flex items-center justify-end gap-3 overflow-x-auto">
+            <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
+            <SettingsSwitcher />
+          </div>
+        </div>
       </div>
 
       <div className="flex">
@@ -72,10 +90,6 @@ export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, 
               </button>
             </div>
             <div className="h-[calc(100%-60px)] overflow-auto">
-              <div className="p-4 space-y-2 border-b border-gray-200">
-                <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
-                <SettingsSwitcher />
-              </div>
               <TenantSidebar tenantId={tenantId} tenantName={tenantName} tenantLogoUrl={tenantLogoUrl} nav={nav} isMobile={true} />
             </div>
           </div>

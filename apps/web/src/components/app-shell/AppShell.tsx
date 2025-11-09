@@ -41,6 +41,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh flex flex-col bg-neutral-50">
       <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
+        {/* Main Header Row */}
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             <span className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
@@ -65,8 +66,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-2 lg:gap-3">
-            {hydrated && user && <TenantSwitcher />}
-            {hydrated && user && <SettingsSwitcher />}
             {hydrated && user ? (
               <>
                 <Link href="/settings">
@@ -92,7 +91,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors flex-shrink-0"
+            className="md:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors shrink-0"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
           >
@@ -105,6 +104,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </svg>
           </button>
         </div>
+
+        {/* Switcher Row - All Screen Sizes */}
+        {hydrated && user && (
+          <div className="border-t border-neutral-200 bg-neutral-50">
+            <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-2 flex items-center justify-end gap-3 overflow-x-auto">
+              <TenantSwitcher />
+              <SettingsSwitcher />
+            </div>
+          </div>
+        )}
 
         {/* Mobile Menu Dropdown */}
         {mobileMenuOpen && (
@@ -119,14 +128,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   itemClassName="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium"
                   onClick={() => setMobileMenuOpen(false)}
                 />
-              )}
-
-              {/* Mobile Tenant & Settings Switchers */}
-              {hydrated && user && (
-                <div className="pt-2 border-t border-neutral-200 space-y-2">
-                  <TenantSwitcher />
-                  <SettingsSwitcher />
-                </div>
               )}
 
               {/* Mobile Actions */}

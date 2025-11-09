@@ -43,9 +43,32 @@ export function useItemsFilters(): UseItemsFiltersReturn {
   }, []);
 
   const applyClientFilters = useCallback((items: Item[]): Item[] => {
-    // Apply category filter (client-side until API supports it)
-    return itemsDataService.applyCategoryFilter(items, categoryFilter);
-  }, [categoryFilter]);
+    let filtered = items;
+
+    // Apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(query) ||
+        item.sku.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(item => item.status === statusFilter);
+    }
+
+    // Apply visibility filter
+    if (visibilityFilter !== 'all') {
+      filtered = filtered.filter(item => item.visibility === visibilityFilter);
+    }
+
+    // Apply category filter
+    filtered = itemsDataService.applyCategoryFilter(filtered, categoryFilter);
+
+    return filtered;
+  }, [searchQuery, statusFilter, visibilityFilter, categoryFilter]);
 
   const hasActiveFilters = 
     searchQuery !== '' ||

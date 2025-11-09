@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Rocket, Package, Sparkles, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { ContextBadges } from '@/components/ContextBadges';
+import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { Badge } from '@/components/ui';
 
 type Scenario = {
   id: string;
@@ -26,6 +28,13 @@ export default function QuickStartPage() {
   const params = useParams();
   const router = useRouter();
   const tenantId = params.tenantId as string;
+
+  // Check tier AND role access for full Quick Start wizard (Professional+ tier, MANAGER+ role)
+  const { canAccess, getFeatureBadgeWithPermission } = useTenantTier(tenantId);
+  const hasFullQuickStart = canAccess('quick_start_wizard_full', 'canManage');
+  const hasBarcodeScanning = canAccess('barcode_scan', 'canEdit');
+  const wizardBadge = getFeatureBadgeWithPermission('quick_start_wizard_full', 'canManage', 'use Quick Start');
+  const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
 
   // Fallback scenarios in case API fails
   const fallbackScenarios: Scenario[] = [
@@ -381,10 +390,15 @@ export default function QuickStartPage() {
           </div>
 
           {/* Option 2: SKU Scanning */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border-2 border-green-500 dark:border-green-600 relative">
+          <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border-2 ${hasBarcodeScanning ? 'border-green-500 dark:border-green-600' : 'border-gray-300 dark:border-gray-600'} relative ${!hasBarcodeScanning ? 'opacity-60' : ''}`}>
             <div className="absolute -top-3 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">
               RECOMMENDED
             </div>
+            {!hasBarcodeScanning && (
+              <div className="absolute -top-3 left-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                PRO+
+              </div>
+            )}
             <div className="flex justify-center mb-4">
               <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -394,6 +408,9 @@ export default function QuickStartPage() {
             </div>
             <h2 className="text-2xl font-bold mb-2 text-center text-gray-900 dark:text-white">
               Scan Products
+              {!hasBarcodeScanning && (
+                <span className="ml-2 text-sm text-purple-600 dark:text-purple-400">(Pro+)</span>
+              )}
             </h2>
             <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
               Scan barcodes to add real products with images

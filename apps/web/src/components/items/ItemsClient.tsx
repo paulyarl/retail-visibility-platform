@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { isFeatureEnabled } from '@/lib/featureFlags';
+import { Modal, ModalFooter, Button, Input, Alert, ConfirmDialog } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 
 // Hooks
@@ -12,6 +13,7 @@ import { useItemsModals } from '@/hooks/useItemsModals';
 import { useItemsActions } from '@/hooks/useItemsActions';
 import { useItemsForm } from '@/hooks/useItemsForm';
 import { useItemsViewMode } from '@/hooks/useItemsViewMode';
+import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 
 // Components
 import ItemsHeader from './ItemsHeader';
@@ -20,14 +22,19 @@ import ItemsCreateForm from './ItemsCreateForm';
 import ItemsGrid from './ItemsGrid';
 import ItemsList from './ItemsList';
 import ItemsPagination from './ItemsPagination';
-
-// Modals
+import ItemsGuide from './ItemsGuide';
 import EditItemModal from './EditItemModal';
 import { QRCodeModal } from './QRCodeModal';
 import BulkUploadModal from './BulkUploadModal';
 import ItemPhotoGallery from './ItemPhotoGallery';
 import CategoryAssignmentModal from './CategoryAssignmentModal';
 import PropagateModal from './PropagateModal';
+
+// Guides & Helpers
+import QuickStartEmptyState from './QuickStartEmptyState';
+import ProductEnrichmentBanner from '@/components/ProductEnrichmentBanner';
+import POSIntegrationBanner from './POSIntegrationBanner';
+import SyncStatusIndicator from './SyncStatusIndicator';
 
 // Types
 import { Item } from '@/services/itemsDataService';
@@ -54,6 +61,11 @@ export default function ItemsClient({
 }: ItemsClientProps) {
   const searchParams = useSearchParams();
 
+  // Tier AND Role Access - Check feature permissions
+  const { canAccess } = useTenantTier(initialTenantId);
+  const canPropagate = canAccess('propagation', 'canManage'); // MANAGER+ only
+  const canScan = canAccess('barcode_scan', 'canEdit'); // MEMBER+ only
+
   // Data & Loading
   const {
     items,
@@ -63,6 +75,7 @@ export default function ItemsClient({
     stats,
     refresh,
     loadPage,
+    setPageSize,
   } = useItemsData({
     tenantId: initialTenantId,
     initialItems,
@@ -110,6 +123,15 @@ export default function ItemsClient({
     openPropagateModal,
     closePropagateModal,
   } = useItemsModals();
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant: 'danger' | 'warning';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, variant: 'warning' });
 
   // Actions
   const {
@@ -176,12 +198,20 @@ export default function ItemsClient({
     }
   };
 
-  const handleDelete = async (item: Item) => {
-    try {
-      await deleteItem(item.id);
-    } catch (error) {
-      console.error('[ItemsClient] Delete failed:', error);
-    }
+  const handleDelete = (item: Item) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Item',
+      message: `Are you sure you want to delete "${item.name}"? This action cannot be undone.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteItem(item.id);
+        } catch (error) {
+          console.error('[ItemsClient] Delete failed:', error);
+        }
+      },
+    });
   };
 
   const handlePhotoUpload = async (itemId: string, files: File[]) => {
@@ -211,21 +241,138 @@ export default function ItemsClient({
     }
   };
 
+  const handleVisibilityToggle = (item: Item) => {
+    const newVisibility = item.visibility === 'public' ? 'private' : 'public';
+    
+    // Only confirm when making private (blocks sync)
+    if (newVisibility === 'private') {
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Make Item Private',
+        message: `Making "${item.name}" private will prevent it from syncing to Google Merchant Center. Continue?`,
+        variant: 'warning',
+        onConfirm: async () => {
+          try {
+            console.log('[ItemsClient] Toggling visibility:', {
+              itemId: item.id,
+              itemName: item.name,
+              from: item.visibility,
+              to: newVisibility,
+            });
+            
+            await updateItem(item.id, { visibility: newVisibility });
+            
+            console.log('[ItemsClient] Visibility updated successfully:', {
+              itemId: item.id,
+              newVisibility,
+            });
+          } catch (error) {
+            console.error('[ItemsClient] Visibility toggle failed:', error);
+          }
+        },
+      });
+    } else {
+      // Making public - no confirmation needed
+      (async () => {
+        try {
+          console.log('[ItemsClient] Toggling visibility:', {
+            itemId: item.id,
+            itemName: item.name,
+            from: item.visibility,
+            to: newVisibility,
+          });
+          
+          await updateItem(item.id, { visibility: newVisibility });
+          
+          console.log('[ItemsClient] Visibility updated successfully:', {
+            itemId: item.id,
+            newVisibility,
+          });
+        } catch (error) {
+          console.error('[ItemsClient] Visibility toggle failed:', error);
+        }
+      })();
+    }
+  };
+
+  const handleStatusToggle = (item: Item) => {
+    const newStatus = item.status === 'active' ? 'inactive' : 'active';
+    
+    // Only confirm when making inactive (blocks sync)
+    if (newStatus === 'inactive') {
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Deactivate Item',
+        message: `Making "${item.name}" inactive will prevent it from syncing to Google Merchant Center. Continue?`,
+        variant: 'warning',
+        onConfirm: async () => {
+          try {
+            console.log('[ItemsClient] Toggling status:', {
+              itemId: item.id,
+              itemName: item.name,
+              from: item.status,
+              to: newStatus,
+            });
+            
+            await updateItem(item.id, { itemStatus: newStatus });
+            
+            console.log('[ItemsClient] Status updated successfully:', {
+              itemId: item.id,
+              newStatus,
+            });
+          } catch (error) {
+            console.error('[ItemsClient] Status toggle failed:', error);
+          }
+        },
+      });
+    } else {
+      // Making active - no confirmation needed
+      (async () => {
+        try {
+          console.log('[ItemsClient] Toggling status:', {
+            itemId: item.id,
+            itemName: item.name,
+            from: item.status,
+            to: newStatus,
+          });
+          
+          await updateItem(item.id, { itemStatus: newStatus });
+          
+          console.log('[ItemsClient] Status updated successfully:', {
+            itemId: item.id,
+            newStatus,
+          });
+        } catch (error) {
+          console.error('[ItemsClient] Status toggle failed:', error);
+        }
+      })();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900" suppressHydrationWarning>
       <PageHeader
         title="Inventory"
-        description="Manage your catalog and stock levels"
+        description="Manage what's on your shelf and make it visible online"
         icon={Icons.Inventory}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
         {/* Header with Stats */}
         <ItemsHeader
           stats={stats}
           onCreateClick={openForm}
           onBulkUploadClick={openBulkUpload}
           tenantId={initialTenantId}
+        />
+
+        {/* Product Enrichment Banner */}
+        <ProductEnrichmentBanner tenantId={initialTenantId} />
+
+        {/* POS Integration Banner */}
+        <POSIntegrationBanner 
+          tenantId={initialTenantId} 
+          itemCount={stats.total}
         />
 
         {/* Filters */}
@@ -271,32 +418,65 @@ export default function ItemsClient({
           </div>
         )}
 
-        {/* Items Grid or List */}
-        {!loading && !loadError && (
-          <>
-            {viewMode === 'grid' ? (
-              <ItemsGrid
-                items={filteredItems}
-                onEdit={openEditModal}
-                onDelete={handleDelete}
-                onQRCode={openQRModal}
-                onPhotos={openPhotoGallery}
-                onCategory={openCategoryModal}
-                onPropagate={openPropagateModal}
-              />
-            ) : (
-              <ItemsList
-                items={filteredItems}
-                onEdit={openEditModal}
-                onDelete={handleDelete}
-              />
-            )}
+        {/* Empty State - Show Quick Start when no items exist */}
+        {!loading && !loadError && stats.total === 0 && (
+          <QuickStartEmptyState tenantId={initialTenantId} />
+        )}
 
-            {/* Pagination */}
-            <ItemsPagination
-              pagination={pagination}
-              onPageChange={loadPage}
-            />
+        {/* Items Grid or List */}
+        {!loading && !loadError && stats.total > 0 && (
+          <>
+            {filteredItems.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-sm text-neutral-500">No items match your filters.</p>
+                <button
+                  onClick={clearFilters}
+                  className="mt-4 text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            ) : (
+              <>
+                {viewMode === 'grid' ? (
+                  <ItemsGrid
+                    items={filteredItems}
+                    onEdit={openEditModal}
+                    onDelete={handleDelete}
+                    onQRCode={openQRModal}
+                    onPhotos={openPhotoGallery}
+                    onCategory={openCategoryModal}
+                    onPropagate={canPropagate ? openPropagateModal : undefined}
+                    onVisibilityToggle={handleVisibilityToggle}
+                    onStatusToggle={handleStatusToggle}
+                    tenantId={initialTenantId}
+                  />
+                ) : (
+                  <ItemsList
+                    items={filteredItems}
+                    onEdit={openEditModal}
+                    onDelete={handleDelete}
+                    onQRCode={openQRModal}
+                    onPhotos={openPhotoGallery}
+                    onCategory={openCategoryModal}
+                    onPropagate={canPropagate ? openPropagateModal : undefined}
+                    onVisibilityToggle={handleVisibilityToggle}
+                    onStatusToggle={handleStatusToggle}
+                    tenantId={initialTenantId}
+                  />
+                )}
+
+                {/* Pagination */}
+                <ItemsPagination
+                  pagination={pagination}
+                  onPageChange={loadPage}
+                  onPageSizeChange={setPageSize}
+                />
+
+                {/* Quick Start Guide */}
+                <ItemsGuide />
+              </>
+            )}
           </>
         )}
       </div>
@@ -353,6 +533,17 @@ export default function ItemsClient({
           onClose={closePropagateModal}
         />
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        confirmText={confirmDialog.variant === 'danger' ? 'Delete' : 'Continue'}
+      />
     </div>
   );
 }

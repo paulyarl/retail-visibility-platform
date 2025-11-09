@@ -1,7 +1,7 @@
 "use client";
 
 interface SyncStatusIndicatorProps {
-  itemStatus?: 'active' | 'inactive' | 'archived';
+  itemStatus?: 'active' | 'inactive' | 'syncing' | 'archived';
   visibility?: 'public' | 'private';
   categoryPath?: string[];
   showDetails?: boolean;
@@ -17,69 +17,85 @@ export default function SyncStatusIndicator({
   const isPublic = visibility === 'public';
   const hasCategory = categoryPath && categoryPath.length > 0;
   
-  const willSync = isActive && isPublic;
+  const willSync = isActive && isPublic && hasCategory;
   
-  // Determine blocking reasons
+  // Determine blocking reasons with actionable instructions
   const blockingReasons: string[] = [];
-  if (!isActive) blockingReasons.push('Item is not active');
-  if (!isPublic) blockingReasons.push('Item is private');
+  if (!isActive) blockingReasons.push('Item is Archived (click Archived to restore)');
+  if (!isPublic) blockingReasons.push('Item is Private (click Private to make Public)');
+  if (!hasCategory) blockingReasons.push('No category assigned (click Category to assign)');
   
   // Warning reasons (won't block sync but may cause issues)
   const warnings: string[] = [];
-  if (!hasCategory) warnings.push('No category assigned');
+  // Currently no warnings - category is now a blocker
 
   if (willSync) {
     return (
-      <div className="flex items-start gap-2">
-        <div className="flex items-center gap-1.5 text-green-600">
-          <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-          </svg>
-          <span className="text-sm font-medium">Syncs to Google</span>
-        </div>
-        {showDetails && warnings.length > 0 && (
-          <div className="ml-6 mt-1">
-            <div className="text-xs text-amber-600 flex items-start gap-1">
-              <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <div>
-                <div className="font-medium">Warnings:</div>
-                <ul className="list-disc list-inside">
-                  {warnings.map((w, i) => <li key={i}>{w}</li>)}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="flex items-center gap-1.5 text-green-600 dark:text-green-500">
+        <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+        </svg>
+        <span className="text-xs sm:text-sm font-medium hidden sm:inline">Syncing to Google</span>
+        <span className="text-xs font-medium sm:hidden">✓ Sync</span>
       </div>
     );
   }
 
+  // Not syncing - show visual indicators for blockers
+  const isIntentionalBlock = !isActive || !isPublic;
+  const colorClass = isIntentionalBlock 
+    ? 'text-red-600 dark:text-red-500' 
+    : 'text-amber-600 dark:text-amber-500';
+  
   return (
-    <div className="flex items-start gap-2">
-      <div className="flex items-center gap-1.5 text-neutral-400">
-        <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-        </svg>
-        <span className="text-sm font-medium">Not syncing</span>
+    <div className="flex items-center gap-1.5">
+      {/* Main status icon */}
+      <svg className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 ${colorClass}`} fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+      </svg>
+      
+      {/* Desktop: Show text */}
+      <span className={`text-xs sm:text-sm font-medium hidden sm:inline ${colorClass}`}>
+        Not syncing
+      </span>
+      
+      {/* Mobile: Show compact visual blockers */}
+      <div className="flex items-center gap-1 sm:hidden">
+        {!isActive && (
+          <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300" title="Archived">
+            📦
+          </span>
+        )}
+        {!isPublic && (
+          <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300" title="Private">
+            🔒
+          </span>
+        )}
+        {!hasCategory && (
+          <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300" title="No category">
+            🏷️
+          </span>
+        )}
       </div>
+      
+      {/* Desktop: Show detailed reasons if requested */}
       {showDetails && blockingReasons.length > 0 && (
-        <div className="ml-6 mt-1">
-          <div className="text-xs text-red-600 flex items-start gap-1">
-            <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            <div>
-              <div className="font-medium">Blocked by:</div>
-              <ul className="list-disc list-inside">
-                {blockingReasons.map((r, i) => <li key={i}>{r}</li>)}
-              </ul>
-              <div className="mt-1 text-neutral-600">
-                To sync: Make item <span className="font-semibold">active</span> and <span className="font-semibold">public</span>
-              </div>
-            </div>
-          </div>
+        <div className="hidden sm:flex items-center gap-1.5 ml-2">
+          {!isActive && (
+            <span className="text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+              Archived
+            </span>
+          )}
+          {!isPublic && (
+            <span className="text-xs px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+              Private
+            </span>
+          )}
+          {!hasCategory && (
+            <span className="text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+              No category
+            </span>
+          )}
         </div>
       )}
     </div>

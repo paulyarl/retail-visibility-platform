@@ -66,30 +66,91 @@ export default function ItemsFilters({
         </Button>
       </div>
 
-      {/* Filter Dropdowns */}
-      <div className="flex flex-wrap gap-3">
-        {/* Status Filter */}
-        <select
-          value={statusFilter}
-          onChange={(e) => onStatusChange(e.target.value as StatusFilter)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md bg-white dark:bg-neutral-800 text-sm"
-        >
-          <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="syncing">Syncing</option>
-        </select>
+      {/* Filter Toggle Groups */}
+      <div className="flex flex-wrap gap-4">
+        {/* Status Filter Toggles */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Status:</span>
+          <div className="inline-flex rounded-lg border border-neutral-300 dark:border-neutral-600 overflow-hidden">
+            <button
+              onClick={() => onStatusChange('all')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                statusFilter === 'all'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => onStatusChange('active')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-neutral-300 dark:border-neutral-600 ${
+                statusFilter === 'active'
+                  ? 'bg-success text-white'
+                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+              }`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => onStatusChange('inactive')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-neutral-300 dark:border-neutral-600 ${
+                statusFilter === 'inactive'
+                  ? 'bg-neutral-500 text-white'
+                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+              }`}
+            >
+              Inactive
+            </button>
+            <button
+              onClick={() => onStatusChange('syncing')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-neutral-300 dark:border-neutral-600 ${
+                statusFilter === 'syncing'
+                  ? 'bg-info text-white'
+                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+              }`}
+            >
+              Syncing
+            </button>
+          </div>
+        </div>
 
-        {/* Visibility Filter */}
-        <select
-          value={visibilityFilter}
-          onChange={(e) => onVisibilityChange(e.target.value as VisibilityFilter)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md bg-white dark:bg-neutral-800 text-sm"
-        >
-          <option value="all">All Visibility</option>
-          <option value="public">Public</option>
-          <option value="private">Private</option>
-        </select>
+        {/* Visibility Filter Toggles */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Visibility:</span>
+          <div className="inline-flex rounded-lg border border-neutral-300 dark:border-neutral-600 overflow-hidden">
+            <button
+              onClick={() => onVisibilityChange('all')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                visibilityFilter === 'all'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => onVisibilityChange('public')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-neutral-300 dark:border-neutral-600 ${
+                visibilityFilter === 'public'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+              }`}
+            >
+              Public
+            </button>
+            <button
+              onClick={() => onVisibilityChange('private')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-neutral-300 dark:border-neutral-600 ${
+                visibilityFilter === 'private'
+                  ? 'bg-neutral-500 text-white'
+                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+              }`}
+            >
+              Private
+            </button>
+          </div>
+        </div>
 
         {/* Category Filter */}
         <select
