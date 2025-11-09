@@ -518,9 +518,24 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: 
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-neutral-900">Find Us</h3>
                 {storeStatus && (
-                  <span className="flex items-center gap-2 text-sm">
-                    <span className={`inline-block w-2 h-2 rounded-full ${storeStatus.isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                    <span className={storeStatus.isOpen ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
+                  <span className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-full ${
+                    // Check if special hours are active (label contains parentheses with note)
+                    storeStatus.label.includes('(') && storeStatus.label.includes(')')
+                      ? 'bg-amber-50 border border-amber-200'
+                      : storeStatus.isOpen 
+                        ? 'bg-green-50 border border-green-200' 
+                        : 'bg-red-50 border border-red-200'
+                  }`}>
+                    <span className={`inline-block w-2 h-2 rounded-full ${
+                      storeStatus.label.includes('(') && storeStatus.label.includes(')')
+                        ? 'bg-amber-500'
+                        : storeStatus.isOpen ? 'bg-green-500' : 'bg-red-500'
+                    }`}></span>
+                    <span className={
+                      storeStatus.label.includes('(') && storeStatus.label.includes(')')
+                        ? 'text-amber-700 font-semibold'
+                        : storeStatus.isOpen ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'
+                    }>
                       {storeStatus.label}
                     </span>
                   </span>

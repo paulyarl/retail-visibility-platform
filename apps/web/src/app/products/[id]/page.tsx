@@ -135,6 +135,8 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
     const tenant: Tenant = tenantRes.ok ? await tenantRes.json() : { id: product.tenantId, name: 'Store' };
 
     // Fetch business profile using public endpoint (no auth required)
+    // Business hours are included in the profile response
+    let storeStatus = null;
     try {
       const profileRes = await fetch(`${apiBaseUrl}/public/tenant/${product.tenantId}/profile`, {
         cache: 'no-store',
@@ -153,25 +155,16 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
             : undefined,
           logo_url: profile.logo_url,
         };
+        
+        // Extract business hours from profile (same as storefront)
+        const businessHours = (profile as any)?.hours;
+        if (businessHours) {
+          storeStatus = computeStoreStatus(businessHours);
+        }
       }
     } catch (e) {
       // Profile fetch failed, continue without it
       console.error('Failed to fetch business profile:', e);
-    }
-
-    // Fetch business hours for store status
-    let storeStatus = null;
-    try {
-      const hoursRes = await fetch(`${apiBaseUrl}/public/tenant/${product.tenantId}/hours`, {
-        cache: 'no-store',
-      });
-      if (hoursRes.ok) {
-        const businessHours = await hoursRes.json();
-        storeStatus = computeStoreStatus(businessHours);
-      }
-    } catch (e) {
-      // Hours fetch failed, continue without it
-      console.error('Failed to fetch business hours:', e);
     }
 
     return { product, tenant, storeStatus };
