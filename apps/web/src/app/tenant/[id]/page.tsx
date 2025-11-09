@@ -428,25 +428,62 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
       </main>
 
       {/* Map Section - How to Get There */}
-      {mapLocation && (
-        <TenantMapSection 
-          location={mapLocation} 
-          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"
-        />
+      {tenant.metadata?.address && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">Find Us</h2>
+            <div className="w-full h-64 sm:h-80 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700">
+              <iframe
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                referrerPolicy="no-referrer-when-downgrade"
+                src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}&q=${encodeURIComponent(tenant.metadata.address)}`}
+                title="Store Location"
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.metadata.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                Get Directions
+              </a>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.metadata.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors text-sm font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                View on Google Maps
+              </a>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Tier-Based Footer */}
       <footer className="bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Business Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Business Info & Contact */}
             <div>
               <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
                 {businessName}
               </h3>
               
               {/* Contact Information */}
-              <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700 mb-4">
+              <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
                 <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
                   <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -490,11 +527,16 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                 )}
                 </div>
               </div>
+            </div>
 
-              {/* Hours Schedule */}
-                {businessHours && (
-                  <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                    <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
+            {/* Business Hours - Own Column */}
+            {businessHours && (
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                  Hours
+                </h3>
+                <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                  <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
                       <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -586,9 +628,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                         </div>
                       );
                     })()}
-                  </div>
-                )}
-            </div>
+                </div>
+              </div>
+            )}
 
             {/* Quick Links */}
             <div>

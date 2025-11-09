@@ -29,6 +29,46 @@ interface Product {
   tenantId: string;
   createdAt: string;
   updatedAt: string;
+  
+  // Enriched barcode data
+  upc?: string;
+  
+  // Nutrition & dietary
+  nutritionFacts?: {
+    servingSize?: string;
+    calories?: number;
+    totalFat?: string;
+    saturatedFat?: string;
+    transFat?: string;
+    cholesterol?: string;
+    sodium?: string;
+    totalCarbohydrate?: string;
+    dietaryFiber?: string;
+    sugars?: string;
+    protein?: string;
+    [key: string]: any;
+  };
+  allergens?: string[];
+  ingredients?: string;
+  dietaryInfo?: string[];
+  nutriScore?: string;
+  
+  // Physical attributes
+  dimensions?: {
+    length?: number;
+    width?: number;
+    height?: number;
+    unit?: string;
+  };
+  weight?: {
+    value?: number;
+    unit?: string;
+  };
+  
+  // Additional specs
+  specifications?: Record<string, any>;
+  environmentalInfo?: string[];
+  
   // Tier-based landing page fields
   marketingDescription?: string;
   imageGallery?: string[];

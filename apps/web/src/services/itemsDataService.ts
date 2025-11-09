@@ -11,7 +11,8 @@ export interface Item {
   itemStatus?: 'active' | 'inactive' | 'syncing'; // Backend field name
   visibility: 'public' | 'private';
   categoryPath?: string[];
-  images?: string[];
+  imageUrl?: string; // Primary photo URL from backend
+  images?: string[]; // Legacy field, may be deprecated
   metadata?: any;
   createdAt?: string;
   updatedAt?: string;

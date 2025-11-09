@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyPut, proxyPatch, proxyDelete } from '@/lib/api-proxy';
+import { proxyGet, proxyPut, proxyPatch, proxyDelete } from '@/lib/api-proxy';
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const res = await proxyGet(req, `/items/${id}`);
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (e) {
+    console.error('[API Proxy] GET /items/:id error:', e);
+    return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
+  }
+}
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

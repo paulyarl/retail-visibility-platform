@@ -17,6 +17,48 @@ interface Product {
   imageUrl?: string;
   sku: string;
   availability: string;
+  
+  // Enriched barcode data
+  upc?: string;
+  gtin?: string;
+  mpn?: string;
+  
+  // Nutrition & dietary
+  nutritionFacts?: {
+    servingSize?: string;
+    calories?: number;
+    totalFat?: string;
+    saturatedFat?: string;
+    transFat?: string;
+    cholesterol?: string;
+    sodium?: string;
+    totalCarbohydrate?: string;
+    dietaryFiber?: string;
+    sugars?: string;
+    protein?: string;
+    [key: string]: any;
+  };
+  allergens?: string[];
+  ingredients?: string;
+  dietaryInfo?: string[];
+  nutriScore?: string;
+  
+  // Physical attributes
+  dimensions?: {
+    length?: number;
+    width?: number;
+    height?: number;
+    unit?: string;
+  };
+  weight?: {
+    value?: number;
+    unit?: string;
+  };
+  
+  // Additional specs
+  specifications?: Record<string, any>;
+  environmentalInfo?: string[];
+  
   // Professional+ tier fields
   marketingDescription?: string;
   imageGallery?: string[];
@@ -69,6 +111,9 @@ export function TierBasedLandingPage({ product, tenant, gallery }: TierBasedLand
   const tier = tenant.subscriptionTier || 'trial';
   const features = getLandingPageFeatures(tier);
   const branding = product.customBranding;
+  
+  // Check if storefront is available (Starter+ tier)
+  const hasStorefront = tier !== 'trial' && tier !== 'google_only';
   
   // Determine colors
   const primaryColor = features.customColors && branding?.primaryColor ? branding.primaryColor : '#3b82f6';
@@ -184,6 +229,194 @@ export function TierBasedLandingPage({ product, tenant, gallery }: TierBasedLand
           )}
         </div>
 
+        {/* Tier-Gated Storefront CTA */}
+        {hasStorefront && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-sm p-6 mb-6 border border-blue-200">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-center sm:text-left">
+                <h3 className="text-lg font-semibold text-neutral-900 mb-1">
+                  Discover More Products
+                </h3>
+                <p className="text-sm text-neutral-600">
+                  Browse our full catalog at {displayName}
+                </p>
+              </div>
+              <a
+                href={`/tenant/${product.tenantId}`}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm whitespace-nowrap"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                Browse All Products
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Enriched Product Data - Instant Credibility */}
+        {/* Ingredients */}
+        {product.ingredients && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 className="text-xl font-semibold text-neutral-900 mb-3">Ingredients</h2>
+            <p className="text-sm text-neutral-700 leading-relaxed">{product.ingredients}</p>
+          </div>
+        )}
+
+        {/* Nutrition Facts */}
+        {product.nutritionFacts && Object.keys(product.nutritionFacts).length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-neutral-900">Nutrition Facts</h2>
+              {product.nutriScore && (
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                  Nutri-Score: {product.nutriScore}
+                </span>
+              )}
+            </div>
+            <div className="border-2 border-black p-4 space-y-2 max-w-md">
+              {product.nutritionFacts.servingSize && (
+                <div className="border-b-8 border-black pb-2">
+                  <p className="text-sm font-bold">Serving Size: {product.nutritionFacts.servingSize}</p>
+                </div>
+              )}
+              {product.nutritionFacts.calories !== undefined && (
+                <div className="border-b-4 border-black pb-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-lg">Calories</span>
+                    <span className="font-bold text-2xl">{product.nutritionFacts.calories}</span>
+                  </div>
+                </div>
+              )}
+              <div className="space-y-1 text-sm">
+                {product.nutritionFacts.totalFat && (
+                  <div className="flex justify-between border-b border-neutral-400 py-1">
+                    <span className="font-bold">Total Fat</span>
+                    <span>{product.nutritionFacts.totalFat}</span>
+                  </div>
+                )}
+                {product.nutritionFacts.saturatedFat && (
+                  <div className="flex justify-between pl-4 py-1">
+                    <span>Saturated Fat</span>
+                    <span>{product.nutritionFacts.saturatedFat}</span>
+                  </div>
+                )}
+                {product.nutritionFacts.cholesterol && (
+                  <div className="flex justify-between border-b border-neutral-400 py-1">
+                    <span className="font-bold">Cholesterol</span>
+                    <span>{product.nutritionFacts.cholesterol}</span>
+                  </div>
+                )}
+                {product.nutritionFacts.sodium && (
+                  <div className="flex justify-between border-b border-neutral-400 py-1">
+                    <span className="font-bold">Sodium</span>
+                    <span>{product.nutritionFacts.sodium}</span>
+                  </div>
+                )}
+                {product.nutritionFacts.totalCarbohydrate && (
+                  <div className="flex justify-between border-b border-neutral-400 py-1">
+                    <span className="font-bold">Total Carbohydrate</span>
+                    <span>{product.nutritionFacts.totalCarbohydrate}</span>
+                  </div>
+                )}
+                {product.nutritionFacts.dietaryFiber && (
+                  <div className="flex justify-between pl-4 py-1">
+                    <span>Dietary Fiber</span>
+                    <span>{product.nutritionFacts.dietaryFiber}</span>
+                  </div>
+                )}
+                {product.nutritionFacts.sugars && (
+                  <div className="flex justify-between pl-4 py-1">
+                    <span>Sugars</span>
+                    <span>{product.nutritionFacts.sugars}</span>
+                  </div>
+                )}
+                {product.nutritionFacts.protein && (
+                  <div className="flex justify-between border-t-4 border-black pt-2 mt-2">
+                    <span className="font-bold">Protein</span>
+                    <span>{product.nutritionFacts.protein}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Allergens & Dietary Info */}
+        {((product.allergens && product.allergens.length > 0) || (product.dietaryInfo && product.dietaryInfo.length > 0)) && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">Allergens & Dietary Information</h2>
+            {product.allergens && product.allergens.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-red-600 mb-2">⚠️ Contains Allergens:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.allergens.map((allergen, idx) => (
+                    <span key={idx} className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
+                      {allergen}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {product.dietaryInfo && product.dietaryInfo.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-700 mb-2">Dietary Information:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.dietaryInfo.map((info, idx) => (
+                    <span key={idx} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                      {info}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Product Specifications */}
+        {((product.dimensions || product.weight) || (product.specifications && Object.keys(product.specifications).length > 0)) && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">Product Specifications</h2>
+            <dl className="space-y-2 text-sm">
+              {product.dimensions && (
+                <div className="flex justify-between py-2 border-b border-neutral-200">
+                  <dt className="font-medium text-neutral-700">Dimensions</dt>
+                  <dd className="text-neutral-900">
+                    {product.dimensions.length} × {product.dimensions.width} × {product.dimensions.height} {product.dimensions.unit}
+                  </dd>
+                </div>
+              )}
+              {product.weight && (
+                <div className="flex justify-between py-2 border-b border-neutral-200">
+                  <dt className="font-medium text-neutral-700">Weight</dt>
+                  <dd className="text-neutral-900">{product.weight.value} {product.weight.unit}</dd>
+                </div>
+              )}
+              {product.specifications && Object.entries(product.specifications).map(([key, value]) => (
+                <div key={key} className="flex justify-between py-2 border-b border-neutral-200">
+                  <dt className="font-medium text-neutral-700 capitalize">{key.replace(/_/g, ' ')}</dt>
+                  <dd className="text-neutral-900">{String(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+
+        {/* Environmental Info */}
+        {product.environmentalInfo && product.environmentalInfo.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">🌱 Environmental Information</h2>
+            <ul className="space-y-2">
+              {product.environmentalInfo.map((info, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm">
+                  <span className="text-green-600 font-bold mt-0.5">✓</span>
+                  <span className="text-neutral-700">{info}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Custom Sections (Enterprise) */}
         {features.customSections && product.customSections && product.customSections.length > 0 && (
           <div className="space-y-6 mb-6">
@@ -276,6 +509,49 @@ export function TierBasedLandingPage({ product, tenant, gallery }: TierBasedLand
               </p>
             )}
           </div>
+
+          {/* Interactive Map */}
+          {metadata?.address && (
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold text-neutral-900 mb-3">Find Us</h3>
+              <div className="w-full h-64 sm:h-80 rounded-lg overflow-hidden border border-neutral-200">
+                <iframe
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}&q=${encodeURIComponent(metadata.address)}`}
+                  title="Store Location"
+                />
+              </div>
+              <div className="mt-3 flex gap-2">
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(metadata.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  Get Directions
+                </a>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(metadata.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  View on Google Maps
+                </a>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Platform Branding (unless Enterprise with removal) */}

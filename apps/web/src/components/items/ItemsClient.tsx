@@ -511,11 +511,23 @@ export default function ItemsClient({
       )}
 
       {showPhotoGallery && galleryItem && (
-        <ItemPhotoGallery
-          item={galleryItem}
-          tenantId={initialTenantId}
-          onUpdate={refresh}
-        />
+        <Modal
+          isOpen={showPhotoGallery}
+          onClose={closePhotoGallery}
+          title={`Photos - ${galleryItem.name}`}
+          size="xl"
+        >
+          <ItemPhotoGallery
+            item={galleryItem}
+            tenantId={initialTenantId}
+            onUpdate={refresh}
+          />
+          <ModalFooter>
+            <Button variant="ghost" onClick={closePhotoGallery}>
+              Close
+            </Button>
+          </ModalFooter>
+        </Modal>
       )}
 
       {showCategoryModal && categoryItem && (

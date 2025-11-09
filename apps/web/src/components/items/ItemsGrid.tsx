@@ -52,11 +52,15 @@ export default function ItemsGrid({
       {items.map((item) => (
         <Card key={item.id} className="hover:shadow-lg transition-shadow">
           <CardContent className="p-3 sm:p-4">
-            {/* Image */}
-            <div className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg mb-3 overflow-hidden">
-              {item.images && item.images.length > 0 ? (
+            {/* Image - Clickable */}
+            <div 
+              className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg mb-3 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank')}
+              title="View item details"
+            >
+              {item.imageUrl ? (
                 <img
-                  src={item.images[0]}
+                  src={item.imageUrl}
                   alt={item.name}
                   className="w-full h-full object-cover"
                 />
@@ -72,7 +76,11 @@ export default function ItemsGrid({
             {/* Content */}
             <div className="space-y-2">
               <div className="flex items-start justify-between gap-2">
-                <h4 className="font-semibold text-neutral-900 dark:text-white line-clamp-2">
+                <h4 
+                  className="font-semibold text-neutral-900 dark:text-white line-clamp-2 cursor-pointer hover:text-primary-600 transition-colors"
+                  onClick={() => tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank')}
+                  title="View item details"
+                >
                   {item.name}
                 </h4>
                 {item.status && (
@@ -151,6 +159,19 @@ export default function ItemsGrid({
                 </svg>
                 <span className="hidden xs:inline">Category</span>
                 <span className="xs:hidden">🏷️</span>
+              </Button>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => window.open(`/products/${item.id}`, '_blank')} 
+                className="text-xs sm:text-sm min-h-[36px] sm:min-h-[32px]"
+                title="View public product page (storefront)"
+              >
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                <span className="hidden xs:inline">View</span>
+                <span className="xs:hidden">👁️</span>
               </Button>
 
               {/* ADDITIONAL ACTIONS */}
