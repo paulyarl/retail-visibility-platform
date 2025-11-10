@@ -6,6 +6,7 @@ interface AppLinks {
   inventory: string;
   tenants: string;
   propagation?: string;
+  integrations?: string;
   settings: string;
 }
 
@@ -43,6 +44,7 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
         inventory: `/t/${tenantId}/items`,
         tenants: '/tenants',
         propagation: `/t/${tenantId}/propagation`,
+        integrations: `/t/${tenantId}/settings/integrations`,
         settings: `/t/${tenantId}/settings`,
       });
       setTenantScopedLinksOn(true);
@@ -52,6 +54,7 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
         inventory: '/items',
         tenants: '/tenants',
         propagation: undefined,
+        integrations: undefined,
         settings: '/settings',
       });
       setTenantScopedLinksOn(false);

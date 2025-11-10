@@ -4,6 +4,7 @@ interface NavLinksProps {
     inventory: string;
     tenants: string;
     propagation?: string;
+    integrations?: string;
     settings: string;
   };
   tenantScopedLinksOn: boolean;
@@ -55,6 +56,23 @@ export default function NavLinks({
           Propagation
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold">
             ORG
+          </span>
+        </a>
+      )}
+      {links.integrations && (
+        <a 
+          className={`${itemClassName} flex items-center gap-1.5`}
+          href={links.integrations}
+          onClick={onClick}
+        >
+          Integrations
+          <span className="flex items-center gap-1">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-600 text-white font-semibold">
+              🟢
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-600 text-white font-semibold">
+              🟦
+            </span>
           </span>
         </a>
       )}

@@ -186,7 +186,7 @@ export default function PromotionSettingsPage() {
                 Your store is currently promoted with <span className="font-semibold capitalize">{status.promotionTier}</span> tier
               </p>
               <p className="mt-2 text-sm text-gray-600">
-                Expires: {new Date(status.promotionExpiresAt).toLocaleDateString()}
+                Expires: {status.promotionExpiresAt ? new Date(status.promotionExpiresAt).toLocaleDateString() : 'Never'}
               </p>
             </div>
             <button

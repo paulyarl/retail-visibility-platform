@@ -334,6 +334,30 @@ export const FEATURE_CATALOG: PlatformFeature[] = [
 
   // PILLAR 6: Connection - Connect Everything Together
   {
+    id: 'clover_pos',
+    name: 'Clover POS Integration',
+    tagline: 'Sync with Clover',
+    description: "Connect your Clover POS and automatically sync inventory! Try it with demo mode first (25 sample products), then connect your real account when ready. Perfect for getting started!",
+    icon: 'pos',
+    pillar: 'connection',
+    category: 'integration',
+    requiredTier: 'starter',
+    route: '/settings/integrations',
+    isNew: true
+  },
+  {
+    id: 'square_pos',
+    name: 'Square POS Integration',
+    tagline: 'Sync with Square',
+    description: "Connect your Square POS and keep inventory in sync automatically! No more double-entry - update once, sync everywhere. Premium feature for Pro+ users.",
+    icon: 'pos',
+    pillar: 'connection',
+    category: 'integration',
+    requiredTier: 'professional',
+    route: '/settings/integrations',
+    isNew: true
+  },
+  {
     id: 'api_access',
     name: 'API Integration',
     tagline: 'Connect everything',
