@@ -866,7 +866,7 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
 
     // A) multipart/form-data "file" upload
     if (req.file) {
-      const f = req.file as Express.Multer.File;
+      const f = req.file as any;
       const ext = f.mimetype.includes("png") ? ".png" : f.mimetype.includes("webp") ? ".webp" : ".jpg";
       const pathKey = `tenants/${tenantId}/logo-${Date.now()}${ext}`;
       
@@ -1158,7 +1158,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 
     // B) multipart/form-data "file" → Supabase (if configured) or local FS in dev
     if (req.file) {
-      const f = req.file as Express.Multer.File;
+      const f = req.file as any;
       let publicUrl: string | null = null;
 
       if (supabase) {
