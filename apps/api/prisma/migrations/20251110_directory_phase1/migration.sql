@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_directory_settings_tenant ON directory_settings(t
 CREATE INDEX IF NOT EXISTS idx_directory_settings_published ON directory_settings(is_published) WHERE is_published = true;
 CREATE INDEX IF NOT EXISTS idx_directory_settings_featured ON directory_settings(is_featured) WHERE is_featured = true;
 CREATE INDEX IF NOT EXISTS idx_directory_settings_slug ON directory_settings(slug) WHERE slug IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_directory_featured_active ON directory_featured_listings(tenant_id, featured_until) WHERE featured_until > NOW();
+CREATE INDEX IF NOT EXISTS idx_directory_featured_active ON directory_featured_listings(tenant_id, featured_until);
 CREATE INDEX IF NOT EXISTS idx_directory_featured_priority ON directory_featured_listings(placement_priority DESC, featured_from DESC);
 CREATE INDEX IF NOT EXISTS idx_directory_support_notes_tenant ON directory_support_notes(tenant_id, created_at DESC);
 
