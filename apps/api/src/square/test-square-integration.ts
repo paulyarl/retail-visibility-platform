@@ -7,8 +7,11 @@
 
 import { createSquareOAuthService } from '../services/square/square-oauth.service';
 import { squareIntegrationRepository } from '../services/square/square-integration.repository';
-import { squareIntegrationService } from './square-integration.service';
+import { SquareIntegrationService } from './square-integration.service';
 import { createSquareClient } from '../services/square/square-client';
+
+// Create test instance
+const squareIntegrationService = new SquareIntegrationService();
 
 // Test configuration
 const TEST_TENANT_ID = process.env.TEST_TENANT_ID || '00000000-0000-0000-0000-000000000001';

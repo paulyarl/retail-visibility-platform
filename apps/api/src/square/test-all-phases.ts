@@ -7,13 +7,16 @@
 
 import { createSquareOAuthService } from '../services/square/square-oauth.service';
 import { squareIntegrationRepository } from '../services/square/square-integration.repository';
-import { squareIntegrationService } from './square-integration.service';
+import { SquareIntegrationService } from './square-integration.service';
 import { createSquareClient } from '../services/square/square-client';
 import { squareSyncService } from '../services/square/square-sync.service';
 import { createCatalogSync } from '../services/square/catalog-sync';
 import { createInventorySync } from '../services/square/inventory-sync';
 import { createConflictResolver } from '../services/square/conflict-resolver';
 import { createSquareBatchProcessor } from '../services/square/batch-processor';
+
+// Create test instance
+const squareIntegrationService = new SquareIntegrationService();
 
 // Test configuration
 const TEST_TENANT_ID = process.env.TEST_TENANT_ID || '00000000-0000-0000-0000-000000000001';
