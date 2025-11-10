@@ -1,12 +1,5 @@
 {
   "buildCommand": "pnpm install --frozen-lockfile && pnpm run vercel-build",
   "outputDirectory": "dist",
-  "framework": null,
-  "functions": {
-    "dist/index.js": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 60,
-      "memory": 1024
-    }
-  }
+  "framework": null
 }
