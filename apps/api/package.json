@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "nodemon",
     "build": "prisma generate && tsc -p tsconfig.build.json --skipLibCheck",
-    "start": "node dist/index.js",
-    "start:with-migrations": "prisma migrate resolve --applied 20251110_directory_phase1 || true && prisma migrate deploy && node dist/index.js",
+    "start": "prisma generate && node dist/index.js",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:local": "tsx prisma/seed.ts",
     "db:push": "doppler run --config dev -- prisma db push",
