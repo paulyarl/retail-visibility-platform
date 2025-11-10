@@ -276,7 +276,7 @@ router.get('/search', async (req, res) => {
       countQuery = Prisma.sql`${countQuery} AND LOWER(state) = LOWER(${state})`;
     }
 
-    const countResult = await db.execute(countQuery);
+    const countResult = await db.query(countQuery);
     const totalItems = Number(countResult.rows[0]?.total || 0);
     const totalPages = Math.ceil(totalItems / limitNum);
 
@@ -313,7 +313,7 @@ router.get('/categories', async (req, res) => {
       ORDER BY count DESC, primary_category ASC
     `;
 
-    const result = await db.execute(query);
+    const result = await db.query(query);
 
     return res.json({
       categories: result.rows.map((row: any) => ({
@@ -348,7 +348,7 @@ router.get('/locations', async (req, res) => {
       LIMIT 100
     `;
 
-    const result = await db.execute(query);
+    const result = await db.query(query);
 
     return res.json({
       locations: result.rows.map((row: any) => ({
@@ -406,7 +406,7 @@ router.get('/:slug', async (req, res) => {
       LIMIT 1
     `;
 
-    const result = await db.execute(query);
+    const result = await db.query(query);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'listing_not_found' });
