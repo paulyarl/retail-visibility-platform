@@ -73,7 +73,7 @@ export async function apiRequest(
   // - Bare path: prefix with API_BASE_URL
   const url = endpoint.startsWith('http') || endpoint.startsWith('/') 
     ? endpoint 
-    : `${API_BASE_URL}${endpoint}`;
+    : `${API_BASE_URL}/${endpoint}`;
 
   // Simple retry/backoff for 429/5xx (max 2 retries)
   const maxRetries = 2;

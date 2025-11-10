@@ -61,6 +61,11 @@ export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentB
       if (response.ok) {
         const data = await response.json();
         setProducts(data.products || []);
+      } else if (response.status === 404) {
+        // API not implemented yet, silently ignore
+        console.warn('[ProductEnrichmentBanner] Enrichment API not available');
+      } else {
+        console.error('[ProductEnrichmentBanner] Failed to fetch products:', response.status);
       }
     } catch (error) {
       console.error('[ProductEnrichmentBanner] Failed to fetch products:', error);
@@ -92,10 +97,10 @@ export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentB
       animate={{ opacity: 1, y: 0 }}
       className="mb-6"
     >
-      <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-orange-50">
+      <Card className="border-2 border-yellow-200 bg-linear-to-br from-yellow-50 to-orange-50">
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0">
+            <div className="shrink-0">
               <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
                 <Sparkles className="w-6 h-6 text-yellow-600" />
               </div>
@@ -105,7 +110,7 @@ export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentB
               <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-lg sm:text-xl font-bold text-neutral-900 flex items-center gap-2 flex-wrap">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0" />
                     <span>{products.length} {products.length === 1 ? 'Product Needs' : 'Products Need'} Enrichment</span>
                   </h3>
                   <p className="text-sm sm:text-base text-neutral-600 mt-1">
@@ -113,7 +118,7 @@ export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentB
                     Enrich them by scanning barcodes to add images, descriptions, and specifications.
                   </p>
                 </div>
-                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 flex-shrink-0">
+                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 shrink-0">
                   {products.length}
                 </Badge>
               </div>

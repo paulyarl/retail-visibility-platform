@@ -73,23 +73,24 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
       setError(null);
 
       // Check user's platform role and tenant role
-      const userResponse = await api.get('/auth/me');
+      const userResponse = await api.get('auth/me');
       if (userResponse.ok) {
         const userData = await userResponse.json();
         
         // Level 0: Platform support bypass (full access)
-        const hasSupportAccess = 
-          userData.role === 'PLATFORM_ADMIN' || 
-          userData.role === 'PLATFORM_SUPPORT';
+        const hasSupportAccess =
+          userData.user?.role === 'PLATFORM_ADMIN' ||
+          userData.user?.role === 'PLATFORM_SUPPORT';
         setCanSupport(hasSupportAccess);
         
         // Platform viewer gets read-only access to all tenants
-        const isPlatformViewer = userData.role === 'PLATFORM_VIEWER';
+        const isPlatformViewer = userData.user?.role === 'PLATFORM_VIEWER';
         
         // Get user's role on this specific tenant
-        if (userData.id && tenantId) {
+        // Platform admins bypass role checks, so skip this call
+        if (!hasSupportAccess && userData.user?.id && tenantId) {
           try {
-            const userTenantResponse = await api.get(`/api/users/${userData.id}/tenants/${tenantId}`);
+            const userTenantResponse = await api.get(`api/users/${userData.user.id}/tenants/${tenantId}`);
             if (userTenantResponse.ok) {
               const userTenantData = await userTenantResponse.json();
               setUserRole(userTenantData.role as UserTenantRole);
@@ -106,14 +107,11 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
           }
         }
         
-        // Platform admins and support bypass all tier checks
-        if (hasSupportAccess) {
-          setLoading(false);
-          return;
-        }
+        // Platform admins and support bypass tier checks, but still fetch tier data for display
+        // The bypass happens in canAccess() and checkFeature() functions
       }
 
-      // Fetch tenant and organization tier data in parallel
+      // Fetch tenant and organization tier data in parallel (Next.js API routes)
       const [tenantResponse, usageResponse] = await Promise.all([
         api.get(`/api/tenants/${tenantId}/tier`),
         api.get(`/api/tenants/${tenantId}/usage`)

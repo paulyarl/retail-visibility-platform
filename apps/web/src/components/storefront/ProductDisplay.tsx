@@ -24,30 +24,105 @@ interface ProductDisplayProps {
 }
 
 export default function ProductDisplay({ products, tenantId }: ProductDisplayProps) {
-  const getInitialView = (): 'grid' | 'list' => {
-    if (typeof window === 'undefined') return 'grid';
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); // Default to grid for SSR
+  const [mounted, setMounted] = useState(false);
+
+  // Initialize view mode on client-side only
+  useEffect(() => {
+    setMounted(true);
     try {
       const qs = new URLSearchParams(window.location.search);
       const q = qs.get('view');
-      if (q === 'grid' || q === 'list') return q;
+      if (q === 'grid' || q === 'list') {
+        setViewMode(q);
+        return;
+      }
       const saved = localStorage.getItem('storefront_view_mode');
-      if (saved === 'grid' || saved === 'list') return saved as 'grid' | 'list';
+      if (saved === 'grid' || saved === 'list') {
+        setViewMode(saved as 'grid' | 'list');
+      }
     } catch {}
-    return 'grid';
-  };
-
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(getInitialView);
+  }, []);
 
   // Persist on change and sync URL without navigation
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!mounted) return; // Only update after initial mount
     try {
       localStorage.setItem('storefront_view_mode', viewMode);
       const url = new URL(window.location.href);
       url.searchParams.set('view', viewMode);
       window.history.replaceState({}, '', url.toString());
     } catch {}
-  }, [viewMode]);
+  }, [viewMode, mounted]);
+
+  // Don't render view toggle until client-side state is initialized
+  if (!mounted) {
+    return (
+      <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {products.map((product: Product) => (
+            <Link
+              key={product.id}
+              href={`/products/${product.id}`}
+              className="group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow"
+            >
+              {/* Product Image */}
+              <div className="relative aspect-square bg-neutral-100 dark:bg-neutral-700">
+                {product.imageUrl ? (
+                  <Image
+                    src={product.imageUrl}
+                    alt={product.title}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
+                    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                )}
+                {/* Stock Badge */}
+                {product.availability === 'out_of_stock' && (
+                  <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
+                    Out of Stock
+                  </div>
+                )}
+                {product.availability === 'preorder' && (
+                  <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+                    Pre-order
+                  </div>
+                )}
+              </div>
+
+              {/* Product Info */}
+              <div className="p-4">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+                  {product.brand}
+                </p>
+                <h3 className="font-semibold text-neutral-900 dark:text-white line-clamp-2 mb-2">
+                  {product.title}
+                </h3>
+                {product.description && (
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-3">
+                    {product.description}
+                  </p>
+                )}
+                <div className="flex items-center justify-between">
+                  <p className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                    {product.currency} {typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    SKU: {product.sku}
+                  </p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -158,7 +233,7 @@ export default function ProductDisplay({ products, tenantId }: ProductDisplayPro
               className="group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow flex"
             >
               {/* Product Image */}
-              <div className="relative w-48 h-48 flex-shrink-0 bg-neutral-100 dark:bg-neutral-700">
+              <div className="relative w-48 h-48 shrink-0 bg-neutral-100 dark:bg-neutral-700">
                 {product.imageUrl ? (
                   <Image
                     src={product.imageUrl}

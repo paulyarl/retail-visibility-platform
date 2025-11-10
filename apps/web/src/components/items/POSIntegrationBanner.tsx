@@ -34,6 +34,10 @@ export default function POSIntegrationBanner({
         if (response.ok) {
           const data = await response.json();
           setHasPOS(data.connected || false);
+        } else if (response.status === 404) {
+          // API not implemented yet, assume no POS connection
+          console.warn('[POSIntegrationBanner] Clover integration API not available');
+          setHasPOS(false);
         }
       } catch (error) {
         console.error('[POSIntegrationBanner] Failed to check POS connection:', error);
