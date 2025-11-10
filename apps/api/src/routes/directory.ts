@@ -7,6 +7,14 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
+import { Pool } from 'pg';
+
+// Create a connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+const db = pool;
 
 const router = Router();
 
@@ -88,7 +96,7 @@ router.get('/search', async (req, res) => {
       [];
 
     // Build query
-    let query = sql`
+    let query = Prisma.sql`
       SELECT 
         id,
         tenant_id as "tenantId",
@@ -117,7 +125,7 @@ router.get('/search', async (req, res) => {
 
     // Add distance calculation if lat/lng provided
     if (lat && lng) {
-      query = sql`${query},
+      query = Prisma.sql`${query},
         calculate_distance_miles(
           ${Number(lat)}, ${Number(lng)}, 
           latitude, longitude
@@ -125,14 +133,14 @@ router.get('/search', async (req, res) => {
       `;
     }
 
-    query = sql`${query}
+    query = Prisma.sql`${query}
       FROM directory_listings
       WHERE is_published = true
     `;
 
     // Full-text search
     if (q) {
-      query = sql`${query}
+      query = Prisma.sql`${query}
         AND to_tsvector('english', 
           COALESCE(business_name, '') || ' ' || 
           COALESCE(description, '') || ' ' || 
@@ -144,7 +152,7 @@ router.get('/search', async (req, res) => {
 
     // Category filter
     if (category) {
-      query = sql`${query}
+      query = Prisma.sql`${query}
         AND (primary_category = ${category} OR ${category} = ANY(secondary_categories))
       `;
     }
@@ -152,23 +160,23 @@ router.get('/search', async (req, res) => {
     // Multiple categories (OR logic)
     if (categories.length > 0) {
       const categoryList = categories.map((c: string) => `'${c}'`).join(',');
-      query = sql`${query}
-        AND (primary_category = ANY(ARRAY[${sql.raw(categoryList)}]) 
-             OR secondary_categories && ARRAY[${sql.raw(categoryList)}])
+      query = Prisma.sql`${query}
+        AND (primary_category = ANY(ARRAY[${Prisma.sql.raw(categoryList)}]) 
+             OR secondary_categories && ARRAY[${Prisma.sql.raw(categoryList)}])
       `;
     }
 
     // Location filters
     if (city) {
-      query = sql`${query} AND LOWER(city) = LOWER(${city})`;
+      query = Prisma.sql`${query} AND LOWER(city) = LOWER(${city})`;
     }
     if (state) {
-      query = sql`${query} AND LOWER(state) = LOWER(${state})`;
+      query = Prisma.sql`${query} AND LOWER(state) = LOWER(${state})`;
     }
 
     // Radius filter (requires lat/lng)
     if (lat && lng && radius) {
-      query = sql`${query}
+      query = Prisma.sql`${query}
         AND ST_DWithin(
           geolocation,
           ST_SetSRID(ST_MakePoint(${Number(lng)}, ${Number(lat)}), 4326)::geography,
@@ -179,13 +187,13 @@ router.get('/search', async (req, res) => {
 
     // Rating filter
     if (minRating) {
-      query = sql`${query} AND rating_avg >= ${Number(minRating)}`;
+      query = Prisma.sql`${query} AND rating_avg >= ${Number(minRating)}`;
     }
 
     // Features filter
     if (features.length > 0) {
       for (const feature of features) {
-        query = sql`${query} AND features->>${feature} = 'true'`;
+        query = Prisma.sql`${query} AND features->>${feature} = 'true'`;
       }
     }
 
@@ -195,7 +203,7 @@ router.get('/search', async (req, res) => {
       const dayOfWeek = now.getDay(); // 0 = Sunday
       const currentTime = now.toTimeString().slice(0, 5); // HH:MM
       
-      query = sql`${query}
+      query = Prisma.sql`${query}
         AND business_hours IS NOT NULL
         AND business_hours->>${dayOfWeek}->>'isOpen' = 'true'
         AND business_hours->>${dayOfWeek}->>'open' <= ${currentTime}
@@ -204,39 +212,39 @@ router.get('/search', async (req, res) => {
     }
 
     // Sorting
-    let orderBy = sql``;
+    let orderBy = Prisma.sql``;
     switch (sort) {
       case 'distance':
         if (lat && lng) {
-          orderBy = sql` ORDER BY distance ASC`;
+          orderBy = Prisma.sql` ORDER BY distance ASC`;
         } else {
-          orderBy = sql` ORDER BY business_name ASC`;
+          orderBy = Prisma.sql` ORDER BY business_name ASC`;
         }
         break;
       case 'rating':
-        orderBy = sql` ORDER BY rating_avg DESC, rating_count DESC`;
+        orderBy = Prisma.sql` ORDER BY rating_avg DESC, rating_count DESC`;
         break;
       case 'newest':
-        orderBy = sql` ORDER BY created_at DESC`;
+        orderBy = Prisma.sql` ORDER BY created_at DESC`;
         break;
       case 'relevance':
       default:
         // Featured first, then by rating
-        orderBy = sql` ORDER BY is_featured DESC, rating_avg DESC, product_count DESC`;
+        orderBy = Prisma.sql` ORDER BY is_featured DESC, rating_avg DESC, product_count DESC`;
         break;
     }
 
-    query = sql`${query}${orderBy}`;
+    query = Prisma.sql`${query}${orderBy}`;
 
     // Pagination
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const offset = (pageNum - 1) * limitNum;
 
-    query = sql`${query} LIMIT ${limitNum} OFFSET ${offset}`;
+    query = Prisma.sql`${query} LIMIT ${limitNum} OFFSET ${offset}`;
 
     // Execute query
-    const listings = await prisma.$queryRawUnsafe(query.sql, ...query.params);
+    const listings = await prisma.$queryRawUnsafe(query.sql, ...query.params) as any;
 
     // Get total count for pagination
     let countQuery = Prisma.sql`
@@ -247,7 +255,7 @@ router.get('/search', async (req, res) => {
 
     // Apply same filters to count
     if (q) {
-      countQuery = sql`${countQuery}
+      countQuery = Prisma.sql`${countQuery}
         AND to_tsvector('english', 
           COALESCE(business_name, '') || ' ' || 
           COALESCE(description, '') || ' ' || 
@@ -257,15 +265,15 @@ router.get('/search', async (req, res) => {
       `;
     }
     if (category) {
-      countQuery = sql`${countQuery}
+      countQuery = Prisma.sql`${countQuery}
         AND (primary_category = ${category} OR ${category} = ANY(secondary_categories))
       `;
     }
     if (city) {
-      countQuery = sql`${countQuery} AND LOWER(city) = LOWER(${city})`;
+      countQuery = Prisma.sql`${countQuery} AND LOWER(city) = LOWER(${city})`;
     }
     if (state) {
-      countQuery = sql`${countQuery} AND LOWER(state) = LOWER(${state})`;
+      countQuery = Prisma.sql`${countQuery} AND LOWER(state) = LOWER(${state})`;
     }
 
     const countResult = await db.execute(countQuery);
@@ -274,7 +282,7 @@ router.get('/search', async (req, res) => {
 
     // Return response (same format as /public/tenant/:id/items)
     return res.json({
-      listings: listings.rows,
+      listings: (listings as any).rows,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -294,7 +302,7 @@ router.get('/search', async (req, res) => {
  */
 router.get('/categories', async (req, res) => {
   try {
-    const query = sql`
+    const query = Prisma.sql`
       SELECT 
         primary_category as category,
         COUNT(*) as count
@@ -326,7 +334,7 @@ router.get('/categories', async (req, res) => {
  */
 router.get('/locations', async (req, res) => {
   try {
-    const query = sql`
+    const query = Prisma.sql`
       SELECT 
         city,
         state,
@@ -364,7 +372,7 @@ router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const query = sql`
+    const query = Prisma.sql`
       SELECT 
         id,
         tenant_id as "tenantId",
