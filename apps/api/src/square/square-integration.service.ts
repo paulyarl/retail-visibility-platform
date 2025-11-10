@@ -196,8 +196,3 @@ export class SquareIntegrationService {
     }
   }
 }
-
-/**
- * Export the class only - instantiation happens lazily in routes
- */
-export { SquareIntegrationService };

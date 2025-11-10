@@ -276,7 +276,7 @@ router.get('/search', async (req, res) => {
       countQuery = Prisma.sql`${countQuery} AND LOWER(state) = LOWER(${state})`;
     }
 
-    const countResult = await prisma.$queryRaw<{ total: bigint }>(countQuery);
+    const countResult = await prisma.$queryRaw<{ total: bigint }[]>(countQuery) as { total: bigint }[];
     const totalItems = Number(countResult[0]?.total || 0);
     const totalPages = Math.ceil(totalItems / limitNum);
 
