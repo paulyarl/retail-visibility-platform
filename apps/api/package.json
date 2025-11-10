@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon",
-    "build": "prisma generate && tsc -p tsconfig.build.json --skipLibCheck",
-    "start": "node dist/index.js",
+    "build": "echo '🚀 Starting Prisma Client generation...' && prisma generate && echo '✅ Prisma Client generated successfully' && tsc -p tsconfig.build.json --skipLibCheck",
+    "start": "echo '🚀 Starting API server with fresh Prisma Client...' && node dist/index.js",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:local": "tsx prisma/seed.ts",
     "db:push": "doppler run --config dev -- prisma db push",
