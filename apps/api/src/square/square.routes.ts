@@ -5,8 +5,18 @@
 
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { squareSyncService } from '../services/square/square-sync.service';
 import { z } from 'zod';
+
+// Lazy import Square services to avoid startup failures
+let squareSyncService: any = null;
+
+const getSquareSyncService = async () => {
+  if (!squareSyncService) {
+    const { squareSyncService: service } = await import('../services/square/square-sync.service');
+    squareSyncService = service;
+  }
+  return squareSyncService;
+};
 
 // Lazy import the integration service to avoid startup failures
 let squareIntegrationService: any = null;
@@ -259,7 +269,8 @@ router.post('/integrations/:tenantId/sync', authenticateToken, async (req: Reque
     }
 
     // Create sync service
-    const syncService = await squareSyncService.create(tenantId);
+    const syncServiceObj = await getSquareSyncService();
+    const syncService = await syncServiceObj.create(tenantId);
 
     // Perform sync based on direction
     let result;
@@ -310,7 +321,8 @@ router.post('/integrations/:tenantId/sync/products', authenticateToken, async (r
       });
     }
 
-    const syncService = await squareSyncService.create(tenantId);
+    const syncServiceObj = await getSquareSyncService();
+    const syncService = await syncServiceObj.create(tenantId);
     const direction = validatedData.direction || 'bidirectional';
 
     let result;
@@ -358,7 +370,8 @@ router.post('/integrations/:tenantId/sync/inventory', authenticateToken, async (
       });
     }
 
-    const syncService = await squareSyncService.create(tenantId);
+    const syncServiceObj = await getSquareSyncService();
+    const syncService = await syncServiceObj.create(tenantId);
     const direction = validatedData.direction || 'bidirectional';
 
     let result;
