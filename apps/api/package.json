@@ -1,7 +1,7 @@
 {
   "name": "@rvp/api",
   "version": "1.0.0",
-  "description": "RVP API server (Express + TS + Prisma + SQLite)",
+  "description": "RVP API server (Express + TS + Prisma + SQLite) - Force rebuild v2",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon",
