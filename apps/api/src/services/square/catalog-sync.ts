@@ -143,9 +143,13 @@ export class CatalogSync {
         });
 
         // Update mapping
-        await squareIntegrationRepository.updateProductMapping(existingMapping.id, {
-          lastSyncedAt: new Date(),
-          syncStatus: 'synced',
+        // Update mapping via upsert
+        await squareIntegrationRepository.createProductMapping({
+          tenantId: this.tenantId,
+          integrationId: this.integrationId,
+          inventoryItemId: platformProduct.id,
+          squareCatalogObjectId: squareProduct.id,
+          squareItemVariationId: squareProduct.item_data?.variations?.[0]?.id || undefined,
         });
       } else {
         // Create new product
@@ -216,9 +220,13 @@ export class CatalogSync {
         };
 
         // Update mapping
-        await squareIntegrationRepository.updateProductMapping(existingMapping.id, {
-          lastSyncedAt: new Date(),
-          syncStatus: 'synced',
+        // Update mapping via upsert
+        await squareIntegrationRepository.createProductMapping({
+          tenantId: this.tenantId,
+          integrationId: this.integrationId,
+          inventoryItemId: platformProduct.id,
+          squareCatalogObjectId: squareProduct.id,
+          squareItemVariationId: squareProduct.item_data?.variations?.[0]?.id || undefined,
         });
       } else {
         // Create new product in Square

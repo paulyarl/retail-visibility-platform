@@ -376,7 +376,6 @@ async function testPhase4Database() {
         accessToken: encryptToken('test-access-token'),
         refreshToken: encryptToken('test-refresh-token'),
         tokenExpiresAt: calculateTokenExpiration(3600),
-        enabled: true,
       },
     });
     

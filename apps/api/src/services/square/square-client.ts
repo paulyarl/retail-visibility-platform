@@ -124,12 +124,12 @@ export class SquareClientService {
 /**
  * Factory function to create Square client from tenant integration
  */
-export function createSquareClient(integration: {
+export function createSquareClientFromIntegration(integration: {
   access_token: string;
   mode: 'sandbox' | 'production';
 }): SquareClientService {
   return new SquareClientService({
-    accessToken: integration.accessToken,
+    accessToken: integration.access_token,
     environment: integration.mode,
   });
 }
@@ -150,3 +150,8 @@ export function createSquareClientFromEnv(): SquareClientService {
     environment,
   });
 }
+
+/**
+ * Alias for createSquareClientFromIntegration (for backwards compatibility)
+ */
+export const createSquareClient = createSquareClientFromIntegration;

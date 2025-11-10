@@ -150,7 +150,7 @@ export class SquareSyncService {
         itemsFailed,
         errors,
         duration: Date.now() - startTime,
-        syncLogId: syncLog.id,
+        syncLogId: syncLog.toString(),
       };
     } catch (error: any) {
       console.error('[SquareSync] Sync from Square failed:', error);
@@ -241,7 +241,7 @@ export class SquareSyncService {
         itemsFailed,
         errors,
         duration: Date.now() - startTime,
-        syncLogId: syncLog.id,
+        syncLogId: syncLog.toString(),
       };
     } catch (error: any) {
       console.error('[SquareSync] Sync to Square failed:', error);

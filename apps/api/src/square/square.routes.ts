@@ -39,6 +39,13 @@ router.post('/oauth/exchange', authenticateToken, async (req: Request, res: Resp
     // Exchange code for tokens and save to database
     const integration = await squareIntegrationService.connectTenant(tenantId, code);
 
+    if (!integration) {
+      return res.status(500).json({
+        error: 'integration_failed',
+        message: 'Failed to create Square integration',
+      });
+    }
+
     res.status(200).json({
       message: 'Square integration connected successfully',
       integration: {
@@ -404,7 +411,7 @@ router.get('/integrations/:tenantId/sync/status', authenticateToken, async (req:
       status: 'active',
       lastSyncAt: integration.lastSyncAt,
       lastError: integration.lastError,
-      recentLogs: recentLogs.map(log => ({
+      recentLogs: recentLogs.map((log: any) => ({
         id: log.id,
         syncType: log.syncType,
         direction: log.direction,
