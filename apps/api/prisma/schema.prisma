@@ -192,7 +192,7 @@ model InventoryItem {
   brand                String
   categoryPath         String[]                 @default([]) // Google taxonomy path
   tenantCategoryId     String?                  @map("tenant_category_id") // FK to TenantCategory
-  condition            ProductCondition?        @default(new)
+  condition            ProductCondition?        @default(brand_new)
   currency             String                   @default("USD") @db.Char(3)
   description          String?
   eligibilityReason    String?
@@ -697,7 +697,7 @@ enum AvailabilityStatus {
 }
 
 enum ProductCondition {
-  new
+  brand_new
   refurbished
   used
 
