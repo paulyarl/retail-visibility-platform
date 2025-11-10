@@ -6,7 +6,7 @@ import { z } from "zod";
 import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
 
 // Debug: Log DATABASE_URL to verify it's correct
-// Migration fix applied: 20251024093000_add_photo_asset_fields marked as rolled back
+// Migration fix applied: ProductCondition enum renamed 'new' to 'brand_new'
 console.log('[DEBUG] DATABASE_URL:', process.env.DATABASE_URL?.substring(0, 50) + '...');
 import fs from "fs";
 import path from "path";
