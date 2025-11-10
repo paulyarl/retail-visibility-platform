@@ -7,6 +7,7 @@ import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
 
 // Debug: Log DATABASE_URL to verify it's correct
 // Migration fix applied: ProductCondition enum renamed 'new' to 'brand_new'
+// Force rebuild v3: Railway build cache bypass
 console.log('[DEBUG] DATABASE_URL:', process.env.DATABASE_URL?.substring(0, 50) + '...');
 import fs from "fs";
 import path from "path";
