@@ -159,10 +159,10 @@ router.get('/search', async (req, res) => {
 
     // Multiple categories (OR logic)
     if (categories.length > 0) {
-      const categoryList = categories.map((c: string) => `'${c}'`).join(',');
+      const categoryList = categories.map((c: string) => `'${c.replace(/'/g, "''")}'`).join(',');
       query = Prisma.sql`${query}
-        AND (primary_category = ANY(ARRAY[${Prisma.sql.raw(categoryList)}]) 
-             OR secondary_categories && ARRAY[${Prisma.sql.raw(categoryList)}])
+        AND (primary_category = ANY(ARRAY[${Prisma.raw(categoryList)}]) 
+             OR secondary_categories && ARRAY[${Prisma.raw(categoryList)}])
       `;
     }
 
@@ -244,7 +244,7 @@ router.get('/search', async (req, res) => {
     query = Prisma.sql`${query} LIMIT ${limitNum} OFFSET ${offset}`;
 
     // Execute query
-    const listings = await prisma.$queryRawUnsafe(query.sql, ...query.params) as any;
+    const listings = await prisma.$queryRaw(query) as any;
 
     // Get total count for pagination
     let countQuery = Prisma.sql`
@@ -276,13 +276,13 @@ router.get('/search', async (req, res) => {
       countQuery = Prisma.sql`${countQuery} AND LOWER(state) = LOWER(${state})`;
     }
 
-    const countResult = await db.query(countQuery);
-    const totalItems = Number(countResult.rows[0]?.total || 0);
+    const countResult = await prisma.$queryRaw<{ total: bigint }>(countQuery);
+    const totalItems = Number(countResult[0]?.total || 0);
     const totalPages = Math.ceil(totalItems / limitNum);
 
     // Return response (same format as /public/tenant/:id/items)
     return res.json({
-      listings: (listings as any).rows,
+      listings: listings,
       pagination: {
         page: pageNum,
         limit: limitNum,
