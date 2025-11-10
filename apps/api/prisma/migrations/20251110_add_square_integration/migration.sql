@@ -89,12 +89,7 @@ CREATE TABLE IF NOT EXISTS square_sync_logs (
     duration_ms INTEGER,
     
     -- Metadata
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    -- Indexes for querying
-    INDEX idx_square_sync_logs_tenant (tenant_id, created_at DESC),
-    INDEX idx_square_sync_logs_integration (integration_id, created_at DESC),
-    INDEX idx_square_sync_logs_status (status, created_at DESC)
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes for Performance
@@ -105,6 +100,10 @@ CREATE INDEX IF NOT EXISTS idx_square_mappings_tenant ON square_product_mappings
 CREATE INDEX IF NOT EXISTS idx_square_mappings_integration ON square_product_mappings(integration_id);
 CREATE INDEX IF NOT EXISTS idx_square_mappings_inventory_item ON square_product_mappings(inventory_item_id);
 CREATE INDEX IF NOT EXISTS idx_square_mappings_sync_status ON square_product_mappings(sync_status);
+
+CREATE INDEX IF NOT EXISTS idx_square_sync_logs_tenant ON square_sync_logs(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_square_sync_logs_integration ON square_sync_logs(integration_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_square_sync_logs_status ON square_sync_logs(status, created_at DESC);
 
 -- RLS Policies (Row Level Security)
 ALTER TABLE square_integrations ENABLE ROW LEVEL SECURITY;
