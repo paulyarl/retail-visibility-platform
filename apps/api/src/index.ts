@@ -98,6 +98,7 @@ import categoriesTenantRoutes from './routes/categories.tenant';
 import categoriesMirrorRoutes from './routes/categories.mirror';
 import mirrorAdminRoutes from './routes/mirror.admin';
 import syncLogsRoutes from './routes/sync-logs';
+import directoryRoutes from './routes/directory-v2';
 import scanRoutes from './routes/scan';
 import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
@@ -112,6 +113,7 @@ import cloverRoutes from './routes/integrations/clover';
 import squareRoutes from './square/square.routes';
 import dashboardRoutes from './routes/dashboard'; // FIXED VERSION
 import tenantTierRoutes from './routes/tenant-tier';
+import promotionRoutes from './routes/promotion';
 
 const app = express();
 
@@ -2166,8 +2168,12 @@ app.use('/tenants', tenantUserRoutes);
 app.use('/api/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
 app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
+app.use('/api/directory', directoryRoutes); // Public directory endpoint - no auth required
+console.log('✅ Directory routes mounted');
 app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
 console.log('✅ Dashboard routes mounted');
+app.use('/api', promotionRoutes); // Promotion endpoints
+console.log('✅ Promotion routes mounted');
 app.use(tenantTierRoutes); // Tenant tier and usage endpoints
 
 /* ------------------------------ v3.6.2-prep APIs ------------------------------ */
