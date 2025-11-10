@@ -19,8 +19,8 @@ RUN corepack enable && corepack prepare pnpm@latest --activate && pnpm install -
 # Copy source code
 COPY . .
 
-# Build TypeScript (exclude test files in production)
-RUN pnpm build
+# Build TypeScript (exclude test files in production) - Force rebuild v4
+RUN echo '🚀 Building with fresh Prisma Client generation...' && pnpm build
 
 # Expose port (Railway uses PORT env var)
 EXPOSE ${PORT:-8080}
