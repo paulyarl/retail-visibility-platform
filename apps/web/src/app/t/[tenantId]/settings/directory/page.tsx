@@ -1,7 +1,9 @@
 import { Suspense } from 'react';
 import DirectorySettingsPanel from '@/components/directory/DirectorySettingsPanel';
 
-export default function DirectorySettingsPage({ params }: { params: { tenantId: string } }) {
+export default async function DirectorySettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {
+  const { tenantId } = await params;
+  
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Suspense fallback={
@@ -10,7 +12,7 @@ export default function DirectorySettingsPage({ params }: { params: { tenantId: 
           <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
         </div>
       }>
-        <DirectorySettingsPanel tenantId={params.tenantId} />
+        <DirectorySettingsPanel tenantId={tenantId} />
       </Suspense>
     </div>
   );

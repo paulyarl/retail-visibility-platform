@@ -2176,15 +2176,17 @@ app.use('/organization-requests', organizationRequestRoutes);
 app.use('/upgrade-requests', upgradeRequestsRoutes);
 app.use('/permissions', permissionRoutes);
 app.use('/users', userRoutes);
-app.use('/tenants', tenantUserRoutes);
+// Directory routes - mount at specific paths to avoid conflicts
+app.use('/api/directory', directoryRoutes); // Public directory endpoint - no auth required
+app.use('/api/admin/directory', directoryAdminRoutes); // Admin directory management (auth in routes)
+app.use('/api/support/directory', directorySupportRoutes); // Support directory tools (auth in routes)
+// Tenant directory routes - MUST come before generic tenant routes
+app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
+console.log('✅ Directory routes mounted (public, tenant, admin, support)');
+// Generic tenant routes come AFTER directory routes
 app.use('/api/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
 app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
-app.use('/api/directory', directoryRoutes); // Public directory endpoint - no auth required
-app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
-app.use('/api/admin/directory', directoryAdminRoutes); // Admin directory management (auth in routes)
-app.use('/api/support/directory', directorySupportRoutes); // Support directory tools (auth in routes)
-console.log('✅ Directory routes mounted (public, tenant, admin, support)');
 app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
 console.log('✅ Dashboard routes mounted');
 app.use('/api', promotionRoutes); // Promotion endpoints

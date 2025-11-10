@@ -298,30 +298,36 @@ router.get('/search', async (req, res) => {
 
 /**
  * GET /api/directory/categories
- * Get list of categories with counts
+ * Get list of available business categories
  */
 router.get('/categories', async (req, res) => {
   try {
-    const query = Prisma.sql`
-      SELECT 
-        primary_category as category,
-        COUNT(*) as count
-      FROM directory_listings
-      WHERE is_published = true
-        AND primary_category IS NOT NULL
-      GROUP BY primary_category
-      ORDER BY count DESC, primary_category ASC
-    `;
+    // Return predefined list of business categories
+    const categories = [
+      { name: 'Retail Store', slug: 'retail-store' },
+      { name: 'Restaurant', slug: 'restaurant' },
+      { name: 'Cafe & Coffee Shop', slug: 'cafe-coffee-shop' },
+      { name: 'Grocery Store', slug: 'grocery-store' },
+      { name: 'Convenience Store', slug: 'convenience-store' },
+      { name: 'Pharmacy', slug: 'pharmacy' },
+      { name: 'Hardware Store', slug: 'hardware-store' },
+      { name: 'Pet Store', slug: 'pet-store' },
+      { name: 'Bookstore', slug: 'bookstore' },
+      { name: 'Electronics Store', slug: 'electronics-store' },
+      { name: 'Clothing Store', slug: 'clothing-store' },
+      { name: 'Sporting Goods', slug: 'sporting-goods' },
+      { name: 'Home & Garden', slug: 'home-garden' },
+      { name: 'Beauty & Cosmetics', slug: 'beauty-cosmetics' },
+      { name: 'Jewelry Store', slug: 'jewelry-store' },
+      { name: 'Toy Store', slug: 'toy-store' },
+      { name: 'Automotive', slug: 'automotive' },
+      { name: 'Bakery', slug: 'bakery' },
+      { name: 'Florist', slug: 'florist' },
+      { name: 'Gift Shop', slug: 'gift-shop' },
+      { name: 'Other', slug: 'other' },
+    ];
 
-    const result = await db.query(query);
-
-    return res.json({
-      categories: result.rows.map((row: any) => ({
-        name: row.category,
-        slug: row.category.toLowerCase().replace(/\s+/g, '-'),
-        count: Number(row.count),
-      })),
-    });
+    return res.json({ categories });
   } catch (error: any) {
     console.error('[GET /api/directory/categories] Error:', error);
     return res.status(500).json({ error: 'failed_to_get_categories' });

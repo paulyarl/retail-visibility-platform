@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { api } from '@/lib/api';
 
 export interface DirectoryListing {
   id: string;
@@ -35,7 +36,7 @@ export interface DirectoryListingHook {
 
 export function useDirectoryListing(tenantId: string): DirectoryListingHook {
   const [listing, setListing] = useState<DirectoryListing | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchListing = useCallback(async () => {
@@ -45,12 +46,11 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/tenants/${tenantId}/directory/listing`, {
-        credentials: 'include',
-      });
+      const response = await api.get(`/api/tenants/${tenantId}/directory/listing`);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch directory listing');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Failed to fetch directory listing (${response.status})`);
       }
 
       const data = await response.json();
@@ -69,10 +69,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      const response = await fetch(`/api/tenants/${tenantId}/directory/publish`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const response = await api.post(`/api/tenants/${tenantId}/directory/publish`);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -93,10 +90,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      const response = await fetch(`/api/tenants/${tenantId}/directory/unpublish`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const response = await api.post(`/api/tenants/${tenantId}/directory/unpublish`);
 
       if (!response.ok) {
         throw new Error('Failed to unpublish listing');
@@ -116,18 +110,11 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      const response = await fetch(`/api/tenants/${tenantId}/directory/listing`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          seo_description: updates.seoDescription,
-          seo_keywords: updates.seoKeywords,
-          primary_category: updates.primaryCategory,
-          secondary_categories: updates.secondaryCategories,
-        }),
+      const response = await api.patch(`/api/tenants/${tenantId}/directory/listing`, {
+        seo_description: updates.seoDescription,
+        seo_keywords: updates.seoKeywords,
+        primary_category: updates.primaryCategory,
+        secondary_categories: updates.secondaryCategories,
       });
 
       if (!response.ok) {
