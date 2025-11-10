@@ -1214,3 +1214,71 @@ model TierChangeLog {
   @@index([createdAt])
   @@map("tier_change_logs")
 }
+
+// Square POS Integration Models
+model SquareIntegration {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  accessToken     String   @map("access_token")
+  refreshToken    String?  @map("refresh_token")
+  merchantId      String   @map("merchant_id")
+  locationId      String?  @map("location_id")
+  tokenExpiresAt  DateTime? @map("token_expires_at")
+  scopes          String[]
+  mode            String   // 'sandbox' or 'production'
+  enabled         Boolean  @default(true)
+  lastSyncAt      DateTime? @map("last_sync_at")
+  lastError       String?  @map("last_error")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId])
+  @@index([tenantId])
+  @@index([enabled])
+  @@map("square_integrations")
+}
+
+model SquareProductMapping {
+  id                      String   @id @default(uuid())
+  tenantId                String   @map("tenant_id")
+  integrationId           String   @map("integration_id")
+  inventoryItemId         String   @map("inventory_item_id")
+  squareCatalogObjectId   String   @map("square_catalog_object_id")
+  squareItemVariationId   String?  @map("square_item_variation_id")
+  syncStatus              String   @default("pending") @map("sync_status")
+  lastSyncedAt            DateTime? @map("last_synced_at")
+  syncError               String?  @map("sync_error")
+  conflictResolution      String?  @map("conflict_resolution")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, inventoryItemId])
+  @@index([tenantId])
+  @@index([integrationId])
+  @@index([inventoryItemId])
+  @@index([syncStatus])
+  @@map("square_product_mappings")
+}
+
+model SquareSyncLog {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  integrationId   String   @map("integration_id")
+  mappingId       String?  @map("mapping_id")
+  syncType        String   @map("sync_type")
+  direction       String
+  operation       String
+  status          String
+  errorMessage    String?  @map("error_message")
+  errorCode       String?  @map("error_code")
+  requestPayload  Json?    @map("request_payload")
+  responsePayload Json?    @map("response_payload")
+  itemsAffected   Int      @default(0) @map("items_affected")
+  durationMs      Int?     @map("duration_ms")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([integrationId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("square_sync_logs")
+}

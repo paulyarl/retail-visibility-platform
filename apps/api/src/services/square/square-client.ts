@@ -4,7 +4,7 @@
  * Phase 1: Infrastructure Setup
  */
 
-import { Client, Environment } from 'square';
+const { SquareClient } = require('square') as any;
 
 export interface SquareConfig {
   accessToken: string;
@@ -12,15 +12,15 @@ export interface SquareConfig {
 }
 
 export class SquareClientService {
-  private client: Client;
-  private environment: Environment;
+  private client: any;
+  private environment: string;
 
   constructor(config: SquareConfig) {
     this.environment = config.environment === 'production' 
-      ? Environment.Production 
-      : Environment.Sandbox;
+      ? 'production' 
+      : 'sandbox';
 
-    this.client = new Client({
+    this.client = new SquareClient({
       accessToken: config.accessToken,
       environment: this.environment,
     });
@@ -29,7 +29,7 @@ export class SquareClientService {
   /**
    * Get the Square API client instance
    */
-  getClient(): Client {
+  getClient(): any {
     return this.client;
   }
 
@@ -73,8 +73,14 @@ export class SquareClientService {
    */
   async testConnection(): Promise<boolean> {
     try {
+      // Test if client is properly initialized
+      if (!this.client || !this.client.locationsApi) {
+        console.error('[SquareClient] Client or locationsApi is undefined');
+        return false;
+      }
+      
       const response = await this.client.locationsApi.listLocations();
-      return response.result.locations !== undefined;
+      return response?.result?.locations !== undefined;
     } catch (error) {
       console.error('[SquareClient] Connection test failed:', error);
       return false;
@@ -111,7 +117,7 @@ export class SquareClientService {
    * Get environment (sandbox or production)
    */
   getEnvironment(): string {
-    return this.environment === Environment.Production ? 'production' : 'sandbox';
+    return this.environment;
   }
 }
 

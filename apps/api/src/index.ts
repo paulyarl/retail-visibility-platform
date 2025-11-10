@@ -109,6 +109,7 @@ import tierSystemRoutes from './routes/admin/tier-system';
 import testGbpRoutes from './routes/test-gbp';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 import cloverRoutes from './routes/integrations/clover';
+import squareRoutes from './square/square.routes';
 import dashboardRoutes from './routes/dashboard'; // FIXED VERSION
 import tenantTierRoutes from './routes/tenant-tier';
 
@@ -2185,6 +2186,7 @@ app.use('/api/admin/feature-overrides', featureOverridesRoutes); // Feature over
 app.use('/api/admin/tier-management', tierManagementRoutes); // Tier management (admin-only, auth handled in route)
 app.use('/api/admin/tier-system', tierSystemRoutes); // Tier system CRUD (platform staff, auth handled in route)
 app.use('/api/integrations', cloverRoutes); // Clover POS integration (auth handled in route)
+app.use('/square', squareRoutes); // Square POS integration (auth handled in route)
 app.use('/admin', authenticateToken, adminUsersRoutes);
 app.use('/api/admin', authenticateToken, adminUsersRoutes);
 app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
