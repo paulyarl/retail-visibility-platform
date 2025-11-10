@@ -14,7 +14,8 @@ import {
   Home,
   Users,
   Menu,
-  X
+  X,
+  MapPin
 } from 'lucide-react';
 import SettingsFooter from '@/components/SettingsFooter';
 
@@ -33,6 +34,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/enrichment', label: 'Product Intelligence', icon: Sparkles },
     { href: '/admin/organizations', label: 'Organizations', icon: Building2 },
     { href: '/admin/categories', label: 'Categories', icon: Layers },
+    { href: '/admin/directory', label: 'Directory', icon: MapPin },
     { href: '/admin/tiers', label: 'Subscription Tiers', icon: DollarSign },
     { href: '/admin/billing', label: 'Billing', icon: DollarSign },
   ];
