@@ -76,6 +76,7 @@ export default async function TenantLayout({ children, params }: { children: Rea
     { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
     { label: 'Insights', href: `/t/${tenantId}/insights` },
     { label: 'Storefront', href: `/tenant/${tenantId}` },
+    { label: 'Directory', href: `/t/${tenantId}/settings/directory` },
     { label: 'Settings', href: `/t/${tenantId}/settings` },
     // Advanced/Diagnostic tools - consider moving to Settings submenu in future
     { label: 'Feed Validation', href: `/t/${tenantId}/feed-validation` },
