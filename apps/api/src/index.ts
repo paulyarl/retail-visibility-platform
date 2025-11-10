@@ -99,6 +99,9 @@ import categoriesMirrorRoutes from './routes/categories.mirror';
 import mirrorAdminRoutes from './routes/mirror.admin';
 import syncLogsRoutes from './routes/sync-logs';
 import directoryRoutes from './routes/directory-v2';
+import directoryTenantRoutes from './routes/directory-tenant';
+import directoryAdminRoutes from './routes/directory-admin';
+import directorySupportRoutes from './routes/directory-support';
 import scanRoutes from './routes/scan';
 import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
@@ -2178,7 +2181,10 @@ app.use('/api/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
 app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
 app.use('/api/directory', directoryRoutes); // Public directory endpoint - no auth required
-console.log('✅ Directory routes mounted');
+app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
+app.use('/api/admin/directory', directoryAdminRoutes); // Admin directory management (auth in routes)
+app.use('/api/support/directory', directorySupportRoutes); // Support directory tools (auth in routes)
+console.log('✅ Directory routes mounted (public, tenant, admin, support)');
 app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
 console.log('✅ Dashboard routes mounted');
 app.use('/api', promotionRoutes); // Promotion endpoints
