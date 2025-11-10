@@ -129,7 +129,7 @@ export function createSquareClient(integration: {
   mode: 'sandbox' | 'production';
 }): SquareClientService {
   return new SquareClientService({
-    accessToken: integration.access_token,
+    accessToken: integration.accessToken,
     environment: integration.mode,
   });
 }

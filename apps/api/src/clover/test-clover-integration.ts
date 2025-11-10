@@ -309,12 +309,11 @@ async function testPhase3DemoMode() {
   subsection('Test 3.2: Demo Item Conversion');
   try {
     const demoItems = getDemoItems();
-    const converted = convertDemoItemToRVPFormat(demoItems[0], TEST_TENANT_ID);
+    const converted = convertDemoItemToRVPFormat(demoItems[0]);
     
     if (
       converted.name === demoItems[0].name &&
-      converted.price === demoItems[0].price / 100 &&
-      converted.tenantId === TEST_TENANT_ID
+      converted.price === demoItems[0].price / 100
     ) {
       passed++;
       success('Demo item conversion works correctly');
@@ -377,7 +376,6 @@ async function testPhase4Database() {
         accessToken: encryptToken('test-access-token'),
         refreshToken: encryptToken('test-refresh-token'),
         tokenExpiresAt: calculateTokenExpiration(3600),
-        isDemo: true,
         enabled: true,
       },
     });

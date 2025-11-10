@@ -87,7 +87,7 @@ export class SquareSyncService {
       const syncLog = await squareIntegrationRepository.createSyncLog({
         tenantId: this.tenantId,
         integrationId: this.integrationId,
-        syncType: options.syncType || 'catalog',
+        syncType: (options.syncType === 'full' ? 'catalog' : options.syncType) || 'catalog',
         direction: 'from_square',
         operation: 'sync',
         status: 'pending',
@@ -132,7 +132,7 @@ export class SquareSyncService {
       await squareIntegrationRepository.createSyncLog({
         tenantId: this.tenantId,
         integrationId: this.integrationId,
-        syncType: options.syncType || 'catalog',
+        syncType: (options.syncType === 'full' ? 'catalog' : options.syncType) || 'catalog',
         direction: 'from_square',
         operation: 'sync',
         status: itemsFailed === 0 ? 'success' : 'error',
@@ -178,7 +178,7 @@ export class SquareSyncService {
       const syncLog = await squareIntegrationRepository.createSyncLog({
         tenantId: this.tenantId,
         integrationId: this.integrationId,
-        syncType: options.syncType || 'catalog',
+        syncType: (options.syncType === 'full' ? 'catalog' : options.syncType) || 'catalog',
         direction: 'to_square',
         operation: 'sync',
         status: 'pending',
@@ -223,7 +223,7 @@ export class SquareSyncService {
       await squareIntegrationRepository.createSyncLog({
         tenantId: this.tenantId,
         integrationId: this.integrationId,
-        syncType: options.syncType || 'catalog',
+        syncType: (options.syncType === 'full' ? 'catalog' : options.syncType) || 'catalog',
         direction: 'to_square',
         operation: 'sync',
         status: itemsFailed === 0 ? 'success' : 'error',
@@ -367,7 +367,7 @@ export async function createSquareSyncService(tenantId: string): Promise<SquareS
 
   // Create Square client
   const squareClient = createSquareClient({
-    access_token: integration.access_token,
+    access_token: integration.accessToken,
     mode: integration.mode as 'sandbox' | 'production',
   });
 

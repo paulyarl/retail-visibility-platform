@@ -43,10 +43,10 @@ router.post('/oauth/exchange', authenticateToken, async (req: Request, res: Resp
       message: 'Square integration connected successfully',
       integration: {
         id: integration.id,
-        merchantId: integration.merchant_id,
+        merchantId: integration.merchantId,
         enabled: integration.enabled,
         mode: integration.mode,
-        createdAt: integration.created_at,
+        createdAt: integration.createdAt,
       },
     });
   } catch (error) {
@@ -103,14 +103,14 @@ router.get('/integrations/:tenantId', authenticateToken, async (req: Request, re
       connected: true,
       integration: {
         id: integration.id,
-        merchantId: integration.merchant_id,
-        locationId: integration.location_id,
+        merchantId: integration.merchantId,
+        locationId: integration.locationId,
         enabled: integration.enabled,
         mode: integration.mode,
-        lastSyncAt: integration.last_sync_at,
-        lastError: integration.last_error,
-        createdAt: integration.created_at,
-        updatedAt: integration.updated_at,
+        lastSyncAt: integration.lastSyncAt,
+        lastError: integration.lastError,
+        createdAt: integration.createdAt,
+        updatedAt: integration.updatedAt,
       },
     });
   } catch (error) {
@@ -402,15 +402,15 @@ router.get('/integrations/:tenantId/sync/status', authenticateToken, async (req:
 
     res.status(200).json({
       status: 'active',
-      lastSyncAt: integration.last_sync_at,
-      lastError: integration.last_error,
+      lastSyncAt: integration.lastSyncAt,
+      lastError: integration.lastError,
       recentLogs: recentLogs.map(log => ({
         id: log.id,
-        syncType: log.sync_type,
+        syncType: log.syncType,
         direction: log.direction,
         status: log.status,
-        itemsAffected: log.items_affected,
-        createdAt: log.created_at,
+        itemsAffected: log.itemsAffected,
+        createdAt: log.createdAt,
       })),
     });
   } catch (error: any) {

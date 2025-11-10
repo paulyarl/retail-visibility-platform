@@ -54,7 +54,7 @@ export class InventorySync {
     return {
       productId: platformProductId,
       quantity: parseInt(squareInventory.quantity, 10) || 0,
-      locationId: squareInventory.location_id,
+      locationId: squareInventory.locationId,
       updatedAt: new Date(squareInventory.calculated_at),
     };
   }
