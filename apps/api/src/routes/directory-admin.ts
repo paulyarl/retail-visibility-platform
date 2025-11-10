@@ -158,7 +158,8 @@ router.get('/stats', authenticateToken, requireAdmin, async (req: Request, res: 
 
     const tierCounts: Record<string, number> = {};
     tenants.forEach(t => {
-      tierCounts[t.subscriptionTier] = (tierCounts[t.subscriptionTier] || 0) + 1;
+      const tier = t.subscriptionTier || 'unknown';
+      tierCounts[tier] = (tierCounts[tier] || 0) + 1;
     });
 
     return res.json({
@@ -190,13 +191,6 @@ router.get('/featured', authenticateToken, requireAdmin, async (req: Request, re
             id: true,
             name: true,
             subscriptionTier: true,
-          },
-        },
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
           },
         },
       },
