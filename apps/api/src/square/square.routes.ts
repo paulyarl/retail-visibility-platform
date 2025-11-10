@@ -23,8 +23,8 @@ let squareIntegrationService: any = null;
 
 const getSquareIntegrationService = async () => {
   if (!squareIntegrationService) {
-    const { squareIntegrationService: service } = await import('./square-integration.service');
-    squareIntegrationService = service;
+    const { SquareIntegrationService } = await import('./square-integration.service');
+    squareIntegrationService = new SquareIntegrationService();
   }
   return squareIntegrationService;
 };

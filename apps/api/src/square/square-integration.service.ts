@@ -198,6 +198,6 @@ export class SquareIntegrationService {
 }
 
 /**
- * Singleton instance - created on first access via routes
+ * Export the class only - instantiation happens lazily in routes
  */
-export const squareIntegrationService = new SquareIntegrationService();
+export { SquareIntegrationService };
