@@ -136,6 +136,9 @@ model Tenant {
   googleBusinessRefreshToken   String?
   googleBusinessTokenExpiry    DateTime?
   cloverIntegration            CloverIntegration?
+  directorySettings            DirectorySettings?
+  directoryFeaturedListings    DirectoryFeaturedListings[]
+  directorySupportNotes        DirectorySupportNotes[]
 
   @@index([name])
   @@index([subscriptionStatus])
@@ -616,9 +619,11 @@ model User {
   updatedAt              DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  tenants      UserTenant[]
-  sessions     UserSession[]
-  scanSessions ScanSession[]
+  tenants                      UserTenant[]
+  sessions                     UserSession[]
+  scanSessions                 ScanSession[]
+  directoryFeaturedListings    DirectoryFeaturedListings[]
+  directorySupportNotes        DirectorySupportNotes[]
 
   @@index([email])
   @@index([role])
@@ -1281,4 +1286,55 @@ model SquareSyncLog {
   @@index([integrationId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@map("square_sync_logs")
+}
+
+// Directory Phase 1 Models
+model DirectorySettings {
+  id                    String    @id @default(uuid())
+  tenantId              String    @unique @map("tenant_id")
+  isPublished           Boolean   @default(false) @map("is_published")
+  seoDescription        String?   @map("seo_description")
+  seoKeywords           String[]  @map("seo_keywords")
+  primaryCategory       String?   @map("primary_category")
+  secondaryCategories   String[]  @map("secondary_categories")
+  isFeatured            Boolean   @default(false) @map("is_featured")
+  featuredUntil         DateTime? @map("featured_until")
+  slug                  String?   @unique
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  tenant                Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([isPublished])
+  @@index([isFeatured])
+  @@index([slug])
+  @@map("directory_settings")
+}
+
+model DirectoryFeaturedListings {
+  id                  String   @id @default(uuid())
+  tenantId            String   @map("tenant_id")
+  featuredFrom        DateTime @map("featured_from")
+  featuredUntil       DateTime @map("featured_until")
+  placementPriority   Int      @default(5) @map("placement_priority")
+  createdBy           String?  @map("created_by")
+  createdAt           DateTime @default(now()) @map("created_at")
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdByUser       User?    @relation(fields: [createdBy], references: [id])
+
+  @@index([tenantId, featuredUntil])
+  @@index([placementPriority, featuredFrom(sort: Desc)])
+  @@map("directory_featured_listings")
+}
+
+model DirectorySupportNotes {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  note        String
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdByUser User   @relation(fields: [createdBy], references: [id])
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("directory_support_notes")
 }
