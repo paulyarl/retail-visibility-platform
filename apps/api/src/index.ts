@@ -110,7 +110,16 @@ import tierSystemRoutes from './routes/admin/tier-system';
 import testGbpRoutes from './routes/test-gbp';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 import cloverRoutes from './routes/integrations/clover';
-import squareRoutes from './square/square.routes';
+// Lazy import Square routes to avoid startup failures
+let squareRoutes: any = null;
+
+const getSquareRoutes = async () => {
+  if (!squareRoutes) {
+    const { default: routes } = await import('./square/square.routes');
+    squareRoutes = routes;
+  }
+  return squareRoutes;
+};
 import dashboardRoutes from './routes/dashboard'; // FIXED VERSION
 import tenantTierRoutes from './routes/tenant-tier';
 import promotionRoutes from './routes/promotion';
@@ -2192,7 +2201,15 @@ app.use('/api/admin/feature-overrides', featureOverridesRoutes); // Feature over
 app.use('/api/admin/tier-management', tierManagementRoutes); // Tier management (admin-only, auth handled in route)
 app.use('/api/admin/tier-system', tierSystemRoutes); // Tier system CRUD (platform staff, auth handled in route)
 app.use('/api/integrations', cloverRoutes); // Clover POS integration (auth handled in route)
-app.use('/square', squareRoutes); // Square POS integration (auth handled in route)
+app.use('/square', async (req, res, next) => {
+  try {
+    const routes = await getSquareRoutes();
+    return routes(req, res, next);
+  } catch (error) {
+    console.error('[Square Routes] Lazy loading error:', error);
+    res.status(500).json({ error: 'square_routes_unavailable' });
+  }
+}); // Square POS integration (auth handled in route)
 app.use('/admin', authenticateToken, adminUsersRoutes);
 app.use('/api/admin', authenticateToken, adminUsersRoutes);
 app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
