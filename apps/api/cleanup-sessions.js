@@ -1,5 +1,5 @@
 /**
- * Cleanup script to close old active scan sessions
+ * Cleanup script to close any old active scan sessions
  * Run with: node cleanup-sessions.js
  */
 

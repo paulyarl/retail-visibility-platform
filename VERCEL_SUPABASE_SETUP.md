@@ -1,6 +1,6 @@
 # Vercel + Supabase Database Configuration
 
-## Issue ##
+## Issue ###
 Prisma migrations are failing with advisory lock timeout errors:
 ```
 Error: P1002
