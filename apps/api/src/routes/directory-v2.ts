@@ -122,7 +122,7 @@ router.get('/categories', async (req: Request, res: Response) => {
     const result = await pool.query(query);
 
     return res.json({
-      categories: result.rows.map((row) => ({
+      categories: result.rows.map((row: any) => ({
         name: row.primary_category,
         count: parseInt(row.count),
       })),
@@ -151,7 +151,7 @@ router.get('/locations', async (req: Request, res: Response) => {
     const result = await pool.query(query);
 
     return res.json({
-      locations: result.rows.map((row) => ({
+      locations: result.rows.map((row: any) => ({
         city: row.city,
         state: row.state,
         count: parseInt(row.count),
