@@ -5,9 +5,19 @@
 
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { squareIntegrationService } from './square-integration.service';
 import { squareSyncService } from '../services/square/square-sync.service';
 import { z } from 'zod';
+
+// Lazy import the integration service to avoid startup failures
+let squareIntegrationService: any = null;
+
+const getSquareIntegrationService = async () => {
+  if (!squareIntegrationService) {
+    const { squareIntegrationService: service } = await import('./square-integration.service');
+    squareIntegrationService = service;
+  }
+  return squareIntegrationService;
+};
 
 const router = Router();
 
@@ -37,7 +47,8 @@ router.post('/oauth/exchange', authenticateToken, async (req: Request, res: Resp
     const { code, tenantId } = validatedData;
 
     // Exchange code for tokens and save to database
-    const integration = await squareIntegrationService.connectTenant(tenantId, code);
+    const service = await getSquareIntegrationService();
+    const integration = await service.connectTenant(tenantId, code);
 
     if (!integration) {
       return res.status(500).json({
@@ -96,7 +107,7 @@ router.get('/integrations/:tenantId', authenticateToken, async (req: Request, re
       });
     }
 
-    const integration = await squareIntegrationService.getIntegrationStatus(tenantId);
+    const integration = await (await getSquareIntegrationService()).getIntegrationStatus(tenantId);
 
     if (!integration) {
       return res.status(404).json({
@@ -145,7 +156,7 @@ router.post('/integrations/:tenantId/disconnect', authenticateToken, async (req:
       });
     }
 
-    await squareIntegrationService.disconnectTenant(tenantId);
+    await (await getSquareIntegrationService()).disconnectTenant(tenantId);
 
     res.status(200).json({
       message: 'Square integration disconnected successfully',
@@ -215,7 +226,7 @@ router.get('/integrations/:tenantId/logs', authenticateToken, async (req: Reques
       });
     }
 
-    const logs = await squareIntegrationService.getSyncLogs(tenantId, limit);
+    const logs = await (await getSquareIntegrationService()).getSyncLogs(tenantId, limit);
 
     res.status(200).json({
       logs,
@@ -395,7 +406,7 @@ router.get('/integrations/:tenantId/sync/status', authenticateToken, async (req:
     }
 
     // Get integration status
-    const integration = await squareIntegrationService.getIntegrationStatus(tenantId);
+    const integration = await (await getSquareIntegrationService()).getIntegrationStatus(tenantId);
 
     if (!integration) {
       return res.status(404).json({
@@ -405,7 +416,7 @@ router.get('/integrations/:tenantId/sync/status', authenticateToken, async (req:
     }
 
     // Get recent sync logs
-    const recentLogs = await squareIntegrationService.getSyncLogs(tenantId, 5);
+    const recentLogs = await (await getSquareIntegrationService()).getSyncLogs(tenantId, 5);
 
     res.status(200).json({
       status: 'active',

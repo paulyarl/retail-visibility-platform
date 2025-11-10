@@ -198,6 +198,6 @@ export class SquareIntegrationService {
 }
 
 /**
- * Singleton instance
+ * Singleton instance - created on first access via routes
  */
 export const squareIntegrationService = new SquareIntegrationService();
