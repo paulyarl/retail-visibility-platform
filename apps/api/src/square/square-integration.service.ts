@@ -9,10 +9,13 @@ import { squareIntegrationRepository } from '../services/square/square-integrati
 import { createSquareClient } from '../services/square/square-client';
 
 export class SquareIntegrationService {
-  private oauthService: SquareOAuthService;
+  private oauthService: SquareOAuthService | null = null;
 
-  constructor() {
-    this.oauthService = createSquareOAuthService();
+  private getOAuthService(): SquareOAuthService {
+    if (!this.oauthService) {
+      this.oauthService = createSquareOAuthService();
+    }
+    return this.oauthService;
   }
 
   /**
@@ -24,7 +27,7 @@ export class SquareIntegrationService {
       console.log(`[SquareIntegration] Connecting tenant ${tenantId}...`);
 
       // Exchange code for tokens
-      const tokens = await this.oauthService.exchangeCodeForToken(authorizationCode);
+      const tokens = await this.getOAuthService().exchangeCodeForToken(authorizationCode);
 
       console.log(`[SquareIntegration] Tokens received for merchant ${tokens.merchantId}`);
 
@@ -78,7 +81,7 @@ export class SquareIntegrationService {
 
       // Revoke access token
       try {
-        await this.oauthService.revokeToken(integration.accessToken);
+        await this.getOAuthService().revokeToken(integration.accessToken);
         console.log(`[SquareIntegration] Token revoked for tenant ${tenantId}`);
       } catch (error) {
         console.warn('[SquareIntegration] Token revocation failed (may already be revoked):', error);
@@ -136,7 +139,7 @@ export class SquareIntegrationService {
     try {
       console.log(`[SquareIntegration] Refreshing token for integration ${integrationId}...`);
 
-      const tokens = await this.oauthService.refreshAccessToken(refreshToken);
+      const tokens = await this.getOAuthService().refreshAccessToken(refreshToken);
 
       await squareIntegrationRepository.updateIntegration(integrationId, {
         accessToken: tokens.accessToken,
