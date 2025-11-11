@@ -96,7 +96,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
         />
 
         {/* Tier Gains Welcome - Celebrate what they unlocked */}
-        {tier && (
+        {tier && tier.effective?.level && tier.effective?.name && (
           <TierGainsWelcome 
             currentTier={tier.effective.level}
             tierDisplayName={tier.effective.name}

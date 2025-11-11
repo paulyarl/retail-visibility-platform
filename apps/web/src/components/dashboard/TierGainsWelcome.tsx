@@ -84,6 +84,9 @@ export default function TierGainsWelcome({ currentTier, tierDisplayName }: TierG
  * Get tier-specific gains based on pillar differentiation strategy
  */
 function getTierGains(tier: string) {
+  // Safety check for undefined tier
+  if (!tier) return null;
+  
   // Normalize tier name (handle both 'google_only' and 'starter' level names)
   const normalizedTier = tier.toLowerCase().replace(/_/g, '');
   
