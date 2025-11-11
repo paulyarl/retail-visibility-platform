@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { UserRole, UserTenantRole } from '@prisma/client';
 import { isPlatformAdmin } from '../utils/platform-admin';
+import { getTenantLimit, getTenantLimitConfig, canCreateTenant } from '../config/tenant-limits';
 
 /**
  * Get tenant ID from request
@@ -103,6 +104,9 @@ export const requireInventoryAccess = requireTenantRole(
 
 /**
  * Check if user can create tenants based on their subscription tier
+ * 
+ * This checks the user's highest tier across all their owned tenants
+ * and enforces location limits accordingly.
  */
 export async function checkTenantCreationLimit(
   req: Request,
@@ -123,38 +127,65 @@ export async function checkTenantCreationLimit(
     }
 
     // Count user's owned tenants
-    const ownedTenantCount = await prisma.userTenant.count({
+    const ownedTenants = await prisma.userTenant.findMany({
       where: {
         userId: req.user.userId,
         role: UserTenantRole.OWNER,
       },
+      include: {
+        tenant: {
+          select: {
+            subscriptionTier: true,
+            subscriptionStatus: true,
+          },
+        },
+      },
     });
 
-    // Get user's tenant limit from their subscription
-    // For now, default limits by role:
-    // PLATFORM_ADMIN: Unlimited
-    // PLATFORM_SUPPORT: Unlimited (can view all, but typically don't create)
-    // PLATFORM_VIEWER: Unlimited (read-only, but typically don't create)
-    // ADMIN: Unlimited (legacy)
-    // OWNER: 10 tenants
-    // USER: 3 tenants
-    const limits: Record<UserRole, number> = {
-      [UserRole.PLATFORM_ADMIN]: Infinity,
-      [UserRole.PLATFORM_SUPPORT]: Infinity,
-      [UserRole.PLATFORM_VIEWER]: Infinity,
-      [UserRole.ADMIN]: Infinity,
-      [UserRole.OWNER]: 10,
-      [UserRole.USER]: 3,
+    const ownedTenantCount = ownedTenants.length;
+
+    // Determine user's effective tier (highest tier they own)
+    // Tier hierarchy: organization > enterprise > professional > starter > google_only
+    const tierPriority: Record<string, number> = {
+      organization: 5,
+      enterprise: 4,
+      professional: 3,
+      starter: 2,
+      google_only: 1,
     };
 
-    const limit = limits[req.user.role] || 1;
+    let effectiveTier = 'starter';
+    let effectiveStatus = 'trial';
+    let highestPriority = 0;
 
-    if (ownedTenantCount >= limit) {
+    for (const ut of ownedTenants) {
+      const tier = ut.tenant.subscriptionTier || 'starter';
+      const status = ut.tenant.subscriptionStatus || 'trial';
+      const priority = tierPriority[tier] || 0;
+      
+      if (priority > highestPriority) {
+        highestPriority = priority;
+        effectiveTier = tier;
+        effectiveStatus = status;
+      }
+    }
+
+    // Get limit for effective tier and status
+    // CRITICAL: Trial status overrides tier limits (always 1 location)
+    const limitConfig = getTenantLimitConfig(effectiveTier, effectiveStatus);
+    const limit = limitConfig.limit;
+
+    // Check if user can create more tenants
+    if (!canCreateTenant(ownedTenantCount, effectiveTier, effectiveStatus)) {
       return res.status(403).json({
         error: 'tenant_limit_reached',
-        message: `Your plan allows ${limit} tenant(s). You currently have ${ownedTenantCount}. Upgrade to create more.`,
+        message: limitConfig.upgradeMessage || `Your ${effectiveTier} plan allows ${limit === Infinity ? 'unlimited' : limit} location(s). You currently have ${ownedTenantCount}.`,
         current: ownedTenantCount,
-        limit,
+        limit: limit === Infinity ? 'unlimited' : limit,
+        tier: effectiveTier,
+        status: effectiveStatus,
+        upgradeToTier: limitConfig.upgradeToTier,
+        upgradeMessage: limitConfig.upgradeMessage,
       });
     }
 

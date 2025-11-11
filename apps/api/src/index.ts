@@ -256,9 +256,25 @@ app.post("/tenants", authenticateToken, checkTenantCreationLimit, async (req, re
   try {
     console.log('[POST /tenants] Creating tenant for user:', req.user?.userId);
     
-    // Set trial to expire 30 days from now
+    // Validate for duplicates
+    const { validateTenantCreation } = await import('./utils/tenant-validation');
+    const validation = await validateTenantCreation(
+      req.user!.userId,
+      parsed.data.name
+    );
+    
+    if (!validation.valid) {
+      console.log('[POST /tenants] Validation failed:', validation.errors);
+      return res.status(409).json({
+        error: 'duplicate_tenant',
+        message: 'A location with this information already exists',
+        validationErrors: validation.errors,
+      });
+    }
+    
+    // Set trial to expire 14 days from now (corrected from 30)
     const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+    trialEndsAt.setDate(trialEndsAt.getDate() + 14);
     
     const tenant = await prisma.tenant.create({
       data: {
