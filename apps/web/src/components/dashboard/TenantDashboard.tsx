@@ -95,10 +95,9 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
         {/* Stats */}
         <DashboardStats
-          totalItems={data?.stats.totalItems || 0}
           activeItems={data?.stats.activeItems || 0}
           syncIssues={data?.stats.syncIssues || 0}
-          locations={data?.stats.locations || 0}
+          tenantId={tenantId}
         />
 
         {/* Tier Gains Welcome - Celebrate what they unlocked */}
