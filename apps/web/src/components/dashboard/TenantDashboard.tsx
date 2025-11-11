@@ -14,6 +14,7 @@ import TierBadge from "./TierBadge";
 import TierGainsWelcome from "./TierGainsWelcome";
 import WhatYouCanDo from "./WhatYouCanDo";
 import UserProfileBadge from "./UserProfileBadge";
+import VisibilityCards from "./VisibilityCards";
 
 interface TenantDashboardProps {
   tenantId: string;
@@ -107,6 +108,14 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
         <QuickActions 
           tenantId={tenantId}
           canManageSettings={canManageSettings}
+        />
+
+        {/* Visibility Cards - Path to Visibility */}
+        <VisibilityCards
+          tenantId={tenantId}
+          tenantName={data?.info?.name || 'Your Store'}
+          hasStorefront={true}
+          isInDirectory={false}
         />
 
         {/* Tier-Aware Feature Showcase */}
