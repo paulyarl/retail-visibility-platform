@@ -10,6 +10,8 @@ import { api } from '@/lib/api';
 import { isPlatformUser, isPlatformAdmin, type UserData } from '@/lib/auth/access-control';
 import { useAuth } from '@/contexts/AuthContext';
 import { ContextBadges } from '@/components/ContextBadges';
+import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
+import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 
 interface Tenant {
   id: string;
@@ -44,6 +46,12 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [requestHistory, setRequestHistory] = useState<PendingRequest[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  
+  // Get tenant ID for capacity data
+  const tenantId = propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('current_tenant_id') || localStorage.getItem('tenantId') : null);
+  
+  // Use centralized subscription usage hook
+  const { usage: capacityData } = useSubscriptionUsage(tenantId || undefined);
 
   useEffect(() => {
     const loadSubscription = async () => {
@@ -69,23 +77,16 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
           return;
         }
 
-        // Fetch tenant info, SKU count, pending requests, and history in parallel
-        const [tenantRes, itemsRes, requestsRes, historyRes] = await Promise.all([
+        // Fetch tenant info, pending requests, and history in parallel
+        // Note: SKU count now comes from useSubscriptionUsage hook
+        const [tenantRes, requestsRes, historyRes] = await Promise.all([
           api.get(`/api/tenants/${tenantId}`),
-          api.get(`/api/items?tenantId=${tenantId}&count=true`),
           api.get(`/api/upgrade-requests?tenantId=${tenantId}&status=new,pending,waiting`),
           api.get(`/api/upgrade-requests?tenantId=${tenantId}&status=complete,denied`)
         ]);
         
         if (tenantRes.ok) {
           const data = await tenantRes.json();
-          
-          // Get SKU count (optimized)
-          let itemCount = 0;
-          if (itemsRes.ok) {
-            const itemsData = await itemsRes.json();
-            itemCount = itemsData.count || (Array.isArray(itemsData) ? itemsData.length : 0);
-          }
           
           // Get pending requests
           if (requestsRes.ok) {
@@ -99,12 +100,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
             setRequestHistory(historyData.data || []);
           }
           
-          setTenant({
-            ...data,
-            _count: {
-              items: itemCount
-            }
-          });
+          setTenant(data);
         }
       } catch (error) {
         console.error('Failed to load user and subscription:', error);
@@ -321,11 +317,13 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   const tierInfo = isChainTier 
     ? CHAIN_TIERS[currentTier as ChainTier]
     : TIER_LIMITS[currentTier as SubscriptionTier];
-  const skuUsage = tenant._count?.items || 0;
-  const skuLimit = isChainTier 
+  
+  // Use capacity data from centralized hook
+  const skuUsage = capacityData?.skuUsage || 0;
+  const skuLimit = capacityData?.skuLimit || (isChainTier 
     ? (tierInfo as any).maxTotalSKUs 
-    : (tierInfo as any).maxSKUs;
-  const usagePercent = skuLimit === Infinity ? 0 : Math.round((skuUsage / skuLimit) * 100);
+    : (tierInfo as any).maxSKUs);
+  const usagePercent = capacityData?.skuPercent || 0;
 
   const handleRequestChange = (newTier: SubscriptionTier | ChainTier) => {
     setSelectedTier(newTier);

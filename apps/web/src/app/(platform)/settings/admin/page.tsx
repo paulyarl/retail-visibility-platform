@@ -8,6 +8,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
+import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 
 type AdminSection = {
   title: string;
@@ -365,6 +366,51 @@ export default function AdminDashboardPage() {
       ],
     },
     {
+      title: 'Capacity Management',
+      description: 'Monitor SKU usage, location limits, and subscription capacity across all tenants',
+      sections: [
+        {
+          title: 'Platform Capacity Overview',
+          description: 'View aggregate capacity usage across all tenants and tiers',
+          href: '/admin/capacity/overview',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          ),
+          color: 'bg-emerald-500',
+          stats: 'Real-time usage metrics',
+          badge: 'NEW',
+        },
+        {
+          title: 'Tenant Capacity Alerts',
+          description: 'Monitor tenants approaching or exceeding their limits',
+          href: '/admin/capacity/alerts',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          ),
+          color: 'bg-amber-500',
+          stats: 'Proactive monitoring',
+          badge: 'NEW',
+        },
+        {
+          title: 'Location Limits Management',
+          description: 'Manage tenant location limits and platform-wide restrictions',
+          href: '/admin/capacity/location-limits',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          ),
+          color: 'bg-cyan-500',
+          stats: 'Multi-location control',
+          badge: 'NEW',
+        },
+      ],
+    },
+    {
       title: 'Billing & Subscriptions',
       description: 'Manage subscription tiers, billing, and platform offerings',
       sections: [
@@ -460,7 +506,7 @@ export default function AdminDashboardPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         {/* System Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <AnimatedCard delay={0} hover={false}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -495,6 +541,24 @@ export default function AdminDashboardPage() {
                 <div className="h-12 w-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
                   <svg className="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+              </div>
+            </CardContent>
+          </AnimatedCard>
+
+          <AnimatedCard delay={0.2} hover={false}>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Platform Capacity</p>
+                  <div className="mt-2">
+                    <SubscriptionUsageBadge variant="inline" />
+                  </div>
+                </div>
+                <div className="h-12 w-12 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
               </div>
@@ -572,7 +636,7 @@ export default function AdminDashboardPage() {
             <CardDescription>Common administrative pages</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Link href="/settings/admin/users" className="p-4 text-left bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors block">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
@@ -611,6 +675,20 @@ export default function AdminDashboardPage() {
                   <div>
                     <p className="font-medium text-neutral-900 dark:text-neutral-100">Manage Features</p>
                     <p className="text-xs text-neutral-500">Toggle feature flags</p>
+                  </div>
+                </div>
+              </Link>
+
+              <Link href="/admin/capacity/overview" className="p-4 text-left bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors block">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900 dark:text-neutral-100">Capacity Overview</p>
+                    <p className="text-xs text-neutral-500">Monitor platform usage</p>
                   </div>
                 </div>
               </Link>

@@ -190,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(TENANT_KEY, data.user.tenants[0].id);
       }
     } catch (error) {
-      console.error('[AuthContext] Login failed:', error);
+      // Don't log to console - error will be caught and displayed in UI
       throw error;
     }
   };
@@ -215,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // After registration, automatically log in
       await login(email, password);
     } catch (error) {
-      console.error('[AuthContext] Registration failed:', error);
+      // Don't log to console - error will be caught and displayed in UI
       throw error;
     }
   };

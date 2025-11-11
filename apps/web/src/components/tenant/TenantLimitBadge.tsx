@@ -54,15 +54,28 @@ export default function TenantLimitBadge({
   }
 
   // Full variant
+  const isPlatformUser = status.tier.startsWith('platform_');
+  
   return (
-    <div className="bg-white border rounded-lg p-4 shadow-sm">
+    <div className={`border rounded-lg p-4 shadow-sm ${
+      isPlatformUser 
+        ? 'bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200' 
+        : 'bg-white'
+    }`}>
       <div className="flex items-start justify-between mb-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
             <MapPin className="w-4 h-4" />
             Locations
+            {isPlatformUser && (
+              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                Platform
+              </span>
+            )}
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">{status.tierDisplayName}</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {status.tierDisplayName || `${status.tier} tier`}
+          </p>
         </div>
         
         <div className="text-right">
@@ -70,11 +83,12 @@ export default function TenantLimitBadge({
             {status.current}
             <span className="text-gray-400 text-lg font-normal"> / {limitText}</span>
           </div>
-          {status.limit !== 'unlimited' && (
-            <div className="text-xs text-gray-500 mt-0.5">
-              {status.remaining} remaining
-            </div>
-          )}
+          <div className="text-xs text-gray-500 mt-0.5">
+            {status.limit === 'unlimited' 
+              ? 'Unlimited access' 
+              : `${status.remaining} remaining`
+            }
+          </div>
         </div>
       </div>
 

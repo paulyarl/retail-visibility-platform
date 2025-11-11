@@ -7,10 +7,21 @@
  * 
  * User can sign up for any tier (google_only, starter, professional)
  * but during trial period, they're limited to 1 location.
+ * 
+ * PLATFORM ROLES:
+ * - PLATFORM_ADMIN: Unlimited tenant creation (no limits)
+ * - PLATFORM_SUPPORT: Limited to 3 tenants total across all users (starter-level limits)
+ * - PLATFORM_VIEWER: Read-only, cannot create tenants
  */
 
 export type TenantLimitTier = 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'expired';
+
+/**
+ * Platform support tenant creation limit
+ * Support staff can create up to 3 test/demo tenants across all users
+ */
+export const PLATFORM_SUPPORT_LIMIT = 3;
 
 export interface TenantLimitConfig {
   limit: number;
@@ -89,6 +100,14 @@ export function getTenantLimit(tier: string, status?: string): number {
   // Paid subscriptions use tier limits
   const config = TENANT_LIMITS[tier as TenantLimitTier];
   return config?.limit ?? 1; // Default to 1 if tier not found
+}
+
+/**
+ * Get platform support tenant limit
+ * Support staff have starter-level limits (3 tenants) across all users
+ */
+export function getPlatformSupportLimit(): number {
+  return PLATFORM_SUPPORT_LIMIT;
 }
 
 /**

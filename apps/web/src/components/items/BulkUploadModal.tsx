@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button } from '@/components/ui';
 import { downloadCSVTemplate, parseCSV, validateCSVItems, type CSVItem } from '@/lib/csv-utils';
+import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 
 interface BulkUploadModalProps {
   tenantId: string;
@@ -115,6 +116,12 @@ export default function BulkUploadModal({ tenantId, onClose, onSuccess }: BulkUp
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            {/* Capacity Warning */}
+            <CreationCapacityWarning 
+              type="sku" 
+              tenantId={tenantId}
+            />
+            
             {/* Instructions */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="font-semibold text-blue-900 mb-2">How to use bulk upload:</h3>

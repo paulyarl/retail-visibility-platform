@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { UserRole, UserTenantRole } from '@prisma/client';
 import { isPlatformAdmin } from '../utils/platform-admin';
-import { getTenantLimit, getTenantLimitConfig, canCreateTenant } from '../config/tenant-limits';
+import { getTenantLimit, getTenantLimitConfig, canCreateTenant, getPlatformSupportLimit } from '../config/tenant-limits';
 
 /**
  * Get tenant ID from request
@@ -107,6 +107,11 @@ export const requireInventoryAccess = requireTenantRole(
  * 
  * This checks the user's highest tier across all their owned tenants
  * and enforces location limits accordingly.
+ * 
+ * PLATFORM ROLES:
+ * - PLATFORM_ADMIN: Unlimited (bypass all checks)
+ * - PLATFORM_SUPPORT: Limited to 3 tenants total across all users
+ * - PLATFORM_VIEWER: Cannot create tenants (read-only)
  */
 export async function checkTenantCreationLimit(
   req: Request,
@@ -124,6 +129,33 @@ export async function checkTenantCreationLimit(
     // Platform admins can create unlimited tenants
     if (isPlatformAdmin(req.user)) {
       return next();
+    }
+
+    // Platform support has starter-level limits (3 tenants) across ALL users
+    if (req.user.role === 'PLATFORM_SUPPORT') {
+      const totalTenants = await prisma.tenant.count();
+      const supportLimit = getPlatformSupportLimit();
+      
+      if (totalTenants >= supportLimit) {
+        return res.status(403).json({
+          error: 'platform_support_limit_reached',
+          message: `Platform support is limited to ${supportLimit} total tenants across all users for testing purposes.`,
+          current: totalTenants,
+          limit: supportLimit,
+          role: 'PLATFORM_SUPPORT',
+        });
+      }
+      
+      return next();
+    }
+
+    // Platform viewers cannot create tenants
+    if (req.user.role === 'PLATFORM_VIEWER') {
+      return res.status(403).json({
+        error: 'platform_viewer_cannot_create',
+        message: 'Platform viewers have read-only access and cannot create tenants.',
+        role: 'PLATFORM_VIEWER',
+      });
     }
 
     // Count user's owned tenants

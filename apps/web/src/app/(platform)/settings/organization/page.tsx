@@ -7,6 +7,7 @@ import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import { api } from '@/lib/api';
+import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 
 interface OrganizationData {
   organizationId: string;
@@ -464,77 +465,8 @@ export default function OrganizationPage() {
           </div>
         )}
 
-        {/* 2. METRICS GAUGES - Above the fold, scannable */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Overall Status */}
-          <Card className="border-l-4 border-l-green-500">
-            <CardContent className="py-4">
-              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
-                Status
-              </div>
-              <div className="text-2xl font-bold text-neutral-900">
-                {getStatusText(orgData.status.overall)}
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Locations Gauge */}
-          <Card>
-            <CardContent className="py-4">
-              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
-                Locations
-              </div>
-              <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-2xl font-bold text-neutral-900">
-                  {orgData.current.totalLocations}
-                </span>
-                <span className="text-sm text-neutral-500">
-                  / {orgData.limits.maxLocations}
-                </span>
-              </div>
-              <div className="w-full bg-neutral-200 rounded-full h-2">
-                <div className={`h-2 rounded-full ${getGaugeColor(locationPercentage)}`} 
-                     style={{ width: `${Math.min(locationPercentage, 100)}%` }} />
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* SKUs Gauge */}
-          <Card>
-            <CardContent className="py-4">
-              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
-                Total SKUs
-              </div>
-              <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-2xl font-bold text-neutral-900">
-                  {orgData.current.totalSKUs.toLocaleString()}
-                </span>
-                <span className="text-sm text-neutral-500">
-                  / {orgData.limits.maxTotalSKUs.toLocaleString()}
-                </span>
-              </div>
-              <div className="w-full bg-neutral-200 rounded-full h-2">
-                <div className={`h-2 rounded-full ${getGaugeColor(skuPercentage)}`} 
-                     style={{ width: `${Math.min(skuPercentage, 100)}%` }} />
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Subscription Tier */}
-          <Card className="bg-gradient-to-br from-primary-50 to-white">
-            <CardContent className="py-4">
-              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
-                Plan
-              </div>
-              <div className="text-2xl font-bold text-primary-600">
-                {orgData.subscriptionTier}
-              </div>
-              <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={() => window.location.href = '/settings/subscription'}>
-                Upgrade →
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        {/* 2. KEY METRICS - Unified Capacity Display */}
+        <SubscriptionUsageBadge variant="card" showUpgradeLink={true} />
 
         {/* 3. QUICK ACTIONS - Primary CTAs */}
         <Card>

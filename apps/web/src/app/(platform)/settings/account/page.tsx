@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Shield, User, Building2, Crown } from 'lucide-react';
+import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
+import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 
 export default function AccountPage() {
   const { user } = useAuth();
@@ -29,8 +31,13 @@ export default function AccountPage() {
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
+      case 'PLATFORM_ADMIN':
       case 'ADMIN':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400';
+      case 'PLATFORM_SUPPORT':
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400';
+      case 'PLATFORM_VIEWER':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
       case 'OWNER':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
       default:
@@ -40,7 +47,12 @@ export default function AccountPage() {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
+      case 'PLATFORM_ADMIN':
       case 'ADMIN':
+        return <Shield className="w-5 h-5" />;
+      case 'PLATFORM_SUPPORT':
+        return <Shield className="w-5 h-5" />;
+      case 'PLATFORM_VIEWER':
         return <Shield className="w-5 h-5" />;
       case 'OWNER':
         return <Crown className="w-5 h-5" />;
@@ -51,12 +63,17 @@ export default function AccountPage() {
 
   const getRoleDescription = (role: string) => {
     switch (role) {
+      case 'PLATFORM_ADMIN':
       case 'ADMIN':
-        return 'Full platform access with administrative privileges';
+        return 'Full platform access';
+      case 'PLATFORM_SUPPORT':
+        return 'Support platform access';
+      case 'PLATFORM_VIEWER':
+        return 'Basic platform access';
       case 'OWNER':
-        return 'Store owner with full tenant management capabilities';
+        return 'Full tenant access';
       case 'USER':
-        return 'Standard user with tenant-scoped access';
+        return 'Basic tenant access';
       default:
         return 'Platform user';
     }
@@ -64,8 +81,10 @@ export default function AccountPage() {
 
   const getPlatformPrivileges = (role: string) => {
     switch (role) {
+      case 'PLATFORM_ADMIN':
       case 'ADMIN':
         return [
+          'Full platform access',
           'Manage all tenants and users',
           'Access platform administration',
           'Configure platform settings',
@@ -73,8 +92,26 @@ export default function AccountPage() {
           'Manage feature flags',
           'Access admin tools',
         ];
+      case 'PLATFORM_SUPPORT':
+        return [
+          'Support platform access',
+          'View and manage tenants for support',
+          'Access support tools',
+          'View analytics and reports',
+          'Test features across tenants',
+          'Limited to 3 test locations globally',
+        ];
+      case 'PLATFORM_VIEWER':
+        return [
+          'Basic platform access',
+          'Read-only access across all tenants',
+          'View analytics and reports',
+          'Monitor platform health',
+          'Cannot create or modify data',
+        ];
       case 'OWNER':
         return [
+          'Full tenant access',
           'Manage tenant settings',
           'Invite and manage team members',
           'Configure store branding',
@@ -83,6 +120,7 @@ export default function AccountPage() {
         ];
       case 'USER':
         return [
+          'Basic tenant access',
           'Access assigned tenants',
           'Manage products and inventory',
           'View tenant analytics',
@@ -181,6 +219,20 @@ export default function AccountPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Location Capacity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Location Capacity</CardTitle>
+            <CardDescription>Your location creation limits based on your role and subscription tier</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TenantLimitBadge variant="full" showUpgrade={true} />
+          </CardContent>
+        </Card>
+
+        {/* SKU Usage & Current Plan */}
+        <SubscriptionUsageBadge variant="card" showUpgradeLink={true} />
 
         {/* Tenant Access */}
         {user.tenants && user.tenants.length > 0 && (

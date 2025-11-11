@@ -6,6 +6,8 @@ import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { requireTenantAdmin } from '../middleware/permissions';
 import { UserTenantRole } from '@prisma/client';
+import { isPlatformAdmin, isPlatformUser } from '../utils/platform-admin';
+import { getTenantLimitConfig, canCreateTenant } from '../config/tenant-limits';
 
 const router = Router();
 
@@ -168,6 +170,89 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
         error: 'cannot_modify_own_role',
         message: 'You cannot change your own role',
       });
+    }
+
+    // CRITICAL: Check if changing TO OWNER role (ownership transfer)
+    if (parsed.data.role === 'OWNER') {
+      // Get the target user to check if they're a platform user
+      const targetUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({
+          error: 'user_not_found',
+          message: 'Target user not found',
+        });
+      }
+
+      // Platform users (except PLATFORM_VIEWER) can receive unlimited tenants
+      const isPlatformUserRole = isPlatformUser({ role: targetUser.role } as any);
+      
+      if (!isPlatformUserRole || targetUser.role === 'PLATFORM_VIEWER') {
+        // Regular user or platform viewer - check their tenant limits
+        
+        // Count target user's current owned tenants
+        const ownedTenants = await prisma.userTenant.findMany({
+          where: {
+            userId: userId,
+            role: UserTenantRole.OWNER,
+          },
+          include: {
+            tenant: {
+              select: {
+                subscriptionTier: true,
+                subscriptionStatus: true,
+              },
+            },
+          },
+        });
+
+        const ownedTenantCount = ownedTenants.length;
+
+        // Determine target user's effective tier
+        const tierPriority: Record<string, number> = {
+          organization: 5,
+          enterprise: 4,
+          professional: 3,
+          starter: 2,
+          google_only: 1,
+        };
+
+        let effectiveTier = 'starter';
+        let effectiveStatus = 'trial';
+        let highestPriority = 0;
+
+        for (const ut of ownedTenants) {
+          const tier = ut.tenant.subscriptionTier || 'starter';
+          const status = ut.tenant.subscriptionStatus || 'trial';
+          const priority = tierPriority[tier] || 0;
+          
+          if (priority > highestPriority) {
+            highestPriority = priority;
+            effectiveTier = tier;
+            effectiveStatus = status;
+          }
+        }
+
+        // Check if target user can accept another tenant
+        if (!canCreateTenant(ownedTenantCount, effectiveTier, effectiveStatus)) {
+          const limitConfig = getTenantLimitConfig(effectiveTier, effectiveStatus);
+          const limit = limitConfig.limit;
+          
+          return res.status(403).json({
+            error: 'tenant_limit_reached',
+            message: `Cannot transfer ownership: Target user has reached their limit. ${limitConfig.upgradeMessage || `Their ${effectiveTier} plan allows ${limit === Infinity ? 'unlimited' : limit} location(s). They currently have ${ownedTenantCount}.`}`,
+            current: ownedTenantCount,
+            limit: limit === Infinity ? 'unlimited' : limit,
+            tier: effectiveTier,
+            status: effectiveStatus,
+            upgradeToTier: limitConfig.upgradeToTier,
+            upgradeMessage: limitConfig.upgradeMessage,
+          });
+        }
+      }
     }
 
     // Update user's role

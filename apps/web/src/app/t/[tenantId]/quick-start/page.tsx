@@ -6,6 +6,7 @@ import { Rocket, Package, Sparkles, CheckCircle2, AlertCircle, Loader2 } from 'l
 import { ContextBadges } from '@/components/ContextBadges';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { Badge } from '@/components/ui';
+import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 
 type Scenario = {
   id: string;
@@ -457,6 +458,14 @@ export default function QuickStartPage() {
             <p className="text-gray-600 dark:text-gray-400">
               Customize your generated product set
             </p>
+          </div>
+
+          {/* Capacity Warning */}
+          <div className="mb-6">
+            <CreationCapacityWarning 
+              type="sku" 
+              tenantId={tenantId}
+            />
           </div>
 
           {/* Eligibility Warning */}

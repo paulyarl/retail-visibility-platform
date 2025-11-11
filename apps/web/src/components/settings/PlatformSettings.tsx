@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, AnimatedCard
 import PageHeader from '@/components/PageHeader';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import { AccessPresets } from '@/lib/auth/useAccessControl';
+import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
 
 type SettingCard = {
   title: string;
@@ -98,6 +99,18 @@ export default function PlatformSettings() {
           href: '/tenants',
           color: 'bg-blue-500',
         },
+        {
+          title: 'Location Limits',
+          description: 'View your tenant creation limits and upgrade options',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          ),
+          href: '/settings/limits',
+          color: 'bg-purple-500',
+        },
       ],
     },
     {
@@ -177,6 +190,11 @@ export default function PlatformSettings() {
       />
 
       <div className="space-y-12">
+        {/* Tenant Limits Badge - Prominent Display */}
+        <div className="mb-8">
+          <TenantLimitBadge variant="full" showUpgrade={true} />
+        </div>
+
         {settingsGroups.map((group) => (
           <div key={group.title}>
             <div className="mb-6">

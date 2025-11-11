@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { canSwitchToTenant } from "@/lib/auth/access-control";
 import { navigateToTenant } from "@/lib/tenant-navigation";
+import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
 
 type Tenant = { id: string; name: string };
 
@@ -77,10 +78,11 @@ export default function TenantSwitcher() {
     return (
       <div className="inline-flex items-center gap-2 text-sm">
         <span className="text-xs text-neutral-500">Location</span>
-        <button onClick={() => onChange(only.id)} className="px-2 py-1 rounded-md hover:bg-neutral-50">
+        <button onClick={() => onChange(only.id)} className="px-2 py-1 rounded-md hover:bg-neutral-50 flex items-center gap-2">
           <span className="font-medium text-neutral-900">{only.name}</span>
+          <MobileCapacityIndicator tenantId={only.id} showText={false} />
           {role && (
-            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-2xs border border-neutral-300 text-neutral-600">
+            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-2xs border border-neutral-300 text-neutral-600">
               {role}
             </span>
           )}

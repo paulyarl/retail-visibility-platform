@@ -16,6 +16,7 @@ import { canManageTenantSettings } from "@/lib/auth/access-control";
 import PublicFooter from "@/components/PublicFooter";
 import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
 import { computeStoreStatus } from "@/lib/hours-utils";
+import SubscriptionUsageBadge from "@/components/subscription/SubscriptionUsageBadge";
 
 export default function PlatformHomePage() {
   return <Home embedded />;
@@ -211,6 +212,9 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
               
               {/* Desktop Navigation */}
               <div className="hidden sm:flex items-center gap-2 md:gap-3">
+                {isAuthenticated && selectedTenantId && (
+                  <SubscriptionUsageBadge variant="compact" tenantId={selectedTenantId} />
+                )}
                 <Link href="/settings">
                   <Button variant="ghost" size="sm">Settings</Button>
                 </Link>

@@ -120,7 +120,7 @@ export class ItemsDataService {
         };
       }
     } catch (error) {
-      console.error('[ItemsDataService] Failed to fetch items:', error);
+      // Error will be caught and displayed in UI
       throw error;
     }
   }
@@ -142,7 +142,7 @@ export class ItemsDataService {
 
       return await response.json();
     } catch (error) {
-      console.error('[ItemsDataService] Failed to create item:', error);
+      // Error will be caught and displayed in UI
       throw error;
     }
   }
@@ -161,7 +161,7 @@ export class ItemsDataService {
 
       return await response.json();
     } catch (error) {
-      console.error('[ItemsDataService] Failed to update item:', error);
+      // Error will be caught and displayed in UI
       throw error;
     }
   }
@@ -178,7 +178,7 @@ export class ItemsDataService {
         throw new Error(errorData?.error || 'Failed to delete item');
       }
     } catch (error) {
-      console.error('[ItemsDataService] Failed to delete item:', error);
+      // Error will be caught and displayed in UI
       throw error;
     }
   }
@@ -200,7 +200,7 @@ export class ItemsDataService {
       const data = await response.json();
       return data.urls || [];
     } catch (error) {
-      console.error('[ItemsDataService] Failed to upload photos:', error);
+      // Error will be caught and displayed in UI
       throw error;
     }
   }

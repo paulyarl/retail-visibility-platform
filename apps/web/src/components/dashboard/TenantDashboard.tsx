@@ -15,6 +15,7 @@ import TierGainsWelcome from "./TierGainsWelcome";
 import WhatYouCanDo from "./WhatYouCanDo";
 import UserProfileBadge from "./UserProfileBadge";
 import VisibilityCards from "./VisibilityCards";
+import TenantLimitBadge from "@/components/tenant/TenantLimitBadge";
 
 interface TenantDashboardProps {
   tenantId: string;
@@ -65,7 +66,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Top Bar: User Profile + Tier Badge */}
+        {/* Top Bar: User Profile + Tier Badge + Tenant Limits */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           {/* User Profile */}
           {profile && (
@@ -74,12 +75,16 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             </div>
           )}
           
-          {/* Tier Badge */}
-          {tier && (
-            <div className="shrink-0">
+          {/* Right Side: Tier Badge + Tenant Limits */}
+          <div className="shrink-0 flex items-center gap-3">
+            {/* Tenant Limits Badge (Compact) */}
+            <TenantLimitBadge variant="compact" showUpgrade={true} />
+            
+            {/* Tier Badge */}
+            {tier && (
               <TierBadge tier={tier} showDetails={true} />
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Header */}

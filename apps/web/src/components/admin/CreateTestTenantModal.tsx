@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Plus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 
 interface CreateTestTenantModalProps {
   onClose: () => void;
@@ -132,6 +133,14 @@ export default function CreateTestTenantModal({ onClose }: CreateTestTenantModal
           >
             <X className="w-6 h-6" />
           </button>
+        </div>
+
+        {/* Capacity Warning */}
+        <div className="mb-4">
+          <CreationCapacityWarning 
+            type="location"
+            showUpgradeLink={false}
+          />
         </div>
 
         {error && (

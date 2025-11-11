@@ -300,7 +300,7 @@ export function getDemoCategories(): string[] {
 }
 
 /**
- * Convert demo item to RVP inventory item format
+ * Convert demo item to Visible Shell inventory item format
  */
 export function convertDemoItemToRVPFormat(demoItem: DemoItem) {
   return {

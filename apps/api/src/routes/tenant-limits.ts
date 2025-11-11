@@ -8,7 +8,7 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { isPlatformAdmin } from '../utils/platform-admin';
-import { getTenantLimitConfig, getRemainingTenantSlots } from '../config/tenant-limits';
+import { getTenantLimitConfig, getRemainingTenantSlots, getPlatformSupportLimit } from '../config/tenant-limits';
 import { UserTenantRole } from '@prisma/client';
 
 const router = Router();
@@ -26,13 +26,49 @@ router.get('/status', authenticateToken, async (req, res) => {
 
     // Platform admins have unlimited
     if (isPlatformAdmin(req.user)) {
+      // Show actual tenant count for platform admins for better UX
+      const totalTenants = await prisma.tenant.count();
+      
       return res.json({
-        current: 0, // Don't count for platform admins
+        current: totalTenants,
         limit: 'unlimited',
         remaining: 'unlimited',
         tier: 'platform_admin',
+        tierDisplayName: 'Platform Admin',
         canCreate: true,
         upgradeMessage: null,
+        upgradeToTier: null,
+      });
+    }
+
+    // Platform support has starter-level limits (3 tenants) across all users
+    if (req.user.role === 'PLATFORM_SUPPORT') {
+      const totalTenants = await prisma.tenant.count();
+      const supportLimit = getPlatformSupportLimit();
+      const remaining = Math.max(0, supportLimit - totalTenants);
+
+      return res.json({
+        current: totalTenants,
+        limit: supportLimit,
+        remaining,
+        tier: 'platform_support',
+        tierDisplayName: `Platform Support (${supportLimit} tenants max)`,
+        canCreate: remaining > 0,
+        upgradeMessage: remaining === 0 ? 'Platform support is limited to testing purposes. Contact admin for more tenants.' : null,
+        upgradeToTier: null,
+      });
+    }
+
+    // Platform viewers cannot create tenants
+    if (req.user.role === 'PLATFORM_VIEWER') {
+      return res.json({
+        current: 0,
+        limit: 0,
+        remaining: 0,
+        tier: 'platform_viewer',
+        tierDisplayName: 'Platform Viewer (Read-Only)',
+        canCreate: false,
+        upgradeMessage: 'Platform viewers have read-only access.',
         upgradeToTier: null,
       });
     }

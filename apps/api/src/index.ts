@@ -127,6 +127,7 @@ const getSquareRoutes = async () => {
 import dashboardRoutes from './routes/dashboard'; // FIXED VERSION
 import tenantTierRoutes from './routes/tenant-tier';
 import promotionRoutes from './routes/promotion';
+import tenantLimitsRoutes from './routes/tenant-limits';
 
 const app = express();
 
@@ -2209,6 +2210,8 @@ console.log('✅ Dashboard routes mounted');
 app.use('/api', promotionRoutes); // Promotion endpoints
 console.log('✅ Promotion routes mounted');
 app.use(tenantTierRoutes); // Tenant tier and usage endpoints
+app.use('/api/tenant-limits', tenantLimitsRoutes); // Tenant creation limits
+console.log('✅ Tenant limits routes mounted');
 
 /* ------------------------------ v3.6.2-prep APIs ------------------------------ */
 app.use('/api/feed-jobs', feedJobsRoutes);

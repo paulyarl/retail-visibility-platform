@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import Link from "next/link";
 import { Button } from "@/components/ui";
+import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { settings } = usePlatformSettings();
@@ -45,11 +46,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             <span className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
-              {settings?.platformName || 'RVP'}
+              {settings?.platformName || 'Visible Shell'}
             </span>
             {hydrated ? (
               tenantName ? (
-                <span className="text-xs sm:text-sm text-neutral-500 truncate hidden sm:inline">· {tenantName}</span>
+                <>
+                  <span className="text-xs sm:text-sm text-neutral-500 truncate hidden sm:inline">· {tenantName}</span>
+                  <MobileCapacityIndicator tenantId={tenantId || undefined} showText={false} className="ml-1" />
+                </>
               ) : null
             ) : (
               <span className="h-4 w-24 bg-neutral-200 rounded animate-pulse hidden sm:inline-block" />
