@@ -41,20 +41,25 @@ router.get('/status', authenticateToken, async (req, res) => {
       });
     }
 
-    // Platform support has starter-level limits (3 tenants) across all users
+    // Platform support can create tenants but is limited to 3 tenants per owner
     if (req.user.role === 'PLATFORM_SUPPORT') {
-      const totalTenants = await prisma.tenant.count();
+      const ownedTenants = await prisma.userTenant.count({
+        where: {
+          userId: req.user.userId,
+          role: 'OWNER',
+        },
+      });
       const supportLimit = getPlatformSupportLimit();
-      const remaining = Math.max(0, supportLimit - totalTenants);
+      const remaining = Math.max(0, supportLimit - ownedTenants);
 
       return res.json({
-        current: totalTenants,
+        current: ownedTenants,
         limit: supportLimit,
         remaining,
         tier: 'platform_support',
-        tierDisplayName: `Platform Support (${supportLimit} tenants max)`,
+        tierDisplayName: `Platform Support (${supportLimit} tenants per owner)`,
         canCreate: remaining > 0,
-        upgradeMessage: remaining === 0 ? 'Platform support is limited to testing purposes. Contact admin for more tenants.' : null,
+        upgradeMessage: remaining === 0 ? 'Platform support users can only create 3 tenants per owner. This owner has reached the limit.' : null,
         upgradeToTier: null,
       });
     }

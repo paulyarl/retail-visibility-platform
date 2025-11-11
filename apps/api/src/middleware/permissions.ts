@@ -110,7 +110,7 @@ export const requireInventoryAccess = requireTenantRole(
  * 
  * PLATFORM ROLES:
  * - PLATFORM_ADMIN: Unlimited (bypass all checks)
- * - PLATFORM_SUPPORT: Limited to 3 tenants total across all users
+ * - PLATFORM_SUPPORT: Limited to 3 tenants per owner (regardless of owner's tier)
  * - PLATFORM_VIEWER: Cannot create tenants (read-only)
  */
 export async function checkTenantCreationLimit(
@@ -131,18 +131,38 @@ export async function checkTenantCreationLimit(
       return next();
     }
 
-    // Platform support has starter-level limits (3 tenants) across ALL users
+    // Platform support can create tenants BUT is limited to 3 tenants per owner
+    // This limit applies regardless of the owner's actual subscription tier
     if (req.user.role === 'PLATFORM_SUPPORT') {
-      const totalTenants = await prisma.tenant.count();
-      const supportLimit = getPlatformSupportLimit();
+      // Determine who will own the tenant being created
+      // Check if ownerId is provided in request body (for creating on behalf of others)
+      const requestBody = req.body as { ownerId?: string };
+      const ownerId = requestBody.ownerId || req.user.userId;
       
-      if (totalTenants >= supportLimit) {
+      // Count tenants created by THIS support user FOR this owner
+      const tenantsCreatedBySupport = await prisma.tenant.count({
+        where: {
+          createdBy: req.user.userId, // Created by THIS support user
+          users: {
+            some: {
+              userId: ownerId, // FOR this owner
+              role: UserTenantRole.OWNER,
+            },
+          },
+        },
+      });
+      
+      const supportLimit = getPlatformSupportLimit(); // 3
+      
+      if (tenantsCreatedBySupport >= supportLimit) {
         return res.status(403).json({
           error: 'platform_support_limit_reached',
-          message: `Platform support is limited to ${supportLimit} total tenants across all users for testing purposes.`,
-          current: totalTenants,
+          message: `Platform support users can only create up to ${supportLimit} tenants per owner. You have already created ${tenantsCreatedBySupport} locations for this owner.`,
+          current: tenantsCreatedBySupport,
           limit: supportLimit,
           role: 'PLATFORM_SUPPORT',
+          creatorId: req.user.userId,
+          ownerId: ownerId,
         });
       }
       

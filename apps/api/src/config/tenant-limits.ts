@@ -10,7 +10,7 @@
  * 
  * PLATFORM ROLES:
  * - PLATFORM_ADMIN: Unlimited tenant creation (no limits)
- * - PLATFORM_SUPPORT: Limited to 3 tenants total across all users (starter-level limits)
+ * - PLATFORM_SUPPORT: Limited to 3 tenants per owner (regardless of owner's tier)
  * - PLATFORM_VIEWER: Read-only, cannot create tenants
  */
 
@@ -18,8 +18,9 @@ export type TenantLimitTier = 'google_only' | 'starter' | 'professional' | 'ente
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'expired';
 
 /**
- * Platform support tenant creation limit
- * Support staff can create up to 3 test/demo tenants across all users
+ * Platform support tenant creation limit per owner
+ * PLATFORM_SUPPORT can only create up to 3 tenants per owner (regardless of owner's tier)
+ * This applies whether creating for themselves or for a customer
  */
 export const PLATFORM_SUPPORT_LIMIT = 3;
 
@@ -103,8 +104,8 @@ export function getTenantLimit(tier: string, status?: string): number {
 }
 
 /**
- * Get platform support tenant limit
- * Support staff have starter-level limits (3 tenants) across all users
+ * Get platform support limit
+ * PLATFORM_SUPPORT can create up to 3 tenants per owner (regardless of owner's tier)
  */
 export function getPlatformSupportLimit(): number {
   return PLATFORM_SUPPORT_LIMIT;

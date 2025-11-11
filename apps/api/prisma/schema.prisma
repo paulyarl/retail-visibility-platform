@@ -98,6 +98,7 @@ model Tenant {
   id                    String                 @id @default(cuid())
   name                  String
   createdAt             DateTime               @default(now())
+  createdBy             String?                @map("created_by") // User ID who created this tenant (for auditing)
   region                String                 @default("us-east-1")
   language              String                 @default("en-US")
   currency              String                 @default("USD")
@@ -145,6 +146,7 @@ model Tenant {
   @@index([subscriptionStatus])
   @@index([organizationId])
   @@index([serviceLevel])
+  @@index([createdBy])
 }
 
 model Organization {

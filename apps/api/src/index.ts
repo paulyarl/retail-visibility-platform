@@ -249,18 +249,28 @@ app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) =
   }
 });
 
-const createTenantSchema = z.object({ name: z.string().min(1) });
+const createTenantSchema = z.object({ 
+  name: z.string().min(1),
+  ownerId: z.string().optional(), // Optional: specify a different owner (for PLATFORM_SUPPORT)
+});
 app.post("/tenants", authenticateToken, checkTenantCreationLimit, async (req, res) => {
   const parsed = createTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   
   try {
-    console.log('[POST /tenants] Creating tenant for user:', req.user?.userId);
+    // Determine who will own this tenant
+    // If ownerId is provided and user is PLATFORM_SUPPORT, use that owner
+    // Otherwise, the authenticated user becomes the owner
+    const ownerId = (req.user?.role === 'PLATFORM_SUPPORT' && parsed.data.ownerId) 
+      ? parsed.data.ownerId 
+      : req.user!.userId;
     
-    // Validate for duplicates
+    console.log('[POST /tenants] Creating tenant for owner:', ownerId, 'by user:', req.user?.userId);
+    
+    // Validate for duplicates (check against the owner, not the creator)
     const { validateTenantCreation } = await import('./utils/tenant-validation');
     const validation = await validateTenantCreation(
-      req.user!.userId,
+      ownerId,
       parsed.data.name
     );
     
@@ -283,24 +293,21 @@ app.post("/tenants", authenticateToken, checkTenantCreationLimit, async (req, re
         subscriptionTier: 'starter',
         subscriptionStatus: 'trial',
         trialEndsAt: trialEndsAt,
+        createdBy: req.user!.userId, // Track who created this tenant (for auditing)
       }
     });
-    console.log('[POST /tenants] Tenant created:', tenant.id);
+    console.log('[POST /tenants] Tenant created:', tenant.id, 'by:', req.user?.userId);
     
-    // Link tenant to the authenticated user as owner
-    if (req.user?.userId) {
-      console.log('[POST /tenants] Linking tenant to user...');
-      await prisma.userTenant.create({
-        data: {
-          userId: req.user.userId,
-          tenantId: tenant.id,
-          role: 'OWNER',
-        },
-      });
-      console.log('[POST /tenants] UserTenant link created successfully');
-    } else {
-      console.error('[POST /tenants] No userId in request.user!', req.user);
-    }
+    // Link tenant to the owner (may be different from creator if PLATFORM_SUPPORT)
+    console.log('[POST /tenants] Linking tenant to owner:', ownerId);
+    await prisma.userTenant.create({
+      data: {
+        userId: ownerId,
+        tenantId: tenant.id,
+        role: 'OWNER',
+      },
+    });
+    console.log('[POST /tenants] UserTenant link created successfully');
     
     await audit({ tenantId: tenant.id, actor: null, action: "tenant.create", payload: { name: parsed.data.name } });
     res.status(201).json(tenant);
