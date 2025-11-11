@@ -1,14 +1,14 @@
 // Audit logging middleware for Express
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'crypto';
 
 /**
  * Middleware to log all write operations to audit_log table
  */
 export async function auditLogger(req: Request, res: Response, next: NextFunction) {
   // Generate request ID if not present
-  const requestId = req.headers['x-request-id'] as string || nanoid();
+  const requestId = req.headers['x-request-id'] as string || randomUUID();
   req.headers['x-request-id'] = requestId;
 
   // Skip audit for GET requests
