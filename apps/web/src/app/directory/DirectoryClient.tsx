@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Map, Grid3x3 } from 'lucide-react';
+import { Map, Grid3x3, List } from 'lucide-react';
 import DirectorySearch from '@/components/directory/DirectorySearch';
 import DirectoryGrid from '@/components/directory/DirectoryGrid';
+import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import { Pagination } from '@/components/ui';
 import dynamic from 'next/dynamic';
@@ -54,7 +55,7 @@ export default function DirectoryClient() {
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Array<{ name: string; count: number }>>([]);
   const [locations, setLocations] = useState<Array<{ city: string; state: string; count: number }>>([]);
-  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
 
   // Fetch categories and locations (once on mount)
   useEffect(() => {
@@ -187,6 +188,17 @@ export default function DirectoryClient() {
                 <span className="hidden sm:inline">Grid</span>
               </button>
               <button
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                }`}
+              >
+                <List className="w-4 h-4" />
+                <span className="hidden sm:inline">List</span>
+              </button>
+              <button
                 onClick={() => setViewMode('map')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
                   viewMode === 'map'
@@ -204,6 +216,14 @@ export default function DirectoryClient() {
         {/* Grid View */}
         {viewMode === 'grid' && (
           <DirectoryGrid 
+            listings={data?.listings || []} 
+            loading={loading}
+          />
+        )}
+
+        {/* List View */}
+        {viewMode === 'list' && (
+          <DirectoryList 
             listings={data?.listings || []} 
             loading={loading}
           />

@@ -39,7 +39,7 @@ export default function VisibilityCards({
   tenantCategory,
 }: VisibilityCardsProps) {
   // Generate URLs if not provided
-  const finalStorefrontUrl = storefrontUrl || `/storefront/${tenantId}`;
+  const finalStorefrontUrl = storefrontUrl || `/tenant/${tenantId}`;
   const finalDirectoryUrl = directoryUrl || `/directory/${tenantId}`;
   
   // Build directory URL with location and category filters for proximity viewing
