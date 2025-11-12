@@ -168,12 +168,23 @@ export default function AdminUsersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          user.role === 'ADMIN'
+                          user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN'
                             ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                            : user.role === 'PLATFORM_SUPPORT'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+                            : user.role === 'PLATFORM_VIEWER'
+                            ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                            : user.role === 'OWNER'
+                            ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400'
+                            : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                         }`}>
-                          {user.role === 'ADMIN' && <Shield className="w-3 h-3" />}
-                          {user.role}
+                          {(user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN') && <Shield className="w-3 h-3" />}
+                          {user.role === 'PLATFORM_ADMIN' && 'Platform Admin'}
+                          {user.role === 'PLATFORM_SUPPORT' && 'Platform Support'}
+                          {user.role === 'PLATFORM_VIEWER' && 'Platform Viewer'}
+                          {user.role === 'OWNER' && 'Tenant Owner'}
+                          {user.role === 'USER' && 'Tenant User'}
+                          {user.role === 'ADMIN' && 'Admin (Deprecated)'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -220,13 +231,26 @@ export default function AdminUsersPage() {
             <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
               Testing User Journeys
             </h3>
-            <p className="text-sm text-blue-800 dark:text-blue-200">
+            <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
               Create users with different roles to test various user experiences:
             </p>
-            <ul className="mt-3 space-y-2 text-sm text-blue-800 dark:text-blue-200">
-              <li>• <strong>Platform Admin:</strong> Full access to all features</li>
-              <li>• <strong>User:</strong> Tenant-scoped access, needs assignment</li>
-            </ul>
+            <div className="space-y-3 text-sm text-blue-800 dark:text-blue-200">
+              <div>
+                <p className="font-semibold mb-1">Platform Users:</p>
+                <ul className="ml-4 space-y-1">
+                  <li>• <strong>Platform Admin:</strong> Full access, unlimited tenants</li>
+                  <li>• <strong>Platform Support:</strong> View all + support (3 tenant limit)</li>
+                  <li>• <strong>Platform Viewer:</strong> Read-only access (cannot create)</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold mb-1">Tenant Users:</p>
+                <ul className="ml-4 space-y-1">
+                  <li>• <strong>Tenant Owner:</strong> Can own tenants (tier-based limits)</li>
+                  <li>• <strong>Tenant User:</strong> Basic access (tier-based limits)</li>
+                </ul>
+              </div>
+            </div>
           </div>
 
           <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-6">
