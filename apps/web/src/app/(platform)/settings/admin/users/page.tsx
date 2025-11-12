@@ -499,11 +499,8 @@ export default function UsersManagementPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => handleEditClick(user)} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
-                      Edit
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => handlePermissionsClick(user)}>
-                      Permissions
+                    <Button size="sm" variant="secondary" onClick={() => handleEditClick(user)} disabled={!canManage} title={!canManage ? 'View only' : 'Edit user details and role'}>
+                      Edit Role
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id)} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
                       <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -599,20 +596,23 @@ export default function UsersManagementPage() {
             onChange={(e) => setEditEmail(e.target.value)}
             disabled={!canManage}
           />
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Role
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <label className="block text-sm font-semibold text-neutral-900 mb-2">
+              Platform Role
             </label>
             <select 
               value={editRole}
               onChange={(e) => setEditRole(e.target.value as 'ADMIN' | 'OWNER' | 'USER')}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-2"
               disabled={!canManage}
             >
-              <option value="USER">User</option>
-              <option value="OWNER">Tenant Owner</option>
-              <option value="ADMIN">Platform Admin</option>
+              <option value="USER">User - Basic access (3 tenant limit)</option>
+              <option value="OWNER">Tenant Owner - Can create/own tenants (10 tenant limit)</option>
+              <option value="ADMIN">Platform Admin - Full system access</option>
             </select>
+            <p className="text-xs text-neutral-600">
+              Platform roles control global access. Users also have tenant-specific roles (Owner, Admin, Member, Viewer) for each location they belong to.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-2">
