@@ -186,7 +186,7 @@ RETURNS void AS $$
 DECLARE
     tenant_table_name TEXT := 'Tenant';
     profile_table_name TEXT := 'tenant_business_profile';
-    inventory_table_name TEXT := 'inventory_item';
+    inventory_table_name TEXT := 'InventoryItem';
 BEGIN
     -- Insert new tenants - use dynamic table names
     EXECUTE format('
