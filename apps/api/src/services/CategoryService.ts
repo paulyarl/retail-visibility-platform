@@ -89,14 +89,37 @@ export const categoryService = {
       throw Object.assign(new Error('item_not_found'), { statusCode: 404 })
     }
 
-    const category = await prisma.tenantCategory.findFirst({
-      where: {
-        tenantId,
-        isActive: true,
-        ...(tenantCategoryId ? { id: tenantCategoryId } : {}),
-        ...(categorySlug ? { slug: categorySlug } : {}),
-      },
-    })
+    let category
+    if (tenantCategoryId) {
+      category = await prisma.tenantCategory.findFirst({
+        where: {
+          id: tenantCategoryId,
+          tenantId,
+          isActive: true,
+        },
+      })
+    } else if (categorySlug) {
+      category = await prisma.tenantCategory.findFirst({
+        where: {
+          tenantId,
+          slug: categorySlug,
+          isActive: true,
+        },
+      })
+      
+      // If category doesn't exist, create it
+      if (!category) {
+        const categoryName = categorySlug.split('-').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ')
+        
+        category = await this.createTenantCategory(tenantId, {
+          name: categoryName,
+          slug: categorySlug,
+        })
+      }
+    }
+
     if (!category) {
       throw Object.assign(new Error('tenant_category_not_found'), { statusCode: 404 })
     }
@@ -116,8 +139,8 @@ export const categoryService = {
         action: 'item.category.assign',
         payload: {
           itemId,
-          tenantCategoryId: tenantCategoryId ?? null,
-          categorySlug: categorySlug ?? null,
+          tenantCategoryId: category.id,
+          categorySlug: category.slug,
         },
       })
     } catch {}
