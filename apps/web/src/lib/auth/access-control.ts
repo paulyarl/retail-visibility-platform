@@ -15,7 +15,7 @@
  * 7. Regular User - No tenant access
  */
 
-export type UserRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+export type UserRole = 'OWNER' | 'ADMIN' | 'SUPPORT' | 'MEMBER' | 'VIEWER';
 export type PlatformRole = 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER';
 
 export interface UserData {
