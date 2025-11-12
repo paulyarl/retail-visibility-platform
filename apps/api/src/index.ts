@@ -1661,14 +1661,21 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
       return res.status(400).json({ error: 'Query parameter required' });
     }
 
-    // For now, return mock results that match the frontend expectations
+    // For now, return mock results that match the frontend mockCategories
     // TODO: Replace with real Google taxonomy search when taxonomy data is deployed
     const mockCategories = [
-      { id: '267', name: 'Mobile Phones', path: ['Electronics', 'Mobile Phones'], fullPath: 'Electronics > Mobile Phones' },
-      { id: '5', name: 'Laptops', path: ['Electronics', 'Computers', 'Laptops'], fullPath: 'Electronics > Computers > Laptops' },
-      { id: '2271', name: 'Pants', path: ['Apparel & Accessories', 'Clothing', 'Pants'], fullPath: 'Apparel & Accessories > Clothing > Pants' },
-      { id: '187', name: 'Shoes', path: ['Apparel & Accessories', 'Shoes'], fullPath: 'Apparel & Accessories > Shoes' },
-      { id: '1604', name: 'Furniture', path: ['Home & Garden', 'Furniture'], fullPath: 'Home & Garden > Furniture' },
+      { id: '1', name: 'Electronics', path: ['Electronics'], fullPath: 'Electronics' },
+      { id: '1-1', name: 'Phones', path: ['Electronics', 'Phones'], fullPath: 'Electronics > Phones' },
+      { id: '1-2', name: 'Laptops', path: ['Electronics', 'Laptops'], fullPath: 'Electronics > Laptops' },
+      { id: '1-3', name: 'Tablets', path: ['Electronics', 'Tablets'], fullPath: 'Electronics > Tablets' },
+      { id: '2', name: 'Clothing', path: ['Clothing'], fullPath: 'Clothing' },
+      { id: '2-1', name: 'Shirts', path: ['Clothing', 'Shirts'], fullPath: 'Clothing > Shirts' },
+      { id: '2-2', name: 'Pants', path: ['Clothing', 'Pants'], fullPath: 'Clothing > Pants' }, // This matches user's request
+      { id: '2-3', name: 'Shoes', path: ['Clothing', 'Shoes'], fullPath: 'Clothing > Shoes' },
+      { id: '3', name: 'Home & Garden', path: ['Home & Garden'], fullPath: 'Home & Garden' },
+      { id: '3-1', name: 'Furniture', path: ['Home & Garden', 'Furniture'], fullPath: 'Home & Garden > Furniture' },
+      { id: '3-2', name: 'Decor', path: ['Home & Garden', 'Decor'], fullPath: 'Home & Garden > Decor' },
+      { id: '3-3', name: 'Tools', path: ['Home & Garden', 'Tools'], fullPath: 'Home & Garden > Tools' },
     ];
 
     const lowerQuery = query.toLowerCase();
