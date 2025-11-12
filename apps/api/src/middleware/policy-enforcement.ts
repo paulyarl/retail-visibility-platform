@@ -81,8 +81,13 @@ export async function enforcePolicyCompliance(
       return next();
     }
 
-    // Only enforce on item endpoints
+    // Only enforce on item endpoints, but exclude category assignment routes
     if (!req.path.includes('/items') && !req.path.includes('/inventory')) {
+      return next();
+    }
+
+    // Skip policy enforcement for category assignment routes
+    if (req.path.includes('/category')) {
       return next();
     }
 
