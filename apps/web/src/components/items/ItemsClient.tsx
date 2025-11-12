@@ -231,9 +231,11 @@ export default function ItemsClient({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // For now, use the first category as the categorySlug
-          // TODO: Update to use real tenant categories with proper slugs
-          categorySlug: categoryPath[0]?.toLowerCase().replace(/\s+/g, '-'),
+          // Create a proper slug from the full category path
+          // e.g., ["Clothing", "Pants"] becomes "clothing-pants"
+          categorySlug: categoryPath.map(part => 
+            part.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+          ).join('-'),
         }),
       });
 
