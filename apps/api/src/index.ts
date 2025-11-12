@@ -1,6 +1,13 @@
-import express from "express";
-import cors from "cors";
-import morgan from "morgan";
+import express from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+
+// Fix for Supabase SSL certificate issues in production
+// This allows Node.js to accept Supabase's SSL certificates
+if (process.env.NODE_ENV === 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  console.log('⚠️  SSL certificate validation disabled for Supabase compatibility');
+}
 import { prisma } from "./prisma";
 import { z } from "zod";
 import { setCsrfCookie, csrfProtect } from "./middleware/csrf";

@@ -3,13 +3,33 @@ import { PrismaClient } from '@prisma/client';
 // Ensure a single PrismaClient in dev (nodemon hot reload safe)
 const globalForPrisma = global as unknown as { prisma?: PrismaClient };
 
+// Build database URL with SSL configuration for production
+const getDatabaseUrl = () => {
+  const baseUrl = process.env.DATABASE_URL || '';
+  
+  // In production, ensure SSL parameters are set correctly for Supabase
+  if (process.env.NODE_ENV === 'production') {
+    const url = new URL(baseUrl);
+    // Remove any existing SSL params
+    url.searchParams.delete('sslmode');
+    url.searchParams.delete('sslaccept');
+    // Add correct SSL params for Supabase
+    url.searchParams.set('sslmode', 'require');
+    // Note: sslaccept is not a standard PostgreSQL parameter
+    // Instead, we rely on NODE_TLS_REJECT_UNAUTHORIZED or proper cert handling
+    return url.toString();
+  }
+  
+  return baseUrl;
+};
+
 // Configure Prisma with connection pooling and retry logic
 // Export basePrisma for use in transactions (avoids retry wrapper issues)
 export const basePrisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   datasources: {
     db: {
-      url: process.env.DATABASE_URL,
+      url: getDatabaseUrl(),
     },
   },
 });
