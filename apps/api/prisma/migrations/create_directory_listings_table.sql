@@ -39,58 +39,129 @@ CREATE INDEX IF NOT EXISTS idx_directory_listings_is_published ON directory_list
 CREATE INDEX IF NOT EXISTS idx_directory_listings_primary_category ON directory_listings(primary_category);
 CREATE INDEX IF NOT EXISTS idx_directory_listings_is_featured ON directory_listings(is_featured);
 
--- Populate the table with existing tenant data
-INSERT INTO directory_listings (
-    id,
-    tenant_id,
-    business_name,
-    slug,
-    address,
-    city,
-    state,
-    zip_code,
-    phone,
-    email,
-    website,
-    latitude,
-    longitude,
-    primary_category,
-    logo_url,
-    subscription_tier,
-    use_custom_website
-)
-SELECT
-    t.id,
-    t.id as tenant_id,
-    COALESCE(tbp.business_name, t.name) as business_name,
-    LOWER(REPLACE(COALESCE(tbp.business_name, t.name), ' ', '-')) || '-' || t.id as slug,
-    COALESCE(tbp.address_line1, '') as address,
-    tbp.city,
-    tbp.state,
-    tbp.postal_code as zip_code,
-    tbp.phone_number as phone,
-    tbp.email,
-    tbp.website,
-    tbp.latitude,
-    tbp.longitude,
-    NULL as primary_category, -- Will be populated separately if categories exist
-    tbp.logo_url,
-    COALESCE(t.subscription_tier, 'trial') as subscription_tier,
-    false as use_custom_website
-FROM tenant t
-LEFT JOIN tenant_business_profile tbp ON t.id = tbp.tenant_id
-WHERE t.id NOT IN (SELECT tenant_id FROM directory_listings)
-ON CONFLICT (id) DO NOTHING;
+-- Check what tables exist and debug
+DO $$
+DECLARE
+    tenant_table_exists BOOLEAN := FALSE;
+    profile_table_exists BOOLEAN := FALSE;
+    inventory_table_exists BOOLEAN := FALSE;
+BEGIN
+    -- Check for tenant table (could be 'tenant' or 'Tenant')
+    SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name IN ('tenant', 'Tenant')
+    ) INTO tenant_table_exists;
 
--- Update product counts
-UPDATE directory_listings
-SET product_count = (
-    SELECT COUNT(*)
-    FROM inventory_item ii
-    WHERE ii.tenant_id = directory_listings.tenant_id
-    AND ii.item_status = 'active'
-    AND ii.visibility = 'public'
-);
+    -- Check for business profile table
+    SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name IN ('tenant_business_profile', 'TenantBusinessProfile')
+    ) INTO profile_table_exists;
+
+    -- Check for inventory table
+    SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name IN ('inventory_item', 'InventoryItem')
+    ) INTO inventory_table_exists;
+
+    RAISE NOTICE 'Table existence check:';
+    RAISE NOTICE '  tenant table exists: %', tenant_table_exists;
+    RAISE NOTICE '  tenant_business_profile exists: %', profile_table_exists;
+    RAISE NOTICE '  inventory_item exists: %', inventory_table_exists;
+
+    IF NOT tenant_table_exists THEN
+        RAISE EXCEPTION 'Tenant table does not exist. Please run Prisma migrations first.';
+    END IF;
+END $$;
+
+-- Populate the table with existing tenant data (using actual table names)
+DO $$
+DECLARE
+    tenant_table_name TEXT;
+    profile_table_name TEXT;
+    inventory_table_name TEXT;
+BEGIN
+    -- Find the actual table names (handle case sensitivity)
+    SELECT table_name INTO tenant_table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_name IN ('tenant', 'Tenant')
+    LIMIT 1;
+
+    SELECT table_name INTO profile_table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_name IN ('tenant_business_profile', 'TenantBusinessProfile')
+    LIMIT 1;
+
+    SELECT table_name INTO inventory_table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_name IN ('inventory_item', 'InventoryItem')
+    LIMIT 1;
+
+    RAISE NOTICE 'Using table names: %, %, %', tenant_table_name, profile_table_name, inventory_table_name;
+
+    -- Insert data using dynamic table names
+    EXECUTE format('
+        INSERT INTO directory_listings (
+            id,
+            tenant_id,
+            business_name,
+            slug,
+            address,
+            city,
+            state,
+            zip_code,
+            phone,
+            email,
+            website,
+            latitude,
+            longitude,
+            logo_url,
+            subscription_tier,
+            use_custom_website
+        )
+        SELECT
+            t.id,
+            t.id as tenant_id,
+            COALESCE(p.business_name, t.name) as business_name,
+            LOWER(REPLACE(COALESCE(p.business_name, t.name), '' '', ''-'')) || ''-'' || t.id as slug,
+            COALESCE(p.address_line1, '''') as address,
+            p.city,
+            p.state,
+            p.postal_code as zip_code,
+            p.phone_number as phone,
+            p.email,
+            p.website,
+            p.latitude,
+            p.longitude,
+            p.logo_url,
+            COALESCE(t.subscription_tier, ''trial'') as subscription_tier,
+            false as use_custom_website
+        FROM %I t
+        LEFT JOIN %I p ON t.id = p.tenant_id
+        WHERE t.id NOT IN (SELECT tenant_id FROM directory_listings)
+        ON CONFLICT (id) DO NOTHING
+    ', tenant_table_name, COALESCE(profile_table_name, tenant_table_name || '_business_profile'));
+
+    -- Update product counts if inventory table exists
+    IF inventory_table_name IS NOT NULL THEN
+        UPDATE directory_listings
+        SET product_count = (
+            SELECT COUNT(*)
+            FROM inventory_item ii
+            WHERE ii.tenant_id = directory_listings.tenant_id
+            AND ii.item_status = 'active'
+            AND ii.visibility = 'public'
+        );
+    END IF;
+
+    RAISE NOTICE 'Directory listings populated successfully';
+END $$;
 
 -- Enable RLS on the directory_listings table
 ALTER TABLE directory_listings ENABLE ROW LEVEL SECURITY;
