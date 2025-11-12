@@ -8,6 +8,7 @@ if (process.env.NODE_ENV === 'production') {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   console.log('⚠️  SSL certificate validation disabled for Supabase compatibility');
 }
+import { Pool } from 'pg';
 import { prisma } from "./prisma";
 import { z } from "zod";
 import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
@@ -2291,6 +2292,127 @@ app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) =
     const msg = e?.message || 'failed_to_assign_category';
     console.error('[PATCH /api/v1/tenants/:tenantId/items/:itemId/category] Error:', msg);
     return res.status(code).json({ success: false, error: msg });
+  }
+});
+
+/* ------------------------------ item updates ------------------------------ */
+// PUT /api/items/:itemId
+// Update an item (general updates, not category assignment)
+app.put('/api/items/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const updateData = req.body;
+
+    // Validate required fields
+    if (!updateData) {
+      return res.status(400).json({ error: 'update_data_required' });
+    }
+
+    // Use direct pool query to bypass Prisma RLS issues
+    const directPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      min: 1,
+      max: 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
+
+    try {
+      // Build dynamic update query
+      const updateFields = [];
+      const values = [];
+      let paramIndex = 1;
+
+      // Handle different field names (camelCase from frontend vs snake_case in DB)
+      if (updateData.name !== undefined) {
+        updateFields.push(`name = $${paramIndex}`);
+        values.push(updateData.name);
+        paramIndex++;
+      }
+
+      if (updateData.price !== undefined) {
+        updateFields.push(`price = $${paramIndex}`);
+        values.push(updateData.price);
+        paramIndex++;
+      }
+
+      if (updateData.stock !== undefined) {
+        updateFields.push(`stock = $${paramIndex}`);
+        values.push(updateData.stock);
+        paramIndex++;
+      }
+
+      if (updateData.description !== undefined) {
+        updateFields.push(`description = $${paramIndex}`);
+        values.push(updateData.description);
+        paramIndex++;
+      }
+
+      if (updateData.visibility !== undefined) {
+        updateFields.push(`visibility = $${paramIndex}`);
+        values.push(updateData.visibility);
+        paramIndex++;
+      }
+
+      if (updateData.itemStatus !== undefined) {
+        updateFields.push(`item_status = $${paramIndex}`);
+        values.push(updateData.itemStatus);
+        paramIndex++;
+      }
+
+      if (updateData.categoryPath !== undefined) {
+        updateFields.push(`category_path = $${paramIndex}`);
+        values.push(updateData.categoryPath);
+        paramIndex++;
+      }
+
+      if (updateFields.length === 0) {
+        return res.status(400).json({ error: 'no_valid_fields_to_update' });
+      }
+
+      // Add updated_at timestamp
+      updateFields.push(`updated_at = NOW()`);
+
+      // Add itemId as the last parameter
+      values.push(itemId);
+
+      const updateQuery = `
+        UPDATE inventory_item
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING *
+      `;
+
+      const result = await directPool.query(updateQuery, values);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'item_not_found' });
+      }
+
+      // Transform snake_case back to camelCase for frontend
+      const row = result.rows[0];
+      const updatedItem = {
+        id: row.id,
+        tenantId: row.tenant_id,
+        sku: row.sku,
+        name: row.name,
+        price: row.price,
+        stock: row.stock,
+        description: row.description,
+        visibility: row.visibility,
+        status: row.item_status,
+        categoryPath: row.category_path,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+
+      return res.json(updatedItem);
+    } finally {
+      await directPool.end();
+    }
+  } catch (error) {
+    console.error('[PUT /api/items/:itemId] Error:', error);
+    return res.status(500).json({ error: 'failed_to_update_item' });
   }
 });
 
