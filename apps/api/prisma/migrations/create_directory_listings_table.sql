@@ -140,7 +140,7 @@ BEGIN
             p.latitude,
             p.longitude,
             p.logo_url,
-            COALESCE(t.subscription_tier, ''trial'') as subscription_tier,
+            COALESCE(t.subscriptionTier, ''trial'') as subscription_tier,
             false as use_custom_website
         FROM %I t
         LEFT JOIN %I p ON t.id = p.tenant_id
@@ -181,61 +181,67 @@ ON directory_listings FOR SELECT TO anon, authenticated USING (is_published = tr
 -- Create function to refresh directory listings (call this periodically or after tenant updates)
 CREATE OR REPLACE FUNCTION refresh_directory_listings()
 RETURNS void AS $$
+DECLARE
+    tenant_table_name TEXT := 'Tenant';
+    profile_table_name TEXT := 'tenant_business_profile';
+    inventory_table_name TEXT := 'inventory_item';
 BEGIN
-    -- Insert new tenants
-    INSERT INTO directory_listings (
-        id,
-        tenant_id,
-        business_name,
-        slug,
-        address,
-        city,
-        state,
-        zip_code,
-        phone,
-        email,
-        website,
-        latitude,
-        longitude,
-        logo_url,
-        subscription_tier,
-        use_custom_website
-    )
-    SELECT
-        t.id,
-        t.id as tenant_id,
-        COALESCE(tbp.business_name, t.name) as business_name,
-        LOWER(REPLACE(COALESCE(tbp.business_name, t.name), ' ', '-')) || '-' || t.id as slug,
-        COALESCE(tbp.address_line1, '') as address,
-        tbp.city,
-        tbp.state,
-        tbp.postal_code as zip_code,
-        tbp.phone_number as phone,
-        tbp.email,
-        tbp.website,
-        tbp.latitude,
-        tbp.longitude,
-        tbp.logo_url,
-        COALESCE(t.subscription_tier, 'trial') as subscription_tier,
-        false as use_custom_website
-    FROM tenant t
-    LEFT JOIN tenant_business_profile tbp ON t.id = tbp.tenant_id
-    WHERE t.id NOT IN (SELECT tenant_id FROM directory_listings)
-    ON CONFLICT (id) DO UPDATE SET
-        business_name = EXCLUDED.business_name,
-        slug = EXCLUDED.slug,
-        address = EXCLUDED.address,
-        city = EXCLUDED.city,
-        state = EXCLUDED.state,
-        zip_code = EXCLUDED.zip_code,
-        phone = EXCLUDED.phone,
-        email = EXCLUDED.email,
-        website = EXCLUDED.website,
-        latitude = EXCLUDED.latitude,
-        longitude = EXCLUDED.longitude,
-        logo_url = EXCLUDED.logo_url,
-        subscription_tier = EXCLUDED.subscription_tier,
-        updated_at = NOW();
+    -- Insert new tenants - use dynamic table names
+    EXECUTE format('
+        INSERT INTO directory_listings (
+            id,
+            tenant_id,
+            business_name,
+            slug,
+            address,
+            city,
+            state,
+            zip_code,
+            phone,
+            email,
+            website,
+            latitude,
+            longitude,
+            logo_url,
+            subscription_tier,
+            use_custom_website
+        )
+        SELECT
+            t.id,
+            t.id as tenant_id,
+            COALESCE(p.business_name, t.name) as business_name,
+            LOWER(REPLACE(COALESCE(p.business_name, t.name), '' '', ''-'')) || ''-'' || t.id as slug,
+            COALESCE(p.address_line1, '''') as address,
+            p.city,
+            p.state,
+            p.postal_code as zip_code,
+            p.phone_number as phone,
+            p.email,
+            p.website,
+            p.latitude,
+            p.longitude,
+            p.logo_url,
+            COALESCE(t.subscriptionTier, ''trial'') as subscription_tier,
+            false as use_custom_website
+        FROM %I t
+        LEFT JOIN %I p ON t.id = p.tenant_id
+        WHERE t.id NOT IN (SELECT tenant_id FROM directory_listings)
+        ON CONFLICT (id) DO UPDATE SET
+            business_name = EXCLUDED.business_name,
+            slug = EXCLUDED.slug,
+            address = EXCLUDED.address,
+            city = EXCLUDED.city,
+            state = EXCLUDED.state,
+            zip_code = EXCLUDED.zip_code,
+            phone = EXCLUDED.phone,
+            email = EXCLUDED.email,
+            website = EXCLUDED.website,
+            latitude = EXCLUDED.latitude,
+            longitude = EXCLUDED.longitude,
+            logo_url = EXCLUDED.logo_url,
+            subscription_tier = EXCLUDED.subscription_tier,
+            updated_at = NOW()
+    ', tenant_table_name, profile_table_name);
 
     -- Update product counts for all listings
     UPDATE directory_listings
