@@ -8,12 +8,12 @@ export interface User {
   email: string;
   firstName?: string;
   lastName?: string;
-  role: 'ADMIN' | 'OWNER' | 'USER';
+  role: 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER';
   emailVerified: boolean;
   tenants: {
     id: string;
     name: string;
-    role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+    role: 'OWNER' | 'ADMIN' | 'SUPPORT' | 'MEMBER' | 'VIEWER';
   }[];
 }
 
