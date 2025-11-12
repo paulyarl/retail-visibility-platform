@@ -151,7 +151,7 @@ export default function ItemsGrid({
                 size="sm" 
                 variant="ghost" 
                 onClick={() => onCategory(item)} 
-                className="text-xs sm:text-sm min-h-[36px] sm:min-h-[32px]"
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0 text-xs sm:text-sm min-h-[36px] sm:min-h-[32px]"
                 title="Assign Google product category (required for Google sync)"
               >
                 <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
