@@ -8,6 +8,8 @@ import DirectoryGrid from '@/components/directory/DirectoryGrid';
 import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import { Pagination } from '@/components/ui';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import Image from 'next/image';
 import dynamic from 'next/dynamic';
 
 // Dynamically import map to avoid SSR issues
@@ -49,6 +51,7 @@ interface DirectoryResponse {
 }
 
 export default function DirectoryClient() {
+  const { settings } = usePlatformSettings();
   const searchParams = useSearchParams();
   const [data, setData] = useState<DirectoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,10 +123,38 @@ export default function DirectoryClient() {
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Hero Section */}
+      {/* Hero Section with Platform Branding */}
       <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
-        <div className="container mx-auto px-4 py-16">
+        <div className="container mx-auto px-4 py-12 md:py-16">
+          {/* Platform Branding */}
+          {settings?.logoUrl && (
+            <div className="flex justify-center mb-8">
+              <div className="relative">
+                <div className="absolute inset-0 bg-white/20 rounded-2xl blur-xl"></div>
+                <div className="relative bg-white/10 backdrop-blur-sm border-2 border-white/30 rounded-2xl p-4 md:p-6">
+                  <Image
+                    src={settings.logoUrl}
+                    alt={settings.platformName || 'Platform Logo'}
+                    width={200}
+                    height={80}
+                    className="h-12 md:h-16 w-auto object-contain"
+                    priority
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="max-w-4xl mx-auto text-center">
+            {/* Platform Name */}
+            {settings?.platformName && (
+              <div className="mb-4">
+                <span className="inline-block px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-sm font-semibold">
+                  {settings.platformName} Directory
+                </span>
+              </div>
+            )}
+
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               Discover Local Stores
             </h1>
