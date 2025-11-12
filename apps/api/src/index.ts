@@ -133,7 +133,7 @@ const app = express();
 
 /* ------------------------- middleware ------------------------- */
 app.use(cors({
-  origin: [/localhost:\d+$/, /\.vercel\.app$/, /visibleshelf\.com$/, /visibleshelf\.store$/],
+  origin: [/localhost:\d+$/, /\.vercel\.app$/, /visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.com$/, /\.visibleshelf\.store$/],
   credentials: true,
   methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
   allowedHeaders: ['content-type','authorization','x-csrf-token','x-tenant-id'],
