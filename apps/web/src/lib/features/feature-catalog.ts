@@ -277,13 +277,13 @@ export const FEATURE_CATALOG: PlatformFeature[] = [
   },
   {
     id: 'propagation',
-    name: 'Chain-Wide Updates',
-    tagline: 'Update once, apply everywhere',
-    description: "Running a chain? Make changes at headquarters and push them to all your locations instantly. Update prices, add products, or change settings across your entire organization with one click. No more calling each store!",
+    name: 'Multi-Location Updates',
+    tagline: 'Update all your locations at once',
+    description: "Got more than one location? Update products and team permissions across all your stores with one click. No more updating each location manually! Starter tier includes product and user role propagation. Upgrade to Professional for hours, categories, and more.",
     icon: 'location',
     pillar: 'scale',
     category: 'locations',
-    requiredTier: 'organization',
+    requiredTier: 'starter',
     route: '/propagation',
     isNew: true
   },

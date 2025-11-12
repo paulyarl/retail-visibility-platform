@@ -135,10 +135,22 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   image_gallery_10: 'enterprise',
   api_access: 'enterprise',
   
+  // Starter tier propagation (limited)
+  propagation_products: 'starter',
+  propagation_user_roles: 'starter',
+  
+  // Professional tier propagation (full operational suite)
+  propagation_hours: 'professional',
+  propagation_profile: 'professional',
+  propagation_categories: 'professional',
+  propagation_gbp_sync: 'professional',
+  propagation_feature_flags: 'professional',
+  
   // Organization tier features
-  propagation_products: 'organization',
-  propagation_categories: 'organization',
-  propagation_gbp_sync: 'organization',
+  propagation_brand_assets: 'organization',
+  propagation_selective: 'organization',
+  propagation_scheduling: 'organization',
+  propagation_rollback: 'organization',
   organization_dashboard: 'organization',
   hero_location: 'organization',
   strategic_testing: 'organization',

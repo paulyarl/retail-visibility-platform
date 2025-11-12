@@ -251,7 +251,7 @@ export default function ItemsGrid({
                 variant="ghost"
                 onClick={() => onPropagate?.(item)}
                 disabled={!onPropagate}
-                title={onPropagate ? "Push this product to all your other locations (Organization tier)" : "Propagate to other locations - Upgrade to Organization tier"}
+                title={onPropagate ? "Push this product to all your other locations (Starter+ with 2+ locations)" : "Propagate to other locations - Available on Starter tier with 2+ locations"}
                 className={`bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white border-0 ${!onPropagate ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

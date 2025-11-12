@@ -169,3 +169,93 @@ export async function validateTierCompatibility(
     });
   }
 }
+
+/**
+ * Middleware to check if tenant has required tier for propagation
+ * Returns a middleware function that validates tier access for specific propagation types
+ */
+export function requirePropagationTier(
+  propagationType: 'products' | 'user_roles' | 'hours' | 'profile' | 'categories' | 'gbp' | 'flags' | 'brand_assets'
+) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const tenantId = req.params.tenantId || req.params.id;
+      
+      if (!tenantId) {
+        return res.status(400).json({
+          error: 'tenant_id_required',
+          message: 'Tenant ID is required'
+        });
+      }
+
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          subscriptionTier: true,
+          organizationId: true,
+          organization: {
+            select: {
+              subscriptionTier: true,
+              _count: { select: { tenants: true } }
+            }
+          }
+        }
+      });
+
+      if (!tenant) {
+        return res.status(404).json({ 
+          error: 'tenant_not_found',
+          message: 'Tenant not found'
+        });
+      }
+
+      // Get effective tier (org tier overrides tenant tier)
+      const effectiveTier = tenant.organization?.subscriptionTier || tenant.subscriptionTier || 'starter';
+      
+      // Check if user has 2+ locations
+      const locationCount = tenant.organization?._count.tenants || 1;
+      if (locationCount < 2) {
+        return res.status(403).json({
+          error: 'insufficient_locations',
+          message: 'Propagation requires 2 or more locations. Upgrade your plan to add more locations.',
+          currentLocations: locationCount,
+          requiredLocations: 2,
+          propagationType
+        });
+      }
+
+      // Define tier requirements for each propagation type
+      const tierRequirements: Record<string, string[]> = {
+        products: ['starter', 'professional', 'enterprise', 'organization'],
+        user_roles: ['starter', 'professional', 'enterprise', 'organization'],
+        hours: ['professional', 'enterprise', 'organization'],
+        profile: ['professional', 'enterprise', 'organization'],
+        categories: ['professional', 'enterprise', 'organization'],
+        gbp: ['professional', 'enterprise', 'organization'],
+        flags: ['professional', 'enterprise', 'organization'],
+        brand_assets: ['organization']
+      };
+
+      const allowedTiers = tierRequirements[propagationType] || [];
+      if (!allowedTiers.includes(effectiveTier)) {
+        const requiredTier = allowedTiers[0];
+        return res.status(403).json({
+          error: 'tier_upgrade_required',
+          message: `${propagationType.replace('_', ' ')} propagation requires ${requiredTier} tier or higher`,
+          currentTier: effectiveTier,
+          requiredTier,
+          propagationType,
+          upgradeUrl: '/settings/subscription'
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error('[requirePropagationTier] Error:', error);
+      return res.status(500).json({
+        error: 'tier_validation_failed',
+        message: 'Failed to validate tier requirements'
+      });
+    }
+  };
+}

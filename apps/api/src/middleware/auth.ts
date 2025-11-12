@@ -329,3 +329,58 @@ export function requirePlatformStaffOrAdmin(req: Request, res: Response, next: N
   
   next();
 }
+
+/**
+ * Middleware to check if user is tenant admin/owner
+ * Used for tenant-level operations like propagation
+ * Platform admins bypass this check
+ */
+export async function requireTenantAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ 
+      error: 'authentication_required',
+      message: 'Not authenticated' 
+    });
+  }
+
+  // Platform admins can always access
+  if (isPlatformAdmin(req.user)) {
+    return next();
+  }
+
+  // Get tenant ID from params
+  const tenantId = req.params.tenantId || req.params.id;
+  if (!tenantId) {
+    return res.status(400).json({
+      error: 'tenant_id_required',
+      message: 'Tenant ID is required'
+    });
+  }
+
+  // Import prisma here to avoid circular dependencies
+  const { prisma } = await import('../prisma');
+  
+  // Check if user is OWNER or ADMIN of this tenant
+  const userTenant = await prisma.userTenant.findUnique({
+    where: {
+      userId_tenantId: {
+        userId: req.user.userId,
+        tenantId: tenantId
+      }
+    },
+    select: {
+      role: true
+    }
+  });
+
+  if (!userTenant || (userTenant.role !== 'OWNER' && userTenant.role !== 'ADMIN')) {
+    return res.status(403).json({
+      error: 'tenant_admin_required',
+      message: 'Tenant owner or administrator access required for this operation',
+      requiredRole: 'OWNER or ADMIN',
+      userRole: userTenant?.role || 'none'
+    });
+  }
+
+  next();
+}

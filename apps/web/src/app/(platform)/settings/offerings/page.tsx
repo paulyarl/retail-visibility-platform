@@ -46,22 +46,22 @@ export default function OfferingsPage() {
               </div>
             </div>
 
-            {/* Organization Propagation Control - ENTERPRISE! */}
-            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 border-2 border-emerald-400 rounded-lg p-6 text-white relative shadow-xl">
-              <div className="absolute -top-2 -right-2 bg-amber-400 text-emerald-900 text-xs px-3 py-1 rounded-full font-bold">
-                ENTERPRISE
+            {/* Multi-Location Management - STARTER+ */}
+            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 border-2 border-blue-400 rounded-lg p-6 text-white relative shadow-xl">
+              <div className="absolute -top-2 -right-2 bg-green-400 text-blue-900 text-xs px-3 py-1 rounded-full font-bold">
+                STARTER+
               </div>
               <div className="text-4xl mb-3">🔗</div>
-              <h3 className="text-lg font-bold mb-2">Organization Propagation Control</h3>
+              <h3 className="text-lg font-bold mb-2">Multi-Location Management</h3>
               <ul className="space-y-1 text-sm">
-                <li>• 8 propagation types (products, categories, GBP sync, hours, profile, flags, roles, brand)</li>
-                <li>• Test on 1 location before rollout</li>
-                <li>• One-click chain-wide sync</li>
-                <li>• Hero location concept</li>
-                <li>• Save 400+ hours per rollout</li>
+                <li>• Starter: Products & user roles propagation</li>
+                <li>• Professional: + Hours, profile, categories, GBP sync, flags</li>
+                <li>• Organization: + Brand assets, selective, scheduling, rollback</li>
+                <li>• Update all locations at once</li>
+                <li>• Save hours every week</li>
               </ul>
-              <div className="mt-3 pt-3 border-t border-emerald-300">
-                <span className="text-xs font-semibold">Worth $50K+/year!</span>
+              <div className="mt-3 pt-3 border-t border-blue-300">
+                <span className="text-xs font-semibold">Available on Starter tier with 2+ locations!</span>
               </div>
             </div>
 

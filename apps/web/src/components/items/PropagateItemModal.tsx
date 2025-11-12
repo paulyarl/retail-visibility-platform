@@ -131,7 +131,7 @@ export default function PropagateItemModal({
             Not Available
           </h3>
           <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-            This location is not part of a chain organization. Item propagation is only available for chain accounts.
+            Item propagation is available on Starter tier and above when you have 2 or more locations. Upgrade your plan to unlock multi-location management.
           </p>
           <button
             onClick={handleClose}
