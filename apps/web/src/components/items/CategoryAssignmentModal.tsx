@@ -31,8 +31,56 @@ export default function CategoryAssignmentModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useSearchMode, setUseSearchMode] = useState(false);
+  const [googleCategories, setGoogleCategories] = useState<GoogleCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
-  // Search Google taxonomy (using mock data for now)
+  // Load Google taxonomy categories on mount
+  useEffect(() => {
+    const loadGoogleCategories = async () => {
+      try {
+        // Load top-level categories first (level 1)
+        const response = await fetch('/api/google/taxonomy/browse?level=1');
+        if (response.ok) {
+          const data = await response.json();
+          setGoogleCategories(data.categories || []);
+        } else {
+          // Fallback to search for common categories
+          const fallbackResponse = await fetch('/api/google/taxonomy/search?q=electronics&limit=50');
+          if (fallbackResponse.ok) {
+            const data = await fallbackResponse.json();
+            // Group by top-level category
+            const grouped = (data.categories || []).reduce((acc: any, cat: any) => {
+              const topLevel = cat.path[0];
+              if (!acc[topLevel]) {
+                acc[topLevel] = { id: topLevel, name: topLevel, path: [topLevel], fullPath: topLevel, children: [] };
+              }
+              if (cat.path.length > 1) {
+                acc[topLevel].children.push(cat);
+              }
+              return acc;
+            }, {});
+            setGoogleCategories(Object.values(grouped));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading Google categories:', error);
+        // Fallback to original mock categories
+        setGoogleCategories([
+          { id: '267', name: 'Mobile Phones', path: ['Electronics', 'Mobile Phones'], fullPath: 'Electronics > Mobile Phones' },
+          { id: '5', name: 'Laptops', path: ['Electronics', 'Computers', 'Laptops'], fullPath: 'Electronics > Computers > Laptops' },
+          { id: '2271', name: 'Pants', path: ['Apparel & Accessories', 'Clothing', 'Pants'], fullPath: 'Apparel & Accessories > Clothing > Pants' },
+          { id: '187', name: 'Shoes', path: ['Apparel & Accessories', 'Shoes'], fullPath: 'Apparel & Accessories > Shoes' },
+          { id: '1604', name: 'Furniture', path: ['Home & Garden', 'Furniture'], fullPath: 'Home & Garden > Furniture' },
+        ]);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    loadGoogleCategories();
+  }, []);
+
+  // Search Google taxonomy
   const searchGoogleCategories = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -40,37 +88,20 @@ export default function CategoryAssignmentModal({
     }
 
     setIsSearching(true);
-    
-    // For now, search through mock categories instead of API
-    const lowerQuery = query.toLowerCase();
-    const results: GoogleCategory[] = [];
-    
-    mockCategories.forEach(category => {
-      // Search parent categories
-      if (category.name.toLowerCase().includes(lowerQuery)) {
-        results.push({
-          id: category.id,
-          name: category.name,
-          path: [category.name],
-          fullPath: category.name
-        });
+    try {
+      const response = await fetch(`/api/google/taxonomy/search?q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data.categories || []);
+      } else {
+        setSearchResults([]);
       }
-      
-      // Search child categories
-      category.children.forEach(child => {
-        if (child.name.toLowerCase().includes(lowerQuery)) {
-          results.push({
-            id: child.id,
-            name: child.name,
-            path: [category.name, child.name],
-            fullPath: `${category.name} > ${child.name}`
-          });
-        }
-      });
-    });
-    
-    setSearchResults(results.slice(0, 10)); // Limit to 10 results
-    setIsSearching(false);
+    } catch (error) {
+      console.error('Error searching Google taxonomy:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   // Debounced search
@@ -84,37 +115,6 @@ export default function CategoryAssignmentModal({
     return () => clearTimeout(timer);
   }, [searchQuery, useSearchMode]);
 
-  // Mock categories for hierarchical browsing - will be replaced with real Google taxonomy
-  const mockCategories = [
-    { 
-      id: '1', 
-      name: 'Electronics', 
-      children: [
-        { id: '1-1', name: 'Phones' },
-        { id: '1-2', name: 'Laptops' },
-        { id: '1-3', name: 'Tablets' }
-      ]
-    },
-    { 
-      id: '2', 
-      name: 'Clothing', 
-      children: [
-        { id: '2-1', name: 'Shirts' },
-        { id: '2-2', name: 'Pants' },
-        { id: '2-3', name: 'Shoes' }
-      ]
-    },
-    { 
-      id: '3', 
-      name: 'Home & Garden', 
-      children: [
-        { id: '3-1', name: 'Furniture' },
-        { id: '3-2', name: 'Decor' },
-        { id: '3-3', name: 'Tools' }
-      ]
-    },
-  ];
-
   const handleSave = async () => {
     if (!selectedCategoryId) return;
 
@@ -122,9 +122,8 @@ export default function CategoryAssignmentModal({
     setError(null);
 
     try {
-      // Both browse and search modes send the mock category ID as categorySlug
-      // This will create a tenant category with the proper googleCategoryId
-      await onSave(item.id, selectedCategoryId, 'Category'); // ID and placeholder name
+      // Send the Google category ID as categorySlug
+      await onSave(item.id, selectedCategoryId, 'Category');
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to assign category');
@@ -250,44 +249,60 @@ export default function CategoryAssignmentModal({
               )}
             </div>
           ) : (
-            /* Browse Mode - Hierarchical Categories */
+            /* Browse Mode - Google Taxonomy Categories */
             <div className="space-y-3">
               <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                Select Category
+                Browse Google Product Categories
               </label>
               
-              {mockCategories.map((category) => (
-                <div key={category.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-3">
-                  <button
-                    onClick={() => setSelectedCategoryId(category.id)}
-                    className={`w-full text-left font-medium mb-2 ${
-                      selectedCategoryId === category.id
-                        ? 'text-primary-600'
-                        : 'text-neutral-900 dark:text-white'
-                    }`}
-                  >
-                    {category.name}
-                  </button>
-                  
-                  {selectedCategoryId === category.id && (
-                    <div className="pl-4 space-y-1">
-                      {category.children.map((child) => (
-                        <button
-                          key={child.id}
-                          onClick={() => setSelectedCategoryId(child.id)}
-                          className={`block w-full text-left text-sm py-1 ${
-                            selectedCategoryId === child.id
-                              ? 'text-primary-600 font-medium'
-                              : 'text-neutral-600 dark:text-neutral-400'
-                          }`}
-                        >
-                          {child.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              {loadingCategories ? (
+                <div className="p-4 text-center text-neutral-500">
+                  Loading categories...
                 </div>
-              ))}
+              ) : googleCategories.length > 0 ? (
+                googleCategories.slice(0, 10).map((category) => (
+                  <div key={category.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-3">
+                    <button
+                      onClick={() => setSelectedCategoryId(category.id)}
+                      className={`w-full text-left font-medium mb-2 ${
+                        selectedCategoryId === category.id
+                          ? 'text-primary-600'
+                          : 'text-neutral-900 dark:text-white'
+                      }`}
+                    >
+                      {category.name}
+                    </button>
+                    
+                    {/* Show some subcategories if available */}
+                    {selectedCategoryId === category.id && category.children && category.children.length > 0 && (
+                      <div className="pl-4 space-y-1">
+                        {category.children.slice(0, 5).map((child: any) => (
+                          <button
+                            key={child.id}
+                            onClick={() => setSelectedCategoryId(child.id)}
+                            className={`block w-full text-left text-sm py-1 ${
+                              selectedCategoryId === child.id
+                                ? 'text-primary-600 font-medium'
+                                : 'text-neutral-600 dark:text-neutral-400'
+                            }`}
+                          >
+                            {child.name}
+                          </button>
+                        ))}
+                        {category.children.length > 5 && (
+                          <div className="text-xs text-neutral-400 mt-2">
+                            +{category.children.length - 5} more categories...
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-center text-neutral-500">
+                  No categories available
+                </div>
+              )}
             </div>
           )}
 
@@ -299,20 +314,21 @@ export default function CategoryAssignmentModal({
                 {(() => {
                   if (useSearchMode) {
                     const selected = searchResults.find(cat => cat.id === selectedCategoryId);
-                    return selected ? `${selected.name} (${selected.fullPath})` : 'Unknown';
+                    return selected ? `${selected.name} (${selected.fullPath})` : `Category ID: ${selectedCategoryId}`;
                   } else {
-                    // Browse mode
-                    for (const category of mockCategories) {
+                    // Browse mode - find in loaded Google categories
+                    for (const category of googleCategories) {
                       if (category.id === selectedCategoryId) {
                         return category.name;
                       }
-                      for (const child of category.children) {
-                        if (child.id === selectedCategoryId) {
-                          return `${category.name} > ${child.name}`;
+                      if (category.children) {
+                        const child = category.children.find((c: any) => c.id === selectedCategoryId);
+                        if (child) {
+                          return `${child.name} (${child.fullPath})`;
                         }
                       }
                     }
-                    return 'Unknown';
+                    return `Category ID: ${selectedCategoryId}`;
                   }
                 })()}
               </div>

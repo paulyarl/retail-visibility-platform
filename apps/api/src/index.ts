@@ -1653,6 +1653,58 @@ app.post("/items/sync-availability", authenticateToken, async (req, res) => {
 
 //* ------------------------------ GOOGLE TAXONOMY SEARCH ------------------------------ */
 
+app.get('/api/google/taxonomy/browse', async (req, res) => {
+  try {
+    const { level = '1' } = req.query;
+    const targetLevel = parseInt(level as string, 10);
+
+    // Get categories at the specified level
+    const categories = await prisma.googleTaxonomy.findMany({
+      where: {
+        isActive: true,
+        level: targetLevel
+      },
+      orderBy: { categoryPath: 'asc' },
+      take: 50 // Limit for performance
+    });
+
+    // For each top-level category, get some children
+    const categoriesWithChildren = await Promise.all(
+      categories.map(async (cat) => {
+        const children = await prisma.googleTaxonomy.findMany({
+          where: {
+            isActive: true,
+            parentId: cat.categoryId
+          },
+          orderBy: { categoryPath: 'asc' },
+          take: 10 // Limit children for UI performance
+        });
+
+        return {
+          id: cat.categoryId,
+          name: cat.categoryPath.split(' > ').pop() || cat.categoryPath,
+          path: cat.categoryPath.split(' > '),
+          fullPath: cat.categoryPath,
+          children: children.map(child => ({
+            id: child.categoryId,
+            name: child.categoryPath.split(' > ').pop() || child.categoryPath,
+            path: child.categoryPath.split(' > '),
+            fullPath: child.categoryPath
+          }))
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      categories: categoriesWithChildren,
+    });
+  } catch (error) {
+    console.error('[Google Taxonomy Browse] Error:', error);
+    res.status(500).json({ success: false, error: 'Browse failed' });
+  }
+});
+
 app.get('/api/google/taxonomy/search', async (req, res) => {
   try {
     const { q: query, limit = '10' } = req.query;
@@ -1661,28 +1713,26 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
       return res.status(400).json({ error: 'Query parameter required' });
     }
 
-    // For now, return mock results that match the frontend mockCategories
-    // TODO: Replace with real Google taxonomy search when taxonomy data is deployed
-    const mockCategories = [
-      { id: '1', name: 'Electronics', path: ['Electronics'], fullPath: 'Electronics' },
-      { id: '1-1', name: 'Phones', path: ['Electronics', 'Phones'], fullPath: 'Electronics > Phones' },
-      { id: '1-2', name: 'Laptops', path: ['Electronics', 'Laptops'], fullPath: 'Electronics > Laptops' },
-      { id: '1-3', name: 'Tablets', path: ['Electronics', 'Tablets'], fullPath: 'Electronics > Tablets' },
-      { id: '2', name: 'Clothing', path: ['Clothing'], fullPath: 'Clothing' },
-      { id: '2-1', name: 'Shirts', path: ['Clothing', 'Shirts'], fullPath: 'Clothing > Shirts' },
-      { id: '2-2', name: 'Pants', path: ['Clothing', 'Pants'], fullPath: 'Clothing > Pants' }, // This matches user's request
-      { id: '2-3', name: 'Shoes', path: ['Clothing', 'Shoes'], fullPath: 'Clothing > Shoes' },
-      { id: '3', name: 'Home & Garden', path: ['Home & Garden'], fullPath: 'Home & Garden' },
-      { id: '3-1', name: 'Furniture', path: ['Home & Garden', 'Furniture'], fullPath: 'Home & Garden > Furniture' },
-      { id: '3-2', name: 'Decor', path: ['Home & Garden', 'Decor'], fullPath: 'Home & Garden > Decor' },
-      { id: '3-3', name: 'Tools', path: ['Home & Garden', 'Tools'], fullPath: 'Home & Garden > Tools' },
-    ];
-
+    // Search real Google taxonomy data from database
     const lowerQuery = query.toLowerCase();
-    const results = mockCategories.filter(cat =>
-      cat.name.toLowerCase().includes(lowerQuery) ||
-      cat.fullPath.toLowerCase().includes(lowerQuery)
-    ).slice(0, parseInt(limit as string, 10));
+    const categories = await prisma.googleTaxonomy.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { categoryPath: { contains: lowerQuery, mode: 'insensitive' } },
+          { categoryId: { contains: lowerQuery } }
+        ]
+      },
+      take: parseInt(limit as string, 10),
+      orderBy: { categoryPath: 'asc' }
+    });
+
+    const results = categories.map(cat => ({
+      id: cat.categoryId,
+      name: cat.categoryPath.split(' > ').pop() || cat.categoryPath,
+      path: cat.categoryPath.split(' > '),
+      fullPath: cat.categoryPath
+    }));
 
     res.json({
       success: true,
