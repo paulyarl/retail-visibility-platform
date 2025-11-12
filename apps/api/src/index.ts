@@ -1651,24 +1651,31 @@ app.post("/items/sync-availability", authenticateToken, async (req, res) => {
   }
 });
 
-// Get Google product feed (filtered by status)
-app.get("/google/feed", async (req, res) => {
+//* ------------------------------ GOOGLE TAXONOMY SEARCH ------------------------------ */
+
+app.get('/api/google/taxonomy/search', async (req, res) => {
   try {
-    const tenantId = req.query.tenantId as string;
-    if (!tenantId) {
-      return res.status(400).json({ error: "tenant_required" });
+    const { q: query, limit = '10' } = req.query;
+    
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'Query parameter required' });
     }
 
-    const { generateProductFeed, getFeedStats } = await import('./lib/google/feed-generator');
-    const [feed, stats] = await Promise.all([
-      generateProductFeed(tenantId),
-      getFeedStats(tenantId),
-    ]);
+    const { searchCategories } = await import('./lib/google/taxonomy');
+    const categories = searchCategories(query, parseInt(limit as string, 10));
 
-    res.json({ feed, stats });
+    res.json({
+      success: true,
+      categories: categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        path: cat.path,
+        fullPath: cat.path.join(' > '),
+      })),
+    });
   } catch (error) {
-    console.error('[Google Feed] Error:', error);
-    res.status(500).json({ error: "failed_to_generate_feed" });
+    console.error('[Google Taxonomy Search] Error:', error);
+    res.status(500).json({ success: false, error: 'Search failed' });
   }
 });
 

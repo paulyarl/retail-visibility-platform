@@ -222,22 +222,42 @@ export default function ItemsClient({
     }
   };
 
-  const handleCategoryAssign = async (itemId: string, categoryId: string) => {
+  const handleCategoryAssign = async (itemId: string, googleCategoryId: string, categoryName: string) => {
     try {
-      // Use the PATCH endpoint for category assignment
-      const response = await fetch(`/api/v1/tenants/${initialTenantId}/items/${itemId}/category`, {
+      // First, create or find a tenant category for this Google category
+      const categoryResponse = await fetch(`/api/v1/tenants/${initialTenantId}/categories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: categoryName,
+          slug: googleCategoryId, // Use Google category ID as slug for uniqueness
+          googleCategoryId: googleCategoryId,
+        }),
+      });
+
+      if (!categoryResponse.ok) {
+        const errorData = await categoryResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create category');
+      }
+
+      const categoryData = await categoryResponse.json();
+      const tenantCategoryId = categoryData.data.id;
+
+      // Now assign the category to the item
+      const assignResponse = await fetch(`/api/v1/tenants/${initialTenantId}/items/${itemId}/category`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Send the selected category ID as the slug
-          categorySlug: categoryId,
+          tenantCategoryId: tenantCategoryId,
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      if (!assignResponse.ok) {
+        const errorData = await assignResponse.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to assign category');
       }
 

@@ -2,9 +2,15 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui';
 import { Item } from '@/services/itemsDataService';
 
+interface GoogleCategory {
+  id: string;
+  name: string;
+  path: string[];
+}
+
 interface CategoryAssignmentModalProps {
   item: Item;
-  onSave: (itemId: string, categoryId: string) => Promise<void>;
+  onSave: (itemId: string, googleCategoryId: string, categoryName: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -17,9 +23,45 @@ export default function CategoryAssignmentModal({
   onSave,
   onClose,
 }: CategoryAssignmentModalProps) {
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<GoogleCategory | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<GoogleCategory[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Search Google taxonomy
+  const searchGoogleCategories = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await fetch(`/api/google/taxonomy/search?q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data.categories || []);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Error searching Google taxonomy:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchGoogleCategories(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Mock categories - in real implementation, fetch from API
   const mockCategories = [
@@ -53,11 +95,13 @@ export default function CategoryAssignmentModal({
   ];
 
   const handleSave = async () => {
+    if (!selectedCategory) return;
+
     setSaving(true);
     setError(null);
 
     try {
-      await onSave(item.id, selectedCategoryId);
+      await onSave(item.id, selectedCategory.id, selectedCategory.name);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to assign category');
@@ -72,7 +116,7 @@ export default function CategoryAssignmentModal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
           <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
-            Assign Category
+            Assign Google Category
           </h3>
           <button
             onClick={onClose}
@@ -101,65 +145,64 @@ export default function CategoryAssignmentModal({
             </div>
           )}
 
-          {/* Category Selection */}
+          {/* Search Input */}
           <div className="space-y-3">
             <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-              Select Category
+              Search Google Product Categories
             </label>
             
-            {mockCategories.map((category) => (
-              <div key={category.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-3">
-                <button
-                  onClick={() => setSelectedCategoryId(category.id)}
-                  className={`w-full text-left font-medium mb-2 ${
-                    selectedCategoryId === category.id
-                      ? 'text-primary-600'
-                      : 'text-neutral-900 dark:text-white'
-                  }`}
-                >
-                  {category.name}
-                </button>
-                
-                {selectedCategoryId === category.id && (
-                  <div className="pl-4 space-y-1">
-                    {category.children.map((child) => (
-                      <button
-                        key={child.id}
-                        onClick={() => setSelectedCategoryId(child.id)}
-                        className={`block w-full text-left text-sm py-1 ${
-                          selectedCategoryId === child.id
-                            ? 'text-primary-600 font-medium'
-                            : 'text-neutral-600 dark:text-neutral-400'
-                        }`}
-                      >
-                        {child.name}
-                      </button>
-                    ))}
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search for categories (e.g., phones, clothing, electronics)"
+              className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white"
+            />
+
+            {/* Search Results */}
+            {searchQuery && (
+              <div className="max-h-60 overflow-y-auto border border-neutral-200 dark:border-neutral-700 rounded-lg">
+                {isSearching ? (
+                  <div className="p-4 text-center text-neutral-500">
+                    Searching...
                   </div>
-                )}
+                ) : searchResults.length > 0 ? (
+                  searchResults.map((category) => (
+                    <button
+                      key={category.id}
+                      onClick={() => setSelectedCategory(category)}
+                      className={`w-full text-left p-3 hover:bg-neutral-50 dark:hover:bg-neutral-700 border-b border-neutral-100 dark:border-neutral-600 last:border-b-0 ${
+                        selectedCategory?.id === category.id
+                          ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-700'
+                          : ''
+                      }`}
+                    >
+                      <div className="font-medium text-neutral-900 dark:text-white">
+                        {category.name}
+                      </div>
+                      <div className="text-xs text-neutral-500 mt-1">
+                        {category.fullPath}
+                      </div>
+                    </button>
+                  ))
+                ) : searchQuery.length > 2 ? (
+                  <div className="p-4 text-center text-neutral-500">
+                    No categories found
+                  </div>
+                ) : null}
               </div>
-            ))}
+            )}
           </div>
 
-          {/* Selected Path Display */}
-          {selectedCategoryId && (
-            <div className="mt-4 p-3 bg-neutral-50 dark:bg-neutral-900 rounded-lg">
-              <div className="text-xs text-neutral-500 mb-1">Selected:</div>
-              <div className="text-sm font-medium text-neutral-900 dark:text-white">
-                {(() => {
-                  // Find the selected category and build the display path
-                  for (const category of mockCategories) {
-                    if (category.id === selectedCategoryId) {
-                      return category.name;
-                    }
-                    for (const child of category.children) {
-                      if (child.id === selectedCategoryId) {
-                        return `${category.name} > ${child.name}`;
-                      }
-                    }
-                  }
-                  return 'Unknown';
-                })()}
+          {/* Selected Category Display */}
+          {selectedCategory && (
+            <div className="mt-4 p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded-lg">
+              <div className="text-xs text-primary-600 dark:text-primary-400 mb-1">Selected Category:</div>
+              <div className="text-sm font-medium text-primary-900 dark:text-primary-100">
+                {selectedCategory.name}
+              </div>
+              <div className="text-xs text-primary-600 dark:text-primary-400 mt-1">
+                {selectedCategory.fullPath}
               </div>
             </div>
           )}
@@ -173,10 +216,10 @@ export default function CategoryAssignmentModal({
           <Button
             variant="primary"
             onClick={handleSave}
-            disabled={!selectedCategoryId || saving}
+            disabled={!selectedCategory || saving}
             loading={saving}
           >
-            {saving ? 'Saving...' : 'Assign Category'}
+            {saving ? 'Assigning...' : 'Assign Category'}
           </Button>
         </div>
       </div>
