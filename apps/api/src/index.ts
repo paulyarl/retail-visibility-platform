@@ -1564,6 +1564,29 @@ app.delete(["/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdm
   }
 });
 
+// Category assignment endpoint
+const categoryAssignmentSchema = z.object({
+  categorySlug: z.string().min(1),
+});
+app.patch("/api/v1/tenants/:tenantId/items/:itemId/category", authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { tenantId, itemId } = req.params;
+    const parsed = categoryAssignmentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+    }
+
+    const updated = await categoryService.assignItemCategory(tenantId, itemId, {
+      categorySlug: parsed.data.categorySlug,
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error('[PATCH /api/v1/tenants/:tenantId/items/:itemId/category] Error:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || "failed_to_assign_category" });
+  }
+});
+
 // Update item status (for Google sync control)
 app.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, res) => {
   try {
