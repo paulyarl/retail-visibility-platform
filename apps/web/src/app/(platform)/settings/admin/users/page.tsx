@@ -296,18 +296,28 @@ export default function UsersManagementPage() {
             <p>
               These are <strong>platform-level roles</strong> that determine a user's global access:
             </p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong>Platform Admin:</strong> Full system access, unlimited tenants</li>
-              <li><strong>Platform Support:</strong> View all tenants + limited actions (3 tenant limit for testing)</li>
-              <li><strong>Platform Viewer:</strong> Read-only access to all tenants (cannot create tenants)</li>
-              <li><strong>Tenant Owner:</strong> Can create and own tenants (limits based on subscription tier)</li>
-              <li><strong>User:</strong> Basic access (limits based on subscription tier)</li>
-            </ul>
+            <div className="space-y-3">
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Platform Users:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>Platform Admin:</strong> Full system access, unlimited tenants</li>
+                  <li><strong>Platform Support:</strong> View all tenants + support actions (3 tenant limit)</li>
+                  <li><strong>Platform Viewer:</strong> Read-only access to all tenants (cannot create)</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Tenant Users:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>Tenant Owner:</strong> Can create/own tenants (limits based on subscription tier)</li>
+                  <li><strong>Tenant User:</strong> Basic access (limits based on subscription tier)</li>
+                </ul>
+              </div>
+            </div>
             <p className="mt-2 text-xs bg-amber-50 border border-amber-200 rounded p-2">
-              <strong>Tenant Limits:</strong> For regular users and owners, the number of tenants they can create depends on their <strong>subscription tier</strong>: Trial (1), Google-Only (1), Starter (3), Professional (10), Enterprise (25), Organization (unlimited).
+              <strong>Tenant Limits:</strong> For Tenant Users and Owners, the number of tenants they can create depends on their <strong>subscription tier</strong>: Trial (1), Google-Only (1), Starter (3), Professional (10), Enterprise (25), Organization (unlimited).
             </p>
             <p className="mt-2">
-              <strong>Note:</strong> Users also have <strong>tenant-specific roles</strong> (Owner, Admin, Member, Viewer) for each location they belong to. Those are managed within each tenant's settings, not here.
+              <strong>Note:</strong> Users also have <strong>tenant-specific roles</strong> (Tenant Owner, Tenant Support, Tenant Member, Tenant Viewer) for each location they belong to. Those are managed within each tenant's settings, not here.
             </p>
           </div>
         </Alert>
@@ -562,11 +572,15 @@ export default function UsersManagementPage() {
               onChange={(e) => setInviteRole(e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER')}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
-              <option value="USER">User</option>
-              <option value="OWNER">Tenant Owner</option>
-              <option value="PLATFORM_ADMIN">Platform Admin</option>
-              <option value="PLATFORM_SUPPORT">Platform Support</option>
-              <option value="PLATFORM_VIEWER">Platform Viewer</option>
+              <optgroup label="Platform Users">
+                <option value="PLATFORM_ADMIN">Platform Admin</option>
+                <option value="PLATFORM_SUPPORT">Platform Support</option>
+                <option value="PLATFORM_VIEWER">Platform Viewer</option>
+              </optgroup>
+              <optgroup label="Tenant Users">
+                <option value="OWNER">Tenant Owner</option>
+                <option value="USER">Tenant User</option>
+              </optgroup>
             </select>
           </div>
         </div>
@@ -613,15 +627,21 @@ export default function UsersManagementPage() {
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-2"
               disabled={!canManage}
             >
-              <option value="USER">User - Basic access (tenant limits based on subscription tier)</option>
-              <option value="OWNER">Tenant Owner - Can create/own tenants (limits based on subscription tier)</option>
-              <option value="PLATFORM_ADMIN">Platform Admin - Full system access (unlimited tenants)</option>
-              <option value="PLATFORM_SUPPORT">Platform Support - View all tenants + limited actions (3 tenant limit for testing)</option>
-              <option value="PLATFORM_VIEWER">Platform Viewer - Read-only access to all tenants (cannot create tenants)</option>
-              <option value="ADMIN">Admin (Deprecated) - Use Platform Admin instead</option>
+              <optgroup label="Platform Users">
+                <option value="PLATFORM_ADMIN">Platform Admin - Full system access (unlimited tenants)</option>
+                <option value="PLATFORM_SUPPORT">Platform Support - View all tenants + support actions (3 tenant limit)</option>
+                <option value="PLATFORM_VIEWER">Platform Viewer - Read-only access to all tenants (cannot create)</option>
+              </optgroup>
+              <optgroup label="Tenant Users">
+                <option value="OWNER">Tenant Owner - Can create/own tenants (limits based on subscription tier)</option>
+                <option value="USER">Tenant User - Basic access (limits based on subscription tier)</option>
+              </optgroup>
+              <optgroup label="Deprecated">
+                <option value="ADMIN">Admin (Deprecated) - Use Platform Admin instead</option>
+              </optgroup>
             </select>
             <p className="text-xs text-neutral-600">
-              Platform roles control global access. Users also have tenant-specific roles (Owner, Admin, Member, Viewer) for each location they belong to.
+              Platform roles control global access. Users also have tenant-specific roles (Tenant Owner, Tenant Support, Tenant Member, Tenant Viewer) for each location they belong to.
             </p>
           </div>
           <div>
