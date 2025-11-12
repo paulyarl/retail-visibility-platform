@@ -1673,7 +1673,7 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
     });
 
     // If no top-level categories found, try to get some representative categories
-    let finalCategories = categories;
+    let finalCategories: any[] = categories;
     if (categories.length === 0) {
       // Get some categories and group them by top-level
       const allCategories = await prisma.googleTaxonomy.findMany({
@@ -1683,7 +1683,7 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
       });
 
       // Group by first part of path
-      const grouped = allCategories.reduce((acc: any, cat) => {
+      const grouped: Record<string, any> = allCategories.reduce((acc: any, cat) => {
         const topLevel = cat.categoryPath.split(' > ')[0];
         if (!acc[topLevel]) {
           acc[topLevel] = {
