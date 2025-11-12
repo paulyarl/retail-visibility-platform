@@ -1,17 +1,12 @@
 /**
  * Directory API Routes - V2
- * Using direct database queries without Prisma ORM
+ * Using Prisma for RLS compatibility
  */
 
 import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
+import { prisma } from '../prisma';
 
 const router = Router();
-
-// Create a connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 /**
  * GET /api/directory/search
@@ -77,20 +72,20 @@ router.get('/search', async (req: Request, res: Response) => {
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
-    const listingsResult = await pool.query(listingsQuery, [...params, limitNum, skip]);
+    const listingsResult = await prisma.$queryRawUnsafe(listingsQuery, ...params, limitNum, skip) as any[];
 
     // Get total count
     const countQuery = `
       SELECT COUNT(*) as count FROM directory_listings
       WHERE ${whereClause}
     `;
-    const countResult = await pool.query(countQuery, params);
+    const countResult = await prisma.$queryRawUnsafe(countQuery, ...params) as any[];
 
-    const total = parseInt(countResult.rows[0]?.count || '0');
+    const total = parseInt(countResult[0]?.count || '0');
     const totalPages = Math.ceil(total / limitNum);
 
     return res.json({
-      listings: listingsResult.rows,
+      listings: listingsResult,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -157,10 +152,10 @@ router.get('/locations', async (req: Request, res: Response) => {
       LIMIT 100
     `;
 
-    const result = await pool.query(query);
+    const result = await prisma.$queryRawUnsafe(query) as any[];
 
     return res.json({
-      locations: result.rows.map((row: any) => ({
+      locations: result.map((row: any) => ({
         city: row.city,
         state: row.state,
         count: parseInt(row.count),
@@ -180,18 +175,18 @@ router.get('/:slug', async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
 
-    const result = await pool.query(
+    const result = await prisma.$queryRawUnsafe(
       `SELECT * FROM directory_listings
        WHERE slug = $1 AND is_published = true
        LIMIT 1`,
-      [slug]
-    );
+      slug
+    ) as any[];
 
-    if (!result.rows || result.rows.length === 0) {
+    if (!result || result.length === 0) {
       return res.status(404).json({ error: 'listing_not_found' });
     }
 
-    return res.json({ listing: result.rows[0] });
+    return res.json({ listing: result[0] });
   } catch (error) {
     console.error('Get listing error:', error);
     return res.status(500).json({ error: 'get_listing_failed' });
@@ -208,16 +203,16 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     const limit = Math.min(6, Number(req.query.limit) || 6);
 
     // First, get the current listing
-    const currentListing = await pool.query(
+    const currentListing = await prisma.$queryRawUnsafe(
       `SELECT * FROM directory_listings WHERE slug = $1 AND is_published = true LIMIT 1`,
-      [slug]
-    );
+      slug
+    ) as any[];
 
-    if (currentListing.rows.length === 0) {
+    if (currentListing.length === 0) {
       return res.status(404).json({ error: 'listing_not_found' });
     }
 
-    const current = currentListing.rows[0];
+    const current = currentListing[0];
 
     // Find related stores using a scoring algorithm
     // Priority: Same category > Same city > Similar rating
@@ -245,18 +240,18 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       LIMIT $6
     `;
 
-    const related = await pool.query(relatedQuery, [
+    const related = await prisma.$queryRawUnsafe(relatedQuery,
       current.primary_category,
       current.city,
       current.state,
       current.rating_avg || 0,
       slug,
-      limit,
-    ]);
+      limit
+    ) as any[];
 
     return res.json({
-      related: related.rows,
-      count: related.rows.length,
+      related: related,
+      count: related.length,
     });
   } catch (error) {
     console.error('Related stores error:', error);
