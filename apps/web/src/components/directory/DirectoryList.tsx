@@ -91,7 +91,7 @@ export default function DirectoryList({ listings, loading }: DirectoryListProps)
         const destinationUrl = 
           canUseCustomUrl && listing.useCustomWebsite && listing.website
             ? listing.website
-            : `/s/${listing.slug}`;
+            : `/tenant/${listing.tenantId}`;
         
         const isExternalLink = canUseCustomUrl && listing.useCustomWebsite && listing.website;
 
