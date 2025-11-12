@@ -138,16 +138,14 @@ router.get('/categories', async (req: Request, res: Response) => {
  */
 router.get('/locations', async (req: Request, res: Response) => {
   try {
-    const result = await prisma.$queryRaw<Array<{ city: string; state: string; count: bigint }>>(
-      Prisma.sql`
-        SELECT city, state, COUNT(*) as count
-        FROM directory_listings
-        WHERE is_published = true AND city IS NOT NULL
-        GROUP BY city, state
-        ORDER BY count DESC, city ASC
-        LIMIT 100
-      `
-    );
+    const result = await prisma.$queryRawUnsafe(`
+      SELECT city, state, COUNT(*) as count
+      FROM directory_listings
+      WHERE is_published = true AND city IS NOT NULL
+      GROUP BY city, state
+      ORDER BY count DESC, city ASC
+      LIMIT 100
+    `) as Array<{ city: string; state: string; count: bigint }>;
 
     return res.json({
       locations: result.map((row: any) => ({
