@@ -187,4 +187,7 @@ SELECT refresh_directory_listings();
 GRANT SELECT ON directory_listings TO anon;
 GRANT SELECT ON directory_listings TO authenticated;
 
-RAISE NOTICE 'Directory listings table created and populated successfully';
+DO $$
+BEGIN
+    RAISE NOTICE 'Directory listings table created and populated successfully';
+END $$;
