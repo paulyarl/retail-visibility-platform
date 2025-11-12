@@ -294,7 +294,7 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
       )}
 
       {/* Organization Tier Upgrade CTA - Show for Professional tier users */}
-      {tier.effective.level === 'pro' && !tier.isChain && (
+      {(tier.effective.level === 'pro' || tier.effective.name?.toLowerCase().includes('professional')) && !tier.isChain && (
         <Card className="border-2 border-gradient-to-r from-purple-300 to-pink-300 bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
