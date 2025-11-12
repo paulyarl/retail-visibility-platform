@@ -32,14 +32,14 @@ export default function UsersManagementPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'ADMIN' | 'OWNER' | 'USER'>('USER');
+  const [inviteRole, setInviteRole] = useState<'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER'>('USER');
   
   // Edit user state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const [editRole, setEditRole] = useState<'ADMIN' | 'OWNER' | 'USER'>('USER');
+  const [editRole, setEditRole] = useState<'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER'>('USER');
   const [editStatus, setEditStatus] = useState<'active' | 'inactive' | 'pending'>('active');
   
   // Permissions state
@@ -298,11 +298,13 @@ export default function UsersManagementPage() {
             </p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li><strong>Platform Admin:</strong> Full system access, can manage all tenants and users</li>
+              <li><strong>Platform Support:</strong> View all tenants + limited actions (3 tenant limit globally)</li>
+              <li><strong>Platform Viewer:</strong> Read-only access to all tenants (analytics/sales/legal)</li>
               <li><strong>Tenant Owner:</strong> Can create and own multiple tenants (10 max)</li>
               <li><strong>User:</strong> Basic access, can be assigned to tenants (3 tenant limit)</li>
             </ul>
             <p className="mt-2">
-              Users also have <strong>tenant-level roles</strong> (Owner, Admin, Member, Viewer) for each tenant they belong to.
+              <strong>Note:</strong> Users also have <strong>tenant-specific roles</strong> (Owner, Admin, Member, Viewer) for each location they belong to. Those are managed within each tenant's settings, not here.
             </p>
           </div>
         </Alert>
@@ -554,12 +556,14 @@ export default function UsersManagementPage() {
             </label>
             <select 
               value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as 'ADMIN' | 'OWNER' | 'USER')}
+              onChange={(e) => setInviteRole(e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER')}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
               <option value="USER">User</option>
               <option value="OWNER">Tenant Owner</option>
-              <option value="ADMIN">Platform Admin</option>
+              <option value="PLATFORM_ADMIN">Platform Admin</option>
+              <option value="PLATFORM_SUPPORT">Platform Support</option>
+              <option value="PLATFORM_VIEWER">Platform Viewer</option>
             </select>
           </div>
         </div>
@@ -602,13 +606,16 @@ export default function UsersManagementPage() {
             </label>
             <select 
               value={editRole}
-              onChange={(e) => setEditRole(e.target.value as 'ADMIN' | 'OWNER' | 'USER')}
+              onChange={(e) => setEditRole(e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER')}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-2"
               disabled={!canManage}
             >
               <option value="USER">User - Basic access (3 tenant limit)</option>
               <option value="OWNER">Tenant Owner - Can create/own tenants (10 tenant limit)</option>
-              <option value="ADMIN">Platform Admin - Full system access</option>
+              <option value="PLATFORM_ADMIN">Platform Admin - Full system access</option>
+              <option value="PLATFORM_SUPPORT">Platform Support - View all tenants + limited actions (3 tenant limit)</option>
+              <option value="PLATFORM_VIEWER">Platform Viewer - Read-only access to all tenants</option>
+              <option value="ADMIN">Admin (Deprecated) - Use Platform Admin instead</option>
             </select>
             <p className="text-xs text-neutral-600">
               Platform roles control global access. Users also have tenant-specific roles (Owner, Admin, Member, Viewer) for each location they belong to.
