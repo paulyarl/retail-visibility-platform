@@ -224,10 +224,30 @@ export default function ItemsClient({
 
   const handleCategoryAssign = async (itemId: string, categoryPath: string[]) => {
     try {
-      await updateItem(itemId, { categoryPath });
+      // Use the PATCH endpoint for category assignment
+      const response = await fetch(`/api/v1/tenants/${initialTenantId}/items/${itemId}/category`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // For now, use the first category as the categorySlug
+          // TODO: Update to use real tenant categories with proper slugs
+          categorySlug: categoryPath[0]?.toLowerCase().replace(/\s+/g, '-'),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to assign category');
+      }
+
       closeCategoryModal();
+      refresh(); // Refresh the items list
     } catch (error) {
       console.error('[ItemsClient] Category assignment failed:', error);
+      // Show error to user
+      alert(error instanceof Error ? error.message : 'Failed to assign category');
     }
   };
 
