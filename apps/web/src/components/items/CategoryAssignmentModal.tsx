@@ -326,7 +326,7 @@ export default function CategoryAssignmentModal({
           <Button
             variant="primary"
             onClick={handleSave}
-            disabled={!selectedCategory || saving}
+            disabled={!selectedCategoryId || saving}
             loading={saving}
           >
             {saving ? 'Assigning...' : 'Assign Category'}
