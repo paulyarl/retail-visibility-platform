@@ -293,6 +293,120 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
         </Card>
       )}
 
+      {/* Trial Tier Upgrade CTA - Show for Trial users */}
+      {tier.effective.name?.toLowerCase().includes('trial') && (
+        <Card className="border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg">
+                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <h4 className="text-xl font-bold text-blue-900">
+                    🚀 Ready to Go Live? Upgrade to Starter
+                  </h4>
+                  <span className="px-2 py-0.5 bg-gradient-to-r from-blue-200 to-indigo-200 text-blue-800 text-xs font-semibold rounded-full">
+                    $49/mo
+                  </span>
+                </div>
+                <p className="text-blue-800 text-sm mb-4">
+                  Your trial ends soon! Upgrade to <strong>Starter</strong> to keep your storefront live and unlock more features.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  <div className="bg-white/70 rounded-lg p-3 border border-blue-200">
+                    <p className="text-blue-900 text-sm font-semibold mb-1">✓ Keep Your Storefront</p>
+                    <p className="text-blue-700 text-xs">Stay live with 500 SKUs</p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-blue-200">
+                    <p className="text-blue-900 text-sm font-semibold mb-1">✓ Google Shopping</p>
+                    <p className="text-blue-700 text-xs">Reach more customers</p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-blue-200">
+                    <p className="text-blue-900 text-sm font-semibold mb-1">✓ Up to 3 Locations</p>
+                    <p className="text-blue-700 text-xs">Grow your business</p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-blue-200">
+                    <p className="text-blue-900 text-sm font-semibold mb-1">✓ QR Codes</p>
+                    <p className="text-blue-700 text-xs">Drive in-store traffic</p>
+                  </div>
+                </div>
+
+                <a
+                  href={`/t/${tenantId}/settings/subscription`}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
+                >
+                  <span>Upgrade to Starter</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Starter Tier Upgrade CTA - Show for Starter users */}
+      {tier.effective.level === 'starter' && (
+        <Card className="border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-green-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-gradient-to-br from-emerald-100 to-green-100 rounded-lg">
+                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <h4 className="text-xl font-bold text-emerald-900">
+                    🚀 Level Up to Professional
+                  </h4>
+                  <span className="px-2 py-0.5 bg-gradient-to-r from-emerald-200 to-green-200 text-emerald-800 text-xs font-semibold rounded-full">
+                    $149/mo
+                  </span>
+                </div>
+                <p className="text-emerald-800 text-sm mb-4">
+                  Ready to grow? <strong>Professional</strong> gives you 10x more SKUs, advanced features, and up to 10 locations.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  <div className="bg-white/70 rounded-lg p-3 border border-emerald-200">
+                    <p className="text-emerald-900 text-sm font-semibold mb-1">✓ 5,000 SKUs</p>
+                    <p className="text-emerald-700 text-xs">10x your catalog (vs 500)</p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-emerald-200">
+                    <p className="text-emerald-900 text-sm font-semibold mb-1">✓ 10 Locations</p>
+                    <p className="text-emerald-700 text-xs">Expand your reach (vs 3)</p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-emerald-200">
+                    <p className="text-emerald-900 text-sm font-semibold mb-1">✓ Google Business Profile</p>
+                    <p className="text-emerald-700 text-xs">Full integration & sync</p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-emerald-200">
+                    <p className="text-emerald-900 text-sm font-semibold mb-1">✓ Enhanced Branding</p>
+                    <p className="text-emerald-700 text-xs">Custom colors & logos</p>
+                  </div>
+                </div>
+
+                <a
+                  href={`/t/${tenantId}/settings/subscription`}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-lg font-semibold hover:from-emerald-700 hover:to-green-700 transition-all shadow-lg hover:shadow-xl"
+                >
+                  <span>Upgrade to Professional</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Organization Tier Upgrade CTA - Show for Professional tier users */}
       {(tier.effective.level === 'pro' || tier.effective.name?.toLowerCase().includes('professional')) && !tier.isChain && (
         <Card className="border-2 border-gradient-to-r from-purple-300 to-pink-300 bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50">
