@@ -66,21 +66,15 @@ router.get('/search', async (req: Request, res: Response) => {
       orderByClause = 'rating_avg DESC NULLS LAST, product_count DESC NULLS LAST, created_at DESC';
     }
 
-    // Get listings
-    const listingsQuery = `
-      SELECT * FROM directory_listings
-      WHERE ${whereClause}
-      ORDER BY ${orderByClause}
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
-    const listingsResult = await prisma.$queryRawUnsafe(listingsQuery, ...params, limitNum, skip) as any[];
+    // Build query with Prisma.sql - inject WHERE and ORDER BY as raw SQL
+    let listingsQuery = Prisma.sql`SELECT * FROM directory_listings WHERE `;
+    listingsQuery = Prisma.sql`${listingsQuery}${Prisma.raw(whereClause)} ORDER BY ${Prisma.raw(orderByClause)} LIMIT ${limitNum} OFFSET ${skip}`;
+    const listingsResult = await prisma.$queryRaw<any[]>(listingsQuery);
 
     // Get total count
-    const countQuery = `
-      SELECT COUNT(*) as count FROM directory_listings
-      WHERE ${whereClause}
-    `;
-    const countResult = await prisma.$queryRawUnsafe(countQuery, ...params) as any[];
+    let countQuery = Prisma.sql`SELECT COUNT(*) as count FROM directory_listings WHERE `;
+    countQuery = Prisma.sql`${countQuery}${Prisma.raw(whereClause)}`;
+    const countResult = await prisma.$queryRaw<any[]>(countQuery);
 
     const total = parseInt(countResult[0]?.count || '0');
     const totalPages = Math.ceil(total / limitNum);
