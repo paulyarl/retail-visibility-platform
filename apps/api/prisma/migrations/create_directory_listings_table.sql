@@ -155,8 +155,8 @@ BEGIN
             SET product_count = (
                 SELECT COUNT(*)
                 FROM %I ii
-                WHERE ii.tenant_id = directory_listings.tenant_id
-                AND ii.item_status = ''active''
+                WHERE ii."tenantId" = directory_listings.tenant_id
+                AND ii."itemStatus" = ''active''
                 AND ii.visibility = ''public''
             )
         ', inventory_table_name);
@@ -251,8 +251,8 @@ BEGIN
         SET product_count = (
             SELECT COUNT(*)
             FROM %I ii
-            WHERE ii.tenant_id = directory_listings.tenant_id
-            AND ii.item_status = ''active''
+            WHERE ii."tenantId" = directory_listings.tenant_id
+            AND ii."itemStatus" = ''active''
             AND ii.visibility = ''public''
         )
     ', inventory_table_name);
