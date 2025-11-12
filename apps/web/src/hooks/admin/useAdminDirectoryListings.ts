@@ -63,6 +63,9 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
       setLoading(true);
       setError(null);
 
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
       if (filters.tier) params.append('tier', filters.tier);
@@ -71,8 +74,17 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
       if (filters.page) params.append('page', filters.page.toString());
       if (filters.limit) params.append('limit', filters.limit.toString());
 
-      const response = await fetch(`/api/admin/directory/listings?${params}`, {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/admin/directory/listings?${params}`, {
         credentials: 'include',
+        headers,
       });
 
       if (!response.ok) {
@@ -94,11 +106,20 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
     try {
       setError(null);
 
-      const response = await fetch(`/api/admin/directory/feature/${tenantId}`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/admin/directory/feature/${tenantId}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         credentials: 'include',
         body: JSON.stringify({
           featured_until: until.toISOString(),
@@ -123,9 +144,19 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
     try {
       setError(null);
 
-      const response = await fetch(`/api/admin/directory/unfeature/${tenantId}`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+
+      const headers: HeadersInit = {};
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/admin/directory/unfeature/${tenantId}`, {
         method: 'DELETE',
         credentials: 'include',
+        headers,
       });
 
       if (!response.ok) {
