@@ -94,8 +94,38 @@ router.get('/search', async (req: Request, res: Response) => {
     const total = parseInt(countResult.rows[0]?.count || '0');
     const totalPages = Math.ceil(total / limitNum);
 
+    // Transform snake_case to camelCase for frontend
+    const listings = listingsResult.rows.map((row: any) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      businessName: row.business_name,
+      slug: row.slug,
+      address: row.address,
+      city: row.city,
+      state: row.state,
+      zipCode: row.zip_code,
+      phone: row.phone,
+      email: row.email,
+      website: row.website,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      primaryCategory: row.primary_category,
+      secondaryCategories: row.secondary_categories,
+      logoUrl: row.logo_url,
+      description: row.description,
+      ratingAvg: row.rating_avg || 0,
+      ratingCount: row.rating_count || 0,
+      productCount: row.product_count || 0,
+      isFeatured: row.is_featured || false,
+      subscriptionTier: row.subscription_tier || 'trial',
+      useCustomWebsite: row.use_custom_website || false,
+      isPublished: row.is_published || true,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+
     return res.json({
-      listings: listingsResult.rows,
+      listings,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -194,7 +224,37 @@ router.get('/:slug', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'listing_not_found' });
     }
 
-    return res.json({ listing: result.rows[0] });
+    const row = result.rows[0];
+    const listing = {
+      id: row.id,
+      tenantId: row.tenant_id,
+      businessName: row.business_name,
+      slug: row.slug,
+      address: row.address,
+      city: row.city,
+      state: row.state,
+      zipCode: row.zip_code,
+      phone: row.phone,
+      email: row.email,
+      website: row.website,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      primaryCategory: row.primary_category,
+      secondaryCategories: row.secondary_categories,
+      logoUrl: row.logo_url,
+      description: row.description,
+      ratingAvg: row.rating_avg || 0,
+      ratingCount: row.rating_count || 0,
+      productCount: row.product_count || 0,
+      isFeatured: row.is_featured || false,
+      subscriptionTier: row.subscription_tier || 'trial',
+      useCustomWebsite: row.use_custom_website || false,
+      isPublished: row.is_published || true,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+
+    return res.json({ listing });
   } catch (error) {
     console.error('Get listing error:', error);
     return res.status(500).json({ error: 'get_listing_failed' });
@@ -257,9 +317,38 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       limit,
     ]);
 
+    const relatedListings = related.rows.map((row: any) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      businessName: row.business_name,
+      slug: row.slug,
+      address: row.address,
+      city: row.city,
+      state: row.state,
+      zipCode: row.zip_code,
+      phone: row.phone,
+      email: row.email,
+      website: row.website,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      primaryCategory: row.primary_category,
+      secondaryCategories: row.secondary_categories,
+      logoUrl: row.logo_url,
+      description: row.description,
+      ratingAvg: row.rating_avg || 0,
+      ratingCount: row.rating_count || 0,
+      productCount: row.product_count || 0,
+      isFeatured: row.is_featured || false,
+      subscriptionTier: row.subscription_tier || 'trial',
+      useCustomWebsite: row.use_custom_website || false,
+      isPublished: row.is_published || true,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+
     return res.json({
-      related: related.rows,
-      count: related.rows.length,
+      related: relatedListings,
+      count: relatedListings.length,
     });
   } catch (error) {
     console.error('Related stores error:', error);
