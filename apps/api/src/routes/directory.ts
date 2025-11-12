@@ -7,14 +7,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
-import { Pool } from 'pg';
-
-// Create a connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const db = pool;
 
 const router = Router();
 
@@ -340,7 +332,7 @@ router.get('/categories', async (req, res) => {
  */
 router.get('/locations', async (req, res) => {
   try {
-    const query = Prisma.sql`
+    const result = await prisma.$queryRaw<Array<{ city: string; state: string; count: bigint }>>`
       SELECT 
         city,
         state,
@@ -354,10 +346,8 @@ router.get('/locations', async (req, res) => {
       LIMIT 100
     `;
 
-    const result = await db.query(query);
-
     return res.json({
-      locations: result.rows.map((row: any) => ({
+      locations: result.map((row: any) => ({
         city: row.city,
         state: row.state,
         slug: `${row.city.toLowerCase().replace(/\s+/g, '-')}-${row.state.toLowerCase()}`,
@@ -378,7 +368,7 @@ router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const query = Prisma.sql`
+    const result = await prisma.$queryRaw<Array<any>>`
       SELECT 
         id,
         tenant_id as "tenantId",
@@ -412,13 +402,11 @@ router.get('/:slug', async (req, res) => {
       LIMIT 1
     `;
 
-    const result = await db.query(query);
-
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ error: 'listing_not_found' });
     }
 
-    return res.json(result.rows[0]);
+    return res.json(result[0]);
   } catch (error: any) {
     console.error('[GET /api/directory/:slug] Error:', error);
     return res.status(500).json({ error: 'failed_to_get_listing' });
