@@ -294,7 +294,7 @@ export default function DirectoryClient() {
                 It's free and takes just a few minutes to set up.
               </p>
               <a
-                href="/signup"
+                href="/register"
                 className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
               >
                 Get Started →
