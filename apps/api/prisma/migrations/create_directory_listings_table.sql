@@ -150,14 +150,16 @@ BEGIN
 
     -- Update product counts if inventory table exists
     IF inventory_table_name IS NOT NULL THEN
-        UPDATE directory_listings
-        SET product_count = (
-            SELECT COUNT(*)
-            FROM inventory_item ii
-            WHERE ii.tenant_id = directory_listings.tenant_id
-            AND ii.item_status = 'active'
-            AND ii.visibility = 'public'
-        );
+        EXECUTE format('
+            UPDATE directory_listings
+            SET product_count = (
+                SELECT COUNT(*)
+                FROM %I ii
+                WHERE ii.tenant_id = directory_listings.tenant_id
+                AND ii.item_status = ''active''
+                AND ii.visibility = ''public''
+            )
+        ', inventory_table_name);
     END IF;
 
     RAISE NOTICE 'Directory listings populated successfully';
@@ -244,14 +246,16 @@ BEGIN
     ', tenant_table_name, profile_table_name);
 
     -- Update product counts for all listings
-    UPDATE directory_listings
-    SET product_count = (
-        SELECT COUNT(*)
-        FROM inventory_item ii
-        WHERE ii.tenant_id = directory_listings.tenant_id
-        AND ii.item_status = 'active'
-        AND ii.visibility = 'public'
-    );
+    EXECUTE format('
+        UPDATE directory_listings
+        SET product_count = (
+            SELECT COUNT(*)
+            FROM %I ii
+            WHERE ii.tenant_id = directory_listings.tenant_id
+            AND ii.item_status = ''active''
+            AND ii.visibility = ''public''
+        )
+    ', inventory_table_name);
 
     RAISE NOTICE 'Directory listings refreshed successfully';
 END;
