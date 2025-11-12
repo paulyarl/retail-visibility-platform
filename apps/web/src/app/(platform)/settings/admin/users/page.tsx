@@ -188,7 +188,17 @@ export default function UsersManagementPage() {
 
   const handlePermissionsClick = (user: User) => {
     setPermissionsUser(user);
-    // TODO: Load user's actual permissions from API
+    // Reset permissions to default for each user
+    // TODO: Load user's actual permissions from API instead of using defaults
+    setPermissions({
+      canCreateTenants: true,
+      canEditTenants: true,
+      canDeleteTenants: false,
+      canManageUsers: false,
+      canViewAnalytics: true,
+      canManageInventory: true,
+      canAccessAdmin: false,
+    });
     setShowPermissionsModal(true);
   };
 
@@ -199,6 +209,21 @@ export default function UsersManagementPage() {
     // TODO: Implement API call
     setShowPermissionsModal(false);
     setPermissionsUser(null);
+  };
+
+  const handlePermissionsClose = () => {
+    setShowPermissionsModal(false);
+    setPermissionsUser(null);
+    // Reset permissions to default to prevent state leakage
+    setPermissions({
+      canCreateTenants: true,
+      canEditTenants: true,
+      canDeleteTenants: false,
+      canManageUsers: false,
+      canViewAnalytics: true,
+      canManageInventory: true,
+      canAccessAdmin: false,
+    });
   };
 
   const handleDelete = async (userId: string) => {
@@ -618,7 +643,7 @@ export default function UsersManagementPage() {
       {/* Permissions Modal */}
       <Modal
         isOpen={showPermissionsModal}
-        onClose={() => setShowPermissionsModal(false)}
+        onClose={handlePermissionsClose}
         title="User Permissions"
         description={permissionsUser ? `Manage permissions for ${permissionsUser.name}` : ''}
         size="lg"
@@ -741,7 +766,7 @@ export default function UsersManagementPage() {
           </div>
         </div>
         <ModalFooter>
-          <Button variant="ghost" onClick={() => setShowPermissionsModal(false)}>
+          <Button variant="ghost" onClick={handlePermissionsClose}>
             Cancel
           </Button>
           <Button onClick={handlePermissionsSave} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
