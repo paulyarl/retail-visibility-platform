@@ -293,6 +293,63 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
         </Card>
       )}
 
+      {/* Google-Only Tier Upgrade CTA - Show for Google-Only users */}
+      {tier.effective.name?.toLowerCase().includes('google') && (
+        <Card className="border-2 border-cyan-300 bg-gradient-to-br from-cyan-50 to-blue-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-gradient-to-br from-cyan-100 to-blue-100 rounded-lg">
+                <svg className="w-8 h-8 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <h4 className="text-xl font-bold text-cyan-900">
+                    🚀 Add a Public Storefront? Upgrade to Starter
+                  </h4>
+                  <span className="px-2 py-0.5 bg-gradient-to-r from-cyan-200 to-blue-200 text-cyan-800 text-xs font-semibold rounded-full">
+                    $49/mo
+                  </span>
+                </div>
+                <p className="text-cyan-800 text-sm mb-4">
+                  You're crushing it with Google! Add a <strong>public storefront</strong> to reach even more customers directly.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  <div className="bg-white/70 rounded-lg p-3 border border-cyan-200">
+                    <p className="text-cyan-900 text-sm font-semibold mb-1">✓ Public Storefront</p>
+                    <p className="text-cyan-700 text-xs">Your own online store</p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-cyan-200">
+                    <p className="text-cyan-900 text-sm font-semibold mb-1">✓ Product Search</p>
+                    <p className="text-cyan-700 text-xs">Customers find what they need</p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-cyan-200">
+                    <p className="text-cyan-900 text-sm font-semibold mb-1">✓ Up to 3 Locations</p>
+                    <p className="text-cyan-700 text-xs">Expand your reach</p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-cyan-200">
+                    <p className="text-cyan-900 text-sm font-semibold mb-1">✓ QR Codes</p>
+                    <p className="text-cyan-700 text-xs">Bridge online & in-store</p>
+                  </div>
+                </div>
+
+                <a
+                  href={`/t/${tenantId}/settings/subscription`}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg font-semibold hover:from-cyan-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
+                >
+                  <span>Upgrade to Starter</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Trial Tier Upgrade CTA - Show for Trial users */}
       {tier.effective.name?.toLowerCase().includes('trial') && (
         <Card className="border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50">
