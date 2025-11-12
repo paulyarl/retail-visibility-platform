@@ -27,7 +27,8 @@ export function useAdminDirectoryStats(): AdminDirectoryStatsHook {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/admin/directory/stats', {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const response = await fetch(`${apiBaseUrl}/api/admin/directory/stats`, {
         credentials: 'include',
       });
 
