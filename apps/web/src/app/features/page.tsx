@@ -35,20 +35,20 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
       </svg>
     ),
-    title: 'Organization Propagation Control - Enterprise Command Center',
-    description: '🚀 REVOLUTIONARY: Manage your entire chain from one dashboard. 8 propagation types give you complete control over products, categories, business info, and brand assets across all locations. Test on 1 location before chain-wide rollout. This is what enterprise retailers pay $50K+/year for.',
+    title: 'Multi-Location Management - Update All Stores at Once',
+    description: '🚀 POWERFUL: Manage all your locations from one dashboard. Update products and team permissions across all your stores with one click (Starter tier). Upgrade to Professional for hours, categories, GBP settings, and more. Organization tier adds brand assets, selective targeting, scheduling, and rollback.',
     benefits: [
-      '8 propagation types (products, categories, GBP sync, hours, profile, flags, roles, brand)',
+      'Starter: Products & user roles propagation',
+      'Professional: Hours, profile, categories, GBP sync, feature flags',
+      'Organization: Brand assets, selective targeting, scheduling, rollback',
       'Test on single location before rollout',
-      'One-click chain-wide distribution',
-      'Hero location concept',
-      'Organization dashboard with analytics',
-      'Dry run mode & rollback capability',
-      'Save 400+ hours per rollout',
-      'Perfect consistency across all locations'
+      'One-click multi-location distribution',
+      'Save hours every week on manual updates',
+      'Perfect consistency across all locations',
+      'Advanced features for enterprise control'
     ],
-    color: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white',
-    badge: 'ENTERPRISE',
+    color: 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white',
+    badge: 'STARTER+',
   },
   {
     icon: (

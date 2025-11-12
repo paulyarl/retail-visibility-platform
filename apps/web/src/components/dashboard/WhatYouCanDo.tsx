@@ -201,32 +201,30 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
         );
       })}
 
-      {/* Locked Features (Upgrade Opportunities) */}
+      {/* Upgrade Section - Show locked features */}
       {lockedFeatures.length > 0 && (
-        <div className="mt-12 space-y-6">
+        <div className="space-y-6">
           <div className="text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full mb-4">
-              <span className="text-2xl">✨</span>
-              <span className="font-semibold text-purple-900">Want Even More?</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-full mb-3">
+              <span className="text-xl">✨</span>
+              <span className="font-semibold text-sm">Want Even More?</span>
             </div>
             <h3 className="text-2xl font-bold text-neutral-900 mb-2">
               Unlock These Awesome Features
             </h3>
             <p className="text-neutral-600 max-w-2xl mx-auto">
-              Upgrade your plan to get access to these powerful tools. 
-              They'll help you work smarter, not harder!
+              Upgrade your plan to get access to these powerful tools. They'll help you work smarter, not harder!
             </p>
           </div>
 
-          {/* Show a preview of locked features */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {lockedFeatures.slice(0, 6).map(feature => (
+            {lockedFeatures.slice(0, 6).map((feature) => (
               <FeatureCard
                 key={feature.id}
                 feature={{
                   id: feature.id,
                   name: feature.name,
-                  description: feature.description,
+                  description: feature.tagline,
                   icon: feature.icon
                 }}
                 status="locked"
@@ -289,6 +287,86 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
                     Update prices, add products, or change settings across your entire chain with one click!
                   </p>
                 </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Organization Tier Upgrade CTA - Show for Professional tier users */}
+      {(tier.effective.level === 'pro' || tier.effective.name?.toLowerCase().includes('professional')) && !tier.isChain && (
+        <Card className="border-2 border-gradient-to-r from-purple-300 to-pink-300 bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg">
+                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <h4 className="text-xl font-bold text-purple-900">
+                    🚀 Ready to Scale? Go Organization Tier
+                  </h4>
+                  <span className="px-2 py-0.5 bg-gradient-to-r from-purple-200 to-pink-200 text-purple-800 text-xs font-semibold rounded-full">
+                    UNLIMITED
+                  </span>
+                </div>
+                <p className="text-purple-800 text-sm mb-4">
+                  Managing multiple locations? Organization tier gives you <strong>unlimited locations</strong> and powerful chain-wide management tools.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  <div className="bg-white/70 rounded-lg p-3 border border-purple-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">⚡</span>
+                      <p className="text-purple-900 text-sm font-semibold">Chain-Wide Propagation</p>
+                    </div>
+                    <p className="text-purple-700 text-xs">
+                      Update all locations instantly - products, prices, hours, settings
+                    </p>
+                  </div>
+                  
+                  <div className="bg-white/70 rounded-lg p-3 border border-purple-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">🎯</span>
+                      <p className="text-purple-900 text-sm font-semibold">Selective Targeting</p>
+                    </div>
+                    <p className="text-purple-700 text-xs">
+                      Push updates to specific locations or groups
+                    </p>
+                  </div>
+                  
+                  <div className="bg-white/70 rounded-lg p-3 border border-purple-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">📅</span>
+                      <p className="text-purple-900 text-sm font-semibold">Scheduled Updates</p>
+                    </div>
+                    <p className="text-purple-700 text-xs">
+                      Schedule changes for future dates and times
+                    </p>
+                  </div>
+                  
+                  <div className="bg-white/70 rounded-lg p-3 border border-purple-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">↩️</span>
+                      <p className="text-purple-900 text-sm font-semibold">Rollback Capability</p>
+                    </div>
+                    <p className="text-purple-700 text-xs">
+                      Undo changes if something goes wrong
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href={`/t/${tenantId}/settings/subscription`}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl"
+                >
+                  <span>Upgrade to Organization</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </a>
               </div>
             </div>
           </CardContent>

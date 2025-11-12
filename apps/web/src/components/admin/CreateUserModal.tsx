@@ -18,7 +18,7 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUs
     email: '',
     password: '',
     name: '',
-    role: 'USER' as 'USER' | 'ADMIN',
+    role: 'USER' as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,17 +164,26 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUs
             </label>
             <select
               value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as 'USER' | 'ADMIN' })}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER' })}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loading}
             >
-              <option value="USER">User (Tenant Member)</option>
-              <option value="ADMIN">Platform Admin</option>
+              <optgroup label="Platform Users">
+                <option value="PLATFORM_ADMIN">Platform Admin</option>
+                <option value="PLATFORM_SUPPORT">Platform Support</option>
+                <option value="PLATFORM_VIEWER">Platform Viewer</option>
+              </optgroup>
+              <optgroup label="Tenant Users">
+                <option value="OWNER">Tenant Owner</option>
+                <option value="USER">Tenant User</option>
+              </optgroup>
             </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {formData.role === 'ADMIN' 
-                ? 'Full platform access, can manage all tenants' 
-                : 'Regular user, needs tenant assignment'}
+              {formData.role === 'PLATFORM_ADMIN' && 'Full platform access, unlimited tenants'}
+              {formData.role === 'PLATFORM_SUPPORT' && 'View all tenants + support actions (3 tenant limit)'}
+              {formData.role === 'PLATFORM_VIEWER' && 'Read-only access to all tenants (cannot create)'}
+              {formData.role === 'OWNER' && 'Can create/own tenants (limits based on subscription tier)'}
+              {formData.role === 'USER' && 'Basic access (limits based on subscription tier)'}
             </p>
           </div>
 

@@ -98,17 +98,24 @@ const canQuickStart = canAccess('quick_start_wizard_full', 'canManage');
 // ❌ ADMIN on Google-Only tier → FALSE (no tier access)
 ```
 
-#### 3. Propagation (Organization tier, Manage permission)
+#### 3. Propagation (Starter+ tier, Manage permission, 2+ locations required)
 
 ```typescript
-// Level 1: Tenant must have Organization tier
+// Level 1: Tenant must have Starter tier or higher
 // Level 2: User must have canManage permission (ADMIN+)
+// Level 3: User must have 2+ locations
+// Note: Starter tier gets Products + User Roles only
+//       Professional tier gets full operational suite
+//       Organization tier gets advanced features
 
 const canPropagate = canAccess('propagation', 'canManage');
 
-// ✅ ADMIN on Organization tier → TRUE
-// ❌ MEMBER on Organization tier → FALSE (no canManage)
-// ❌ ADMIN on Professional tier → FALSE (no tier access)
+// ✅ ADMIN on Starter tier with 3 locations → TRUE (Products + User Roles)
+// ✅ ADMIN on Professional tier with 10 locations → TRUE (Full suite)
+// ✅ ADMIN on Organization tier → TRUE (Advanced features)
+// ❌ ADMIN on Starter tier with 1 location → FALSE (needs 2+)
+// ❌ MEMBER on Starter tier with 3 locations → FALSE (no canManage)
+// ❌ ADMIN on Google-Only tier → FALSE (no tier access)
 ```
 
 #### 4. View Storefront (Starter+ tier, View permission)

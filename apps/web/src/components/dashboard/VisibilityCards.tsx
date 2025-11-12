@@ -22,6 +22,9 @@ interface VisibilityCardsProps {
   isInDirectory?: boolean;
   storefrontUrl?: string;
   directoryUrl?: string;
+  tenantCity?: string;
+  tenantState?: string;
+  tenantCategory?: string;
 }
 
 export default function VisibilityCards({
@@ -31,10 +34,26 @@ export default function VisibilityCards({
   isInDirectory = false,
   storefrontUrl,
   directoryUrl,
+  tenantCity,
+  tenantState,
+  tenantCategory,
 }: VisibilityCardsProps) {
   // Generate URLs if not provided
-  const finalStorefrontUrl = storefrontUrl || `/storefront/${tenantId}`;
+  const finalStorefrontUrl = storefrontUrl || `/tenant/${tenantId}`;
   const finalDirectoryUrl = directoryUrl || `/directory/${tenantId}`;
+  
+  // Build directory URL with location and category filters for proximity viewing
+  const buildDirectoryUrl = () => {
+    const params = new URLSearchParams();
+    if (tenantCity) params.append('city', tenantCity);
+    if (tenantState) params.append('state', tenantState);
+    if (tenantCategory) params.append('category', tenantCategory);
+    
+    const queryString = params.toString();
+    return queryString ? `/directory?${queryString}` : '/directory';
+  };
+  
+  const proximityDirectoryUrl = buildDirectoryUrl();
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -143,33 +162,36 @@ export default function VisibilityCards({
 
               {/* Actions */}
               <div className="flex flex-wrap gap-2">
-                {isInDirectory ? (
-                  <Link
-                    href={finalDirectoryUrl}
-                    target="_blank"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View Listing
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
-                ) : (
+                {/* Always show Browse Directory - filtered by location and category for proximity viewing */}
+                <Link
+                  href={proximityDirectoryUrl}
+                  target="_blank"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm"
+                  title={tenantCity && tenantCategory ? `Browse ${tenantCategory} stores in ${tenantCity}, ${tenantState}` : 'Browse directory'}
+                >
+                  <Eye className="w-4 h-4" />
+                  {isInDirectory ? 'View Your Listing' : 'Browse Directory'}
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+                
+                {/* Get Listed or Settings */}
+                {!isInDirectory ? (
                   <Link
                     href={`/t/${tenantId}/settings/directory`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm"
                   >
                     <MapPin className="w-4 h-4" />
                     Get Listed
                   </Link>
+                ) : (
+                  <Link
+                    href={`/t/${tenantId}/settings/directory`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Settings
+                  </Link>
                 )}
-                
-                <Link
-                  href={`/t/${tenantId}/settings/directory`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm"
-                >
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </Link>
               </div>
             </div>
           </div>

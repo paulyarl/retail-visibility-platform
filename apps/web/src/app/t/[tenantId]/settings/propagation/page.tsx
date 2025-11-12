@@ -319,7 +319,7 @@ export default function PropagationControlPanel() {
         pageTitle="Propagation Control Panel"
         pageDescription="Manage multi-location propagation"
         title="Access Restricted"
-        message="The Propagation Control Panel is only available to organization owners and administrators (must be owner/admin of the hero location)."
+        message="The Propagation Control Panel requires Starter tier or higher with multiple locations. You must be an owner or administrator to access propagation features."
         userRole={userIsPlatformAdmin ? 'Platform Admin' : tenantRole}
         backLink={{ href: `/t/${tenantId}/settings`, label: 'Back to Settings' }}
       />
@@ -344,7 +344,7 @@ export default function PropagationControlPanel() {
                 </svg>
                 <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-2">Not Part of an Organization</h3>
                 <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-                  This tenant is not part of a chain organization. Propagation features are only available for chain organizations with multiple locations.
+                  Propagation features are available when you have 2 or more locations. Upgrade to Starter tier or higher to manage multiple locations and use propagation tools.
                 </p>
                 <Link href={`/t/${tenantId}/settings/organization`} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

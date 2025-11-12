@@ -29,7 +29,7 @@ export interface TierBadge {
 export type PermissionType = 'canView' | 'canEdit' | 'canManage' | 'canSupport' | 'canAdmin';
 
 // User roles on tenant
-export type UserTenantRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'MANAGER' | 'VIEWER';
+export type UserTenantRole = 'OWNER' | 'ADMIN' | 'SUPPORT' | 'MEMBER' | 'MANAGER' | 'VIEWER';
 
 export interface UseTenantTierReturn {
   tier: ResolvedTier | null;
@@ -265,17 +265,21 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
    * Maps user roles to what they can do
    * 
    * Hierarchy (most to least permissions):
-   * OWNER > ADMIN > MANAGER > MEMBER > VIEWER
+   * OWNER > ADMIN > SUPPORT = MANAGER > MEMBER > VIEWER
    */
   const getRolePermissions = (role: UserTenantRole | null): Set<PermissionType> => {
     if (!role) return new Set();
     
     const rolePermissions: Record<UserTenantRole, PermissionType[]> = {
-      // OWNER - Full control including billing
+      // OWNER - Full control including billing + can delete
       'OWNER': ['canView', 'canEdit', 'canManage', 'canSupport', 'canAdmin'],
       
-      // ADMIN - Full operational control, no billing
+      // ADMIN - Full operational control, no billing, can delete
       'ADMIN': ['canView', 'canEdit', 'canManage', 'canSupport'],
+      
+      // SUPPORT - Can manage operations but cannot delete tenant/items
+      // Can set visibility, status, manage operations
+      'SUPPORT': ['canView', 'canEdit', 'canManage', 'canSupport'],
       
       // MANAGER - Trusted authority, can manage operations but not users
       // Has elevated permissions: can do bulk operations, quick starts, etc.

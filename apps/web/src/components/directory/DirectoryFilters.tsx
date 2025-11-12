@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Filter, SlidersHorizontal, X } from 'lucide-react';
+import { Filter, SlidersHorizontal, X, MapPin, Navigation } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface DirectoryFiltersProps {
@@ -16,16 +16,48 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [selectedLocation, setSelectedLocation] = useState(searchParams.get('city') || '');
+  const [zipCode, setZipCode] = useState(searchParams.get('zip') || '');
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'relevance');
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+  const [gettingLocation, setGettingLocation] = useState(false);
 
   // Count active filters
   const activeFilters = [
     selectedCategory,
     selectedLocation,
+    zipCode,
     searchQuery,
     sortBy !== 'relevance' ? sortBy : null,
   ].filter(Boolean).length;
+
+  // Get user's current location ("Near Me")
+  const getNearMe = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const params = new URLSearchParams();
+        params.set('lat', position.coords.latitude.toString());
+        params.set('lng', position.coords.longitude.toString());
+        params.set('sort', 'distance');
+        if (searchQuery) params.set('q', searchQuery);
+        if (selectedCategory) params.set('category', selectedCategory);
+        
+        router.push(`/directory?${params.toString()}`);
+        setGettingLocation(false);
+        setShowFilters(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        alert('Unable to get your location. Please enable location services.');
+        setGettingLocation(false);
+      }
+    );
+  };
 
   // Apply filters
   const applyFilters = () => {
@@ -33,7 +65,13 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
     
     if (searchQuery) params.set('q', searchQuery);
     if (selectedCategory) params.set('category', selectedCategory);
-    if (selectedLocation) {
+    if (zipCode) {
+      params.set('zip', zipCode);
+      // Auto-sort by distance when ZIP is provided
+      if (!sortBy || sortBy === 'relevance') {
+        params.set('sort', 'distance');
+      }
+    } else if (selectedLocation) {
       const location = locations.find(l => `${l.city}, ${l.state}` === selectedLocation);
       if (location) {
         params.set('city', location.city);
@@ -50,6 +88,7 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
   const clearFilters = () => {
     setSelectedCategory('');
     setSelectedLocation('');
+    setZipCode('');
     setSortBy('relevance');
     setSearchQuery('');
     router.push('/directory');
@@ -77,7 +116,7 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
 
         {/* Desktop Filters - Always Visible */}
         <div className={`${showFilters ? 'block' : 'hidden'} lg:block mt-4 lg:mt-0`}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Search */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -111,15 +150,40 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
               </select>
             </div>
 
-            {/* Location Filter */}
+            {/* ZIP Code or Location */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Location
+                ZIP Code
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={zipCode}
+                  onChange={(e) => {
+                    setZipCode(e.target.value);
+                    if (e.target.value) setSelectedLocation(''); // Clear city/state if ZIP entered
+                  }}
+                  placeholder="Enter ZIP code"
+                  maxLength={5}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <MapPin className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" />
+              </div>
+            </div>
+
+            {/* City/State Dropdown */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Or City/State
               </label>
               <select
                 value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => {
+                  setSelectedLocation(e.target.value);
+                  if (e.target.value) setZipCode(''); // Clear ZIP if city/state selected
+                }}
+                disabled={!!zipCode}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">All Locations</option>
                 {locations.slice(0, 50).map((loc) => (
@@ -141,6 +205,7 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="relevance">Relevance</option>
+                <option value="distance">Distance (Nearest)</option>
                 <option value="rating">Highest Rated</option>
                 <option value="newest">Newest</option>
                 <option value="products">Most Products</option>
@@ -149,13 +214,24 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3 mt-4">
+          <div className="flex items-center gap-3 mt-4 flex-wrap">
             <button
               onClick={applyFilters}
               className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
               <Filter className="w-4 h-4" />
               Apply Filters
+            </button>
+
+            {/* Near Me Button */}
+            <button
+              onClick={getNearMe}
+              disabled={gettingLocation}
+              className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+              title="Find stores near your current location"
+            >
+              <Navigation className={`w-4 h-4 ${gettingLocation ? 'animate-spin' : ''}`} />
+              {gettingLocation ? 'Getting Location...' : 'Near Me'}
             </button>
 
             {activeFilters > 0 && (

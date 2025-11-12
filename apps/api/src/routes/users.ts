@@ -222,7 +222,7 @@ const updateUserSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   email: z.string().email().optional(),
-  role: z.enum(['ADMIN', 'OWNER', 'USER']).optional(),
+  role: z.enum(['PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'PLATFORM_VIEWER', 'ADMIN', 'OWNER', 'USER']).optional(),
   isActive: z.boolean().optional(),
 });
 

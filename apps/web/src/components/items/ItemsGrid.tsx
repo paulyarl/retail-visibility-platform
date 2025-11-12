@@ -138,7 +138,7 @@ export default function ItemsGrid({
                 size="sm" 
                 variant="ghost" 
                 onClick={() => onPhotos(item)} 
-                className="text-xs sm:text-sm min-h-[36px] sm:min-h-[32px]"
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white border-0 text-xs sm:text-sm min-h-[36px] sm:min-h-[32px]"
                 title="Add or manage product images (required for Google sync)"
               >
                 <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -151,7 +151,7 @@ export default function ItemsGrid({
                 size="sm" 
                 variant="ghost" 
                 onClick={() => onCategory(item)} 
-                className="text-xs sm:text-sm min-h-[36px] sm:min-h-[32px]"
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0 text-xs sm:text-sm min-h-[36px] sm:min-h-[32px]"
                 title="Assign Google product category (required for Google sync)"
               >
                 <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -251,7 +251,7 @@ export default function ItemsGrid({
                 variant="ghost"
                 onClick={() => onPropagate?.(item)}
                 disabled={!onPropagate}
-                title={onPropagate ? "Push this product to all your other locations (Organization tier)" : "Propagate to other locations - Upgrade to Organization tier"}
+                title={onPropagate ? "Push this product to all your other locations (Starter+ with 2+ locations)" : "Propagate to other locations - Available on Starter tier with 2+ locations"}
                 className={`bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white border-0 ${!onPropagate ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

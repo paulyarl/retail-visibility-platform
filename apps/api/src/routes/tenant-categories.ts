@@ -6,6 +6,8 @@ import { triggerRevalidate } from '../utils/revalidate';
 import { categoryService } from '../services/CategoryService';
 import { getCategoryById } from '../lib/google/taxonomy';
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
+import { requireTenantAdmin } from '../middleware/auth';
+import { requirePropagationTier } from '../middleware/tier-validation';
 
 const router = Router();
 
@@ -657,11 +659,11 @@ const propagateCategoriesSchema = z.object({
 
 /**
  * POST /api/v1/tenants/:tenantId/categories/propagate
- * Propagate all categories from hero tenant to all location tenants in the organization
+ * Propagate all categories from hero tenant to all location tenants
  * Body: { mode?: 'create_only' | 'update_only' | 'create_or_update' }
- * Permission: Platform admin or support (low-risk operation)
+ * Permission: Tenant admin (Professional tier+, 2+ locations required)
  */
-router.post('/:tenantId/categories/propagate', requireSupportActions, async (req, res) => {
+router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropagationTier('categories'), async (req, res) => {
   try {
     const { tenantId } = req.params;
     const body = propagateCategoriesSchema.parse(req.body);
@@ -827,9 +829,9 @@ const propagateFeatureFlagsSchema = z.object({
 
 /**
  * POST /api/v1/tenants/:tenantId/feature-flags/propagate
- * Propagate feature flags from hero tenant to all location tenants in the organization
+ * Propagate feature flags from hero tenant to all location tenants
  * Body: { mode?: 'create_only' | 'update_only' | 'create_or_update' }
- * Permission: Platform admin only (high-risk - affects feature access)
+ * Permission: Platform admin only (SECURITY: affects feature access, keep admin-only)
  */
 router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (req, res) => {
   try {
@@ -957,11 +959,11 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
 
 /**
  * POST /api/v1/tenants/:tenantId/business-hours/propagate
- * Propagate business hours from hero tenant to all location tenants in the organization
+ * Propagate business hours from hero tenant to all location tenants
  * Body: { includeSpecialHours?: boolean }
- * Permission: Platform admin or support (low-risk operation)
+ * Permission: Tenant admin (Professional tier+, 2+ locations required)
  */
-router.post('/:tenantId/business-hours/propagate', requireSupportActions, async (req, res) => {
+router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePropagationTier('hours'), async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { includeSpecialHours = true } = req.body;
@@ -1130,11 +1132,11 @@ const propagateUserRolesSchema = z.object({
 
 /**
  * POST /api/v1/tenants/:tenantId/user-roles/propagate
- * Propagate user roles from hero tenant to all location tenants in the organization
+ * Propagate user roles from hero tenant to all location tenants
  * Body: { mode?: 'create_only' | 'update_only' | 'create_or_update' }
- * Permission: Platform admin only (high-risk - affects user access)
+ * Permission: Tenant admin (Starter tier+, 2+ locations required)
  */
-router.post('/:tenantId/user-roles/propagate', requirePlatformAdmin, async (req, res) => {
+router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropagationTier('user_roles'), async (req, res) => {
   try {
     const { tenantId } = req.params;
     const body = propagateUserRolesSchema.parse(req.body);
@@ -1239,9 +1241,9 @@ router.post('/:tenantId/user-roles/propagate', requirePlatformAdmin, async (req,
 /**
  * POST /api/v1/tenants/:tenantId/brand-assets/propagate
  * Propagate brand assets from hero tenant to all location tenants (always overwrites)
- * Permission: Platform admin only (high-risk - overwrites branding)
+ * Permission: Tenant admin (Organization tier only, 2+ locations required)
  */
-router.post('/:tenantId/brand-assets/propagate', requirePlatformAdmin, async (req, res) => {
+router.post('/:tenantId/brand-assets/propagate', requireTenantAdmin, requirePropagationTier('brand_assets'), async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -1326,9 +1328,9 @@ router.post('/:tenantId/brand-assets/propagate', requirePlatformAdmin, async (re
 /**
  * POST /api/v1/tenants/:tenantId/business-profile/propagate
  * Propagate business profile from hero tenant to all location tenants (always overwrites)
- * Permission: Platform admin only (high-risk - changes business identity)
+ * Permission: Tenant admin (Professional tier+, 2+ locations required)
  */
-router.post('/:tenantId/business-profile/propagate', requirePlatformAdmin, async (req, res) => {
+router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, requirePropagationTier('profile'), async (req, res) => {
   try {
     const { tenantId } = req.params;
 

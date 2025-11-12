@@ -122,10 +122,14 @@ function getTierGains(tier: string) {
     case 'starter':
     case 'growth':
       return {
-        title: '🏪 You Now Have Your Own Storefront!',
-        subtitle: 'Beyond Google - you now have a beautiful online store that\'s all yours.',
+        title: '🏪 You Now Have Your Own Storefront + Multi-Location Power!',
+        subtitle: 'Beyond Google - you now have a beautiful online store AND can manage multiple locations efficiently.',
         gains: [
           // NEW in Starter
+          {
+            name: '✨ Multi-Location Propagation',
+            description: 'Update products & user roles across all locations at once (2+ locations)'
+          },
           {
             name: '✨ Public Storefront',
             description: 'Your own website where customers can browse and shop'
@@ -161,10 +165,14 @@ function getTierGains(tier: string) {
     case 'professional':
     case 'pro':
       return {
-        title: '⚡ Automation Unlocked!',
-        subtitle: 'Save hours every week with smart automation tools that do the work for you.',
+        title: '⚡ Automation + Full Propagation Suite Unlocked!',
+        subtitle: 'Save hours every week with smart automation AND manage all your locations from one dashboard.',
         gains: [
           // NEW in Professional
+          {
+            name: '✨ Full Propagation Suite',
+            description: 'Propagate hours, categories, profiles, GBP settings across all locations'
+          },
           {
             name: '✨ Smart Barcode Scanner',
             description: 'Scan products with your camera - we auto-fill everything instantly'
@@ -182,6 +190,10 @@ function getTierGains(tier: string) {
             description: 'Make it yours and get help when you need it'
           },
           // From Starter
+          {
+            name: 'Product & User Role Propagation',
+            description: 'Update products and team permissions across locations'
+          },
           {
             name: 'Public Storefront',
             description: 'Your own website where customers can browse and shop'

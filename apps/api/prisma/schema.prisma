@@ -665,9 +665,10 @@ model UserTenant {
 
 // User role within a specific tenant
 enum UserTenantRole {
-  OWNER // Tenant owner
-  ADMIN // Tenant admin
-  MEMBER // Regular member
+  OWNER // Tenant owner (full control + billing + can delete)
+  ADMIN // Tenant admin (full operations, no billing, can delete)
+  SUPPORT // Tenant support (can manage operations but cannot delete tenant/items)
+  MEMBER // Regular member (edit only)
   VIEWER // Read-only access
 
   @@map("user_tenant_role")

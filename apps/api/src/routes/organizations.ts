@@ -5,6 +5,8 @@ import { prisma, basePrisma } from '../prisma';
 import { generateQuickStartProducts } from '../lib/quick-start';
 import { validateOrganizationTier, validateOrganizationLimits, validateOrganizationTierChange } from '../middleware/organization-validation';
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
+import { requireTenantAdmin } from '../middleware/auth';
+import { requirePropagationTier } from '../middleware/tier-validation';
 
 const router = Router();
 
@@ -271,8 +273,8 @@ const propagateSchema = z.object({
 });
 
 // POST /organizations/:id/items/propagate - Propagate item to tenants
-// Permission: Platform support (helping customers with inventory)
-router.post('/:id/items/propagate', requireSupportActions, async (req, res) => {
+// Permission: Tenant admin (Starter tier+, 2+ locations required)
+router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('products'), async (req, res) => {
   try {
     const parsed = propagateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -520,8 +522,8 @@ const propagateBulkSchema = z.object({
 });
 
 // POST /organizations/:id/items/propagate-bulk - Bulk propagate items
-// Permission: Platform support (helping customers with inventory)
-router.post('/:id/items/propagate-bulk', requireSupportActions, async (req, res) => {
+// Permission: Tenant admin (Starter tier+, 2+ locations required)
+router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationTier('products'), async (req, res) => {
   try {
     const parsed = propagateBulkSchema.safeParse(req.body);
     if (!parsed.success) {

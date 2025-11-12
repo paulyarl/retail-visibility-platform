@@ -10,6 +10,7 @@ export interface TierLimits {
   price: string;
   pricePerMonth: number;
   maxSKUs: number;
+  maxLocations: number;
   description: string;
   features: string[];
   color: string;
@@ -21,6 +22,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     price: 'Free',
     pricePerMonth: 0,
     maxSKUs: 500,
+    maxLocations: 1,
     description: 'Try the platform with basic features',
     features: [
       '500 SKUs',
@@ -36,6 +38,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     price: '$29/month',
     pricePerMonth: 29,
     maxSKUs: 250,
+    maxLocations: 1,
     description: 'Get discovered on Google',
     features: [
       '250 SKUs',
@@ -53,6 +56,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     price: '$49/month',
     pricePerMonth: 49,
     maxSKUs: 500,
+    maxLocations: 3,
     description: 'Get started with the basics',
     features: [
       '500 SKUs',
@@ -70,6 +74,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     price: '$499/month',
     pricePerMonth: 499,
     maxSKUs: 5000,
+    maxLocations: 10,
     description: 'For established retail businesses',
     features: [
       '5,000 SKUs (10x Starter)',
@@ -92,6 +97,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     price: '$999/month',
     pricePerMonth: 999,
     maxSKUs: Infinity,
+    maxLocations: 25,
     description: 'For large single-location operations',
     features: [
       'Unlimited SKUs',
@@ -113,6 +119,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     price: '$999/month',
     pricePerMonth: 999,
     maxSKUs: 10000, // Shared pool across all locations
+    maxLocations: Infinity,
     description: 'For franchise chains & multi-location businesses',
     features: [
       '10,000 shared SKUs across all locations',

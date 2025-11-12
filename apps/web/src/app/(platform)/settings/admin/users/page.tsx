@@ -32,14 +32,14 @@ export default function UsersManagementPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'ADMIN' | 'OWNER' | 'USER'>('USER');
+  const [inviteRole, setInviteRole] = useState<'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER'>('USER');
   
   // Edit user state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const [editRole, setEditRole] = useState<'ADMIN' | 'OWNER' | 'USER'>('USER');
+  const [editRole, setEditRole] = useState<'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER'>('USER');
   const [editStatus, setEditStatus] = useState<'active' | 'inactive' | 'pending'>('active');
   
   // Permissions state
@@ -188,7 +188,17 @@ export default function UsersManagementPage() {
 
   const handlePermissionsClick = (user: User) => {
     setPermissionsUser(user);
-    // TODO: Load user's actual permissions from API
+    // Reset permissions to default for each user
+    // TODO: Load user's actual permissions from API instead of using defaults
+    setPermissions({
+      canCreateTenants: true,
+      canEditTenants: true,
+      canDeleteTenants: false,
+      canManageUsers: false,
+      canViewAnalytics: true,
+      canManageInventory: true,
+      canAccessAdmin: false,
+    });
     setShowPermissionsModal(true);
   };
 
@@ -199,6 +209,21 @@ export default function UsersManagementPage() {
     // TODO: Implement API call
     setShowPermissionsModal(false);
     setPermissionsUser(null);
+  };
+
+  const handlePermissionsClose = () => {
+    setShowPermissionsModal(false);
+    setPermissionsUser(null);
+    // Reset permissions to default to prevent state leakage
+    setPermissions({
+      canCreateTenants: true,
+      canEditTenants: true,
+      canDeleteTenants: false,
+      canManageUsers: false,
+      canViewAnalytics: true,
+      canManageInventory: true,
+      canAccessAdmin: false,
+    });
   };
 
   const handleDelete = async (userId: string) => {
@@ -271,13 +296,28 @@ export default function UsersManagementPage() {
             <p>
               These are <strong>platform-level roles</strong> that determine a user's global access:
             </p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong>Platform Admin:</strong> Full system access, can manage all tenants and users</li>
-              <li><strong>Tenant Owner:</strong> Can create and own multiple tenants (10 max)</li>
-              <li><strong>User:</strong> Basic access, can be assigned to tenants (3 tenant limit)</li>
-            </ul>
+            <div className="space-y-3">
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Platform Users:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>Platform Admin:</strong> Full system access, unlimited tenants</li>
+                  <li><strong>Platform Support:</strong> View all tenants + support actions (3 tenant limit)</li>
+                  <li><strong>Platform Viewer:</strong> Read-only access to all tenants (cannot create)</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-900 mb-1">Tenant Users:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>Tenant Owner:</strong> Can create/own tenants (limits based on subscription tier)</li>
+                  <li><strong>Tenant User:</strong> Basic access (limits based on subscription tier)</li>
+                </ul>
+              </div>
+            </div>
+            <p className="mt-2 text-xs bg-amber-50 border border-amber-200 rounded p-2">
+              <strong>Tenant Limits:</strong> For Tenant Users and Owners, the number of tenants they can create depends on their <strong>subscription tier</strong>: Trial (1), Google-Only (1), Starter (3), Professional (10), Enterprise (25), Organization (unlimited).
+            </p>
             <p className="mt-2">
-              Users also have <strong>tenant-level roles</strong> (Owner, Admin, Member, Viewer) for each tenant they belong to.
+              <strong>Note:</strong> Users also have <strong>tenant-specific roles</strong> (Tenant Owner, Tenant Support, Tenant Member, Tenant Viewer) for each location they belong to. Those are managed within each tenant's settings, not here.
             </p>
           </div>
         </Alert>
@@ -474,11 +514,8 @@ export default function UsersManagementPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => handleEditClick(user)} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
-                      Edit
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => handlePermissionsClick(user)}>
-                      Permissions
+                    <Button size="sm" variant="secondary" onClick={() => handleEditClick(user)} disabled={!canManage} title={!canManage ? 'View only' : 'Edit user details and role'}>
+                      Edit Role
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id)} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
                       <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -532,12 +569,18 @@ export default function UsersManagementPage() {
             </label>
             <select 
               value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as 'ADMIN' | 'OWNER' | 'USER')}
+              onChange={(e) => setInviteRole(e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER')}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
-              <option value="USER">User</option>
-              <option value="OWNER">Tenant Owner</option>
-              <option value="ADMIN">Platform Admin</option>
+              <optgroup label="Platform Users">
+                <option value="PLATFORM_ADMIN">Platform Admin</option>
+                <option value="PLATFORM_SUPPORT">Platform Support</option>
+                <option value="PLATFORM_VIEWER">Platform Viewer</option>
+              </optgroup>
+              <optgroup label="Tenant Users">
+                <option value="OWNER">Tenant Owner</option>
+                <option value="USER">Tenant User</option>
+              </optgroup>
             </select>
           </div>
         </div>
@@ -574,20 +617,32 @@ export default function UsersManagementPage() {
             onChange={(e) => setEditEmail(e.target.value)}
             disabled={!canManage}
           />
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Role
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <label className="block text-sm font-semibold text-neutral-900 mb-2">
+              Platform Role
             </label>
             <select 
               value={editRole}
-              onChange={(e) => setEditRole(e.target.value as 'ADMIN' | 'OWNER' | 'USER')}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              onChange={(e) => setEditRole(e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER')}
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-2"
               disabled={!canManage}
             >
-              <option value="USER">User</option>
-              <option value="OWNER">Tenant Owner</option>
-              <option value="ADMIN">Platform Admin</option>
+              <optgroup label="Platform Users">
+                <option value="PLATFORM_ADMIN">Platform Admin - Full system access (unlimited tenants)</option>
+                <option value="PLATFORM_SUPPORT">Platform Support - View all tenants + support actions (3 tenant limit)</option>
+                <option value="PLATFORM_VIEWER">Platform Viewer - Read-only access to all tenants (cannot create)</option>
+              </optgroup>
+              <optgroup label="Tenant Users">
+                <option value="OWNER">Tenant Owner - Can create/own tenants (limits based on subscription tier)</option>
+                <option value="USER">Tenant User - Basic access (limits based on subscription tier)</option>
+              </optgroup>
+              <optgroup label="Deprecated">
+                <option value="ADMIN">Admin (Deprecated) - Use Platform Admin instead</option>
+              </optgroup>
             </select>
+            <p className="text-xs text-neutral-600">
+              Platform roles control global access. Users also have tenant-specific roles (Tenant Owner, Tenant Support, Tenant Member, Tenant Viewer) for each location they belong to.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -618,7 +673,7 @@ export default function UsersManagementPage() {
       {/* Permissions Modal */}
       <Modal
         isOpen={showPermissionsModal}
-        onClose={() => setShowPermissionsModal(false)}
+        onClose={handlePermissionsClose}
         title="User Permissions"
         description={permissionsUser ? `Manage permissions for ${permissionsUser.name}` : ''}
         size="lg"
@@ -741,7 +796,7 @@ export default function UsersManagementPage() {
           </div>
         </div>
         <ModalFooter>
-          <Button variant="ghost" onClick={() => setShowPermissionsModal(false)}>
+          <Button variant="ghost" onClick={handlePermissionsClose}>
             Cancel
           </Button>
           <Button onClick={handlePermissionsSave} disabled={!canManage} title={!canManage ? 'View only' : undefined}>

@@ -277,13 +277,13 @@ export const FEATURE_CATALOG: PlatformFeature[] = [
   },
   {
     id: 'propagation',
-    name: 'Chain-Wide Updates',
-    tagline: 'Update once, apply everywhere',
-    description: "Running a chain? Make changes at headquarters and push them to all your locations instantly. Update prices, add products, or change settings across your entire organization with one click. No more calling each store!",
+    name: 'Multi-Location Updates',
+    tagline: 'Update all your locations at once',
+    description: "Got more than one location? Update products and team permissions across all your stores with one click. No more updating each location manually! Starter tier includes product and user role propagation. Upgrade to Professional for hours, categories, and more.",
     icon: 'location',
     pillar: 'scale',
     category: 'locations',
-    requiredTier: 'organization',
+    requiredTier: 'starter',
     route: '/propagation',
     isNew: true
   },
@@ -434,17 +434,30 @@ export function getFeaturesForTier(tierLevel: string): PlatformFeature[] {
  * Get locked features for a specific tier (features requiring upgrade)
  */
 export function getLockedFeatures(tierLevel: string): PlatformFeature[] {
-  const tierHierarchy = ['google_only', 'starter', 'professional', 'enterprise'];
-  const tierIndex = tierHierarchy.indexOf(tierLevel);
+  // Map tier levels to hierarchy (handle both old and new naming)
+  const tierMap: Record<string, number> = {
+    'google_only': 0,
+    'trial': 0,
+    'starter': 1,
+    'growth': 1,
+    'professional': 2,
+    'pro': 2,
+    'enterprise': 3,
+    'organization': 4,
+    'custom': 4
+  };
   
-  if (tierIndex === -1) {
-    return FEATURE_CATALOG;
+  const currentTierLevel = tierMap[tierLevel];
+  
+  // If tier not found or is top tier, return empty (no locked features)
+  if (currentTierLevel === undefined || currentTierLevel >= 4) {
+    return [];
   }
   
   // Return features that require a higher tier
   return FEATURE_CATALOG.filter(feature => {
-    const featureIndex = tierHierarchy.indexOf(feature.requiredTier);
-    return featureIndex !== -1 && featureIndex > tierIndex;
+    const requiredTierLevel = tierMap[feature.requiredTier];
+    return requiredTierLevel !== undefined && requiredTierLevel > currentTierLevel;
   });
 }
 
