@@ -1,13 +1,22 @@
 /**
  * Directory API Routes - V2
- * Using Prisma for RLS compatibility
+ * Using direct database queries for RLS compatibility
  */
 
 import { Router, Request, Response } from 'express';
-import { prisma } from '../prisma';
-import { Prisma } from '@prisma/client';
+import { Pool } from 'pg';
 
 const router = Router();
+
+// Create a direct database connection pool that bypasses Prisma's retry logic
+const directPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  // Force direct connection without retry wrappers
+  min: 1,
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
 
 /**
  * GET /api/directory/search
@@ -66,21 +75,27 @@ router.get('/search', async (req: Request, res: Response) => {
       orderByClause = 'rating_avg DESC NULLS LAST, product_count DESC NULLS LAST, created_at DESC';
     }
 
-    // Build query with Prisma.sql - inject WHERE and ORDER BY as raw SQL
-    let listingsQuery = Prisma.sql`SELECT * FROM directory_listings WHERE `;
-    listingsQuery = Prisma.sql`${listingsQuery}${Prisma.raw(whereClause)} ORDER BY ${Prisma.raw(orderByClause)} LIMIT ${limitNum} OFFSET ${skip}`;
-    const listingsResult = await prisma.$queryRaw<any[]>(listingsQuery);
+    // Get listings - use direct database query
+    const listingsQuery = `
+      SELECT * FROM directory_listings
+      WHERE ${whereClause}
+      ORDER BY ${orderByClause}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    const listingsResult = await directPool.query(listingsQuery, [...params, limitNum, skip]);
 
     // Get total count
-    let countQuery = Prisma.sql`SELECT COUNT(*) as count FROM directory_listings WHERE `;
-    countQuery = Prisma.sql`${countQuery}${Prisma.raw(whereClause)}`;
-    const countResult = await prisma.$queryRaw<any[]>(countQuery);
+    const countQuery = `
+      SELECT COUNT(*) as count FROM directory_listings
+      WHERE ${whereClause}
+    `;
+    const countResult = await directPool.query(countQuery, params);
 
-    const total = parseInt(countResult[0]?.count || '0');
+    const total = parseInt(countResult.rows[0]?.count || '0');
     const totalPages = Math.ceil(total / limitNum);
 
     return res.json({
-      listings: listingsResult,
+      listings: listingsResult.rows,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -138,20 +153,20 @@ router.get('/categories', async (req: Request, res: Response) => {
  */
 router.get('/locations', async (req: Request, res: Response) => {
   try {
-    const result = await prisma.$queryRawUnsafe(`
+    const result = await directPool.query(`
       SELECT city, state, COUNT(*) as count
       FROM directory_listings
       WHERE is_published = true AND city IS NOT NULL
       GROUP BY city, state
       ORDER BY count DESC, city ASC
       LIMIT 100
-    `) as Array<{ city: string; state: string; count: bigint }>;
+    `);
 
     return res.json({
-      locations: result.map((row: any) => ({
+      locations: result.rows.map((row: any) => ({
         city: row.city,
         state: row.state,
-        count: parseInt(row.count.toString()),
+        count: parseInt(row.count),
       })),
     });
   } catch (error) {
@@ -168,18 +183,18 @@ router.get('/:slug', async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
 
-    const result = await prisma.$queryRawUnsafe(
+    const result = await directPool.query(
       `SELECT * FROM directory_listings
        WHERE slug = $1 AND is_published = true
        LIMIT 1`,
-      slug
-    ) as any[];
+      [slug]
+    );
 
-    if (!result || result.length === 0) {
+    if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ error: 'listing_not_found' });
     }
 
-    return res.json({ listing: result[0] });
+    return res.json({ listing: result.rows[0] });
   } catch (error) {
     console.error('Get listing error:', error);
     return res.status(500).json({ error: 'get_listing_failed' });
@@ -196,55 +211,55 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     const limit = Math.min(6, Number(req.query.limit) || 6);
 
     // First, get the current listing
-    const currentListing = await prisma.$queryRawUnsafe(
+    const currentListing = await directPool.query(
       `SELECT * FROM directory_listings WHERE slug = $1 AND is_published = true LIMIT 1`,
-      slug
-    ) as any[];
+      [slug]
+    );
 
-    if (currentListing.length === 0) {
+    if (currentListing.rows.length === 0) {
       return res.status(404).json({ error: 'listing_not_found' });
     }
 
-    const current = currentListing[0];
+    const current = currentListing.rows[0];
 
     // Find related stores using a scoring algorithm
     // Priority: Same category > Same city > Similar rating
     const relatedQuery = `
       SELECT *,
         (
-          CASE 
+          CASE
             WHEN primary_category = $1 THEN 3
             ELSE 0
           END +
-          CASE 
+          CASE
             WHEN city = $2 AND state = $3 THEN 2
             WHEN state = $3 THEN 1
             ELSE 0
           END +
-          CASE 
+          CASE
             WHEN ABS(rating_avg - $4) < 0.5 THEN 1
             ELSE 0
           END
         ) as relevance_score
       FROM directory_listings
-      WHERE slug != $5 
+      WHERE slug != $5
         AND is_published = true
       ORDER BY relevance_score DESC, rating_avg DESC, product_count DESC
       LIMIT $6
     `;
 
-    const related = await prisma.$queryRawUnsafe(relatedQuery,
+    const related = await directPool.query(relatedQuery, [
       current.primary_category,
       current.city,
       current.state,
       current.rating_avg || 0,
       slug,
-      limit
-    ) as any[];
+      limit,
+    ]);
 
     return res.json({
-      related: related,
-      count: related.length,
+      related: related.rows,
+      count: related.rows.length,
     });
   } catch (error) {
     console.error('Related stores error:', error);
