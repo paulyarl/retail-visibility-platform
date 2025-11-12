@@ -201,32 +201,30 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
         );
       })}
 
-      {/* Locked Features (Upgrade Opportunities) */}
+      {/* Upgrade Section - Show locked features */}
       {lockedFeatures.length > 0 && (
-        <div className="mt-12 space-y-6">
+        <div className="space-y-6">
           <div className="text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full mb-4">
-              <span className="text-2xl">✨</span>
-              <span className="font-semibold text-purple-900">Want Even More?</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-full mb-3">
+              <span className="text-xl">✨</span>
+              <span className="font-semibold text-sm">Want Even More?</span>
             </div>
             <h3 className="text-2xl font-bold text-neutral-900 mb-2">
               Unlock These Awesome Features
             </h3>
             <p className="text-neutral-600 max-w-2xl mx-auto">
-              Upgrade your plan to get access to these powerful tools. 
-              They'll help you work smarter, not harder!
+              Upgrade your plan to get access to these powerful tools. They'll help you work smarter, not harder!
             </p>
           </div>
 
-          {/* Show a preview of locked features */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {lockedFeatures.slice(0, 6).map(feature => (
+            {lockedFeatures.slice(0, 6).map((feature) => (
               <FeatureCard
                 key={feature.id}
                 feature={{
                   id: feature.id,
                   name: feature.name,
-                  description: feature.description,
+                  description: feature.tagline,
                   icon: feature.icon
                 }}
                 status="locked"
