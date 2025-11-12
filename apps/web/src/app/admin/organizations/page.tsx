@@ -26,6 +26,28 @@ interface Organization {
 
 const ITEMS_PER_PAGE = 10;
 
+// Organization tier limits configuration
+const ORGANIZATION_TIER_LIMITS = {
+  chain_starter: {
+    maxLocations: 5,
+    maxTotalSKUs: 2500,
+    displayName: 'Chain Starter',
+    price: '$199/mo',
+  },
+  chain_professional: {
+    maxLocations: 25,
+    maxTotalSKUs: 12500,
+    displayName: 'Chain Professional',
+    price: '$1,999/mo',
+  },
+  chain_enterprise: {
+    maxLocations: 999999, // Effectively unlimited for UI purposes
+    maxTotalSKUs: 999999, // Effectively unlimited for UI purposes
+    displayName: 'Chain Enterprise',
+    price: '$4,999/mo',
+  },
+} as const;
+
 export default function AdminOrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,8 +61,8 @@ export default function AdminOrganizationsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
   const [newOrgTier, setNewOrgTier] = useState('chain_starter');
-  const [newOrgMaxLocations, setNewOrgMaxLocations] = useState('10');
-  const [newOrgMaxSKUs, setNewOrgMaxSKUs] = useState('50000');
+  const [newOrgMaxLocations, setNewOrgMaxLocations] = useState('5');
+  const [newOrgMaxSKUs, setNewOrgMaxSKUs] = useState('2500');
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -427,13 +449,26 @@ export default function AdminOrganizationsPage() {
             </label>
             <select
               value={newOrgTier}
-              onChange={(e) => setNewOrgTier(e.target.value)}
+              onChange={(e) => {
+                const tier = e.target.value as keyof typeof ORGANIZATION_TIER_LIMITS;
+                setNewOrgTier(tier);
+                // Auto-populate limits based on tier
+                const limits = ORGANIZATION_TIER_LIMITS[tier];
+                setNewOrgMaxLocations(limits.maxLocations.toString());
+                setNewOrgMaxSKUs(limits.maxTotalSKUs.toString());
+              }}
               disabled={creating}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-              <option value="chain_starter">Chain Starter</option>
-              <option value="chain_professional">Chain Professional</option>
-              <option value="chain_enterprise">Chain Enterprise</option>
+              <option value="chain_starter">
+                Chain Starter - {ORGANIZATION_TIER_LIMITS.chain_starter.price}
+              </option>
+              <option value="chain_professional">
+                Chain Professional - {ORGANIZATION_TIER_LIMITS.chain_professional.price}
+              </option>
+              <option value="chain_enterprise">
+                Chain Enterprise - {ORGANIZATION_TIER_LIMITS.chain_enterprise.price}
+              </option>
             </select>
           </div>
 
@@ -445,10 +480,13 @@ export default function AdminOrganizationsPage() {
               type="number"
               value={newOrgMaxLocations}
               onChange={(e) => setNewOrgMaxLocations(e.target.value)}
-              placeholder="10"
+              placeholder="5"
               disabled={creating}
               min="1"
             />
+            <p className="text-xs text-neutral-500 mt-1">
+              Auto-populated based on tier. Platform admins can customize if needed.
+            </p>
           </div>
 
           <div>
@@ -459,10 +497,13 @@ export default function AdminOrganizationsPage() {
               type="number"
               value={newOrgMaxSKUs}
               onChange={(e) => setNewOrgMaxSKUs(e.target.value)}
-              placeholder="50000"
+              placeholder="2500"
               disabled={creating}
               min="1"
             />
+            <p className="text-xs text-neutral-500 mt-1">
+              Auto-populated based on tier. Platform admins can customize if needed.
+            </p>
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -480,8 +521,8 @@ export default function AdminOrganizationsPage() {
               setShowCreateModal(false);
               setNewOrgName('');
               setNewOrgTier('chain_starter');
-              setNewOrgMaxLocations('10');
-              setNewOrgMaxSKUs('50000');
+              setNewOrgMaxLocations('5');
+              setNewOrgMaxSKUs('2500');
             }}
             disabled={creating}
           >
