@@ -24,12 +24,13 @@ export default function CategoryAssignmentModal({
   onSave,
   onClose,
 }: CategoryAssignmentModalProps) {
-  const [selectedCategory, setSelectedCategory] = useState<GoogleCategory | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<GoogleCategory[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useSearchMode, setUseSearchMode] = useState(false);
 
   // Search Google taxonomy
   const searchGoogleCategories = async (query: string) => {
@@ -57,14 +58,16 @@ export default function CategoryAssignmentModal({
 
   // Debounced search
   useEffect(() => {
+    if (!useSearchMode) return;
+    
     const timer = setTimeout(() => {
       searchGoogleCategories(searchQuery);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, useSearchMode]);
 
-  // Mock categories - in real implementation, fetch from API
+  // Mock categories for hierarchical browsing - will be replaced with real Google taxonomy
   const mockCategories = [
     { 
       id: '1', 
@@ -96,12 +99,29 @@ export default function CategoryAssignmentModal({
   ];
 
   const handleSave = async () => {
-    if (!selectedCategory) return;
+    if (!selectedCategoryId) return;
 
     setSaving(true);
     setError(null);
 
     try {
+      // For now, use mock category names - will be replaced with real Google taxonomy
+      const selectedCategory = useSearchMode 
+        ? searchResults.find(cat => cat.id === selectedCategoryId)
+        : (() => {
+            for (const category of mockCategories) {
+              if (category.id === selectedCategoryId) return { id: selectedCategoryId, name: category.name, path: [category.name] };
+              for (const child of category.children) {
+                if (child.id === selectedCategoryId) return { id: selectedCategoryId, name: child.name, path: [category.name, child.name] };
+              }
+            }
+            return null;
+          })();
+
+      if (!selectedCategory) {
+        throw new Error('Category not found');
+      }
+
       await onSave(item.id, selectedCategory.id, selectedCategory.name);
       onClose();
     } catch (err) {
@@ -146,64 +166,153 @@ export default function CategoryAssignmentModal({
             </div>
           )}
 
-          {/* Search Input */}
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-              Search Google Product Categories
-            </label>
-            
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for categories (e.g., phones, clothing, electronics)"
-              className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white"
-            />
-
-            {/* Search Results */}
-            {searchQuery && (
-              <div className="max-h-60 overflow-y-auto border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                {isSearching ? (
-                  <div className="p-4 text-center text-neutral-500">
-                    Searching...
-                  </div>
-                ) : searchResults.length > 0 ? (
-                  searchResults.map((category) => (
-                    <button
-                      key={category.id}
-                      onClick={() => setSelectedCategory(category)}
-                      className={`w-full text-left p-3 hover:bg-neutral-50 dark:hover:bg-neutral-700 border-b border-neutral-100 dark:border-neutral-600 last:border-b-0 ${
-                        selectedCategory?.id === category.id
-                          ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-700'
-                          : ''
-                      }`}
-                    >
-                      <div className="font-medium text-neutral-900 dark:text-white">
-                        {category.name}
-                      </div>
-                      <div className="text-xs text-neutral-500 mt-1">
-                        {category.fullPath}
-                      </div>
-                    </button>
-                  ))
-                ) : searchQuery.length > 2 ? (
-                  <div className="p-4 text-center text-neutral-500">
-                    No categories found
-                  </div>
-                ) : null}
-              </div>
-            )}
+          {/* Mode Toggle */}
+          <div className="mb-4 flex items-center gap-4">
+            <button
+              onClick={() => {
+                setUseSearchMode(false);
+                setSelectedCategoryId('');
+                setSearchQuery('');
+              }}
+              className={`px-3 py-1 text-sm rounded-md ${
+                !useSearchMode
+                  ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
+                  : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
+              }`}
+            >
+              Browse Categories
+            </button>
+            <button
+              onClick={() => {
+                setUseSearchMode(true);
+                setSelectedCategoryId('');
+                setSearchQuery('');
+              }}
+              className={`px-3 py-1 text-sm rounded-md ${
+                useSearchMode
+                  ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
+                  : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
+              }`}
+            >
+              Search Categories
+            </button>
           </div>
 
+          {useSearchMode ? (
+            /* Search Mode */
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Search Google Product Categories
+              </label>
+              
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search for categories (e.g., phones, clothing, electronics)"
+                className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white"
+              />
+
+              {/* Search Results */}
+              {searchQuery && (
+                <div className="max-h-60 overflow-y-auto border border-neutral-200 dark:border-neutral-700 rounded-lg">
+                  {isSearching ? (
+                    <div className="p-4 text-center text-neutral-500">
+                      Searching...
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map((category) => (
+                      <button
+                        key={category.id}
+                        onClick={() => setSelectedCategoryId(category.id)}
+                        className={`w-full text-left p-3 hover:bg-neutral-50 dark:hover:bg-neutral-700 border-b border-neutral-100 dark:border-neutral-600 last:border-b-0 ${
+                          selectedCategoryId === category.id
+                            ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-700'
+                            : ''
+                        }`}
+                      >
+                        <div className="font-medium text-neutral-900 dark:text-white">
+                          {category.name}
+                        </div>
+                        <div className="text-xs text-neutral-500 mt-1">
+                          {category.fullPath}
+                        </div>
+                      </button>
+                    ))
+                  ) : searchQuery.length > 2 ? (
+                    <div className="p-4 text-center text-neutral-500">
+                      No categories found
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Browse Mode - Hierarchical Categories */
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Select Category
+              </label>
+              
+              {mockCategories.map((category) => (
+                <div key={category.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-3">
+                  <button
+                    onClick={() => setSelectedCategoryId(category.id)}
+                    className={`w-full text-left font-medium mb-2 ${
+                      selectedCategoryId === category.id
+                        ? 'text-primary-600'
+                        : 'text-neutral-900 dark:text-white'
+                    }`}
+                  >
+                    {category.name}
+                  </button>
+                  
+                  {selectedCategoryId === category.id && (
+                    <div className="pl-4 space-y-1">
+                      {category.children.map((child) => (
+                        <button
+                          key={child.id}
+                          onClick={() => setSelectedCategoryId(child.id)}
+                          className={`block w-full text-left text-sm py-1 ${
+                            selectedCategoryId === child.id
+                              ? 'text-primary-600 font-medium'
+                              : 'text-neutral-600 dark:text-neutral-400'
+                          }`}
+                        >
+                          {child.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Selected Category Display */}
-          {selectedCategory && (
-            <div className="mt-4 p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded-lg">
-              <div className="text-xs text-primary-600 dark:text-primary-400 mb-1">Selected Category:</div>
-              <div className="text-sm font-medium text-primary-900 dark:text-primary-100">
-                {selectedCategory.name}
-              </div>
-              <div className="text-xs text-primary-600 dark:text-primary-400 mt-1">
-                {selectedCategory.fullPath}
+          {selectedCategoryId && (
+            <div className="mt-4 p-3 bg-neutral-50 dark:bg-neutral-900 rounded-lg">
+              <div className="text-xs text-neutral-500 mb-1">Selected:</div>
+              <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                {(() => {
+                  if (useSearchMode) {
+                    const selected = searchResults.find(cat => cat.id === selectedCategoryId);
+                    return selected ? `${selected.name} (${selected.fullPath})` : 'Unknown';
+                  } else {
+                    // Browse mode
+                    for (const category of mockCategories) {
+                      if (category.id === selectedCategoryId) {
+                        return category.name;
+                      }
+                      for (const child of category.children) {
+                        if (child.id === selectedCategoryId) {
+                          return `${category.name} > ${child.name}`;
+                        }
+                      }
+                    }
+                    return 'Unknown';
+                  }
+                })()}
               </div>
             </div>
           )}
