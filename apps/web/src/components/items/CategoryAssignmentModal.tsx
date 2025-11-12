@@ -32,7 +32,7 @@ export default function CategoryAssignmentModal({
   const [error, setError] = useState<string | null>(null);
   const [useSearchMode, setUseSearchMode] = useState(false);
 
-  // Search Google taxonomy
+  // Search Google taxonomy (using mock data for now)
   const searchGoogleCategories = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -40,20 +40,37 @@ export default function CategoryAssignmentModal({
     }
 
     setIsSearching(true);
-    try {
-      const response = await fetch(`/api/google/taxonomy/search?q=${encodeURIComponent(query)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.categories || []);
-      } else {
-        setSearchResults([]);
+    
+    // For now, search through mock categories instead of API
+    const lowerQuery = query.toLowerCase();
+    const results: GoogleCategory[] = [];
+    
+    mockCategories.forEach(category => {
+      // Search parent categories
+      if (category.name.toLowerCase().includes(lowerQuery)) {
+        results.push({
+          id: category.id,
+          name: category.name,
+          path: [category.name],
+          fullPath: category.name
+        });
       }
-    } catch (error) {
-      console.error('Error searching Google taxonomy:', error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
+      
+      // Search child categories
+      category.children.forEach(child => {
+        if (child.name.toLowerCase().includes(lowerQuery)) {
+          results.push({
+            id: child.id,
+            name: child.name,
+            path: [category.name, child.name],
+            fullPath: `${category.name} > ${child.name}`
+          });
+        }
+      });
+    });
+    
+    setSearchResults(results.slice(0, 10)); // Limit to 10 results
+    setIsSearching(false);
   };
 
   // Debounced search
@@ -105,24 +122,9 @@ export default function CategoryAssignmentModal({
     setError(null);
 
     try {
-      // For now, use mock category names - will be replaced with real Google taxonomy
-      const selectedCategory = useSearchMode 
-        ? searchResults.find(cat => cat.id === selectedCategoryId)
-        : (() => {
-            for (const category of mockCategories) {
-              if (category.id === selectedCategoryId) return { id: selectedCategoryId, name: category.name, path: [category.name] };
-              for (const child of category.children) {
-                if (child.id === selectedCategoryId) return { id: selectedCategoryId, name: child.name, path: [category.name, child.name] };
-              }
-            }
-            return null;
-          })();
-
-      if (!selectedCategory) {
-        throw new Error('Category not found');
-      }
-
-      await onSave(item.id, selectedCategory.id, selectedCategory.name);
+      // Both browse and search modes send the mock category ID as categorySlug
+      // This will create a tenant category with the proper googleCategoryId
+      await onSave(item.id, selectedCategoryId, 'Category'); // ID and placeholder name
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to assign category');

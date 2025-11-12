@@ -222,19 +222,16 @@ export default function ItemsClient({
     }
   };
 
-  const handleCategoryAssign = async (itemId: string, googleCategoryId: string, categoryName: string) => {
+  const handleCategoryAssign = async (itemId: string, categoryId: string, categoryName: string) => {
     try {
-      // For now, use the existing category assignment API with the Google category ID as slug
-      // This will create a tenant category if needed and align it properly
+      // Send the mock category ID as categorySlug (e.g., "2-2" for Pants)
       const response = await fetch(`/api/v1/tenants/${initialTenantId}/items/${itemId}/category`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Use the Google category ID as the slug for now
-          // This will create a tenant category with the proper googleCategoryId
-          categorySlug: googleCategoryId,
+          categorySlug: categoryId, // Send the mock ID like "2-2"
         }),
       });
 
