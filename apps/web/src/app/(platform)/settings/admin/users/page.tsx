@@ -297,12 +297,15 @@ export default function UsersManagementPage() {
               These are <strong>platform-level roles</strong> that determine a user's global access:
             </p>
             <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong>Platform Admin:</strong> Full system access, can manage all tenants and users</li>
-              <li><strong>Platform Support:</strong> View all tenants + limited actions (3 tenant limit globally)</li>
-              <li><strong>Platform Viewer:</strong> Read-only access to all tenants (analytics/sales/legal)</li>
-              <li><strong>Tenant Owner:</strong> Can create and own multiple tenants (10 max)</li>
-              <li><strong>User:</strong> Basic access, can be assigned to tenants (3 tenant limit)</li>
+              <li><strong>Platform Admin:</strong> Full system access, unlimited tenants</li>
+              <li><strong>Platform Support:</strong> View all tenants + limited actions (3 tenant limit for testing)</li>
+              <li><strong>Platform Viewer:</strong> Read-only access to all tenants (cannot create tenants)</li>
+              <li><strong>Tenant Owner:</strong> Can create and own tenants (limits based on subscription tier)</li>
+              <li><strong>User:</strong> Basic access (limits based on subscription tier)</li>
             </ul>
+            <p className="mt-2 text-xs bg-amber-50 border border-amber-200 rounded p-2">
+              <strong>Tenant Limits:</strong> For regular users and owners, the number of tenants they can create depends on their <strong>subscription tier</strong>: Trial (1), Google-Only (1), Starter (3), Professional (10), Enterprise (25), Organization (unlimited).
+            </p>
             <p className="mt-2">
               <strong>Note:</strong> Users also have <strong>tenant-specific roles</strong> (Owner, Admin, Member, Viewer) for each location they belong to. Those are managed within each tenant's settings, not here.
             </p>
@@ -610,11 +613,11 @@ export default function UsersManagementPage() {
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-2"
               disabled={!canManage}
             >
-              <option value="USER">User - Basic access (3 tenant limit)</option>
-              <option value="OWNER">Tenant Owner - Can create/own tenants (10 tenant limit)</option>
-              <option value="PLATFORM_ADMIN">Platform Admin - Full system access</option>
-              <option value="PLATFORM_SUPPORT">Platform Support - View all tenants + limited actions (3 tenant limit)</option>
-              <option value="PLATFORM_VIEWER">Platform Viewer - Read-only access to all tenants</option>
+              <option value="USER">User - Basic access (tenant limits based on subscription tier)</option>
+              <option value="OWNER">Tenant Owner - Can create/own tenants (limits based on subscription tier)</option>
+              <option value="PLATFORM_ADMIN">Platform Admin - Full system access (unlimited tenants)</option>
+              <option value="PLATFORM_SUPPORT">Platform Support - View all tenants + limited actions (3 tenant limit for testing)</option>
+              <option value="PLATFORM_VIEWER">Platform Viewer - Read-only access to all tenants (cannot create tenants)</option>
               <option value="ADMIN">Admin (Deprecated) - Use Platform Admin instead</option>
             </select>
             <p className="text-xs text-neutral-600">
