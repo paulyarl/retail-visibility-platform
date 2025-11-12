@@ -4,7 +4,7 @@ import { Item } from '@/services/itemsDataService';
 
 interface CategoryAssignmentModalProps {
   item: Item;
-  onSave: (itemId: string, categoryPath: string[]) => Promise<void>;
+  onSave: (itemId: string, categoryId: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -17,15 +17,39 @@ export default function CategoryAssignmentModal({
   onSave,
   onClose,
 }: CategoryAssignmentModalProps) {
-  const [selectedPath, setSelectedPath] = useState<string[]>(item.categoryPath || []);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Mock categories - in real implementation, fetch from API
   const mockCategories = [
-    { id: '1', name: 'Electronics', children: ['Phones', 'Laptops', 'Tablets'] },
-    { id: '2', name: 'Clothing', children: ['Shirts', 'Pants', 'Shoes'] },
-    { id: '3', name: 'Home & Garden', children: ['Furniture', 'Decor', 'Tools'] },
+    { 
+      id: '1', 
+      name: 'Electronics', 
+      children: [
+        { id: '1-1', name: 'Phones' },
+        { id: '1-2', name: 'Laptops' },
+        { id: '1-3', name: 'Tablets' }
+      ]
+    },
+    { 
+      id: '2', 
+      name: 'Clothing', 
+      children: [
+        { id: '2-1', name: 'Shirts' },
+        { id: '2-2', name: 'Pants' },
+        { id: '2-3', name: 'Shoes' }
+      ]
+    },
+    { 
+      id: '3', 
+      name: 'Home & Garden', 
+      children: [
+        { id: '3-1', name: 'Furniture' },
+        { id: '3-2', name: 'Decor' },
+        { id: '3-3', name: 'Tools' }
+      ]
+    },
   ];
 
   const handleSave = async () => {
@@ -33,7 +57,7 @@ export default function CategoryAssignmentModal({
     setError(null);
 
     try {
-      await onSave(item.id, selectedPath);
+      await onSave(item.id, selectedCategoryId);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to assign category');
@@ -86,9 +110,9 @@ export default function CategoryAssignmentModal({
             {mockCategories.map((category) => (
               <div key={category.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-3">
                 <button
-                  onClick={() => setSelectedPath([category.name])}
+                  onClick={() => setSelectedCategoryId(category.id)}
                   className={`w-full text-left font-medium mb-2 ${
-                    selectedPath[0] === category.name
+                    selectedCategoryId === category.id
                       ? 'text-primary-600'
                       : 'text-neutral-900 dark:text-white'
                   }`}
@@ -96,19 +120,19 @@ export default function CategoryAssignmentModal({
                   {category.name}
                 </button>
                 
-                {selectedPath[0] === category.name && (
+                {selectedCategoryId === category.id && (
                   <div className="pl-4 space-y-1">
                     {category.children.map((child) => (
                       <button
-                        key={child}
-                        onClick={() => setSelectedPath([category.name, child])}
+                        key={child.id}
+                        onClick={() => setSelectedCategoryId(child.id)}
                         className={`block w-full text-left text-sm py-1 ${
-                          selectedPath[1] === child
+                          selectedCategoryId === child.id
                             ? 'text-primary-600 font-medium'
                             : 'text-neutral-600 dark:text-neutral-400'
                         }`}
                       >
-                        {child}
+                        {child.name}
                       </button>
                     ))}
                   </div>
@@ -118,11 +142,24 @@ export default function CategoryAssignmentModal({
           </div>
 
           {/* Selected Path Display */}
-          {selectedPath.length > 0 && (
+          {selectedCategoryId && (
             <div className="mt-4 p-3 bg-neutral-50 dark:bg-neutral-900 rounded-lg">
               <div className="text-xs text-neutral-500 mb-1">Selected:</div>
               <div className="text-sm font-medium text-neutral-900 dark:text-white">
-                {selectedPath.join(' > ')}
+                {(() => {
+                  // Find the selected category and build the display path
+                  for (const category of mockCategories) {
+                    if (category.id === selectedCategoryId) {
+                      return category.name;
+                    }
+                    for (const child of category.children) {
+                      if (child.id === selectedCategoryId) {
+                        return `${category.name} > ${child.name}`;
+                      }
+                    }
+                  }
+                  return 'Unknown';
+                })()}
               </div>
             </div>
           )}
@@ -136,7 +173,7 @@ export default function CategoryAssignmentModal({
           <Button
             variant="primary"
             onClick={handleSave}
-            disabled={selectedPath.length === 0 || saving}
+            disabled={!selectedCategoryId || saving}
             loading={saving}
           >
             {saving ? 'Saving...' : 'Assign Category'}

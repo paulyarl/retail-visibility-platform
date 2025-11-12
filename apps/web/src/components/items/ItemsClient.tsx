@@ -222,7 +222,7 @@ export default function ItemsClient({
     }
   };
 
-  const handleCategoryAssign = async (itemId: string, categoryPath: string[]) => {
+  const handleCategoryAssign = async (itemId: string, categoryId: string) => {
     try {
       // Use the PATCH endpoint for category assignment
       const response = await fetch(`/api/v1/tenants/${initialTenantId}/items/${itemId}/category`, {
@@ -231,11 +231,8 @@ export default function ItemsClient({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Create a proper slug from the full category path
-          // e.g., ["Clothing", "Pants"] becomes "clothing-pants"
-          categorySlug: categoryPath.map(part => 
-            part.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-          ).join('-'),
+          // Send the selected category ID as the slug
+          categorySlug: categoryId,
         }),
       });
 
