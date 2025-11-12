@@ -140,7 +140,7 @@ BEGIN
             p.latitude,
             p.longitude,
             p.logo_url,
-            COALESCE(t.subscriptionTier, ''trial'') as subscription_tier,
+            COALESCE(t."subscriptionTier", ''trial'') as subscription_tier,
             false as use_custom_website
         FROM %I t
         LEFT JOIN %I p ON t.id = p.tenant_id
@@ -221,7 +221,7 @@ BEGIN
             p.latitude,
             p.longitude,
             p.logo_url,
-            COALESCE(t.subscriptionTier, ''trial'') as subscription_tier,
+            COALESCE(t."subscriptionTier", ''trial'') as subscription_tier,
             false as use_custom_website
         FROM %I t
         LEFT JOIN %I p ON t.id = p.tenant_id
