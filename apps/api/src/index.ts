@@ -1658,23 +1658,57 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
     const { level = '1' } = req.query;
     const targetLevel = parseInt(level as string, 10);
 
-    // Get categories at the specified level
+    // Get top-level categories (those without parentId or with specific parent)
+    // Instead of relying on level field, get categories that represent top-level groupings
     const categories = await prisma.googleTaxonomy.findMany({
       where: {
         isActive: true,
-        level: targetLevel
+        OR: [
+          { parentId: null },
+          { parentId: { equals: '' } }
+        ]
       },
       orderBy: { categoryPath: 'asc' },
-      take: 50 // Limit for performance
+      take: 20 // Limit for performance
     });
+
+    // If no top-level categories found, try to get some representative categories
+    let finalCategories = categories;
+    if (categories.length === 0) {
+      // Get some categories and group them by top-level
+      const allCategories = await prisma.googleTaxonomy.findMany({
+        where: { isActive: true },
+        orderBy: { categoryPath: 'asc' },
+        take: 100
+      });
+
+      // Group by first part of path
+      const grouped = allCategories.reduce((acc: any, cat) => {
+        const topLevel = cat.categoryPath.split(' > ')[0];
+        if (!acc[topLevel]) {
+          acc[topLevel] = {
+            categoryId: topLevel,
+            categoryPath: topLevel,
+            level: 1,
+            parentId: null,
+            isActive: true
+          };
+        }
+        return acc;
+      }, {});
+
+      finalCategories = Object.values(grouped).slice(0, 20);
+    }
 
     // For each top-level category, get some children
     const categoriesWithChildren = await Promise.all(
-      categories.map(async (cat) => {
+      finalCategories.map(async (cat: any) => {
         const children = await prisma.googleTaxonomy.findMany({
           where: {
             isActive: true,
-            parentId: cat.categoryId
+            categoryPath: {
+              startsWith: cat.categoryPath + ' > '
+            }
           },
           orderBy: { categoryPath: 'asc' },
           take: 10 // Limit children for UI performance
