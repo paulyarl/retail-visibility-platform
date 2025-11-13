@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Modal, ModalFooter, Button, Input, Select, Alert } from '@/components/ui';
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput, geocodeAddress } from '@/lib/validation/businessProfile';
 import { z } from 'zod';
+import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 
 interface EditBusinessProfileModalProps {
   isOpen: boolean;
@@ -40,69 +41,15 @@ export default function EditBusinessProfileModal({
     }
   }, [isOpen, profile]);
 
-  // Image compression helper
-  const compressImage = async (file: File, maxWidth = 800, quality = 0.85): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        img.src = e.target?.result as string;
-      };
-      
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let { width, height } = img;
-        
-        // Resize if needed
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          reject(new Error("canvas_failed"));
-          return;
-        }
-        
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        // Convert to JPEG with compression
-        const dataUrl = canvas.toDataURL("image/jpeg", quality);
-        resolve(dataUrl);
-      };
-      
-      img.onerror = () => reject(new Error("image_load_failed"));
-      reader.onerror = () => reject(new Error("read_failed"));
-      reader.readAsDataURL(file);
-    });
-  };
-
   // Handle logo file upload
   const handleLogoUpload = async (file: File) => {
     try {
       setUploadingLogo(true);
       setError(null);
 
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setError('Please select an image file');
-        return;
-      }
-
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Logo file size must be less than 5MB');
-        return;
-      }
-
-      // Compress image
-      const dataUrl = await compressImage(file);
-      setLogoPreview(dataUrl);
+      // Use centralized image upload middleware
+      const result = await uploadImage(file, ImageUploadPresets.logo);
+      setLogoPreview(result.dataUrl);
 
       // Get tenant ID from localStorage
       const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
@@ -114,8 +61,8 @@ export default function EditBusinessProfileModal({
       // Upload to server
       const body = JSON.stringify({ 
         tenant_id: tenantId, 
-        dataUrl, 
-        contentType: "image/jpeg" 
+        dataUrl: result.dataUrl, 
+        contentType: result.contentType 
       });
 
       const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
@@ -136,9 +83,9 @@ export default function EditBusinessProfileModal({
         handleChange('logo_url', uploadedUrl);
         setLogoPreview(uploadedUrl);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Logo upload error:', err);
-      setError('Failed to upload logo');
+      setError(err.message || 'Failed to upload logo');
     } finally {
       setUploadingLogo(false);
     }
@@ -159,16 +106,10 @@ export default function EditBusinessProfileModal({
       const blob = await response.blob();
       
       // Convert blob to File
-      const file = new File([blob], 'logo.jpg', { type: blob.type || 'image/jpeg' });
+      const file = new File([blob], 'logo.png', { type: blob.type || 'image/png' });
 
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Logo file size must be less than 5MB');
-        return null;
-      }
-
-      // Compress image
-      const dataUrl = await compressImage(file, 400, 0.9); // Smaller size for logos
+      // Use centralized image upload middleware
+      const result = await uploadImage(file, ImageUploadPresets.logo);
 
       // Get tenant ID from localStorage
       const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
@@ -180,8 +121,8 @@ export default function EditBusinessProfileModal({
       // Upload to server
       const body = JSON.stringify({ 
         tenant_id: tenantId, 
-        dataUrl, 
-        contentType: "image/jpeg" 
+        dataUrl: result.dataUrl, 
+        contentType: result.contentType 
       });
 
       const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
@@ -198,9 +139,9 @@ export default function EditBusinessProfileModal({
 
       // Return the optimized URL
       return payload.url;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to optimize pasted logo URL:', err);
-      setError('Failed to fetch and optimize logo from URL');
+      setError(err.message || 'Failed to fetch and optimize logo from URL');
       return null;
     } finally {
       setUploadingLogo(false);

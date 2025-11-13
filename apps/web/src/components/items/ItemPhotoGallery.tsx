@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button, Input } from "@/components/ui";
 import { api } from "@/lib/api";
+import { uploadImage, ImageUploadPresets } from "@/lib/image-upload";
 
 type Photo = {
   id: string;
@@ -50,44 +51,6 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
     loadPhotos();
   }, [item.id]);
 
-  const compressImage = async (file: File, maxWidth = 1024, quality = 0.8): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const reader = new FileReader();
-
-      reader.onload = (e) => {
-        img.src = e.target?.result as string;
-      };
-
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let { width, height } = img;
-
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          reject(new Error("canvas_failed"));
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL("image/jpeg", quality);
-        resolve(dataUrl);
-      };
-
-      img.onerror = () => reject(new Error("image_load_failed"));
-      reader.onerror = () => reject(new Error("read_failed"));
-      reader.readAsDataURL(file);
-    });
-  };
-
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -101,7 +64,9 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
       setUploading(true);
       setError(null);
 
-      const dataUrl = await compressImage(file);
+      // Use middleware with HIGH compression for product images (many images)
+      const result = await uploadImage(file, ImageUploadPresets.product);
+      const dataUrl = result.dataUrl;
 
       const res = await api.post(`/api/items/${item.id}/photos`, {
         tenantId,

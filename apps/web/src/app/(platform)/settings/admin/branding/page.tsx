@@ -9,6 +9,7 @@ import * as z from 'zod';
 import Image from 'next/image';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
 
 const brandingSchema = z.object({
   platformName: z.string().min(1, 'Platform name is required'),
@@ -61,27 +62,31 @@ export default function BrandingSettings() {
     loadSettings();
   }, [setValue, toast]);
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-      setValue('logo', file);
+      try {
+        // Use middleware with LOW compression for platform branding (only 1 logo)
+        const result = await uploadImage(file, ImageUploadPresets.platformBranding);
+        setLogoPreview(result.dataUrl);
+        setValue('logo', file);
+      } catch (error: any) {
+        showError(error.message || 'Failed to process logo');
+      }
     }
   };
 
-  const handleFaviconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFaviconChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFaviconPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-      setValue('favicon', file);
+      try {
+        // Use middleware with HIGH compression for favicon (small icon)
+        const result = await uploadImage(file, ImageUploadPresets.favicon);
+        setFaviconPreview(result.dataUrl);
+        setValue('favicon', file);
+      } catch (error: any) {
+        showError(error.message || 'Failed to process favicon');
+      }
     }
   };
 

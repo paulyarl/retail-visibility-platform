@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import Image from 'next/image';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
+import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
 
 export default function TenantBrandingPage() {
   const params = useParams();
@@ -86,96 +87,19 @@ export default function TenantBrandingPage() {
     }
   };
 
-  const compressImage = async (file: File, maxWidth = 800, quality = 0.85): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = document.createElement('img');
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        img.src = e.target?.result as string;
-      };
-      
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'));
-          return;
-        }
-        
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const compressedReader = new FileReader();
-              compressedReader.onloadend = () => {
-                resolve(compressedReader.result as string);
-              };
-              compressedReader.readAsDataURL(blob);
-            } else {
-              reject(new Error('Failed to compress image'));
-            }
-          },
-          'image/jpeg',
-          quality
-        );
-      };
-      
-      img.onerror = () => reject(new Error('Failed to load image'));
-      reader.readAsDataURL(file);
-    });
-  };
-
   const handleLogoUpload = async (file: File) => {
     try {
       setUploadingLogo(true);
       setError(null);
 
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        throw new Error('Please upload an image file');
-      }
-
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error('Image must be less than 5MB');
-      }
-
-      // Validate aspect ratio (should be roughly square for logos)
-      const img = document.createElement('img');
-      const imageUrl = URL.createObjectURL(file);
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageUrl;
-      });
-      URL.revokeObjectURL(imageUrl);
-
-      const aspectRatio = img.width / img.height;
-      if (aspectRatio < 0.5 || aspectRatio > 2) {
-        throw new Error('Logo should be roughly square (aspect ratio between 1:2 and 2:1). For wide images, use the Banner upload below.');
-      }
-
-      // Compress image
-      const compressedBase64 = await compressImage(file);
+      // Use centralized image upload middleware
+      const result = await uploadImage(file, ImageUploadPresets.logo);
 
       // Upload to backend
       const body = JSON.stringify({
         tenant_id: tenantId,
-        dataUrl: compressedBase64,
-        contentType: "image/jpeg" 
+        dataUrl: result.dataUrl,
+        contentType: result.contentType,
       });
 
       const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
@@ -219,39 +143,14 @@ export default function TenantBrandingPage() {
       setUploadingBanner(true);
       setError(null);
 
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        throw new Error('Please upload an image file');
-      }
-
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error('Image must be less than 5MB');
-      }
-
-      // Validate aspect ratio (should be wide/landscape for banners)
-      const img = document.createElement('img');
-      const imageUrl = URL.createObjectURL(file);
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageUrl;
-      });
-      URL.revokeObjectURL(imageUrl);
-
-      const aspectRatio = img.width / img.height;
-      if (aspectRatio < 2) {
-        throw new Error('Banner should be wide/landscape (aspect ratio at least 2:1, e.g., 1200x400). For square images, use the Logo upload above.');
-      }
-
-      // Compress image with wider aspect ratio (1200px for banners)
-      const compressedBase64 = await compressImage(file, 1200);
+      // Use centralized image upload middleware
+      const result = await uploadImage(file, ImageUploadPresets.banner);
 
       // Upload to backend
       const body = JSON.stringify({
         tenant_id: tenantId,
-        dataUrl: compressedBase64,
-        contentType: "image/jpeg" 
+        dataUrl: result.dataUrl,
+        contentType: result.contentType,
       });
 
       const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/banner`, {
@@ -421,7 +320,7 @@ export default function TenantBrandingPage() {
                 <input
                   id="logo-upload"
                   type="file"
-                  accept="image/*"
+                  accept={getAcceptString(ImageUploadPresets.logo.allowedTypes!)}
                   onChange={handleLogoChange}
                   disabled={uploadingLogo}
                   className="block w-full text-sm text-neutral-500
@@ -477,7 +376,7 @@ export default function TenantBrandingPage() {
                 <input
                   id="banner-upload"
                   type="file"
-                  accept="image/*"
+                  accept={getAcceptString(ImageUploadPresets.banner.allowedTypes!)}
                   onChange={handleBannerChange}
                   disabled={uploadingBanner}
                   className="block w-full text-sm text-neutral-500
