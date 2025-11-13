@@ -1774,6 +1774,11 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
   try {
     const { q: query, limit = '10' } = req.query;
 
+    // Disable caching for search results
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
     if (!query || typeof query !== 'string') {
       return res.status(400).json({ error: 'Query parameter required' });
     }
@@ -1784,13 +1789,29 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
       where: {
         isActive: true,
         OR: [
-          { categoryPath: { contains: lowerQuery, mode: 'insensitive' } },
-          { categoryId: { contains: lowerQuery } }
+          { categoryPath: { contains: query } }, // Try case-sensitive first
+          { categoryId: { contains: query } }
         ]
       },
       take: parseInt(limit as string, 10),
       orderBy: { categoryPath: 'asc' }
     });
+
+    // If no results with case-sensitive, try case-insensitive approach
+    if (categories.length === 0) {
+      const caseInsensitiveCategories = await prisma.googleTaxonomy.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { categoryPath: { contains: lowerQuery } },
+            { categoryId: { contains: lowerQuery } }
+          ]
+        },
+        take: parseInt(limit as string, 10),
+        orderBy: { categoryPath: 'asc' }
+      });
+      categories.push(...caseInsensitiveCategories);
+    }
 
     const results = categories.map(cat => ({
       id: cat.categoryId,
@@ -2478,7 +2499,6 @@ app.post('/api/admin/taxonomy/sync', requireAdmin, async (req, res) => {
     res.status(500).json({ error: 'Taxonomy sync failed' });
   }
 });
-app.use('/auth', googleBusinessOAuthRoutes); // Google Business Profile OAuth flow
 app.use('/admin', authenticateToken, platformFlagsRoutes);
 app.use('/api/admin', authenticateToken, platformFlagsRoutes);
 // Effective flags: middleware applied per-route (admin for platform, tenant access for tenant)

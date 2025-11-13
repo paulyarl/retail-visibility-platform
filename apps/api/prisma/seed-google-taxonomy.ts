@@ -48,10 +48,15 @@ const categories = [
 
 async function seedGoogleTaxonomy() {
   console.log("🌱 Seeding Google Product Taxonomy...");
+  console.log("Database URL:", process.env.DATABASE_URL?.substring(0, 50) + "...");
+
+  // Check existing count
+  const existingCount = await db.googleTaxonomy.count();
+  console.log(`📊 Existing categories: ${existingCount}`);
 
   for (const category of categories) {
     try {
-      await db.googleTaxonomy.upsert({
+      const result = await db.googleTaxonomy.upsert({
         where: { categoryId: category.categoryId },
         update: {
           categoryPath: category.categoryPath,
@@ -67,11 +72,15 @@ async function seedGoogleTaxonomy() {
           isActive: true,
         },
       });
-      console.log(`✅ Created/Updated: ${category.categoryPath}`);
+      console.log(`✅ Created/Updated: ${category.categoryPath} (ID: ${result.categoryId})`);
     } catch (error) {
       console.error(`❌ Failed to create ${category.categoryPath}:`, error);
     }
   }
+
+  // Check final count
+  const finalCount = await db.googleTaxonomy.count();
+  console.log(`📊 Final categories: ${finalCount}`);
 
   console.log("🎉 Google Product Taxonomy seeding complete!");
 }
