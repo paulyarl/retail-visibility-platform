@@ -18,9 +18,11 @@ import {
   MapPin
 } from 'lucide-react';
 import SettingsFooter from '@/components/SettingsFooter';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { settings } = usePlatformSettings();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -59,9 +61,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 )}
               </button>
               
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Rocket className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-              </div>
+              {settings?.logoUrl ? (
+                <img 
+                  src={settings.logoUrl} 
+                  alt={settings.platformName || 'Platform Logo'} 
+                  className="h-8 sm:h-10 w-auto object-contain"
+                />
+              ) : (
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Rocket className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                </div>
+              )}
               <div>
                 <h1 className="text-base sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   Platform Admin
