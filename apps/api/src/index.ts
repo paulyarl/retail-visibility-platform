@@ -404,6 +404,8 @@ const tenantProfileSchema = z.object({
     .optional(),
   contact_person: z.string().optional(),
   logo_url: z.string().url().optional().or(z.literal('')),
+  banner_url: z.string().url().optional().or(z.literal('')),
+  business_description: z.string().optional(),
   hours: z.any().optional(),
   social_links: z.any().optional(),
   seo_tags: z.any().optional(),
