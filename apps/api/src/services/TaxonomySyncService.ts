@@ -19,7 +19,7 @@ export class TaxonomySyncService {
       const latestTaxonomy = await this.googleService.fetchLatestTaxonomy();
       const currentTaxonomy = await this.getCurrentTaxonomy();
 
-      const changes = this.detectChanges(currentTaxonomy, latestTaxonomy);
+      const changes = this.detectChanges(currentTaxonomy, latestTaxonomy.categories);
 
       return {
         hasUpdates: changes.length > 0,
