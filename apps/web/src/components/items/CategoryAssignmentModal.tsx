@@ -7,6 +7,7 @@ interface GoogleCategory {
   name: string;
   path: string[];
   fullPath: string;
+  children?: GoogleCategory[];
 }
 
 interface CategoryAssignmentModalProps {
