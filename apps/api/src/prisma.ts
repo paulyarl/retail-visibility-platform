@@ -3,24 +3,10 @@ import { PrismaClient } from '@prisma/client';
 // Ensure a single PrismaClient in dev (nodemon hot reload safe)
 const globalForPrisma = global as unknown as { prisma?: PrismaClient };
 
-// Build database URL with SSL configuration for production
+// Use DATABASE_URL directly without modification
+// SSL and connection params should be set in the environment variable itself
 const getDatabaseUrl = () => {
-  const baseUrl = process.env.DATABASE_URL || '';
-  
-  // In production, ensure SSL parameters are set correctly for Supabase
-  if (process.env.NODE_ENV === 'production') {
-    const url = new URL(baseUrl);
-    // Remove any existing SSL params
-    url.searchParams.delete('sslmode');
-    url.searchParams.delete('sslaccept');
-    // Add correct SSL params for Supabase
-    url.searchParams.set('sslmode', 'require');
-    // Note: sslaccept is not a standard PostgreSQL parameter
-    // Instead, we rely on NODE_TLS_REJECT_UNAUTHORIZED or proper cert handling
-    return url.toString();
-  }
-  
-  return baseUrl;
+  return process.env.DATABASE_URL || '';
 };
 
 // Configure Prisma with connection pooling and retry logic
