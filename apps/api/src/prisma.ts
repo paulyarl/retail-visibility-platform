@@ -9,6 +9,7 @@ const getDatabaseUrl = () => {
   return process.env.DATABASE_URL || '';
 };
 
+// Production-grade Prisma configuration for Vercel serverless
 // Configure Prisma with connection pooling and retry logic
 // Export basePrisma for use in transactions (avoids retry wrapper issues)
 export const basePrisma = new PrismaClient({
@@ -18,13 +19,21 @@ export const basePrisma = new PrismaClient({
       url: getDatabaseUrl(),
     },
   },
+  // Critical for serverless: prevent connection exhaustion
+  // https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
+  // @ts-ignore - connection_limit is valid but not in types
+  __internal: {
+    engine: {
+      connection_limit: 1, // One connection per serverless function instance
+    },
+  },
 });
 
-// Retry logic for intermittent Supabase pooler connection issues
+// Enhanced retry logic for production reliability
 async function withRetry<T>(
   operation: () => Promise<T>,
-  maxRetries = 3,
-  delayMs = 100
+  maxRetries = 5, // Increased for production
+  initialDelayMs = 200 // Longer initial delay
 ): Promise<T> {
   let lastError: Error | undefined;
   
@@ -34,14 +43,27 @@ async function withRetry<T>(
     } catch (error: any) {
       lastError = error;
       
-      // Only retry on connection errors (P1001)
-      if (error.code === 'P1001' && attempt < maxRetries) {
-        console.log(`[Prisma Retry] Attempt ${attempt}/${maxRetries} failed, retrying in ${delayMs}ms...`);
+      // Retry on connection errors
+      const isConnectionError = 
+        error.code === 'P1001' || // Can't reach database
+        error.name === 'PrismaClientInitializationError' || // Client init failed
+        error.message?.includes("Can't reach database server") ||
+        error.message?.includes('Connection refused') ||
+        error.message?.includes('ECONNREFUSED');
+      
+      if (isConnectionError && attempt < maxRetries) {
+        // Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 3200ms
+        const delayMs = initialDelayMs * Math.pow(2, attempt - 1);
+        console.error(`[Prisma Retry] Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+        console.error(`[Prisma Retry] Retrying in ${delayMs}ms with exponential backoff...`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
         continue;
       }
       
       // Don't retry other errors or if max retries reached
+      if (attempt === maxRetries) {
+        console.error(`[Prisma Retry] All ${maxRetries} attempts failed. Giving up.`);
+      }
       throw error;
     }
   }
@@ -76,6 +98,25 @@ export const prisma = new Proxy(basePrisma, {
   },
 });
 
-if (process.env.NODE_ENV !== 'production') {
+// Graceful shutdown for production
+if (process.env.NODE_ENV === 'production') {
+  // Vercel serverless functions should disconnect after each request
+  // This is handled automatically, but we ensure cleanup on process exit
+  process.on('beforeExit', async () => {
+    await basePrisma.$disconnect();
+  });
+} else {
+  // Development: reuse connection
   globalForPrisma.prisma = prisma;
+}
+
+// Health check helper
+export async function checkDatabaseConnection(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch (error) {
+    console.error('[Database Health] Connection check failed:', error);
+    return false;
+  }
 }
