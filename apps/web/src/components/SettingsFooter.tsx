@@ -12,7 +12,7 @@ export default function SettingsFooter() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4 text-sm text-neutral-600">
-            <span>© {currentYear} {settings?.platformName || 'RVP'}</span>
+            <span>© {currentYear} {settings?.platformName || 'Visible Shell'}</span>
             <span className="hidden sm:inline">•</span>
             <span className="text-xs bg-neutral-100 px-2 py-1 rounded">v3.5.0</span>
           </div>

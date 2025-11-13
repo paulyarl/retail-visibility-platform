@@ -214,7 +214,7 @@ export class BarcodeEnrichmentService {
   private async enrichFromOpenFoodFacts(barcode: string): Promise<EnrichmentResult | null> {
     const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`, {
       headers: {
-        'User-Agent': 'RVP-Scanner/1.0',
+        'User-Agent': 'VisibleShell-Scanner/1.0',
         'Accept': 'application/json',
       },
       signal: AbortSignal.timeout(5000), // 5 second timeout

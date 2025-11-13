@@ -387,18 +387,18 @@ PROBLEMS CAUGHT
 
 ## Feature Access Matrix
 
-| Feature | VIEWER | MEMBER | MANAGER | ADMIN | OWNER | PLATFORM |
-|---------|--------|--------|---------|-------|-------|----------|
-| View Products | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Edit Products | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Scan Barcodes | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Bulk Upload | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ |
-| Quick Start | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ |
-| Propagation | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ |
-| Team Management | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ |
-| Billing | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ |
-| Delete Tenant | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ (ADMIN) |
-| Platform Admin | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ (ADMIN only) |
+| Feature           | VIEWER    | MEMBER    | MANAGER   | ADMIN | OWNER | PLATFORM  |
+|---------  ----    |---------|---------|---------|-------|-------|----------|
+| View Products     | ✓        | ✓      | ✓       | ✓     | ✓     | ✓        |
+| Edit Products     | ✗        | ✓      | ✓       | ✓     | ✓     | ✓        |
+| Scan Barcodes     | ✗        | ✓      | ✓       | ✓     | ✓     | ✓        |
+| Bulk Upload       | ✗        | ✗      | ✓       | ✓     | ✓     | ✓        |
+| Quick Start       | ✗        | ✗      | ✓       | ✓     | ✓     | ✓        |
+| Propagation       | ✗        | ✗      | ✓       | ✓     | ✓     | ✓        |
+| Team Management   | ✗        | ✗      | ✗       | ✓     | ✓     | ✓        |
+| Billing           | ✗        | ✗      | ✗       | ✗     | ✓     | ✓        |
+| Delete Tenant     | ✗        | ✗      | ✗       | ✗     | ✓     | ✓ (ADMIN) |
+| Platform Admin    | ✗        | ✗      | ✗       | ✗     | ✗     | ✓ (ADMIN only) |
 
 ---
 

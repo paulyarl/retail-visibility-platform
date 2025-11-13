@@ -11,8 +11,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Retail Visibility MVP",
-  description: "Inventory visibility for local retailers (Admin + Storefront)",
+  title: "Visible Shelf",
+  description: "Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
