@@ -785,79 +785,108 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
     const { tenant_id, ...delta } = parsed.data;
-    console.log('[PATCH /tenant/profile] Delta:', JSON.stringify(delta, null, 2));
     const existingTenant = await prisma.tenant.findUnique({ where: { id: tenant_id } });
     if (!existingTenant) return res.status(404).json({ error: "tenant_not_found" });
 
-    const updated = await prisma.tenantBusinessProfile.upsert({
-      where: { tenantId: tenant_id },
-      create: {
-        tenantId: tenant_id,
-        businessName: delta.business_name || existingTenant.name,
-        addressLine1: delta.address_line1 || "",
-        city: delta.city || "",
-        postalCode: delta.postal_code || "",
-        countryCode: (delta.country_code || "US").toUpperCase(),
-        addressLine2: delta.address_line2 ?? null,
-        state: delta.state ?? null,
-        phoneNumber: delta.phone_number ?? null,
-        email: delta.email ?? null,
-        website: delta.website ?? null,
-        contactPerson: delta.contact_person ?? null,
-        logoUrl: delta.logo_url ?? null,
-        bannerUrl: delta.banner_url ?? null,
-        businessDescription: delta.business_description ?? null,
-        hours: (delta as any).hours ?? null,
-        socialLinks: (delta as any).social_links ?? null,
-        seoTags: (delta as any).seo_tags ?? null,
-        latitude: (delta as any).latitude ?? null,
-        longitude: (delta as any).longitude ?? null,
-        displayMap: (delta as any).display_map ?? false,
-        mapPrivacyMode: (delta as any).map_privacy_mode ?? 'precise',
-      },
-      update: {
-        businessName: delta.business_name ?? undefined,
-        addressLine1: delta.address_line1 ?? undefined,
-        addressLine2: delta.address_line2 ?? undefined,
-        city: delta.city ?? undefined,
-        state: delta.state ?? undefined,
-        postalCode: delta.postal_code ?? undefined,
-        countryCode: delta.country_code ? delta.country_code.toUpperCase() : undefined,
-        phoneNumber: delta.phone_number ?? undefined,
-        email: delta.email ?? undefined,
-        website: delta.website ?? undefined,
-        contactPerson: delta.contact_person ?? undefined,
-        logoUrl: 'logo_url' in delta ? (delta.logo_url === '' ? null : delta.logo_url) : undefined,
-        bannerUrl: 'banner_url' in delta ? (delta.banner_url === '' ? null : delta.banner_url) : undefined,
-        businessDescription: delta.business_description ?? undefined,
-        hours: (delta as any).hours ?? undefined,
-        socialLinks: (delta as any).social_links ?? undefined,
-        seoTags: (delta as any).seo_tags ?? undefined,
-        latitude: (delta as any).latitude ?? undefined,
-        longitude: (delta as any).longitude ?? undefined,
-        displayMap: (delta as any).display_map ?? undefined,
-        mapPrivacyMode: (delta as any).map_privacy_mode ?? undefined,
-      },
-    });
+    // Use raw SQL instead of Prisma client since it doesn't recognize the new table
+    // Import basePrisma to bypass retry wrapper
+    const { basePrisma } = await import('./prisma');
+    
+    // Check if profile exists
+    const existingProfiles = await basePrisma.$queryRaw`
+      SELECT tenant_id FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
+    `;
 
-    if (delta.business_name) {
+    let result;
+    if ((existingProfiles as any[]).length > 0) {
+      // Update existing profile - build dynamic update query
+      const updateParts = [];
+      const values = [];
+
+      Object.entries(delta).forEach(([key, value]) => {
+        if (value !== undefined) {
+          updateParts.push(`"${key}" = $${values.length + 1}`);
+          values.push(value === '' ? null : value);
+        }
+      });
+
+      if (updateParts.length > 0) {
+        updateParts.push(`updated_at = CURRENT_TIMESTAMP`);
+        values.push(tenant_id); // Add tenant_id at the end
+        const updateQuery = `
+          UPDATE "TenantBusinessProfile"
+          SET ${updateParts.join(', ')}
+          WHERE tenant_id = $${values.length}
+        `;
+        await basePrisma.$executeRawUnsafe(updateQuery, ...values);
+      }
+
+      // Get updated profile
+      result = await basePrisma.$queryRaw`
+        SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
+      `;
+    } else {
+      // Create new profile
+      const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
+      const insertValues = [
+        tenant_id,
+        delta.business_name || existingTenant.name,
+        delta.address_line1 || '',
+        delta.city || '',
+        delta.postal_code || '',
+        (delta.country_code || 'US').toUpperCase()
+      ];
+
+      // Add optional fields
+      const optionalMappings = {
+        address_line2: delta.address_line2,
+        state: delta.state,
+        phone_number: delta.phone_number,
+        email: delta.email,
+        website: delta.website,
+        contact_person: delta.contact_person,
+        logo_url: delta.logo_url,
+        banner_url: delta.banner_url,
+        business_description: delta.business_description,
+      };
+
+      Object.entries(optionalMappings).forEach(([field, value]) => {
+        if (value !== undefined) {
+          insertFields.push(field);
+          insertValues.push(value === '' ? null : (value as any));
+        }
+      });
+
+      const placeholders = insertFields.map((_, i) => `$${i + 1}`);
+      const insertQuery = `
+        INSERT INTO "TenantBusinessProfile" (${insertFields.map(f => `"${f}"`).join(', ')})
+        VALUES (${placeholders.join(', ')})
+        RETURNING *
+      `;
+
+      result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
+        basePrisma.$queryRaw`SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}`
+      );
+    }
+
+    // Update tenant name if business_name changed
+    if (delta.business_name && typeof delta.business_name === 'string' && delta.business_name.trim()) {
       await prisma.tenant.update({ where: { id: tenant_id }, data: { name: delta.business_name } });
     }
 
-    // Also clear logo_url from tenant metadata if it's being removed
+    // Handle logo_url clearing from tenant metadata
     if ('logo_url' in delta && delta.logo_url === '') {
       const currentMetadata = (existingTenant.metadata as any) || {};
       if (currentMetadata.logo_url) {
         delete currentMetadata.logo_url;
-        await prisma.tenant.update({ 
-          where: { id: tenant_id }, 
-          data: { metadata: currentMetadata } 
+        await prisma.tenant.update({
+          where: { id: tenant_id },
+          data: { metadata: currentMetadata }
         });
       }
     }
 
-    console.log('[PATCH /tenant/profile] Updated logoUrl:', updated.logoUrl);
-    return res.json(updated);
+    return res.json((result as any)[0] || result);
   } catch (e: any) {
     console.error("[PATCH /tenant/profile] Error:", e);
     return res.status(500).json({ error: "failed_to_update_profile" });
