@@ -583,6 +583,8 @@ model TenantBusinessProfile {
   website        String?
   contactPerson  String?  @map("contact_person")
   logoUrl        String?  @map("logo_url")
+  bannerUrl      String?  @map("banner_url")
+  businessDescription String?  @map("business_description")
   hours          Json?
   socialLinks    Json?    @map("social_links")
   seoTags        Json?    @map("seo_tags")
