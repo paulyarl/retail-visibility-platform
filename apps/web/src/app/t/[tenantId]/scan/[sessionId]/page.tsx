@@ -142,6 +142,29 @@ export default function TenantActiveScanPage() {
     }
   };
 
+  const handleEnrichmentEdit = async (field: string, value: any) => {
+    if (!selectedResult || !session || session.status !== 'active') {
+      return;
+    }
+
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const response = await api.patch(`${apiBaseUrl}/api/scan/${sessionId}/results/${selectedResult.id}/enrichment`, {
+        [field]: value,
+      });
+
+      if (response.ok) {
+        // Reload session to get updated enrichment data
+        await loadSession();
+      } else {
+        alert('Failed to update enrichment data');
+      }
+    } catch (error) {
+      console.error('Failed to update enrichment:', error);
+      alert('Failed to update enrichment data');
+    }
+  };
+
   const handleCommit = async () => {
     if (!session || session.status !== 'active') {
       alert('Session is not active');
@@ -268,6 +291,8 @@ export default function TenantActiveScanPage() {
                   }] : []),
                 ]}
                 isLoading={scanning && selectedResult.barcode === selectedResult.barcode}
+                editable={session.status === 'active'}
+                onEdit={handleEnrichmentEdit}
               />
             )}
           </div>

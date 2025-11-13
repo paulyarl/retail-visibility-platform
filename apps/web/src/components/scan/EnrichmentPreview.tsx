@@ -1,6 +1,8 @@
 'use client';
 
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
+import { useState } from 'react';
+import CategorySelector from '@/components/items/CategorySelector';
 
 interface EnrichmentData {
   name?: string;
@@ -37,8 +39,7 @@ export default function EnrichmentPreview({
   onEdit,
   editable = false,
 }: EnrichmentPreviewProps) {
-  const hasErrors = validation.some(v => v.severity === 'error');
-  const hasWarnings = validation.some(v => v.severity === 'warning');
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -53,29 +54,15 @@ export default function EnrichmentPreview({
     }
   };
 
-  const getSeverityIcon = (severity: string) => {
-    switch (severity) {
-      case 'error':
-        return (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
-      case 'warning':
-        return (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        );
-      case 'info':
-        return (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
-      default:
-        return null;
+  const handleCategorySelect = (categoryPath: string[]) => {
+    if (onEdit) {
+      onEdit('categoryPath', categoryPath);
     }
+    setShowCategorySelector(false);
+  };
+
+  const handleCategoryCancel = () => {
+    setShowCategorySelector(false);
   };
 
   return (
@@ -215,19 +202,58 @@ export default function EnrichmentPreview({
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                   Category {!enrichment?.categoryPath?.length && <span className="text-red-500">*</span>}
                 </label>
-                {enrichment?.categoryPath && enrichment.categoryPath.length > 0 ? (
-                  <div className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                    <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                    <span>{enrichment.categoryPath.join(' > ')}</span>
-                    <Badge variant="success" className="text-xs">Suggested</Badge>
+                {editable && onEdit ? (
+                  <div className="space-y-2">
+                    {enrichment?.categoryPath && enrichment.categoryPath.length > 0 ? (
+                      <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                        <div className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                          <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                          <span>{enrichment.categoryPath.join(' > ')}</span>
+                          <Badge variant="success" className="text-xs">Assigned</Badge>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowCategorySelector(true)}
+                          className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowCategorySelector(true)}
+                        className="w-full p-3 text-left border-2 border-dashed border-yellow-300 dark:border-yellow-600 rounded-lg hover:border-yellow-400 dark:hover:border-yellow-500 transition-colors bg-yellow-50 dark:bg-yellow-900/20"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Assign Category</p>
+                            <p className="text-xs text-yellow-700 dark:text-yellow-300">Required before committing this item</p>
+                          </div>
+                          <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  <div className="text-sm text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                    <p className="font-medium">Category Required</p>
-                    <p className="text-xs mt-1">Please assign a category before committing this item.</p>
-                  </div>
+                  enrichment?.categoryPath && enrichment.categoryPath.length > 0 ? (
+                    <div className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                      <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      <span>{enrichment.categoryPath.join(' > ')}</span>
+                      <Badge variant="success" className="text-xs">Suggested</Badge>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                      <p className="font-medium">Category Required</p>
+                      <p className="text-xs mt-1">Please assign a category before committing this item.</p>
+                    </div>
+                  )
                 )}
               </div>
 
@@ -289,6 +315,35 @@ export default function EnrichmentPreview({
           )}
         </div>
       </CardContent>
+
+      {/* Category Selector Modal */}
+      {showCategorySelector && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
+              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
+                Select Category
+              </h3>
+              <button
+                onClick={handleCategoryCancel}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <CategorySelector
+                currentCategory={enrichment?.categoryPath || []}
+                onCategorySelect={handleCategorySelect}
+                onCancel={handleCategoryCancel}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

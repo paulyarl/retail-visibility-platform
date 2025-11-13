@@ -1100,4 +1100,59 @@ async function validateScanResults(results: any[], template: any): Promise<{ val
   };
 }
 
+// PATCH /api/scan/:sessionId/results/:resultId/enrichment - Update enrichment data
+router.patch('/api/scan/:sessionId/results/:resultId/enrichment', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { sessionId, resultId } = req.params;
+    const updates = req.body;
+
+    // Validate updates (only allow specific fields)
+    const allowedFields = ['name', 'brand', 'description', 'categoryPath'];
+    const filteredUpdates: any = {};
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        filteredUpdates[field] = updates[field];
+      }
+    }
+
+    if (Object.keys(filteredUpdates).length === 0) {
+      return res.status(400).json({ success: false, error: 'no_valid_updates' });
+    }
+
+    // Get result with session
+    const result = await prisma.scanResult.findUnique({
+      where: { id: resultId },
+      include: { session: true },
+    });
+
+    if (!result || result.sessionId !== sessionId) {
+      return res.status(404).json({ success: false, error: 'result_not_found' });
+    }
+
+    if (result.session.status !== 'active') {
+      return res.status(400).json({ success: false, error: 'session_not_active' });
+    }
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, result.tenantId)) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Update enrichment data
+    const currentEnrichment = result.enrichment as any || {};
+    const updatedEnrichment = { ...currentEnrichment, ...filteredUpdates };
+
+    await prisma.scanResult.update({
+      where: { id: resultId },
+      data: { enrichment: updatedEnrichment },
+    });
+
+    return res.json({ success: true, enrichment: updatedEnrichment });
+  } catch (error: any) {
+    console.error('[scan/:sessionId/results/:resultId/enrichment PATCH] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
 export default router;
