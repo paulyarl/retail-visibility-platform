@@ -1774,6 +1774,11 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
   try {
     const { q: query, limit = '10' } = req.query;
 
+    // Disable caching for search results
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
     if (!query || typeof query !== 'string') {
       return res.status(400).json({ error: 'Query parameter required' });
     }
@@ -1784,13 +1789,29 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
       where: {
         isActive: true,
         OR: [
-          { categoryPath: { contains: lowerQuery, mode: 'insensitive' } },
-          { categoryId: { contains: lowerQuery } }
+          { categoryPath: { contains: query } }, // Try case-sensitive first
+          { categoryId: { contains: query } }
         ]
       },
       take: parseInt(limit as string, 10),
       orderBy: { categoryPath: 'asc' }
     });
+
+    // If no results with case-sensitive, try case-insensitive approach
+    if (categories.length === 0) {
+      const caseInsensitiveCategories = await prisma.googleTaxonomy.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { categoryPath: { contains: lowerQuery } },
+            { categoryId: { contains: lowerQuery } }
+          ]
+        },
+        take: parseInt(limit as string, 10),
+        orderBy: { categoryPath: 'asc' }
+      });
+      categories.push(...caseInsensitiveCategories);
+    }
 
     const results = categories.map(cat => ({
       id: cat.categoryId,
@@ -2417,10 +2438,67 @@ app.use('/admin', authenticateToken, adminUsersRoutes);
 app.use('/api/admin', authenticateToken, adminUsersRoutes);
 app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
 app.use('/api', feedValidationRoutes);
-app.use('/api', businessProfileValidationRoutes);
-app.use('/api', businessHoursRoutes);
-app.use(testGbpRoutes); // Test endpoint for GBP API verification
-app.use('/auth', googleBusinessOAuthRoutes); // Google Business Profile OAuth flow
+/* ------------------------------ TAXONOMY ADMIN API ------------------------------ */
+
+// GET /api/admin/taxonomy/status - Check taxonomy sync status
+app.get('/api/admin/taxonomy/status', requireAdmin, async (req, res) => {
+  try {
+    const { TaxonomySyncService } = await import('./services/TaxonomySyncService');
+    const syncService = new TaxonomySyncService();
+
+    const status = await syncService.checkForUpdates();
+
+    // Get current taxonomy version
+    const currentVersion = await prisma.googleTaxonomy.findFirst({
+      select: { version: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      currentVersion: currentVersion?.version || 'unknown',
+      latestVersion: status.latestVersion,
+      hasUpdates: status.hasUpdates,
+      changeCount: status.changes.length,
+      lastChecked: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Taxonomy Status] Error:', error);
+    res.status(500).json({ error: 'Failed to check taxonomy status' });
+  }
+});
+
+// POST /api/admin/taxonomy/sync - Manually trigger taxonomy sync
+app.post('/api/admin/taxonomy/sync', requireAdmin, async (req, res) => {
+  try {
+    const { TaxonomySyncService } = await import('./services/TaxonomySyncService');
+    const syncService = new TaxonomySyncService();
+
+    const status = await syncService.checkForUpdates();
+
+    if (!status.hasUpdates) {
+      return res.json({
+        success: true,
+        message: 'Taxonomy is already up to date',
+        changes: []
+      });
+    }
+
+    const migrationResult = await syncService.applySafeUpdates(status.changes);
+    const itemMigration = await syncService.migrateAffectedItems(status.changes);
+
+    res.json({
+      success: true,
+      message: `Applied ${migrationResult.applied} updates, ${migrationResult.needsReview} need review`,
+      applied: migrationResult.applied,
+      needsReview: migrationResult.needsReview,
+      migratedItems: itemMigration.migrated,
+      flaggedItems: itemMigration.flagged
+    });
+  } catch (error) {
+    console.error('[Taxonomy Sync] Error:', error);
+    res.status(500).json({ error: 'Taxonomy sync failed' });
+  }
+});
 app.use('/admin', authenticateToken, platformFlagsRoutes);
 app.use('/api/admin', authenticateToken, platformFlagsRoutes);
 // Effective flags: middleware applied per-route (admin for platform, tenant access for tenant)
@@ -2554,37 +2632,47 @@ if (process.env.NODE_ENV !== "test") {
 export default app;
 export { app };
 
-/* ------------------------------ GBP Hours runner (flag-gated) ------------------------------ */
+/* ------------------------------ TAXONOMY SYNC JOB ------------------------------ */
 
-(async function startGbpHoursRunner(){
-  const enabled = String(process.env.FF_TENANT_GBP_HOURS_SYNC || '').toLowerCase() === 'true'
-  if (!enabled) return
-  let running = false
+(async function startTaxonomySyncJob(){
+  const enabled = String(process.env.FF_TAXONOMY_AUTO_SYNC || 'true').toLowerCase() === 'true';
+  if (!enabled) {
+    console.log('📋 Taxonomy sync job disabled');
+    return;
+  }
+
+  console.log('📋 Taxonomy sync job enabled - checking weekly');
+
+  // Check for updates every 7 days (604800000 ms)
   setInterval(async () => {
-    if (running) return
-    running = true
     try {
-      // pick one queued job
-      const job = await prisma.syncJob.findFirst({
-        where: { target: 'gbp_hours', status: 'queued' },
-        orderBy: { createdAt: 'asc' },
-      })
-      if (!job) return
+      console.log('🔄 Checking for Google taxonomy updates...');
 
-      // mark processing
-      await prisma.syncJob.update({ where: { id: job.id }, data: { status: 'processing', attempt: (job.attempt || 0) + 1, lastError: null } })
+      const { TaxonomySyncService } = await import('./services/TaxonomySyncService');
+      const syncService = new TaxonomySyncService();
 
-      const result = await runGbpHoursSync({ tenantId: job.tenantId })
-      if ((result as any)?.ok) {
-        await prisma.syncJob.update({ where: { id: job.id }, data: { status: 'success' } })
+      const result = await syncService.checkForUpdates();
+
+      if (result.hasUpdates) {
+        console.log(`📈 Found ${result.changes.length} taxonomy changes for version ${result.latestVersion}`);
+
+        // Apply safe updates automatically
+        const migrationResult = await syncService.applySafeUpdates(result.changes);
+        console.log(`✅ Applied ${migrationResult.applied} safe updates, ${migrationResult.needsReview} need review`);
+
+        // Migrate affected items
+        const itemMigration = await syncService.migrateAffectedItems(result.changes);
+        console.log(`🔄 Migrated ${itemMigration.migrated} items, flagged ${itemMigration.flagged} for review`);
+
+        // TODO: Send admin notification for manual review items
+        if (migrationResult.needsReview > 0 || itemMigration.flagged > 0) {
+          console.log('⚠️  Manual review required - check admin dashboard');
+        }
       } else {
-        const attempt = (job.attempt || 0) + 1
-        await prisma.syncJob.update({ where: { id: job.id }, data: { status: 'queued', attempt, lastError: String((result as any)?.error || 'unknown') } })
+        console.log('✅ Taxonomy is up to date');
       }
-    } catch (e) {
-      // swallow
-    } finally {
-      running = false
+    } catch (error) {
+      console.error('❌ Taxonomy sync job failed:', error);
     }
-  }, 5000)
-})()
+  }, 7 * 24 * 60 * 60 * 1000); // 7 days
+})();

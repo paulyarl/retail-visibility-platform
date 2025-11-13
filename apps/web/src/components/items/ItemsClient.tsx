@@ -222,23 +222,10 @@ export default function ItemsClient({
     }
   };
 
-  const handleCategoryAssign = async (itemId: string, categoryId: string, categoryName: string) => {
+  const handleCategoryAssign = async (itemId: string, categoryId: string, categoryPath: string[]) => {
     try {
-      // Send the mock category ID as categorySlug (e.g., "2-2" for Pants)
-      const response = await fetch(`/api/v1/tenants/${initialTenantId}/items/${itemId}/category`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          categorySlug: categoryId, // Send the mock ID like "2-2"
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to assign category');
-      }
+      // Update the item with the new category path
+      await updateItem(itemId, { categoryPath });
 
       closeCategoryModal();
       refresh(); // Refresh the items list
