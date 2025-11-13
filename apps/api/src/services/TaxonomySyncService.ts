@@ -74,7 +74,7 @@ export class TaxonomySyncService {
       if (migrationResult.success) {
         migrated++;
       } else {
-        await this.flagItemForReview(item.id, migrationResult.reason);
+        await this.flagItemForReview(item.id, migrationResult.reason || 'Category migration failed');
         flagged++;
       }
     }
