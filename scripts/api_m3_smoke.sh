@@ -2,14 +2,14 @@
 # Simple Git Bash/Unix smoke test for M3 category endpoints
 # Usage:
 #   export TOKEN='YOUR_ADMIN_JWT'
-#   export BASE_URL='https://visibleshelfstaging.up.railway.app'
+#   export BASE_URL='https://aps.visibleshelf.store'
 #   export TENANT_ID='tenant_...' # optional for tenant/mirror tests
 #   bash scripts/api_m3_smoke.sh
 
 set -euo pipefail
 
 : "${TOKEN:?TOKEN env is required}"
-BASE_URL="${BASE_URL:-https://visibleshelfstaging.up.railway.app}"
+BASE_URL="${BASE_URL:-https://aps.visibleshelf.store}"
 TENANT_ID="${TENANT_ID:-}"
 
 hr() { printf '%*s\n' "$(tput cols 2>/dev/null || echo 80)" '' | tr ' ' '-'; }

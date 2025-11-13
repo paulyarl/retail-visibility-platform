@@ -4,7 +4,7 @@
  */
 
 const tenantId = process.argv[2] || 'chain_location_1762183000976_0';
-const apiUrl = process.env.API_URL || 'http://localhost:3001';
+const apiUrl = process.env.API_URL || 'http://localhost:4000';
 
 async function syncAvailability() {
   try {

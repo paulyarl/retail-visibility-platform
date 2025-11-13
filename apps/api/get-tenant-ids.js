@@ -12,7 +12,7 @@ async function getTenantIds() {
   tenants.forEach(t => {
     console.log(`${t.name}:`);
     console.log(`  ID: ${t.id}`);
-    console.log(`  Quick Start: https://retail-visibility-platform-web-git-staging-paul-yarls-projects.vercel.app/t/${t.id}/quick-start\n`);
+    console.log(`  Quick Start: https://visibleshelf.store/t/${t.id}/quick-start\n`);
   });
 
   await prisma.$disconnect();

@@ -1,6 +1,6 @@
 # Simple Propagation Test Runner
 param(
-    [string]$ApiBaseUrl = "https://visibleshelfstaging.up.railway.app",
+    [string]$ApiBaseUrl = "https://aps.visibleshelf.store",
     [string]$TenantId = "cmhm7fruk0002g8l401pm9nbq",
     [string]$AuthToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWhnenFtaWIwMDAwZzhhZzlrMnVoaDhlIiwiZW1haWwiOiJhZG1pbkBkZW1vLmxvY2FsIiwicm9sZSI6IkFETUlOIiwidGVuYW50SWRzIjpbXSwiaWF0IjoxNzYyMzk1NDYwLCJleHAiOjE3OTM5MzE0NjB9.Iq_wRnVxnpQXXMo9k34X8TLZhkFYR6cgWh0FbDiVq4A"
 )

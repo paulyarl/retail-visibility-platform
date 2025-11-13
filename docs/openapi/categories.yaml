@@ -3,7 +3,7 @@ info:
   title: RVP Categories and Mirror API
   version: 0.1.0
 servers:
-  - url: https://visibleshelfstaging.up.railway.app
+  - url: https://aps.visibleshelf.store
 paths:
   /api/platform/categories:
     get:
