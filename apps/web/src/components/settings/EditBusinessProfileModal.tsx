@@ -9,7 +9,7 @@ import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 interface EditBusinessProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  profile: BusinessProfile | null;
+  profile: BusinessProfile | Partial<BusinessProfile> | null;
   onSave?: (profile: BusinessProfile) => void;
 }
 

@@ -21,10 +21,12 @@ export default function TenantBusinessProfilePage() {
   );
   
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
+  const [tenantName, setTenantName] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadProfile();
+    loadTenantName();
   }, [tenantId]);
 
   const loadProfile = async () => {
@@ -40,6 +42,20 @@ export default function TenantBusinessProfilePage() {
       console.error('Failed to load profile:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTenantName = async () => {
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const response = await api.get(`${apiBaseUrl}/public/tenant/${encodeURIComponent(tenantId)}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTenantName(data.name || '');
+      }
+    } catch (error) {
+      console.error('Failed to load tenant name:', error);
     }
   };
 
@@ -80,6 +96,7 @@ export default function TenantBusinessProfilePage() {
           profile={profile} 
           loading={loading}
           onUpdate={handleUpdate}
+          tenantName={tenantName}
         />
       </div>
     </div>

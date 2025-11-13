@@ -10,9 +10,10 @@ interface BusinessProfileCardProps {
   profile: BusinessProfile | null;
   loading?: boolean;
   onUpdate?: (profile: BusinessProfile) => void;
+  tenantName?: string;
 }
 
-export default function BusinessProfileCard({ profile, loading, onUpdate }: BusinessProfileCardProps) {
+export default function BusinessProfileCard({ profile, loading, onUpdate, tenantName }: BusinessProfileCardProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   if (loading) {
@@ -63,7 +64,7 @@ export default function BusinessProfileCard({ profile, loading, onUpdate }: Busi
         <EditBusinessProfileModal
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          profile={null}
+          profile={tenantName ? { business_name: tenantName } as Partial<BusinessProfile> : null}
           onSave={onUpdate}
         />
       </Card>
