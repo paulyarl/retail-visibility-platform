@@ -2597,6 +2597,47 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);
 
+/* ------------------------------ GBP Categories ------------------------------ */
+// GET /api/gbp/categories/popular - Get popular retail categories
+app.get("/api/gbp/categories/popular", async (req, res) => {
+  try {
+    // Hardcoded popular retail categories based on common use cases
+    const popularCategories = [
+      // Food & Beverage
+      { id: "gcid:grocery_store", name: "Grocery store", path: ["Shopping", "Food & Beverage"] },
+      { id: "gcid:convenience_store", name: "Convenience store", path: ["Shopping", "Food & Beverage"] },
+      { id: "gcid:supermarket", name: "Supermarket", path: ["Shopping", "Food & Beverage"] },
+      { id: "gcid:liquor_store", name: "Liquor store", path: ["Shopping", "Food & Beverage"] },
+      { id: "gcid:specialty_food_store", name: "Specialty food store", path: ["Shopping", "Food & Beverage"] },
+      
+      // General Retail
+      { id: "gcid:clothing_store", name: "Clothing store", path: ["Shopping", "Apparel"] },
+      { id: "gcid:shoe_store", name: "Shoe store", path: ["Shopping", "Apparel"] },
+      { id: "gcid:electronics_store", name: "Electronics store", path: ["Shopping", "Electronics"] },
+      { id: "gcid:furniture_store", name: "Furniture store", path: ["Shopping", "Home & Garden"] },
+      { id: "gcid:hardware_store", name: "Hardware store", path: ["Shopping", "Home & Garden"] },
+      
+      // Health & Beauty
+      { id: "gcid:pharmacy", name: "Pharmacy", path: ["Health", "Pharmacy"] },
+      { id: "gcid:beauty_supply_store", name: "Beauty supply store", path: ["Shopping", "Beauty & Spa"] },
+      { id: "gcid:cosmetics_store", name: "Cosmetics store", path: ["Shopping", "Beauty & Spa"] },
+      { id: "gcid:health_and_beauty_shop", name: "Health and beauty shop", path: ["Shopping", "Beauty & Spa"] },
+      
+      // Specialty Stores
+      { id: "gcid:book_store", name: "Book store", path: ["Shopping", "Books & Media"] },
+      { id: "gcid:pet_store", name: "Pet store", path: ["Shopping", "Pets"] },
+      { id: "gcid:toy_store", name: "Toy store", path: ["Shopping", "Toys & Games"] },
+      { id: "gcid:sporting_goods_store", name: "Sporting goods store", path: ["Shopping", "Sports & Recreation"] },
+      { id: "gcid:gift_shop", name: "Gift shop", path: ["Shopping", "Gifts & Specialty"] },
+    ];
+
+    return res.json({ items: popularCategories });
+  } catch (error) {
+    console.error('[GET /api/gbp/categories/popular] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_popular_categories' });
+  }
+});
+
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
 
