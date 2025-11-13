@@ -83,18 +83,34 @@ router.post('/login', async (req: Request, res: Response) => {
     }
     
     if (error instanceof Error) {
+      // Database connection errors - critical for login
+      if (
+        error.name === 'PrismaClientInitializationError' ||
+        error.message?.includes("Can't reach database server") ||
+        error.message?.includes('Connection refused')
+      ) {
+        console.error('[Login Critical] Database connection failed:', error.message);
+        return res.status(503).json({
+          error: 'service_unavailable',
+          message: 'Authentication service is temporarily unavailable. Please try again in a moment.',
+        });
+      }
+      
       if (error.message.includes('Invalid email or password') || error.message.includes('deactivated')) {
         return res.status(401).json({
           error: 'authentication_failed',
           message: error.message,
         });
       }
+      
+      console.error('[Login Error]', error.message);
       return res.status(400).json({
         error: 'login_failed',
         message: error.message,
       });
     }
     
+    console.error('[Login Critical] Unexpected error:', error);
     res.status(500).json({
       error: 'internal_error',
       message: 'An unexpected error occurred',

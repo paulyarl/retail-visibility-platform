@@ -174,37 +174,8 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 app.use("/uploads", express.static(UPLOAD_DIR));
 
 /* ----------------------------- health ----------------------------- */
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
-
-// Database health check endpoint
-app.get("/health/db", async (_req, res) => {
-  try {
-    // Simple query to test database connection
-    await prisma.$queryRaw`SELECT 1 as test`;
-    
-    // Get connection info (without sensitive data)
-    const dbUrl = process.env.DATABASE_URL || '';
-    const hostname = dbUrl.match(/@([^:]+):/)?.[1] || 'unknown';
-    const port = dbUrl.match(/:(\d+)\//)?.[1] || 'unknown';
-    
-    res.json({ 
-      status: "ok",
-      database: "connected",
-      hostname,
-      port,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error: any) {
-    console.error('Database health check failed:', error);
-    res.status(503).json({ 
-      status: "error",
-      database: "disconnected",
-      error: error.message,
-      code: error.code,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
+import healthRoutes from './routes/health';
+app.use('/health', healthRoutes);
 
 /* ------------------------------ TENANTS ------------------------------ */
 app.get("/tenants", authenticateToken, async (req, res) => {
