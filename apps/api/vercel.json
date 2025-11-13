@@ -21,5 +21,7 @@
       "maxDuration": 30,
       "memory": 1024
     }
-  }
+  },
+  "framework": null,
+  "outputDirectory": null
 }
