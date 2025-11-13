@@ -110,15 +110,22 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      const response = await api.patch(`/api/tenants/${tenantId}/directory/listing`, {
+      // Convert empty strings to undefined for API
+      const requestData = {
         seo_description: updates.seoDescription,
         seo_keywords: updates.seoKeywords,
-        primary_category: updates.primaryCategory,
+        primary_category: updates.primaryCategory || undefined,
         secondary_categories: updates.secondaryCategories,
-      });
+      };
+      console.log('[updateSettings] Sending data:', requestData);
+      
+      const response = await api.patch(`/api/tenants/${tenantId}/directory/listing`, requestData);
 
       if (!response.ok) {
-        throw new Error('Failed to update listing');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error', message: `HTTP ${response.status}` }));
+        console.error('[updateSettings] Server error:', errorData);
+        const errorMessage = errorData.message || errorData.error || `Failed to update listing (HTTP ${response.status})`;
+        throw new Error(errorMessage);
       }
 
       await fetchListing();

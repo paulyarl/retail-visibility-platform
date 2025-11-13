@@ -97,13 +97,27 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
  * Update directory listing settings
  */
 router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  console.log('[PATCH /tenants/:id/directory/listing] ===== REQUEST RECEIVED =====');
+  console.log('[PATCH /tenants/:id/directory/listing] Tenant ID:', req.params.id);
+  console.log('[PATCH /tenants/:id/directory/listing] User:', req.user?.userId);
+  console.log('[PATCH /tenants/:id/directory/listing] Body:', JSON.stringify(req.body, null, 2));
+  console.log('[PATCH /tenants/:id/directory/listing] Headers:', {
+    'content-type': req.headers['content-type'],
+    'authorization': req.headers.authorization ? 'PRESENT' : 'MISSING',
+    'x-csrf-token': req.headers['x-csrf-token'] ? 'PRESENT' : 'MISSING',
+    'x-tenant-id': req.headers['x-tenant-id']
+  });
   try {
     const { id: tenantId } = req.params;
     const parsed = updateListingSchema.safeParse(req.body);
 
     if (!parsed.success) {
+      console.error('[PATCH /tenants/:id/directory/listing] Validation failed:', parsed.error.flatten());
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
+
+    console.log('[PATCH /tenants/:id/directory/listing] Validation passed. Parsed data:', JSON.stringify(parsed.data, null, 2));
+    console.log('[PATCH /tenants/:id/directory/listing] About to upsert...');
 
     const updated = await prisma.directorySettings.upsert({
       where: { tenantId },
@@ -123,9 +137,13 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
       },
     });
 
+    console.log('[PATCH /tenants/:id/directory/listing] Upsert completed successfully. Updated record:', JSON.stringify(updated, null, 2));
     return res.json(updated);
   } catch (error: any) {
-    console.error('[PATCH /tenants/:id/directory/listing] Error:', error);
+    console.error('[PATCH /tenants/:id/directory/listing] ===== ERROR =====');
+    console.error('[PATCH /tenants/:id/directory/listing] Error details:', error);
+    console.error('[PATCH /tenants/:id/directory/listing] Error message:', error.message);
+    console.error('[PATCH /tenants/:id/directory/listing] Error stack:', error.stack);
     return res.status(500).json({ error: 'failed_to_update_listing' });
   }
 });

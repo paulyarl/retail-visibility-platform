@@ -71,6 +71,50 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  
+  try {
+    const body = await request.json();
+    const authHeader = request.headers.get('authorization');
+    const csrfToken = request.headers.get('x-csrf-token');
+    const tenantId = request.headers.get('x-tenant-id');
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    if (csrfToken) {
+      headers['x-csrf-token'] = csrfToken;
+    }
+    if (tenantId) {
+      headers['x-tenant-id'] = tenantId;
+    }
+    
+    // Forward request to backend API
+    const response = await fetch(`${API_BASE_URL}/api/tenants/${id}/directory/listing`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(body),
+    });
+    
+    const data = await response.json();
+    
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('[Directory Listing PATCH Proxy] Error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update directory listing' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

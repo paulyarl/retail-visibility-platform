@@ -39,9 +39,12 @@ export function csrfProtect(req: Request, res: Response, next: NextFunction) {
   const cookieToken = getCookie(req, 'csrf');
   const headerToken = req.headers['x-csrf-token'] as string | undefined;
 
+  console.log('[CSRF] Method:', method, 'Enforce:', enforce, 'Cookie:', !!cookieToken, 'Header:', !!headerToken);
+  
   if (!enforce) return next();
 
   if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+    console.error('[CSRF] Token mismatch - Cookie:', cookieToken?.substring(0, 8), 'Header:', headerToken?.substring(0, 8));
     return res.status(403).json({ error: 'csrf_missing_or_invalid' });
   }
 
