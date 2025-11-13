@@ -106,7 +106,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       const itemRes = await api.get(`/api/items/${itemId}`);
       if (!itemRes.ok) throw new Error('Failed to load item');
       const itemData = await itemRes.json();
-      setItem(itemData);
+      
+      // Normalize the item data to match frontend expectations
+      const normalizedItem = {
+        ...itemData,
+        status: itemData.itemStatus || itemData.status || 'inactive',
+      };
+      
+      setItem(normalizedItem);
 
       // Fetch photos
       const photosRes = await api.get(`/api/items/${itemId}/photos`);

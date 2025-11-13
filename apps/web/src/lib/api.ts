@@ -4,7 +4,7 @@
  * Works with both Next.js API routes (/api/*) and direct backend calls
  */
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL;
 
 /**
  * Get access token from localStorage or cookies
@@ -71,8 +71,8 @@ export async function apiRequest(
   // - Absolute http(s): use as-is
   // - Leading '/': use as-is (hit Next.js API/proxy routes)
   // - Bare path: prefix with API_BASE_URL
-  const url = endpoint.startsWith('http') || endpoint.startsWith('/') 
-    ? endpoint 
+  const url = endpoint.startsWith('http') || endpoint.startsWith('/')
+    ? endpoint
     : `${API_BASE_URL}/${endpoint}`;
 
   // Simple retry/backoff for 429/5xx (max 2 retries)

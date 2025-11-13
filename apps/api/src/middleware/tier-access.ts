@@ -36,7 +36,7 @@ export const TIER_FEATURES = {
   professional: [
     // ⚠️ CRITICAL REVENUE-PROTECTING FEATURES
     'quick_start_wizard',       // Saves 400+ hours, worth $10K+
-    'product_scanning',          // Worth $375/mo in labor
+    'barcode_scan',          // Worth $375/mo in labor
     'gbp_integration',           // Worth $200-300/mo
     'custom_branding',
     'business_logo',
@@ -87,7 +87,7 @@ export const TIER_FEATURES = {
   ],
   chain_professional: [
     'quick_start_wizard',
-    'product_scanning',
+    'barcode_scan',
     'gbp_integration',
     'custom_branding',
     'qr_codes_1024',
@@ -125,7 +125,7 @@ const TIER_HIERARCHY: Record<string, string[]> = {
 const FEATURE_TIER_MAP: Record<string, string> = {
   // Professional tier features (CRITICAL)
   quick_start_wizard: 'professional',
-  product_scanning: 'professional',
+  barcode_scan: 'professional',
   gbp_integration: 'professional',
   custom_branding: 'professional',
   qr_codes_1024: 'professional',

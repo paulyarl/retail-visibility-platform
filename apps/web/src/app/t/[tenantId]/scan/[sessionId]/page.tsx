@@ -44,18 +44,7 @@ export default function TenantActiveScanPage() {
     if (sessionId) {
       loadSession();
     }
-
-    // Auto-cleanup: Cancel session when user navigates away (if still active)
-    return () => {
-      if (session?.status === 'active' && session.scannedCount === 0) {
-        // Only auto-cancel if no items were scanned
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        api.delete(`${apiBaseUrl}/api/scan/${sessionId}`).catch(() => {
-          // Silently fail - user is already navigating away
-        });
-      }
-    };
-  }, [sessionId, session?.status, session?.scannedCount]);
+  }, [sessionId]);
 
   const loadSession = async () => {
     try {

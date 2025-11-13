@@ -54,7 +54,7 @@ const commitSessionSchema = z.object({
 });
 
 // POST /api/scan/start - Start new scan session
-router.post('/api/scan/start', authenticateToken, requireTierFeature('product_scanning'), async (req: Request, res: Response) => {
+router.post('/api/scan/start', authenticateToken, requireTierFeature('barcode_scan'), async (req: Request, res: Response) => {
   try {
     if (!Flags.SKU_SCANNING) {
       return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SKU_SCANNING' });
@@ -382,6 +382,12 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
     for (const result of session.results) {
       try {
         const enrichment = result.enrichment as any || {};
+        console.log(`[commit] Processing ${result.barcode}:`, {
+          hasCategoryPath: !!enrichment.categoryPath,
+          categoryPathLength: enrichment.categoryPath?.length,
+          categoryPath: enrichment.categoryPath,
+          templateDefault: session.template?.defaultCategory
+        });
         const stock = enrichment.stock || 0;
         const item = await prisma.inventoryItem.create({
           data: {
@@ -397,10 +403,13 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
             currency: session.template?.defaultCurrency || 'USD',
             visibility: (session.template?.defaultVisibility as any) || 'private',
             availability: stock > 0 ? 'in_stock' : 'out_of_stock',
-            categoryPath: enrichment.categoryPath || (session.template?.defaultCategory ? [session.template.defaultCategory] : []),
+            categoryPath: (enrichment.categoryPath && enrichment.categoryPath.length > 0) 
+              ? enrichment.categoryPath 
+              : (session.template?.defaultCategory ? [session.template.defaultCategory] : []),
             metadata: { ...enrichment.metadata, scannedFrom: sessionId },
           },
         });
+        console.log(`[commit] Created item ${item.id} with categoryPath:`, item.categoryPath);
         committed.push(item.id);
 
         // Process product images if available
@@ -602,15 +611,26 @@ router.post('/api/scan/cleanup-my-sessions', authenticateToken, async (req: Requ
 // POST /api/scan/cleanup-idle-sessions - Cleanup idle sessions (can be called by cron)
 router.post('/api/scan/cleanup-idle-sessions', async (req: Request, res: Response) => {
   try {
-    // Close sessions that have been active for more than 1 hour with no activity
+    // Close sessions that have been active for more than 1 hour AND have no recent activity
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    
+
+    // First, find sessions that have recent results (active in last hour)
+    const activeSessionIds = await prisma.scanResult.findMany({
+      where: {
+        createdAt: { gte: oneHourAgo },
+      },
+      select: { sessionId: true },
+      distinct: ['sessionId'],
+    });
+
+    const activeIds = activeSessionIds.map(r => r.sessionId);
+
+    // Cancel sessions that are active, started more than 1 hour ago, AND have no recent results
     const result = await prisma.scanSession.updateMany({
       where: {
         status: 'active',
-        startedAt: {
-          lt: oneHourAgo,
-        },
+        startedAt: { lt: oneHourAgo },
+        id: { notIn: activeIds }, // Exclude sessions with recent activity
       },
       data: {
         status: 'cancelled',
@@ -618,12 +638,13 @@ router.post('/api/scan/cleanup-idle-sessions', async (req: Request, res: Respons
       },
     });
 
-    console.log(`[Idle Cleanup] Closed ${result.count} idle sessions`);
-    
-    return res.json({ 
-      success: true, 
+    console.log(`[Idle Cleanup] Closed ${result.count} idle sessions (excluded ${activeIds.length} with recent activity)`);
+
+    return res.json({
+      success: true,
       cleaned: result.count,
-      message: `Cleaned up ${result.count} idle sessions` 
+      excluded: activeIds.length,
+      message: `Cleaned up ${result.count} idle sessions`
     });
   } catch (error: any) {
     console.error('[scan/cleanup-idle-sessions POST] Error:', error);

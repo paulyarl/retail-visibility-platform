@@ -215,9 +215,9 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
       },
       
       // Professional tier features
-      'barcode_scan': { 
-        tier: 'professional', 
-        badge: 'PRO+', 
+      'barcode_scan': {
+        tier: 'professional',
+        badge: 'PRO+',
         tooltip: 'Requires Professional tier or higher - Upgrade for barcode scanning',
         color: 'bg-gradient-to-r from-purple-600 to-pink-600'
       },

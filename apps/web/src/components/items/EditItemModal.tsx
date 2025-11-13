@@ -1,8 +1,7 @@
-"use client";
-
 import { useState, useEffect } from 'react';
 import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
 import { useFeatureFlag } from '@/lib/featureFlags';
+import CategorySelector from './CategorySelector';
 
 interface Item {
   id: string;
@@ -14,6 +13,7 @@ interface Item {
   stock?: number;
   description?: string;
   status?: 'active' | 'inactive' | 'syncing';
+  categoryPath?: string[];
 }
 
 interface EditItemModalProps {
@@ -34,6 +34,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categoryPath, setCategoryPath] = useState<string[]>([]);
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
 
   // Feature flag: sticky quick actions footer
   const ffQuick = useFeatureFlag('FF_CATEGORY_QUICK_ACTIONS');
@@ -65,6 +67,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
       setStatus((item.status === 'active' || item.status === 'inactive') ? item.status : 'active');
+      setCategoryPath(item.categoryPath || []);
     }
   }, [item]);
 
@@ -100,9 +103,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const handleSave = async () => {
     if (!item) return;
 
-    // Validation
     if (!name.trim()) {
-      setError('Name is required');
+      setError('Product name is required');
       return;
     }
 
@@ -121,6 +123,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         description: description.trim() || undefined,
         status,
         itemStatus: status, // Backend uses itemStatus field
+        categoryPath,
       } as Item;
 
       await onSave(updatedItem);
@@ -312,6 +315,69 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </p>
         </div>
 
+        {/* Category Section */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">
+            Google Product Category
+          </label>
+          <div className="space-y-3">
+            {/* Current Category Display */}
+            <div className="p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                    Current Category
+                  </p>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+                    {categoryPath.length > 0 ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-md border border-blue-200 dark:border-blue-800">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        {categoryPath.join(' › ')}
+                      </span>
+                    ) : (
+                      <span className="text-neutral-500 italic">No category assigned</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Category Selection */}
+            <div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowCategorySelector(!showCategorySelector)}
+                disabled={saving}
+                className="w-full"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                {showCategorySelector ? 'Hide Category Selection' : 'Change Category'}
+              </Button>
+
+              {showCategorySelector && (
+                <div className="mt-3 p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+                  <CategorySelector
+                    currentCategory={categoryPath}
+                    onCategorySelect={(newCategory) => {
+                      setCategoryPath(newCategory);
+                      setShowCategorySelector(false);
+                    }}
+                    onCancel={() => setShowCategorySelector(false)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-neutral-500 mt-2">
+            Required for Google Shopping sync. Choose the most specific category that fits your product.
+          </p>
+        </div>
+
         {/* Current Values Display */}
         <div className="p-4 bg-neutral-50 rounded-lg">
           <p className="text-sm font-medium text-neutral-700 mb-2">Current Values</p>
@@ -330,6 +396,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             {item.stock !== undefined && (
               <p><span className="font-medium">Stock:</span> {item.stock}</p>
             )}
+            <p><span className="font-medium">Category:</span> {item.categoryPath && item.categoryPath.length > 0 ? item.categoryPath.join(' › ') : 'None'}</p>
             {item.description && (
               <p><span className="font-medium">Description:</span> {item.description.substring(0, 100)}{item.description.length > 100 ? '...' : ''}</p>
             )}

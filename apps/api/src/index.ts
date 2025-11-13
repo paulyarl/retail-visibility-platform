@@ -1360,7 +1360,7 @@ const listQuery = z.object({
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 
-app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
+app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateToken, async (req, res) => {
   const parsed = listQuery.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: "tenant_required" });
   
@@ -1463,13 +1463,14 @@ app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
         hasMore: skip + items.length < totalCount,
       },
     });
+
   } catch (e: any) {
     console.error('[GET /items] Error listing items:', e);
     res.status(500).json({ error: "failed_to_list_items", message: e?.message });
   }
 });
 
-app.get(["/items/:id", "/inventory/:id"], async (req, res) => {
+app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], async (req, res) => {
   const it = await prisma.inventoryItem.findUnique({ 
     where: { id: req.params.id },
     include: {
@@ -1672,47 +1673,77 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
       take: 20 // Limit for performance
     });
 
-    // If no top-level categories found, try to get some representative categories
+    // For now, return some test categories if database is empty
     let finalCategories: any[] = categories;
     if (categories.length === 0) {
-      // Get some categories and group them by top-level
-      const allCategories = await prisma.googleTaxonomy.findMany({
-        where: { isActive: true },
-        orderBy: { categoryPath: 'asc' },
-        take: 100
-      });
-
-      // Group by first part of path
-      const grouped: Record<string, any> = allCategories.reduce((acc: any, cat) => {
-        const topLevel = cat.categoryPath.split(' > ')[0];
-        if (!acc[topLevel]) {
-          acc[topLevel] = {
-            categoryId: topLevel,
-            categoryPath: topLevel,
-            level: 1,
-            parentId: null,
-            isActive: true
-          };
+      console.log('No categories found in database, using fallback test categories');
+      finalCategories = [
+        {
+          categoryId: "8",
+          categoryPath: "Food, Beverages & Tobacco",
+          level: 1,
+          parentId: null,
+          isActive: true
+        },
+        {
+          categoryId: "7", 
+          categoryPath: "Electronics",
+          level: 1,
+          parentId: null,
+          isActive: true
+        },
+        {
+          categoryId: "499685",
+          categoryPath: "Food, Beverages & Tobacco > Food Items",
+          level: 2,
+          parentId: "8",
+          isActive: true
+        },
+        {
+          categoryId: "499686",
+          categoryPath: "Food, Beverages & Tobacco > Beverages", 
+          level: 2,
+          parentId: "8",
+          isActive: true
+        },
+        {
+          categoryId: "499776",
+          categoryPath: "Food, Beverages & Tobacco > Beverages > Coffee",
+          level: 3,
+          parentId: "499686",
+          isActive: true
+        },
+        {
+          categoryId: "499777",
+          categoryPath: "Food, Beverages & Tobacco > Beverages > Tea & Infusions",
+          level: 3,
+          parentId: "499686", 
+          isActive: true
         }
-        return acc;
-      }, {});
-
-      finalCategories = Object.values(grouped).slice(0, 20);
+      ];
     }
 
     // For each top-level category, get some children
     const categoriesWithChildren = await Promise.all(
       finalCategories.map(async (cat: any) => {
-        const children = await prisma.googleTaxonomy.findMany({
-          where: {
-            isActive: true,
-            categoryPath: {
-              startsWith: cat.categoryPath + ' > '
-            }
-          },
-          orderBy: { categoryPath: 'asc' },
-          take: 10 // Limit children for UI performance
-        });
+        let children: any[] = [];
+        
+        // If using fallback categories, get children from the hardcoded list
+        if (categories.length === 0) {
+          children = finalCategories.filter(c => c.parentId === cat.categoryId);
+        } else {
+          // Get children from database
+          children = await prisma.googleTaxonomy.findMany({
+            where: {
+              isActive: true,
+              categoryPath: {
+                startsWith: cat.categoryPath + ' > '
+              }
+            },
+            orderBy: { categoryPath: 'asc' },
+            take: 10 // Limit children for UI performance
+          });
+        }
 
         return {
           id: cat.categoryId,
@@ -2427,7 +2458,7 @@ app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) =
 /* ------------------------------ item updates ------------------------------ */
 // PUT /api/items/:itemId
 // Update an item (general updates, not category assignment)
-app.put('/api/items/:itemId', async (req, res) => {
+app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
   try {
     const { itemId } = req.params;
     const updateData = req.body;
@@ -2437,108 +2468,41 @@ app.put('/api/items/:itemId', async (req, res) => {
       return res.status(400).json({ error: 'update_data_required' });
     }
 
-    // Use direct pool query to bypass Prisma RLS issues
-    const directPool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      min: 1,
-      max: 5,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+    // Prepare update data for Prisma
+    const prismaUpdateData: any = {};
+    
+    // Handle different field names (camelCase from frontend vs snake_case in DB)
+    if (updateData.name !== undefined) prismaUpdateData.name = updateData.name;
+    if (updateData.price !== undefined) prismaUpdateData.price = updateData.price;
+    if (updateData.stock !== undefined) prismaUpdateData.stock = updateData.stock;
+    if (updateData.description !== undefined) prismaUpdateData.description = updateData.description;
+    if (updateData.visibility !== undefined) prismaUpdateData.visibility = updateData.visibility;
+    if (updateData.itemStatus !== undefined) prismaUpdateData.itemStatus = updateData.itemStatus;
+    if (updateData.categoryPath !== undefined) prismaUpdateData.categoryPath = updateData.categoryPath;
+
+    // Update the item
+    const updatedItem = await prisma.inventoryItem.update({
+      where: { id: itemId },
+      data: prismaUpdateData,
     });
 
-    try {
-      // Build dynamic update query
-      const updateFields = [];
-      const values = [];
-      let paramIndex = 1;
+    // Transform snake_case back to camelCase for frontend
+    const result = {
+      id: updatedItem.id,
+      tenantId: updatedItem.tenantId,
+      sku: updatedItem.sku,
+      name: updatedItem.name,
+      price: updatedItem.price,
+      stock: updatedItem.stock,
+      description: updatedItem.description,
+      visibility: updatedItem.visibility,
+      status: updatedItem.itemStatus,
+      categoryPath: updatedItem.categoryPath,
+      createdAt: updatedItem.createdAt,
+      updatedAt: updatedItem.updatedAt,
+    };
 
-      // Handle different field names (camelCase from frontend vs snake_case in DB)
-      if (updateData.name !== undefined) {
-        updateFields.push(`name = $${paramIndex}`);
-        values.push(updateData.name);
-        paramIndex++;
-      }
-
-      if (updateData.price !== undefined) {
-        updateFields.push(`price = $${paramIndex}`);
-        values.push(updateData.price);
-        paramIndex++;
-      }
-
-      if (updateData.stock !== undefined) {
-        updateFields.push(`stock = $${paramIndex}`);
-        values.push(updateData.stock);
-        paramIndex++;
-      }
-
-      if (updateData.description !== undefined) {
-        updateFields.push(`description = $${paramIndex}`);
-        values.push(updateData.description);
-        paramIndex++;
-      }
-
-      if (updateData.visibility !== undefined) {
-        updateFields.push(`visibility = $${paramIndex}`);
-        values.push(updateData.visibility);
-        paramIndex++;
-      }
-
-      if (updateData.itemStatus !== undefined) {
-        updateFields.push(`item_status = $${paramIndex}`);
-        values.push(updateData.itemStatus);
-        paramIndex++;
-      }
-
-      if (updateData.categoryPath !== undefined) {
-        updateFields.push(`category_path = $${paramIndex}`);
-        values.push(updateData.categoryPath);
-        paramIndex++;
-      }
-
-      if (updateFields.length === 0) {
-        return res.status(400).json({ error: 'no_valid_fields_to_update' });
-      }
-
-      // Add updated_at timestamp
-      updateFields.push(`updated_at = NOW()`);
-
-      // Add itemId as the last parameter
-      values.push(itemId);
-
-      const updateQuery = `
-        UPDATE inventory_item
-        SET ${updateFields.join(', ')}
-        WHERE id = $${paramIndex}
-        RETURNING *
-      `;
-
-      const result = await directPool.query(updateQuery, values);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'item_not_found' });
-      }
-
-      // Transform snake_case back to camelCase for frontend
-      const row = result.rows[0];
-      const updatedItem = {
-        id: row.id,
-        tenantId: row.tenant_id,
-        sku: row.sku,
-        name: row.name,
-        price: row.price,
-        stock: row.stock,
-        description: row.description,
-        visibility: row.visibility,
-        status: row.item_status,
-        categoryPath: row.category_path,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      };
-
-      return res.json(updatedItem);
-    } finally {
-      await directPool.end();
-    }
+    return res.json(result);
   } catch (error) {
     console.error('[PUT /api/items/:itemId] Error:', error);
     return res.status(500).json({ error: 'failed_to_update_item' });
