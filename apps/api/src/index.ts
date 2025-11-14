@@ -679,7 +679,7 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     const { basePrisma } = await import('./prisma');
     const bpResults = await basePrisma.$queryRaw`
-      SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenantId}
+      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, created_at, updated_at FROM "TenantBusinessProfile" WHERE tenant_id = ${tenantId}
     `;
     const bp = (bpResults as any[])[0] || null;
     
@@ -742,6 +742,7 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
       logo_url: bp?.logoUrl ?? md.logo_url ?? null,
       banner_url: bp?.banner_url ?? md.banner_url ?? null,
       business_description: bp?.business_description || md.business_description || null,
+      hours: hoursData || bp?.hours || md.hours || null,
     };
     return res.json(profile);
   } catch (e: any) {
@@ -2508,6 +2509,8 @@ app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
 console.log('✅ Dashboard routes mounted');
 app.use('/api', promotionRoutes); // Promotion endpoints
 console.log('✅ Promotion routes mounted');
+app.use('/api', businessHoursRoutes); // Business hours management
+console.log('✅ Business hours routes mounted');
 app.use(tenantTierRoutes); // Tenant tier and usage endpoints
 app.use('/api/tenant-limits', tenantLimitsRoutes); // Tenant creation limits
 console.log('✅ Tenant limits routes mounted');
