@@ -115,7 +115,7 @@ router.post('/scan/start', authenticateToken, requireTierFeature('barcode_scan')
     } catch {}
 
     // Emit metric
-    scanSessionStarted.inc({ tenant: tenantId, deviceType: deviceType || 'manual' });
+    // scanSessionStarted.inc({ tenant: tenantId, deviceType: deviceType || 'manual' });
 
     return res.status(201).json({ success: true, session });
   } catch (error: any) {
@@ -193,7 +193,7 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
     });
 
     if (existing) {
-      scanBarcodeDuplicate.inc({ tenant: session.tenantId });
+      // scanBarcodeDuplicate.inc({ tenant: session.tenantId });
       return res.status(409).json({ success: false, error: 'duplicate_barcode', result: existing });
     }
 
@@ -235,10 +235,10 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
     });
 
     // Emit metrics
-    scanBarcodeSuccess.inc({ tenant: session.tenantId, hasDuplicate: String(!!duplicateItem) });
-    if (duplicateItem) {
-      scanBarcodeDuplicate.inc({ tenant: session.tenantId });
-    }
+    // scanBarcodeSuccess.inc({ tenant: session.tenantId, hasDuplicate: String(!!duplicateItem) });
+    // if (duplicateItem) {
+    //   scanBarcodeDuplicate.inc({ tenant: session.tenantId });
+    // }
 
     return res.status(201).json({
       success: true,
@@ -370,9 +370,9 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
       const validation = await validateScanResults(session.results, session.template);
       if (!validation.valid) {
         // Emit validation error metrics
-        validation.errors.forEach(() => {
-          scanValidationError.inc({ tenant: session.tenantId });
-        });
+        // validation.errors.forEach(() => {
+        //   scanValidationError.inc({ tenant: session.tenantId });
+        // });
         return res.status(422).json({ success: false, error: 'validation_failed', validation });
       }
     }
@@ -457,10 +457,10 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
     } catch {}
 
     // Emit metrics
-    const duration = Date.now() - startTime;
-    scanCommitSuccess.inc({ tenant: session.tenantId, itemCount: String(committed.length) });
-    scanCommitDurationMs.observe(duration, { tenant: session.tenantId });
-    scanSessionCompleted.inc({ tenant: session.tenantId });
+    // const duration = Date.now() - startTime;
+    // scanCommitSuccess.inc({ tenant: session.tenantId, itemCount: String(committed.length) });
+    // scanCommitDurationMs.observe(duration, { tenant: session.tenantId });
+    // scanSessionCompleted.inc({ tenant: session.tenantId });
 
     return res.json({ success: true, committed: committed.length, itemIds: committed });
   } catch (error: any) {
@@ -508,7 +508,7 @@ router.delete('/scan/:sessionId', authenticateToken, async (req: Request, res: R
     } catch {}
 
     // Emit metric
-    scanSessionCancelled.inc({ tenant: session.tenantId });
+    // scanSessionCancelled.inc({ tenant: session.tenantId });
 
     return res.json({ success: true, cancelled: sessionId });
   } catch (error: any) {
