@@ -7,7 +7,7 @@ import { proxyGet } from '@/lib/api-proxy';
  */
 export async function GET(request: NextRequest) {
   try {
-    const response = await proxyGet(request, '/user/profile');
+    const response = await proxyGet(request, '/users/profile');
     return response;
   } catch (error) {
     console.error('[User Profile API] Error:', error);
