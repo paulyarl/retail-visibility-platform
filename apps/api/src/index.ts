@@ -2621,26 +2621,34 @@ console.log('✅ Scan routes mounted inline');
 // INLINE SCAN ROUTES FOR TESTING
 const inlineScanRoutes = require('express').Router();
 inlineScanRoutes.get('/scan/my-sessions', authenticateToken, async (req: Request, res: Response) => {
-  console.log('[INLINE GET /scan/my-sessions] Called with query:', (req as any).query);
+  console.log('[INLINE GET /scan/my-sessions] START - Called with query:', (req as any).query);
   try {
     const { tenantId } = (req as any).query;
     const userId = ((req as any).user)?.userId;
 
+    console.log('[INLINE] userId:', userId, 'tenantId:', tenantId);
+
     if (!userId) {
+      console.log('[INLINE] No userId - returning 401');
       return res.status(401).json({ success: false, error: 'unauthorized' });
     }
 
     if (!tenantId || typeof (tenantId as string) !== 'string') {
+      console.log('[INLINE] Invalid tenantId - returning 400');
       return res.status(400).json({ success: false, error: 'tenant_id_required' });
     }
 
     // Check tenant access (simplified)
     const isPlatformAdmin = ((req as any).user)?.role === 'PLATFORM_ADMIN';
     const userTenantIds = ((req as any).user)?.tenantIds || [];
+    console.log('[INLINE] isPlatformAdmin:', isPlatformAdmin, 'userTenantIds:', userTenantIds);
+
     if (!isPlatformAdmin && !userTenantIds.includes(tenantId as string)) {
+      console.log('[INLINE] Access denied - returning 403');
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
+    console.log('[INLINE] Access granted - returning success');
     // Mock response for testing
     return res.json({ success: true, sessions: [], message: 'Inline route working' });
   } catch (error: any) {
