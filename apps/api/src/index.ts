@@ -742,6 +742,7 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
       logo_url: bp?.logoUrl ?? md.logo_url ?? null,
       banner_url: bp?.banner_url ?? md.banner_url ?? null,
       business_description: bp?.business_description || md.business_description || null,
+    };
     return res.json(profile);
   } catch (e: any) {
     console.error("[GET /public/tenant/:tenantId/profile] Error:", e);
