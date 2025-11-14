@@ -53,6 +53,69 @@ const commitSessionSchema = z.object({
   skipValidation: z.boolean().optional().default(false),
 });
 
+// POST /scan/start - Start new scan session
+router.post('/scan/start', authenticateToken, /* requireTierFeature('barcode_scan'), */ async (req: Request, res: Response) => {
+  try {
+    // if (!Flags.SKU_SCANNING) {
+    //   return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SKU_SCANNING' });
+    // }
+
+    const parsed = startSessionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_input', details: parsed.error.issues });
+    }
+
+    const { tenantId, templateId, deviceType, metadata } = parsed.data;
+    const userId = (req.user as any)?.userId;
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, tenantId)) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Check rate limit: max 50 active sessions per tenant
+    const activeSessions = await prisma.scanSession.count({
+      where: { tenantId, status: 'active' },
+    });
+    if (activeSessions >= 50) {
+      return res.status(429).json({ success: false, error: 'rate_limit_exceeded', limit: 50 });
+    }
+
+    // Create session
+    const session = await prisma.scanSession.create({
+      data: {
+        tenantId,
+        userId,
+        templateId,
+        deviceType: deviceType || 'manual',
+        status: 'active',
+        metadata: metadata as any || {},
+      },
+      include: {
+        template: true,
+      },
+    });
+
+    // Audit
+    try {
+      await audit({
+        tenantId,
+        actor: userId,
+        action: 'scan.session.start',
+        payload: { sessionId: session.id, deviceType, templateId },
+      });
+    } catch {}
+
+    // Emit metric
+    // scanSessionStarted.inc({ tenant: tenantId, deviceType: deviceType || 'manual' });
+
+    return res.status(201).json({ success: true, session });
+  } catch (error: any) {
+    console.error('[scan/start] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
 // GET /scan/my-sessions - Get user's scan sessions for a tenant
 router.get('/scan/my-sessions', authenticateToken, async (req: Request, res: Response) => {
   console.log('[GET /scan/my-sessions] Called with query:', (req as any).query);
