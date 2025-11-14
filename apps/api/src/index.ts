@@ -2615,6 +2615,7 @@ app.use(mirrorAdminRoutes);
 app.use(syncLogsRoutes);
 // M4: SKU Scanning routes
 app.use('/api', scanRoutes);
+console.log('✅ Scan routes mounted at /api/scan');
 app.use(scanMetricsRoutes);
 
 /* ------------------------------ item category assignment ------------------------------ */

@@ -519,6 +519,7 @@ router.delete('/scan/:sessionId', authenticateToken, async (req: Request, res: R
 
 // GET /scan/my-sessions - Get user's scan sessions for a tenant
 router.get('/scan/my-sessions', authenticateToken, async (req: Request, res: Response) => {
+  console.log('[GET /scan/my-sessions] Called with query:', req.query);
   try {
     const { tenantId } = req.query;
     const userId = (req.user as any)?.userId;
