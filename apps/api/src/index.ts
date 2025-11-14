@@ -2618,6 +2618,12 @@ app.use('/api', scanRoutes);
 console.log('✅ Scan routes mounted at /api/scan');
 app.use(scanMetricsRoutes);
 
+// TEST ROUTE - Remove after debugging
+app.get('/api/test-scan', (req, res) => {
+  console.log('TEST ROUTE HIT');
+  res.json({ message: 'Test route works', timestamp: new Date().toISOString() });
+});
+
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenantId/items/:itemId/category
 // Body: { tenantCategoryId?: string, categorySlug?: string }
