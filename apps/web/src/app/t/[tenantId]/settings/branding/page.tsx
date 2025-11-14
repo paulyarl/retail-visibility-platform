@@ -61,7 +61,7 @@ export default function TenantBrandingPage() {
       let businessDescription = '';
       
       try {
-        const response = await api.get(`${apiBaseUrl}/tenant/${encodeURIComponent(tenantId)}/profile`);
+        const response = await api.get(`${apiBaseUrl}/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`);
         if (response.ok) {
           const data = await response.json();
           // Use tenant name if no business_name is set, otherwise use business_name
