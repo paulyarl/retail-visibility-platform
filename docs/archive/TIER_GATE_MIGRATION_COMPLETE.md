@@ -1,5 +1,9 @@
 # Tier Gate Migration - Completed
 
+> [!WARNING]
+> **Partially deprecated — the TierGate migration pattern and page list are still accurate, but specific tier prices/positioning are superseded by `TIER_MODEL_V2_SIMPLIFIED.md` (canonical as of 2025‑11‑14).**
+> Use the V2 tier model for any new gating or pricing references.
+
 ## ✅ Migrated Pages
 
 ### 1. Quick Start Wizard

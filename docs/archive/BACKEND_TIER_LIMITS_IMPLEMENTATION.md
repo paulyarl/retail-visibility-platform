@@ -1,5 +1,9 @@
 # Backend Implementation: Tier-Specific Feature Limits
 
+> [!WARNING]
+> **Partially deprecated — the backend pattern for enforcing tier-specific limits is still useful, but concrete tier thresholds and examples are superseded by `TIER_MODEL_V2_SIMPLIFIED.md` (canonical as of 2025‑11‑14).**
+> Consult the V2 tier model for real limits when implementing or updating enforcement.
+
 ## Current Gap
 
 The backend tier middleware (`tier-access.ts`) currently:

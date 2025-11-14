@@ -1,5 +1,9 @@
 # Tier Management System
 
+> [!WARNING]
+> **Deprecated — tier/pricing details are superseded by `TIER_MODEL_V2_SIMPLIFIED.md` (canonical as of 2025‑11‑14).**
+> This document remains useful for understanding the admin UI and audit model, but should not be treated as the source of truth for tier names, prices, or limits.
+
 ## Overview
 
 The Tier Management System provides platform administrators with comprehensive tools to manage tenant subscription tiers, monitor tier distribution, and handle tier upgrades/downgrades with full audit logging.

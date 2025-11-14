@@ -1,5 +1,9 @@
 # Tier System Integration Guide
 
+> [!WARNING]
+> **Partially deprecated — the integration pattern (TierService, DB-driven tiers) remains valid, but specific tier definitions are superseded by `TIER_MODEL_V2_SIMPLIFIED.md` (canonical as of 2025‑11‑14).**
+> Always pull limits/names from the canonical tier model when implementing new behavior.
+
 ## Overview
 
 The tier system has been migrated from hardcoded values to a **database-driven architecture** while maintaining **100% backward compatibility** with existing middleware and code.

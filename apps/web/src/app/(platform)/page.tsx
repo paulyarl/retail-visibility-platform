@@ -326,7 +326,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                       ? `Managing ${stats.locations} locations across ${stats.organizationName || 'your organization'}`
                       : 'Manage your retail inventory and visibility across platforms'
                     )
-                  : 'Empowering retailers with complete online visibility'
+                  : 'Making your shelves visible online so you can compete with the giants'
                 }
               </p>
             </div>
@@ -437,9 +437,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   Empowering Local Retailers to Compete Online
                 </h2>
                 <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
-                  We believe every local retailer deserves the same online presence as major chains. 
-                  That's why we built a platform that gives you enterprise-level tools without the 
-                  enterprise price tag or complexity.
+                  We built this platform as the missing connector between your physical shelves and the internet. Think of it as the Amazon of local retail on your terms and the Shopify of offline retail: it plugs into the tools you already use, uses AI and automation to keep everything in sync, and makes your inventory discoverable on Google, your storefront, and our directory—the same way social media connected people to the world.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
                   <motion.div 
@@ -451,7 +449,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">🎯</div>
                     <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Mission</h3>
                     <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      Level the playing field for local retailers competing against big box stores
+                      Make every local shelf visible online and give small retailers big-brand style visibility.
                     </p>
                   </motion.div>
                   <motion.div 
@@ -463,7 +461,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">💡</div>
                     <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Vision</h3>
                     <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      A world where local businesses thrive online as easily as they do in-store
+                      A world where local businesses are connected to the world as easily as people are on social media.
                     </p>
                   </motion.div>
                   <motion.div 
@@ -475,7 +473,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">⚡</div>
                     <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Promise</h3>
                     <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      Enterprise features, small business pricing, and setup in minutes—not months
+                      Enterprise features with an "it just works" experience, small business pricing, and setup in minutes—not months.
                     </p>
                   </motion.div>
                 </div>

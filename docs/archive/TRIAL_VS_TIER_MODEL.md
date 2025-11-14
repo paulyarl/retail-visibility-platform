@@ -1,6 +1,10 @@
 # Trial vs Tier Model - Clarified
 
-**Status:** ✅ IMPLEMENTED
+> [!WARNING]
+> **Deprecated — the canonical definition of trial vs tier behavior now lives in `TIER_MODEL_V2_SIMPLIFIED.md` (as of 2025‑11‑14).**
+> This document captures an earlier framing and is retained only for historical context.
+
+**Status:** ⚠️ DEPRECATED (see TIER_MODEL_V2_SIMPLIFIED.md)
 
 ## 🎯 Core Concept
 

@@ -9,31 +9,66 @@ import Image from 'next/image';
 
 const faqs = [
   {
+    category: 'About the Platform',
+    questions: [
+      {
+        question: 'What is this platform actually about?',
+        answer:
+          'We built this as the "Amazon of local retail"—but for your store, on your terms. The platform makes your physical shelves visible online so you can show up next to the giants instead of disappearing behind them. It takes the products you already have in-store and turns them into rich, searchable pages on Google, your own storefront, and a shared retail directory—without hiring agencies or writing a line of code.'
+      },
+      {
+        question: 'I\'m a small retailer with no tech team. How does this actually help me compete?',
+        answer:
+          'Think of it like an Apple-style experience for retail: powerful under the hood, but with a big "it just works" button on top. You don\'t have a spare IT department, and your to-do list is already a mile long. We give you shortcuts: Quick Start to spin up a real catalog in minutes, product scanning to fill in the details automatically, and smart sync so everything stays up to date. Instead of paying thousands for a custom site that goes stale, you get a focused tool that quietly does the heavy lifting for you in the background.'
+      },
+      {
+        question: 'Why is this different from just having a website or using my POS?',
+        answer:
+          'A standalone website or POS is only one piece of the puzzle. Your website goes out of date, and your POS is built for ringing up sales, not getting discovered. We aim to be the "Shopify of offline retail": a connecting layer that plugs into tools like Clover and Square, keeps inventory and pricing accurate, and then pushes that out to Google, your storefront, and a curated directory. It\'s the missing infrastructure that almost no one is building for small retailers right now.'
+      },
+      {
+        question: 'Who is this platform designed for?',
+        answer:
+          'We designed this for independent retailers and small chains who feel invisible next to Amazon, CVS, Walmart, and other big-box players. If you have physical shelves and real-world inventory, we help you show that to the world—whether you\'re a single-location shop or an organization with dozens of locations. You get big-brand style visibility and control without giving up the local personality that makes your store special.'
+      },
+      {
+        question: 'Why now, and what makes this platform different?',
+        answer:
+          'Until recently, the tech stack to do this was only available to giants: custom integrations, big data teams, and expensive agencies. Now the pieces are ready—modern APIs, AI, and cloud tools that can plug systems together instead of replacing them. This platform leans into that future. It doesn\'t try to be your POS or your website; it acts as the connector and enabler in the middle, using automation and AI to sync data and tell your story. The same way social media connected people to the world, we\'re here to connect local shelves to the world so the little guys can finally be seen.'
+      },
+      {
+        question: 'Why do I only see big chains when I search for products on Google Maps?',
+        answer:
+          'Right now, when you search for a specific product on Google Maps or in the Shopping results, you mostly see the same names: CVS, Walmart, Target, Amazon, and a handful of big-box chains. It\'s not because local stores don\'t carry those products—it\'s because their inventory isn\'t connected to Google in a structured way. This platform exists to close that gap: we take your real in-store inventory and push it into the same Google surfaces (Maps, Shopping, and See What\'s In Store) so shoppers can finally see that a local merchant nearby actually has what they\'re looking for.'
+      }
+    ]
+  },
+  {
     category: 'Subscription & Billing',
     questions: [
       {
         question: 'What happens when my trial expires?',
-        answer: 'When your 30-day trial expires, your account automatically converts to the Starter plan ($49/mo) with no interruption to your service. You\'ll have 30 days to add payment information. All your data, including inventory, photos, and Google integrations, remain intact.'
+        answer: 'During your 14-day free trial, you get full access to the features of the plan you chose at signup (within that plan\'s location and SKU limits). When the trial ends, you can upgrade to a paid plan (Starter, Professional, Enterprise, or Organization) to keep editing and syncing. If you don\'t upgrade, your account moves into a limited read-only mode: your data and public pages stay online for at least 90 days, but you won\'t be able to add new locations or products until you subscribe.'
       },
       {
         question: 'What happens if my payment fails or my subscription expires?',
-        answer: 'If your payment fails, your account enters a "Past Due" status. During this time, all platform functionality is blocked, including inventory management, photo uploads, and Google sync. However, your data is safely preserved and will be immediately accessible once payment is resolved. Your public product landing pages remain visible to customers.'
+        answer: 'If your payment fails, your account moves into a "Past Due" status. You\'ll see clear warnings to update your billing details, and for a short grace period your storefront, directory, and Google sync continue to work. If payment isn\'t resolved after that, your subscription moves into a frozen, read-only state: your public pages stay online, but you won\'t be able to add or edit products or locations until billing is fixed.'
       },
       {
         question: 'What happens to my data if I cancel my subscription?',
-        answer: 'When you cancel, your account enters a "Canceled" status and all functionality is blocked. Your data (inventory, photos, settings) is preserved for 90 days, allowing you to reactivate without data loss. After 90 days, data may be permanently deleted. Contact support to reactivate your account at any time.'
+        answer: 'When you cancel, your account moves into a read-only "Canceled" state. Your data (inventory, photos, settings) is preserved for at least 90 days so you can reactivate without losing anything. After that retention window, we may permanently delete data in line with our data retention policies. Contact support any time to reactivate your account.'
       },
       {
         question: 'Does Google sync stop if my subscription is past due?',
-        answer: 'Yes. When your account is in "Past Due" or "Canceled" status, all Google integrations (Merchant Center, Business Profile, SWIS) are paused. Your products will no longer sync to Google Shopping. Once payment is resolved, sync automatically resumes and your products are re-uploaded.'
+        answer: 'If your account is Past Due, we continue syncing for a short grace period while we remind you to fix billing. If billing isn\'t resolved and your subscription becomes frozen or canceled, new syncs to Google (Merchant Center, Business Profile, SWIS) are paused. Your existing listings and product pages can remain online, and sync resumes as soon as you reactivate or resolve payment.'
       },
       {
         question: 'Can I change my subscription plan?',
         answer: 'Yes! You can upgrade or downgrade at any time from the Subscription page. Changes take effect immediately. When upgrading, you gain access to new features right away. When downgrading, you keep current features until your next billing cycle.'
       },
       {
-        question: 'What\'s included in the 30-day trial?',
-        answer: 'The trial includes full access to Professional tier features: 5,000 SKUs, 1024px QR codes, enhanced landing pages, business logo display, custom marketing copy, image galleries, and Google integrations. No credit card required to start.'
+        question: 'What\'s included in the free trial?',
+        answer: 'The trial lasts 14 days and lets you experience the full feature set of the plan you chose at signup (Starter, Professional, Enterprise, or an Organization pilot) with one location. You can import products, connect Google, and launch your storefront. Before the trial ends, you can decide which paid plan fits your locations and SKU volume best—no credit card is required to start.'
       }
     ]
   },
@@ -42,11 +77,11 @@ const faqs = [
     questions: [
       {
         question: 'Is my data safe during subscription issues?',
-        answer: 'Yes! Your data is always safe and preserved, even during Past Due or Canceled status. We maintain full backups and your inventory, photos, and settings remain intact. You never lose data due to billing issues.'
+        answer: 'Yes. We don\'t immediately delete data due to billing issues. During Past Due or Canceled status your inventory, photos, and settings remain intact, and you can reactivate your subscription without re-entering everything. We preserve data for at least 90 days after cancellation and will give you opportunities to reactivate before any permanent deletion.'
       },
       {
         question: 'What happens to my product landing pages if I can\'t pay?',
-        answer: 'Your public product landing pages remain live and accessible to customers even if your account is Past Due or Canceled. This ensures your customers can still view your products and contact you. However, you won\'t be able to update or add new products until payment is resolved.'
+        answer: 'During a short grace period after payment issues, your public product landing pages remain live and you can still make changes. If billing isn\'t resolved and your account moves into a frozen, read-only state, your public pages remain live for a period of time so customers can still find you, but you won\'t be able to add or update products until you reactivate.'
       },
       {
         question: 'Can I export my data before canceling?',
@@ -57,6 +92,70 @@ const faqs = [
   {
     category: 'Features & Functionality',
     questions: [
+      {
+        question: 'How do Google Sync, Storefront, and POS integration work together?',
+        answer: 'They form the three core growth engines of the platform. Google Sync brings customers in by putting your products on Google Shopping and Google Business Profile. Your Storefront converts that traffic with a browsable, branded catalog. POS integrations like Clover and Square keep your inventory in sync automatically. As you move up plans (Starter → Professional → Enterprise → Organization), you unlock deeper analytics, automation, and multi-location controls on top of these same engines.'
+      },
+      {
+        question: 'Is Clover and Square integration really included, or is it another paid app?',
+        answer: 'Clover and Square integrations are built-in, not a bolt-on app with surprise fees. On higher tiers you connect once with OAuth, we pull in your products, and then keep everything in sync for you. No extra marketplace subscription, no “one more tool” to manage.'
+      },
+      {
+        question: 'What actually happens when I connect my POS?',
+        answer: 'Think of it as turning on autopilot. You connect Clover or Square, we import your catalog, then keep prices, inventory, and product details synced between your POS, Google, and your storefront. You stop doing copy‑paste and spreadsheet gymnastics, and changes flow through automatically.'
+      },
+      {
+        question: 'What is the Quick Start Wizard and why should I care?',
+        answer: 'Quick Start Wizard is the "skip the spreadsheet" button. Instead of typing products one-by-one, you pick a scenario and we spin up 50–100 realistic products in seconds as editable drafts. It is perfect for getting a new location live fast, then you can layer in product scanning and enrichment to make everything production-ready.'
+      },
+      {
+        question: 'How does product scanning help me in real life?',
+        answer: 'Product scanning lets you point a camera at a barcode and pull in the hard stuff automatically—photos, descriptions, nutrition facts, allergens, specs, and more. Combined with Quick Start, it turns "I should get my catalog online" into "I actually did it" without spending nights in front of a spreadsheet.'
+      },
+      {
+        question: 'How much time does Quick Start + product scanning actually save?',
+        answer: 'Instead of spending 15–17 hours hand-entering 100 products, you can generate them with Quick Start in seconds and enrich them with scanning in under an hour. In practice, that means saving hundreds of dollars in labor every time you onboard a new location, while ending up with better, more complete product pages.'
+      },
+      {
+        question: 'Should I use Quick Start or scanning first?',
+        answer: 'Use Quick Start to lay down the foundation—names, basic categories, and prices for a batch of products in one shot. Then use scanning on the products that matter most to add rich content: photos, nutrition, specs, and marketing copy. Quick Start gets you live fast; scanning makes your bestsellers shine.'
+      },
+      {
+        question: 'What do I actually get with the storefront?',
+        answer: 'The storefront is your online front door: a browsable, mobile-friendly catalog with search, categories, maps, and SEO built in. You get a link you can share anywhere (social, email, QR codes), and customers can explore what you sell before they ever walk in the door.'
+      },
+      {
+        question: 'What is the directory and how is it different from my storefront?',
+        answer: 'Your storefront is your own branded space. The directory is the bigger neighborhood—where shoppers can browse many retailers and discover you by category or location. Being in the directory helps new customers find you even if they have never heard of your store name before.'
+      },
+      {
+        question: 'How does multi-location propagation work for chains?',
+        answer: 'For multi-location retailers, you should not be copying changes by hand. Higher tiers let you set up one “hero” location, test changes there, then push updates (products, hours, branding, GBP settings, and more) out to some or all locations in a controlled way. It feels like AI-assisted autopilot for keeping every store in sync without losing local control.'
+      },
+      {
+        question: 'What are Smart Business Hours and why do they matter?',
+        answer: 'Smart Business Hours go beyond the simple open/close you get in most tools. You can handle split shifts, multiple periods per day, special events, and emergency changes—and your storefront always shows the correct “open now” status. We sync as much as Google allows and fill the gaps so your customers aren’t guessing.'
+      },
+      {
+        question: 'How do Smart Categories keep me in sync with Google?',
+        answer: 'We align your products to Google’s product taxonomy behind the scenes and keep your categories and Google Business Profile categories in sync. If something drifts out of alignment, we flag it and help you fix it with a couple of clicks so you stay discoverable in local search.'
+      },
+      {
+        question: 'Can I manage inventory for multiple locations from one place?',
+        answer: 'Yes. Inventory is centralized so you can see what’s in stock across locations, get low-stock alerts, and run bulk updates instead of logging into separate systems. Multi-location retailers use this to keep shelves accurate and avoid “sorry, we\'re out” moments that hurt trust.'
+      },
+      {
+        question: 'How does photo management work? Do I have to think about image sizes?',
+        answer: 'You upload once and we take it from there. Photos are stored in the cloud, optimized for web and mobile, and reused on storefront, directory, and Google where possible. You don’t have to worry about formats, compression, or crop sizes—we handle the tech so your products just look good everywhere.'
+      },
+      {
+        question: 'What kind of analytics do I get?',
+        answer: 'You can see which products, categories, and locations are doing the heavy lifting—plus which channels are driving the most traffic. Think simple, actionable insights: what’s getting views, what’s converting, and where you might be leaving money on the table, rather than a wall of confusing charts.'
+      },
+      {
+        question: 'Is this secure enough for my business data?',
+        answer: 'Yes. Access is role-based so staff only see what they need, changes are logged for accountability, and data is encrypted in transit and at rest. The short version: we treat your catalog and customer data like production infrastructure, not like a side project.'
+      },
       {
         question: 'What are QR codes and how do they work?',
         answer: 'QR codes are scannable barcodes that link directly to your product landing pages. Print them on flyers, business cards, or store windows. When customers scan with their phone, they\'re taken to your product page with photos, pricing, and purchase information. Higher tiers get higher resolution codes (up to 2048px for print quality).'
@@ -71,11 +170,11 @@ const faqs = [
       },
       {
         question: 'What\'s the difference between individual and chain pricing?',
-        answer: 'Individual pricing is per-location ($49-$499/mo). Chain pricing is for businesses with multiple locations and offers massive savings (e.g., 10 locations for $499/mo vs $490-$4,990/mo individually). Chain plans include centralized management, shared SKU pools, and organization-wide analytics.'
+        answer: 'Standard plans (Starter, Professional, Enterprise) are ideal for single retailers or small groups of locations. Organization plans are designed for chains and franchises with 25+ locations and use custom, volume-discounted pricing. Organization gives you centralized management, shared SKU pools, and organization-wide analytics so you can manage many locations from a single dashboard.'
       },
       {
         question: 'Can I use my own branding?',
-        answer: 'Yes! Professional tier includes business logo display on landing pages. Enterprise tier offers full white-label branding: custom colors, remove platform branding, custom domain, and fully branded landing pages. Upload your logo in Settings > Branding.'
+        answer: 'Yes! Professional tier includes business logo display on landing pages. Enterprise and Organization tiers offer full white-label branding: custom colors, remove platform branding, custom domain, and fully branded landing pages. Upload your logo in Settings > Branding.'
       }
     ]
   },
@@ -96,7 +195,7 @@ const faqs = [
       },
       {
         question: 'Is there an API for custom integrations?',
-        answer: 'Enterprise tier includes full API access with documentation. Integrate with your POS system, accounting software, or custom applications. API includes webhooks for real-time inventory updates and order notifications. Contact sales for API documentation.'
+        answer: 'Enterprise and Organization tiers include full API access with documentation. Integrate with your POS system, accounting software, or custom applications. The API includes webhooks for real-time inventory updates and order notifications. Contact sales for API documentation.'
       }
     ]
   },
@@ -105,7 +204,7 @@ const faqs = [
     questions: [
       {
         question: 'How do I get help?',
-        answer: 'Starter: Email support (24-48hr response). Professional: Priority email support (12-24hr response). Enterprise: Dedicated account manager + 24/7 phone support. All tiers have access to documentation, video tutorials, and this FAQ.'
+        answer: 'Starter: Email support (24-48hr response). Professional: Priority email support (12-24hr response). Enterprise & Organization: Dedicated account manager plus priority channels. All tiers have access to documentation, video tutorials, and this FAQ.'
       },
       {
         question: 'Can I get help setting up my account?',

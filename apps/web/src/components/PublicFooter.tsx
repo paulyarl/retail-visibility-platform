@@ -93,14 +93,19 @@ export default function PublicFooter() {
                 </Link>
               </li>
               <li>
-                <a href="#" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
-                  Privacy Policy
-                </a>
+                <Link href="/legal" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                  Legal
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                <Link href="/privacy" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
                   Terms of Service
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

@@ -1,6 +1,10 @@
 # Tier Offerings & Location Limits
 
-**Status:** ✅ OFFICIAL PRICING MODEL
+> [!WARNING]
+> **Deprecated — superseded by `TIER_MODEL_V2_SIMPLIFIED.md` (canonical tier model as of 2025‑11‑14).**
+> This document describes an earlier iteration of the tier/pricing model and is kept only for historical reference. Do not use it for new implementations.
+
+**Status:** ⚠️ DEPRECATED (see TIER_MODEL_V2_SIMPLIFIED.md)
 **Last Updated:** November 2025
 
 ## 🎯 Core Principles

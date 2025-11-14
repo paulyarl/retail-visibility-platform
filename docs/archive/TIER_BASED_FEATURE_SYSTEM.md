@@ -1,5 +1,9 @@
 # Tier-Based Feature Gating System
 
+> [!WARNING]
+> **Partially deprecated — the feature-gating architecture described here is still valid, but tier names, prices, and limits are superseded by `TIER_MODEL_V2_SIMPLIFIED.md` (canonical as of 2025‑11‑14).**
+> When in doubt, use the V2 tier model for any new tier or pricing logic.
+
 ## Overview
 A centralized system for controlling feature access based on subscription tiers, similar to platform feature flags but driven by tenant subscription levels.
 
