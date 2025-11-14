@@ -532,29 +532,37 @@ app.get("/tenant/profile", authenticateToken, async (req, res) => {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
 
-    const bp = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } });
+    // Use raw SQL instead of Prisma client since it doesn't recognize the new table
+    const { basePrisma } = await import('./prisma');
+    const bpResults = await basePrisma.$queryRaw`
+      SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenantId}
+    `;
+    const bp = (bpResults as any[])[0] || null;
+    
     const md = (tenant.metadata as any) || {};
     const profile = {
       tenant_id: tenant.id,
-      business_name: bp?.businessName || md.business_name || tenant.name || null,
-      address_line1: bp?.addressLine1 || md.address_line1 || null,
-      address_line2: bp?.addressLine2 || md.address_line2 || null,
+      business_name: bp?.business_name || md.business_name || tenant.name || null,
+      address_line1: bp?.address_line1 || md.address_line1 || null,
+      address_line2: bp?.address_line2 || md.address_line2 || null,
       city: bp?.city || md.city || null,
       state: bp?.state || md.state || null,
-      postal_code: bp?.postalCode || md.postal_code || null,
-      country_code: bp?.countryCode || md.country_code || null,
-      phone_number: bp?.phoneNumber || md.phone_number || null,
+      postal_code: bp?.postal_code || md.postal_code || null,
+      country_code: bp?.country_code || md.country_code || null,
+      phone_number: bp?.phone_number || md.phone_number || null,
       email: bp?.email || md.email || null,
       website: bp?.website || md.website || null,
-      contact_person: bp?.contactPerson || md.contact_person || null,
-      logo_url: bp?.logoUrl ?? md.logo_url ?? null,
+      contact_person: bp?.contact_person || md.contact_person || null,
+      logo_url: bp?.logo_url ?? md.logo_url ?? null,
+      banner_url: bp?.banner_url ?? md.banner_url ?? null,
+      business_description: bp?.business_description || md.business_description || null,
       hours: bp?.hours || md.hours || null,
-      social_links: bp?.socialLinks || md.social_links || null,
-      seo_tags: bp?.seoTags || md.seo_tags || null,
+      social_links: bp?.social_links || md.social_links || null,
+      seo_tags: bp?.seo_tags || md.seo_tags || null,
       latitude: bp?.latitude ? Number(bp.latitude) : (md.latitude || null),
       longitude: bp?.longitude ? Number(bp.longitude) : (md.longitude || null),
-      display_map: bp?.displayMap ?? md.display_map ?? false,
-      map_privacy_mode: bp?.mapPrivacyMode || md.map_privacy_mode || 'precise',
+      display_map: bp?.display_map ?? md.display_map ?? false,
+      map_privacy_mode: bp?.map_privacy_mode || md.map_privacy_mode || 'precise',
     };
     return res.json(profile);
   } catch (e: any) {
