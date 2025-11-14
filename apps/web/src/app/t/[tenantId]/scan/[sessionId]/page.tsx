@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import BarcodeScanner from '@/components/scan/BarcodeScanner';
@@ -39,7 +39,6 @@ export default function TenantActiveScanPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [committing, setCommitting] = useState(false);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (sessionId) {
@@ -173,29 +172,8 @@ export default function TenantActiveScanPage() {
       };
     });
 
-    // Clear existing timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    // Debounce API call
-    debounceTimerRef.current = setTimeout(async () => {
-      try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await api.patch(`${apiBaseUrl}/api/scan/${sessionId}/results/${selectedResult.id}/enrichment`, {
-          [field]: value,
-        });
-
-        if (!response.ok) {
-          console.error('Failed to update enrichment data');
-          // Optionally reload session to revert to server state
-          // await loadSession();
-        }
-      } catch (error) {
-        console.error('Failed to update enrichment:', error);
-      }
-    }, 500); // Wait 500ms after user stops typing
-  }, [selectedResult, session, sessionId]);
+    // No auto-save - data will be saved when user clicks Commit
+  }, [selectedResult, session]);
 
   const handleCommit = async () => {
     if (!session || session.status !== 'active') {
@@ -213,6 +191,19 @@ export default function TenantActiveScanPage() {
       setCommitting(true);
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
+      // First, save all enrichment data for all results
+      console.log('Saving enrichment data for all results...');
+      for (const result of session.results) {
+        if (result.enrichment && Object.keys(result.enrichment).length > 0) {
+          try {
+            await api.patch(`${apiBaseUrl}/api/scan/${sessionId}/results/${result.id}/enrichment`, result.enrichment);
+          } catch (error) {
+            console.error(`Failed to save enrichment for result ${result.id}:`, error);
+          }
+        }
+      }
+      
+      // Then commit the session
       const response = await api.post(`${apiBaseUrl}/api/scan/${sessionId}/commit`, {
         skipValidation: false,
       });
