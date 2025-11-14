@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { MANAGED_SERVICES, type ServiceLevel } from '@/lib/managed-services';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
+import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 
 export default function OfferingsPage() {
   return (
@@ -19,6 +20,8 @@ export default function OfferingsPage() {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+        {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
+        <SubscriptionStatusGuide />
         
         {/* What You Get Overview */}
         <section>
@@ -282,125 +285,87 @@ export default function OfferingsPage() {
               </svg>
             </button>
           </div>
-        </section>
-
-        {/* Feature Progression by Tier */}
-        <section>
           <h2 className="text-2xl font-bold text-neutral-900 mb-2">What's Included at Each Level</h2>
-          <p className="text-neutral-600 mb-6">Each tier builds on the previous one—Starter adds storefront, Professional adds Google Business Profile & maps, Enterprise adds white-label customization</p>
+          <p className="text-neutral-600 mb-6">Each tier builds on the previous oneStarter gives you core visibility, Professional adds POS and intelligence, Enterprise adds AI automation and chain management, Organization adds full chain control.</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Google-Only Entry Tier */}
-            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 rounded-lg p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">🔍</span>
-                <h3 className="font-bold text-green-900 text-lg">Google-Only</h3>
-              </div>
-              <p className="text-xs text-green-700 mb-3 italic">Get discovered on Google instantly!</p>
-              <ul className="space-y-2 text-sm text-green-800">
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">✓</span>
-                  <span><strong>Google Shopping feeds</strong></span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">✓</span>
-                  <span>Google Merchant Center sync</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">✓</span>
-                  <span>Automatic product updates</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">✓</span>
-                  <span>QR code generation (512px)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">✓</span>
-                  <span>Basic product pages</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">✓</span>
-                  <span>Performance analytics</span>
-                </li>
-              </ul>
-              <div className="mt-4 pt-4 border-t border-green-300">
-                <p className="text-xs font-semibold text-green-900">Perfect foot-in-the-door!</p>
-              </div>
-            </div>
-
-            {/* Starter Core Features */}
+            {/* Starter Core Tier */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg p-6">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">🚀</span>
-                <h3 className="font-bold text-blue-900 text-lg">Starter Adds</h3>
+                <span className="text-2xl">f680</span>
+                <h3 className="font-bold text-blue-900 text-lg">Starter (Core)</h3>
               </div>
-              <p className="text-xs text-blue-700 mb-3 italic">Everything in Google-Only, plus:</p>
+              <p className="text-xs text-blue-700 mb-3 italic">Core visibility and storefront for small retailers.</p>
               <ul className="space-y-2 text-sm text-blue-800">
                 <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">✓</span>
-                  <span><strong>Complete storefront</strong> with product catalog</span>
+                  <span className="text-blue-600 mt-0.5"></span>
+                  <span><strong>Storefront with product catalog & search</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">✓</span>
-                  <span><strong>Product search</strong> functionality</span>
+                  <span className="text-blue-600 mt-0.5"></span>
+                  <span>Directory listing</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">✓</span>
-                  <span>Mobile-responsive design</span>
+                  <span className="text-blue-600 mt-0.5"></span>
+                  <span>Google Shopping feeds & Merchant Center sync</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">✓</span>
-                  <span>Enhanced SEO optimization</span>
+                  <span className="text-blue-600 mt-0.5"></span>
+                  <span>Basic barcode scanner + manual entry</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">✓</span>
-                  <span>500 SKU limit</span>
+                  <span className="text-blue-600 mt-0.5"></span>
+                  <span>Basic product enrichment</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5"></span>
+                  <span>QR codes & basic analytics</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5"></span>
+                  <span><strong>Up to 3 locations  500 SKUs per location</strong></span>
                 </li>
               </ul>
               <div className="mt-4 pt-4 border-t border-blue-300">
-                <p className="text-xs font-semibold text-blue-900">Your own online store!</p>
+                <p className="text-xs font-semibold text-blue-900">Your complete online presence, out of the box.</p>
               </div>
             </div>
 
             {/* Professional Adds */}
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-lg p-6">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">⭐</span>
+                <span className="text-2xl">b50</span>
                 <h3 className="font-bold text-purple-900 text-lg">Professional Adds</h3>
               </div>
-              <p className="text-xs text-purple-700 mb-3 italic">Everything in Starter, plus:</p>
+              <p className="text-xs text-purple-700 mb-3 italic">Everything in Starter, plus POS, intelligence, and automation.</p>
               <ul className="space-y-2 text-sm text-purple-800">
                 <li className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">✓</span>
-                  <span><strong>Google Business Profile integration</strong></span>
+                  <span className="text-purple-600 mt-0.5"></span>
+                  <span><strong>Quick Start Wizard</strong> (500 products in seconds)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">✓</span>
-                  <span><strong>Interactive store location maps</strong></span>
+                  <span className="text-purple-600 mt-0.5"></span>
+                  <span>SKU scanning + inventory intelligence</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">✓</span>
-                  <span>Privacy mode for location</span>
+                  <span className="text-purple-600 mt-0.5"></span>
+                  <span>Full Google Business Profile & Shopping suite</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">✓</span>
-                  <span>Business logo display</span>
+                  <span className="text-purple-600 mt-0.5"></span>
+                  <span>Clover + Square POS integration</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">✓</span>
-                  <span>Custom marketing copy</span>
+                  <span className="text-purple-600 mt-0.5"></span>
+                  <span>Advanced analytics & reporting</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">✓</span>
-                  <span>Product image galleries (5 photos)</span>
+                  <span className="text-purple-600 mt-0.5"></span>
+                  <span>Bulk operations & CSV import/export</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">✓</span>
-                  <span>Higher resolution QR codes (1024px)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">✓</span>
-                  <span>5,000 SKU limit</span>
+                  <span className="text-purple-600 mt-0.5"></span>
+                  <span><strong>Up to 10 locations  5,000 SKUs per location</strong></span>
                 </li>
               </ul>
             </div>
@@ -408,212 +373,125 @@ export default function OfferingsPage() {
             {/* Enterprise Adds */}
             <div className="bg-gradient-to-br from-amber-50 to-amber-100 border-2 border-amber-300 rounded-lg p-6">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">👑</span>
+                <span className="text-2xl">f451</span>
                 <h3 className="font-bold text-amber-900 text-lg">Enterprise Adds</h3>
               </div>
-              <p className="text-xs text-amber-700 mb-3 italic">Everything in Professional, plus:</p>
+              <p className="text-xs text-amber-700 mb-3 italic">Everything in Professional, plus full connector + AI automation.</p>
               <ul className="space-y-2 text-sm text-amber-800">
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">✓</span>
-                  <span><strong>White-label storefront</strong> (no platform branding)</span>
+                  <span className="text-amber-600 mt-0.5"></span>
+                  <span>API access & custom integrations</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">✓</span>
-                  <span><strong>Custom domain</strong> for storefront</span>
+                  <span className="text-amber-600 mt-0.5"></span>
+                  <span>Advanced chain management with hero-location testing</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">✓</span>
-                  <span>Advanced map customization</span>
+                  <span className="text-amber-600 mt-0.5"></span>
+                  <span>White-label storefront & custom branding</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">✓</span>
-                  <span>Custom branding & colors</span>
+                  <span className="text-amber-600 mt-0.5"></span>
+                  <span>AI-assisted product enrichment & copy</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">✓</span>
-                  <span>Product image galleries (10 photos)</span>
+                  <span className="text-amber-600 mt-0.5"></span>
+                  <span>Dedicated account manager & SLA-backed support</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">✓</span>
-                  <span>Ultra-high resolution QR codes (2048px)</span>
+                  <span className="text-amber-600 mt-0.5"></span>
+                  <span><strong>Up to 25 locations  10,000+ SKUs per location</strong></span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Organization Adds */}
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-2 border-emerald-300 rounded-lg p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl">f3e2</span>
+                <h3 className="font-bold text-emerald-900 text-lg">Organization Adds</h3>
+              </div>
+              <p className="text-xs text-emerald-700 mb-3 italic">Everything in Enterprise, plus full chain control for franchises & chains.</p>
+              <ul className="space-y-2 text-sm text-emerald-800">
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 mt-0.5"></span>
+                  <span><strong>Unlimited locations</strong> & SKUs (within technical limits)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">✓</span>
-                  <span>Priority support</span>
+                  <span className="text-emerald-600 mt-0.5"></span>
+                  <span>Multiple propagation types across all stores</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 mt-0.5"></span>
+                  <span>Hero location & brand asset distribution</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 mt-0.5"></span>
+                  <span>Org-level dashboard & analytics</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 mt-0.5"></span>
+                  <span>Org-level billing, custom contracts & pricing</span>
                 </li>
               </ul>
             </div>
           </div>
+        </section>
 
-          <div className="mt-6 bg-green-50 border-2 border-green-300 rounded-lg p-4 text-center">
+        <div className="mt-6 bg-green-50 border-2 border-green-300 rounded-lg p-4 text-center">
             <p className="text-sm font-semibold text-green-900">
               💡 <strong>Chain pricing works the same way!</strong> Chain Starter includes all Starter features, Chain Professional adds Professional features, etc. You just get massive discounts for multiple locations.
             </p>
           </div>
-        </section>
-        
-        {/* Free Trial */}
-        <section>
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-6">
-            <div className="flex items-start gap-4">
-              <div className="text-5xl">🆓</div>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-neutral-900 mb-2">14-Day Free Trial</h2>
-                <p className="text-neutral-700 mb-4">
-                  Try any tier risk-free with full access to all features. No credit card required.
-                </p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <h3 className="font-semibold text-neutral-900 mb-2">What's Included:</h3>
-                    <ul className="space-y-1 text-sm">
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Trial any tier (Starter, Professional, or Enterprise)</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Full access to all tier features</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Quick Start Wizard (Professional+)</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Product Scanning (Professional+)</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">✓</span>
-                        <span>Google Shopping & GBP integration</span>
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h3 className="font-semibold text-neutral-900 mb-2">Terms & Conditions:</h3>
-                    <ul className="space-y-1 text-sm text-neutral-700">
-                      <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>14 days from account creation</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>No credit card required to start</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>Choose your tier at signup</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>Add payment before trial ends to continue</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">•</span>
-                        <span>Cancel anytime with no charges</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-                
-                <div className="bg-white border border-green-300 rounded-lg p-3">
-                  <p className="text-sm text-neutral-800">
-                    <strong>💡 Pro Tip:</strong> Use the trial period to upload your inventory, test QR codes, and see how our platform drives traffic to your business before committing to a paid plan.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-        
+
         {/* Individual Location Subscriptions */}
         <section>
           <h2 className="text-2xl font-bold text-neutral-900 mb-2">Individual Location Subscriptions</h2>
-          <p className="text-neutral-600 mb-6">Perfect for single-location businesses</p>
+          <p className="text-neutral-600 mb-6">Perfect for individual retailers and small chains</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Google-Only */}
-            <Card className="border-2 border-green-200">
-              <CardHeader>
-                <div className="flex items-center justify-between mb-2">
-                  <CardTitle>Google-Only</CardTitle>
-                  <Badge variant="default" className="bg-green-100 text-green-800">$29/mo</Badge>
-                </div>
-                <p className="text-sm text-neutral-600">Get discovered on Google</p>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>250 SKUs</strong></span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>Google Shopping feeds</strong></span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Google Merchant Center sync</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>512px QR codes</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Basic product pages</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Performance analytics</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-400 mt-0.5">✗</span>
-                    <span className="text-neutral-400">No storefront</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
             {/* Starter */}
             <Card className="border-2 border-neutral-200">
               <CardHeader>
                 <div className="flex items-center justify-between mb-2">
                   <CardTitle>Starter</CardTitle>
-                  <Badge variant="default" className="bg-blue-100 text-blue-800">$49/mo</Badge>
+                  <Badge variant="default" className="bg-blue-100 text-blue-800">$29/mo</Badge>
                 </div>
-                <p className="text-sm text-neutral-600">Get started with the basics</p>
+                <p className="text-sm text-neutral-600">Core visibility and storefront</p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>500 SKUs</strong></span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span><strong>Up to 3 locations</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>Public storefront</strong> with product catalog</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span><strong>Up to 500 SKUs per location</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Product search functionality</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Public storefront with catalog & search</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>512px QR codes</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Directory listing</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Google Shopping feeds</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Google Shopping feeds & Merchant Center sync</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Basic product pages</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Basic barcode scanner + manual entry</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Platform branding</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Basic product enrichment</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>QR codes & basic analytics</span>
                   </li>
                 </ul>
               </CardContent>
@@ -627,51 +505,43 @@ export default function OfferingsPage() {
               <CardHeader>
                 <div className="flex items-center justify-between mb-2">
                   <CardTitle>Professional</CardTitle>
-                  <Badge variant="default" className="bg-purple-100 text-purple-800">$499/mo</Badge>
+                  <Badge variant="default" className="bg-purple-100 text-purple-800">$99/mo</Badge>
                 </div>
-                <p className="text-sm text-neutral-600">Enhanced features for growth</p>
+                <p className="text-sm text-neutral-600">Connected & growing retailers (POS + intelligence)</p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>5,000 SKUs</strong></span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span><strong>Up to 10 locations</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>Enhanced storefront</strong> with custom branding</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span><strong>Up to 5,000 SKUs per location</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>Google Business Profile integration</strong></span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Quick Start Wizard (500 products in seconds)</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>Interactive store location maps</strong></span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>SKU scanning + inventory intelligence</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Privacy mode for location display</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Full Google Business Profile & Shopping suite</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>1024px QR codes</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Clover + Square POS integration</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Business logo display</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Advanced analytics & bulk operations</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Custom marketing copy</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Product image galleries (5 photos)</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Custom CTAs & social links</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>CSV import/export & higher enrichment quotas</span>
                   </li>
                 </ul>
               </CardContent>
@@ -682,51 +552,78 @@ export default function OfferingsPage() {
               <CardHeader>
                 <div className="flex items-center justify-between mb-2">
                   <CardTitle>Enterprise</CardTitle>
-                  <Badge variant="default" className="bg-amber-100 text-amber-800">$999/mo</Badge>
+                  <Badge variant="default" className="bg-amber-100 text-amber-800">$499/mo</Badge>
                 </div>
-                <p className="text-sm text-neutral-600">Full customization & white-label</p>
+                <p className="text-sm text-neutral-600">Full connector + AI automation</p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>Unlimited SKUs</strong></span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span><strong>Up to 25 locations</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>White-label storefront</strong> (no platform branding)</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span><strong>10,000+ SKUs per location</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span><strong>Custom domain</strong> for storefront</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>API access & custom integrations</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Advanced map customization</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Advanced chain management with hero-location testing</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>2048px QR codes</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>White-label storefront & custom branding</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Fully custom page layouts</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>AI-assisted product enrichment & copy</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Custom branding & colors</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Dedicated account manager & SLA-backed support</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Organization */}
+            <Card className="border-2 border-emerald-300">
+              <CardHeader>
+                <div className="flex items-center justify-between mb-2">
+                  <CardTitle>Organization</CardTitle>
+                  <Badge variant="default" className="bg-emerald-100 text-emerald-800">Custom</Badge>
+                </div>
+                <p className="text-sm text-neutral-600">For chains & franchises (25+ locations)</p>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span><strong>Unlimited locations</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Product image galleries (10 photos)</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Unlimited SKUs (within technical limits)</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Custom sections & themes</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Full chain management & multi-type propagation</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Priority support</span>
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Hero location & brand asset distribution</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Org-level analytics and billing</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5"></span>
+                    <span>Custom contracts & pricing</span>
                   </li>
                 </ul>
               </CardContent>

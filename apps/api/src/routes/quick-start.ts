@@ -13,7 +13,7 @@ import { UserRole } from '@prisma/client';
 import { isPlatformAdmin, isPlatformUser, canViewAllTenants, canPerformSupportActions } from '../utils/platform-admin';
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
-import { requireTierFeature } from '../middleware/tier-access';
+import { requireTierFeature, requireWritableSubscription } from '../middleware/tier-access';
 
 const router = Router();
 
@@ -83,7 +83,7 @@ const quickStartSchema = z.object({
   createAsDrafts: z.boolean().optional().default(true),
 });
 
-router.post('/tenants/:tenantId/quick-start', authenticateToken, requireTierFeature('quick_start_wizard'), validateSKULimits, async (req, res) => {
+router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quick_start_wizard'), validateSKULimits, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId;

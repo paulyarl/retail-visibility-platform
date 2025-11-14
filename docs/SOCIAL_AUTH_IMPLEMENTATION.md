@@ -4,6 +4,17 @@
 **Timeline:** 5-6 weeks  
 **Priority:** High
 
+**Platform context:**
+- Frontend: Next.js app deployed on **Vercel** (`apps/web`).
+- Backend: **Custom Express API** (`apps/api`) using Prisma, connecting to the **Supabase Postgres** database.
+- Auth: Existing **JWT-based auth** and multi-tenant RBAC (platform roles + tenant roles); social login must integrate cleanly with this system.
+- We are **not** using Supabase Auth for this flow; `apps/api` remains the source of truth for user identities and sessions.
+
+**Provider priority:**
+- ✅ Google: High priority (Phase 2) – implement first.
+- ✅ Microsoft: High priority (Phase 3) – implement alongside/after Google.
+- 💤 Apple: **Low priority / optional** (Phase 4+) due to ongoing Apple Developer Program cost; can be deferred until there is clear demand.
+
 ---
 
 ## Quick Start Checklist
@@ -11,11 +22,39 @@
 Before implementation:
 - [ ] Create Google OAuth app (Google Cloud Console)
 - [ ] Create Microsoft OAuth app (Azure Portal)
-- [ ] Enroll in Apple Developer Program ($99/year)
+- [ ] (Optional, **low priority**) Enroll in Apple Developer Program ($99/year) – only needed when implementing Phase 4 (Apple Sign In)
 - [ ] Set up environment variables
 - [ ] Review security requirements
 
 ---
+
+## Platform Context & Role Mapping
+
+### Platform Architecture
+
+- This implementation assumes:
+  - `apps/api` is the **authoritative auth backend**, exposing `/api/auth/*` routes.
+  - Prisma connects to the **Supabase Postgres** instance used by the rest of the platform.
+  - The frontend on Vercel (`apps/web`) calls `apps/api` via `NEXT_PUBLIC_API_BASE_URL`.
+
+### Multi-Tenant & Role Mapping
+
+Social auth must respect the existing multi-tenant + role system:
+
+- **New user via social login**
+  - When `findOrCreateUser` creates a brand-new user (no existing record by email):
+    - Assign the **lowest-privilege default role** per current RBAC (e.g., basic platform viewer/user).
+    - Do **not** automatically attach the user to any tenant; tenant membership should be created via existing flows (create-tenant, invite-accept, etc.).
+
+- **Existing user by email**
+  - If a user record already exists for the OAuth-provided email (e.g., created via email/password or invite), `findOrCreateUser` must **link** the OAuth provider to that user and **not** create a duplicate account.
+  - This ensures invites, membership, and permissions tied to that email are preserved.
+
+- **Tenant membership & permissions**
+  - Social login should **not bypass** any tenant-level permissions. After login, the user’s effective capabilities still flow through the existing permission system (`canAccess`, tier checks, role hierarchy).
+  - Any role upgrades (e.g., OWNER/ADMIN/MANAGER for a tenant) continue to be managed via existing settings flows, not via social login.
+
+This keeps social auth focused on identity, while ownership, tenant membership, and permissions remain under current, centralized control.
 
 ## Phase 1: Database & Configuration (Week 1)
 
@@ -588,12 +627,14 @@ Similar structure to Google, with Microsoft-specific endpoints and user info nor
 
 ---
 
-## Phase 4: Apple Sign In (Week 4)
+## Phase 4: Apple Sign In (Week 4, low priority / optional)
 
 Apple has unique requirements:
 - JWT-based client secret
 - Private email relay
 - Name provided only on first auth
+
+> **Priority note:** Due to the annual cost of the Apple Developer Program and the current platform focus on Google/Microsoft, Phase 4 is considered **low priority** and **optional** for initial launch. Apple Sign In should be implemented only after Google and Microsoft flows are stable and there is clear customer demand.
 
 **Key Files:**
 - `apps/api/src/routes/auth-apple.ts`
@@ -621,6 +662,32 @@ router.post('/account/link/google', authenticateToken, async (req, res) => {
 3. **Token Encryption**
 4. **Rate Limiting**
 5. **Audit Logging**
+
+#### Security Implementation Details
+
+- **State handling**
+  - `generateState()` already creates a random value. For production, state should be **signed and validated**:
+    - Sign state using `OAUTH_STATE_SECRET` and store either in a short-lived, httpOnly cookie or embed a signature in the state value itself.
+    - On `/callback`, validate that the incoming `state` matches what was issued; if not, reject the request.
+
+- **PKCE usage**
+  - For public clients (e.g., mobile apps), implement PKCE:
+    - Generate a `code_verifier` and `code_challenge` on the client.
+    - Include `code_challenge` when redirecting to the provider.
+    - Include `code_verifier` when exchanging the code for tokens.
+
+- **Token handling**
+  - Current examples pass access/refresh tokens via URL query parameters and store them in `localStorage`. This matches the existing custom auth flow but has security trade-offs (URL leakage, XSS risk).
+  - For a future hardening pass, consider:
+    - Using **httpOnly cookies** for session tokens where feasible.
+    - Avoiding long-lived tokens in browser storage.
+
+- **ID token verification (where applicable)**
+  - For providers that issue ID tokens (e.g., Google, Microsoft, Apple), consider verifying ID token signatures and claims (issuer, audience, expiry) as an additional safeguard, especially if you rely on ID token fields instead of separate `/userinfo` calls.
+
+- **Audit & rate limiting**
+  - Log OAuth errors with provider, reason, and correlation IDs.
+  - Apply rate limiting on `/api/auth/*` endpoints to mitigate abuse.
 
 ---
 
@@ -653,3 +720,182 @@ router.post('/account/link/google', authenticateToken, async (req, res) => {
 ---
 
 **Ready to implement!** All code examples are production-ready and can be used directly.
+
+---
+
+## Implementation Appendix: Security Helpers (TypeScript)
+
+These helpers complement Phase 5 (Security) and are designed to be dropped into `apps/api` and reused across providers.
+
+### A. OAuth State Signing & Validation
+
+**File:** `apps/api/src/utils/oauth-state.ts`
+
+```ts
+import crypto from 'crypto';
+
+const STATE_SECRET = process.env.OAUTH_STATE_SECRET!;
+
+// Generates a signed state string: <random>.<signature>
+export function generateSignedState(): string {
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const signature = signValue(nonce);
+  return `${nonce}.${signature}`;
+}
+
+export function validateSignedState(state: string | undefined | null): boolean {
+  if (!state) return false;
+  const [nonce, signature] = state.split('.');
+  if (!nonce || !signature) return false;
+  const expected = signValue(nonce);
+  return timingSafeEqual(signature, expected);
+}
+
+function signValue(value: string): string {
+  return crypto
+    .createHmac('sha256', STATE_SECRET)
+    .update(value)
+    .digest('hex');
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'hex');
+  const bufB = Buffer.from(b, 'hex');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+```
+
+**Usage:**
+
+- When initiating OAuth:
+  - Use `generateSignedState()` in `oauthService.generateAuthUrl()` instead of `generateState()`.
+  - Optionally, also store the raw nonce in a short-lived cookie if you want extra correlation.
+
+- In `/callback` routes:
+  - Validate `state` before exchanging the `code`:
+
+  ```ts
+  import { validateSignedState } from '../utils/oauth-state';
+
+  const { code, state } = req.query;
+  if (!validateSignedState(state as string)) {
+    return res.redirect(`${process.env.FRONTEND_URL}/login?error=invalid_state`);
+  }
+  ```
+
+---
+
+### B. PKCE Utility (for Public Clients)
+
+If you build native/mobile or public clients, PKCE can be used alongside server-side flows.
+
+**File (example client-side helper):** `apps/web/src/utils/pkce.ts`
+
+```ts
+// Note: This is a client-side helper; do not use Node crypto here.
+
+async function sha256(input: string): Promise<ArrayBuffer> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  return crypto.subtle.digest('SHA-256', data);
+}
+
+function base64UrlEncode(arrayBuffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = '';
+  bytes.forEach(b => (binary += String.fromCharCode(b)));
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export async function generatePkcePair() {
+  const verifier = [...crypto.getRandomValues(new Uint8Array(32))]
+    .map(x => ('0' + x.toString(16)).slice(-2))
+    .join('');
+
+  const hash = await sha256(verifier);
+  const challenge = base64UrlEncode(hash);
+
+  return { verifier, challenge };
+}
+```
+
+You would:
+
+- Generate `{ verifier, challenge }` on the client.
+- Store `verifier` in local storage or a secure cookie until callback.
+- Add `code_challenge` & `code_challenge_method=S256` to the authorization URL.
+- Include `code_verifier` in the token exchange request.
+
+Server-side token exchange would then add `code_verifier` to the POST payload for providers that support PKCE.
+
+---
+
+### C. ID Token Verification (Optional Hardening)
+
+For providers that issue ID tokens (Google, Microsoft, Apple), you can optionally validate them.
+
+**File:** `apps/api/src/utils/id-token.ts`
+
+```ts
+import jwt, { JwtHeader, SigningKeyCallback } from 'jsonwebtoken';
+import jwksClient from 'jwks-rsa';
+
+interface VerifyOptions {
+  issuer: string;
+  audience: string;
+  jwksUri: string;
+}
+
+export async function verifyIdToken(idToken: string, opts: VerifyOptions): Promise<any> {
+  const client = jwksClient({ jwksUri: opts.jwksUri });
+
+  function getKey(header: JwtHeader, callback: SigningKeyCallback) {
+    if (!header.kid) {
+      return callback(new Error('No kid in token header'));
+    }
+    client.getSigningKey(header.kid, (err, key) => {
+      if (err) return callback(err);
+      const signingKey = key?.getPublicKey();
+      callback(null, signingKey);
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    jwt.verify(
+      idToken,
+      getKey,
+      {
+        issuer: opts.issuer,
+        audience: opts.audience,
+        algorithms: ['RS256'],
+      },
+      (err, decoded) => {
+        if (err) return reject(err);
+        resolve(decoded);
+      },
+    );
+  });
+}
+```
+
+**Example (Google ID token):**
+
+```ts
+// After exchanging code for tokens and receiving id_token from Google
+import { verifyIdToken } from '../utils/id-token';
+
+const decoded = await verifyIdToken(tokens.id_token!, {
+  issuer: 'https://accounts.google.com',
+  audience: process.env.GOOGLE_CLIENT_ID!,
+  jwksUri: 'https://www.googleapis.com/oauth2/v3/certs',
+});
+
+// decoded now contains claims; you can cross-check email, email_verified, etc.
+```
+
+This is optional for initial implementation but provides an additional security layer where needed.
+
+---
+
+These helpers, together with the main spec above, give you a concrete, implementation-ready foundation for secure social auth integration on top of your existing Vercel + Supabase + custom API stack.

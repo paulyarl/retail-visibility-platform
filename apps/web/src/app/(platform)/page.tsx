@@ -17,6 +17,7 @@ import PublicFooter from "@/components/PublicFooter";
 import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
 import { computeStoreStatus } from "@/lib/hours-utils";
 import SubscriptionUsageBadge from "@/components/subscription/SubscriptionUsageBadge";
+import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
 
 export default function PlatformHomePage() {
   return <Home embedded />;
@@ -284,6 +285,9 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
+        {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
+        {isAuthenticated && <SubscriptionStatusGuide />}
+
         {/* Banner Hero Section (if authenticated and banner exists) */}
         {isAuthenticated && tenantData?.bannerUrl && (
           <div className="mb-6 sm:mb-8">

@@ -385,6 +385,58 @@ export function requireAnyTierFeature(features: string[]) {
   };
 }
 
+export async function requireWritableSubscription(req: Request, res: Response, next: NextFunction) {
+  try {
+    const tenantId = (req.params.tenantId || req.params.id || req.body.tenantId || req.query.tenantId) as string | undefined;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        error: 'tenant_id_required',
+        message: 'Tenant ID is required for write operations',
+      });
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: String(tenantId) },
+      select: {
+        subscriptionTier: true,
+        subscriptionStatus: true,
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'tenant_not_found',
+        message: 'Tenant not found',
+      });
+    }
+
+    const tier = tenant.subscriptionTier || 'starter';
+    const status = tenant.subscriptionStatus || 'active';
+
+    const isInactive = status === 'canceled' || status === 'expired';
+    const isReadOnlyTier = tier === 'google_only';
+
+    if (isInactive || isReadOnlyTier) {
+      return res.status(403).json({
+        error: 'subscription_read_only',
+        message: 'Your account is in read-only visibility mode. Upgrade to add or update products or sync new changes.',
+        subscriptionTier: tier,
+        subscriptionStatus: status,
+        upgradeUrl: '/settings/subscription',
+      });
+    }
+
+    return next();
+  } catch (error) {
+    console.error('[requireWritableSubscription] Error:', error);
+    return res.status(500).json({
+      error: 'subscription_check_failed',
+      message: 'Failed to check subscription status',
+    });
+  }
+}
+
 /**
  * Get all available features for a tier
  */

@@ -96,6 +96,40 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Enforce subscription state with 6-month maintenance window for google_only fallback
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    const tier = tenant.subscriptionTier || 'starter';
+    const status = tenant.subscriptionStatus || 'active';
+    const now = new Date();
+    const isInactive = status === 'canceled' || status === 'expired';
+
+    // google_only maintenance window: allow enrichment while active and before trialEndsAt boundary.
+    // trialEndsAt is treated as the current maintenance boundary and should be extended externally
+    // in 6-month increments while the subscription remains active.
+    const inMaintenanceWindow =
+      tier === 'google_only' &&
+      status === 'active' &&
+      (!tenant.trialEndsAt || now < tenant.trialEndsAt);
+
+    const isFullyFrozen = isInactive || (tier === 'google_only' && !inMaintenanceWindow);
+
+    if (isFullyFrozen) {
+      return res.status(403).json({
+        error: 'subscription_read_only',
+        message: 'Your account is in read-only visibility mode. Upgrade to add or update products or sync new changes.',
+        subscriptionTier: tier,
+        subscriptionStatus: status,
+      });
+    }
+
     // Get existing product
     const product = await prisma.inventoryItem.findUnique({
       where: { id: productId },

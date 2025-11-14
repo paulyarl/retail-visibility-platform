@@ -27,6 +27,42 @@ router.post('/', async (req, res) => {
   try {
     const body = createFeedJobSchema.parse(req.body);
 
+    // Block feed pushes for fully frozen tenants, but allow google_only fallback
+    // tenants to push feeds while they are active and within the maintenance window.
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: body.tenantId },
+      select: { subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'tenant_not_found',
+      });
+    }
+
+    const tier = tenant.subscriptionTier || 'starter';
+    const status = tenant.subscriptionStatus || 'active';
+    const now = new Date();
+    const isInactive = status === 'canceled' || status === 'expired';
+
+    const inMaintenanceWindow =
+      tier === 'google_only' &&
+      status === 'active' &&
+      (!tenant.trialEndsAt || now < tenant.trialEndsAt);
+
+    const isFullyFrozen = isInactive || (tier === 'google_only' && !inMaintenanceWindow);
+
+    if (isFullyFrozen) {
+      return res.status(403).json({
+        success: false,
+        error: 'subscription_read_only',
+        message: 'Your account is in read-only visibility mode. Upgrade to sync products to Google.',
+        subscriptionTier: tier,
+        subscriptionStatus: status,
+      });
+    }
+
     // Optional enforcement: block feed pushes when categories are missing/unmapped
     if (Flags.FEED_ALIGNMENT_ENFORCE === true) {
       const tenantId = body.tenantId;

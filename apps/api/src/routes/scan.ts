@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { requireTierFeature } from '../middleware/tier-access';
+import { requireTierFeature, requireWritableSubscription } from '../middleware/tier-access';
 import { prisma } from '../prisma';
 // import { Flags } from '../config';
 import { audit } from '../audit';
@@ -54,7 +54,7 @@ const commitSessionSchema = z.object({
 });
 
 // POST /scan/start - Start new scan session
-router.post('/scan/start', authenticateToken, /* requireTierFeature('barcode_scan'), */ async (req: Request, res: Response) => {
+router.post('/scan/start', authenticateToken, requireWritableSubscription, /* requireTierFeature('barcode_scan'), */ async (req: Request, res: Response) => {
   try {
     // if (!Flags.SKU_SCANNING) {
     //   return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SKU_SCANNING' });
@@ -186,6 +186,31 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
+    // Block commit for read-only or inactive subscriptions
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: session.tenantId },
+      select: { subscriptionTier: true, subscriptionStatus: true },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ success: false, error: 'tenant_not_found' });
+    }
+
+    const tier = tenant.subscriptionTier || 'starter';
+    const status = tenant.subscriptionStatus || 'active';
+    const isInactive = status === 'canceled' || status === 'expired';
+    const isReadOnlyTier = tier === 'google_only';
+
+    if (isInactive || isReadOnlyTier) {
+      return res.status(403).json({
+        success: false,
+        error: 'subscription_read_only',
+        message: 'Your account is in read-only visibility mode. Upgrade to add or update products or sync new changes.',
+        subscriptionTier: tier,
+        subscriptionStatus: status,
+      });
+    }
+
     // Check if barcode already scanned in this session
     const existing = await prisma.scanResult.findFirst({
       where: { sessionId, barcode },
@@ -285,6 +310,31 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
     // Check tenant access
     if (!hasAccessToTenant(req, session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Block commit for read-only or inactive subscriptions
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: session.tenantId },
+      select: { subscriptionTier: true, subscriptionStatus: true },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ success: false, error: 'tenant_not_found' });
+    }
+
+    const tier = tenant.subscriptionTier || 'starter';
+    const status = tenant.subscriptionStatus || 'active';
+    const isInactive = status === 'canceled' || status === 'expired';
+    const isReadOnlyTier = tier === 'google_only';
+
+    if (isInactive || isReadOnlyTier) {
+      return res.status(403).json({
+        success: false,
+        error: 'subscription_read_only',
+        message: 'Your account is in read-only visibility mode. Upgrade to add or update products or sync new changes.',
+        subscriptionTier: tier,
+        subscriptionStatus: status,
+      });
     }
 
     if (session.results.length === 0) {

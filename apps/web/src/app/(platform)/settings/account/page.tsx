@@ -6,6 +6,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { Shield, User, Building2, Crown } from 'lucide-react';
 import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
+import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 
 export default function AccountPage() {
   const { user } = useAuth();
@@ -140,6 +141,9 @@ export default function AccountPage() {
       />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
+        <SubscriptionStatusGuide />
+
         {/* User Information */}
         <Card>
           <CardHeader>

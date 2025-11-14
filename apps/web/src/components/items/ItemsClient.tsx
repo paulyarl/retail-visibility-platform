@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import { Modal, ModalFooter, Button, Input, Alert, ConfirmDialog } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 
 // Hooks
 import { useItemsData } from '@/hooks/useItemsData';
@@ -363,6 +364,9 @@ export default function ItemsClient({
       />
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
+        {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
+        <SubscriptionStatusGuide />
+
         {/* Header with Stats */}
         <ItemsHeader
           stats={stats}

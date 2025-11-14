@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ContextBadges } from '@/components/ContextBadges';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
+import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 
 interface Tenant {
   id: string;
@@ -217,7 +218,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
             {/* Individual Plans */}
             <h3 className="text-lg font-semibold text-neutral-900 mb-4">Individual Location Plans</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {(['google_only', 'starter', 'professional', 'enterprise'] as SubscriptionTier[]).map((tier) => {
+              {(['starter', 'professional', 'enterprise', 'organization'] as SubscriptionTier[]).map((tier) => {
                 const info = TIER_LIMITS[tier];
                 return (
                   <Card key={tier} className="border-2 border-neutral-200">
@@ -367,7 +368,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
       }
 
       // Determine if upgrade or downgrade
-      const tierOrder = ['trial', 'google_only', 'starter', 'professional', 'enterprise'];
+      const tierOrder = ['trial', 'starter', 'professional', 'enterprise', 'organization'];
       const chainTierOrder = ['chain_starter', 'chain_professional', 'chain_enterprise'];
       
       const currentIndex = isChainTier 
@@ -410,7 +411,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
     }
   };
 
-  const availableTiers: SubscriptionTier[] = ['google_only', 'starter', 'professional', 'enterprise', 'organization'];
+  const availableTiers: SubscriptionTier[] = ['starter', 'professional', 'enterprise', 'organization'];
   const availableChainTiers: ChainTier[] = ['chain_starter', 'chain_professional', 'chain_enterprise'];
 
   return (
@@ -426,6 +427,9 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
       />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
+        <SubscriptionStatusGuide />
+
         {/* Context Badges */}
         <ContextBadges 
           tenant={tenant || undefined} 

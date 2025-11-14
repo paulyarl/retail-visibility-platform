@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { canEditTenant, canDeleteTenant, canRenameTenant } from "@/lib/auth/access-control";
 import { ContextBadges } from "@/components/ContextBadges";
+import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
 
 type Tenant = { 
   id: string; 
@@ -179,6 +180,9 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
+        <SubscriptionStatusGuide />
+
         {/* Context Badges */}
         <ContextBadges showPlatformRole contextLabel="Tenants" />
         {/* Quick Stats Dashboard */}
