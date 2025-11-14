@@ -181,12 +181,9 @@ app.use('/health', healthRoutes);
 app.get("/tenants", authenticateToken, async (req, res) => {
   try {
     // Platform users (admin, support, viewer) see all tenants, regular users see only their tenants
-    const isPlatformUserRole = req.user?.role === 'ADMIN' || 
-                                req.user?.role === 'PLATFORM_ADMIN' ||
-                                req.user?.role === 'PLATFORM_SUPPORT' ||
-                                req.user?.role === 'PLATFORM_VIEWER';
+    const { isPlatformUser } = await import('./utils/platform-admin');
     const tenants = await prisma.tenant.findMany({ 
-      where: isPlatformUserRole ? {} : {
+      where: isPlatformUser(req.user) ? {} : {
         users: {
           some: {
             userId: req.user?.userId
