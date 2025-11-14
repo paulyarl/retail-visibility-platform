@@ -39,6 +39,7 @@ interface Tenant {
     address?: string;
     logo_url?: string;
     banner_url?: string;
+    business_description?: string;
   };
 }
 
