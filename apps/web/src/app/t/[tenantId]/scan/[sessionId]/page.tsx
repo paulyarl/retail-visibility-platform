@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import BarcodeScanner from '@/components/scan/BarcodeScanner';
@@ -39,6 +39,7 @@ export default function TenantActiveScanPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [committing, setCommitting] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (sessionId) {
@@ -142,28 +143,59 @@ export default function TenantActiveScanPage() {
     }
   };
 
-  const handleEnrichmentEdit = async (field: string, value: any) => {
+  const handleEnrichmentEdit = useCallback((field: string, value: any) => {
     if (!selectedResult || !session || session.status !== 'active') {
       return;
     }
 
-    try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.patch(`${apiBaseUrl}/api/scan/${sessionId}/results/${selectedResult.id}/enrichment`, {
-        [field]: value,
-      });
+    // Update local state immediately for responsive UI
+    setSelectedResult(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        enrichment: {
+          ...prev.enrichment,
+          [field]: value,
+        },
+      };
+    });
 
-      if (response.ok) {
-        // Reload session to get updated enrichment data
-        await loadSession();
-      } else {
-        alert('Failed to update enrichment data');
-      }
-    } catch (error) {
-      console.error('Failed to update enrichment:', error);
-      alert('Failed to update enrichment data');
+    // Update session results to keep UI in sync
+    setSession(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        results: prev.results.map(r => 
+          r.id === selectedResult.id 
+            ? { ...r, enrichment: { ...r.enrichment, [field]: value } }
+            : r
+        ),
+      };
+    });
+
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
-  };
+
+    // Debounce API call
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const response = await api.patch(`${apiBaseUrl}/api/scan/${sessionId}/results/${selectedResult.id}/enrichment`, {
+          [field]: value,
+        });
+
+        if (!response.ok) {
+          console.error('Failed to update enrichment data');
+          // Optionally reload session to revert to server state
+          // await loadSession();
+        }
+      } catch (error) {
+        console.error('Failed to update enrichment:', error);
+      }
+    }, 500); // Wait 500ms after user stops typing
+  }, [selectedResult, session, sessionId]);
 
   const handleCommit = async () => {
     if (!session || session.status !== 'active') {
