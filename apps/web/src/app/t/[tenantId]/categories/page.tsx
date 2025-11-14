@@ -40,6 +40,9 @@ export default function CategoriesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
+  // Filter state
+  const [filterUnmapped, setFilterUnmapped] = useState(false)
+
   // Edit modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selected, setSelected] = useState<Category | null>(null)
@@ -74,12 +77,23 @@ export default function CategoriesPage() {
     setTimeout(() => setToast(null), 3000)
   }
 
+  // Filtered categories
+  const filteredCategories = useMemo(() => {
+    if (!filterUnmapped) return categories
+    return categories.filter(cat => !cat.googleCategoryId)
+  }, [categories, filterUnmapped])
+
   // Paginated categories
   const paginatedCategories = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize
     const endIndex = startIndex + pageSize
-    return categories.slice(startIndex, endIndex)
-  }, [categories, currentPage, pageSize])
+    return filteredCategories.slice(startIndex, endIndex)
+  }, [filteredCategories, currentPage, pageSize])
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterUnmapped])
 
   useEffect(() => {
     async function fetchData() {
@@ -422,7 +436,36 @@ export default function CategoriesPage() {
       {/* Categories List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Categories</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold">Categories</h2>
+            {alignmentStatus && alignmentStatus.unmapped > 0 && (
+              <button
+                onClick={() => setFilterUnmapped(!filterUnmapped)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  filterUnmapped
+                    ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                    : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                }`}
+                title={filterUnmapped ? 'Show all categories' : 'Show only unmapped categories'}
+              >
+                {filterUnmapped ? (
+                  <>
+                    <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    Unmapped Only ({alignmentStatus.unmapped})
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+                    </svg>
+                    Filter Unmapped ({alignmentStatus.unmapped})
+                  </>
+                )}
+              </button>
+            )}
+          </div>
           <div className="flex gap-2">
             {organizationInfo && categories.length > 0 && (
               <button
@@ -506,7 +549,7 @@ export default function CategoriesPage() {
         {categories.length > 0 && (
           <Pagination
             currentPage={currentPage}
-            totalItems={categories.length}
+            totalItems={filteredCategories.length}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
             onPageSizeChange={(size) => {
