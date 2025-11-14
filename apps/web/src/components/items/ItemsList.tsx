@@ -90,6 +90,11 @@ export default function ItemsList({
                       {item.name}
                     </h3>
                     <p className="text-xs sm:text-sm text-neutral-500 font-mono">{item.sku}</p>
+                    {item.description && (
+                      <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mt-1 line-clamp-2">
+                        {item.description}
+                      </p>
+                    )}
                     {item.categoryPath && item.categoryPath.length > 0 && (
                       <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-md border border-blue-200 dark:border-blue-800 mt-1">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
