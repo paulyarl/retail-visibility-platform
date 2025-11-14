@@ -2,12 +2,12 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { requireTierFeature } from '../middleware/tier-access';
 import { prisma } from '../prisma';
-import { Flags } from '../config';
+// import { Flags } from '../config';
 import { audit } from '../audit';
 import { z } from 'zod';
 import { UserRole, Prisma } from '@prisma/client';
-import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
-import { imageEnrichmentService } from '../services/ImageEnrichmentService';
+// import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
+// import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
 import {
   scanSessionStarted,
@@ -56,9 +56,9 @@ const commitSessionSchema = z.object({
 // POST /scan/start - Start new scan session
 router.post('/scan/start', authenticateToken, requireTierFeature('barcode_scan'), async (req: Request, res: Response) => {
   try {
-    if (!Flags.SKU_SCANNING) {
-      return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SKU_SCANNING' });
-    }
+    // if (!Flags.SKU_SCANNING) {
+    //   return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SKU_SCANNING' });
+    // }
 
     const parsed = startSessionSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -74,12 +74,12 @@ router.post('/scan/start', authenticateToken, requireTierFeature('barcode_scan')
     }
 
     // Check device type permissions
-    if (deviceType === 'camera' && !Flags.SCAN_CAMERA) {
-      return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SCAN_CAMERA' });
-    }
-    if (deviceType === 'usb' && !Flags.SCAN_USB) {
-      return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SCAN_USB' });
-    }
+    // if (deviceType === 'camera' && !Flags.SCAN_CAMERA) {
+    //   return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SCAN_CAMERA' });
+    // }
+    // if (deviceType === 'usb' && !Flags.SCAN_USB) {
+    //   return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SCAN_USB' });
+    // }
 
     // Check rate limit: max 50 active sessions per tenant
     const activeSessions = await prisma.scanSession.count({
@@ -207,9 +207,9 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
     });
 
     // Perform barcode lookup/enrichment using the service
-    const enrichment = Flags.SCAN_ENRICHMENT 
-      ? await barcodeEnrichmentService.enrich(barcode, session.tenantId)
-      : null;
+    // const enrichment = Flags.SCAN_ENRICHMENT 
+    //   ? await barcodeEnrichmentService.enrich(barcode, session.tenantId)
+    //   : null;
 
     // Create scan result
     const result = await prisma.scanResult.create({
@@ -219,7 +219,7 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
         barcode,
         sku: sku || barcode,
         status: duplicateItem ? 'duplicate' : 'new',
-        enrichment: enrichment as any || {},
+        enrichment: {} as any, // enrichment as any || {},
         duplicateOf: duplicateItem?.id,
         rawPayload: { barcode, sku, timestamp: new Date().toISOString() },
       },
@@ -413,24 +413,24 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
         committed.push(item.id);
 
         // Process product images if available
-        if (Flags.SCAN_ENRICHMENT && enrichment) {
-          try {
-            const imageUrls = imageEnrichmentService.extractImageUrls(enrichment);
-            if (imageUrls.length > 0) {
-              const imageCount = await imageEnrichmentService.processProductImages(
-                session.tenantId,
-                item.id,
-                item.sku,
-                imageUrls,
-                item.name
-              );
-              console.log(`[commit] Processed ${imageCount}/${imageUrls.length} images for ${item.sku}`);
-            }
-          } catch (imageError) {
-            // Don't fail commit if image processing fails
-            console.error(`[commit] Failed to process images for ${item.sku}:`, imageError);
-          }
-        }
+        // if (Flags.SCAN_ENRICHMENT && enrichment) {
+        //   try {
+        //     const imageUrls = imageEnrichmentService.extractImageUrls(enrichment);
+        //     if (imageUrls.length > 0) {
+        //       const imageCount = await imageEnrichmentService.processProductImages(
+        //         session.tenantId,
+        //         item.id,
+        //         item.sku,
+        //         imageUrls,
+        //         item.name
+        //       );
+        //       console.log(`[commit] Processed ${imageCount}/${imageUrls.length} images for ${item.sku}`);
+        //     }
+        //   } catch (imageError) {
+        //     // Don't fail commit if image processing fails
+        //     console.error(`[commit] Failed to process images for ${item.sku}:`, imageError);
+        //   }
+        // }
       } catch (error) {
         console.error(`[commit] Failed to create item for barcode ${result.barcode}:`, error);
       }
@@ -654,236 +654,236 @@ router.post('/scan/cleanup-idle-sessions', async (req: Request, res: Response) =
 });
 
 // Admin endpoints for enrichment stats
-router.get('/admin/enrichment/cache-stats', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    if (!canViewAllTenants(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_access_required' });
-    }
+// router.get('/admin/enrichment/cache-stats', authenticateToken, async (req: Request, res: Response) => {
+//   try {
+//     if (!canViewAllTenants(req.user as any)) {
+//       return res.status(403).json({ success: false, error: 'platform_access_required' });
+//     }
 
-    const stats = barcodeEnrichmentService.getCacheStats();
-    return res.json({ success: true, stats });
-  } catch (error: any) {
-    console.error('[enrichment/cache-stats] Error:', error);
-    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
-  }
-});
+//     const stats = barcodeEnrichmentService.getCacheStats();
+//     return res.json({ success: true, stats });
+//   } catch (error: any) {
+//     console.error('[enrichment/cache-stats] Error:', error);
+//     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+//   }
+// });
 
-router.get('/admin/enrichment/rate-limits', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    if (!canViewAllTenants(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_access_required' });
-    }
+// router.get('/admin/enrichment/rate-limits', authenticateToken, async (req: Request, res: Response) => {
+//   try {
+//     if (!canViewAllTenants(req.user as any)) {
+//       return res.status(403).json({ success: false, error: 'platform_access_required' });
+//     }
 
-    const stats = barcodeEnrichmentService.getRateLimitStats();
-    return res.json({ success: true, stats });
-  } catch (error: any) {
-    console.error('[enrichment/rate-limits] Error:', error);
-    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
-  }
-});
+//     const stats = barcodeEnrichmentService.getRateLimitStats();
+//     return res.json({ success: true, stats });
+//   } catch (error: any) {
+//     console.error('[enrichment/rate-limits] Error:', error);
+//     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+//   }
+// });
 
-router.post('/admin/enrichment/clear-cache', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    if (!isPlatformAdmin(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_admin_required' });
-    }
+// router.post('/admin/enrichment/clear-cache', authenticateToken, async (req: Request, res: Response) => {
+//   try {
+//     if (!isPlatformAdmin(req.user as any)) {
+//       return res.status(403).json({ success: false, error: 'platform_admin_required' });
+//     }
 
-    const { barcode } = req.body;
-    barcodeEnrichmentService.clearCache(barcode);
+//     const { barcode } = req.body;
+//     barcodeEnrichmentService.clearCache(barcode);
     
-    return res.json({ 
-      success: true, 
-      message: barcode ? `Cache cleared for ${barcode}` : 'All cache cleared' 
-    });
-  } catch (error: any) {
-    console.error('[enrichment/clear-cache] Error:', error);
-    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
-  }
-});
+//     return res.json({ 
+//       success: true, 
+//       message: barcode ? `Cache cleared for ${barcode}` : 'All cache cleared' 
+//     });
+//   } catch (error: any) {
+//     console.error('[enrichment/clear-cache] Error:', error);
+//     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+//   }
+// });
 
 // Comprehensive enrichment analytics
-router.get('/admin/enrichment/analytics', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    if (!canViewAllTenants(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_access_required' });
-    }
+// router.get('/admin/enrichment/analytics', authenticateToken, async (req: Request, res: Response) => {
+//   try {
+//     if (!canViewAllTenants(req.user as any)) {
+//       return res.status(403).json({ success: false, error: 'platform_access_required' });
+//     }
 
-    // Get total cached products
-    const totalCached = await prisma.barcodeEnrichment.count();
+//     // Get total cached products
+//     const totalCached = await prisma.barcodeEnrichment.count();
     
-    // Get most popular products (top 10 by fetch count)
-    const popularProducts = await prisma.barcodeEnrichment.findMany({
-      orderBy: { fetchCount: 'desc' },
-      take: 10,
-      select: {
-        barcode: true,
-        name: true,
-        brand: true,
-        fetchCount: true,
-        source: true,
-        lastFetchedAt: true,
-      },
-    });
+//     // Get most popular products (top 10 by fetch count)
+//     const popularProducts = await prisma.barcodeEnrichment.findMany({
+//       orderBy: { fetchCount: 'desc' },
+//       take: 10,
+//       select: {
+//         barcode: true,
+//         name: true,
+//         brand: true,
+//         fetchCount: true,
+//         source: true,
+//         lastFetchedAt: true,
+//       },
+//     });
 
-    // Get data quality metrics
-    const withNutrition = await prisma.barcodeEnrichment.count({
-      where: {
-        metadata: {
-          path: ['nutrition', 'per_100g'],
-          not: Prisma.JsonNull,
-        },
-      },
-    });
+//     // Get data quality metrics
+//     const withNutrition = await prisma.barcodeEnrichment.count({
+//       where: {
+//         metadata: {
+//           path: ['nutrition', 'per_100g'],
+//           not: Prisma.JsonNull,
+//         },
+//       },
+//     });
 
-    const withImages = await prisma.barcodeEnrichment.count({
-      where: {
-        OR: [
-          { imageUrl: { not: null } },
-          { imageThumbnailUrl: { not: null } },
-        ],
-      },
-    });
+//     const withImages = await prisma.barcodeEnrichment.count({
+//       where: {
+//         OR: [
+//           { imageUrl: { not: null } },
+//           { imageThumbnailUrl: { not: null } },
+//         ],
+//       },
+//     });
 
-    const withEnvironmental = await prisma.barcodeEnrichment.count({
-      where: {
-        metadata: {
-          path: ['environmental'],
-          not: Prisma.JsonNull,
-        },
-      },
-    });
+//     const withEnvironmental = await prisma.barcodeEnrichment.count({
+//       where: {
+//         metadata: {
+//           path: ['environmental'],
+//           not: Prisma.JsonNull,
+//         },
+//       },
+//     });
 
-    // Get source breakdown
-    const sourceBreakdown = await prisma.barcodeEnrichment.groupBy({
-      by: ['source'],
-      _count: true,
-    });
+//     // Get source breakdown
+//     const sourceBreakdown = await prisma.barcodeEnrichment.groupBy({
+//       by: ['source'],
+//       _count: true,
+//     });
 
-    // Get recent additions (last 24 hours)
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const recentAdditions = await prisma.barcodeEnrichment.count({
-      where: {
-        createdAt: { gte: oneDayAgo },
-      },
-    });
+//     // Get recent additions (last 24 hours)
+//     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+//     const recentAdditions = await prisma.barcodeEnrichment.count({
+//       where: {
+//         createdAt: { gte: oneDayAgo },
+//       },
+//     });
 
-    // Calculate total API calls saved (sum of fetchCount - 1 for each product)
-    const totalFetchCount = await prisma.barcodeEnrichment.aggregate({
-      _sum: { fetchCount: true },
-    });
-    const apiCallsSaved = (totalFetchCount._sum.fetchCount || 0) - totalCached;
+//     // Calculate total API calls saved (sum of fetchCount - 1 for each product)
+//     const totalFetchCount = await prisma.barcodeEnrichment.aggregate({
+//       _sum: { fetchCount: true },
+//     });
+//     const apiCallsSaved = (totalFetchCount._sum.fetchCount || 0) - totalCached;
 
-    return res.json({
-      success: true,
-      analytics: {
-        totalCached,
-        popularProducts,
-        dataQuality: {
-          withNutrition,
-          withImages,
-          withEnvironmental,
-          nutritionPercentage: totalCached > 0 ? ((withNutrition / totalCached) * 100).toFixed(1) : '0',
-          imagesPercentage: totalCached > 0 ? ((withImages / totalCached) * 100).toFixed(1) : '0',
-          environmentalPercentage: totalCached > 0 ? ((withEnvironmental / totalCached) * 100).toFixed(1) : '0',
-        },
-        sourceBreakdown,
-        recentAdditions,
-        apiCallsSaved,
-        estimatedCostSavings: (apiCallsSaved * 0.01).toFixed(2), // $0.01 per call
-      },
-    });
-  } catch (error: any) {
-    console.error('[enrichment/analytics] Error:', error);
-    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
-  }
-});
+//     return res.json({
+//       success: true,
+//       analytics: {
+//         totalCached,
+//         popularProducts,
+//         dataQuality: {
+//           withNutrition,
+//           withImages,
+//           withEnvironmental,
+//           nutritionPercentage: totalCached > 0 ? ((withNutrition / totalCached) * 100).toFixed(1) : '0',
+//           imagesPercentage: totalCached > 0 ? ((withImages / totalCached) * 100).toFixed(1) : '0',
+//           environmentalPercentage: totalCached > 0 ? ((withEnvironmental / totalCached) * 100).toFixed(1) : '0',
+//         },
+//         sourceBreakdown,
+//         recentAdditions,
+//         apiCallsSaved,
+//         estimatedCostSavings: (apiCallsSaved * 0.01).toFixed(2), // $0.01 per call
+//       },
+//     });
+//   } catch (error: any) {
+//     console.error('[enrichment/analytics] Error:', error);
+//     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+//   }
+// });
 
 // Search and browse cached products
-router.get('/admin/enrichment/search', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    if (!canViewAllTenants(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_access_required' });
-    }
+// router.get('/admin/enrichment/search', authenticateToken, async (req: Request, res: Response) => {
+//   try {
+//     if (!canViewAllTenants(req.user as any)) {
+//       return res.status(403).json({ success: false, error: 'platform_access_required' });
+//     }
 
-    const { query, source, page = '1', limit = '20' } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+//     const { query, source, page = '1', limit = '20' } = req.query;
+//     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const where: any = {};
+//     const where: any = {};
     
-    if (query) {
-      where.OR = [
-        { barcode: { contains: query as string } },
-        { name: { contains: query as string, mode: 'insensitive' } },
-        { brand: { contains: query as string, mode: 'insensitive' } },
-      ];
-    }
+//     if (query) {
+//       where.OR = [
+//         { barcode: { contains: query as string } },
+//         { name: { contains: query as string, mode: 'insensitive' } },
+//         { brand: { contains: query as string, mode: 'insensitive' } },
+//       ];
+//     }
 
-    if (source) {
-      where.source = source;
-    }
+//     if (source) {
+//       where.source = source;
+//     }
 
-    const [products, total] = await Promise.all([
-      prisma.barcodeEnrichment.findMany({
-        where,
-        orderBy: { fetchCount: 'desc' },
-        skip,
-        take: parseInt(limit as string),
-        select: {
-          id: true,
-          barcode: true,
-          name: true,
-          brand: true,
-          description: true,
-          imageUrl: true,
-          imageThumbnailUrl: true,
-          source: true,
-          fetchCount: true,
-          lastFetchedAt: true,
-          createdAt: true,
-        },
-      }),
-      prisma.barcodeEnrichment.count({ where }),
-    ]);
+//     const [products, total] = await Promise.all([
+//       prisma.barcodeEnrichment.findMany({
+//         where,
+//         orderBy: { fetchCount: 'desc' },
+//         skip,
+//         take: parseInt(limit as string),
+//         select: {
+//           id: true,
+//           barcode: true,
+//           name: true,
+//           brand: true,
+//           description: true,
+//           imageUrl: true,
+//           imageThumbnailUrl: true,
+//           source: true,
+//           fetchCount: true,
+//           lastFetchedAt: true,
+//           createdAt: true,
+//         },
+//       }),
+//       prisma.barcodeEnrichment.count({ where }),
+//     ]);
 
-    return res.json({
-      success: true,
-      products,
-      pagination: {
-        total,
-        page: parseInt(page as string),
-        limit: parseInt(limit as string),
-        totalPages: Math.ceil(total / parseInt(limit as string)),
-      },
-    });
-  } catch (error: any) {
-    console.error('[enrichment/search] Error:', error);
-    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
-  }
-});
+//     return res.json({
+//       success: true,
+//       products,
+//       pagination: {
+//         total,
+//         page: parseInt(page as string),
+//         limit: parseInt(limit as string),
+//         totalPages: Math.ceil(total / parseInt(limit as string)),
+//       },
+//     });
+//   } catch (error: any) {
+//     console.error('[enrichment/search] Error:', error);
+//     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+//   }
+// });
 
 // Get detailed product enrichment data
-router.get('/admin/enrichment/:barcode', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    if (!canViewAllTenants(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_access_required' });
-    }
+// router.get('/admin/enrichment/:barcode', authenticateToken, async (req: Request, res: Response) => {
+//   try {
+//     if (!canViewAllTenants(req.user as any)) {
+//       return res.status(403).json({ success: false, error: 'platform_access_required' });
+//     }
 
-    const { barcode } = req.params;
+//     const { barcode } = req.params;
 
-    const product = await prisma.barcodeEnrichment.findUnique({
-      where: { barcode },
-    });
+//     const product = await prisma.barcodeEnrichment.findUnique({
+//       where: { barcode },
+//     });
 
-    if (!product) {
-      return res.status(404).json({ success: false, error: 'not_found' });
-    }
+//     if (!product) {
+//       return res.status(404).json({ success: false, error: 'not_found' });
+//     }
 
-    return res.json({ success: true, product });
-  } catch (error: any) {
-    console.error('[enrichment/detail] Error:', error);
-    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
-  }
-});
+//     return res.json({ success: true, product });
+//   } catch (error: any) {
+//     console.error('[enrichment/detail] Error:', error);
+//     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+//   }
+// });
 
 // Tenant-specific enrichment analytics
 router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Request, res: Response) => {
