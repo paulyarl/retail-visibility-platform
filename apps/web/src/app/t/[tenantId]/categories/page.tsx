@@ -42,6 +42,7 @@ export default function CategoriesPage() {
 
   // Filter state
   const [filterUnmapped, setFilterUnmapped] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Edit modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -79,9 +80,25 @@ export default function CategoriesPage() {
 
   // Filtered categories
   const filteredCategories = useMemo(() => {
-    if (!filterUnmapped) return categories
-    return categories.filter(cat => !cat.googleCategoryId)
-  }, [categories, filterUnmapped])
+    let filtered = categories
+
+    // Apply unmapped filter
+    if (filterUnmapped) {
+      filtered = filtered.filter(cat => !cat.googleCategoryId)
+    }
+
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(cat => 
+        cat.name.toLowerCase().includes(query) ||
+        cat.slug.toLowerCase().includes(query) ||
+        (cat.googleCategoryId && cat.googleCategoryId.toLowerCase().includes(query))
+      )
+    }
+
+    return filtered
+  }, [categories, filterUnmapped, searchQuery])
 
   // Paginated categories
   const paginatedCategories = useMemo(() => {
@@ -90,10 +107,10 @@ export default function CategoriesPage() {
     return filteredCategories.slice(startIndex, endIndex)
   }, [filteredCategories, currentPage, pageSize])
 
-  // Reset to page 1 when filter changes
+  // Reset to page 1 when filter or search changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [filterUnmapped])
+  }, [filterUnmapped, searchQuery])
 
   useEffect(() => {
     async function fetchData() {
@@ -435,13 +452,40 @@ export default function CategoriesPage() {
 
       {/* Categories List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-1">
             <h2 className="text-lg font-semibold">Categories</h2>
+            
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-xs">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search categories..."
+                className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  title="Clear search"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Unmapped Filter Button */}
             {alignmentStatus && alignmentStatus.unmapped > 0 && (
               <button
                 onClick={() => setFilterUnmapped(!filterUnmapped)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex-shrink-0 ${
                   filterUnmapped
                     ? 'bg-orange-100 text-orange-800 border border-orange-300'
                     : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
