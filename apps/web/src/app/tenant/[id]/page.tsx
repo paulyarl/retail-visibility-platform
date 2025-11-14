@@ -86,6 +86,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
             ? `${businessProfile.address_line1}${businessProfile.address_line2 ? ', ' + businessProfile.address_line2 : ''}, ${businessProfile.city}, ${businessProfile.state} ${businessProfile.postal_code}`
             : undefined,
           logo_url: businessProfile.logo_url,
+          business_description: businessProfile.business_description,
         };
         // Detect hours presence for branding evaluation
         const hours = (businessProfile as any)?.hours;
@@ -527,6 +528,21 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                 )}
                 </div>
               </div>
+
+              {/* Business Description */}
+              {tenant.metadata?.business_description && (
+                <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700 mt-4">
+                  <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
+                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    About Us
+                  </h4>
+                  <div className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                    {tenant.metadata.business_description}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Business Hours - Own Column */}
