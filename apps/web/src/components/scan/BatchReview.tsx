@@ -129,8 +129,7 @@ export default function BatchReview({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={removeSelected}
-                    disabled={disabled}
-                    className="px-3 py-1 text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                    className="px-3 py-1 text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
                   >
                     Remove Selected
                   </button>
@@ -221,8 +220,7 @@ export default function BatchReview({
                       {/* Actions */}
                       <button
                         onClick={() => onRemove(result.id)}
-                        disabled={disabled}
-                        className="p-1 text-neutral-500 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+                        className="p-1 text-neutral-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                         title="Remove item"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
