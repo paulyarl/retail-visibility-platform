@@ -53,8 +53,8 @@ const commitSessionSchema = z.object({
   skipValidation: z.boolean().optional().default(false),
 });
 
-// POST /api/scan/start - Start new scan session
-router.post('/api/scan/start', authenticateToken, requireTierFeature('barcode_scan'), async (req: Request, res: Response) => {
+// POST /scan/start - Start new scan session
+router.post('/scan/start', authenticateToken, requireTierFeature('barcode_scan'), async (req: Request, res: Response) => {
   try {
     if (!Flags.SKU_SCANNING) {
       return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SKU_SCANNING' });
@@ -124,8 +124,8 @@ router.post('/api/scan/start', authenticateToken, requireTierFeature('barcode_sc
   }
 });
 
-// GET /api/scan/:sessionId - Get session details
-router.get('/api/scan/:sessionId', authenticateToken, async (req: Request, res: Response) => {
+// GET /scan/:sessionId - Get session details
+router.get('/scan/:sessionId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
 
@@ -156,8 +156,8 @@ router.get('/api/scan/:sessionId', authenticateToken, async (req: Request, res: 
   }
 });
 
-// POST /api/scan/:sessionId/lookup-barcode - Lookup and add barcode to session
-router.post('/api/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Request, res: Response) => {
+// POST /scan/:sessionId/lookup-barcode - Lookup and add barcode to session
+router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
     const parsed = lookupBarcodeSchema.safeParse(req.body);
@@ -251,8 +251,8 @@ router.post('/api/scan/:sessionId/lookup-barcode', authenticateToken, async (req
   }
 });
 
-// GET /api/scan/:sessionId/results - Get all scan results for session
-router.get('/api/scan/:sessionId/results', authenticateToken, async (req: Request, res: Response) => {
+// GET /scan/:sessionId/results - Get all scan results for session
+router.get('/scan/:sessionId/results', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
 
@@ -282,8 +282,8 @@ router.get('/api/scan/:sessionId/results', authenticateToken, async (req: Reques
   }
 });
 
-// DELETE /api/scan/:sessionId/results/:resultId - Remove a scan result
-router.delete('/api/scan/:sessionId/results/:resultId', authenticateToken, async (req: Request, res: Response) => {
+// DELETE /scan/:sessionId/results/:resultId - Remove a scan result
+router.delete('/scan/:sessionId/results/:resultId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { sessionId, resultId } = req.params;
 
@@ -324,8 +324,8 @@ router.delete('/api/scan/:sessionId/results/:resultId', authenticateToken, async
   }
 });
 
-// POST /api/scan/:sessionId/commit - Commit scanned items to inventory
-router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Request, res: Response) => {
+// POST /scan/:sessionId/commit - Commit scanned items to inventory
+router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, res: Response) => {
   try {
     const startTime = Date.now();
     const { sessionId } = req.params;
@@ -469,8 +469,8 @@ router.post('/api/scan/:sessionId/commit', authenticateToken, async (req: Reques
   }
 });
 
-// DELETE /api/scan/:sessionId - Cancel session
-router.delete('/api/scan/:sessionId', authenticateToken, async (req: Request, res: Response) => {
+// DELETE /scan/:sessionId - Cancel session
+router.delete('/scan/:sessionId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
     const userId = (req.user as any)?.userId;
@@ -517,8 +517,8 @@ router.delete('/api/scan/:sessionId', authenticateToken, async (req: Request, re
   }
 });
 
-// GET /api/scan/my-sessions - Get user's scan sessions for a tenant
-router.get('/api/scan/my-sessions', authenticateToken, async (req: Request, res: Response) => {
+// GET /scan/my-sessions - Get user's scan sessions for a tenant
+router.get('/scan/my-sessions', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.query;
     const userId = (req.user as any)?.userId;
@@ -555,8 +555,8 @@ router.get('/api/scan/my-sessions', authenticateToken, async (req: Request, res:
   }
 });
 
-// POST /api/scan/cleanup-my-sessions - User cleanup their own active sessions
-router.post('/api/scan/cleanup-my-sessions', authenticateToken, async (req: Request, res: Response) => {
+// POST /scan/cleanup-my-sessions - User cleanup their own active sessions
+router.post('/scan/cleanup-my-sessions', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.body;
     const userId = (req.user as any)?.userId;
@@ -608,8 +608,8 @@ router.post('/api/scan/cleanup-my-sessions', authenticateToken, async (req: Requ
   }
 });
 
-// POST /api/scan/cleanup-idle-sessions - Cleanup idle sessions (can be called by cron)
-router.post('/api/scan/cleanup-idle-sessions', async (req: Request, res: Response) => {
+// POST /scan/cleanup-idle-sessions - Cleanup idle sessions (can be called by cron)
+router.post('/scan/cleanup-idle-sessions', async (req: Request, res: Response) => {
   try {
     // Close sessions that have been active for more than 1 hour AND have no recent activity
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
@@ -885,7 +885,7 @@ router.get('/api/admin/enrichment/:barcode', authenticateToken, async (req: Requ
 });
 
 // Tenant-specific enrichment analytics
-router.get('/api/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Request, res: Response) => {
+router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const user = req.user as any;
@@ -1009,7 +1009,7 @@ router.get('/api/scan/tenant/:tenantId/analytics', authenticateToken, async (req
 });
 
 // Enrichment preview tool - check what data is available for a barcode
-router.get('/api/scan/preview/:barcode', authenticateToken, async (req: Request, res: Response) => {
+router.get('/scan/preview/:barcode', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { barcode } = req.params;
 
@@ -1100,8 +1100,8 @@ async function validateScanResults(results: any[], template: any): Promise<{ val
   };
 }
 
-// PATCH /api/scan/:sessionId/results/:resultId/enrichment - Update enrichment data
-router.patch('/api/scan/:sessionId/results/:resultId/enrichment', authenticateToken, async (req: Request, res: Response) => {
+// PATCH /scan/:sessionId/results/:resultId/enrichment - Update enrichment data
+router.patch('/scan/:sessionId/results/:resultId/enrichment', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { sessionId, resultId } = req.params;
     const updates = req.body;
