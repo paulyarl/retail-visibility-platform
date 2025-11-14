@@ -38,6 +38,8 @@ export default function TenantScanPage() {
   const [selectedDevice, setSelectedDevice] = useState<'usb' | 'camera' | 'manual'>('manual'); // Default to manual for all tiers
   const [rateLimitError, setRateLimitError] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const sessionsPerPage = 10;
 
   useEffect(() => {
     loadSessions();
@@ -332,13 +334,44 @@ export default function TenantScanPage() {
           </CardContent>
         </Card>
 
+        {/* Best Practices Warning */}
+        {sessions.length > 20 && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                  💡 Best Practice: Keep Your Sessions Clean
+                </p>
+                <p className="text-sm text-blue-800 dark:text-blue-400 mt-1">
+                  You have {sessions.length} scan sessions. For better performance, we recommend completing or canceling old sessions regularly. Active sessions should be committed or canceled within the same day.
+                </p>
+                <button
+                  onClick={cleanupMySessions}
+                  disabled={cleaningUp}
+                  className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {cleaningUp ? 'Cleaning up...' : 'Close All Active Sessions'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Recent Sessions */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Recent Sessions</CardTitle>
-                <CardDescription>View and manage your scanning sessions</CardDescription>
+                <CardDescription>
+                  {sessions.length > 0 
+                    ? `Showing ${Math.min((currentPage - 1) * sessionsPerPage + 1, sessions.length)}-${Math.min(currentPage * sessionsPerPage, sessions.length)} of ${sessions.length} sessions`
+                    : 'View and manage your scanning sessions'
+                  }
+                </CardDescription>
               </div>
               <button
                 onClick={loadSessions}
@@ -368,56 +401,91 @@ export default function TenantScanPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors"
-                  >
-                    <div 
-                      className="flex-1 cursor-pointer"
-                      onClick={() => router.push(`/t/${tenantId}/scan/${session.id}`)}
+              <>
+                <div className="space-y-3">
+                  {sessions
+                    .slice((currentPage - 1) * sessionsPerPage, currentPage * sessionsPerPage)
+                    .map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors"
                     >
-                      <div className="flex items-center gap-3 mb-1">
-                        {getStatusBadge(session.status)}
-                        <span className="text-sm text-neutral-600 dark:text-neutral-400">
-                          {new Date(session.startedAt).toLocaleString()}
-                        </span>
-                        <span className="text-xs text-neutral-500 dark:text-neutral-500">
-                          {session.deviceType}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-neutral-700 dark:text-neutral-300">
-                        <span>{session.scannedCount} scanned</span>
-                        <span>{session.committedCount} committed</span>
-                        {session.duplicateCount > 0 && (
-                          <span className="text-yellow-600 dark:text-yellow-400">
-                            {session.duplicateCount} duplicates
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => router.push(`/t/${tenantId}/scan/${session.id}`)}
+                      >
+                        <div className="flex items-center gap-3 mb-1">
+                          {getStatusBadge(session.status)}
+                          <span className="text-sm text-neutral-600 dark:text-neutral-400">
+                            {new Date(session.startedAt).toLocaleString()}
                           </span>
+                          <span className="text-xs text-neutral-500 dark:text-neutral-500">
+                            {session.deviceType}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-neutral-700 dark:text-neutral-300">
+                          <span>{session.scannedCount} scanned</span>
+                          <span>{session.committedCount} committed</span>
+                          {session.duplicateCount > 0 && (
+                            <span className="text-yellow-600 dark:text-yellow-400">
+                              {session.duplicateCount} duplicates
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {session.status === 'active' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('Cancel this session?')) {
+                                cancelSession(session.id);
+                              }
+                            }}
+                            className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          >
+                            Cancel
+                          </button>
                         )}
+                        <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {session.status === 'active' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm('Cancel this session?')) {
-                              cancelSession(session.id);
-                            }
-                          }}
-                          className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                      <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {sessions.length > sessionsPerPage && (
+                  <div className="flex items-center justify-between pt-4 border-t border-neutral-200 dark:border-neutral-700 mt-4">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Previous
+                    </button>
+                    
+                    <span className="text-sm text-neutral-600 dark:text-neutral-400">
+                      Page {currentPage} of {Math.ceil(sessions.length / sessionsPerPage)}
+                    </span>
+                    
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(Math.ceil(sessions.length / sessionsPerPage), p + 1))}
+                      disabled={currentPage >= Math.ceil(sessions.length / sessionsPerPage)}
+                      className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      Next
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
-                    </div>
+                    </button>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
