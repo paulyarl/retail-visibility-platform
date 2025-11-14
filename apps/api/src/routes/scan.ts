@@ -1027,4 +1027,80 @@ router.patch('/scan/:sessionId/results/:resultId/enrichment', authenticateToken,
   }
 });
 
+//
+// DELETE /scan/:sessionId/results/:resultId - Remove a result from a scan session
+//
+router.delete('/scan/:sessionId/results/:resultId', authenticateToken, async (req, res) => {
+  try {
+    const sessionId = req.params.sessionId;
+    const resultId = req.params.resultId;
+
+    // Find the result with session relation
+    const result = await prisma.scanResult.findUnique({
+      where: { id: resultId },
+      include: { session: true },
+    });
+
+    if (!result || result.sessionId !== sessionId) {
+      return res.status(404).json({ success: false, error: 'result_not_found' });
+    }
+
+    if (result.session.status !== 'active') {
+      return res.status(400).json({ success: false, error: 'session_not_active' });
+    }
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, result.session.tenantId)) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Delete the result
+    await prisma.scanResult.delete({
+      where: { id: resultId },
+    });
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('[scan/:sessionId/results/:resultId DELETE] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
+//
+// DELETE /scan/:sessionId - Cancel a scan session
+//
+router.delete('/scan/:sessionId', authenticateToken, async (req, res) => {
+  try {
+    const sessionId = req.params.sessionId;
+
+    // Find the session
+    const session = await prisma.scanSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session) {
+      return res.status(404).json({ success: false, error: 'session_not_found' });
+    }
+
+    if (session.status !== 'active') {
+      return res.status(400).json({ success: false, error: 'session_not_active' });
+    }
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, session.tenantId)) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Delete the session (this will cascade delete all results due to Prisma relations)
+    await prisma.scanSession.delete({
+      where: { id: sessionId },
+    });
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('[scan/:sessionId DELETE] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
 export default router;
