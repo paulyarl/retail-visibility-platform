@@ -285,8 +285,8 @@ export default function TenantBrandingPage() {
 
         {/* Success Alert */}
         {success && (
-          <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-            <p className="text-green-800 dark:text-green-200">{success}</p>
+          <Alert variant="success" title="Success!">
+            <p>{success}</p>
           </Alert>
         )}
 
