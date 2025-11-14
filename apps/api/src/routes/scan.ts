@@ -9,18 +9,18 @@ import { UserRole, Prisma } from '@prisma/client';
 // import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
 // import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
-import {
-  scanSessionStarted,
-  scanSessionCompleted,
-  scanSessionCancelled,
-  scanBarcodeSuccess,
-  scanBarcodeFail,
-  scanBarcodeDuplicate,
-  scanCommitSuccess,
-  scanCommitFail,
-  scanCommitDurationMs,
-  scanValidationError,
-} from '../metrics';
+// import {
+//   scanSessionStarted,
+//   scanSessionCompleted,
+//   scanSessionCancelled,
+//   scanBarcodeSuccess,
+//   scanBarcodeFail,
+//   scanBarcodeDuplicate,
+//   scanCommitSuccess,
+//   scanCommitFail,
+//   scanCommitDurationMs,
+//   scanValidationError,
+// } from '../metrics';
 
 // Helper to check tenant access
 function hasAccessToTenant(req: Request, tenantId: string): boolean {
