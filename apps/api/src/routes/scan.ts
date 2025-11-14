@@ -155,6 +155,246 @@ router.get('/scan/my-sessions', authenticateToken, async (req: Request, res: Res
   }
 });
 
+// POST /scan/:sessionId/lookup-barcode - Lookup and add barcode to session
+router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const parsed = lookupBarcodeSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_input', details: parsed.error.issues });
+    }
+
+    const { barcode, sku } = parsed.data;
+
+    // Get session
+    const session = await prisma.scanSession.findUnique({
+      where: { id: sessionId },
+      include: { template: true },
+    });
+
+    if (!session) {
+      return res.status(404).json({ success: false, error: 'session_not_found' });
+    }
+
+    if (session.status !== 'active') {
+      return res.status(400).json({ success: false, error: 'session_not_active' });
+    }
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, session.tenantId)) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Check if barcode already scanned in this session
+    const existing = await prisma.scanResult.findFirst({
+      where: { sessionId, barcode },
+    });
+
+    if (existing) {
+      // scanBarcodeDuplicate.inc({ tenant: session.tenantId });
+      return res.status(409).json({ success: false, error: 'duplicate_barcode', result: existing });
+    }
+
+    // Check for duplicates in inventory
+    const duplicateItem = await prisma.inventoryItem.findFirst({
+      where: {
+        tenantId: session.tenantId,
+        sku: sku || barcode,
+      },
+      select: { id: true, name: true, sku: true },
+    });
+
+    // Perform barcode lookup/enrichment using the service
+    // const enrichment = Flags.SCAN_ENRICHMENT
+    //   ? await barcodeEnrichmentService.enrich(barcode, session.tenantId)
+    //   : null;
+
+    // Create scan result
+    const result = await prisma.scanResult.create({
+      data: {
+        tenantId: session.tenantId,
+        sessionId,
+        barcode,
+        sku: sku || barcode,
+        status: duplicateItem ? 'duplicate' : 'new',
+        enrichment: {} as any, // enrichment as any || {},
+        duplicateOf: duplicateItem?.id,
+        rawPayload: { barcode, sku, timestamp: new Date().toISOString() },
+      },
+    });
+
+    // Update session counts
+    await prisma.scanSession.update({
+      where: { id: sessionId },
+      data: {
+        scannedCount: { increment: 1 },
+        duplicateCount: duplicateItem ? { increment: 1 } : undefined,
+      },
+    });
+
+    // Emit metrics
+    // scanBarcodeSuccess.inc({ tenant: session.tenantId, hasDuplicate: String(!!duplicateItem) });
+    // if (duplicateItem) {
+    //   scanBarcodeDuplicate.inc({ tenant: session.tenantId });
+    // }
+
+    return res.status(201).json({
+      success: true,
+      result,
+      duplicate: duplicateItem ? { item: duplicateItem, warning: 'Item already exists in inventory' } : null,
+    });
+  } catch (error: any) {
+    console.error('[scan/:sessionId/lookup-barcode] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
+// POST /scan/:sessionId/commit - Commit scanned items to inventory
+router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const startTime = Date.now();
+    const { sessionId } = req.params;
+    const parsed = commitSessionSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_input', details: parsed.error.issues });
+    }
+
+    const { skipValidation } = parsed.data;
+    const userId = (req.user as any)?.userId;
+
+    const session = await prisma.scanSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        results: {
+          where: { status: { not: 'duplicate' } },
+        },
+        template: true,
+      },
+    });
+
+    if (!session) {
+      return res.status(404).json({ success: false, error: 'session_not_found' });
+    }
+
+    if (session.status !== 'active') {
+      return res.status(400).json({ success: false, error: 'session_not_active' });
+    }
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, session.tenantId)) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    if (session.results.length === 0) {
+      return res.status(400).json({ success: false, error: 'no_items_to_commit' });
+    }
+
+    // Validate items (unless skipped)
+    if (!skipValidation) {
+      const validation = await validateScanResults(session.results, session.template);
+      if (!validation.valid) {
+        // Emit validation error metrics
+        // validation.errors.forEach(() => {
+        //   scanValidationError.inc({ tenant: session.tenantId });
+        // });
+        return res.status(422).json({ success: false, error: 'validation_failed', validation });
+      }
+    }
+
+    // Commit items to inventory
+    const committed = [];
+    for (const result of session.results) {
+      try {
+        const enrichment = result.enrichment as any || {};
+        console.log(`[commit] Processing ${result.barcode}:`, {
+          hasCategoryPath: !!enrichment.categoryPath,
+          categoryPathLength: enrichment.categoryPath?.length,
+          categoryPath: enrichment.categoryPath,
+          templateDefault: session.template?.defaultCategory
+        });
+        const stock = enrichment.stock || 0;
+        const item = await prisma.inventoryItem.create({
+          data: {
+            tenantId: session.tenantId,
+            name: enrichment.name || `Product ${result.barcode}`,
+            title: enrichment.name || `Product ${result.barcode}`,
+            brand: enrichment.brand || 'Unknown',
+            description: enrichment.description || null,
+            sku: result.sku || result.barcode,
+            price: (enrichment.priceCents || session.template?.defaultPriceCents || 0) / 100,
+            priceCents: enrichment.priceCents || session.template?.defaultPriceCents || 0,
+            stock: stock,
+            currency: session.template?.defaultCurrency || 'USD',
+            visibility: (session.template?.defaultVisibility as any) || 'private',
+            availability: stock > 0 ? 'in_stock' : 'out_of_stock',
+            categoryPath: (enrichment.categoryPath && enrichment.categoryPath.length > 0)
+              ? enrichment.categoryPath
+              : (session.template?.defaultCategory ? [session.template.defaultCategory] : []),
+            metadata: { ...enrichment.metadata, scannedFrom: sessionId },
+          },
+        });
+        console.log(`[commit] Created item ${item.id} with categoryPath:`, item.categoryPath);
+        committed.push(item.id);
+
+        // Process product images if available
+        // if (Flags.SCAN_ENRICHMENT && enrichment) {
+        //   try {
+        //     const imageUrls = imageEnrichmentService.extractImageUrls(enrichment);
+        //     if (imageUrls.length > 0) {
+        //       const imageCount = await imageEnrichmentService.processProductImages(
+        //         session.tenantId,
+        //         item.id,
+        //         item.sku,
+        //         imageUrls,
+        //         item.name
+        //       );
+        //       console.log(`[commit] Processed ${imageCount}/${imageUrls.length} images for ${item.sku}`);
+        //     }
+        //   } catch (imageError) {
+        //     // Don't fail commit if image processing fails
+        //     console.error(`[commit] Failed to process images for ${item.sku}:`, imageError);
+        //   }
+        // }
+      } catch (error) {
+        console.error(`[commit] Failed to create item for barcode ${result.barcode}:`, error);
+      }
+    }
+
+    // Update session
+    await prisma.scanSession.update({
+      where: { id: sessionId },
+      data: {
+        status: 'completed',
+        committedCount: committed.length,
+        completedAt: new Date(),
+      },
+    });
+
+    // Audit
+    try {
+      await audit({
+        tenantId: session.tenantId,
+        actor: userId,
+        action: 'scan.session.commit',
+        payload: { sessionId, committedCount: committed.length, itemIds: committed },
+      });
+    } catch {}
+
+    // Emit metrics
+    // const duration = Date.now() - startTime;
+    // scanCommitSuccess.inc({ tenant: session.tenantId, itemCount: String(committed.length) });
+    // scanCommitDurationMs.observe(duration, { tenant: session.tenantId });
+    // scanSessionCompleted.inc({ tenant: session.tenantId });
+
+    return res.json({ success: true, committed: committed.length, itemIds: committed });
+  } catch (error: any) {
+    console.error('[scan/:sessionId/commit] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
 // GET /scan/:sessionId - Get session details
 router.get('/scan/:sessionId', authenticateToken, async (req: Request, res: Response) => {
   try {
