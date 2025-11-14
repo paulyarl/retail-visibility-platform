@@ -836,14 +836,17 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     // Import basePrisma to bypass retry wrapper
     const { basePrisma } = await import('./prisma');
+    console.log(`[PATCH /tenant/profile] Processing update for tenant ${tenant_id}`);
+    console.log(`[PATCH /tenant/profile] Delta data:`, delta);
     
     // Check if profile exists
     const existingProfiles = await basePrisma.$queryRaw`
       SELECT tenant_id FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
     `;
-
+    console.log(`[PATCH /tenant/profile] Existing profiles found:`, (existingProfiles as any[]).length);
     let result;
     if ((existingProfiles as any[]).length > 0) {
+      console.log(`[PATCH /tenant/profile] Updating existing profile`);
       // Update existing profile - build dynamic update query
       const updateParts = [];
       const values = [];
@@ -863,14 +866,19 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
           SET ${updateParts.join(', ')}
           WHERE tenant_id = $${values.length}
         `;
+        console.log(`[PATCH /tenant/profile] Update query:`, updateQuery);
+        console.log(`[PATCH /tenant/profile] Update values:`, values);
         await basePrisma.$executeRawUnsafe(updateQuery, ...values);
+        console.log(`[PATCH /tenant/profile] Update executed successfully`);
       }
 
       // Get updated profile
       result = await basePrisma.$queryRaw`
         SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
       `;
+      console.log(`[PATCH /tenant/profile] Retrieved updated profile:`, result);
     } else {
+      console.log(`[PATCH /tenant/profile] Creating new profile`);
       // Create new profile
       const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
       const insertValues = [
@@ -908,10 +916,13 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
         VALUES (${placeholders.join(', ')})
         RETURNING *
       `;
+      console.log(`[PATCH /tenant/profile] Insert query:`, insertQuery);
+      console.log(`[PATCH /tenant/profile] Insert values:`, insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
         basePrisma.$queryRaw`SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}`
       );
+      console.log(`[PATCH /tenant/profile] Created new profile:`, result);
     }
 
     // Update tenant name if business_name changed
@@ -931,6 +942,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
       }
     }
 
+    console.log(`[PATCH /tenant/profile] Final result to return:`, (result as any)[0] || result);
     return res.json((result as any)[0] || result);
   } catch (e: any) {
     console.error("[PATCH /tenant/profile] Error:", e);
