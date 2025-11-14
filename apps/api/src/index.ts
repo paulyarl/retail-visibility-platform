@@ -111,8 +111,8 @@ import directoryRoutes from './routes/directory-v2';
 import directoryTenantRoutes from './routes/directory-tenant';
 import directoryAdminRoutes from './routes/directory-admin';
 import directorySupportRoutes from './routes/directory-support';
-import scanRoutes from './routes/scan';
-import scanMetricsRoutes from './routes/scan-metrics';
+// import scanRoutes from './routes/scan';
+// import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
 import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
@@ -2614,9 +2614,42 @@ app.use(categoriesMirrorRoutes);
 app.use(mirrorAdminRoutes);
 app.use(syncLogsRoutes);
 // M4: SKU Scanning routes
-app.use('/api', scanRoutes);
-console.log('✅ Scan routes mounted at /api/scan');
-app.use(scanMetricsRoutes);
+// app.use('/api', scanRoutes);
+console.log('✅ Scan routes mounted inline');
+// app.use(scanMetricsRoutes);
+
+// INLINE SCAN ROUTES FOR TESTING
+const inlineScanRoutes = require('express').Router();
+inlineScanRoutes.get('/scan/my-sessions', authenticateToken, async (req: Request, res: Response) => {
+  console.log('[INLINE GET /scan/my-sessions] Called with query:', req.query);
+  try {
+    const { tenantId } = req.query;
+    const userId = (req.user as any)?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'unauthorized' });
+    }
+
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({ success: false, error: 'tenant_id_required' });
+    }
+
+    // Check tenant access (simplified)
+    const isPlatformAdmin = (req.user as any)?.role === 'PLATFORM_ADMIN';
+    const userTenantIds = (req.user as any)?.tenantIds || [];
+    if (!isPlatformAdmin && !userTenantIds.includes(tenantId)) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Mock response for testing
+    return res.json({ success: true, sessions: [], message: 'Inline route working' });
+  } catch (error: any) {
+    console.error('[inline scan/my-sessions GET] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
+
+app.use('/api', inlineScanRoutes);
 
 // TEST ROUTE - Remove after debugging
 app.get('/api/test-scan', (req, res) => {
