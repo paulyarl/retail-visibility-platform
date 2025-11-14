@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
-// import { requireTierFeature } from '../middleware/tier-access';
+import { requireTierFeature } from '../middleware/tier-access';
 import { prisma } from '../prisma';
-// import { Flags } from '../config';
+import { Flags } from '../config';
 import { audit } from '../audit';
 import { z } from 'zod';
-// import { UserRole, Prisma } from '@prisma/client';
-// import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
-// import { imageEnrichmentService } from '../services/ImageEnrichmentService';
+import { UserRole, Prisma } from '@prisma/client';
+import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
+import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
 import {
   scanSessionStarted,
