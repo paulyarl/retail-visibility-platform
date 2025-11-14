@@ -421,58 +421,103 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
   
   try {
     const { tenant_id, ...profileData } = parsed.data;
-    // Upsert profile into dedicated table
-    const upserted = await prisma.tenantBusinessProfile.upsert({
-      where: { tenantId: tenant_id },
-      create: {
-        tenantId: tenant_id,
-        businessName: profileData.business_name || "",
-        addressLine1: profileData.address_line1 || "",
-        addressLine2: profileData.address_line2 || null,
-        city: profileData.city || "",
-        state: profileData.state || null,
-        postalCode: profileData.postal_code || "",
-        countryCode: (profileData.country_code || "").toUpperCase(),
-        phoneNumber: profileData.phone_number || null,
-        email: profileData.email || null,
-        website: profileData.website || null,
-        contactPerson: profileData.contact_person || null,
-        hours: (profileData as any).hours ?? null,
-        socialLinks: (profileData as any).social_links ?? null,
-        seoTags: (profileData as any).seo_tags ?? null,
-        latitude: (profileData as any).latitude ?? null,
-        longitude: (profileData as any).longitude ?? null,
-        displayMap: (profileData as any).display_map ?? false,
-        mapPrivacyMode: (profileData as any).map_privacy_mode ?? "precise",
-      },
-      update: {
-        businessName: profileData.business_name ?? undefined,
-        addressLine1: profileData.address_line1 ?? undefined,
-        addressLine2: profileData.address_line2 ?? undefined,
-        city: profileData.city ?? undefined,
-        state: profileData.state ?? undefined,
-        postalCode: profileData.postal_code ?? undefined,
-        countryCode: profileData.country_code ? profileData.country_code.toUpperCase() : undefined,
-        phoneNumber: profileData.phone_number ?? undefined,
-        email: profileData.email ?? undefined,
-        website: profileData.website ?? undefined,
-        contactPerson: profileData.contact_person ?? undefined,
-        hours: (profileData as any).hours ?? undefined,
-        socialLinks: (profileData as any).social_links ?? undefined,
-        seoTags: (profileData as any).seo_tags ?? undefined,
-        latitude: (profileData as any).latitude ?? undefined,
-        longitude: (profileData as any).longitude ?? undefined,
-        displayMap: (profileData as any).display_map ?? undefined,
-        mapPrivacyMode: (profileData as any).map_privacy_mode ?? undefined,
-      },
-    });
+    const existingTenant = await prisma.tenant.findUnique({ where: { id: tenant_id } });
+    if (!existingTenant) return res.status(404).json({ error: "tenant_not_found" });
+
+    // Use raw SQL instead of Prisma client since it doesn't recognize the new table
+    // Import basePrisma to bypass retry wrapper
+    const { basePrisma } = await import('./prisma');
+    
+    // Check if profile exists
+    const existingProfiles = await basePrisma.$queryRaw`
+      SELECT tenant_id FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
+    `;
+
+    let result;
+    if ((existingProfiles as any[]).length > 0) {
+      // Update existing profile - build dynamic update query
+      const updateParts = [];
+      const values = [];
+
+      Object.entries(profileData).forEach(([key, value]) => {
+        if (value !== undefined) {
+          updateParts.push(`"${key}" = $${values.length + 1}`);
+          values.push(value === '' ? null : value);
+        }
+      });
+
+      if (updateParts.length > 0) {
+        updateParts.push(`updated_at = CURRENT_TIMESTAMP`);
+        values.push(tenant_id); // Add tenant_id at the end
+        const updateQuery = `
+          UPDATE "TenantBusinessProfile"
+          SET ${updateParts.join(', ')}
+          WHERE tenant_id = $${values.length}
+        `;
+        await basePrisma.$executeRawUnsafe(updateQuery, ...values);
+      }
+
+      // Get updated profile
+      result = await basePrisma.$queryRaw`
+        SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
+      `;
+    } else {
+      // Create new profile
+      const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
+      const insertValues = [
+        tenant_id,
+        profileData.business_name || existingTenant.name,
+        profileData.address_line1 || '',
+        profileData.city || '',
+        profileData.postal_code || '',
+        (profileData.country_code || 'US').toUpperCase()
+      ];
+
+      // Add optional fields
+      const optionalMappings = {
+        address_line2: profileData.address_line2,
+        state: profileData.state,
+        phone_number: profileData.phone_number,
+        email: profileData.email,
+        website: profileData.website,
+        contact_person: profileData.contact_person,
+        logo_url: profileData.logo_url,
+        banner_url: profileData.banner_url,
+        business_description: profileData.business_description,
+        hours: (profileData as any).hours,
+        social_links: (profileData as any).social_links,
+        seo_tags: (profileData as any).seo_tags,
+        latitude: (profileData as any).latitude,
+        longitude: (profileData as any).longitude,
+        display_map: (profileData as any).display_map,
+        map_privacy_mode: (profileData as any).map_privacy_mode,
+      };
+
+      Object.entries(optionalMappings).forEach(([field, value]) => {
+        if (value !== undefined) {
+          insertFields.push(field);
+          insertValues.push(value === '' ? null : (value as any));
+        }
+      });
+
+      const placeholders = insertFields.map((_, i) => `$${i + 1}`);
+      const insertQuery = `
+        INSERT INTO "TenantBusinessProfile" (${insertFields.map(f => `"${f}"`).join(', ')})
+        VALUES (${placeholders.join(', ')})
+        RETURNING *
+      `;
+
+      result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
+        basePrisma.$queryRaw`SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}`
+      );
+    }
 
     // Keep Tenant.name in sync
     if (profileData.business_name) {
       await prisma.tenant.update({ where: { id: tenant_id }, data: { name: profileData.business_name } });
     }
 
-    res.json(upserted);
+    res.json((result as any)[0] || result);
   } catch (e: any) {
     console.error("Failed to save tenant profile:", e);
     res.status(500).json({ error: "failed_to_save_profile" });
