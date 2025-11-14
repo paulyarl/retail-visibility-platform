@@ -1,5 +1,12 @@
 -- Production Database Migration for Directory & Branding Settings Fix
 -- Run these commands against your production Supabase database
+-- Applied to production: [Date when applied]
+-- Related commits: 83cf948, 34e7b1e, b18079b
+
+-- This migration adds support for:
+-- ✅ Directory settings (primary categories, SEO, secondary categories)
+-- ✅ Branding settings (business info, logos, banners)
+-- ✅ Onboarding flow (tenant profile creation)
 
 -- 1. Create DirectorySettings table
 CREATE TABLE IF NOT EXISTS "DirectorySettings" (
