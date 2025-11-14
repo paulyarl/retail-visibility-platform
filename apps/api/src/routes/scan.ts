@@ -654,7 +654,7 @@ router.post('/scan/cleanup-idle-sessions', async (req: Request, res: Response) =
 });
 
 // Admin endpoints for enrichment stats
-router.get('/api/admin/enrichment/cache-stats', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/enrichment/cache-stats', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -668,7 +668,7 @@ router.get('/api/admin/enrichment/cache-stats', authenticateToken, async (req: R
   }
 });
 
-router.get('/api/admin/enrichment/rate-limits', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/enrichment/rate-limits', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -682,7 +682,7 @@ router.get('/api/admin/enrichment/rate-limits', authenticateToken, async (req: R
   }
 });
 
-router.post('/api/admin/enrichment/clear-cache', authenticateToken, async (req: Request, res: Response) => {
+router.post('/admin/enrichment/clear-cache', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!isPlatformAdmin(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_admin_required' });
@@ -702,7 +702,7 @@ router.post('/api/admin/enrichment/clear-cache', authenticateToken, async (req: 
 });
 
 // Comprehensive enrichment analytics
-router.get('/api/admin/enrichment/analytics', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/enrichment/analytics', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -799,7 +799,7 @@ router.get('/api/admin/enrichment/analytics', authenticateToken, async (req: Req
 });
 
 // Search and browse cached products
-router.get('/api/admin/enrichment/search', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/enrichment/search', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -862,7 +862,7 @@ router.get('/api/admin/enrichment/search', authenticateToken, async (req: Reques
 });
 
 // Get detailed product enrichment data
-router.get('/api/admin/enrichment/:barcode', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/enrichment/:barcode', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
