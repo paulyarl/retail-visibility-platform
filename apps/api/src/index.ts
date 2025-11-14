@@ -724,6 +724,8 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
       console.log('[Profile API] No business hours found for', tenantId);
     }
     
+    const md = (tenant.metadata as any) || {};
+    
     // Return public business information only
     const profile = {
       business_name: bp?.businessName || md.business_name || tenant.name || null,
