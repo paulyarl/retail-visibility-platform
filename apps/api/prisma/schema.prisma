@@ -116,6 +116,11 @@ model Tenant {
   dedicatedManager      String?
   monthlySkuQuota       Int?
   skusAddedThisMonth    Int                    @default(0)
+  locationStatus        LocationStatus         @default(active) @map("location_status")
+  statusChangedAt       DateTime?              @map("status_changed_at")
+  statusChangedBy       String?                @map("status_changed_by")
+  reopeningDate         DateTime?              @map("reopening_date")
+  closureReason         String?                @map("closure_reason")
   items                 InventoryItem[]
   photos                PhotoAsset[]
   performance           ProductPerformance[]
@@ -147,6 +152,7 @@ model Tenant {
   @@index([organizationId])
   @@index([serviceLevel])
   @@index([createdBy])
+  @@index([locationStatus])
 }
 
 model Organization {
@@ -732,6 +738,16 @@ enum ItemStatus {
   trashed
 
   @@map("item_status")
+}
+
+enum LocationStatus {
+  pending      // New location being set up
+  active       // Fully operational
+  inactive     // Temporarily closed (seasonal, renovations)
+  closed       // Permanently closed (data retained)
+  archived     // Historical record only
+
+  @@map("location_status")
 }
 
 enum ActorType {
