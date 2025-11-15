@@ -1667,6 +1667,8 @@ const baseItemSchema = z.object({
   // Item status and visibility
   itemStatus: z.enum(['active', 'inactive', 'archived']).optional(),
   visibility: z.enum(['public', 'private']).optional(),
+  // Category path for Google Shopping
+  categoryPath: z.array(z.string()).optional(),
 });
 
 const createItemSchema = baseItemSchema.transform((data) => {
