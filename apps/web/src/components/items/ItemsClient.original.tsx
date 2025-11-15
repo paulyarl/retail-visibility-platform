@@ -811,7 +811,7 @@ export default function ItemsClient({
                   placeholder={t('inventory.pricePlaceholder', 'Price (e.g. 12.99)')}
                   label="Price"
                   type="number"
-                  step="0.01"
+                  step="0.5"
                 />
                 <Input
                   value={stock}
@@ -819,6 +819,7 @@ export default function ItemsClient({
                   placeholder={t('inventory.stock', 'Stock')}
                   label="Stock"
                   type="number"
+                  step="1.0"
                 />
               </div>
               <Button type="submit" disabled={creating} loading={creating}>

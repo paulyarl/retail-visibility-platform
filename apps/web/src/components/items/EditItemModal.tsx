@@ -269,7 +269,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           <Input
             label="Price"
             type="number"
-            step="0.01"
+            step="0.5"
             min="0"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
@@ -286,6 +286,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           <Input
             label="Stock Quantity"
             type="number"
+            step="1.0"
             min="0"
             value={stock}
             onChange={(e) => setStock(e.target.value)}
