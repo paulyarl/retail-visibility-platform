@@ -2714,6 +2714,125 @@ app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) =
   }
 });
 
+/* ------------------------------ item fetching ------------------------------ */
+// GET /api/items
+// Fetch items with pagination, filtering, and tenant access control
+app.get('/api/items', authenticateToken, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    
+    // Parse query parameters
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 25;
+    const offset = (page - 1) * limit;
+    
+    // Get tenant ID from either tenant_id or tenantId parameter (support both)
+    const tenantId = req.query.tenant_id || req.query.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenant_id_required', message: 'Tenant ID is required' });
+    }
+    
+    // Verify user has access to this tenant
+    if (!user.tenantIds.includes(tenantId)) {
+      return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
+    }
+    
+    // Build where clause for filtering
+    const where: any = { tenantId };
+    
+    // Apply filters
+    const q = req.query.q as string;
+    if (q) {
+      where.OR = [
+        { sku: { contains: q, mode: 'insensitive' } },
+        { name: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+    
+    const status = req.query.status as string;
+    if (status && status !== 'all') {
+      where.itemStatus = status;
+    }
+    
+    const visibility = req.query.visibility as string;
+    if (visibility && visibility !== 'all') {
+      where.visibility = visibility;
+    }
+    
+    // Fetch items with pagination
+    const [items, totalCount] = await Promise.all([
+      prisma.inventoryItem.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip: offset,
+        take: limit,
+        include: {
+          photos: {
+            select: {
+              id: true,
+              url: true,
+              isPrimary: true,
+            },
+            orderBy: { isPrimary: 'desc', createdAt: 'asc' },
+          },
+          tenantCategory: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+        },
+      }),
+      prisma.inventoryItem.count({ where }),
+    ]);
+    
+    // Transform items to match frontend expectations
+    const transformedItems = items.map(item => ({
+      id: item.id,
+      tenantId: item.tenantId,
+      sku: item.sku,
+      name: item.name,
+      price: item.price,
+      stock: item.stock,
+      description: item.description,
+      visibility: item.visibility,
+      status: item.itemStatus,
+      categoryPath: item.categoryPath,
+      imageUrl: item.photos.find(p => p.isPrimary)?.url || item.photos[0]?.url,
+      images: item.photos.map(p => p.url),
+      metadata: item.metadata,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      tenantCategory: item.tenantCategory,
+      missingImages: item.missingImages,
+      missingDescription: item.missingDescription,
+      missingBrand: item.missingBrand,
+      missingSpecs: item.missingSpecs,
+    }));
+    
+    // Return paginated response
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = offset + items.length < totalCount;
+    
+    res.json({
+      items: transformedItems,
+      pagination: {
+        page,
+        limit,
+        totalItems: totalCount,
+        totalPages,
+        hasMore,
+      },
+    });
+  } catch (error) {
+    console.error('[GET /api/items] Error:', error);
+    res.status(500).json({ error: 'failed_to_fetch_items' });
+  }
+});
+
 /* ------------------------------ item updates ------------------------------ */
 // PUT /api/items/:itemId
 // Update an item (general updates, not category assignment)
