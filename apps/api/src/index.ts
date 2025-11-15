@@ -2564,6 +2564,43 @@ app.use('/api/admin/feature-overrides', featureOverridesRoutes); // Feature over
 app.use('/api/admin/tier-management', tierManagementRoutes); // Tier management (admin-only, auth handled in route)
 app.use('/api/admin/tier-system', tierSystemRoutes); // Tier system CRUD (platform staff, auth handled in route)
 app.use('/api/integrations', cloverRoutes); // Clover POS integration (auth handled in route)
+console.log('✅ Clover integration routes mounted');
+
+// Simple Clover connection status endpoint for frontend banners
+app.get('/api/tenants/:tenantId/integrations/clover', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const user = (req as any).user;
+
+    // Verify tenant access
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: { users: true }
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: 'tenant_not_found' });
+    }
+
+    // Check if user has access to this tenant
+    const hasAccess = tenant.users.some((ut: any) => ut.userId === user.id);
+    if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
+      return res.status(403).json({ error: 'access_denied' });
+    }
+
+    // Check if integration exists and is active
+    const integration = await prisma.cloverIntegration.findUnique({
+      where: { tenantId }
+    });
+
+    const connected = integration && integration.status === 'active';
+
+    return res.json({ connected });
+  } catch (error) {
+    console.error('[GET /api/tenants/:tenantId/integrations/clover] Error:', error);
+    return res.status(500).json({ error: 'failed_to_check_connection' });
+  }
+});
 app.use('/square', async (req, res, next) => {
   try {
     const routes = await getSquareRoutes();
@@ -2724,6 +2761,80 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('[PUT /api/items/:itemId] Error:', error);
     return res.status(500).json({ error: 'failed_to_update_item' });
+  }
+});
+
+/* ------------------------------ products needing enrichment ------------------------------ */
+// GET /api/products/needs-enrichment
+// Returns products that need enrichment (missing images, descriptions, etc.)
+app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    
+    // Get tenant IDs the user has access to
+    const tenantIds = user.tenantIds || [];
+    
+    if (tenantIds.length === 0) {
+      return res.json({ products: [] });
+    }
+
+    // Find products that need enrichment
+    // Products created by Quick Start Wizard typically have source = 'QUICK_START_WIZARD' and are missing details
+    const products = await prisma.inventoryItem.findMany({
+      where: {
+        tenantId: { in: tenantIds },
+        OR: [
+          // Products with missing images
+          { missingImages: true },
+          // Products with missing descriptions
+          { missingDescription: true },
+          // Products with missing brand
+          { missingBrand: true },
+          // Products with missing specs
+          { missingSpecs: true },
+          // Products created by quick start that might need enrichment
+          { source: 'QUICK_START_WIZARD' }
+        ]
+      },
+      select: {
+        id: true,
+        name: true,
+        source: true,
+        missingImages: true,
+        missingDescription: true,
+        missingBrand: true,
+        missingSpecs: true,
+        description: true,
+        brand: true,
+        tenantId: true,
+        photos: {
+          select: {
+            id: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50 // Limit results for performance
+    });
+
+    // Transform to match the expected format by ProductEnrichmentBanner
+    const enrichedProducts = products.map(product => ({
+      id: product.id,
+      name: product.name,
+      source: product.source,
+      enrichmentStatus: 'needs_enrichment',
+      missing: {
+        missingImages: product.missingImages,
+        missingDescription: product.missingDescription,
+        missingSpecs: product.missingSpecs,
+        missingBrand: product.missingBrand
+      }
+    }));
+
+    return res.json({ products: enrichedProducts });
+  } catch (error) {
+    console.error('[GET /api/products/needs-enrichment] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_products_needing_enrichment' });
   }
 });
 
