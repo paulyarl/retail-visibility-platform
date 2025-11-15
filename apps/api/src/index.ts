@@ -1594,8 +1594,17 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     ]);
     
     // Return paginated response
+    // Hide priceCents from frontend since price is the authoritative field
+    const itemsWithoutPriceCents = items.map(item => {
+      const { priceCents, ...itemWithoutPriceCents } = item;
+      return {
+        ...itemWithoutPriceCents,
+        price: item.price ? Number(item.price) : undefined,
+      };
+    });
+
     res.json({
-      items,
+      items: itemsWithoutPriceCents,
       pagination: {
         page,
         limit,
@@ -1628,8 +1637,10 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   if (!it) return res.status(404).json({ error: "not_found" });
 
   // Convert Decimal price to number for frontend compatibility
+  // Hide priceCents from frontend since price is the authoritative field
+  const { priceCents, ...itemWithoutPriceCents } = it;
   const transformed = {
-    ...it,
+    ...itemWithoutPriceCents,
     price: it.price ? Number(it.price) : undefined,
   };
 
@@ -1677,7 +1688,9 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], checkSubscrip
       ...parsed.data,
       title: parsed.data.title || parsed.data.name,
       brand: parsed.data.brand || 'Unknown',
-      price: parsed.data.price ?? parsed.data.priceCents / 100,
+      // Price logic: prioritize price (dollars) over priceCents (cents)
+      price: parsed.data.price ?? (parsed.data.priceCents ? parsed.data.priceCents / 100 : undefined),
+      priceCents: parsed.data.priceCents ?? (parsed.data.price ? Math.round(parsed.data.price * 100) : 0),
       currency: parsed.data.currency || 'USD',
       // Auto-set availability based on stock if not explicitly provided
       availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
@@ -1704,6 +1717,15 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     if (updateData.stock !== undefined) {
       // If stock is being updated, automatically set availability
       updateData.availability = updateData.stock > 0 ? 'in_stock' : 'out_of_stock';
+    }
+
+    // Sync price and priceCents fields
+    if (updateData.price !== undefined) {
+      // If price (dollars) is being updated, sync priceCents
+      updateData.priceCents = Math.round(updateData.price * 100);
+    } else if (updateData.priceCents !== undefined) {
+      // If priceCents is being updated, sync price
+      updateData.price = updateData.priceCents / 100;
     }
     
     const updated = await prisma.inventoryItem.update({ where: { id: req.params.id }, data: updateData });

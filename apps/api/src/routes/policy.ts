@@ -137,10 +137,39 @@ router.delete('/admin/policy-history/:id', requireAdmin, async (req, res) => {
 router.get('/admin/policy/effective', requireAdmin, async (req, res) => {
   try {
     const { scope = 'global' } = req.query;
-    
+
+    // For global scope, get the global policy from sku_billing_policy table
+    if (scope === 'global') {
+      const result = await prisma.$queryRaw<any[]>`
+        SELECT
+          scope,
+          count_active_private,
+          count_preorder,
+          count_zero_price,
+          require_image,
+          require_currency,
+          updated_at
+        FROM sku_billing_policy
+        WHERE scope = 'global'
+        ORDER BY updated_at DESC
+        LIMIT 1
+      `;
+
+      return res.json(result[0] || null);
+    }
+
+    // For tenant-specific scope, get from the view
     const result = await prisma.$queryRaw<any[]>`
-      SELECT * FROM v_effective_sku_billing_policy
-      WHERE scope = ${scope}
+      SELECT
+        tenant_id as scope,
+        count_active_private,
+        count_preorder,
+        count_zero_price,
+        require_image,
+        require_currency,
+        updated_at
+      FROM v_effective_sku_billing_policy
+      WHERE tenant_id = ${scope}
       LIMIT 1
     `;
 

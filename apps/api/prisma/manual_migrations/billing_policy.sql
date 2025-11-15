@@ -1,19 +1,57 @@
 -- SKU Billing Policy for tier-based gating
 -- Configurable rules for what counts as a "billable SKU"
 
--- 1) Global policy table
-CREATE TABLE IF NOT EXISTS sku_billing_policy (
-  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  scope text NOT NULL DEFAULT 'global',
-  count_active_private boolean NOT NULL DEFAULT true,
-  count_preorder boolean NOT NULL DEFAULT true,
-  count_zero_price boolean NOT NULL DEFAULT false,
-  require_image boolean NOT NULL DEFAULT true,
-  require_currency boolean NOT NULL DEFAULT true,
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
+-- Try to fix existing table first (safer than dropping)
+DO $$
+BEGIN
+  -- Check if table exists and has issues
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'sku_billing_policy') THEN
+    -- Check if id column has proper default
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'sku_billing_policy'
+        AND column_name = 'id'
+        AND column_default LIKE '%gen_random_uuid%'
+    ) THEN
+      -- Fix the id column default
+      ALTER TABLE sku_billing_policy ALTER COLUMN id SET DEFAULT gen_random_uuid()::text;
+    END IF;
 
--- 2) Per-tenant overrides
+    -- Check if updated_at column has proper default
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'sku_billing_policy'
+        AND column_name = 'updated_at'
+        AND column_default LIKE '%now%'
+    ) THEN
+      -- Fix the updated_at column default
+      ALTER TABLE sku_billing_policy ALTER COLUMN updated_at SET DEFAULT now();
+    END IF;
+
+    -- Ensure we have the global policy
+    IF NOT EXISTS (SELECT 1 FROM sku_billing_policy WHERE scope = 'global') THEN
+      INSERT INTO sku_billing_policy (scope, count_active_private, count_preorder, count_zero_price, require_image, require_currency)
+      VALUES ('global', true, true, false, true, true);
+    END IF;
+  ELSE
+    -- Table doesn't exist, create it
+    CREATE TABLE sku_billing_policy (
+      id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      scope text NOT NULL DEFAULT 'global',
+      count_active_private boolean NOT NULL DEFAULT true,
+      count_preorder boolean NOT NULL DEFAULT true,
+      count_zero_price boolean NOT NULL DEFAULT false,
+      require_image boolean NOT NULL DEFAULT true,
+      require_currency boolean NOT NULL DEFAULT true,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+
+    INSERT INTO sku_billing_policy (scope, count_active_private, count_preorder, count_zero_price, require_image, require_currency)
+    VALUES ('global', true, true, false, true, true);
+  END IF;
+END $$;
+
+-- Create overrides table if it doesn't exist
 CREATE TABLE IF NOT EXISTS sku_billing_policy_overrides (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   tenant_id text NOT NULL REFERENCES "Tenant"(id) ON DELETE CASCADE,
@@ -27,11 +65,6 @@ CREATE TABLE IF NOT EXISTS sku_billing_policy_overrides (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(tenant_id)
 );
-
--- 3) Insert default global policy
-INSERT INTO sku_billing_policy (scope, count_active_private, count_preorder, count_zero_price, require_image, require_currency)
-VALUES ('global', true, true, false, true, true)
-ON CONFLICT (id) DO NOTHING;
 
 -- 4) Effective policy view (resolves overrides)
 CREATE OR REPLACE VIEW v_effective_sku_billing_policy AS

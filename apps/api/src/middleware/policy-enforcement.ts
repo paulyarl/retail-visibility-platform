@@ -16,10 +16,17 @@ interface PolicyRules {
 async function getEffectivePolicy(tenantId?: string): Promise<PolicyRules | null> {
   try {
     const scope = tenantId || 'global';
-    
+
     const result = await prisma.$queryRaw<PolicyRules[]>`
-      SELECT * FROM v_effective_sku_billing_policy
-      WHERE scope = ${scope}
+      SELECT
+        tenant_id as scope,
+        count_active_private,
+        count_preorder,
+        count_zero_price,
+        require_image,
+        require_currency
+      FROM v_effective_sku_billing_policy
+      WHERE tenant_id = ${scope}
       LIMIT 1
     `;
 
