@@ -25,7 +25,7 @@ const router = Router();
 
 // Initialize Stripe (ensure STRIPE_SECRET_KEY is set in environment)
 const stripe = process.env.STRIPE_SECRET_KEY 
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-11-20.acacia' })
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-10-29.clover' })
   : null;
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -206,7 +206,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
  * Handle customer.subscription.created / updated
  * Main subscription lifecycle handler
  */
-async function handleSubscriptionCreatedOrUpdated(subscription: Stripe.Subscription) {
+async function handleSubscriptionCreatedOrUpdated(subscription: any) {
   console.log('[Stripe Webhooks] Processing subscription update:', subscription.id);
 
   // Find tenant by Stripe customer ID
@@ -279,7 +279,7 @@ async function handleSubscriptionCreatedOrUpdated(subscription: Stripe.Subscript
  * Handle customer.subscription.deleted
  * Subscription cancellation
  */
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+async function handleSubscriptionDeleted(subscription: any) {
   console.log('[Stripe Webhooks] Processing subscription deletion:', subscription.id);
 
   const tenant = await prisma.tenant.findFirst({
@@ -308,7 +308,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
  * Handle invoice.payment_failed
  * Payment failure - set to past_due
  */
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
+async function handlePaymentFailed(invoice: any) {
   console.log('[Stripe Webhooks] Processing payment failure:', invoice.id);
 
   if (!invoice.subscription) {
@@ -342,7 +342,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
  * Handle invoice.payment_succeeded
  * Payment success - restore to active if was past_due
  */
-async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
+async function handlePaymentSucceeded(invoice: any) {
   console.log('[Stripe Webhooks] Processing payment success:', invoice.id);
 
   if (!invoice.subscription) {
