@@ -202,36 +202,48 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
       }
 
       // Use transaction to avoid unique constraint violation during swap
-      await prisma.$transaction(async (tx) => {
-        if (targetPhoto) {
-          // Step 1: Move target photo to a temporary position (-1)
-          await tx.photoAsset.update({
-            where: { id: targetPhoto.id },
-            data: { position: -1 },
-          });
-          console.log(`[Photo Update] Moved target photo to temp position -1`);
-        }
+      try {
+        await prisma.$transaction(async (tx) => {
+          if (targetPhoto) {
+            // Step 1: Move target photo to a temporary position (-1)
+            await tx.photoAsset.update({
+              where: { id: targetPhoto.id },
+              data: { position: -1 },
+            });
+            console.log(`[Photo Update] Moved target photo to temp position -1`);
+          }
 
-        // Step 2: Move this photo to target position
-        await tx.photoAsset.update({
-          where: { id: photoId },
-          data: {
-            position,
-            ...(alt !== undefined && { alt }),
-            ...(caption !== undefined && { caption }),
-          },
+          // Step 2: Move this photo to target position
+          await tx.photoAsset.update({
+            where: { id: photoId },
+            data: {
+              position,
+              ...(alt !== undefined && { alt }),
+              ...(caption !== undefined && { caption }),
+            },
+          });
+          console.log(`[Photo Update] Moved photo ${photoId} to position ${position}`);
+
+          if (targetPhoto) {
+            // Step 3: Move target photo to this photo's old position
+            await tx.photoAsset.update({
+              where: { id: targetPhoto.id },
+              data: { position: photo.position },
+            });
+            console.log(`[Photo Update] Moved target photo to position ${photo.position}`);
+          }
+        }, {
+          isolationLevel: 'Serializable', // Ensure strict transaction isolation
+          maxWait: 5000, // Wait up to 5s for transaction to start
+          timeout: 10000, // Transaction timeout 10s
         });
-        console.log(`[Photo Update] Moved photo ${photoId} to position ${position}`);
-
-        if (targetPhoto) {
-          // Step 3: Move target photo to this photo's old position
-          await tx.photoAsset.update({
-            where: { id: targetPhoto.id },
-            data: { position: photo.position },
-          });
-          console.log(`[Photo Update] Moved target photo to position ${photo.position}`);
-        }
-      });
+      } catch (txError: any) {
+        console.error(`[Photo Update] Transaction failed:`, txError);
+        return res.status(500).json({ 
+          error: "position_update_failed", 
+          details: txError.message 
+        });
+      }
 
       // Refetch the updated photo to ensure we return the committed state
       const updated = await prisma.photoAsset.findUnique({ where: { id: photoId } });
