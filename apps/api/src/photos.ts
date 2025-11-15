@@ -212,44 +212,44 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
         console.log(`[Photo Update] Found photo at target position: ${targetPhoto.id}`);
       }
 
-      // Use transaction to avoid unique constraint violation during swap
+      // Use sequential updates to avoid Prisma transaction tracing issues
+      // The unique constraint on [inventoryItemId, position] requires careful ordering
       try {
-        await prisma.$transaction(async (tx) => {
-          if (targetPhoto) {
-            // Step 1: Move target photo to a temporary position (-1)
-            await tx.photoAsset.update({
-              where: { id: targetPhoto.id },
-              data: { position: -1 },
-            });
-            console.log(`[Photo Update] Moved target photo to temp position -1`);
-          }
-
-          // Step 2: Move this photo to target position
-          await tx.photoAsset.update({
-            where: { id: photoId },
-            data: {
-              position,
-              ...(alt !== undefined && { alt }),
-              ...(caption !== undefined && { caption }),
-            },
+        if (targetPhoto) {
+          // Step 1: Move target photo to a temporary position (-1)
+          await prisma.photoAsset.update({
+            where: { id: targetPhoto.id },
+            data: { position: -1 },
           });
-          console.log(`[Photo Update] Moved photo ${photoId} to position ${position}`);
+          console.log(`[Photo Update] Moved target photo to temp position -1`);
+        }
 
-          if (targetPhoto) {
-            // Step 3: Move target photo to this photo's old position
-            await tx.photoAsset.update({
-              where: { id: targetPhoto.id },
-              data: { position: photo.position },
-            });
-            console.log(`[Photo Update] Moved target photo to position ${photo.position}`);
-          }
+        // Step 2: Move this photo to target position
+        await prisma.photoAsset.update({
+          where: { id: photoId },
+          data: {
+            position,
+            ...(alt !== undefined && { alt }),
+            ...(caption !== undefined && { caption }),
+          },
         });
-        console.log(`[Photo Update] Transaction completed successfully`);
-      } catch (txError: any) {
-        console.error(`[Photo Update] Transaction failed:`, txError);
+        console.log(`[Photo Update] Moved photo ${photoId} to position ${position}`);
+
+        if (targetPhoto) {
+          // Step 3: Move target photo to this photo's old position
+          await prisma.photoAsset.update({
+            where: { id: targetPhoto.id },
+            data: { position: photo.position },
+          });
+          console.log(`[Photo Update] Moved target photo to position ${photo.position}`);
+        }
+        
+        console.log(`[Photo Update] Position swap completed successfully`);
+      } catch (swapError: any) {
+        console.error(`[Photo Update] Position swap failed:`, swapError);
         return res.status(500).json({ 
           error: "position_update_failed", 
-          details: txError.message 
+          details: swapError.message 
         });
       }
 
