@@ -190,23 +190,30 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
 
     // If position is changing, handle swap/reorder
     if (position !== undefined && position !== photo.position) {
+      console.log(`[Photo Update] Changing position from ${photo.position} to ${position} for photo ${photoId}`);
+      
       // Find photo at target position (if any)
       const targetPhoto = await prisma.photoAsset.findFirst({
         where: { inventoryItemId: itemId, position },
       });
 
+      if (targetPhoto) {
+        console.log(`[Photo Update] Found photo at target position: ${targetPhoto.id}`);
+      }
+
       // Use transaction to avoid unique constraint violation during swap
-      const updated = await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx) => {
         if (targetPhoto) {
           // Step 1: Move target photo to a temporary position (-1)
           await tx.photoAsset.update({
             where: { id: targetPhoto.id },
             data: { position: -1 },
           });
+          console.log(`[Photo Update] Moved target photo to temp position -1`);
         }
 
         // Step 2: Move this photo to target position
-        const updatedPhoto = await tx.photoAsset.update({
+        await tx.photoAsset.update({
           where: { id: photoId },
           data: {
             position,
@@ -214,6 +221,7 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
             ...(caption !== undefined && { caption }),
           },
         });
+        console.log(`[Photo Update] Moved photo ${photoId} to position ${position}`);
 
         if (targetPhoto) {
           // Step 3: Move target photo to this photo's old position
@@ -221,10 +229,17 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
             where: { id: targetPhoto.id },
             data: { position: photo.position },
           });
+          console.log(`[Photo Update] Moved target photo to position ${photo.position}`);
         }
-
-        return updatedPhoto;
       });
+
+      // Refetch the updated photo to ensure we return the committed state
+      const updated = await prisma.photoAsset.findUnique({ where: { id: photoId } });
+      if (!updated) {
+        return res.status(500).json({ error: "photo update failed" });
+      }
+
+      console.log(`[Photo Update] Final position: ${updated.position}`);
 
       // Update item.imageUrl if primary changed
       if (position === 0) {
@@ -232,6 +247,7 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
           where: { id: itemId },
           data: { imageUrl: updated.url },
         });
+        console.log(`[Photo Update] Updated item imageUrl to ${updated.url}`);
       }
 
       return res.json(updated);
