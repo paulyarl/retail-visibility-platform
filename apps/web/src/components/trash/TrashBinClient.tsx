@@ -13,10 +13,21 @@ interface TrashBinClientProps {
   tenantId: string;
 }
 
+interface TrashCapacity {
+  current: number;
+  capacity: number;
+  remaining: number;
+  percent: number;
+  status: 'healthy' | 'warning' | 'critical';
+  color: 'green' | 'yellow' | 'red';
+  isFull: boolean;
+}
+
 export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [capacity, setCapacity] = useState<TrashCapacity | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -33,15 +44,26 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
 
   const { viewMode, setViewMode } = useItemsViewMode();
 
-  // Load trashed items
+  // Load trashed items and capacity
   const loadTrash = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get(`/api/items?tenantId=${tenantId}&status=trashed&limit=100`);
-      if (!response.ok) throw new Error('Failed to load trash');
-      const data = await response.json();
-      setItems(data.items || []);
+      
+      // Load items and capacity in parallel
+      const [itemsResponse, capacityResponse] = await Promise.all([
+        api.get(`/api/items?tenantId=${tenantId}&status=trashed&limit=100`),
+        api.get(`/api/trash/capacity?tenantId=${tenantId}`)
+      ]);
+      
+      if (!itemsResponse.ok) throw new Error('Failed to load trash');
+      const itemsData = await itemsResponse.json();
+      setItems(itemsData.items || []);
+      
+      if (capacityResponse.ok) {
+        const capacityData = await capacityResponse.json();
+        setCapacity(capacityData);
+      }
     } catch (err) {
       console.error('[TrashBin] Load error:', err);
       setError('Failed to load trash bin');
@@ -117,6 +139,16 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
     });
   };
 
+  // Get capacity color classes
+  const getCapacityColorClasses = () => {
+    if (!capacity) return { bg: 'bg-green-500', text: 'text-green-900', border: 'border-green-200' };
+    if (capacity.color === 'red') return { bg: 'bg-red-500', text: 'text-red-900', border: 'border-red-200' };
+    if (capacity.color === 'yellow') return { bg: 'bg-yellow-500', text: 'text-yellow-900', border: 'border-yellow-200' };
+    return { bg: 'bg-green-500', text: 'text-green-900', border: 'border-green-200' };
+  };
+
+  const colorClasses = getCapacityColorClasses();
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -126,7 +158,7 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
           <div className="flex gap-2">
             <Button
               onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              variant="outline"
+              variant="ghost"
               size="sm"
             >
               {viewMode === 'grid' ? 'List View' : 'Grid View'}
@@ -143,6 +175,41 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
           </div>
         }
       />
+
+      {/* Capacity Indicator */}
+      {capacity && (
+        <div className={`border ${colorClasses.border} rounded-lg p-4 ${capacity.status === 'critical' ? 'bg-red-50' : capacity.status === 'warning' ? 'bg-yellow-50' : 'bg-white'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Trash Capacity</span>
+              <span className={`text-sm ${colorClasses.text}`}>
+                {capacity.current} / {capacity.capacity} items ({capacity.percent}%)
+              </span>
+            </div>
+            {capacity.isFull && (
+              <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded">
+                FULL
+              </span>
+            )}
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className={`${colorClasses.bg} h-2 rounded-full transition-all duration-300`}
+              style={{ width: `${Math.min(100, capacity.percent)}%` }}
+            />
+          </div>
+          {capacity.status === 'critical' && (
+            <p className="text-xs text-red-600 mt-2">
+              ⚠️ Trash is full! Purge some items before you can delete more.
+            </p>
+          )}
+          {capacity.status === 'warning' && (
+            <p className="text-xs text-yellow-700 mt-2">
+              ⚠️ Trash is {capacity.percent}% full. Consider purging items you don't need.
+            </p>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="bg-error/10 text-error px-4 py-3 rounded-lg">
