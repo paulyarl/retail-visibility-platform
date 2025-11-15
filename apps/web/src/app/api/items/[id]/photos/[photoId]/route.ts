@@ -9,11 +9,33 @@ export async function PUT(
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const url = `${base}/items/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`;
 
+    // Create headers object, excluding problematic headers
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add Authorization if present
+    const auth = req.headers.get('authorization');
+    if (auth) headers['Authorization'] = auth;
+
+    // Add other safe headers but exclude traceparent and other problematic ones
+    const excludeHeaders = ['traceparent', 'tracestate', 'x-trace-id', 'x-span-id', 'x-b3-traceid', 'x-b3-spanid', 'x-b3-parentspanid', 'x-b3-sampled', 'x-b3-flags'];
+    req.headers.forEach((value, key) => {
+      const lowerKey = key.toLowerCase();
+      if (key.startsWith('x-') || key.startsWith('trace') || excludeHeaders.includes(lowerKey)) {
+        console.log(`Filtering out header: ${key}`);
+        return; // Skip tracing and custom headers
+      }
+      if (!headers[key]) {
+        headers[key] = value;
+      }
+    });
+
+    console.log('Final headers being sent:', Object.keys(headers));
+
     const res = await fetch(url, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: req.body,
       // @ts-expect-error - duplex is a new fetch feature
       duplex: 'half',
@@ -27,6 +49,36 @@ export async function PUT(
     }
 
     const data = await res.json();
+    console.log('Backend response status:', res.status, 'data:', data);
+
+    // Handle specific traceparent error from backend
+    if (res.status === 500 && data.error === 'invalid traceparent header') {
+      console.warn('Backend rejected traceparent header, retrying without it');
+      // Retry without any tracing headers
+      const cleanHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': headers['Authorization'] || '',
+      };
+
+      const retryRes = await fetch(url, {
+        method: 'PUT',
+        headers: cleanHeaders,
+        body: req.body,
+        // @ts-expect-error - duplex is a new fetch feature
+        duplex: 'half',
+      });
+
+      const retryContentType = retryRes.headers.get('content-type');
+      if (retryContentType?.includes('application/json')) {
+        const retryData = await retryRes.json();
+        console.log('Retry response:', retryRes.status, retryData);
+        return NextResponse.json(retryData, { status: retryRes.status });
+      }
+
+      // If retry also fails, return original error
+      return NextResponse.json(data, { status: res.status });
+    }
+
     return NextResponse.json(data, { status: res.status });
   } catch (e) {
     console.error('PUT photo proxy error', e);

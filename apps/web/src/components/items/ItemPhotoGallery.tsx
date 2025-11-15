@@ -93,6 +93,9 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
     try {
       const res = await api.put(`/api/items/${item.id}/photos/${photoId}`, {
         position: 0,
+      }, {
+        // Disable client-side retries since we handle retries in the API route
+        headers: { 'x-no-retry': 'true' }
       });
 
       if (!res.ok) throw new Error("Failed to set primary");

@@ -75,8 +75,9 @@ export async function apiRequest(
     ? endpoint
     : `${API_BASE_URL}/${endpoint}`;
 
-  // Simple retry/backoff for 429/5xx (max 2 retries)
-  const maxRetries = 2;
+  // Simple retry/backoff for 429/5xx (max 2 retries), but skip if x-no-retry header is set
+  const shouldRetry = !headers['x-no-retry'];
+  const maxRetries = shouldRetry ? 2 : 0;
   let attempt = 0;
   let resp: Response;
   while (true) {
