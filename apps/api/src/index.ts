@@ -2726,8 +2726,12 @@ app.get('/api/items', authenticateToken, async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 25;
     const offset = (page - 1) * limit;
     
+    console.log('[DEBUG] Query params:', req.query);
+    
     // Get tenant ID from either tenant_id or tenantId parameter (support both)
     const tenantId = req.query.tenant_id || req.query.tenantId;
+    
+    console.log('[DEBUG] tenantId extracted:', tenantId, 'from tenant_id:', req.query.tenant_id, 'tenantId:', req.query.tenantId);
     
     if (!tenantId) {
       return res.status(400).json({ error: 'tenant_id_required', message: 'Tenant ID is required' });
