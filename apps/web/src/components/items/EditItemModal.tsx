@@ -9,7 +9,7 @@ interface Item {
   name: string;
   brand?: string;
   manufacturer?: string;
-  priceCents?: number;
+  price: number;
   stock?: number;
   description?: string;
   status?: 'active' | 'inactive' | 'syncing';
@@ -63,7 +63,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setName(item.name || '');
       setBrand(item.brand || '');
       setManufacturer(item.manufacturer || '');
-      setPrice(item.priceCents ? (item.priceCents / 100).toFixed(2) : '');
+      setPrice(item.price ? item.price.toFixed(2) : '');
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
       setStatus((item.status === 'active' || item.status === 'inactive') ? item.status : 'active');
@@ -118,7 +118,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         name: name.trim(),
         brand: brand.trim() || undefined,
         manufacturer: manufacturer.trim() || undefined,
-        priceCents: price ? Math.round(parseFloat(price) * 100) : undefined,
+        price: price ? parseFloat(price) : undefined,
         stock: stock ? parseInt(stock) : undefined,
         description: description.trim() || undefined,
         status,
@@ -390,8 +390,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             {item.manufacturer && (
               <p><span className="font-medium">Manufacturer:</span> {item.manufacturer}</p>
             )}
-            {item.priceCents !== undefined && (
-              <p><span className="font-medium">Price:</span> ${(item.priceCents / 100).toFixed(2)}</p>
+            {item.price !== undefined && (
+              <p><span className="font-medium">Price:</span> ${item.price.toFixed(2)}</p>
             )}
             {item.stock !== undefined && (
               <p><span className="font-medium">Stock:</span> {item.stock}</p>

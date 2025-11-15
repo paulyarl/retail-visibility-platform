@@ -180,7 +180,7 @@ export default function ItemsClient({
       await createItem({
         sku: formData.sku,
         name: formData.name,
-        price: Math.round(parseFloat(formData.price) * 100), // Convert to cents
+        price: parseFloat(formData.price), // Send price in dollars
         stock: parseInt(formData.stock),
         description: formData.description,
       });

@@ -42,7 +42,7 @@ type Item = {
   id: string;
   sku: string;
   name: string;
-  priceCents?: number;
+  price: number;
   stock?: number;
   imageUrl?: string;
   itemStatus?: 'active' | 'inactive' | 'archived';
@@ -77,7 +77,7 @@ export default function ItemsClient({
     const activeCount = allItems.filter(i => i.itemStatus === 'active').length;
     const inactiveCount = allItems.filter(i => i.itemStatus === 'inactive').length;
     const lowStockCount = allItems.filter(i => i.stock !== undefined && i.stock < 10).length;
-    const totalValue = allItems.reduce((sum, i) => sum + (i.priceCents || 0), 0) / 100;
+    const totalValue = allItems.reduce((sum, i) => sum + (i.price || 0), 0);
     
     return {
       total: totalItems,
@@ -343,12 +343,11 @@ export default function ItemsClient({
     setCreating(true);
     setError(null);
     try {
-      const priceCents = price ? Math.round(parseFloat(price) * 100) : 0;
       const body = {
         tenantId,
         sku: sku.trim(),
         name: name.trim(),
-        priceCents,
+        price: parseFloat(price), // Send price in dollars
         stock: stock ? parseInt(stock, 10) : 0,
       };
       const res = await api.post("/api/items", body);
@@ -1069,8 +1068,8 @@ export default function ItemsClient({
                         )}
                       </div>
                       <div className="mt-1 flex items-center gap-4 text-sm text-neutral-500">
-                        {typeof i.priceCents === "number" && (
-                          <span className="font-semibold text-neutral-900 dark:text-neutral-100">${(i.priceCents / 100).toFixed(2)}</span>
+                        {typeof i.price === "number" && (
+                          <span className="font-semibold text-neutral-900 dark:text-neutral-100">${i.price.toFixed(2)}</span>
                         )}
                         {typeof i.stock === "number" && (
                           <span>Stock: {i.stock}</span>
