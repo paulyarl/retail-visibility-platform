@@ -1486,7 +1486,8 @@ console.log("✓ Photos router mounted");
 
 /* --------------------------- ITEMS / INVENTORY --------------------------- */
 const listQuery = z.object({
-  tenantId: z.string().min(1),
+  tenantId: z.string().min(1).optional(),
+  tenant_id: z.string().min(1).optional(),
   count: z.string().optional(), // Return only count for performance
   page: z.string().optional(), // Page number (1-indexed)
   limit: z.string().optional(), // Items per page
@@ -1495,7 +1496,10 @@ const listQuery = z.object({
   visibility: z.enum(['all', 'public', 'private']).optional(), // Filter by visibility
   sortBy: z.enum(['name', 'sku', 'price', 'stock', 'updatedAt', 'createdAt']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
-});
+}).transform((data) => ({
+  ...data,
+  tenantId: data.tenantId || data.tenant_id, // Use tenantId or tenant_id
+}));
 
 app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateToken, async (req, res) => {
   const parsed = listQuery.safeParse(req.query);
@@ -2712,14 +2716,6 @@ app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) =
     console.error('[PATCH /api/v1/tenants/:tenantId/items/:itemId/category] Error:', msg);
     return res.status(code).json({ success: false, error: msg });
   }
-});
-
-/* ------------------------------ item fetching ------------------------------ */
-// GET /api/items
-// Fetch items with pagination, filtering, and tenant access control
-app.get('/api/items', authenticateToken, async (req, res) => {
-  console.log('[DEBUG] /api/items route handler called');
-  return res.json({ debug: 'Route reached', query: req.query, user: (req as any).user });
 });
 
 /* ------------------------------ item updates ------------------------------ */
