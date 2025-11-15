@@ -2528,12 +2528,16 @@ app.use('/upgrade-requests', upgradeRequestsRoutes);
 app.use('/permissions', permissionRoutes);
 app.use('/users', userRoutes);
 // Directory routes - mount at specific paths to avoid conflicts
+// TEMPORARILY DISABLED: Directory listings table missing in production
+// Re-enable after running fix_directory_table.sql in production database
+/*
 app.use('/api/directory', directoryRoutes); // Public directory endpoint - no auth required
 app.use('/api/admin/directory', directoryAdminRoutes); // Admin directory management (auth in routes)
 app.use('/api/support/directory', directorySupportRoutes); // Support directory tools (auth in routes)
 // Tenant directory routes - MUST come before generic tenant routes
 app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
-console.log('✅ Directory routes mounted (public, tenant, admin, support)');
+*/
+console.log('⚠️ Directory routes temporarily disabled - missing directory_listings table');
 // Generic tenant routes come AFTER directory routes
 app.use('/api/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
