@@ -243,11 +243,8 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
             });
             console.log(`[Photo Update] Moved target photo to position ${photo.position}`);
           }
-        }, {
-          isolationLevel: 'Serializable', // Ensure strict transaction isolation
-          maxWait: 5000, // Wait up to 5s for transaction to start
-          timeout: 10000, // Transaction timeout 10s
         });
+        console.log(`[Photo Update] Transaction completed successfully`);
       } catch (txError: any) {
         console.error(`[Photo Update] Transaction failed:`, txError);
         return res.status(500).json({ 
