@@ -11,29 +11,19 @@ export async function PUT(
     const url = `${base}/items/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`;
     console.log('[Next.js Proxy] Target URL:', url);
 
-    // Create headers object, excluding problematic headers
+    // Create headers object with ONLY essential headers
+    // Do NOT forward other headers to avoid conflicts
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
     // Add Authorization if present
     const auth = req.headers.get('authorization');
-    if (auth) headers['Authorization'] = auth;
+    if (auth) {
+      headers['Authorization'] = auth;
+    }
 
-    // Add other safe headers but exclude traceparent and other problematic ones
-    const excludeHeaders = ['traceparent', 'tracestate', 'x-trace-id', 'x-span-id', 'x-b3-traceid', 'x-b3-spanid', 'x-b3-parentspanid', 'x-b3-sampled', 'x-b3-flags'];
-    req.headers.forEach((value, key) => {
-      const lowerKey = key.toLowerCase();
-      if (key.startsWith('x-') || key.startsWith('trace') || excludeHeaders.includes(lowerKey)) {
-        console.log(`[Next.js Proxy] Filtering out header: ${key}`);
-        return; // Skip tracing and custom headers
-      }
-      if (!headers[key]) {
-        headers[key] = value;
-      }
-    });
-
-    console.log('[Next.js Proxy] Final headers being sent:', Object.keys(headers));
+    console.log('[Next.js Proxy] Headers to send:', JSON.stringify(headers));
 
     // Read the request body as JSON
     console.log('[Next.js Proxy] Reading request body...');
