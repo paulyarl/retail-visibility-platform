@@ -178,15 +178,26 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
     const { id: itemId, photoId } = req.params;
     const { alt, caption, position } = req.body || {};
 
+    console.log(`[Photo Update] PUT request received - itemId: ${itemId}, photoId: ${photoId}`);
+    console.log(`[Photo Update] Request body:`, JSON.stringify(req.body));
+    console.log(`[Photo Update] Parsed values - alt: ${alt}, caption: ${caption}, position: ${position}`);
+
     // Verify item exists
     const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
-    if (!item) return res.status(404).json({ error: "item not found" });
+    if (!item) {
+      console.log(`[Photo Update] Item not found: ${itemId}`);
+      return res.status(404).json({ error: "item not found" });
+    }
 
     // Verify photo exists and belongs to this item
     const photo = await prisma.photoAsset.findUnique({ where: { id: photoId } });
     if (!photo || photo.inventoryItemId !== itemId) {
+      console.log(`[Photo Update] Photo not found or doesn't belong to item`);
       return res.status(404).json({ error: "photo not found" });
     }
+
+    console.log(`[Photo Update] Current photo position: ${photo.position}, requested position: ${position}`);
+    console.log(`[Photo Update] Condition check - position !== undefined: ${position !== undefined}, position !== photo.position: ${position !== photo.position}`);
 
     // If position is changing, handle swap/reorder
     if (position !== undefined && position !== photo.position) {
