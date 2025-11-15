@@ -30,7 +30,10 @@ export default function POSIntegrationBanner({
   useEffect(() => {
     const checkPOSConnection = async () => {
       try {
-        const response = await fetch(`/api/tenants/${tenantId}/integrations/clover`);
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}/integrations/clover`, {
+          credentials: 'include'
+        });
         if (response.ok) {
           const data = await response.json();
           setHasPOS(data.connected || false);
