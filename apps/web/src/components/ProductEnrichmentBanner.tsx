@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -43,6 +44,7 @@ interface ProductEnrichmentBannerProps {
 
 export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentBannerProps = {}) {
   const router = useRouter();
+  const { user } = useAuth();
   const [products, setProducts] = useState<ProductNeedingEnrichment[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -54,7 +56,20 @@ export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentB
   const fetchProductsNeedingEnrichment = async () => {
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      
+      // Get access token from localStorage (same way AuthContext does)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(`${API_BASE_URL}/api/products/needs-enrichment`, {
+        headers,
         credentials: 'include'
       });
 

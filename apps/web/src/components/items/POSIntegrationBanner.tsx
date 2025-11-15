@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { X } from 'lucide-react';
@@ -22,6 +22,7 @@ export default function POSIntegrationBanner({
   itemCount,
 }: POSIntegrationBannerProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [isDismissed, setIsDismissed] = useState(false);
   const [hasPOS, setHasPOS] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -31,7 +32,20 @@ export default function POSIntegrationBanner({
     const checkPOSConnection = async () => {
       try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        
+        // Get access token from localStorage (same way AuthContext does)
+        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+        
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}/integrations/clover`, {
+          headers,
           credentials: 'include'
         });
         if (response.ok) {
