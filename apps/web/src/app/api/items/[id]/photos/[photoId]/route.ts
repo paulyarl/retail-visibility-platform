@@ -66,7 +66,12 @@ export async function PUT(
     }
 
     const data = await res.json();
-    console.log('Backend response status:', res.status, 'data:', data);
+    console.log('[Next.js Proxy] Backend response status:', res.status, 'data:', data);
+
+    // Add custom header to confirm proxy was hit
+    const responseHeaders = new Headers();
+    responseHeaders.set('x-proxy-version', 'v2-with-json-parse');
+    responseHeaders.set('Content-Type', 'application/json');
 
     // Handle specific traceparent error from backend
     if (res.status === 500 && data.error === 'invalid traceparent header') {
@@ -86,15 +91,15 @@ export async function PUT(
       const retryContentType = retryRes.headers.get('content-type');
       if (retryContentType?.includes('application/json')) {
         const retryData = await retryRes.json();
-        console.log('Retry response:', retryRes.status, retryData);
-        return NextResponse.json(retryData, { status: retryRes.status });
+        console.log('[Next.js Proxy] Retry response:', retryRes.status, retryData);
+        return NextResponse.json(retryData, { status: retryRes.status, headers: responseHeaders });
       }
 
       // If retry also fails, return original error
-      return NextResponse.json(data, { status: res.status });
+      return NextResponse.json(data, { status: res.status, headers: responseHeaders });
     }
 
-    return NextResponse.json(data, { status: res.status });
+    return NextResponse.json(data, { status: res.status, headers: responseHeaders });
   } catch (e) {
     console.error('PUT photo proxy error', e);
     return NextResponse.json({ error: 'proxy_failed', details: e instanceof Error ? e.message : String(e) }, { status: 500 });
