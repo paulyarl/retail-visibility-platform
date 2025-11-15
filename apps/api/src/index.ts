@@ -420,12 +420,22 @@ const tenantProfileSchema = z.object({
 
 app.post("/tenant/profile", authenticateToken, async (req, res) => {
   const parsed = tenantProfileSchema.safeParse(req.body ?? {});
-  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  if (!parsed.success) {
+    console.error('[POST /tenant/profile] Validation failed:', parsed.error.flatten());
+    return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  }
   
   try {
     const { tenant_id, ...profileData } = parsed.data;
+    console.log('[POST /tenant/profile] Starting for tenant:', tenant_id);
+    console.log('[POST /tenant/profile] Profile data:', profileData);
+    
     const existingTenant = await prisma.tenant.findUnique({ where: { id: tenant_id } });
-    if (!existingTenant) return res.status(404).json({ error: "tenant_not_found" });
+    if (!existingTenant) {
+      console.error('[POST /tenant/profile] Tenant not found:', tenant_id);
+      return res.status(404).json({ error: "tenant_not_found" });
+    }
+    console.log('[POST /tenant/profile] Found tenant:', existingTenant.name);
 
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     // Import basePrisma to bypass retry wrapper
@@ -435,9 +445,11 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
     const existingProfiles = await basePrisma.$queryRaw`
       SELECT tenant_id FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
     `;
+    console.log('[POST /tenant/profile] Existing profiles check result:', existingProfiles);
 
     let result;
     if ((existingProfiles as any[]).length > 0) {
+      console.log('[POST /tenant/profile] Updating existing profile');
       // Update existing profile - build dynamic update query
       const updateParts = [];
       const values = [];
@@ -457,14 +469,19 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
           SET ${updateParts.join(', ')}
           WHERE tenant_id = $${values.length}
         `;
+        console.log('[POST /tenant/profile] Update query:', updateQuery);
+        console.log('[POST /tenant/profile] Update values:', values);
         await basePrisma.$executeRawUnsafe(updateQuery, ...values);
+        console.log('[POST /tenant/profile] Update executed successfully');
       }
 
       // Get updated profile
       result = await basePrisma.$queryRaw`
         SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
       `;
+      console.log('[POST /tenant/profile] Retrieved updated profile');
     } else {
+      console.log('[POST /tenant/profile] Creating new profile');
       // Create new profile
       const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
       const insertValues = [
@@ -475,6 +492,8 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
         profileData.postal_code || '',
         (profileData.country_code || 'US').toUpperCase()
       ];
+      console.log('[POST /tenant/profile] Insert fields:', insertFields);
+      console.log('[POST /tenant/profile] Insert values:', insertValues);
 
       // Add optional fields
       const optionalMappings = {
@@ -509,20 +528,31 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
         VALUES (${placeholders.join(', ')})
         RETURNING *
       `;
+      console.log('[POST /tenant/profile] Insert query:', insertQuery);
+      console.log('[POST /tenant/profile] Final insert values:', insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
         basePrisma.$queryRaw`SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}`
       );
+      console.log('[POST /tenant/profile] Created new profile');
     }
 
     // Keep Tenant.name in sync
     if (profileData.business_name) {
+      console.log('[POST /tenant/profile] Updating tenant name to:', profileData.business_name);
       await prisma.tenant.update({ where: { id: tenant_id }, data: { name: profileData.business_name } });
     }
 
+    console.log('[POST /tenant/profile] Success, returning result:', (result as any)[0] || result);
     res.json((result as any)[0] || result);
   } catch (e: any) {
-    console.error("Failed to save tenant profile:", e);
+    console.error("[POST /tenant/profile] Full error details:", {
+      message: e?.message,
+      stack: e?.stack,
+      code: e?.code,
+      name: e?.name,
+      tenant_id: req.body?.tenant_id
+    });
     res.status(500).json({ error: "failed_to_save_profile" });
   }
 });
