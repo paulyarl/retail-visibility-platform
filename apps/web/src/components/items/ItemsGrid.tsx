@@ -104,7 +104,7 @@ export default function ItemsGrid({
 
               <div className="flex items-center justify-between">
                 <div className="text-lg font-bold text-neutral-900 dark:text-white">
-                  ${(item.price / 100).toFixed(2)}
+                  ${item.price.toFixed(2)}
                 </div>
                 <div className={`text-sm ${item.stock < 10 ? 'text-warning font-medium' : 'text-neutral-600 dark:text-neutral-400'}`}>
                   Stock: {item.stock}

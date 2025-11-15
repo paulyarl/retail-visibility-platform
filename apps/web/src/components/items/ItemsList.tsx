@@ -130,7 +130,7 @@ export default function ItemsList({
                   <div>
                     <p className="text-xs text-neutral-500">Price</p>
                     <p className="text-xl font-bold text-neutral-900 dark:text-white">
-                      ${(item.price / 100).toFixed(2)}
+                      ${item.price.toFixed(2)}
                     </p>
                   </div>
                   <div>
