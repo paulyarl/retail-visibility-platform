@@ -382,6 +382,142 @@ app.delete("/tenants/:id", authenticateToken, checkTenantAccess, requireTenantOw
   }
 });
 
+// Location Status Management Endpoints
+const { 
+  validateStatusChange, 
+  canChangeStatus, 
+  getLocationStatusInfo,
+  getStatusChangeImpact 
+} = require('./utils/location-status');
+
+// Change location status
+app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reason, reopeningDate } = req.body;
+
+    // Check if user can change status
+    const userRole = req.user?.role || 'USER';
+    const tenantRole = req.user?.tenantIds?.includes(id) ? 'TENANT_ADMIN' : userRole;
+    
+    if (!canChangeStatus(tenantRole)) {
+      return res.status(403).json({ 
+        error: "insufficient_permissions", 
+        message: "You don't have permission to change location status" 
+      });
+    }
+
+    // Get current tenant
+    const tenant = await prisma.tenant.findUnique({ where: { id } });
+    if (!tenant) {
+      return res.status(404).json({ error: "tenant_not_found" });
+    }
+
+    // Validate status change
+    const validation = validateStatusChange(tenant.locationStatus as any, status, reason);
+    if (!validation.valid) {
+      return res.status(400).json({ 
+        error: "invalid_status_change", 
+        message: validation.error 
+      });
+    }
+
+    // Update tenant status
+    const updated = await prisma.tenant.update({
+      where: { id },
+      data: {
+        locationStatus: status,
+        statusChangedAt: new Date(),
+        statusChangedBy: req.user?.userId,
+        reopeningDate: reopeningDate ? new Date(reopeningDate) : null,
+        closureReason: reason || null,
+      },
+    });
+
+    // TODO: Create audit log entry (Phase 1.4)
+    // TODO: Send notifications (Phase 6)
+
+    res.json({
+      ...updated,
+      statusInfo: getLocationStatusInfo(status),
+    });
+  } catch (error: any) {
+    console.error('[PATCH /api/tenants/:id/status] Error:', error);
+    res.status(500).json({ error: "failed_to_update_status", details: error.message });
+  }
+});
+
+// Get status change impact preview
+app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const tenant = await prisma.tenant.findUnique({ where: { id } });
+    if (!tenant) {
+      return res.status(404).json({ error: "tenant_not_found" });
+    }
+
+    const impact = getStatusChangeImpact(tenant.locationStatus as any, status);
+    const validation = validateStatusChange(tenant.locationStatus as any, status);
+
+    res.json({
+      currentStatus: tenant.locationStatus,
+      newStatus: status,
+      valid: validation.valid,
+      error: validation.error,
+      impact,
+    });
+  } catch (error: any) {
+    console.error('[POST /api/tenants/:id/status/preview] Error:', error);
+    res.status(500).json({ error: "failed_to_preview_status", details: error.message });
+  }
+});
+
+// Get tenants by status (admin only)
+app.get("/api/tenants/by-status/:status", authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { status } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 25;
+    const skip = (page - 1) * limit;
+
+    const [tenants, total] = await Promise.all([
+      prisma.tenant.findMany({
+        where: { locationStatus: status as any },
+        skip,
+        take: limit,
+        orderBy: { statusChangedAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          locationStatus: true,
+          statusChangedAt: true,
+          statusChangedBy: true,
+          reopeningDate: true,
+          closureReason: true,
+          subscriptionTier: true,
+          subscriptionStatus: true,
+        },
+      }),
+      prisma.tenant.count({ where: { locationStatus: status as any } }),
+    ]);
+
+    res.json({
+      tenants,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error: any) {
+    console.error('[GET /api/tenants/by-status/:status] Error:', error);
+    res.status(500).json({ error: "failed_to_get_tenants", details: error.message });
+  }
+});
+
 // Tenant profile (business information)
 const E164 = /^\+[1-9]\d{1,14}$/; // E.164 phone pattern: MUST start with '+'
 const HTTPS_URL = /^https:\/\//i;
