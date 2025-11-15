@@ -2733,8 +2733,8 @@ app.get('/api/items', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'tenant_id_required', message: 'Tenant ID is required' });
     }
     
-    // Verify user has access to this tenant
-    if (!user.tenantIds.includes(tenantId)) {
+    // Verify user has access to this tenant (platform admins can access all)
+    if (!user.tenantIds.includes(tenantId) && user.role !== 'PLATFORM_ADMIN') {
       return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
     }
     
