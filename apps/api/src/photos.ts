@@ -176,7 +176,7 @@ r.get("/items/:id/photos", async (req, res) => {
 r.put("/items/:id/photos/:photoId", async (req, res) => {
   try {
     const { id: itemId, photoId } = req.params;
-    const { alt, caption, position } = req.body;
+    const { alt, caption, position } = req.body || {};
 
     // Verify item exists
     const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
