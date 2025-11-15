@@ -1630,7 +1630,8 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
 });
 
 const createItemSchema = z.object({
-  tenantId: z.string().min(1),
+  tenantId: z.string().min(1).optional(),
+  tenant_id: z.string().min(1).optional(),
   sku: z.string().min(1),
   name: z.string().min(1),
   priceCents: z.number().int().nonnegative().default(0),
@@ -1648,7 +1649,10 @@ const createItemSchema = z.object({
   // Item status and visibility
   itemStatus: z.enum(['active', 'inactive', 'archived']).optional(),
   visibility: z.enum(['public', 'private']).optional(),
-});
+}).transform((data) => ({
+  ...data,
+  tenantId: data.tenantId || data.tenant_id, // Use tenantId or tenant_id
+}));
 
 app.post(["/api/items", "/api/inventory", "/items", "/inventory"], checkSubscriptionLimits, enforcePolicyCompliance, async (req, res) => {
   const parsed = createItemSchema.safeParse(req.body ?? {});
