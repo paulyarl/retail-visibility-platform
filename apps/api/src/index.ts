@@ -2718,6 +2718,7 @@ app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) =
 // GET /api/items
 // Fetch items with pagination, filtering, and tenant access control
 app.get('/api/items', authenticateToken, async (req, res) => {
+  console.log('[DEBUG] /api/items route handler called');
   try {
     const user = (req as any).user;
     
