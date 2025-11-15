@@ -1,0 +1,237 @@
+"use client";
+
+import { useEffect, useState } from 'react';
+import { Button, ConfirmDialog } from '@/components/ui';
+import PageHeader from '@/components/PageHeader';
+import { api } from '@/lib/api';
+import { Item } from '@/services/itemsDataService';
+import ItemsGrid from '../items/ItemsGrid';
+import ItemsList from '../items/ItemsList';
+import { useItemsViewMode } from '@/hooks/useItemsViewMode';
+
+interface TrashBinClientProps {
+  tenantId: string;
+}
+
+export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'warning';
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    variant: 'danger',
+    onConfirm: async () => {},
+  });
+
+  const { viewMode, setViewMode } = useItemsViewMode();
+
+  // Load trashed items
+  const loadTrash = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await api.get(`/api/items?tenantId=${tenantId}&status=trashed&limit=100`);
+      if (!response.ok) throw new Error('Failed to load trash');
+      const data = await response.json();
+      setItems(data.items || []);
+    } catch (err) {
+      console.error('[TrashBin] Load error:', err);
+      setError('Failed to load trash bin');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tenantId) {
+      loadTrash();
+    }
+  }, [tenantId]);
+
+  // Restore item
+  const handleRestore = async (item: Item) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Restore Item',
+      message: `Restore "${item.name}" from trash? It will be set back to active status.`,
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          const response = await api.patch(`/api/items/${item.id}/restore`);
+          if (!response.ok) throw new Error('Failed to restore');
+          await loadTrash();
+        } catch (err) {
+          console.error('[TrashBin] Restore error:', err);
+          setError('Failed to restore item');
+        }
+      },
+    });
+  };
+
+  // Permanently delete item
+  const handlePurge = async (item: Item) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Permanently Delete',
+      message: `Are you sure you want to permanently delete "${item.name}"? This action CANNOT be undone!`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const response = await api.delete(`/api/items/${item.id}/purge`);
+          if (!response.ok) throw new Error('Failed to purge');
+          await loadTrash();
+        } catch (err) {
+          console.error('[TrashBin] Purge error:', err);
+          setError('Failed to permanently delete item');
+        }
+      },
+    });
+  };
+
+  // Empty entire trash
+  const handleEmptyTrash = async () => {
+    if (items.length === 0) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Empty Trash',
+      message: `Are you sure you want to permanently delete ALL ${items.length} items in trash? This action CANNOT be undone!`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await Promise.all(items.map(item => api.delete(`/api/items/${item.id}/purge`)));
+          await loadTrash();
+        } catch (err) {
+          console.error('[TrashBin] Empty trash error:', err);
+          setError('Failed to empty trash');
+        }
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Trash Bin"
+        description={`${items.length} item${items.length !== 1 ? 's' : ''} in trash`}
+        actions={
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+              variant="outline"
+              size="sm"
+            >
+              {viewMode === 'grid' ? 'List View' : 'Grid View'}
+            </Button>
+            {items.length > 0 && (
+              <Button
+                onClick={handleEmptyTrash}
+                variant="danger"
+                size="sm"
+              >
+                Empty Trash
+              </Button>
+            )}
+          </div>
+        }
+      />
+
+      {error && (
+        <div className="bg-error/10 text-error px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-muted">Loading trash...</p>
+        </div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-12 bg-base-200 rounded-lg">
+          <svg className="w-16 h-16 mx-auto text-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          <h3 className="text-lg font-semibold mb-2">Trash is Empty</h3>
+          <p className="text-muted">Items you delete will appear here</p>
+        </div>
+      ) : viewMode === 'grid' ? (
+        <ItemsGrid
+          items={items}
+          onEdit={() => {}} // Disabled in trash
+          onDelete={handlePurge}
+          onPhotoManage={() => {}} // Disabled in trash
+          onCategoryAssign={() => {}} // Disabled in trash
+          onToggleStatus={handleRestore}
+          onToggleVisibility={() => {}} // Disabled in trash
+          onQRCode={() => {}} // Disabled in trash
+          onPropagate={() => {}} // Disabled in trash
+          onEnrich={() => {}} // Disabled in trash
+          canPropagate={false}
+          canScan={false}
+          customActions={(item) => (
+            <Button
+              size="sm"
+              variant="success"
+              onClick={() => handleRestore(item)}
+              title="Restore from trash"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Restore
+            </Button>
+          )}
+        />
+      ) : (
+        <ItemsList
+          items={items}
+          onEdit={() => {}} // Disabled in trash
+          onDelete={handlePurge}
+          onPhotoManage={() => {}} // Disabled in trash
+          onCategoryAssign={() => {}} // Disabled in trash
+          onToggleStatus={handleRestore}
+          onToggleVisibility={() => {}} // Disabled in trash
+          onQRCode={() => {}} // Disabled in trash
+          onPropagate={() => {}} // Disabled in trash
+          onEnrich={() => {}} // Disabled in trash
+          canPropagate={false}
+          canScan={false}
+          customActions={(item) => (
+            <Button
+              size="sm"
+              variant="success"
+              onClick={() => handleRestore(item)}
+              title="Restore from trash"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Restore
+            </Button>
+          )}
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        onConfirm={async () => {
+          await confirmDialog.onConfirm();
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+        }}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
+    </div>
+  );
+}

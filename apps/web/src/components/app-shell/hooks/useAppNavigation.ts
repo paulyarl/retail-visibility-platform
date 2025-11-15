@@ -4,6 +4,7 @@ import { isFeatureEnabled } from '@/lib/featureFlags';
 interface AppLinks {
   dashboard: string;
   inventory: string;
+  trash?: string;
   tenants: string;
   propagation?: string;
   integrations?: string;
@@ -42,6 +43,7 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
       setLinks({
         dashboard: `/t/${tenantId}/dashboard`,
         inventory: `/t/${tenantId}/items`,
+        trash: `/t/${tenantId}/trash`,
         tenants: '/tenants',
         propagation: `/t/${tenantId}/propagation`,
         integrations: `/t/${tenantId}/settings/integrations`,
@@ -52,6 +54,7 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
       setLinks({
         dashboard: '/',
         inventory: '/items',
+        trash: undefined,
         tenants: '/tenants',
         propagation: undefined,
         integrations: undefined,
