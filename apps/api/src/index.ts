@@ -2773,9 +2773,9 @@ app.get('/api/items', authenticateToken, async (req, res) => {
             select: {
               id: true,
               url: true,
-              isPrimary: true,
+              position: true, // Use position instead of isPrimary
             },
-            orderBy: { isPrimary: 'desc', createdAt: 'asc' },
+            orderBy: { position: 'asc', createdAt: 'asc' }, // Order by position first
           },
           tenantCategory: {
             select: {
@@ -2801,7 +2801,7 @@ app.get('/api/items', authenticateToken, async (req, res) => {
       visibility: item.visibility,
       status: item.itemStatus,
       categoryPath: item.categoryPath,
-      imageUrl: item.photos.find(p => p.isPrimary)?.url || item.photos[0]?.url,
+      imageUrl: item.photos.find(p => p.position === 0)?.url || item.photos[0]?.url,
       images: item.photos.map(p => p.url),
       metadata: item.metadata,
       createdAt: item.createdAt,
