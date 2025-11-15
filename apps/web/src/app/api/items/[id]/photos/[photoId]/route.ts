@@ -5,14 +5,12 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; photoId: string }> }
 ) {
   try {
-    console.log('[Next.js Proxy] PUT request received');
     const { id, photoId } = await params;
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const url = `${base}/items/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`;
-    console.log('[Next.js Proxy] Target URL:', url);
 
     // Create headers object with ONLY essential headers
-    // Do NOT forward other headers to avoid conflicts
+    // Do NOT forward other headers to avoid conflicts with Express body parser
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -23,40 +21,23 @@ export async function PUT(
       headers['Authorization'] = auth;
     }
 
-    console.log('[Next.js Proxy] Headers to send:', JSON.stringify(headers));
-
-    // Read the request body as JSON
-    console.log('[Next.js Proxy] Reading request body...');
+    // Read and parse the request body
     let body;
     try {
       body = await req.json();
-      console.log('[Next.js Proxy] Request body parsed successfully:', JSON.stringify(body));
     } catch (parseError) {
-      console.error('[Next.js Proxy] Failed to parse request body:', parseError);
-      console.log('[Next.js Proxy] Request content-type:', req.headers.get('content-type'));
-      console.log('[Next.js Proxy] Request method:', req.method);
+      console.error('[Photo Update Proxy] Failed to parse request body:', parseError);
       return NextResponse.json({ 
         error: 'body_parse_failed', 
         details: parseError instanceof Error ? parseError.message : String(parseError) 
       }, { status: 400 });
     }
-    console.log('[Next.js Proxy] Body stringified for backend:', JSON.stringify(body));
-
-    const requestPayload = JSON.stringify(body);
-    console.log('[Next.js Proxy] About to send fetch request:');
-    console.log('[Next.js Proxy]   URL:', url);
-    console.log('[Next.js Proxy]   Method: PUT');
-    console.log('[Next.js Proxy]   Headers:', JSON.stringify(headers));
-    console.log('[Next.js Proxy]   Body:', requestPayload);
-    console.log('[Next.js Proxy]   Body length:', requestPayload.length);
 
     const res = await fetch(url, {
       method: 'PUT',
       headers,
-      body: requestPayload,
+      body: JSON.stringify(body),
     });
-
-    console.log('[Next.js Proxy] Fetch completed, response status:', res.status);
 
     const contentType = res.headers.get('content-type');
     if (!contentType?.includes('application/json')) {
@@ -66,43 +47,13 @@ export async function PUT(
     }
 
     const data = await res.json();
-    console.log('[Next.js Proxy] Backend response status:', res.status, 'data:', data);
-
-    // Add custom header to confirm proxy was hit
-    const responseHeaders = new Headers();
-    responseHeaders.set('x-proxy-version', 'v2-with-json-parse');
-    responseHeaders.set('Content-Type', 'application/json');
-
-    // Handle specific traceparent error from backend
-    if (res.status === 500 && data.error === 'invalid traceparent header') {
-      console.warn('Backend rejected traceparent header, retrying without it');
-      // Retry without any tracing headers
-      const cleanHeaders = {
-        'Content-Type': 'application/json',
-        'Authorization': headers['Authorization'] || '',
-      };
-
-      const retryRes = await fetch(url, {
-        method: 'PUT',
-        headers: cleanHeaders,
-        body: JSON.stringify(body),
-      });
-
-      const retryContentType = retryRes.headers.get('content-type');
-      if (retryContentType?.includes('application/json')) {
-        const retryData = await retryRes.json();
-        console.log('[Next.js Proxy] Retry response:', retryRes.status, retryData);
-        return NextResponse.json(retryData, { status: retryRes.status, headers: responseHeaders });
-      }
-
-      // If retry also fails, return original error
-      return NextResponse.json(data, { status: res.status, headers: responseHeaders });
-    }
-
-    return NextResponse.json(data, { status: res.status, headers: responseHeaders });
+    return NextResponse.json(data, { status: res.status });
   } catch (e) {
-    console.error('PUT photo proxy error', e);
-    return NextResponse.json({ error: 'proxy_failed', details: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    console.error('[Photo Update Proxy] Error:', e);
+    return NextResponse.json({ 
+      error: 'proxy_failed', 
+      details: e instanceof Error ? e.message : String(e) 
+    }, { status: 500 });
   }
 }
 
