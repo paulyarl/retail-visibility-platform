@@ -729,6 +729,7 @@ enum ItemStatus {
   active
   inactive
   archived
+  trashed
 
   @@map("item_status")
 }

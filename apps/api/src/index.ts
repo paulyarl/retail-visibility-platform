@@ -1518,6 +1518,11 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     // Build where clause
     const where: any = { tenantId };
     
+    // Exclude trashed items by default (unless explicitly requested)
+    if (parsed.data.status !== 'trashed') {
+      where.itemStatus = { not: 'trashed' };
+    }
+    
     // Apply search filter
     if (parsed.data.search) {
       const searchTerm = parsed.data.search.toLowerCase();
@@ -1533,6 +1538,8 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         where.itemStatus = 'active';
       } else if (parsed.data.status === 'inactive') {
         where.itemStatus = 'inactive';
+      } else if (parsed.data.status === 'trashed') {
+        where.itemStatus = 'trashed';
       } else if (parsed.data.status === 'syncing') {
         where.AND = [
           { OR: [{ itemStatus: 'active' }, { itemStatus: null }] },
@@ -1754,12 +1761,49 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   }
 });
 
+// Soft delete - move item to trash
 app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
+    const item = await prisma.inventoryItem.update({
+      where: { id: req.params.id },
+      data: { itemStatus: 'trashed' }
+    });
+    res.json(item);
+  } catch {
+    res.status(500).json({ error: "failed_to_trash_item" });
+  }
+});
+
+// Restore from trash
+app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, requireTenantAdmin, async (req, res) => {
+  try {
+    const item = await prisma.inventoryItem.update({
+      where: { id: req.params.id },
+      data: { itemStatus: 'active' }
+    });
+    res.json(item);
+  } catch {
+    res.status(500).json({ error: "failed_to_restore_item" });
+  }
+});
+
+// Permanent delete (purge) - only works on trashed items
+app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requireTenantAdmin, async (req, res) => {
+  try {
+    // First check if item is trashed
+    const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
+    if (!item) {
+      return res.status(404).json({ error: "item_not_found" });
+    }
+    if (item.itemStatus !== 'trashed') {
+      return res.status(400).json({ error: "item_not_in_trash", message: "Item must be in trash before it can be permanently deleted" });
+    }
+    
+    // Permanently delete
     await prisma.inventoryItem.delete({ where: { id: req.params.id } });
     res.status(204).end();
   } catch {
-    res.status(500).json({ error: "failed_to_delete_item" });
+    res.status(500).json({ error: "failed_to_purge_item" });
   }
 });
 
