@@ -146,6 +146,7 @@ model Tenant {
   directorySettings            DirectorySettings?
   directoryFeaturedListings    DirectoryFeaturedListings[]
   directorySupportNotes        DirectorySupportNotes[]
+  locationStatusLogs           LocationStatusLog[]
 
   @@index([name])
   @@index([subscriptionStatus])
@@ -153,6 +154,24 @@ model Tenant {
   @@index([serviceLevel])
   @@index([createdBy])
   @@index([locationStatus])
+}
+
+// Location Status Change Audit Log
+model LocationStatusLog {
+  id            String         @id @default(cuid())
+  tenantId      String         @map("tenant_id")
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  oldStatus     LocationStatus @map("old_status")
+  newStatus     LocationStatus @map("new_status")
+  changedBy     String         @map("changed_by") // User ID
+  reason        String?
+  reopeningDate DateTime?      @map("reopening_date")
+  metadata      Json?          // Additional context (e.g., IP, user agent)
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([changedBy])
+  @@map("location_status_logs")
 }
 
 model Organization {

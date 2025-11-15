@@ -422,24 +422,40 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
       });
     }
 
-    // Update tenant status
-    const updated = await prisma.tenant.update({
-      where: { id },
-      data: {
-        locationStatus: status,
-        statusChangedAt: new Date(),
-        statusChangedBy: req.user?.userId,
-        reopeningDate: reopeningDate ? new Date(reopeningDate) : null,
-        closureReason: reason || null,
-      },
-    });
+    // Update tenant status and create audit log in a transaction
+    const [updated, auditLog] = await prisma.$transaction([
+      prisma.tenant.update({
+        where: { id },
+        data: {
+          locationStatus: status,
+          statusChangedAt: new Date(),
+          statusChangedBy: req.user?.userId,
+          reopeningDate: reopeningDate ? new Date(reopeningDate) : null,
+          closureReason: reason || null,
+        },
+      }),
+      prisma.locationStatusLog.create({
+        data: {
+          tenantId: id,
+          oldStatus: tenant.locationStatus as any,
+          newStatus: status,
+          changedBy: req.user?.userId || 'system',
+          reason,
+          reopeningDate: reopeningDate ? new Date(reopeningDate) : null,
+          metadata: {
+            userAgent: req.headers['user-agent'],
+            ip: req.ip || req.headers['x-forwarded-for'],
+          },
+        },
+      }),
+    ]);
 
-    // TODO: Create audit log entry (Phase 1.4)
     // TODO: Send notifications (Phase 6)
 
     res.json({
       ...updated,
       statusInfo: getLocationStatusInfo(status),
+      auditLogId: auditLog.id,
     });
   } catch (error: any) {
     console.error('[PATCH /api/tenants/:id/status] Error:', error);
@@ -471,6 +487,35 @@ app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess
   } catch (error: any) {
     console.error('[POST /api/tenants/:id/status/preview] Error:', error);
     res.status(500).json({ error: "failed_to_preview_status", details: error.message });
+  }
+});
+
+// Get location status change history
+app.get("/api/tenants/:id/status-history", authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+
+    const history = await prisma.locationStatusLog.findMany({
+      where: { tenantId: id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+
+    // Enrich with user information if needed
+    const enrichedHistory = history.map(log => ({
+      ...log,
+      oldStatusInfo: getLocationStatusInfo(log.oldStatus as any),
+      newStatusInfo: getLocationStatusInfo(log.newStatus as any),
+    }));
+
+    res.json({
+      history: enrichedHistory,
+      count: history.length,
+    });
+  } catch (error: any) {
+    console.error('[GET /api/tenants/:id/status-history] Error:', error);
+    res.status(500).json({ error: "failed_to_get_status_history", details: error.message });
   }
 });
 
