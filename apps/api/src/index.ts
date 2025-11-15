@@ -443,7 +443,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
     
     // Check if profile exists
     const existingProfiles = await basePrisma.$queryRaw`
-      SELECT tenant_id FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
+      SELECT tenant_id FROM "tenant_business_profile" WHERE tenant_id = ${tenant_id}
     `;
     console.log('[POST /tenant/profile] Existing profiles check result:', existingProfiles);
 
@@ -465,7 +465,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
         updateParts.push(`updated_at = CURRENT_TIMESTAMP`);
         values.push(tenant_id); // Add tenant_id at the end
         const updateQuery = `
-          UPDATE "TenantBusinessProfile"
+          UPDATE "tenant_business_profile"
           SET ${updateParts.join(', ')}
           WHERE tenant_id = $${values.length}
         `;
@@ -477,7 +477,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
 
       // Get updated profile
       result = await basePrisma.$queryRaw`
-        SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
+        SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenant_id}
       `;
       console.log('[POST /tenant/profile] Retrieved updated profile');
     } else {
@@ -524,7 +524,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
 
       const placeholders = insertFields.map((_, i) => `$${i + 1}`);
       const insertQuery = `
-        INSERT INTO "TenantBusinessProfile" (${insertFields.map(f => `"${f}"`).join(', ')})
+        INSERT INTO "tenant_business_profile" (${insertFields.map(f => `"${f}"`).join(', ')})
         VALUES (${placeholders.join(', ')})
         RETURNING *
       `;
@@ -532,7 +532,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
       console.log('[POST /tenant/profile] Final insert values:', insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
-        basePrisma.$queryRaw`SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}`
+        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenant_id}`
       );
       console.log('[POST /tenant/profile] Created new profile');
     }
@@ -568,7 +568,7 @@ app.get("/tenant/profile", authenticateToken, async (req, res) => {
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     const { basePrisma } = await import('./prisma');
     const bpResults = await basePrisma.$queryRaw`
-      SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenantId}
+      SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
     `;
     const bp = (bpResults as any[])[0] || null;
     
@@ -712,7 +712,7 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     const { basePrisma } = await import('./prisma');
     const bpResults = await basePrisma.$queryRaw`
-      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, created_at, updated_at FROM "TenantBusinessProfile" WHERE tenant_id = ${tenantId}
+      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, created_at, updated_at FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
     `;
     const bp = (bpResults as any[])[0] || null;
     
@@ -885,7 +885,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
     
     // Check if profile exists
     const existingProfiles = await basePrisma.$queryRaw`
-      SELECT tenant_id FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
+      SELECT tenant_id FROM "tenant_business_profile" WHERE tenant_id = ${tenant_id}
     `;
     console.log(`[PATCH /tenant/profile] Existing profiles found:`, (existingProfiles as any[]).length);
     let result;
@@ -906,7 +906,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
         updateParts.push(`updated_at = CURRENT_TIMESTAMP`);
         values.push(tenant_id); // Add tenant_id at the end
         const updateQuery = `
-          UPDATE "TenantBusinessProfile"
+          UPDATE "tenant_business_profile"
           SET ${updateParts.join(', ')}
           WHERE tenant_id = $${values.length}
         `;
@@ -918,7 +918,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
 
       // Get updated profile
       result = await basePrisma.$queryRaw`
-        SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}
+        SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenant_id}
       `;
       console.log(`[PATCH /tenant/profile] Retrieved updated profile:`, result);
     } else {
@@ -956,7 +956,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
 
       const placeholders = insertFields.map((_, i) => `$${i + 1}`);
       const insertQuery = `
-        INSERT INTO "TenantBusinessProfile" (${insertFields.map(f => `"${f}"`).join(', ')})
+        INSERT INTO "tenant_business_profile" (${insertFields.map(f => `"${f}"`).join(', ')})
         VALUES (${placeholders.join(', ')})
         RETURNING *
       `;
@@ -964,7 +964,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
       console.log(`[PATCH /tenant/profile] Insert values:`, insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
-        basePrisma.$queryRaw`SELECT * FROM "TenantBusinessProfile" WHERE tenant_id = ${tenant_id}`
+        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenant_id}`
       );
       console.log(`[PATCH /tenant/profile] Created new profile:`, result);
     }
@@ -2019,7 +2019,7 @@ app.get("/google/auth", async (req, res) => {
     }
 
     // Validate NAP (Name, Address, Phone) is complete
-    // Check TenantBusinessProfile table first, fallback to metadata for backwards compatibility
+    // Check tenant_business_profile table first, fallback to metadata for backwards compatibility
     const businessProfile = await prisma.tenantBusinessProfile.findUnique({
       where: { tenantId }
     });
