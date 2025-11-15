@@ -17,6 +17,7 @@ import UserProfileBadge from "./UserProfileBadge";
 import VisibilityCards from "./VisibilityCards";
 import TenantLimitBadge from "@/components/tenant/TenantLimitBadge";
 import SubscriptionStateBanner from "@/components/subscription/SubscriptionStateBanner";
+import LocationStatusBanner from "@/components/tenant/LocationStatusBanner";
 
 interface TenantDashboardProps {
   tenantId: string;
@@ -90,6 +91,17 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
         {/* Subscription State Banner (Maintenance/Freeze) */}
         <SubscriptionStateBanner tenantId={tenantId} />
+
+        {/* Location Status Banner (Inactive/Closed/Pending/Archived) */}
+        {data?.info?.locationStatus && (
+          <LocationStatusBanner
+            locationStatus={data.info.locationStatus}
+            reopeningDate={data.info.reopeningDate}
+            tenantName={data.info.name || 'This Location'}
+            tenantId={tenantId}
+            variant="full"
+          />
+        )}
 
         {/* Header */}
         <DashboardHeader 

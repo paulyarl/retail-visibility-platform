@@ -13,6 +13,8 @@ export interface TenantDashboardInfo {
   name: string;
   logoUrl?: string;
   bannerUrl?: string;
+  locationStatus?: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
+  reopeningDate?: string | null;
 }
 
 export interface TenantDashboardData {
@@ -113,12 +115,16 @@ export function useTenantDashboard(tenantId: string | null): UseTenantDashboardR
           if (info) {
             info.logoUrl = tenantData.metadata?.logo_url;
             info.bannerUrl = tenantData.metadata?.banner_url;
+            info.locationStatus = tenantData.locationStatus || tenantData.statusInfo?.status || 'active';
+            info.reopeningDate = tenantData.reopeningDate;
           } else {
             info = {
               id: tenantData.id,
               name: tenantData.name || 'Unknown Tenant',
               logoUrl: tenantData.metadata?.logo_url,
               bannerUrl: tenantData.metadata?.banner_url,
+              locationStatus: tenantData.locationStatus || tenantData.statusInfo?.status || 'active',
+              reopeningDate: tenantData.reopeningDate,
             };
           }
         } catch (err) {
