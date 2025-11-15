@@ -1612,7 +1612,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
 });
 
 app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], async (req, res) => {
-  const it = await prisma.inventoryItem.findUnique({ 
+  const it = await prisma.inventoryItem.findUnique({
     where: { id: req.params.id },
     include: {
       tenantCategory: {
@@ -1626,7 +1626,14 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     },
   });
   if (!it) return res.status(404).json({ error: "not_found" });
-  res.json(it);
+
+  // Convert Decimal price to number for frontend compatibility
+  const transformed = {
+    ...it,
+    price: it.price ? Number(it.price) : undefined,
+  };
+
+  res.json(transformed);
 });
 
 const baseItemSchema = z.object({
