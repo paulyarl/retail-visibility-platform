@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import TierService from '../services/TierService';
+import { getMaintenanceState } from '../utils/subscription-status';
 
 /**
  * Tier-Based Feature Access Control
@@ -401,6 +402,7 @@ export async function requireWritableSubscription(req: Request, res: Response, n
       select: {
         subscriptionTier: true,
         subscriptionStatus: true,
+        trialEndsAt: true,
       },
     });
 
@@ -413,16 +415,20 @@ export async function requireWritableSubscription(req: Request, res: Response, n
 
     const tier = tenant.subscriptionTier || 'starter';
     const status = tenant.subscriptionStatus || 'active';
+    const maintenanceState = getMaintenanceState({
+      tier,
+      status,
+      trialEndsAt: tenant.trialEndsAt ?? undefined,
+    });
 
-    const isInactive = status === 'canceled' || status === 'expired';
-    const isReadOnlyTier = tier === 'google_only';
-
-    if (isInactive || isReadOnlyTier) {
+    // Freeze: read-only visibility mode (canceled/expired or google_only outside maintenance window)
+    if (maintenanceState === 'freeze') {
       return res.status(403).json({
         error: 'subscription_read_only',
         message: 'Your account is in read-only visibility mode. Upgrade to add or update products or sync new changes.',
         subscriptionTier: tier,
         subscriptionStatus: status,
+        maintenanceState,
         upgradeUrl: '/settings/subscription',
       });
     }

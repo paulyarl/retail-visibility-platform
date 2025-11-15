@@ -1,9 +1,11 @@
 /**
  * QR Code feature tiers
  * Aligns with subscription tiers (Starter/Pro/Enterprise)
+ *
+ * NOTE: Trial is a STATUS, not a tier. This type only models actual tiers.
  */
 
-export type SubscriptionTier = 'starter' | 'professional' | 'enterprise' | 'trial';
+export type SubscriptionTier = 'starter' | 'professional' | 'enterprise';
 
 export interface QRCodeFeatures {
   enabled: boolean;
@@ -18,17 +20,6 @@ export interface QRCodeFeatures {
 }
 
 export const QR_TIER_FEATURES: Record<SubscriptionTier, QRCodeFeatures> = {
-  trial: {
-    enabled: true, // Free during trial
-    maxResolution: 512,
-    customColors: false,
-    customLogo: false,
-    bulkDownload: false,
-    analytics: false,
-    printTemplates: false,
-    whiteLabel: false,
-    dynamicQR: false,
-  },
   starter: {
     enabled: true,
     maxResolution: 512,
@@ -65,8 +56,8 @@ export const QR_TIER_FEATURES: Record<SubscriptionTier, QRCodeFeatures> = {
 };
 
 export function getQRFeatures(tier: SubscriptionTier | string | null | undefined): QRCodeFeatures {
-  const normalizedTier = (tier?.toLowerCase() || 'trial') as SubscriptionTier;
-  return QR_TIER_FEATURES[normalizedTier] || QR_TIER_FEATURES.trial;
+  const normalizedTier = (tier?.toLowerCase() || 'starter') as SubscriptionTier;
+  return QR_TIER_FEATURES[normalizedTier] || QR_TIER_FEATURES.starter;
 }
 
 export function canUseQRFeature(tier: SubscriptionTier | string | null | undefined): boolean {

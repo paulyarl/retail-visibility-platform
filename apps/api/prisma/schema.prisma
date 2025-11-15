@@ -1344,3 +1344,17 @@ model DirectorySupportNotes {
   @@index([tenantId, createdAt(sort: Desc)])
   @@map("directory_support_notes")
 }
+
+// Stripe webhook event tracking for idempotency
+model StripeWebhookEvent {
+  id          String   @id @default(uuid())
+  eventId     String   @unique @map("event_id")
+  eventType   String   @map("event_type")
+  processedAt DateTime @default(now()) @map("processed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([eventId])
+  @@index([eventType])
+  @@index([processedAt])
+  @@map("stripe_webhook_events")
+}

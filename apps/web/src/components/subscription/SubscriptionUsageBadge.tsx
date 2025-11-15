@@ -14,7 +14,8 @@
 
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from '@/components/ui';
-import { Package } from 'lucide-react';
+import { Package, AlertTriangle, Lock } from 'lucide-react';
+import { getStatusLabel } from '@/lib/subscription-status';
 
 interface SubscriptionUsageBadgeProps {
   variant?: 'compact' | 'card' | 'inline';
@@ -45,8 +46,30 @@ export default function SubscriptionUsageBadge({
 
   // Compact variant - for headers/dashboards
   if (variant === 'compact') {
+    // Show maintenance/freeze indicator if applicable
+    const showMaintenanceIndicator = usage.maintenanceState !== null;
+    
     return (
       <div className={`inline-flex items-center gap-3 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg ${className}`}>
+        {/* Maintenance/Freeze Indicator */}
+        {showMaintenanceIndicator && (
+          <>
+            <div className="flex items-center gap-1.5">
+              {usage.maintenanceState === 'freeze' ? (
+                <Lock className="w-4 h-4 text-red-600" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-yellow-600" />
+              )}
+              <span className={`text-xs font-medium ${
+                usage.maintenanceState === 'freeze' ? 'text-red-600' : 'text-yellow-600'
+              }`}>
+                {usage.maintenanceState === 'freeze' ? 'Frozen' : 'Maintenance'}
+              </span>
+            </div>
+            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600" />
+          </>
+        )}
+        
         {/* SKU Usage */}
         <div className="flex items-center gap-2">
           <Package className="w-4 h-4 text-gray-600 dark:text-gray-400" />

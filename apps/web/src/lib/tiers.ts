@@ -1,9 +1,11 @@
 /**
  * Subscription tier definitions and limits
  * Centralized tier configuration for the platform
+ *
+ * NOTE: Trial is a STATUS, not a tier. This type only models actual tiers.
  */
 
-export type SubscriptionTier = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
+export type SubscriptionTier = 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
 
 export interface TierLimits {
   name: string;
@@ -17,22 +19,6 @@ export interface TierLimits {
 }
 
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
-  trial: {
-    name: 'Trial',
-    price: 'Free',
-    pricePerMonth: 0,
-    maxSKUs: 500,
-    maxLocations: 1,
-    description: 'Try the platform with basic features',
-    features: [
-      '500 SKUs',
-      'Google Shopping integration',
-      '512px QR codes',
-      'Basic product pages',
-      'Performance analytics',
-    ],
-    color: 'bg-neutral-100 text-neutral-900',
-  },
   google_only: {
     name: 'Google-Only',
     price: '$29/month',
@@ -134,8 +120,8 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
  * Get tier information
  */
 export function getTierInfo(tier: SubscriptionTier | string | null | undefined): TierLimits {
-  const normalizedTier = (tier?.toLowerCase() || 'trial') as SubscriptionTier;
-  return TIER_LIMITS[normalizedTier] || TIER_LIMITS.trial;
+  const normalizedTier = (tier?.toLowerCase() || 'starter') as SubscriptionTier;
+  return TIER_LIMITS[normalizedTier] || TIER_LIMITS.starter;
 }
 
 /**

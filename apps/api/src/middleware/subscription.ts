@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma";
+import { getMaintenanceState, deriveInternalStatus } from "../utils/subscription-status";
 
 /**
  * Subscription status check middleware
@@ -138,6 +139,8 @@ export async function checkSubscriptionLimits(
       select: {
         id: true,
         subscriptionTier: true,
+        subscriptionStatus: true,
+        trialEndsAt: true,
         organizationId: true,
         organization: {
           select: {
@@ -208,8 +211,29 @@ export async function checkSubscriptionLimits(
 
     const tier = tenant.subscriptionTier || "starter";
     const limit = limits[tier] || limits.starter;
+    const status = tenant.subscriptionStatus || "active";
+    const maintenanceState = getMaintenanceState({
+      tier,
+      status,
+      trialEndsAt: tenant.trialEndsAt ?? undefined,
+    });
 
-    // Check if creating new item would exceed limit
+    // In maintenance mode, block growth (new items) even if numeric limits not reached
+    if (req.method === "POST" && maintenanceState === "maintenance") {
+      return res.status(403).json({
+        error: "maintenance_no_growth",
+        message:
+          "Your account is in maintenance mode. You can update existing products, but cannot add new products until you upgrade.",
+        subscriptionTier: tier,
+        subscriptionStatus: status,
+        maintenanceState,
+        limit: limit.items,
+        current: tenant._count.items,
+        upgradeUrl: "/settings/subscription",
+      });
+    }
+
+    // Check if creating new item would exceed numeric tier limit
     if (req.method === "POST" && tenant._count.items >= limit.items) {
       return res.status(402).json({
         error: "item_limit_reached",
@@ -224,5 +248,95 @@ export async function checkSubscriptionLimits(
   } catch (error) {
     console.error("[Subscription Limits] Error:", error);
     next(); // Don't block on limit check errors
+  }
+}
+
+/**
+ * Require writable subscription middleware
+ * Blocks write operations for frozen accounts (read-only visibility mode)
+ * Allows maintenance mode (google_only) to update existing data but not grow
+ * 
+ * Use this on endpoints that modify data (items, profile, sync triggers, etc.)
+ */
+export async function requireWritableSubscription(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const tenantId = req.query.tenantId as string;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        error: "tenant_required",
+        message: "Tenant ID is required",
+      });
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        subscriptionStatus: true,
+        subscriptionTier: true,
+        trialEndsAt: true,
+        subscriptionEndsAt: true,
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        error: "tenant_not_found",
+        message: "Tenant not found",
+      });
+    }
+
+    // Derive internal status to determine write permissions
+    const internalStatus = deriveInternalStatus(tenant);
+
+    // Frozen accounts are read-only (visibility only)
+    if (internalStatus === 'frozen') {
+      return res.status(403).json({
+        error: "account_frozen",
+        message: "Your account is in read-only mode. Your storefront and directory listing remain visible, but you cannot make changes. Please upgrade to regain full access.",
+        subscriptionStatus: tenant.subscriptionStatus,
+        subscriptionTier: tenant.subscriptionTier,
+        internalStatus,
+        upgradeUrl: "/settings/subscription",
+      });
+    }
+
+    // Canceled accounts cannot make changes
+    if (internalStatus === 'canceled') {
+      return res.status(403).json({
+        error: "subscription_canceled",
+        message: "Your subscription has been canceled. Please contact support to reactivate or upgrade to a new plan.",
+        subscriptionStatus: tenant.subscriptionStatus,
+        internalStatus,
+      });
+    }
+
+    // Expired accounts need to upgrade
+    if (internalStatus === 'expired') {
+      return res.status(402).json({
+        error: "subscription_expired",
+        message: "Your subscription has expired. Please upgrade to continue making changes.",
+        subscriptionStatus: tenant.subscriptionStatus,
+        subscriptionTier: tenant.subscriptionTier,
+        internalStatus,
+        upgradeUrl: "/settings/subscription",
+      });
+    }
+
+    // Maintenance mode is allowed (handled by checkSubscriptionLimits for growth restrictions)
+    // Active, trialing, and past_due are allowed
+    next();
+  } catch (error) {
+    console.error("[Writable Subscription Check] Error:", error);
+    return res.status(500).json({
+      error: "subscription_check_failed",
+      message: "Failed to verify subscription write permissions",
+    });
   }
 }

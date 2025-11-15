@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
+import { deriveInternalStatus, type InternalStatus, type MaintenanceState, getMaintenanceState } from '@/lib/subscription-status';
 
 export interface SubscriptionUsage {
   // Tenant info
@@ -21,6 +22,8 @@ export interface SubscriptionUsage {
   tierPrice: string;
   tierDescription: string;
   status: string;
+  internalStatus: InternalStatus; // Derived operational status
+  maintenanceState: MaintenanceState; // For google_only lifecycle
   
   // SKU usage
   skuUsage: number;
@@ -157,6 +160,21 @@ export function useSubscriptionUsage(tenantIdProp?: string) {
           overallStatus = 'warning';
         }
 
+        // Derive internal status and maintenance state
+        const subscriptionStatus = tenantData.subscriptionStatus || 'active';
+        const internalStatus = deriveInternalStatus({
+          subscriptionStatus,
+          subscriptionTier: tier,
+          trialEndsAt: tenantData.trialEndsAt,
+          subscriptionEndsAt: tenantData.subscriptionEndsAt,
+        });
+        
+        const maintenanceState = getMaintenanceState({
+          tier,
+          status: subscriptionStatus,
+          trialEndsAt: tenantData.trialEndsAt,
+        });
+
         setUsage({
           tenantId,
           tenantName: tenantData.name,
@@ -164,7 +182,9 @@ export function useSubscriptionUsage(tenantIdProp?: string) {
           tierName: tierInfo.name,
           tierPrice: tierInfo.price,
           tierDescription: tierInfo.description,
-          status: tenantData.subscriptionStatus || 'active',
+          status: subscriptionStatus,
+          internalStatus,
+          maintenanceState,
           skuUsage: itemCount,
           skuLimit,
           skuPercent,

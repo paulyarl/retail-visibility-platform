@@ -11,8 +11,9 @@
 
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 import { Card, CardContent, Badge, Button } from '@/components/ui';
-import { AlertTriangle, Package, Building2, ArrowUpRight } from 'lucide-react';
+import { AlertTriangle, Package, Building2, ArrowUpRight, Lock } from 'lucide-react';
 import Link from 'next/link';
+import { getStatusLabel } from '@/lib/subscription-status';
 
 interface CreationCapacityWarningProps {
   type: 'sku' | 'location' | 'both';
@@ -35,7 +36,67 @@ export default function CreationCapacityWarning({
     return null;
   }
 
-  // Determine what warnings to show
+  // Check for maintenance/freeze state (highest priority)
+  const isFrozen = usage.internalStatus === 'frozen';
+  const isMaintenance = usage.internalStatus === 'maintenance';
+  const isTrialExpired = usage.status === 'expired' && usage.tier === 'google_only';
+
+  // Show maintenance/freeze warning if applicable (overrides capacity warnings)
+  if (isFrozen || isMaintenance || isTrialExpired) {
+    return (
+      <Card className={`border-red-200 bg-red-50 ${className}`}>
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <Lock className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <h4 className="font-semibold text-red-800">
+                  {isFrozen ? 'Account Frozen' : 'Trial Ended - Maintenance Mode'}
+                </h4>
+                <Badge className="bg-red-100 text-red-800">
+                  {usage.tierName}
+                </Badge>
+              </div>
+              
+              <div className="space-y-2 mb-3">
+                {isFrozen ? (
+                  <>
+                    <p className="text-sm text-red-800">
+                      Your account is in read-only mode. You cannot add or update products until you upgrade.
+                    </p>
+                    <p className="text-sm text-red-700">
+                      Your storefront and directory listing remain visible to customers.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-red-800">
+                      Your trial has ended. You can update existing products but cannot add new ones.
+                    </p>
+                    <p className="text-sm text-red-700">
+                      Upgrade to a paid plan to continue growing your catalog and access premium features.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {showUpgradeLink && (
+                <Link href="/settings/subscription">
+                  <Button variant="secondary" size="sm" className="text-xs">
+                    View Plans & Upgrade
+                    <ArrowUpRight className="w-3 h-3 ml-1" />
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Determine what capacity warnings to show
   const showSkuWarning = (type === 'sku' || type === 'both') && 
     !usage.skuIsUnlimited && usage.skuPercent >= 80;
   

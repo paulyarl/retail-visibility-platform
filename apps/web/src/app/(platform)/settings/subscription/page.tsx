@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
+import { isTrialStatus, getTrialEndLabel } from '@/lib/trial';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 import { getAllAdminEmails } from '@/lib/admin-emails';
 import { api } from '@/lib/api';
@@ -610,15 +611,11 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                 </div>
                 
                 {/* Trial Expiration */}
-                {(tenant.subscriptionTier === 'trial' || tenant.subscriptionStatus === 'trial') && tenant.trialEndsAt && (
+                {isTrialStatus(tenant.subscriptionStatus) && tenant.trialEndsAt && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-neutral-600">Trial Ends</span>
                     <span className="text-sm font-medium text-neutral-900">
-                      {new Date(tenant.trialEndsAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
+                      {getTrialEndLabel(tenant.trialEndsAt) ?? ''}
                     </span>
                   </div>
                 )}

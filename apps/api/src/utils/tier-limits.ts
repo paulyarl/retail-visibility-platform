@@ -3,9 +3,11 @@
  * 
  * Centralized tier limit definitions for the API
  * Must match frontend definitions in apps/web/src/lib/tiers.ts
+ * 
+ * NOTE: Trial is a STATUS, not a tier. This utility only models actual tiers.
  */
 
-export type SubscriptionTier = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
+export type SubscriptionTier = 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
 
 export interface TierLimits {
   maxSKUs: number;
@@ -13,10 +15,6 @@ export interface TierLimits {
 }
 
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
-  trial: {
-    name: 'Trial',
-    maxSKUs: 500,
-  },
   google_only: {
     name: 'Google-Only',
     maxSKUs: 250,
@@ -43,8 +41,8 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
  * Get SKU limit for a tier
  */
 export function getSKULimit(tier: string | null | undefined): number {
-  const normalizedTier = (tier?.toLowerCase() || 'trial') as SubscriptionTier;
-  return TIER_LIMITS[normalizedTier]?.maxSKUs || TIER_LIMITS.trial.maxSKUs;
+  const normalizedTier = (tier?.toLowerCase() || 'starter') as SubscriptionTier;
+  return TIER_LIMITS[normalizedTier]?.maxSKUs || TIER_LIMITS.starter.maxSKUs;
 }
 
 /**
@@ -59,6 +57,6 @@ export function canAddSKUs(tier: string | null | undefined, currentCount: number
  * Get tier information
  */
 export function getTierInfo(tier: string | null | undefined): TierLimits {
-  const normalizedTier = (tier?.toLowerCase() || 'trial') as SubscriptionTier;
-  return TIER_LIMITS[normalizedTier] || TIER_LIMITS.trial;
+  const normalizedTier = (tier?.toLowerCase() || 'starter') as SubscriptionTier;
+  return TIER_LIMITS[normalizedTier] || TIER_LIMITS.starter;
 }

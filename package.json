@@ -17,7 +17,9 @@
     "build": "pnpm -r build",
     "prisma:generate": "npm run -w @rvp/api prisma:generate",
     "typecheck": "pnpm -r typecheck || exit 0",
-    "lint": "pnpm -r lint || exit 0"
+    "lint": "pnpm -r lint || exit 0",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
   },
   "license": "ISC",
   "packageManager": "pnpm@10.20.0",

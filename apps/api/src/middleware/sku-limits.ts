@@ -15,6 +15,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { getSKULimit } from '../utils/tier-limits';
 import TierService from '../services/TierService';
+import { getMaintenanceState } from '../utils/subscription-status';
 
 /**
  * Validate SKU limits for product creation/import
@@ -34,11 +35,13 @@ export async function validateSKULimits(
       return next();
     }
 
-    // Get tenant with tier and current SKU count
+    // Get tenant with tier, status, and current SKU count
     const tenant = await prisma.tenant.findUnique({
       where: { id: actualTenantId },
       select: {
         subscriptionTier: true,
+        subscriptionStatus: true,
+        trialEndsAt: true,
         _count: {
           select: { items: true },
         },
@@ -53,6 +56,28 @@ export async function validateSKULimits(
     }
 
     const tier = tenant.subscriptionTier || 'starter';
+    const status = tenant.subscriptionStatus || 'active';
+
+    const maintenanceState = getMaintenanceState({
+      tier,
+      status,
+      trialEndsAt: tenant.trialEndsAt ?? undefined,
+    });
+
+    // In maintenance mode, block growth (bulk product creation) even if numeric limits not reached
+    if (maintenanceState === 'maintenance') {
+      return res.status(403).json({
+        error: 'maintenance_no_growth',
+        message:
+          'Your account is in maintenance mode. You can update existing products, but cannot add new products until you upgrade.',
+        subscriptionTier: tier,
+        subscriptionStatus: status,
+        maintenanceState,
+        requested: productCount,
+        upgradeUrl: '/settings/subscription',
+      });
+    }
+
     // Try database-driven limit first, fallback to utility function
     const skuLimit = await TierService.getTierSKULimit(tier).catch(() => getSKULimit(tier));
     const currentCount = tenant._count.items;

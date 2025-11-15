@@ -16,6 +16,7 @@ import WhatYouCanDo from "./WhatYouCanDo";
 import UserProfileBadge from "./UserProfileBadge";
 import VisibilityCards from "./VisibilityCards";
 import TenantLimitBadge from "@/components/tenant/TenantLimitBadge";
+import SubscriptionStateBanner from "@/components/subscription/SubscriptionStateBanner";
 
 interface TenantDashboardProps {
   tenantId: string;
@@ -86,6 +87,9 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             )}
           </div>
         </div>
+
+        {/* Subscription State Banner (Maintenance/Freeze) */}
+        <SubscriptionStateBanner tenantId={tenantId} />
 
         {/* Header */}
         <DashboardHeader 

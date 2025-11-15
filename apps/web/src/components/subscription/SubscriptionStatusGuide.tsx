@@ -3,6 +3,8 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
 import { AlertTriangle } from 'lucide-react';
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
+import { isTrialStatus } from '@/lib/trial';
+import { getMaintenanceState, type MaintenanceState } from '@/lib/subscription-status';
 
 export function SubscriptionStatusGuide() {
   const { usage, loading } = useSubscriptionUsage();
@@ -15,34 +17,18 @@ export function SubscriptionStatusGuide() {
   const status = usage.status || 'active';
   const now = new Date();
 
-  // ----- Maintenance vs freeze (google_only + canceled/expired) -----
-  let maintenanceState: 'maintenance' | 'freeze' | null = null;
-  const isInactive = status === 'canceled' || status === 'expired';
-
-  let inMaintenanceWindow = false;
-  if (tier === 'google_only' && status === 'active') {
-    if (!usage.trialEndsAt) {
-      inMaintenanceWindow = true;
-    } else {
-      const boundary = new Date(usage.trialEndsAt);
-      if (!Number.isNaN(boundary.getTime()) && now < boundary) {
-        inMaintenanceWindow = true;
-      }
-    }
-  }
-
-  const isFullyFrozen = isInactive || (tier === 'google_only' && !inMaintenanceWindow);
-
-  if (inMaintenanceWindow) {
-    maintenanceState = 'maintenance';
-  } else if (isFullyFrozen) {
-    maintenanceState = 'freeze';
-  }
+  // ----- Maintenance vs freeze (google_only lifecycle) -----
+  // Use centralized helper that mirrors backend logic
+  const maintenanceState: MaintenanceState = getMaintenanceState({
+    tier,
+    status,
+    trialEndsAt: usage.trialEndsAt,
+  });
 
   // ----- Trial nearing expiration -----
   let showTrialWarning = false;
   let trialDaysRemaining: number | null = null;
-  if (status === 'trial' && usage.trialEndsAt) {
+  if (isTrialStatus(status) && usage.trialEndsAt) {
     const trialEnd = new Date(usage.trialEndsAt);
     if (!Number.isNaN(trialEnd.getTime())) {
       const diffMs = trialEnd.getTime() - now.getTime();
@@ -84,13 +70,19 @@ export function SubscriptionStatusGuide() {
           <CardHeader>
             <CardTitle>Trial ending soon</CardTitle>
             <CardDescription>
-              Your trial ends in {trialDaysRemaining} day{trialDaysRemaining === 1 ? '' : 's'}. After that, you'll move into a limited maintenance window unless you choose a paid plan.
+              Your trial ends in {trialDaysRemaining} day{trialDaysRemaining === 1 ? '' : 's'}. After that, you'll automatically move into a maintenance window where you can update existing products but cannot add new ones.
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-gray-700 dark:text-gray-300">
-            <p>
-              During the trial you have full access to your selected tier. When the trial ends, your storefront, directory, and Google listings stay online,
-              but your ability to grow your catalog will be limited unless you upgrade.
+          <CardContent className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+            <p className="font-medium">What happens when your trial ends:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Your storefront, directory listing, and Google listings remain online</li>
+              <li>You can update existing products (prices, descriptions, images)</li>
+              <li>You cannot add new products or grow your catalog</li>
+              <li>Premium features (Quick Start, barcode scanner) will be disabled</li>
+            </ul>
+            <p className="mt-3">
+              To keep full access and continue growing, choose a paid plan that fits your needs.
             </p>
           </CardContent>
         </Card>

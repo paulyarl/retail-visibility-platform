@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Butto
 import { motion } from 'framer-motion';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
+import { isTrialStatus } from '@/lib/trial';
 
 interface Tenant {
   id: string;
@@ -52,8 +53,8 @@ export default function AdminTenantsPage() {
               const itemsRes = await api.get(`/api/tenants/${t.id}/items`);
               const items = itemsRes.ok ? await itemsRes.json() : [];
               
-              // Determine status based on subscriptionStatus
-              const isActive = t.subscriptionStatus === 'active' || t.subscriptionStatus === 'trial';
+              // Determine status based on subscriptionStatus (treat trial as active for this view)
+              const isActive = t.subscriptionStatus === 'active' || isTrialStatus(t.subscriptionStatus);
               
               return {
                 ...t,
@@ -63,7 +64,7 @@ export default function AdminTenantsPage() {
             } catch {
               return {
                 ...t,
-                status: t.subscriptionStatus === 'active' || t.subscriptionStatus === 'trial' ? 'active' : 'inactive',
+                status: t.subscriptionStatus === 'active' || isTrialStatus(t.subscriptionStatus) ? 'active' : 'inactive',
                 itemCount: 0,
               };
             }

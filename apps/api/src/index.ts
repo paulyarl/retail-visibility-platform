@@ -22,6 +22,7 @@ import path from "path";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import { Flags } from "./config";
+import { TRIAL_CONFIG } from "./config/tenant-limits";
 import { setRequestContext } from "./context";
 import { StorageBuckets } from "./storage-config";
 import { audit, ensureAuditTable } from "./audit";
@@ -100,7 +101,7 @@ import permissionRoutes from './routes/permissions';
 import userRoutes from './routes/users';
 import tenantUserRoutes from './routes/tenant-users';
 import { auditLogger } from './middleware/audit-logger';
-import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
+import { requireActiveSubscription, checkSubscriptionLimits, requireWritableSubscription } from './middleware/subscription';
 import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 import categoriesPlatformRoutes from './routes/categories.platform';
 import categoriesTenantRoutes from './routes/categories.tenant';
@@ -215,12 +216,12 @@ app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) =
     
     // Auto-set trial expiration date if missing for trial users
     if (
-      (tenant.subscriptionStatus === "trial" || tenant.subscriptionTier === "trial") &&
+      tenant.subscriptionStatus === "trial" &&
       !tenant.trialEndsAt
     ) {
-      console.log(`[GET /tenants/:id] Trial date missing for tenant ${tenant.id}. Setting trial to expire in 30 days.`);
+      console.log(`[GET /tenants/:id] Trial date missing for tenant ${tenant.id}. Setting trial to expire in ${TRIAL_CONFIG.durationDays} days.`);
       const trialEndsAt = new Date();
-      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+      trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_CONFIG.durationDays);
       
       tenant = await prisma.tenant.update({
         where: { id: tenant.id },
@@ -232,21 +233,26 @@ app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) =
       console.log(`[GET /tenants/:id] Trial date set for tenant ${tenant.id}: ${trialEndsAt.toISOString()}`);
     }
     
-    // Check if trial has expired and mark as expired (do NOT auto-convert)
-    // Admin must manually convert after payment/contract confirmation
+    // Check if trial has expired and mark as expired
+    // If there is no active subscription attached, downgrade tier to internal google_only
     if (
       tenant.subscriptionStatus === "trial" &&
       tenant.trialEndsAt &&
       tenant.trialEndsAt < now
     ) {
-      console.log(`[GET /tenants/:id] Trial expired for tenant ${tenant.id}. Marking as expired.`);
+      const hasStripeSubscription = !!tenant.stripeSubscriptionId;
+
+      console.log(`[GET /tenants/:id] Trial expired for tenant ${tenant.id}.`);
+
       tenant = await prisma.tenant.update({
         where: { id: tenant.id },
         data: {
           subscriptionStatus: "expired",
+          // For maintenance-only accounts without a paid subscription, force internal google_only tier
+          subscriptionTier: hasStripeSubscription ? tenant.subscriptionTier : "google_only",
         },
       });
-      console.log(`[GET /tenants/:id] Tenant ${tenant.id} marked as expired. Admin action required.`);
+      console.log(`[GET /tenants/:id] Tenant ${tenant.id} marked as expired with tier ${tenant.subscriptionTier}.`);
     }
     
     res.json(tenant);
@@ -289,9 +295,9 @@ app.post("/tenants", authenticateToken, checkTenantCreationLimit, async (req, re
       });
     }
     
-    // Set trial to expire 14 days from now (corrected from 30)
+    // Set trial to expire based on configured trial duration
     const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+    trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_CONFIG.durationDays);
     
     const tenant = await prisma.tenant.create({
       data: {
@@ -348,7 +354,7 @@ app.put("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) =
 
 // PATCH /tenants/:id - Update tenant subscription tier (admin only)
 const patchTenantSchema = z.object({
-  subscriptionTier: z.enum(['trial', 'google_only', 'starter', 'professional', 'enterprise', 'organization']).optional(),
+  subscriptionTier: z.enum(['google_only', 'starter', 'professional', 'enterprise', 'organization']).optional(),
   subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
   organizationId: z.string().optional(), // For linking to organization
 });

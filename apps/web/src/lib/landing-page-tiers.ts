@@ -3,7 +3,7 @@
  * Defines what customization options are available per subscription tier
  */
 
-export type SubscriptionTier = 'trial' | 'starter' | 'professional' | 'enterprise';
+import type { SubscriptionTier } from '@/lib/tiers';
 
 export interface LandingPageFeatures {
   // Content features
@@ -29,7 +29,7 @@ export interface LandingPageFeatures {
 }
 
 export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFeatures> = {
-  trial: {
+  google_only: {
     customMarketingDescription: false,
     imageGallery: false,
     maxGalleryImages: 1,
@@ -97,11 +97,28 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
     abTesting: true,
     advancedAnalytics: true,
   },
+  organization: {
+    customMarketingDescription: true,
+    imageGallery: true,
+    maxGalleryImages: 10,
+    customCta: true,
+    socialLinks: true,
+    showBusinessLogo: true,
+    removePlatformBranding: true,
+    customLogo: true,
+    customColors: true,
+    customSections: true,
+    maxCustomSections: 5,
+    customTheme: true,
+    customDomain: true,
+    abTesting: true,
+    advancedAnalytics: true,
+  },
 };
 
 export function getLandingPageFeatures(tier: SubscriptionTier | string | null | undefined): LandingPageFeatures {
-  const normalizedTier = (tier?.toLowerCase() || 'trial') as SubscriptionTier;
-  return LANDING_PAGE_TIER_FEATURES[normalizedTier] || LANDING_PAGE_TIER_FEATURES.trial;
+  const normalizedTier = (tier?.toLowerCase() || 'starter') as SubscriptionTier;
+  return LANDING_PAGE_TIER_FEATURES[normalizedTier] || LANDING_PAGE_TIER_FEATURES.starter;
 }
 
 export function canUseFeature(tier: SubscriptionTier | string | null | undefined, feature: keyof LandingPageFeatures): boolean {
