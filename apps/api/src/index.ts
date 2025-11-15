@@ -1761,16 +1761,74 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   }
 });
 
-// Soft delete - move item to trash
+// Soft delete - move item to trash (with capacity check)
 app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
-    const item = await prisma.inventoryItem.update({
+    // Get item to find tenant
+    const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
+    if (!item) {
+      return res.status(404).json({ error: "item_not_found" });
+    }
+
+    // Get tenant to check tier
+    const tenant = await prisma.tenant.findUnique({ where: { id: item.tenantId } });
+    if (!tenant) {
+      return res.status(404).json({ error: "tenant_not_found" });
+    }
+
+    // Check trash capacity
+    const { isTrashFull, getTrashCapacity } = await import('./utils/trash-capacity');
+    const trashCount = await prisma.inventoryItem.count({
+      where: { tenantId: item.tenantId, itemStatus: 'trashed' }
+    });
+    
+    if (isTrashFull(trashCount, tenant.subscriptionTier)) {
+      const capacity = getTrashCapacity(tenant.subscriptionTier);
+      return res.status(400).json({
+        error: "trash_capacity_exceeded",
+        message: `Trash bin is full (${trashCount}/${capacity} items). Please purge some items before deleting more.`,
+        current: trashCount,
+        capacity,
+      });
+    }
+
+    // Move to trash
+    const updated = await prisma.inventoryItem.update({
       where: { id: req.params.id },
       data: { itemStatus: 'trashed' }
     });
-    res.json(item);
-  } catch {
+    res.json(updated);
+  } catch (error) {
+    console.error('[Delete Item] Error:', error);
     res.status(500).json({ error: "failed_to_trash_item" });
+  }
+});
+
+// Get trash capacity info
+app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (req, res) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenant_id_required" });
+    }
+
+    // Get tenant to check tier
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      return res.status(404).json({ error: "tenant_not_found" });
+    }
+
+    // Get trash count and capacity info
+    const { getTrashCapacityInfo } = await import('./utils/trash-capacity');
+    const trashCount = await prisma.inventoryItem.count({
+      where: { tenantId, itemStatus: 'trashed' }
+    });
+    
+    const capacityInfo = getTrashCapacityInfo(trashCount, tenant.subscriptionTier);
+    res.json(capacityInfo);
+  } catch (error) {
+    console.error('[Trash Capacity] Error:', error);
+    res.status(500).json({ error: "failed_to_get_trash_capacity" });
   }
 });
 
