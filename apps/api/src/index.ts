@@ -1651,10 +1651,13 @@ const baseItemSchema = z.object({
   visibility: z.enum(['public', 'private']).optional(),
 });
 
-const createItemSchema = baseItemSchema.transform((data) => ({
-  ...data,
-  tenantId: data.tenantId || data.tenant_id, // Use tenantId or tenant_id
-}));
+const createItemSchema = baseItemSchema.transform((data) => {
+  const { tenant_id, tenantId, ...rest } = data;
+  return {
+    ...rest,
+    tenantId: tenantId || tenant_id, // Use tenantId or tenant_id
+  };
+});
 
 const updateItemSchema = baseItemSchema.partial();
 
