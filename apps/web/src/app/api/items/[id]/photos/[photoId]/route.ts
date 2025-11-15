@@ -5,9 +5,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; photoId: string }> }
 ) {
   try {
+    console.log('[Next.js Proxy] PUT request received');
     const { id, photoId } = await params;
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const url = `${base}/items/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`;
+    console.log('[Next.js Proxy] Target URL:', url);
 
     // Create headers object, excluding problematic headers
     const headers: Record<string, string> = {
@@ -23,7 +25,7 @@ export async function PUT(
     req.headers.forEach((value, key) => {
       const lowerKey = key.toLowerCase();
       if (key.startsWith('x-') || key.startsWith('trace') || excludeHeaders.includes(lowerKey)) {
-        console.log(`Filtering out header: ${key}`);
+        console.log(`[Next.js Proxy] Filtering out header: ${key}`);
         return; // Skip tracing and custom headers
       }
       if (!headers[key]) {
@@ -31,11 +33,13 @@ export async function PUT(
       }
     });
 
-    console.log('Final headers being sent:', Object.keys(headers));
+    console.log('[Next.js Proxy] Final headers being sent:', Object.keys(headers));
 
     // Read the request body as JSON
+    console.log('[Next.js Proxy] Reading request body...');
     const body = await req.json();
-    console.log('Request body:', body);
+    console.log('[Next.js Proxy] Request body parsed:', JSON.stringify(body));
+    console.log('[Next.js Proxy] Body stringified for backend:', JSON.stringify(body));
 
     const res = await fetch(url, {
       method: 'PUT',
