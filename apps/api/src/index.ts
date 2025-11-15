@@ -1650,7 +1650,7 @@ const createItemSchema = z.object({
   visibility: z.enum(['public', 'private']).optional(),
 });
 
-app.post(["/items", "/inventory"], checkSubscriptionLimits, enforcePolicyCompliance, async (req, res) => {
+app.post(["/api/items", "/api/inventory", "/items", "/inventory"], checkSubscriptionLimits, enforcePolicyCompliance, async (req, res) => {
   const parsed = createItemSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
@@ -1675,7 +1675,7 @@ app.post(["/items", "/inventory"], checkSubscriptionLimits, enforcePolicyComplia
 });
 
 const updateItemSchema = createItemSchema.partial().extend({ tenantId: z.string().min(1).optional() });
-app.put(["/items/:id", "/inventory/:id"], enforcePolicyCompliance, async (req, res) => {
+app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], enforcePolicyCompliance, async (req, res) => {
   const parsed = updateItemSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     console.error('[PUT /items/:id] Validation failed:', JSON.stringify(parsed.error.flatten(), null, 2));
@@ -1697,7 +1697,7 @@ app.put(["/items/:id", "/inventory/:id"], enforcePolicyCompliance, async (req, r
   }
 });
 
-app.delete(["/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
+app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     await prisma.inventoryItem.delete({ where: { id: req.params.id } });
     res.status(204).end();
