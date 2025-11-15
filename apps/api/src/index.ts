@@ -834,6 +834,12 @@ app.get("/public/tenant/:tenantId", async (req, res) => {
     });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
 
+    // Check location status for storefront visibility
+    const { shouldShowStorefront, getStorefrontMessage } = await import('./utils/location-status');
+    const locationStatus = tenant.locationStatus as any || 'active';
+    const canShowStorefront = shouldShowStorefront(locationStatus);
+    const storefrontMessage = getStorefrontMessage(locationStatus, tenant.reopeningDate);
+
     // Check if tenant has storefront access (tier + overrides)
     const tier = tenant.subscriptionTier || 'trial';
     const hasStorefrontByTier = tier !== 'google_only'; // google_only doesn't have storefront
@@ -847,15 +853,21 @@ app.get("/public/tenant/:tenantId", async (req, res) => {
       ? storefrontOverride.granted 
       : hasStorefrontByTier;
 
+    // Storefront is accessible if: tier allows it AND location status allows it
+    const finalStorefrontAccess = hasStorefrontAccess && canShowStorefront;
+
     // Return basic public tenant information with access status
     return res.json({
       id: tenant.id,
       name: tenant.name,
       subscriptionTier: tenant.subscriptionTier,
       metadata: tenant.metadata,
+      locationStatus,
+      reopeningDate: tenant.reopeningDate,
       access: {
-        storefront: hasStorefrontAccess,
-      }
+        storefront: finalStorefrontAccess,
+      },
+      storefrontMessage: storefrontMessage || undefined,
     });
   } catch (e: any) {
     console.error("[GET /public/tenant/:tenantId] Error:", e);

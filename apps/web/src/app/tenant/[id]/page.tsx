@@ -9,6 +9,7 @@ import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductDisplay from '@/components/storefront/ProductDisplay';
 import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
+import LocationClosedBanner from '@/components/storefront/LocationClosedBanner';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -195,6 +196,18 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   // Get tier features for footer
   const tier = tenant.subscriptionTier || 'trial';
   const features = getLandingPageFeatures(tier);
+
+  // Location status check: Show closed banner if location is not active
+  if (tenant.storefrontMessage) {
+    return (
+      <LocationClosedBanner
+        title={tenant.storefrontMessage.title}
+        message={tenant.storefrontMessage.message}
+        tenantId={id}
+        businessName={businessName}
+      />
+    );
+  }
 
   // Tier gate: Check backend access status (respects overrides)
   if (tenant.access && !tenant.access.storefront) {
