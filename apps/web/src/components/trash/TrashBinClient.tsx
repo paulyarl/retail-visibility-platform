@@ -5,9 +5,6 @@ import { Button, ConfirmDialog } from '@/components/ui';
 import PageHeader from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import { Item } from '@/services/itemsDataService';
-import ItemsGrid from '../items/ItemsGrid';
-import ItemsList from '../items/ItemsList';
-import { useItemsViewMode } from '@/hooks/useItemsViewMode';
 
 interface TrashBinClientProps {
   tenantId: string;
@@ -42,7 +39,7 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
     onConfirm: async () => {},
   });
 
-  const { viewMode, setViewMode } = useItemsViewMode();
+  // Removed viewMode - using simple list view only
 
   // Load trashed items and capacity
   const loadTrash = async () => {
@@ -155,24 +152,15 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
         title="Trash Bin"
         description={`${items.length} item${items.length !== 1 ? 's' : ''} in trash`}
         actions={
-          <div className="flex gap-2">
+          items.length > 0 && (
             <Button
-              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              variant="ghost"
+              onClick={handleEmptyTrash}
+              variant="danger"
               size="sm"
             >
-              {viewMode === 'grid' ? 'List View' : 'Grid View'}
+              Empty Trash
             </Button>
-            {items.length > 0 && (
-              <Button
-                onClick={handleEmptyTrash}
-                variant="danger"
-                size="sm"
-              >
-                Empty Trash
-              </Button>
-            )}
-          </div>
+          )
         }
       />
 
@@ -230,62 +218,47 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
           <h3 className="text-lg font-semibold mb-2">Trash is Empty</h3>
           <p className="text-muted">Items you delete will appear here</p>
         </div>
-      ) : viewMode === 'grid' ? (
-        <ItemsGrid
-          items={items}
-          onEdit={() => {}} // Disabled in trash
-          onDelete={handlePurge}
-          onPhotoManage={() => {}} // Disabled in trash
-          onCategoryAssign={() => {}} // Disabled in trash
-          onToggleStatus={handleRestore}
-          onToggleVisibility={() => {}} // Disabled in trash
-          onQRCode={() => {}} // Disabled in trash
-          onPropagate={() => {}} // Disabled in trash
-          onEnrich={() => {}} // Disabled in trash
-          canPropagate={false}
-          canScan={false}
-          customActions={(item) => (
-            <Button
-              size="sm"
-              variant="success"
-              onClick={() => handleRestore(item)}
-              title="Restore from trash"
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Restore
-            </Button>
-          )}
-        />
       ) : (
-        <ItemsList
-          items={items}
-          onEdit={() => {}} // Disabled in trash
-          onDelete={handlePurge}
-          onPhotoManage={() => {}} // Disabled in trash
-          onCategoryAssign={() => {}} // Disabled in trash
-          onToggleStatus={handleRestore}
-          onToggleVisibility={() => {}} // Disabled in trash
-          onQRCode={() => {}} // Disabled in trash
-          onPropagate={() => {}} // Disabled in trash
-          onEnrich={() => {}} // Disabled in trash
-          canPropagate={false}
-          canScan={false}
-          customActions={(item) => (
-            <Button
-              size="sm"
-              variant="success"
-              onClick={() => handleRestore(item)}
-              title="Restore from trash"
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Restore
-            </Button>
-          )}
-        />
+        <div className="grid grid-cols-1 gap-4">
+          {items.map((item) => (
+            <div key={item.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {item.imageUrl && (
+                  <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover rounded" />
+                )}
+                <div>
+                  <h3 className="font-semibold">{item.name}</h3>
+                  <p className="text-sm text-gray-600">{item.sku}</p>
+                  <p className="text-sm text-gray-500">${item.price}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => handleRestore(item)}
+                  title="Restore from trash"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Restore
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => handlePurge(item)}
+                  title="Permanently delete"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Purge
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       <ConfirmDialog
@@ -297,7 +270,7 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
           await confirmDialog.onConfirm();
           setConfirmDialog({ ...confirmDialog, isOpen: false });
         }}
-        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
       />
     </div>
   );
