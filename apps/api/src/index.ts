@@ -1699,7 +1699,15 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], checkSubscrip
     };
     const created = await prisma.inventoryItem.create({ data });
     await audit({ tenantId: created.tenantId, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
-    res.status(201).json(created);
+    
+    // Convert Decimal price to number and hide priceCents for frontend compatibility
+    const { priceCents, ...itemWithoutPriceCents } = created;
+    const transformed = {
+      ...itemWithoutPriceCents,
+      price: created.price ? Number(created.price) : undefined,
+    };
+    
+    res.status(201).json(transformed);
   } catch (e: any) {
     if (e?.code === "P2002") return res.status(409).json({ error: "duplicate_sku" });
     console.error('[POST /items] Error creating item:', e);
@@ -1732,7 +1740,15 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     
     const updated = await prisma.inventoryItem.update({ where: { id: req.params.id }, data: updateData });
     await audit({ tenantId: updated.tenantId, actor: null, action: "inventory.update", payload: { id: updated.id } });
-    res.json(updated);
+    
+    // Convert Decimal price to number and hide priceCents for frontend compatibility
+    const { priceCents, ...itemWithoutPriceCents } = updated;
+    const transformed = {
+      ...itemWithoutPriceCents,
+      price: updated.price ? Number(updated.price) : undefined,
+    };
+    
+    res.json(transformed);
   } catch {
     res.status(500).json({ error: "failed_to_update_item" });
   }
@@ -1763,7 +1779,14 @@ app.patch("/api/v1/tenants/:tenantId/items/:itemId/category", authenticateToken,
       categorySlug: parsed.data.categorySlug,
     });
 
-    res.json(updated);
+    // Convert Decimal price to number and hide priceCents for frontend compatibility
+    const { priceCents, ...itemWithoutPriceCents } = updated;
+    const transformed = {
+      ...itemWithoutPriceCents,
+      price: updated.price ? Number(updated.price) : undefined,
+    };
+
+    res.json(transformed);
   } catch (error: any) {
     console.error('[PATCH /api/v1/tenants/:tenantId/items/:itemId/category] Error:', error);
     res.status(error.statusCode || 500).json({ error: error.message || "failed_to_assign_category" });
@@ -1785,7 +1808,14 @@ app.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, res) 
       data: updateData,
     });
     
-    res.json(updated);
+    // Convert Decimal price to number and hide priceCents for frontend compatibility
+    const { priceCents, ...itemWithoutPriceCents } = updated;
+    const transformed = {
+      ...itemWithoutPriceCents,
+      price: updated.price ? Number(updated.price) : undefined,
+    };
+    
+    res.json(transformed);
   } catch (error) {
     console.error('[PATCH Item] Error:', error);
     res.status(500).json({ error: "failed_to_update_item" });
