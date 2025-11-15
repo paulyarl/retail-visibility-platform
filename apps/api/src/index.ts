@@ -1678,7 +1678,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], checkSubscrip
   }
 });
 
-const updateItemSchema = createItemSchema.partial().extend({ tenantId: z.string().min(1).optional() });
+const updateItemSchema = createItemSchema.partial();
 app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], enforcePolicyCompliance, async (req, res) => {
   const parsed = updateItemSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
