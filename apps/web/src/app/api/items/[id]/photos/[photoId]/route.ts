@@ -33,12 +33,14 @@ export async function PUT(
 
     console.log('Final headers being sent:', Object.keys(headers));
 
+    // Read the request body as JSON
+    const body = await req.json();
+    console.log('Request body:', body);
+
     const res = await fetch(url, {
       method: 'PUT',
       headers,
-      body: req.body,
-      // @ts-expect-error - duplex is a new fetch feature
-      duplex: 'half',
+      body: JSON.stringify(body),
     });
 
     const contentType = res.headers.get('content-type');
@@ -63,9 +65,7 @@ export async function PUT(
       const retryRes = await fetch(url, {
         method: 'PUT',
         headers: cleanHeaders,
-        body: req.body,
-        // @ts-expect-error - duplex is a new fetch feature
-        duplex: 'half',
+        body: JSON.stringify(body),
       });
 
       const retryContentType = retryRes.headers.get('content-type');
