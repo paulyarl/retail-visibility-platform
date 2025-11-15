@@ -155,7 +155,7 @@ export default function ItemsGridV2({
                       <div className="flex items-center justify-between mt-3">
                         {/* Price & Stock */}
                         <div className="flex items-center gap-6">
-                          {typeof item.price === 'number' && (
+                          {typeof item.price === 'number' && item.price > 0 && (
                             <div>
                               <p className="text-xs text-neutral-500">Price</p>
                               <p className="text-xl font-bold text-neutral-900">
@@ -338,7 +338,7 @@ export default function ItemsGridV2({
                   {/* Price & Stock */}
                   <div className="flex items-center justify-between mb-4 pb-4 border-b border-neutral-200">
                     <div>
-                      {typeof item.price === 'number' && (
+                      {typeof item.price === 'number' && item.price > 0 && (
                         <p className="text-2xl font-bold text-neutral-900">
                           ${item.price.toFixed(2)}
                         </p>
