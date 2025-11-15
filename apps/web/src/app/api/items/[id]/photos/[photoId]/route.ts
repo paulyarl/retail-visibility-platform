@@ -52,11 +52,21 @@ export async function PUT(
     }
     console.log('[Next.js Proxy] Body stringified for backend:', JSON.stringify(body));
 
+    const requestPayload = JSON.stringify(body);
+    console.log('[Next.js Proxy] About to send fetch request:');
+    console.log('[Next.js Proxy]   URL:', url);
+    console.log('[Next.js Proxy]   Method: PUT');
+    console.log('[Next.js Proxy]   Headers:', JSON.stringify(headers));
+    console.log('[Next.js Proxy]   Body:', requestPayload);
+    console.log('[Next.js Proxy]   Body length:', requestPayload.length);
+
     const res = await fetch(url, {
       method: 'PUT',
       headers,
-      body: JSON.stringify(body),
+      body: requestPayload,
     });
+
+    console.log('[Next.js Proxy] Fetch completed, response status:', res.status);
 
     const contentType = res.headers.get('content-type');
     if (!contentType?.includes('application/json')) {
