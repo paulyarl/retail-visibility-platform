@@ -37,8 +37,19 @@ export async function PUT(
 
     // Read the request body as JSON
     console.log('[Next.js Proxy] Reading request body...');
-    const body = await req.json();
-    console.log('[Next.js Proxy] Request body parsed:', JSON.stringify(body));
+    let body;
+    try {
+      body = await req.json();
+      console.log('[Next.js Proxy] Request body parsed successfully:', JSON.stringify(body));
+    } catch (parseError) {
+      console.error('[Next.js Proxy] Failed to parse request body:', parseError);
+      console.log('[Next.js Proxy] Request content-type:', req.headers.get('content-type'));
+      console.log('[Next.js Proxy] Request method:', req.method);
+      return NextResponse.json({ 
+        error: 'body_parse_failed', 
+        details: parseError instanceof Error ? parseError.message : String(parseError) 
+      }, { status: 400 });
+    }
     console.log('[Next.js Proxy] Body stringified for backend:', JSON.stringify(body));
 
     const res = await fetch(url, {
