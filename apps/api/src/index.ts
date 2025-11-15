@@ -183,13 +183,34 @@ app.get("/tenants", authenticateToken, async (req, res) => {
   try {
     // Platform users (admin, support, viewer) see all tenants, regular users see only their tenants
     const { isPlatformUser } = await import('./utils/platform-admin');
-    const tenants = await prisma.tenant.findMany({ 
-      where: isPlatformUser(req.user) ? {} : {
-        users: {
-          some: {
-            userId: req.user?.userId
-          }
+    
+    // Query parameters for filtering
+    const includeArchived = req.query.includeArchived === 'true';
+    const statusFilter = req.query.status as string;
+    
+    // Build where clause
+    const baseWhere = isPlatformUser(req.user) ? {} : {
+      users: {
+        some: {
+          userId: req.user?.userId
         }
+      }
+    };
+    
+    // Add status filtering
+    let statusCondition: any = {};
+    if (statusFilter) {
+      // Specific status requested
+      statusCondition = { locationStatus: statusFilter as any };
+    } else if (!includeArchived) {
+      // Default: exclude archived
+      statusCondition = { locationStatus: { not: 'archived' as any } };
+    }
+    
+    const tenants = await prisma.tenant.findMany({ 
+      where: {
+        ...baseWhere,
+        ...statusCondition,
       },
       orderBy: { createdAt: "desc" },
       include: {
@@ -255,7 +276,14 @@ app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) =
       console.log(`[GET /tenants/:id] Tenant ${tenant.id} marked as expired with tier ${tenant.subscriptionTier}.`);
     }
     
-    res.json(tenant);
+    // Add location status info
+    const { getLocationStatusInfo } = await import('./utils/location-status');
+    const statusInfo = getLocationStatusInfo(tenant.locationStatus as any);
+    
+    res.json({
+      ...tenant,
+      statusInfo,
+    });
   } catch (_e) {
     res.status(500).json({ error: "failed_to_get_tenant" });
   }
