@@ -1713,7 +1713,7 @@ const listQuery = z.object({
   page: z.string().optional(), // Page number (1-indexed)
   limit: z.string().optional(), // Items per page
   search: z.string().optional(), // Search by SKU or name
-  status: z.enum(['all', 'active', 'inactive', 'syncing']).optional(), // Filter by status
+  status: z.enum(['all', 'active', 'inactive', 'syncing', 'trashed']).optional(), // Filter by status
   visibility: z.enum(['all', 'public', 'private']).optional(), // Filter by visibility
   sortBy: z.enum(['name', 'sku', 'price', 'stock', 'updatedAt', 'createdAt']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
