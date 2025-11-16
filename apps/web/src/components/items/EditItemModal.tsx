@@ -31,7 +31,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<'active' | 'inactive'>('active');
+  const [status, setStatus] = useState<'draft' | 'active' | 'archived' | 'inactive'>('draft');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categoryPath, setCategoryPath] = useState<string[]>([]);
@@ -66,7 +66,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setPrice(item.price ? item.price.toFixed(2) : '');
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
-      setStatus((item.status === 'active' || item.status === 'inactive') ? item.status : 'active');
+      setStatus((item.status === 'draft' || item.status === 'active' || item.status === 'archived' || item.status === 'inactive') ? item.status : 'draft');
       setCategoryPath(item.categoryPath || []);
     }
   }, [item]);
@@ -164,46 +164,58 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
             Item Status
           </label>
-          <div className="flex items-center gap-4">
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setStatus('draft')}
+              disabled={saving}
+              className={`px-3 py-2 rounded-lg border-2 transition-all ${
+                status === 'draft'
+                  ? 'border-blue-600 bg-blue-600 text-white'
+                  : 'border-neutral-300 dark:border-neutral-600 hover:border-neutral-400 bg-white dark:bg-neutral-800'
+              }`}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-lg">✏️</span>
+                <span className="text-xs font-medium">Draft</span>
+              </div>
+            </button>
             <button
               type="button"
               onClick={() => setStatus('active')}
               disabled={saving}
-              className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+              className={`px-3 py-2 rounded-lg border-2 transition-all ${
                 status === 'active'
                   ? 'border-green-600 bg-green-600 text-white'
                   : 'border-neutral-300 dark:border-neutral-600 hover:border-neutral-400 bg-white dark:bg-neutral-800'
               }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="font-medium">Active</span>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-lg">✓</span>
+                <span className="text-xs font-medium">Active</span>
               </div>
             </button>
             <button
               type="button"
-              onClick={() => setStatus('inactive')}
+              onClick={() => setStatus('archived')}
               disabled={saving}
-              className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
-                status === 'inactive'
-                  ? 'border-red-600 bg-red-600 text-white'
+              className={`px-3 py-2 rounded-lg border-2 transition-all ${
+                status === 'archived'
+                  ? 'border-amber-600 bg-amber-600 text-white'
                   : 'border-neutral-300 dark:border-neutral-600 hover:border-neutral-400 bg-white dark:bg-neutral-800'
               }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                <span className="font-medium">Inactive</span>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-lg">📦</span>
+                <span className="text-xs font-medium">Archived</span>
               </div>
             </button>
           </div>
           <p className="text-xs text-neutral-500 mt-2">
-            {status === 'active' 
-              ? '✓ Item will sync to Google if public and has a category' 
-              : '✗ Item will not sync to Google (inactive items are hidden)'}
+            {status === 'draft' && '✏️ Draft - Review before activating (will not sync)'}
+            {status === 'active' && '✓ Active - Will sync to Google if public and has a category'}
+            {status === 'archived' && '📦 Archived - Preserved but will not sync to Google'}
+            {status === 'inactive' && '⏸️ Inactive - Legacy status (will not sync)'}
           </p>
         </div>
 
