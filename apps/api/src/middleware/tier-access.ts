@@ -245,8 +245,8 @@ export function requireTierFeature(feature: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Platform admins and support bypass all tier restrictions
-      const { isPlatformAdmin } = await import('../utils/platform-admin');
-      if (isPlatformAdmin(req.user)) {
+      const { canPerformSupportActions } = await import('../utils/platform-admin');
+      if (canPerformSupportActions(req.user)) {
         return next();
       }
       
@@ -346,8 +346,8 @@ export function requireAnyTierFeature(features: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Platform admins and support bypass all tier restrictions
-      const { isPlatformAdmin } = await import('../utils/platform-admin');
-      if (isPlatformAdmin(req.user)) {
+      const { canPerformSupportActions } = await import('../utils/platform-admin');
+      if (canPerformSupportActions(req.user)) {
         return next();
       }
       
