@@ -54,14 +54,17 @@ export default function StoreIdentityStep({
       
       setFormData(sanitized);
       
-      // Validate the pre-populated data but be lenient with phone format
-      // This allows users to proceed with existing data even if format is slightly off
+      // Notify parent of the sanitized data (with HTTPS conversion)
+      onDataChange(sanitized);
+      
+      // Validate the sanitized data (not the original initialData)
+      // This ensures HTTP->HTTPS conversion is validated correctly
       try {
         // Create a lenient schema that accepts pre-populated phone numbers
         const lenientSchema = businessProfileSchema.extend({
           phone_number: z.string().min(1, 'Phone number is required').trim(),
         });
-        lenientSchema.parse(initialData);
+        lenientSchema.parse(sanitized);
         onValidationChange(true);
         console.log('[StoreIdentityStep] Pre-populated data is valid (lenient validation)');
       } catch (error) {
