@@ -63,20 +63,20 @@ SELECT
   tc.slug as category_slug,
   tc.google_category_id,
   COUNT(ii.id) as product_count,
-  MAX(ii.updated_at) as last_product_update,
+  MAX(ii."updatedAt") as last_product_update,
   t.google_last_sync,
   t.google_sync_enabled,
   t.directory_visible
 FROM "Tenant" t
 INNER JOIN tenant_business_profile bp ON bp.tenant_id = t.id
-INNER JOIN "InventoryItem" ii ON ii.tenant_id = t.id
+INNER JOIN "InventoryItem" ii ON ii."tenantId" = t.id
 INNER JOIN tenant_category tc ON ii.tenant_category_id = tc.id
 WHERE 
   t.google_sync_enabled = true
   AND t.google_last_sync > NOW() - INTERVAL '24 hours'
   AND t.directory_visible = true
   AND t.location_status = 'active'
-  AND ii.item_status = 'active'
+  AND ii."itemStatus" = 'active'
   AND ii.visibility = 'public'
   AND tc.is_active = true
 GROUP BY 
@@ -100,6 +100,10 @@ GROUP BY
 -- Step 5: Create indexes on materialized view
 -- ============================================================================
 
+-- IMPORTANT: Create unique index first (required for CONCURRENT refresh)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_directory_category_stores_unique 
+  ON directory_category_stores(tenant_id, category_id);
+
 CREATE INDEX IF NOT EXISTS idx_directory_category_stores_category 
   ON directory_category_stores(category_id);
 
@@ -119,7 +123,12 @@ CREATE INDEX IF NOT EXISTS idx_directory_category_stores_slug
 CREATE OR REPLACE FUNCTION refresh_directory_category_stores()
 RETURNS void AS $$
 BEGIN
+  -- Use CONCURRENTLY for non-blocking refresh (requires unique index)
   REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_stores;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Fallback to regular refresh if concurrent fails
+    REFRESH MATERIALIZED VIEW directory_category_stores;
 END;
 $$ LANGUAGE plpgsql;
 

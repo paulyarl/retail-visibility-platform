@@ -3017,11 +3017,11 @@ app.use('/api/support/directory', directorySupportRoutes); // Support directory 
 // Tenant directory routes - MUST come before generic tenant routes
 app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
 */
-console.log('⚠️ Directory routes temporarily disabled - missing directory_listings table');
+console.log('⚠️ Old directory routes temporarily disabled - missing directory_listings table');
 
 // Directory Categories routes - NEW for category-based discovery (no auth required - public)
 app.use('/api/directory', directoryCategoriesRoutes);
-console.log('✅ Directory categories routes mounted');
+console.log('✅ NEW Directory categories routes mounted (category-based discovery active)');
 // Generic tenant routes come AFTER directory routes
 app.use('/api/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
