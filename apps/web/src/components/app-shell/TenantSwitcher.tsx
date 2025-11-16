@@ -7,7 +7,32 @@ import { canSwitchToTenant } from "@/lib/auth/access-control";
 import { navigateToTenant } from "@/lib/tenant-navigation";
 import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
 
-type Tenant = { id: string; name: string };
+type Tenant = { 
+  id: string; 
+  name: string;
+  locationStatus?: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
+};
+
+const getStatusBadge = (status?: string) => {
+  if (!status || status === 'active') return null;
+  
+  const badges: Record<string, { label: string; color: string; icon: string }> = {
+    pending: { label: 'Opening Soon', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: '🚧' },
+    inactive: { label: 'Temp Closed', color: 'bg-orange-100 text-orange-800 border-orange-300', icon: '⏸️' },
+    closed: { label: 'Closed', color: 'bg-red-100 text-red-800 border-red-300', icon: '🔒' },
+    archived: { label: 'Archived', color: 'bg-gray-100 text-gray-800 border-gray-300', icon: '📦' },
+  };
+  
+  const badge = badges[status];
+  if (!badge) return null;
+  
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs border ${badge.color}`}>
+      <span>{badge.icon}</span>
+      <span>{badge.label}</span>
+    </span>
+  );
+};
 
 export default function TenantSwitcher() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -80,6 +105,7 @@ export default function TenantSwitcher() {
         <span className="text-xs text-neutral-500">Location</span>
         <button onClick={() => onChange(only.id)} className="px-2 py-1 rounded-md hover:bg-neutral-50 flex items-center gap-2">
           <span className="font-medium text-neutral-900">{only.name}</span>
+          {getStatusBadge(only.locationStatus)}
           <MobileCapacityIndicator tenantId={only.id} showText={false} />
           {role && (
             <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-2xs border border-neutral-300 text-neutral-600">
@@ -102,9 +128,12 @@ export default function TenantSwitcher() {
       >
         {tenants.map((t) => {
           const role = user?.tenants?.find(x => x.id === t.id)?.role;
+          const statusLabel = t.locationStatus && t.locationStatus !== 'active' 
+            ? ` [${t.locationStatus.toUpperCase()}]` 
+            : '';
           return (
             <option key={t.id} value={t.id}>
-              {t.name}{role ? ` — ${role.toLowerCase()}` : ''}
+              {t.name}{statusLabel}{role ? ` — ${role.toLowerCase()}` : ''}
             </option>
           );
         })}
