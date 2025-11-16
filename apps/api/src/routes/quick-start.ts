@@ -396,26 +396,72 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
       });
     }
 
-    // Generate categories based on business type
-    const categoryTemplates: Record<string, string[]> = {
+    // Generate categories based on business type with Google taxonomy alignment
+    const categoryTemplates: Record<string, Array<{ name: string; searchTerm: string }>> = {
       grocery: [
-        'Fresh Produce', 'Dairy & Eggs', 'Meat & Seafood', 'Bakery', 'Frozen Foods',
-        'Beverages', 'Snacks & Candy', 'Canned Goods', 'Pasta & Grains', 'Condiments & Sauces',
-        'Health & Beauty', 'Household Supplies', 'Pet Food', 'Baby Products', 'Deli'
+        { name: 'Fresh Produce', searchTerm: 'fresh produce fruits vegetables' },
+        { name: 'Dairy & Eggs', searchTerm: 'dairy eggs milk cheese yogurt' },
+        { name: 'Meat & Seafood', searchTerm: 'meat seafood fish chicken beef pork' },
+        { name: 'Bakery', searchTerm: 'bakery bread pastries cakes' },
+        { name: 'Frozen Foods', searchTerm: 'frozen food ice cream pizza meals' },
+        { name: 'Beverages', searchTerm: 'beverages drinks juice soda coffee tea' },
+        { name: 'Snacks & Candy', searchTerm: 'snacks candy chips cookies sweets' },
+        { name: 'Canned Goods', searchTerm: 'canned goods preserved food' },
+        { name: 'Pasta & Grains', searchTerm: 'pasta grains rice noodles cereal' },
+        { name: 'Condiments & Sauces', searchTerm: 'condiments sauces spices seasonings' },
+        { name: 'Health & Beauty', searchTerm: 'health beauty personal care cosmetics' },
+        { name: 'Household Supplies', searchTerm: 'household cleaning supplies detergent' },
+        { name: 'Pet Food', searchTerm: 'pet food dog cat animal supplies' },
+        { name: 'Baby Products', searchTerm: 'baby products infant diapers formula' },
+        { name: 'Deli', searchTerm: 'deli prepared food sandwiches salads' }
       ],
       fashion: [
-        'Women\'s Clothing', 'Men\'s Clothing', 'Kids\' Clothing', 'Shoes', 'Accessories',
-        'Jewelry', 'Handbags', 'Watches', 'Sunglasses', 'Belts', 'Hats', 'Scarves'
+        { name: 'Women\'s Clothing', searchTerm: 'women clothing apparel dresses tops' },
+        { name: 'Men\'s Clothing', searchTerm: 'men clothing apparel shirts pants' },
+        { name: 'Kids\' Clothing', searchTerm: 'kids children clothing apparel' },
+        { name: 'Shoes', searchTerm: 'shoes footwear sneakers boots sandals' },
+        { name: 'Accessories', searchTerm: 'fashion accessories bags purses' },
+        { name: 'Jewelry', searchTerm: 'jewelry rings necklaces earrings' },
+        { name: 'Handbags', searchTerm: 'handbags purses bags totes' },
+        { name: 'Watches', searchTerm: 'watches timepieces wristwatches' },
+        { name: 'Sunglasses', searchTerm: 'sunglasses eyewear shades' },
+        { name: 'Belts', searchTerm: 'belts leather accessories' },
+        { name: 'Hats', searchTerm: 'hats caps headwear' },
+        { name: 'Scarves', searchTerm: 'scarves wraps shawls' }
       ],
       electronics: [
-        'Mobile Phones', 'Computers & Laptops', 'Tablets', 'Audio & Headphones', 'Cameras',
-        'Gaming', 'Smart Home', 'Wearables', 'Accessories', 'Cables & Chargers'
+        { name: 'Mobile Phones', searchTerm: 'mobile phones smartphones cell' },
+        { name: 'Computers & Laptops', searchTerm: 'computers laptops notebooks desktops' },
+        { name: 'Tablets', searchTerm: 'tablets ipad android slate' },
+        { name: 'Audio & Headphones', searchTerm: 'audio headphones speakers earbuds' },
+        { name: 'Cameras', searchTerm: 'cameras photography digital dslr' },
+        { name: 'Gaming', searchTerm: 'gaming video games consoles' },
+        { name: 'Smart Home', searchTerm: 'smart home automation devices' },
+        { name: 'Wearables', searchTerm: 'wearables smartwatch fitness tracker' },
+        { name: 'Accessories', searchTerm: 'electronics accessories peripherals' },
+        { name: 'Cables & Chargers', searchTerm: 'cables chargers adapters power' }
       ],
       general: [
-        'Home & Garden', 'Health & Beauty', 'Sports & Outdoors', 'Toys & Games', 'Books',
-        'Office Supplies', 'Pet Supplies', 'Automotive', 'Tools & Hardware', 'Arts & Crafts',
-        'Party Supplies', 'Seasonal', 'Gifts', 'Electronics', 'Clothing', 'Food & Beverage',
-        'Home Improvement', 'Baby & Kids', 'Jewelry & Accessories', 'Furniture'
+        { name: 'Home & Garden', searchTerm: 'home garden furniture decor' },
+        { name: 'Health & Beauty', searchTerm: 'health beauty cosmetics skincare' },
+        { name: 'Sports & Outdoors', searchTerm: 'sports outdoors fitness camping' },
+        { name: 'Toys & Games', searchTerm: 'toys games puzzles board games' },
+        { name: 'Books', searchTerm: 'books reading literature magazines' },
+        { name: 'Office Supplies', searchTerm: 'office supplies stationery paper' },
+        { name: 'Pet Supplies', searchTerm: 'pet supplies dog cat animal' },
+        { name: 'Automotive', searchTerm: 'automotive car parts accessories' },
+        { name: 'Tools & Hardware', searchTerm: 'tools hardware construction' },
+        { name: 'Arts & Crafts', searchTerm: 'arts crafts hobbies supplies' },
+        { name: 'Party Supplies', searchTerm: 'party supplies decorations celebrations' },
+        { name: 'Seasonal', searchTerm: 'seasonal holiday decorations' },
+        { name: 'Gifts', searchTerm: 'gifts presents novelties' },
+        { name: 'Electronics', searchTerm: 'electronics gadgets devices' },
+        { name: 'Clothing', searchTerm: 'clothing apparel fashion' },
+        { name: 'Food & Beverage', searchTerm: 'food beverage grocery' },
+        { name: 'Home Improvement', searchTerm: 'home improvement renovation building' },
+        { name: 'Baby & Kids', searchTerm: 'baby kids children products' },
+        { name: 'Jewelry & Accessories', searchTerm: 'jewelry accessories fashion' },
+        { name: 'Furniture', searchTerm: 'furniture home living room' }
       ],
     };
 
@@ -424,19 +470,35 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, asyn
     // Limit to requested count
     const categories = allCategories.slice(0, categoryCount);
 
-    // Create categories
+    // Import Google taxonomy functions
+    const { suggestCategories, getCategoryById } = await import('../lib/google/taxonomy');
+
+    // Create categories with Google taxonomy alignment
     const createdCategories = await Promise.all(
-      categories.map((name, index) =>
-        prisma.tenantCategory.create({
+      categories.map(async (cat, index) => {
+        // Use live Google taxonomy to find best matching category
+        const suggestions = suggestCategories(cat.searchTerm, 1);
+        const googleCategoryId = suggestions.length > 0 ? suggestions[0].id : null;
+        
+        // Log the mapping for transparency
+        if (googleCategoryId) {
+          const googleCat = getCategoryById(googleCategoryId);
+          console.log(`[Category Quick Start] Mapped "${cat.name}" to Google category: ${googleCat?.path.join(' > ')} (ID: ${googleCategoryId})`);
+        } else {
+          console.warn(`[Category Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
+        }
+
+        return prisma.tenantCategory.create({
           data: {
             tenantId,
-            name,
-            slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            name: cat.name,
+            slug: cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            googleCategoryId,
             sortOrder: index,
             isActive: true,
           },
-        })
-      )
+        });
+      })
     );
 
     console.log(`[Category Quick Start] Created ${createdCategories.length} categories for tenant ${tenantId}`);
