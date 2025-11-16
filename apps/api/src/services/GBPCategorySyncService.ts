@@ -5,6 +5,7 @@
  */
 
 import { prisma } from '../prisma';
+import { decryptToken, refreshAccessToken, encryptToken } from '../lib/google/oauth';
 
 interface GBPCategory {
   categoryId: string;
@@ -23,6 +24,53 @@ interface GBPCategoryChange {
 export class GBPCategorySyncService {
   private readonly API_BASE = 'https://mybusiness.googleapis.com/v4';
   
+  /**
+   * Get any valid Google OAuth access token with business.manage scope.
+   * Uses the shared google_oauth_tokens table and refreshes tokens when expired.
+   */
+  private async getAnyValidAccessToken(): Promise<string | null> {
+    try {
+      const tokenRecord = await prisma.googleOAuthToken.findFirst({
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!tokenRecord) {
+        console.error('[GBPCategorySync] No Google OAuth token found for GBP categories');
+        return null;
+      }
+
+      const now = new Date();
+      if (tokenRecord.expiresAt <= now) {
+        console.log('[GBPCategorySync] Token expired, refreshing for GBP categories...');
+
+        const refreshToken = decryptToken(tokenRecord.refreshTokenEncrypted);
+        const newTokens = await refreshAccessToken(refreshToken);
+
+        if (!newTokens) {
+          console.error('[GBPCategorySync] Failed to refresh token for GBP categories');
+          return null;
+        }
+
+        const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
+        await prisma.googleOAuthToken.update({
+          where: { accountId: tokenRecord.accountId },
+          data: {
+            accessTokenEncrypted: encryptToken(newTokens.access_token),
+            expiresAt: newExpiresAt,
+            scopes: newTokens.scope.split(' '),
+          },
+        });
+
+        return newTokens.access_token;
+      }
+
+      return decryptToken(tokenRecord.accessTokenEncrypted);
+    } catch (error) {
+      console.error('[GBPCategorySync] Error getting valid access token:', error);
+      return null;
+    }
+  }
+
   /**
    * Fetch latest GBP categories from Google API
    * Requires OAuth token with business.manage scope
@@ -43,8 +91,14 @@ export class GBPCategorySyncService {
     } = options;
 
     try {
-      // Note: This requires OAuth token - will need to be implemented
-      // For now, we'll use a placeholder that can be filled in later
+      const accessToken = await this.getAnyValidAccessToken();
+
+      // If we don't have an OAuth token yet, fall back to hardcoded categories
+      if (!accessToken) {
+        console.log('[GBPCategorySync] No OAuth token available, using hardcoded GBP categories');
+        return this.getHardcodedCategories();
+      }
+
       const categories: GBPCategory[] = [];
       let nextPageToken: string | undefined;
       let totalCount = 0;
@@ -54,35 +108,56 @@ export class GBPCategorySyncService {
           regionCode,
           languageCode,
           pageSize: pageSize.toString(),
-          ...(nextPageToken && { pageToken: nextPageToken })
         });
 
-        // TODO: Add OAuth token to headers
-        // const response = await fetch(`${this.API_BASE}/categories?${params}`, {
-        //   headers: {
-        //     'Authorization': `Bearer ${oauthToken}`,
-        //     'Content-Type': 'application/json'
-        //   }
-        // });
+        if (nextPageToken) {
+          params.set('pageToken', nextPageToken);
+        }
 
-        // For now, return empty result - will be implemented with OAuth
-        console.log('[GBPCategorySync] OAuth implementation pending for API fetch');
-        break;
+        const response = await fetch(`${this.API_BASE}/categories?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
-        // const data = await response.json();
-        // categories.push(...data.categories);
-        // totalCount = data.totalCategoryCount;
-        // nextPageToken = data.nextPageToken;
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[GBPCategorySync] Failed to fetch GBP categories from API:', {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText,
+          });
+          return this.getHardcodedCategories();
+        }
+
+        const data: any = await response.json();
+
+        if (Array.isArray(data.categories)) {
+          for (const cat of data.categories) {
+            categories.push({
+              categoryId: cat.name || '',
+              displayName: cat.displayName || '',
+              serviceTypes: cat.serviceTypes || [],
+              moreHoursTypes: cat.moreHoursTypes || [],
+            });
+          }
+        }
+
+        totalCount = typeof data.totalCategoryCount === 'number'
+          ? data.totalCategoryCount
+          : categories.length;
+        nextPageToken = data.nextPageToken;
       } while (nextPageToken);
 
       return {
         categories,
         totalCount,
-        version: this.generateVersion()
+        version: this.generateVersion(),
       };
     } catch (error) {
       console.error('[GBPCategorySync] Failed to fetch categories:', error);
-      throw error;
+      return this.getHardcodedCategories();
     }
   }
 
@@ -241,6 +316,62 @@ export class GBPCategorySyncService {
     }
 
     return seeded;
+  }
+
+  /**
+   * Get hardcoded GBP categories as a fallback when OAuth / API is unavailable.
+   */
+  private getHardcodedCategories(): {
+    categories: GBPCategory[];
+    totalCount: number;
+    version: string;
+  } {
+    const categories: GBPCategory[] = [
+      // Food & Beverage
+      { categoryId: 'gcid:grocery_store', displayName: 'Grocery store' },
+      { categoryId: 'gcid:convenience_store', displayName: 'Convenience store' },
+      { categoryId: 'gcid:supermarket', displayName: 'Supermarket' },
+      { categoryId: 'gcid:liquor_store', displayName: 'Liquor store' },
+      { categoryId: 'gcid:specialty_food_store', displayName: 'Specialty food store' },
+
+      // General Retail
+      { categoryId: 'gcid:clothing_store', displayName: 'Clothing store' },
+      { categoryId: 'gcid:shoe_store', displayName: 'Shoe store' },
+      { categoryId: 'gcid:electronics_store', displayName: 'Electronics store' },
+      { categoryId: 'gcid:furniture_store', displayName: 'Furniture store' },
+      { categoryId: 'gcid:hardware_store', displayName: 'Hardware store' },
+
+      // Health & Beauty
+      { categoryId: 'gcid:pharmacy', displayName: 'Pharmacy' },
+      { categoryId: 'gcid:beauty_supply_store', displayName: 'Beauty supply store' },
+      { categoryId: 'gcid:cosmetics_store', displayName: 'Cosmetics store' },
+      { categoryId: 'gcid:health_and_beauty_shop', displayName: 'Health and beauty shop' },
+
+      // Specialty Stores
+      { categoryId: 'gcid:book_store', displayName: 'Book store' },
+      { categoryId: 'gcid:pet_store', displayName: 'Pet store' },
+      { categoryId: 'gcid:toy_store', displayName: 'Toy store' },
+      { categoryId: 'gcid:sporting_goods_store', displayName: 'Sporting goods store' },
+      { categoryId: 'gcid:gift_shop', displayName: 'Gift shop' },
+
+      // Additional common categories
+      { categoryId: 'gcid:department_store', displayName: 'Department store' },
+      { categoryId: 'gcid:discount_store', displayName: 'Discount store' },
+      { categoryId: 'gcid:variety_store', displayName: 'Variety store' },
+      { categoryId: 'gcid:home_goods_store', displayName: 'Home goods store' },
+      { categoryId: 'gcid:jewelry_store', displayName: 'Jewelry store' },
+      { categoryId: 'gcid:florist', displayName: 'Florist' },
+      { categoryId: 'gcid:bakery', displayName: 'Bakery' },
+      { categoryId: 'gcid:butcher_shop', displayName: 'Butcher shop' },
+      { categoryId: 'gcid:produce_market', displayName: 'Produce market' },
+      { categoryId: 'gcid:wine_store', displayName: 'Wine store' },
+    ];
+
+    return {
+      categories,
+      totalCount: categories.length,
+      version: this.generateVersion(),
+    };
   }
 
   /**
