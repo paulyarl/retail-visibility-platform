@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Map, Grid3x3, List } from 'lucide-react';
+import Link from 'next/link';
+import { Map, Grid3x3, List, Sparkles } from 'lucide-react';
 import DirectorySearch from '@/components/directory/DirectorySearch';
 import DirectoryGrid from '@/components/directory/DirectoryGrid';
 import DirectoryList from '@/components/directory/DirectoryList';
@@ -159,21 +160,32 @@ export default function DirectoryClient() {
               <DirectorySearch />
             </div>
 
-            {/* Quick Stats */}
-            {!loading && data && (
-              <div className="flex items-center justify-center gap-6 text-sm text-neutral-600 dark:text-neutral-400">
-                <div>
-                  <span className="font-semibold text-neutral-900 dark:text-white">{totalItems.toLocaleString()}</span>
-                  <span className="ml-1">stores</span>
-                </div>
-                {searchParams.get('q') && (
+            {/* Quick Stats & CTA */}
+            <div className="flex flex-col items-center gap-4">
+              {!loading && data && (
+                <div className="flex items-center justify-center gap-6 text-sm text-neutral-600 dark:text-neutral-400">
                   <div>
-                    <span>Results for</span>
-                    <span className="font-semibold text-neutral-900 dark:text-white ml-1">"{searchParams.get('q')}"</span>
+                    <span className="font-semibold text-neutral-900 dark:text-white">{totalItems.toLocaleString()}</span>
+                    <span className="ml-1">stores</span>
                   </div>
-                )}
-              </div>
-            )}
+                  {searchParams.get('q') && (
+                    <div>
+                      <span>Results for</span>
+                      <span className="font-semibold text-neutral-900 dark:text-white ml-1">"{searchParams.get('q')}"</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* How It Works CTA */}
+              <Link
+                href="/directory/about"
+                className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>See how this directory works its magic</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
