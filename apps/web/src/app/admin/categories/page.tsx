@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, ModalFooter, Input } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, ModalFooter, Input, Pagination } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 
 interface Category {
@@ -34,6 +34,9 @@ export default function AdminCategoriesPage() {
   const [taxonomyResults, setTaxonomyResults] = useState<Array<{ id: string; name: string; path: string[] }>>([]);
   const [taxonomyLoading, setTaxonomyLoading] = useState(false);
   const [selectedTaxonomies, setSelectedTaxonomies] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
   const apiUrl = (path: string) => `${API_BASE}${path}`;
   
@@ -52,6 +55,24 @@ export default function AdminCategoriesPage() {
   useEffect(() => {
     loadCategories();
   }, []);
+
+  // Filter and paginate categories
+  const filteredCategories = categories.filter(cat => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return cat.name.toLowerCase().includes(query) || cat.id.toLowerCase().includes(query);
+  });
+
+  const totalPages = Math.ceil(filteredCategories.length / pageSize);
+  const paginatedCategories = filteredCategories.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const loadCategories = async () => {
     try {
@@ -491,7 +512,16 @@ export default function AdminCategoriesPage() {
         {/* Categories List */}
         <Card>
           <CardHeader>
-            <CardTitle>All Categories</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>All Categories</CardTitle>
+              <div className="w-64">
+                <Input
+                  placeholder="Search categories..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {categories.length === 0 ? (
@@ -501,9 +531,17 @@ export default function AdminCategoriesPage() {
                   Create your first category to get started
                 </p>
               </div>
+            ) : filteredCategories.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-neutral-500">No categories match your search</p>
+                <p className="text-sm text-neutral-400 mt-2">
+                  Try a different search term
+                </p>
+              </div>
             ) : (
-              <div className="space-y-3">
-                {categories.map((category) => (
+              <>
+                <div className="space-y-3">
+                  {paginatedCategories.map((category) => (
                   <div
                     key={category.id}
                     className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
@@ -534,6 +572,19 @@ export default function AdminCategoriesPage() {
                   </div>
                 ))}
               </div>
+              
+              {totalPages > 1 && (
+                <div className="mt-6">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredCategories.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                </div>
+              )}
+            </>
             )}
           </CardContent>
         </Card>
