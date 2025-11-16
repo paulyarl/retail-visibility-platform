@@ -46,93 +46,44 @@ export function useTenantDashboard(tenantId: string | null): UseTenantDashboardR
       return;
     }
 
-    console.log('[useTenantDashboard] Fetching data for tenantId:', tenantId);
+    console.log('[useTenantDashboard] Fetching consolidated data for tenantId:', tenantId);
 
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch stats and tenant info in parallel
-      const [statsResponse, tenantResponse] = await Promise.all([
-        api.get(`/api/dashboard?tenantId=${encodeURIComponent(tenantId)}`),
-        api.get(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/tenants/${tenantId}`)
-      ]);
+      // Use consolidated endpoint - reduces 2 API calls to 1
+      const response = await api.get(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/dashboard/consolidated/${encodeURIComponent(tenantId)}`);
 
-      console.log('[useTenantDashboard] Stats response status:', statsResponse.status);
-      console.log('[useTenantDashboard] Tenant response status:', tenantResponse.status);
+      console.log('[useTenantDashboard] Consolidated response status:', response.status);
 
-      let stats: TenantDashboardStats = {
-        totalItems: 0,
-        activeItems: 0,
-        syncIssues: 0,
-        locations: 0,
+      if (!response.ok) {
+        throw new Error(`Failed to fetch dashboard data: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[useTenantDashboard] Consolidated data received:', {
+        tenant: data.tenant?.id,
+        stats: data.stats,
+      });
+
+      // Extract stats
+      const stats: TenantDashboardStats = {
+        totalItems: data.stats?.totalItems || 0,
+        activeItems: data.stats?.activeItems || 0,
+        syncIssues: data.stats?.syncIssues || 0,
+        locations: data.stats?.locations || 0,
       };
 
-      let info: TenantDashboardInfo | null = null;
-
-      // Process stats response
-      if (statsResponse.ok) {
-        try {
-          const statsData = await statsResponse.json();
-          console.log('[useTenantDashboard] Stats data received:', {
-            tenant: statsData.tenant,
-            stats: statsData.stats
-          });
-          
-          stats = {
-            totalItems: statsData.stats?.totalItems || 0,
-            activeItems: statsData.stats?.activeItems || 0,
-            syncIssues: statsData.stats?.syncIssues || 0,
-            locations: statsData.stats?.locations || 0,
-          };
-
-          // Extract organization info from stats response
-          if (statsData.tenant) {
-            info = {
-              id: statsData.tenant.id,
-              name: statsData.tenant.name || 'Unknown Tenant',
-              logoUrl: undefined,
-              bannerUrl: undefined,
-            };
-            console.log('[useTenantDashboard] Tenant info from stats:', info);
-          }
-        } catch (err) {
-          console.error('[useTenantDashboard] Error parsing stats response:', err);
-        }
-      } else {
-        console.error('[useTenantDashboard] Stats response not OK:', statsResponse.status, statsResponse.statusText);
-      }
-
-      // Process tenant response (for logo/banner)
-      if (tenantResponse.ok) {
-        try {
-          const tenantData = await tenantResponse.json();
-          console.log('[useTenantDashboard] Tenant data received:', {
-            id: tenantData.id,
-            name: tenantData.name
-          });
-          
-          if (info) {
-            info.logoUrl = tenantData.metadata?.logo_url;
-            info.bannerUrl = tenantData.metadata?.banner_url;
-            info.locationStatus = tenantData.locationStatus || tenantData.statusInfo?.status || 'active';
-            info.reopeningDate = tenantData.reopeningDate;
-          } else {
-            info = {
-              id: tenantData.id,
-              name: tenantData.name || 'Unknown Tenant',
-              logoUrl: tenantData.metadata?.logo_url,
-              bannerUrl: tenantData.metadata?.banner_url,
-              locationStatus: tenantData.locationStatus || tenantData.statusInfo?.status || 'active',
-              reopeningDate: tenantData.reopeningDate,
-            };
-          }
-        } catch (err) {
-          console.error('[useTenantDashboard] Error parsing tenant response:', err);
-        }
-      } else {
-        console.error('[useTenantDashboard] Tenant response not OK:', tenantResponse.status, tenantResponse.statusText);
-      }
+      // Extract tenant info
+      const info: TenantDashboardInfo = {
+        id: data.tenant?.id || tenantId,
+        name: data.tenant?.name || 'Unknown Tenant',
+        logoUrl: data.tenant?.logoUrl,
+        bannerUrl: data.tenant?.bannerUrl,
+        locationStatus: data.tenant?.locationStatus || 'active',
+        reopeningDate: data.tenant?.reopeningDate,
+      };
 
       console.log('[useTenantDashboard] Final data to set:', { stats, info });
       setData({ stats, info });
