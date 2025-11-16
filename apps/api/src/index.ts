@@ -3007,21 +3007,19 @@ app.use('/organization-requests', organizationRequestRoutes);
 app.use('/upgrade-requests', upgradeRequestsRoutes);
 app.use('/permissions', permissionRoutes);
 app.use('/users', userRoutes);
-// Directory routes - mount at specific paths to avoid conflicts
-// TEMPORARILY DISABLED: Directory listings table missing in production
-// Re-enable after running fix_directory_table.sql in production database
-/*
+// Directory Categories routes - NEW for category-based discovery (mount FIRST to take precedence)
+app.use('/api/directory', directoryCategoriesRoutes);
+console.log('✅ Directory categories routes mounted (category-based discovery)');
+
+// Directory routes - mount AFTER category routes to avoid conflicts
+// Category routes handle: /api/directory/categories/*
+// These routes handle: /api/directory/search, /api/directory/locations, etc.
 app.use('/api/directory', directoryRoutes); // Public directory endpoint - no auth required
 app.use('/api/admin/directory', directoryAdminRoutes); // Admin directory management (auth in routes)
 app.use('/api/support/directory', directorySupportRoutes); // Support directory tools (auth in routes)
 // Tenant directory routes - MUST come before generic tenant routes
 app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
-*/
-console.log('⚠️ Old directory routes temporarily disabled - missing directory_listings table');
-
-// Directory Categories routes - NEW for category-based discovery (no auth required - public)
-app.use('/api/directory', directoryCategoriesRoutes);
-console.log('✅ NEW Directory categories routes mounted (category-based discovery active)');
+console.log('✅ Directory listings routes mounted (directory_listings table)');
 // Generic tenant routes come AFTER directory routes
 app.use('/api/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);
