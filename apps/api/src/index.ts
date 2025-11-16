@@ -3050,7 +3050,7 @@ app.use('/api/v1', quickStartRoutes);
 app.use('/admin', authenticateToken, tenantFlagsRoutes);
 app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
 // Admin tools and users - these are more generic and should come after specific routes
-app.use('/api/admin/tools', authenticateToken, requireAdmin, adminToolsRoutes);
+app.use('/api/admin', authenticateToken, requireAdmin, adminToolsRoutes);
 app.use('/api/admin/feature-overrides', featureOverridesRoutes); // Feature overrides (admin-only, auth handled in route)
 app.use('/api/admin/tier-management', tierManagementRoutes); // Tier management (admin-only, auth handled in route)
 app.use('/api/admin/tier-system', tierSystemRoutes); // Tier system CRUD (platform staff, auth handled in route)
