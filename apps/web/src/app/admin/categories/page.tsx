@@ -37,6 +37,10 @@ export default function AdminCategoriesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [showQuickStartModal, setShowQuickStartModal] = useState(false);
+  const [quickStartType, setQuickStartType] = useState<'grocery' | 'fashion' | 'electronics' | 'general'>('general');
+  const [quickStartCount, setQuickStartCount] = useState(15);
+  const [quickStartLoading, setQuickStartLoading] = useState(false);
   const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
   const apiUrl = (path: string) => `${API_BASE}${path}`;
   
@@ -325,6 +329,35 @@ export default function AdminCategoriesPage() {
     }
   };
 
+  const handleQuickStart = async () => {
+    setQuickStartLoading(true);
+    try {
+      // Use platform tenant ID for platform-level categories
+      const res = await fetch('/api/platform/categories/quick-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessType: quickStartType,
+          categoryCount: quickStartCount,
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        await loadCategories();
+        setShowQuickStartModal(false);
+        alert(`Successfully generated ${data.categoriesCreated} Google-aligned categories!`);
+      } else {
+        const data = await res.json();
+        alert(`Failed to generate categories: ${data.message || data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      alert('Failed to generate categories. Please try again.');
+    } finally {
+      setQuickStartLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -494,6 +527,12 @@ export default function AdminCategoriesPage() {
             {categories.length} {categories.length === 1 ? 'category' : 'categories'}
           </p>
           <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setShowQuickStartModal(true)}
+            >
+              ⚡ Quick Start
+            </Button>
             <Button
               variant="secondary"
               onClick={() => setShowImportModal(true)}
@@ -747,6 +786,72 @@ export default function AdminCategoriesPage() {
             disabled={!categoryName.trim()}
           >
             Save Changes
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Quick Start Modal */}
+      <Modal
+        isOpen={showQuickStartModal}
+        onClose={() => setShowQuickStartModal(false)}
+        title="⚡ Quick Start: Generate Categories"
+        description="Generate Google-aligned categories for your business type"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">
+              Business Type
+            </label>
+            <select
+              value={quickStartType}
+              onChange={(e) => setQuickStartType(e.target.value as any)}
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="general">General Retail (20 categories)</option>
+              <option value="grocery">Grocery Store (15 categories)</option>
+              <option value="fashion">Fashion Retail (12 categories)</option>
+              <option value="electronics">Electronics Store (10 categories)</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">
+              Number of Categories: {quickStartCount}
+            </label>
+            <input
+              type="range"
+              min="5"
+              max="30"
+              value={quickStartCount}
+              onChange={(e) => setQuickStartCount(parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
+            />
+            <div className="flex justify-between text-xs text-neutral-500 mt-1">
+              <span>5 min</span>
+              <span>30 max</span>
+            </div>
+          </div>
+          
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              <strong>✓ Google-Aligned:</strong> Each category will be automatically mapped to Google's Product Taxonomy for optimal SEO and Google Business Profile sync.
+            </p>
+          </div>
+        </div>
+        <ModalFooter>
+          <Button
+            variant="ghost"
+            onClick={() => setShowQuickStartModal(false)}
+            disabled={quickStartLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleQuickStart}
+            disabled={quickStartLoading}
+          >
+            {quickStartLoading ? 'Generating...' : `Generate ${quickStartCount} Categories`}
           </Button>
         </ModalFooter>
       </Modal>
