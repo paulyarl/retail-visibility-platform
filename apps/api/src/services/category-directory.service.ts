@@ -22,19 +22,21 @@ export class CategoryDirectoryService {
       console.log('[CategoryService] Fetching categories from materialized view...');
       
       // Query the materialized view with timeout
+      const query = `
+        SELECT 
+          category_id as id,
+          category_name as name,
+          category_slug as slug,
+          google_category_id as "googleCategoryId",
+          COUNT(DISTINCT tenant_id) as store_count,
+          SUM(product_count)::int as product_count
+        FROM directory_category_stores
+        GROUP BY category_id, category_name, category_slug, google_category_id
+        ORDER BY store_count DESC, product_count DESC
+      `;
+      
       const results = await Promise.race([
-        prisma.$queryRaw<any[]>`
-          SELECT 
-            category_id as id,
-            category_name as name,
-            category_slug as slug,
-            google_category_id as "googleCategoryId",
-            COUNT(DISTINCT tenant_id) as store_count,
-            SUM(product_count)::int as product_count
-          FROM directory_category_stores
-          GROUP BY category_id, category_name, category_slug, google_category_id
-          ORDER BY store_count DESC, product_count DESC
-        `,
+        prisma.$queryRawUnsafe<any[]>(query),
         new Promise<never>((_, reject) => 
           setTimeout(() => reject(new Error('Query timeout')), 10000)
         )
