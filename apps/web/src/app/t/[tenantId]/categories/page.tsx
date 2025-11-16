@@ -313,7 +313,7 @@ export default function CategoriesPage() {
     const t = setTimeout(async () => {
       try {
         setTaxLoading(true)
-        const res = await api.get(`${API_BASE_URL}/categories/search?q=${encodeURIComponent(taxQuery)}&limit=8`)
+        const res = await api.get(`${API_BASE_URL}/api/categories/search?q=${encodeURIComponent(taxQuery)}&limit=8`)
         if (res.ok) {
           const data = await res.json()
           if (active) setTaxResults(data.results || [])
