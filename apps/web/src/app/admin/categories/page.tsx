@@ -50,9 +50,11 @@ export default function AdminCategoriesPage() {
 
   const loadCategories = async () => {
     try {
-      const res = await fetch('/api/categories');
+      const res = await fetch('/api/platform/categories');
       const data = await res.json();
-      setCategories(Array.isArray(data) ? data : []);
+      // API returns {success: true, data: [...]}
+      const categories = data.success ? data.data : (Array.isArray(data) ? data : []);
+      setCategories(categories);
     } catch (error) {
       console.error('Failed to load categories:', error);
     } finally {
