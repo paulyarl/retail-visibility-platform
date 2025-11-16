@@ -9,6 +9,7 @@ import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductDisplay from '@/components/storefront/ProductDisplay';
 import CategorySidebar from '@/components/storefront/CategorySidebar';
+import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 import LocationClosedBanner from '@/components/storefront/LocationClosedBanner';
 
@@ -353,39 +354,78 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         </div>
       )}
 
-      {/* Products Grid */}
+      {/* Products Section with Sidebar */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Header with Search */}
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white">
-              Products ({total})
-              {search && (
-                <span className="text-base font-normal text-neutral-600 dark:text-neutral-400 ml-2">
-                  - Results for "{search}"
-                </span>
-              )}
-            </h2>
-            {totalPages > 1 && (
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Page {currentPage} of {totalPages}
-              </p>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Category Sidebar - Desktop */}
+          {categories.length > 0 && (
+            <aside className="hidden lg:block lg:col-span-1">
+              <CategorySidebar 
+                tenantId={id} 
+                categories={categories} 
+                totalProducts={total} 
+              />
+            </aside>
+          )}
+
+          {/* Main Content */}
+          <div className={categories.length > 0 ? "lg:col-span-3" : "lg:col-span-4"}>
+            {/* Mobile Category Dropdown */}
+            {categories.length > 0 && (
+              <CategoryMobileDropdown 
+                tenantId={id} 
+                categories={categories} 
+                totalProducts={total} 
+              />
             )}
-          </div>
-          
-          {/* Search Box */}
-          <div className="max-w-md">
-            <ProductSearch tenantId={id} />
-          </div>
-        </div>
+
+            {/* Header with Search and Category Context */}
+            <div className="mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white">
+                    {currentCategory ? currentCategory.name : 'All Products'} ({total})
+                  </h2>
+                  {(search || currentCategory) && (
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+                      {currentCategory && !search && `Showing all ${currentCategory.name.toLowerCase()} products`}
+                      {search && !currentCategory && `Results for "${search}"`}
+                      {search && currentCategory && `Results for "${search}" in ${currentCategory.name}`}
+                    </p>
+                  )}
+                </div>
+                {totalPages > 1 && (
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                )}
+              </div>
+              
+              {/* Search Box */}
+              <div className="max-w-md">
+                <ProductSearch tenantId={id} />
+              </div>
+            </div>
 
         {products.length === 0 ? (
           <div className="text-center py-12 space-y-6">
             <p className="text-neutral-600 dark:text-neutral-400 text-lg">
-              {search 
+              {currentCategory && search 
+                ? `No products found matching "${search}" in ${currentCategory.name}.`
+                : currentCategory
+                ? `No products in ${currentCategory.name} yet.`
+                : search 
                 ? `No products found matching "${search}". Try a different search term.`
                 : 'No products available at this time.'}
             </p>
+            {currentCategory && (
+              <Link
+                href={`/tenant/${id}`}
+                className="inline-flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:underline"
+              >
+                ← View all products
+              </Link>
+            )}
             {!hasBranding && (
               <div className="mx-auto max-w-2xl p-5 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
                 <div className="flex items-start gap-3">
@@ -470,6 +510,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
             )}
           </>
         )}
+          </div>
+        </div>
       </main>
 
       {/* Map Section - How to Get There */}
