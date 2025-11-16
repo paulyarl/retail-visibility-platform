@@ -259,7 +259,7 @@ export async function generateQuickStartProducts(
       }
 
       // Determine item status
-      const itemStatus = createAsDrafts ? 'inactive' as const : (Math.random() > 0.25 ? 'active' as const : 'inactive' as const);
+      const itemStatus = createAsDrafts ? 'draft' as const : (Math.random() > 0.25 ? 'active' as const : 'draft' as const);
 
       return {
         tenantId,
