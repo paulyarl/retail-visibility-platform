@@ -1120,6 +1120,30 @@ app.get("/public/tenant/:tenantId/categories", async (req, res) => {
   }
 });
 
+// Authenticated endpoint to get tenant categories with ALL product counts
+app.get("/api/tenants/:tenantId/categories", authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    
+    // Import category count utility
+    const { getCategoryCounts, getUncategorizedCount, getTotalProductCount } = await import('./utils/category-counts');
+    
+    // Get categories with counts (ALL items, not just public)
+    const categories = await getCategoryCounts(tenantId, true);
+    const uncategorizedCount = await getUncategorizedCount(tenantId, true);
+    const totalCount = await getTotalProductCount(tenantId, true);
+    
+    res.json({
+      categories,
+      uncategorizedCount,
+      totalCount,
+    });
+  } catch (e: any) {
+    console.error("[GET /api/tenants/:tenantId/categories] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_categories" });
+  }
+});
+
 // Public endpoint for features showcase config (no auth required)
 app.get("/api/public/features-showcase-config", async (req, res) => {
   try {

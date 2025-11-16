@@ -99,6 +99,30 @@ export default function ItemsClient({
     hasActiveFilters,
   } = useItemsFilters();
 
+  // Categories for filtering
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string; count: number }>>([]);
+  const [uncategorizedCount, setUncategorizedCount] = useState(0);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch(`/api/tenants/${initialTenantId}/categories`);
+        if (response.ok) {
+          const data = await response.json();
+          setCategories(data.categories || []);
+          setUncategorizedCount(data.uncategorizedCount || 0);
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      }
+    };
+
+    if (initialTenantId) {
+      fetchCategories();
+    }
+  }, [initialTenantId]);
+
   // Modals
   const {
     editingItem,
@@ -402,6 +426,8 @@ export default function ItemsClient({
           onViewModeToggle={toggleViewMode}
           hasActiveFilters={hasActiveFilters}
           onClearFilters={clearFilters}
+          categories={categories}
+          uncategorizedCount={uncategorizedCount}
         />
 
         {/* Create Form */}

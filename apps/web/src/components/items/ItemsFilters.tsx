@@ -2,6 +2,13 @@ import { Input, Button } from '@/components/ui';
 import { StatusFilter, VisibilityFilter, CategoryFilter } from '@/hooks/useItemsFilters';
 import { ViewMode } from '@/hooks/useItemsViewMode';
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  count: number;
+}
+
 interface ItemsFiltersProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -15,6 +22,8 @@ interface ItemsFiltersProps {
   onViewModeToggle: () => void;
   hasActiveFilters: boolean;
   onClearFilters: () => void;
+  categories?: Category[];
+  uncategorizedCount?: number;
 }
 
 /**
@@ -34,6 +43,8 @@ export default function ItemsFilters({
   onViewModeToggle,
   hasActiveFilters,
   onClearFilters,
+  categories = [],
+  uncategorizedCount = 0,
 }: ItemsFiltersProps) {
   return (
     <div className="mb-6 space-y-4">
@@ -153,15 +164,32 @@ export default function ItemsFilters({
         </div>
 
         {/* Category Filter */}
-        <select
-          value={categoryFilter}
-          onChange={(e) => onCategoryChange(e.target.value as CategoryFilter)}
-          className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md bg-white dark:bg-neutral-800 text-sm"
-        >
-          <option value="all">All Categories</option>
-          <option value="assigned">With Category</option>
-          <option value="unassigned">No Category</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Category:</span>
+          <select
+            value={categoryFilter}
+            onChange={(e) => onCategoryChange(e.target.value as CategoryFilter)}
+            className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md bg-white dark:bg-neutral-800 text-sm min-w-[180px]"
+          >
+            <option value="all">All Categories</option>
+            {categories.length > 0 && (
+              <>
+                <option disabled>──────────</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.slug}>
+                    {category.name} ({category.count})
+                  </option>
+                ))}
+              </>
+            )}
+            {uncategorizedCount > 0 && (
+              <>
+                <option disabled>──────────</option>
+                <option value="unassigned">No Category ({uncategorizedCount})</option>
+              </>
+            )}
+          </select>
+        </div>
 
         {/* Clear Filters */}
         {hasActiveFilters && (
