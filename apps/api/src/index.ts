@@ -3357,6 +3357,101 @@ app.get("/api/gbp/categories/popular", async (req, res) => {
   }
 });
 
+// GET /api/gbp/categories - Search GBP categories
+app.get("/api/gbp/categories", async (req, res) => {
+  try {
+    const { query, limit = '20' } = req.query;
+
+    // Disable caching for search results
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'Query parameter required' });
+    }
+
+    // Try to search database first (if populated)
+    const dbCategories = await prisma.gBPCategory.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { displayName: { contains: query, mode: 'insensitive' } }
+        ]
+      },
+      take: parseInt(limit as string, 10),
+      orderBy: { name: 'asc' }
+    });
+
+    // If database has results, use them
+    if (dbCategories.length > 0) {
+      const results = dbCategories.map(cat => ({
+        id: cat.id,
+        name: cat.displayName || cat.name,
+        path: [] // GBP categories don't have hierarchical paths
+      }));
+      return res.json({ items: results, source: 'database' });
+    }
+
+    // Fallback: Search hardcoded popular categories (for now)
+    const popularCategories = [
+      // Food & Beverage
+      { id: "gcid:grocery_store", name: "Grocery store", path: ["Shopping", "Food & Beverage"] },
+      { id: "gcid:convenience_store", name: "Convenience store", path: ["Shopping", "Food & Beverage"] },
+      { id: "gcid:supermarket", name: "Supermarket", path: ["Shopping", "Food & Beverage"] },
+      { id: "gcid:liquor_store", name: "Liquor store", path: ["Shopping", "Food & Beverage"] },
+      { id: "gcid:specialty_food_store", name: "Specialty food store", path: ["Shopping", "Food & Beverage"] },
+      
+      // General Retail
+      { id: "gcid:clothing_store", name: "Clothing store", path: ["Shopping", "Apparel"] },
+      { id: "gcid:shoe_store", name: "Shoe store", path: ["Shopping", "Apparel"] },
+      { id: "gcid:electronics_store", name: "Electronics store", path: ["Shopping", "Electronics"] },
+      { id: "gcid:furniture_store", name: "Furniture store", path: ["Shopping", "Home & Garden"] },
+      { id: "gcid:hardware_store", name: "Hardware store", path: ["Shopping", "Home & Garden"] },
+      
+      // Health & Beauty
+      { id: "gcid:pharmacy", name: "Pharmacy", path: ["Health", "Pharmacy"] },
+      { id: "gcid:beauty_supply_store", name: "Beauty supply store", path: ["Shopping", "Beauty & Spa"] },
+      { id: "gcid:cosmetics_store", name: "Cosmetics store", path: ["Shopping", "Beauty & Spa"] },
+      { id: "gcid:health_and_beauty_shop", name: "Health and beauty shop", path: ["Shopping", "Beauty & Spa"] },
+      
+      // Specialty Stores
+      { id: "gcid:book_store", name: "Book store", path: ["Shopping", "Books & Media"] },
+      { id: "gcid:pet_store", name: "Pet store", path: ["Shopping", "Pets"] },
+      { id: "gcid:toy_store", name: "Toy store", path: ["Shopping", "Toys & Games"] },
+      { id: "gcid:sporting_goods_store", name: "Sporting goods store", path: ["Shopping", "Sports & Recreation"] },
+      { id: "gcid:gift_shop", name: "Gift shop", path: ["Shopping", "Gifts & Specialty"] },
+      
+      // Additional common categories
+      { id: "gcid:department_store", name: "Department store", path: ["Shopping", "General"] },
+      { id: "gcid:discount_store", name: "Discount store", path: ["Shopping", "General"] },
+      { id: "gcid:variety_store", name: "Variety store", path: ["Shopping", "General"] },
+      { id: "gcid:home_goods_store", name: "Home goods store", path: ["Shopping", "Home & Garden"] },
+      { id: "gcid:jewelry_store", name: "Jewelry store", path: ["Shopping", "Accessories"] },
+      { id: "gcid:florist", name: "Florist", path: ["Shopping", "Gifts & Specialty"] },
+      { id: "gcid:bakery", name: "Bakery", path: ["Food", "Bakery"] },
+      { id: "gcid:butcher_shop", name: "Butcher shop", path: ["Food", "Meat"] },
+      { id: "gcid:produce_market", name: "Produce market", path: ["Food", "Produce"] },
+      { id: "gcid:wine_store", name: "Wine store", path: ["Shopping", "Food & Beverage"] },
+    ];
+
+    // Case-insensitive search in hardcoded list
+    const lowerQuery = query.toLowerCase();
+    const filteredCategories = popularCategories
+      .filter(cat => 
+        cat.name.toLowerCase().includes(lowerQuery) ||
+        cat.path.some(p => p.toLowerCase().includes(lowerQuery))
+      )
+      .slice(0, parseInt(limit as string, 10));
+
+    return res.json({ items: filteredCategories, source: 'hardcoded' });
+  } catch (error) {
+    console.error('[GET /api/gbp/categories] Error:', error);
+    return res.status(500).json({ error: 'failed_to_search_categories' });
+  }
+});
+
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
 
