@@ -300,7 +300,7 @@ const categoryQuickStartSchema = z.object({
   categoryCount: z.number().int().min(5).max(30).optional().default(15),
 });
 
-router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, async (req, res) => {
+router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('category_quick_start'), async (req, res) => {
   try {
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId;

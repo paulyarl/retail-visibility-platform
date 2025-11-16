@@ -14,8 +14,7 @@ export const TIER_FEATURES = {
     'basic_product_pages',
     'qr_codes_512',
     'performance_analytics',
-    'quick_start_wizard',        // LIMITED: Max 25 SKUs, once per 7 days (taste test)
-    // NOTE: No 'storefront' feature - this is the key differentiator
+    // NOTE: No 'storefront' or quick starts - google_only is maintenance mode
   ],
   starter: [
     'storefront',
@@ -23,6 +22,7 @@ export const TIER_FEATURES = {
     'mobile_responsive',
     'enhanced_seo',
     'basic_categories',
+    'category_quick_start',      // Generate starter categories (Starter+)
   ],
   professional: [
     // ⚠️ CRITICAL REVENUE-PROTECTING FEATURES
@@ -119,6 +119,7 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   product_search: 'starter',
   mobile_responsive: 'starter',
   enhanced_seo: 'starter',
+  category_quick_start: 'starter',
   
   // Professional tier features (CRITICAL)
   quick_start_wizard: 'professional',
@@ -175,9 +176,10 @@ export const TIER_DISPLAY_NAMES: Record<string, string> = {
 export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
   // Core features
   'storefront': 'Public Storefront',
-  'quick_start_wizard': 'Quick Start Wizard',
-  'quick_start_wizard_limited': 'Quick Start Wizard (Limited)',
-  'quick_start_wizard_full': 'Quick Start Wizard (Full Access)',
+  'quick_start_wizard': 'Product Quick Start',
+  'quick_start_wizard_limited': 'Product Quick Start (Limited)',
+  'quick_start_wizard_full': 'Product Quick Start (Full Access)',
+  'category_quick_start': 'Category Quick Start',
   'product_scanning': 'Product Scanning',
   'gbp_integration': 'Google Business Profile Integration',
   'api_access': 'API Access',
@@ -264,39 +266,46 @@ export const TIER_PRICING: Record<string, number> = {
 };
 
 /**
- * Feature-specific limits per tier
- * Used to restrict "taste test" features for lower tiers
- */
+* Feature-specific limits per tier
+* Used to restrict "taste test" features for lower tiers
+*/
 export const TIER_FEATURE_LIMITS: Record<string, Record<string, any>> = {
-  google_only: {
-    quick_start_wizard: {
-      maxProducts: 25,           // Limited to 25 products (vs 100 for Professional)
-      rateLimitDays: 7,          // Once per 7 days (vs 1 day for Professional)
-      scenarios: ['grocery'],    // Only 1 scenario available (vs all 4)
-      message: 'Google-Only tier includes a limited Quick Start to help you get started. Upgrade to Professional for unlimited access with up to 100 products and all scenarios.',
-    },
-  },
-  professional: {
-    quick_start_wizard: {
-      maxProducts: 100,          // Full access: up to 100 products
-      rateLimitDays: 1,          // Once per day
-      scenarios: ['grocery', 'fashion', 'electronics', 'general'], // All scenarios
-      message: null,             // No restrictions
-    },
-  },
-  enterprise: {
-    quick_start_wizard: {
-      maxProducts: 100,
-      rateLimitDays: 1,
-      scenarios: ['grocery', 'fashion', 'electronics', 'general'],
-      message: null,
-    },
-  },
+starter: {
+category_quick_start: {
+maxCategories: 15,         // Up to 15 categories
+rateLimitDays: 7,          // Once per 7 days
+businessTypes: ['grocery', 'fashion', 'electronics', 'general'], // All types
+},
+},
+professional: {
+quick_start_wizard: {
+maxProducts: 100,          // Full access: up to 100 products
+rateLimitDays: 1,          // Once per day
+scenarios: ['grocery', 'fashion', 'electronics', 'general'], // All scenarios
+},
+category_quick_start: {
+maxCategories: 30,         // Up to 30 categories
+rateLimitDays: 1,          // Once per day
+businessTypes: ['grocery', 'fashion', 'electronics', 'general'], // All types
+},
+},
+enterprise: {
+quick_start_wizard: {
+maxProducts: 100,
+rateLimitDays: 1,
+scenarios: ['grocery', 'fashion', 'electronics', 'general'],
+},
+category_quick_start: {
+maxCategories: 30,
+rateLimitDays: 1,
+businessTypes: ['grocery', 'fashion', 'electronics', 'general'],
+},
+},
 };
 
 /**
- * Check if a tier has access to a feature
- */
+* Check if a tier has access to a feature
+*/
 export function checkTierFeature(tier: string, feature: string): boolean {
   // Get features for this tier
   const tierFeatures = TIER_FEATURES[tier as keyof typeof TIER_FEATURES] || [];
