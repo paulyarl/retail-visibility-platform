@@ -73,7 +73,7 @@ export class CategoryDirectoryService {
     const categories = await prisma.tenantCategory.findMany({
       where: {
         isActive: true,
-        inventoryItems: {
+        items: {
           some: {
             itemStatus: 'active',
             visibility: 'public',
@@ -95,7 +95,7 @@ export class CategoryDirectoryService {
         sortOrder: true,
         _count: {
           select: {
-            inventoryItems: {
+            items: {
               where: {
                 itemStatus: 'active',
                 visibility: 'public',
@@ -109,7 +109,7 @@ export class CategoryDirectoryService {
             },
           },
         },
-        inventoryItems: {
+        items: {
           where: {
             itemStatus: 'active',
             visibility: 'public',
@@ -137,8 +137,8 @@ export class CategoryDirectoryService {
       name: category.name,
       slug: category.slug,
       googleCategoryId: category.googleCategoryId,
-      storeCount: category.inventoryItems.length, // Distinct tenant count
-      productCount: category._count.inventoryItems,
+      storeCount: category.items.length, // Distinct tenant count
+      productCount: category._count.items,
     }));
   }
 
