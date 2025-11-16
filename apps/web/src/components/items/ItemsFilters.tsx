@@ -123,6 +123,26 @@ export default function ItemsFilters({
             >
               Syncing
             </button>
+            <button
+              onClick={() => onStatusChange('draft')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-neutral-300 dark:border-neutral-600 ${
+                statusFilter === 'draft'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+              }`}
+            >
+              Draft
+            </button>
+            <button
+              onClick={() => onStatusChange('archived')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-neutral-300 dark:border-neutral-600 ${
+                statusFilter === 'archived'
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+              }`}
+            >
+              Archived
+            </button>
           </div>
         </div>
 
