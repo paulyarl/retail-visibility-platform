@@ -142,101 +142,6 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
         />
       </div>
 
-      {/* Value Proposition Guide */}
-      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border-2 border-indigo-200 dark:border-indigo-800 rounded-xl p-6 md:p-8">
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-              </svg>
-            </div>
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-              Why Join the Directory? It's a Win-Win! 🎯
-            </h3>
-            <p className="text-gray-700 dark:text-gray-300 mb-4">
-              The directory creates a powerful network effect that benefits everyone in the community.
-            </p>
-            
-            <div className="grid md:grid-cols-2 gap-4 mb-4">
-              {/* Be Discovered */}
-              <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg p-4 border border-indigo-100 dark:border-indigo-900">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white">Be Discovered</h4>
-                </div>
-                <ul className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400">
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Customers find you through location search</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Category filtering brings targeted traffic</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Build trust with ratings and reviews</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Increase foot traffic to your store</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Discover Others */}
-              <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg p-4 border border-purple-100 dark:border-purple-900">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white">Discover Others</h4>
-                </div>
-                <ul className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400">
-                  <li className="flex items-start gap-2">
-                    <span className="text-purple-500 mt-0.5">✓</span>
-                    <span>Find complementary businesses nearby</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-purple-500 mt-0.5">✓</span>
-                    <span>Explore partnership opportunities</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-purple-500 mt-0.5">✓</span>
-                    <span>Learn from successful local stores</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-purple-500 mt-0.5">✓</span>
-                    <span>Build community connections</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-4 text-white">
-              <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <p className="text-sm font-medium">
-                  <strong>The more stores in the directory, the more customers discover the platform — and you!</strong> 
-                  {' '}Every listing strengthens the network and brings more visibility to all merchants.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Save Message */}
       {saveMessage && (
         <div className={`p-4 rounded-lg ${
@@ -389,6 +294,101 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
               </a>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Value Proposition Guide */}
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border-2 border-indigo-200 dark:border-indigo-800 rounded-xl p-6 md:p-8">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+              </svg>
+            </div>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              Why Join the Directory? It's a Win-Win! 🎯
+            </h3>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              The directory creates a powerful network effect that benefits everyone in the community.
+            </p>
+            
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              {/* Be Discovered */}
+              <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg p-4 border border-indigo-100 dark:border-indigo-900">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white">Be Discovered</h4>
+                </div>
+                <ul className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span>Customers find you through location search</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span>Category filtering brings targeted traffic</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span>Build trust with ratings and reviews</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span>Increase foot traffic to your store</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Discover Others */}
+              <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg p-4 border border-purple-100 dark:border-purple-900">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white">Discover Others</h4>
+                </div>
+                <ul className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400">
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-500 mt-0.5">✓</span>
+                    <span>Find complementary businesses nearby</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-500 mt-0.5">✓</span>
+                    <span>Explore partnership opportunities</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-500 mt-0.5">✓</span>
+                    <span>Learn from successful local stores</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-500 mt-0.5">✓</span>
+                    <span>Build community connections</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-4 text-white">
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <p className="text-sm font-medium">
+                  <strong>The more stores in the directory, the more customers discover the platform — and you!</strong> 
+                  {' '}Every listing strengthens the network and brings more visibility to all merchants.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

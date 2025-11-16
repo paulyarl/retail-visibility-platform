@@ -14,8 +14,18 @@ export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav
 
   const isActive = (href: string) => {
     if (!pathname) return false
-    // Exact match or prefix match for sections
-    return pathname === href || pathname.startsWith(href + '/')
+    // Exact match
+    if (pathname === href) return true
+    // For prefix matching, ensure we don't match parent paths
+    // e.g., /settings should not match /settings/directory
+    if (pathname.startsWith(href + '/')) {
+      // Special case: if href is /settings, don't match /settings/directory
+      if (href.endsWith('/settings') && pathname.includes('/settings/directory')) {
+        return false
+      }
+      return true
+    }
+    return false
   }
 
   return (
