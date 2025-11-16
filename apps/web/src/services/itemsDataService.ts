@@ -7,8 +7,8 @@ export interface Item {
   description?: string;
   price: number;
   stock: number;
-  status: 'active' | 'inactive' | 'syncing';
-  itemStatus?: 'active' | 'inactive' | 'syncing'; // Backend field name
+  status: 'active' | 'inactive' | 'archived' | 'syncing';
+  itemStatus?: 'active' | 'inactive' | 'archived' | 'syncing'; // Backend field name
   visibility: 'public' | 'private';
   categoryPath?: string[];
   imageUrl?: string; // Primary photo URL from backend
