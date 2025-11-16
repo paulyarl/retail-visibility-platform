@@ -14,7 +14,10 @@ export class CategoryDirectoryService {
    * Get all categories with store and product counts
    * Uses the materialized view for performance
    */
-  async getCategoriesWithStores(): Promise<CategoryWithStores[]> {
+  async getCategoriesWithStores(
+    location?: { lat: number; lng: number },
+    radius?: number
+  ): Promise<CategoryWithStores[]> {
     try {
       console.log('[CategoryService] Fetching categories from materialized view...');
       
@@ -54,19 +57,27 @@ export class CategoryDirectoryService {
     }
   }
   
-  async getStoresByCategory() {
+  async getStoresByCategory(
+    categoryId: string,
+    location?: { lat: number; lng: number },
+    radius?: number
+  ) {
+    console.log('[CategoryService] getStoresByCategory called (stub)');
     return [];
   }
   
-  async getCategoryHierarchy() {
+  async getCategoryHierarchy(categoryId?: string) {
+    console.log('[CategoryService] getCategoryHierarchy called (stub)');
     return [];
   }
   
-  async verifyStoreCategory() {
+  async verifyStoreCategory(tenantId: string, categoryId: string) {
+    console.log('[CategoryService] verifyStoreCategory called (stub)');
     return false;
   }
   
-  async getCategoryPath() {
+  async getCategoryPath(categoryId: string) {
+    console.log('[CategoryService] getCategoryPath called (stub)');
     return [];
   }
 }
