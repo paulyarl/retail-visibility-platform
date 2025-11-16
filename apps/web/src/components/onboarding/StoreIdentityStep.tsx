@@ -42,6 +42,16 @@ export default function StoreIdentityStep({
     if (Object.keys(initialData).length > 0) {
       console.log('[StoreIdentityStep] Updating formData with initialData:', initialData);
       const sanitized = sanitizeData(initialData);
+      
+      // Auto-convert HTTP to HTTPS for website field
+      if (sanitized.website && typeof sanitized.website === 'string') {
+        const website = sanitized.website.trim();
+        if (website.toLowerCase().startsWith('http://')) {
+          sanitized.website = 'https://' + website.substring(7);
+          console.log('[StoreIdentityStep] Auto-converted HTTP to HTTPS:', sanitized.website);
+        }
+      }
+      
       setFormData(sanitized);
       
       // Validate the pre-populated data but be lenient with phone format
@@ -133,6 +143,15 @@ export default function StoreIdentityStep({
   const handlePhoneChange = (value: string) => {
     const normalized = normalizePhoneInput(value);
     handleChange('phone_number', normalized);
+  };
+
+  const handleWebsiteChange = (value: string) => {
+    // Auto-convert HTTP to HTTPS
+    let normalized = value.trim();
+    if (normalized && normalized.toLowerCase().startsWith('http://')) {
+      normalized = 'https://' + normalized.substring(7);
+    }
+    handleChange('website', normalized);
   };
 
   const handleAddressChange = (value: string) => {
@@ -316,10 +335,10 @@ export default function StoreIdentityStep({
           label="Website"
           placeholder="https://www.example.com"
           value={formData.website || ''}
-          onChange={(e) => handleChange('website', e.target.value)}
+          onChange={(e) => handleWebsiteChange(e.target.value)}
           onBlur={() => handleBlur('website')}
           error={touched.website ? errors.website : undefined}
-          helperText="Optional - Must use HTTPS (e.g., https://www.example.com)"
+          helperText="Optional - HTTP will be auto-converted to HTTPS"
         />
 
         {/* Contact Person */}
