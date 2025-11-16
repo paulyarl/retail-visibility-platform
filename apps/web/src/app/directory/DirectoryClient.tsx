@@ -11,7 +11,6 @@ import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBr
 import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
 import { Pagination } from '@/components/ui';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
 
 // Dynamically import map to avoid SSR issues
@@ -144,61 +143,33 @@ export default function DirectoryClient() {
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Hero Section with Platform Branding */}
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
-        <div className="container mx-auto px-4 py-12 md:py-16">
-          {/* Platform Branding */}
-          {settings?.logoUrl && (
-            <div className="flex justify-center mb-8">
-              <div className="relative">
-                <div className="absolute inset-0 bg-white/20 rounded-2xl blur-xl"></div>
-                <div className="relative bg-white/10 backdrop-blur-sm border-2 border-white/30 rounded-2xl p-4 md:p-6">
-                  <Image
-                    src={settings.logoUrl}
-                    alt={settings.platformName || 'Platform Logo'}
-                    width={200}
-                    height={80}
-                    className="h-12 md:h-16 w-auto object-contain"
-                    priority
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
+      {/* Page Title Section */}
+      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+        <div className="container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto text-center">
-            {/* Platform Name */}
-            {settings?.platformName && (
-              <div className="mb-4">
-                <span className="inline-block px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-sm font-semibold">
-                  {settings.platformName} Directory
-                </span>
-              </div>
-            )}
-
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
+            <h1 className="text-3xl md:text-4xl font-bold text-neutral-900 dark:text-white mb-3">
               Discover Local Stores
             </h1>
-            <p className="text-xl md:text-2xl text-blue-100 mb-8">
+            <p className="text-lg text-neutral-600 dark:text-neutral-400 mb-6">
               Find products and services from merchants near you
             </p>
             
             {/* Search Bar */}
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-2xl mx-auto mb-4">
               <DirectorySearch />
             </div>
 
             {/* Quick Stats */}
             {!loading && data && (
-              <div className="mt-8 flex items-center justify-center gap-8 text-sm">
+              <div className="flex items-center justify-center gap-6 text-sm text-neutral-600 dark:text-neutral-400">
                 <div>
-                  <span className="font-semibold">{totalItems.toLocaleString()}</span>
-                  <span className="text-blue-200 ml-1">stores</span>
+                  <span className="font-semibold text-neutral-900 dark:text-white">{totalItems.toLocaleString()}</span>
+                  <span className="ml-1">stores</span>
                 </div>
                 {searchParams.get('q') && (
                   <div>
-                    <span className="text-blue-200">Results for</span>
-                    <span className="font-semibold ml-1">"{searchParams.get('q')}"</span>
+                    <span>Results for</span>
+                    <span className="font-semibold text-neutral-900 dark:text-white ml-1">"{searchParams.get('q')}"</span>
                   </div>
                 )}
               </div>

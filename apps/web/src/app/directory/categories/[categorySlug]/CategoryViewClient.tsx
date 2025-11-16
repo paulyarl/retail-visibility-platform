@@ -157,36 +157,36 @@ export default function CategoryViewClient({
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Hero Section - Modified for category */}
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
-        <div className="container mx-auto px-4 py-12">
+      {/* Page Title Section */}
+      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+        <div className="container mx-auto px-4 py-6">
           {/* Breadcrumb */}
-          <nav className="mb-4 text-sm flex items-center gap-2">
-            <Link href="/directory" className="hover:underline opacity-90">
+          <nav className="mb-3 text-sm flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
+            <Link href="/directory" className="hover:text-blue-600 dark:hover:text-blue-400">
               Directory
             </Link>
-            <span className="opacity-60">›</span>
-            <span className="font-semibold">{category?.name || categorySlug}</span>
+            <span>›</span>
+            <span className="font-semibold text-neutral-900 dark:text-white">{category?.name || categorySlug}</span>
           </nav>
 
           {/* Title */}
-          <div className="flex items-center gap-4 mb-4">
-            <h1 className="text-4xl font-bold">{category?.name || categorySlug}</h1>
-            <span className="text-2xl">🏷️</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{category?.name || categorySlug}</h1>
+              <span className="text-2xl">🏷️</span>
+            </div>
+            <Link
+              href="/directory"
+              className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Back</span>
+            </Link>
           </div>
 
-          <p className="text-xl opacity-90 mb-6">
+          <p className="text-neutral-600 dark:text-neutral-400 mt-2">
             {totalItems} {totalItems === 1 ? 'store' : 'stores'} · {category?.productCount || 0} products
           </p>
-
-          {/* Back Button */}
-          <Link
-            href="/directory"
-            className="inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Directory
-          </Link>
         </div>
       </div>
 

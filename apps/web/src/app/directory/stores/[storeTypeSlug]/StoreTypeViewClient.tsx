@@ -161,37 +161,37 @@ export default function StoreTypeViewClient({
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Hero Section - Green theme for store types */}
-      <div className="bg-gradient-to-br from-green-600 to-emerald-700 text-white">
-        <div className="container mx-auto px-4 py-12">
+      {/* Page Title Section */}
+      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+        <div className="container mx-auto px-4 py-6">
           {/* Breadcrumb */}
-          <nav className="mb-4 text-sm flex items-center gap-2">
-            <Link href="/directory" className="hover:underline opacity-90">
+          <nav className="mb-3 text-sm flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
+            <Link href="/directory" className="hover:text-green-600 dark:hover:text-green-400">
               Directory
             </Link>
-            <span className="opacity-60">›</span>
-            <span className="font-semibold">{displayName}</span>
+            <span>›</span>
+            <span className="font-semibold text-neutral-900 dark:text-white">{displayName}</span>
           </nav>
 
           {/* Title */}
-          <div className="flex items-center gap-4 mb-4">
-            <h1 className="text-4xl font-bold">{displayName}</h1>
-            <span className="text-2xl">🏪</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{displayName}</h1>
+              <span className="text-2xl">🏪</span>
+            </div>
+            <Link
+              href="/directory"
+              className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Back</span>
+            </Link>
           </div>
 
-          <p className="text-xl opacity-90 mb-6">
+          <p className="text-neutral-600 dark:text-neutral-400 mt-2">
             {totalItems} {totalItems === 1 ? 'store' : 'stores'}
             {storeType?.productCount && ` · ${storeType.productCount} products`}
           </p>
-
-          {/* Back Button */}
-          <Link
-            href="/directory"
-            className="inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Directory
-          </Link>
         </div>
       </div>
 
