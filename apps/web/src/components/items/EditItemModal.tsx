@@ -31,7 +31,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<'draft' | 'active' | 'archived' | 'inactive'>('draft');
+  const [status, setStatus] = useState<'draft' | 'active' | 'archived'>('draft');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categoryPath, setCategoryPath] = useState<string[]>([]);
@@ -66,7 +66,9 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setPrice(item.price ? item.price.toFixed(2) : '');
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
-      setStatus((item.status === 'draft' || item.status === 'active' || item.status === 'archived' || item.status === 'inactive') ? item.status : 'draft');
+      // Map 'inactive' to 'archived' since we no longer have an Inactive button
+      const mappedStatus = item.status === 'inactive' ? 'archived' : item.status;
+      setStatus((mappedStatus === 'draft' || mappedStatus === 'active' || mappedStatus === 'archived') ? mappedStatus : 'draft');
       setCategoryPath(item.categoryPath || []);
     }
   }, [item]);
@@ -215,7 +217,6 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             {status === 'draft' && '✏️ Draft - Review before activating (will not sync)'}
             {status === 'active' && '✓ Active - Will sync to Google if public and has a category'}
             {status === 'archived' && '📦 Archived - Preserved but will not sync to Google'}
-            {status === 'inactive' && '⏸️ Inactive - Legacy status (will not sync)'}
           </p>
         </div>
 
