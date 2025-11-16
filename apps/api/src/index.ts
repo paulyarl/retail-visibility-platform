@@ -113,6 +113,7 @@ import directoryTenantRoutes from './routes/directory-tenant';
 import directoryAdminRoutes from './routes/directory-admin';
 import directorySupportRoutes from './routes/directory-support';
 import directoryCategoriesRoutes from './routes/directory-categories';
+import directoryStoreTypesRoutes from './routes/directory-store-types';
 import scanRoutes from './routes/scan';
 import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
@@ -3010,6 +3011,10 @@ app.use('/users', userRoutes);
 // Directory Categories routes - NEW for category-based discovery (mount FIRST to take precedence)
 app.use('/api/directory', directoryCategoriesRoutes);
 console.log('✅ Directory categories routes mounted (category-based discovery)');
+
+// Directory Store Types routes - NEW for store type browsing (dual category system)
+app.use('/api/directory', directoryStoreTypesRoutes);
+console.log('✅ Directory store types routes mounted (store type discovery)');
 
 // Directory routes - mount AFTER category routes to avoid conflicts
 // Category routes handle: /api/directory/categories/*
