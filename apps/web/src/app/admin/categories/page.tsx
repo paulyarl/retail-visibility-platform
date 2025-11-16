@@ -102,10 +102,13 @@ export default function AdminCategoriesPage() {
     if (!categoryName.trim()) return;
     
     try {
-      const res = await fetch('/api/categories', {
+      // Generate slug from name
+      const slug = categoryName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      
+      const res = await fetch('/api/platform/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: categoryName }),
+        body: JSON.stringify({ name: categoryName, slug }),
       });
       
       if (res.ok) {
