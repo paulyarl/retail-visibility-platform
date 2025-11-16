@@ -112,6 +112,7 @@ import directoryRoutes from './routes/directory-v2';
 import directoryTenantRoutes from './routes/directory-tenant';
 import directoryAdminRoutes from './routes/directory-admin';
 import directorySupportRoutes from './routes/directory-support';
+import directoryCategoriesRoutes from './routes/directory-categories';
 import scanRoutes from './routes/scan';
 import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
@@ -3017,6 +3018,10 @@ app.use('/api/support/directory', directorySupportRoutes); // Support directory 
 app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
 */
 console.log('⚠️ Directory routes temporarily disabled - missing directory_listings table');
+
+// Directory Categories routes - NEW for category-based discovery (no auth required - public)
+app.use('/api/directory', directoryCategoriesRoutes);
+console.log('✅ Directory categories routes mounted');
 // Generic tenant routes come AFTER directory routes
 app.use('/api/tenants', tenantUserRoutes);
 app.use(platformSettingsRoutes);

@@ -1,0 +1,271 @@
+import { Router, Request, Response } from 'express';
+import { categoryDirectoryService } from '../services/category-directory.service';
+
+const router = Router();
+
+/**
+ * GET /api/directory/categories
+ * 
+ * Get all categories available in the directory
+ * Only includes categories from stores that are syncing with Google
+ * 
+ * Query params:
+ * - lat: Latitude for location filtering (optional)
+ * - lng: Longitude for location filtering (optional)
+ * - radius: Radius in miles for location filtering (optional, default: 25)
+ */
+router.get('/categories', async (req: Request, res: Response) => {
+  try {
+    const { lat, lng, radius } = req.query;
+
+    // Parse location parameters if provided
+    const location =
+      lat && lng
+        ? {
+            lat: parseFloat(lat as string),
+            lng: parseFloat(lng as string),
+          }
+        : undefined;
+
+    const radiusMiles = radius ? parseFloat(radius as string) : 25;
+
+    // Get categories with store counts
+    const categories = await categoryDirectoryService.getCategoriesWithStores(
+      location,
+      radiusMiles
+    );
+
+    res.json({
+      success: true,
+      data: {
+        categories,
+        location: location || null,
+        radius: radiusMiles,
+        count: categories.length,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching directory categories:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch directory categories',
+    });
+  }
+});
+
+/**
+ * GET /api/directory/categories/:categoryId
+ * 
+ * Get details for a specific category including breadcrumb path
+ * 
+ * Path params:
+ * - categoryId: Category ID
+ */
+router.get('/categories/:categoryId', async (req: Request, res: Response) => {
+  try {
+    const { categoryId } = req.params;
+
+    // Get category path (breadcrumb)
+    const path = await categoryDirectoryService.getCategoryPath(categoryId);
+
+    if (path.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Category not found',
+      });
+    }
+
+    // Get the current category (last in path)
+    const category = path[path.length - 1];
+
+    // Get subcategories
+    const subcategories = await categoryDirectoryService.getCategoryHierarchy(
+      categoryId
+    );
+
+    res.json({
+      success: true,
+      data: {
+        category,
+        path,
+        subcategories,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching category details:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch category details',
+    });
+  }
+});
+
+/**
+ * GET /api/directory/categories/:categoryId/stores
+ * 
+ * Get stores that have products in a specific category
+ * Only includes verified stores (syncing with Google)
+ * 
+ * Path params:
+ * - categoryId: Category ID
+ * 
+ * Query params:
+ * - lat: Latitude for distance calculation (optional)
+ * - lng: Longitude for distance calculation (optional)
+ * - radius: Maximum distance in miles (optional, default: 25)
+ * - limit: Maximum number of stores to return (optional, default: 50)
+ */
+router.get(
+  '/categories/:categoryId/stores',
+  async (req: Request, res: Response) => {
+    try {
+      const { categoryId } = req.params;
+      const { lat, lng, radius, limit } = req.query;
+
+      // Parse location parameters if provided
+      const location =
+        lat && lng
+          ? {
+              lat: parseFloat(lat as string),
+              lng: parseFloat(lng as string),
+            }
+          : undefined;
+
+      const radiusMiles = radius ? parseFloat(radius as string) : 25;
+      const maxStores = limit ? parseInt(limit as string, 10) : 50;
+
+      // Get stores by category
+      const stores = await categoryDirectoryService.getStoresByCategory(
+        categoryId,
+        location,
+        radiusMiles
+      );
+
+      // Limit results
+      const limitedStores = stores.slice(0, maxStores);
+
+      // Get category path for context
+      const categoryPath = await categoryDirectoryService.getCategoryPath(
+        categoryId
+      );
+
+      res.json({
+        success: true,
+        data: {
+          category: categoryPath[categoryPath.length - 1] || null,
+          categoryPath,
+          stores: limitedStores,
+          totalCount: stores.length,
+          returnedCount: limitedStores.length,
+          location: location || null,
+          radius: radiusMiles,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching stores by category:', error);
+      
+      if (error instanceof Error && error.message === 'Category not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Category not found',
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch stores by category',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/directory/categories/:categoryId/hierarchy
+ * 
+ * Get category hierarchy tree starting from a specific category
+ * Useful for building navigation trees
+ * 
+ * Path params:
+ * - categoryId: Category ID (optional, if not provided returns root categories)
+ */
+router.get(
+  '/categories/:categoryId/hierarchy',
+  async (req: Request, res: Response) => {
+    try {
+      const { categoryId } = req.params;
+
+      const hierarchy = await categoryDirectoryService.getCategoryHierarchy(
+        categoryId === 'root' ? undefined : categoryId
+      );
+
+      res.json({
+        success: true,
+        data: {
+          hierarchy,
+          rootCategoryId: categoryId === 'root' ? null : categoryId,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching category hierarchy:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch category hierarchy',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/directory/categories/search
+ * 
+ * Search categories by name or slug
+ * 
+ * Query params:
+ * - q: Search query
+ * - limit: Maximum number of results (optional, default: 20)
+ */
+router.get('/categories/search', async (req: Request, res: Response) => {
+  try {
+    const { q, limit } = req.query;
+
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Search query (q) is required',
+      });
+    }
+
+    const maxResults = limit ? parseInt(limit as string, 10) : 20;
+
+    // Get all categories and filter by search query
+    // TODO: Implement full-text search in the service for better performance
+    const allCategories = await categoryDirectoryService.getCategoriesWithStores();
+    
+    const searchLower = q.toLowerCase();
+    const filtered = allCategories.filter(
+      (cat) =>
+        cat.name.toLowerCase().includes(searchLower) ||
+        cat.slug.toLowerCase().includes(searchLower)
+    );
+
+    const limited = filtered.slice(0, maxResults);
+
+    res.json({
+      success: true,
+      data: {
+        query: q,
+        categories: limited,
+        totalCount: filtered.length,
+        returnedCount: limited.length,
+      },
+    });
+  } catch (error) {
+    console.error('Error searching categories:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to search categories',
+    });
+  }
+});
+
+export default router;
