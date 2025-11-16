@@ -23,6 +23,7 @@ export const TIER_FEATURES = {
     'enhanced_seo',
     'basic_categories',
     'category_quick_start',      // Generate starter categories (Starter+)
+    'image_finder',              // Find stock photos for products (Starter+)
   ],
   professional: [
     // ⚠️ CRITICAL REVENUE-PROTECTING FEATURES
@@ -120,6 +121,7 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   mobile_responsive: 'starter',
   enhanced_seo: 'starter',
   category_quick_start: 'starter',
+  image_finder: 'starter',
   
   // Professional tier features (CRITICAL)
   quick_start_wizard: 'professional',
@@ -180,6 +182,7 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
   'quick_start_wizard_limited': 'Product Quick Start (Limited)',
   'quick_start_wizard_full': 'Product Quick Start (Full Access)',
   'category_quick_start': 'Category Quick Start',
+  'image_finder': 'Product Image Finder',
   'product_scanning': 'Product Scanning',
   'gbp_integration': 'Google Business Profile Integration',
   'api_access': 'API Access',

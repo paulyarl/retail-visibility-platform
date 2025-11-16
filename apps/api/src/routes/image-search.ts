@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
+import { checkImageSearchLimit } from '../middleware/image-search-limits';
+import { requireTierFeature } from '../middleware/tier-access';
 import fetch from 'node-fetch';
 
 const router = Router();
@@ -22,8 +24,9 @@ interface ImageResult {
 /**
  * GET /api/v1/images/search
  * Search for product images from Unsplash and Pexels
+ * Rate limited by tier, requires Starter+ tier
  */
-router.get('/search', authenticateToken, async (req, res) => {
+router.get('/search', authenticateToken, checkImageSearchLimit, async (req, res) => {
   try {
     const { query } = req.query;
 
