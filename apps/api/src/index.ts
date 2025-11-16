@@ -3538,3 +3538,50 @@ export { app };
     }
   }, 7 * 24 * 60 * 60 * 1000); // 7 days
 })();
+
+/* ------------------------------ GBP CATEGORY SYNC JOB ------------------------------ */
+
+(async function startGBPCategorySyncJob(){
+  const enabled = String(process.env.FF_GBP_CATEGORY_AUTO_SYNC || 'true').toLowerCase() === 'true';
+  if (!enabled) {
+    console.log('📋 GBP category sync job disabled');
+    return;
+  }
+
+  console.log('📋 GBP category sync job enabled - checking weekly');
+
+  // Seed hardcoded categories on startup (fallback for when OAuth is not configured)
+  try {
+    const { GBPCategorySyncService } = await import('./services/GBPCategorySyncService');
+    const syncService = new GBPCategorySyncService();
+    
+    const seeded = await syncService.seedHardcodedCategories();
+    console.log(`✅ Seeded ${seeded} GBP categories to database`);
+  } catch (error) {
+    console.error('❌ GBP category seeding failed:', error);
+  }
+
+  // Check for updates every 7 days (604800000 ms)
+  setInterval(async () => {
+    try {
+      console.log('🔄 Checking for GBP category updates...');
+
+      const { GBPCategorySyncService } = await import('./services/GBPCategorySyncService');
+      const syncService = new GBPCategorySyncService();
+
+      const result = await syncService.checkForUpdates();
+
+      if (result.hasUpdates) {
+        console.log(`📈 Found ${result.changes.length} GBP category changes`);
+
+        // Apply all updates
+        const updateResult = await syncService.applyUpdates(result.changes);
+        console.log(`✅ Applied ${updateResult.applied} updates, ${updateResult.failed} failed`);
+      } else {
+        console.log('✅ GBP categories are up to date');
+      }
+    } catch (error) {
+      console.error('❌ GBP category sync job failed:', error);
+    }
+  }, 7 * 24 * 60 * 60 * 1000); // 7 days
+})();
