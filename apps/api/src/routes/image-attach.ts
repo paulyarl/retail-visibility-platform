@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { prisma } from '../prisma';
 import fetch from 'node-fetch';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
 
@@ -49,7 +49,7 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
     
     // Generate unique filename
     const ext = path.extname(new URL(imageUrl).pathname) || '.jpg';
-    const filename = `${uuidv4()}${ext}`;
+    const filename = `${randomUUID()}${ext}`;
     
     // Save to uploads directory
     const uploadsDir = path.join(process.cwd(), 'uploads', 'items');
