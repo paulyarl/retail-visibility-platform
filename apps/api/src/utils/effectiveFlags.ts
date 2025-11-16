@@ -90,15 +90,25 @@ export async function getEffectiveTenant(flag: string, tenantId: string): Promis
   let tenantEffectiveSource: EffectiveTenant['tenantEffectiveSource'] = 'blocked'
 
   if (!plat.effectiveOn && !allowOverride) {
+    // Platform OFF + no override allowed = blocked
     tenantEffectiveOn = false
     tenantEffectiveSource = 'blocked'
+  } else if (plat.effectiveOn && !allowOverride) {
+    // Platform ON + no override allowed = inherit platform state (no tenant DB record needed)
+    tenantEffectiveOn = true
+    tenantEffectiveSource = 'tenant_db' // Use tenant_db as source for consistency
   } else {
-    // Either platform is ON, or override allowed when OFF
+    // Platform ON + override allowed OR Platform OFF + override allowed
+    // Check tenant override first, then tenant DB, then fall back to platform
     if (tenantOverride !== undefined) {
       tenantEffectiveOn = tenantOverride
       tenantEffectiveSource = 'tenant_override'
+    } else if (tenantDbOn) {
+      tenantEffectiveOn = true
+      tenantEffectiveSource = 'tenant_db'
     } else {
-      tenantEffectiveOn = tenantDbOn
+      // No tenant override or DB record, inherit platform state
+      tenantEffectiveOn = plat.effectiveOn
       tenantEffectiveSource = 'tenant_db'
     }
   }
