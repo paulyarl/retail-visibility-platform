@@ -478,6 +478,22 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
       }),
     ]);
 
+    // Sync to Google Business Profile (async, don't block response)
+    const { syncLocationStatusToGoogle } = await import('./services/GoogleBusinessStatusSync');
+    syncLocationStatusToGoogle(id, status, reopeningDate ? new Date(reopeningDate) : null)
+      .then((result) => {
+        if (result.success) {
+          console.log(`[Status Change] Google sync successful for tenant ${id}:`, result.gbpStatus);
+        } else if (result.skipped) {
+          console.log(`[Status Change] Google sync skipped for tenant ${id}:`, result.reason);
+        } else {
+          console.error(`[Status Change] Google sync failed for tenant ${id}:`, result.error);
+        }
+      })
+      .catch((error) => {
+        console.error(`[Status Change] Google sync error for tenant ${id}:`, error);
+      });
+
     // TODO: Send notifications (Phase 6)
 
     res.json({
