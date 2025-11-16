@@ -244,6 +244,12 @@ export async function checkTierAccessWithOverrides(
 export function requireTierFeature(feature: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Platform admins and support bypass all tier restrictions
+      const { isPlatformAdmin } = await import('../utils/platform-admin');
+      if (isPlatformAdmin(req.user)) {
+        return next();
+      }
+      
       // Get tenant ID from params, body, or query
       const tenantId = req.params.tenantId || req.body.tenantId || req.query.tenantId;
       
@@ -339,6 +345,12 @@ export function requireTierFeature(feature: string) {
 export function requireAnyTierFeature(features: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Platform admins and support bypass all tier restrictions
+      const { isPlatformAdmin } = await import('../utils/platform-admin');
+      if (isPlatformAdmin(req.user)) {
+        return next();
+      }
+      
       const tenantId = req.params.tenantId || req.body.tenantId || req.query.tenantId;
       
       if (!tenantId) {

@@ -15,6 +15,7 @@
  */
 
 import { useMemo } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   checkTierFeature,
   getTierFeatures,
@@ -63,9 +64,14 @@ export interface TierAccessResult {
  * @returns Object with tier access utilities
  * 
  * NOTE: 'trial' is not a tier - it's a subscription status. Pass the actual tier (e.g., 'starter')
+ * NOTE: Platform admins and support bypass all tier restrictions
  */
 export function useTierAccess(tenantTier: string | null | undefined): TierAccessResult {
   const tier = tenantTier || 'starter';
+  const { user } = useAuth();
+  
+  // Check if user is platform admin or support
+  const isPlatformAdmin = user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   
   return useMemo(() => {
     const tierDisplay = getTierDisplayName(tier);
@@ -76,17 +82,20 @@ export function useTierAccess(tenantTier: string | null | undefined): TierAccess
       tierDisplay,
       tierPrice,
       
-      hasFeature: (feature: string) => checkTierFeature(tier, feature),
+      // Platform admins bypass all tier checks
+      hasFeature: (feature: string) => isPlatformAdmin || checkTierFeature(tier, feature),
       
       getFeatures: () => getTierFeatures(tier),
       
       requiresUpgrade: (feature: string) => calculateUpgradeRequirements(tier, feature),
       
+      // Platform admins bypass all tier checks
       hasAllFeatures: (features: string[]) => 
-        features.every(feature => checkTierFeature(tier, feature)),
+        isPlatformAdmin || features.every(feature => checkTierFeature(tier, feature)),
       
+      // Platform admins bypass all tier checks
       hasAnyFeature: (features: string[]) => 
-        features.some(feature => checkTierFeature(tier, feature)),
+        isPlatformAdmin || features.some(feature => checkTierFeature(tier, feature)),
     };
-  }, [tier]);
+  }, [tier, isPlatformAdmin]);
 }
