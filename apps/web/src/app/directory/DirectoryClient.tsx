@@ -96,33 +96,41 @@ export default function DirectoryClient() {
     fetchFilters();
   }, []);
 
-  // Fetch directory listings
+  // Fetch directory listings - DISABLED: endpoint not available yet
+  // TODO: Re-enable when directory_listings table is available
   useEffect(() => {
-    const fetchListings = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const params = new URLSearchParams(searchParams.toString());
-        
-        const response = await fetch(`${apiBaseUrl}/api/directory/search?${params.toString()}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch directory listings');
-        }
-
-        const result = await response.json();
-        setData(result);
-      } catch (err: any) {
-        console.error('Error fetching directory:', err);
-        setError(err.message || 'Failed to load directory');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchListings();
+    // Skip fetching listings for now - old directory system disabled
+    // Just show category browser
+    setLoading(false);
+    setData({
+      listings: [],
+      pagination: {
+        page: 1,
+        limit: 24,
+        totalItems: 0,
+        totalPages: 0,
+      },
+    });
+    
+    // Original code (disabled):
+    // const fetchListings = async () => {
+    //   setLoading(true);
+    //   setError(null);
+    //   try {
+    //     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+    //     const params = new URLSearchParams(searchParams.toString());
+    //     const response = await fetch(`${apiBaseUrl}/api/directory/search?${params.toString()}`);
+    //     if (!response.ok) throw new Error('Failed to fetch directory listings');
+    //     const result = await response.json();
+    //     setData(result);
+    //   } catch (err: any) {
+    //     console.error('Error fetching directory:', err);
+    //     setError(err.message || 'Failed to load directory');
+    //   } finally {
+    //     setLoading(false);
+    //   }
+    // };
+    // fetchListings();
   }, [searchParams]);
 
   const currentPage = data?.pagination.page || 1;
