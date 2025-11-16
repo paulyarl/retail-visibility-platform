@@ -6,8 +6,8 @@ const phoneRegex = /^\+[1-9]\d{1,14}$/;
 // Email validation
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Website URL validation
-const websiteRegex = /^https?:\/\/.+\..+/;
+// Website URL validation (HTTPS required to match backend)
+const websiteRegex = /^https:\/\/.+\..+/;
 
 export const businessProfileSchema = z.object({
   business_name: z.string()
@@ -60,7 +60,7 @@ export const businessProfileSchema = z.object({
     .or(z.literal('')),
   
   website: z.string()
-    .regex(websiteRegex, 'Website must be a valid URL (https://...)')
+    .regex(websiteRegex, 'Website must use HTTPS (e.g., https://www.example.com)')
     .toLowerCase()
     .trim()
     .optional()

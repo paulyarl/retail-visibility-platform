@@ -319,7 +319,7 @@ export default function StoreIdentityStep({
           onChange={(e) => handleChange('website', e.target.value)}
           onBlur={() => handleBlur('website')}
           error={touched.website ? errors.website : undefined}
-          helperText="Optional - Include https://"
+          helperText="Optional - Must use HTTPS (e.g., https://www.example.com)"
         />
 
         {/* Contact Person */}
