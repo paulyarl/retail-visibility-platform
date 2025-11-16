@@ -8,6 +8,7 @@ import DirectoryGrid from '@/components/directory/DirectoryGrid';
 import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBrowser';
+import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
 import { Pagination } from '@/components/ui';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
@@ -65,6 +66,11 @@ export default function DirectoryClient() {
     storeCount: number;
     productCount: number;
   }>>([]);
+  const [storeTypes, setStoreTypes] = useState<Array<{
+    name: string;
+    slug: string;
+    storeCount: number;
+  }>>([]);
   const [locations, setLocations] = useState<Array<{ city: string; state: string; count: number }>>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
 
@@ -74,11 +80,18 @@ export default function DirectoryClient() {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
       try {
-        // Fetch categories
+        // Fetch product categories
         const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories`);
         if (categoriesRes.ok) {
           const catData = await categoriesRes.json();
           setCategories(catData.data?.categories || []);
+        }
+
+        // Fetch store types
+        const storeTypesRes = await fetch(`${apiBaseUrl}/api/directory/store-types`);
+        if (storeTypesRes.ok) {
+          const typesData = await storeTypesRes.json();
+          setStoreTypes(typesData.data?.storeTypes || []);
         }
 
         // Locations endpoint is disabled (old directory system)
@@ -199,10 +212,18 @@ export default function DirectoryClient() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        {/* Category Browser - Show when no search is active */}
+        {/* Product Category Browser - Show when no search is active */}
         {!searchParams.get('q') && !searchParams.get('category') && categories.length > 0 && (
           <DirectoryCategoryBrowser 
             categories={categories}
+            className="mb-8"
+          />
+        )}
+
+        {/* Store Type Browser - Show when no search is active */}
+        {!searchParams.get('q') && !searchParams.get('category') && storeTypes.length > 0 && (
+          <DirectoryStoreTypeBrowser 
+            storeTypes={storeTypes}
             className="mb-8"
           />
         )}
