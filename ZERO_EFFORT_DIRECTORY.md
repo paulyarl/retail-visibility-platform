@@ -30,26 +30,92 @@ Store owners manage their business. The platform handles discovery.
 
 ---
 
+## The Apple Experience - Unified Across Platform
+
+### Three Places, One Category System
+
+**The Magic:** Product categories work identically everywhere:
+1. **Directory** - Discover stores by product category
+2. **Storefront** - Browse store's products by category  
+3. **Tenant Dashboard** - Manage products with categories
+
+**One Action, Three Benefits:**
+```
+Store owner assigns category to product
+  ↓
+├─ Directory: Store appears in category page
+├─ Storefront: Product appears in category sidebar
+└─ Dashboard: Product organized by category
+
+All automatic. All instant. All synchronized.
+```
+
+### The Apple.com Pattern (But Better)
+
+**Apple.com:**
+```
+Browse Products → Click "Mac" → See all Mac products
+```
+
+**Our Platform:**
+```
+Directory (Platform-wide)
+  Browse by Product Category
+    → Click "Laptops"
+      → See stores selling laptops
+        → Click a store
+          → Storefront shows that store's laptops
+
+Storefront (Store-specific)
+  Browse by Category
+    → Click "Laptops"  
+      → See store's laptop products
+
+Same navigation. Same categories. Seamless transition.
+```
+
+### Parallel Experiences
+
+| Feature | Directory | Storefront | Dashboard |
+|---------|-----------|------------|-----------|
+| Category Browser | ✅ Top categories | ✅ Store categories | ✅ Manage categories |
+| Category Sidebar | ✅ Filter stores | ✅ Navigate products | ✅ Organize inventory |
+| Product Count | ✅ Per store | ✅ Per category | ✅ Per category |
+| View Toggle | ✅ Grid/List/Map | ✅ Grid/List | ✅ Table/Grid |
+| Search | ✅ Search stores | ✅ Search products | ✅ Search inventory |
+| Real-time | ✅ Instant updates | ✅ Instant updates | ✅ Instant updates |
+
+**Same data. Same UX patterns. Zero duplication.**
+
+---
+
 ## Data Flow
 
-### From Tenant Dashboard to Directory
+### From Tenant Dashboard to Directory AND Storefront
 
 ```
-Tenant Dashboard                    Directory
-─────────────────                   ─────────
+Tenant Dashboard                    Directory + Storefront
+─────────────────                   ──────────────────────
                                     
-Add Product                    →    Product count increases
-  ├─ Name: "MacBook Pro"            Store appears in results
-  ├─ Category: Laptops              
-  └─ Status: Active            →    Category: Laptops
-                                      ├─ 1 store
-                                      └─ 1 product
+Add Product                    →    Directory:
+  ├─ Name: "MacBook Pro"              ├─ Product count increases
+  ├─ Category: Laptops                ├─ Store appears in "Laptops"
+  └─ Status: Active                   └─ Store product count: +1
+                                    
+                               →    Storefront:
+                                      ├─ Product appears in grid
+                                      ├─ "Laptops" category count: +1
+                                      └─ Category sidebar updates
 
-Assign Category                →    Category browser updates
-  ├─ Laptops                        "Browse by Product Category"
-  ├─ Smartphones                      ├─ Laptops (1 store)
-  └─ Accessories                      ├─ Smartphones (0 stores)
-                                      └─ Accessories (0 stores)
+Assign Category                →    Directory:
+  ├─ Laptops                          "Browse by Product Category"
+  ├─ Smartphones                        ├─ Laptops (1 store)
+  └─ Accessories                        └─ Smartphones (0 stores)
+                                    
+                               →    Storefront:
+                                      Category Sidebar
+                                        ├─ Laptops (1 product)
+                                        └─ Smartphones (0 products)
 
 Enable Google Sync             →    Store becomes discoverable
   └─ googleSyncEnabled: true        Appears in directory listings
@@ -92,19 +158,36 @@ Update Store Info              →    Directory listing updates
 
 ### Tenant Action → Directory Update
 
-**Scenario 1: New Product Added**
+**Scenario 1: New Product Added (The Apple Magic)**
 ```
 Time: 10:00 AM
-Action: Store owner adds "iPhone 15 Pro"
-        Category: Smartphones
+Action: Store owner adds "MacBook Pro M3" to inventory
+        Category: Laptops
         Status: Active
+        Visibility: Public
 
 Time: 10:00 AM + 1 second
-Result: 
-  ✅ Smartphones category count: +1 product
-  ✅ Store appears in "Smartphones" category page
-  ✅ Directory search includes new product
-  ✅ Store product count increases
+Results Across Platform:
+
+  ✅ Directory
+      ├─ "Laptops" category count: +1 product
+      ├─ Store appears in "Laptops" category page
+      ├─ Store product count increases
+      └─ Directory search includes new product
+  
+  ✅ Storefront
+      ├─ Product appears in product grid
+      ├─ "Laptops" category count: +1 product
+      ├─ Category sidebar updates automatically
+      └─ Product searchable in store
+  
+  ✅ Dashboard
+      ├─ Product appears in "Laptops" category
+      ├─ Category stats update
+      └─ Inventory count increases
+
+All automatic. All instant. Zero manual work.
+Apple-like experience everywhere.
 ```
 
 **Scenario 2: Category Changed**
@@ -498,25 +581,67 @@ No manual tracking needed!
 ```
 Store owner adds product
   ↓
-├─ Inventory increases
-├─ Category count increases
-├─ Directory listing updates
-├─ Search index updates
-├─ Category page updates
-├─ Google sync updates
-└─ Discovery improves
+├─ Dashboard: Inventory increases
+├─ Dashboard: Category count increases
+├─ Directory: Listing updates
+├─ Directory: Category page updates
+├─ Storefront: Product appears
+├─ Storefront: Category sidebar updates
+├─ Search: Index updates (directory + storefront)
+├─ Google: Sync updates
+└─ Discovery: Improves everywhere
 
 All automatic. All real-time. All zero-effort.
+Apple-like experience across the entire platform.
+```
+
+### The Apple Experience, Democratized
+
+**What Apple Does:**
+- Beautiful product browsing
+- Clear category navigation
+- Seamless user experience
+- One Apple Store
+
+**What We Do:**
+- Beautiful product browsing (every store)
+- Clear category navigation (directory + storefront)
+- Seamless user experience (platform-wide)
+- Thousands of stores, one unified experience
+
+**The Difference:**
+```
+Apple: One company, one experience
+Us: Every retailer, same experience
+
+Apple: Manual curation
+Us: Automatic generation
+
+Apple: Expensive to replicate
+Us: Zero-effort for everyone
 ```
 
 ### The Platform Promise
-```
-"Focus on your business.
- We'll handle discovery."
-```
+
+**For Store Owners:**
+> "Organize your products once.
+>  We create Apple-like experiences everywhere:
+>  Directory, Storefront, and Discovery."
+
+**For Users:**
+> "Browse like Apple.com, but across all stores.
+>  Same categories. Same navigation. Instant results.
+>  Every store feels like the Apple Store."
+
+**For Platform:**
+> "One category system. Three experiences.
+>  Zero manual work. Infinite scale.
+>  Apple's UX, democratized."
 
 **This is the power of a well-architected platform.**
 **Data flows naturally. Features emerge automatically.**
 **Scale is effortless. Quality is guaranteed.**
 
-**Zero-effort directory. Maximum-impact discovery.**
+**Zero-effort directory. Apple-like storefront. Maximum-impact discovery.**
+
+**The Apple experience, available to every retailer.**
