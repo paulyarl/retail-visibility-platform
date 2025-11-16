@@ -387,6 +387,68 @@ export default function AdminCategoriesPage() {
           </CardContent>
         </Card>
 
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-neutral-700">
+            {categories.length} {categories.length === 1 ? 'category' : 'categories'}
+          </p>
+          <Button
+            variant="primary"
+            onClick={() => setShowCreateModal(true)}
+          >
+            + Create Category
+          </Button>
+        </div>
+
+        {/* Categories List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Categories</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {categories.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-neutral-500">No categories yet</p>
+                <p className="text-sm text-neutral-400 mt-2">
+                  Create your first category to get started
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {categories.map((category) => (
+                  <div
+                    key={category.id}
+                    className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 rounded-lg mb-1">
+                        <h3 className="font-bold text-primary-900 dark:text-primary-100">{category.name}</h3>
+                      </div>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400">ID: {category.id}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => openEditModal(category)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openDeleteModal(category)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Admin Guide */}
         <Card>
           <CardHeader>
@@ -465,68 +527,6 @@ export default function AdminCategoriesPage() {
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-neutral-700">
-            {categories.length} {categories.length === 1 ? 'category' : 'categories'}
-          </p>
-          <Button
-            variant="primary"
-            onClick={() => setShowCreateModal(true)}
-          >
-            + Create Category
-          </Button>
-        </div>
-
-        {/* Categories List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>All Categories</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {categories.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-neutral-500">No categories yet</p>
-                <p className="text-sm text-neutral-400 mt-2">
-                  Create your first category to get started
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {categories.map((category) => (
-                  <div
-                    key={category.id}
-                    className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 rounded-lg mb-1">
-                        <h3 className="font-bold text-primary-900 dark:text-primary-100">{category.name}</h3>
-                      </div>
-                      <p className="text-sm text-neutral-600 dark:text-neutral-400">ID: {category.id}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => openEditModal(category)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openDeleteModal(category)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
