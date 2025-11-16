@@ -108,8 +108,8 @@ export default function ItemsList({
                   {/* Badges & Sync Status */}
                   <div className="flex flex-col gap-2 items-end">
                     <div className="flex flex-wrap gap-2 justify-end">
-                      <Badge variant={item.status === 'active' ? 'success' : 'default'}>
-                        {item.status}
+                      <Badge variant={item.status === 'active' ? 'success' : item.status === 'syncing' ? 'info' : 'default'}>
+                        {item.status === 'active' ? 'Active' : item.status === 'syncing' ? 'Syncing' : 'Archived'}
                       </Badge>
                       <Badge variant={item.visibility === 'public' ? 'info' : 'default'}>
                         {item.visibility}
