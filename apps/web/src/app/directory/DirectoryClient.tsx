@@ -7,6 +7,7 @@ import DirectorySearch from '@/components/directory/DirectorySearch';
 import DirectoryGrid from '@/components/directory/DirectoryGrid';
 import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
+import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBrowser';
 import { Pagination } from '@/components/ui';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
@@ -56,7 +57,14 @@ export default function DirectoryClient() {
   const [data, setData] = useState<DirectoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Array<{ name: string; count: number }>>([]);
+  const [categories, setCategories] = useState<Array<{
+    id: string;
+    name: string;
+    slug: string;
+    googleCategoryId: string | null;
+    storeCount: number;
+    productCount: number;
+  }>>([]);
   const [locations, setLocations] = useState<Array<{ city: string; state: string; count: number }>>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
 
@@ -73,7 +81,7 @@ export default function DirectoryClient() {
 
         if (categoriesRes.ok) {
           const catData = await categoriesRes.json();
-          setCategories(catData.categories || []);
+          setCategories(catData.data?.categories || []);
         }
 
         if (locationsRes.ok) {
@@ -187,10 +195,18 @@ export default function DirectoryClient() {
       </div>
 
       {/* Filters */}
-      <DirectoryFilters categories={categories} locations={locations} />
+      <DirectoryFilters categories={[]} locations={locations} />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
+        {/* Category Browser - Show when no search is active */}
+        {!searchParams.get('q') && !searchParams.get('category') && categories.length > 0 && (
+          <DirectoryCategoryBrowser 
+            categories={categories}
+            className="mb-8"
+          />
+        )}
+
         {/* Error State */}
         {error && (
           <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
