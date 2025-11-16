@@ -6,7 +6,8 @@ const router = Router();
 
 router.get('/api/platform/categories', authenticateToken, requireAdmin, async (_req: Request, res: Response) => {
   try {
-    return res.json({ success: true, data: [] });
+    const categories = await categoryService.getTenantCategories('platform');
+    return res.json({ success: true, data: categories });
   } catch (e: any) {
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
   }

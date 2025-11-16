@@ -11,6 +11,20 @@ export type UpdateCategoryInput = Partial<{
 }>
 
 export const categoryService = {
+  async getTenantCategories(tenantId: string) {
+    const categories = await prisma.tenantCategory.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+      },
+      orderBy: [
+        { sortOrder: 'asc' },
+        { name: 'asc' },
+      ],
+    })
+    return categories
+  },
+
   async createTenantCategory(tenantId: string, input: Required<Pick<UpdateCategoryInput, 'name' | 'slug'>> & Partial<UpdateCategoryInput>) {
     const category = await prisma.tenantCategory.create({
       data: {
