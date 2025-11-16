@@ -3026,6 +3026,10 @@ app.use(platformSettingsRoutes);
 app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
 app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
 console.log('✅ Dashboard routes mounted');
+// Consolidated dashboard endpoint (reduces 4 calls to 1)
+const dashboardConsolidatedRoutes = require('./routes/dashboard-consolidated').default;
+app.use('/api/dashboard', dashboardConsolidatedRoutes);
+console.log('✅ Consolidated dashboard route mounted');
 app.use('/api', promotionRoutes); // Promotion endpoints
 console.log('✅ Promotion routes mounted');
 app.use('/api', businessHoursRoutes); // Business hours management
