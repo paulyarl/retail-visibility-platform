@@ -23,6 +23,8 @@ interface Product {
   stock: number;
   imageUrl?: string;
   availability: 'in_stock' | 'out_of_stock' | 'preorder';
+  itemStatus?: 'active' | 'inactive' | 'draft' | 'archived';
+  visibility?: 'public' | 'private';
   categoryPath?: string[];
   condition?: string;
   gtin?: string;
@@ -239,6 +241,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const { product, tenant, storeStatus } = data;
   const businessName = tenant.metadata?.businessName || tenant.name;
 
+  // Check if product is publicly accessible
+  const isPubliclyAccessible = product.itemStatus === 'active' && product.visibility === 'public';
+  const statusLabel = product.itemStatus === 'draft' ? 'Draft' : product.itemStatus === 'archived' ? 'Archived' : product.itemStatus;
+  const visibilityLabel = product.visibility === 'private' ? 'Private' : 'Public';
+
   // Build image gallery: try photos endpoint; fall back to product.imageUrl
   const photos = await getProductPhotos(product.id);
   const gallery = photos.length > 0
@@ -283,6 +290,34 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       {/* Back to Inventory Button (for authenticated users) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
         <BackToInventoryButton tenantId={product.tenantId} />
+        
+        {/* Alert for non-public products (only shown to authenticated users) */}
+        {!isPubliclyAccessible && (
+          <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-4 rounded-r-lg">
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                  ⚠️ This Product is Not Publicly Accessible
+                </h3>
+                <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
+                  <strong>Status:</strong> {statusLabel} | <strong>Visibility:</strong> {visibilityLabel}
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  {product.itemStatus === 'draft' && 'This product is in draft mode. Activate it to make it publicly accessible.'}
+                  {product.itemStatus === 'archived' && 'This product is archived. Restore it to active status to make it publicly accessible.'}
+                  {product.itemStatus === 'inactive' && 'This product is inactive. Activate it to make it publicly accessible.'}
+                  {product.visibility === 'private' && product.itemStatus === 'active' && 'This product is set to private. Change visibility to public to make it accessible.'}
+                </p>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                  💡 Only you can see this page because you're authenticated. Public visitors will see a 404 error.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tier-Based Landing Page with Gallery (only if multiple images) */}
