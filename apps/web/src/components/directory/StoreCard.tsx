@@ -62,16 +62,16 @@ export default function StoreCard({ listing, index }: StoreCardProps) {
       >
         <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow duration-200">
           {/* Logo/Image */}
-          <div className="relative aspect-video bg-neutral-100 dark:bg-neutral-700 overflow-hidden">
+          <div className="relative aspect-video bg-white dark:bg-neutral-800 overflow-hidden flex items-center justify-center p-4">
             {listing.logoUrl ? (
               <img
                 src={listing.logoUrl}
                 alt={listing.businessName}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-200"
                 loading="lazy"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
+              <div className="w-full h-full flex items-center justify-center bg-neutral-100 dark:bg-neutral-700">
                 <svg className="w-16 h-16 text-neutral-300 dark:text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
