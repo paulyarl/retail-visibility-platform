@@ -1947,6 +1947,16 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   });
   if (!it) return res.status(404).json({ error: "not_found" });
 
+  // Security: Only allow public access to items that are active AND public
+  // Draft, archived, and private items should not be accessible via public URLs
+  const isAuthenticated = req.headers.authorization; // Check if request has auth token
+  if (!isAuthenticated) {
+    // For unauthenticated requests, only show active + public items
+    if (it.itemStatus !== 'active' || it.visibility !== 'public') {
+      return res.status(404).json({ error: "not_found" });
+    }
+  }
+
   // Convert Decimal price to number for frontend compatibility
   // Hide priceCents from frontend since price is the authoritative field
   const { priceCents, ...itemWithoutPriceCents } = it;
