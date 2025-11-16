@@ -31,12 +31,17 @@ export default function AdminCategoriesPage() {
   const [polling, setPolling] = useState(false);
   const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
   const apiUrl = (path: string) => `${API_BASE}${path}`;
-  const API_BEARER = (process.env.NEXT_PUBLIC_API_BEARER || (typeof window !== 'undefined' ? (window.localStorage?.getItem('API_BEARER') || '') : ''));
-  const authHeader = API_BEARER ? { Authorization: `Bearer ${API_BEARER}` } : ({} as Record<string, string>);
+  
   const getCookie = (name: string) => {
     if (typeof document === 'undefined') return '';
     const match = document.cookie.split(';').map(s => s.trim()).find(c => c.startsWith(name + '='));
     return match ? decodeURIComponent(match.split('=')[1] || '') : '';
+  };
+  
+  // Get auth token from cookie (access_token or ACCESS_TOKEN)
+  const getAuthHeader = (): Record<string, string> => {
+    const token = getCookie('access_token') || getCookie('ACCESS_TOKEN');
+    return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
   useEffect(() => {
@@ -75,7 +80,7 @@ export default function AdminCategoriesPage() {
       qs.set('strategy', 'platform_to_gbp');
       const res = await fetch(apiUrl(`/api/admin/mirror/last-run?${qs.toString()}`), {
         method: 'GET',
-        headers: { ...authHeader },
+        headers: { ...getAuthHeader() },
         credentials: 'include',
       });
       const data = await res.json().catch(() => ({}));
@@ -167,7 +172,7 @@ export default function AdminCategoriesPage() {
       const csrf = getCookie('csrf');
       const res = await fetch(apiUrl('/api/categories/mirror'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}), ...authHeader },
+        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}), ...getAuthHeader() },
         credentials: 'include',
         body: JSON.stringify(body),
       });
