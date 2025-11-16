@@ -464,6 +464,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     onEditProfile={() => router.push(`/t/${encodeURIComponent(t.id)}/onboarding`)}
                     onRename={onRename}
                     onDelete={() => onDelete(t.id)}
+                    onStatusChange={(tenantId) => router.push(`/t/${encodeURIComponent(tenantId)}/settings/location-status`)}
                     canEdit={canEdit}
                     canDelete={canDelete}
                     canRename={canRename}
@@ -490,13 +491,14 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   );
 }
 
-function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete, canEdit = false, canRename = false, canDelete = false }: {
+function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete, onStatusChange, canEdit = false, canRename = false, canDelete = false }: {
   tenant: Tenant;
   index: number;
   onSelect: () => void;
   onEditProfile: () => void;
   onRename: (id: string, newName: string) => void;
   onDelete: () => void;
+  onStatusChange: (tenantId: string) => void;
   canEdit?: boolean;
   canRename?: boolean;
   canDelete?: boolean;
@@ -579,6 +581,31 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
         {/* Actions */}
         {!editing && (
           <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-neutral-100 mt-3">
+            {/* Quick Status Change - Prominent placement */}
+            {canEdit && (
+              <Button 
+                size="sm" 
+                variant={tenant.locationStatus === 'active' ? 'secondary' : 'danger'}
+                onClick={() => onStatusChange(tenant.id)}
+                title="Change location status"
+              >
+                {tenant.locationStatus === 'active' ? (
+                  <>
+                    <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Active
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    {tenant.locationStatus ? tenant.locationStatus.charAt(0).toUpperCase() + tenant.locationStatus.slice(1) : 'Status'}
+                  </>
+                )}
+              </Button>
+            )}
             {canEdit && (
               <Button size="sm" variant="secondary" onClick={onEditProfile}>
                 <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
