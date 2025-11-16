@@ -191,7 +191,10 @@ export default function DirectoryClient() {
       </div>
 
       {/* Filters */}
-      <DirectoryFilters categories={[]} locations={locations} />
+      <DirectoryFilters 
+        categories={categories.map(cat => ({ name: cat.name, count: cat.storeCount }))} 
+        locations={locations} 
+      />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
