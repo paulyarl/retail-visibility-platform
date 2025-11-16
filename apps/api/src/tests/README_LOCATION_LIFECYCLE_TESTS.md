@@ -77,11 +77,43 @@ npm run dev
 
 ## Running Tests
 
-### Run All Tests
+### Quick Start with Doppler (Recommended)
+
+**Windows (PowerShell):**
+```powershell
+cd apps/api
+.\test-lifecycle.ps1
+```
+
+**Linux/Mac (Bash):**
+```bash
+cd apps/api
+chmod +x test-lifecycle.sh
+./test-lifecycle.sh
+```
+
+The script will:
+1. Check Doppler is installed and logged in
+2. Prompt for test credentials
+3. Run tests with production config
+4. Show results
+
+### Run All Tests (Manual)
 
 ```bash
 cd apps/api
 npm test -- location-lifecycle.test.ts
+```
+
+### Run with Doppler (Manual)
+
+```bash
+cd apps/api
+doppler run --config prd -- \
+  env TEST_AUTH_TOKEN="your_token" \
+      TEST_TENANT_ID="your_tenant_id" \
+      TEST_USER_ID="your_user_id" \
+  npm test -- src/tests/location-lifecycle.test.ts
 ```
 
 ### Run Specific Test Suite
