@@ -33,8 +33,24 @@ async function apiRequest(method: string, path: string, body?: any) {
     options.body = JSON.stringify(body);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, options);
-  const data = response.ok ? await response.json() : null;
+  const url = `${API_BASE_URL}${path}`;
+  const response = await fetch(url, options);
+  
+  let data = null;
+  try {
+    const text = await response.text();
+    data = text ? JSON.parse(text) : null;
+  } catch (e) {
+    // Response wasn't JSON
+    console.error(`Non-JSON response from ${method} ${path}:`, await response.text());
+  }
+
+  // Debug output for failures
+  if (!response.ok) {
+    console.error(`API Error: ${method} ${url}`);
+    console.error(`Status: ${response.status}`);
+    console.error(`Response:`, data);
+  }
 
   return { response, data };
 }
