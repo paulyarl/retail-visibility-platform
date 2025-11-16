@@ -127,8 +127,9 @@ router.get('/:id', requireSupportActions, async (req, res) => {
 // POST /organizations - Create organization
 const createOrgSchema = z.object({
   name: z.string().min(1),
-  ownerId: z.string().min(1),
+  ownerId: z.string().min(1).optional(), // Optional - defaults to authenticated user
   subscriptionTier: z.enum(['chain_starter', 'chain_professional', 'chain_enterprise']).default('chain_starter'),
+  subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).default('trial'),
   maxLocations: z.number().int().positive().default(5),
   maxTotalSKUs: z.number().int().positive().default(2500),
 });
@@ -142,12 +143,19 @@ router.post('/', requirePlatformAdmin, validateOrganizationTier, validateOrganiz
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
+    const user = (req as any).user;
+    const ownerId = parsed.data.ownerId || user?.userId;
+
+    if (!ownerId) {
+      return res.status(400).json({ error: 'owner_id_required', message: 'ownerId must be provided or user must be authenticated' });
+    }
+
     const organization = await prisma.organization.create({
       data: {
         name: parsed.data.name,
-        ownerId: parsed.data.ownerId,
+        ownerId,
         subscriptionTier: parsed.data.subscriptionTier,
-        subscriptionStatus: 'trial',
+        subscriptionStatus: parsed.data.subscriptionStatus,
         maxLocations: parsed.data.maxLocations,
         maxTotalSKUs: parsed.data.maxTotalSKUs,
         trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
@@ -157,7 +165,7 @@ router.post('/', requirePlatformAdmin, validateOrganizationTier, validateOrganiz
     res.status(201).json(organization);
   } catch (error: any) {
     console.error('[Organizations] Create error:', error);
-    res.status(500).json({ error: 'failed_to_create_organization' });
+    res.status(500).json({ error: 'failed_to_create_organization', message: error.message });
   }
 });
 
