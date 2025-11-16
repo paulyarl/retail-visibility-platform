@@ -560,7 +560,7 @@ export default function QuickStartPage() {
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-                <span>Create as archived (inactive until you review)</span>
+                <span>Create as drafts (review before activating)</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />

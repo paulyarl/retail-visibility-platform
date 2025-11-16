@@ -1,7 +1,7 @@
 "use client";
 
 interface SyncStatusIndicatorProps {
-  itemStatus?: 'active' | 'inactive' | 'syncing' | 'archived';
+  itemStatus?: 'active' | 'inactive' | 'syncing' | 'archived' | 'draft';
   visibility?: 'public' | 'private';
   categoryPath?: string[];
   showDetails?: boolean;
@@ -16,6 +16,7 @@ export default function SyncStatusIndicator({
   const isActive = itemStatus === 'active';
   const isArchived = itemStatus === 'archived';
   const isInactive = itemStatus === 'inactive';
+  const isDraft = itemStatus === 'draft';
   const isPublic = visibility === 'public';
   const hasCategory = categoryPath && categoryPath.length > 0;
   
@@ -23,6 +24,7 @@ export default function SyncStatusIndicator({
   
   // Determine blocking reasons with actionable instructions
   const blockingReasons: string[] = [];
+  if (isDraft) blockingReasons.push('Item is Draft (click Draft to activate)');
   if (isArchived) blockingReasons.push('Item is Archived (click Archived to restore)');
   if (isInactive) blockingReasons.push('Item is Inactive (click Inactive to activate)');
   if (!isPublic) blockingReasons.push('Item is Private (click Private to make Public)');
@@ -45,7 +47,7 @@ export default function SyncStatusIndicator({
   }
 
   // Not syncing - show visual indicators for blockers
-  const isIntentionalBlock = isArchived || isInactive || !isPublic;
+  const isIntentionalBlock = isDraft || isArchived || isInactive || !isPublic;
   const colorClass = isIntentionalBlock 
     ? 'text-red-600 dark:text-red-500' 
     : 'text-amber-600 dark:text-amber-500';
@@ -64,6 +66,11 @@ export default function SyncStatusIndicator({
       
       {/* Mobile: Show compact visual blockers */}
       <div className="flex items-center gap-1 sm:hidden">
+        {isDraft && (
+          <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300" title="Draft">
+            ✏️
+          </span>
+        )}
         {isArchived && (
           <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300" title="Archived">
             📦
@@ -89,6 +96,11 @@ export default function SyncStatusIndicator({
       {/* Desktop: Show detailed reasons if requested */}
       {showDetails && blockingReasons.length > 0 && (
         <div className="hidden sm:flex items-center gap-1.5 ml-2">
+          {isDraft && (
+            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+              Draft
+            </span>
+          )}
           {isArchived && (
             <span className="text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
               Archived

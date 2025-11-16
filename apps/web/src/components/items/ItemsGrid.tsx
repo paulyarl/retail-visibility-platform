@@ -84,8 +84,8 @@ export default function ItemsGrid({
                   {item.name}
                 </h4>
                 {item.status && (
-                  <Badge variant={item.status === 'active' ? 'success' : item.status === 'syncing' ? 'info' : 'default'}>
-                    {item.status === 'active' ? 'Active' : item.status === 'syncing' ? 'Syncing' : 'Archived'}
+                  <Badge variant={item.status === 'active' ? 'success' : item.status === 'syncing' ? 'info' : item.status === 'draft' ? 'info' : 'default'}>
+                    {item.status === 'active' ? 'Active' : item.status === 'syncing' ? 'Syncing' : item.status === 'draft' ? 'Draft' : 'Archived'}
                   </Badge>
                 )}
               </div>
