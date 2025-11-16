@@ -15,6 +15,7 @@ type Tenant = {
   id: string; 
   name: string; 
   createdAt?: string;
+  locationStatus?: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
   organization?: {
     id: string;
     name: string;
@@ -35,6 +36,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [chainFilter, setChainFilter] = useState<'all' | 'chain' | 'standalone'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'inactive' | 'closed' | 'archived'>('all');
   
   // View mode toggle
   const getInitialView = (): 'grid' | 'list' => {
@@ -62,9 +64,11 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       const matchesChain = chainFilter === 'all' || 
         (chainFilter === 'chain' && t.organization) ||
         (chainFilter === 'standalone' && !t.organization);
-      return matchesSearch && matchesChain;
+      const matchesStatus = statusFilter === 'all' || 
+        (t.locationStatus || 'active') === statusFilter;
+      return matchesSearch && matchesChain && matchesStatus;
     });
-  }, [tenants, searchQuery, chainFilter]);
+  }, [tenants, searchQuery, chainFilter, statusFilter]);
 
   const paginatedTenants = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -80,7 +84,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, chainFilter]);
+  }, [searchQuery, chainFilter, statusFilter]);
 
   const refresh = async () => {
     setLoading(true);
@@ -332,7 +336,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
               />
               
               {/* Chain Filter */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant={chainFilter === 'all' ? 'primary' : 'ghost'}
                   size="sm"
@@ -357,6 +361,57 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                 >
                   Standalone
                 </Button>
+              </div>
+              
+              {/* Location Status Filter */}
+              <div>
+                <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2 block">
+                  Location Status
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={statusFilter === 'all' ? 'primary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setStatusFilter('all')}
+                  >
+                    All Status
+                  </Button>
+                  <Button
+                    variant={statusFilter === 'active' ? 'primary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setStatusFilter('active')}
+                  >
+                    ✅ Active
+                  </Button>
+                  <Button
+                    variant={statusFilter === 'inactive' ? 'primary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setStatusFilter('inactive')}
+                  >
+                    ⏸️ Inactive
+                  </Button>
+                  <Button
+                    variant={statusFilter === 'pending' ? 'primary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setStatusFilter('pending')}
+                  >
+                    🚧 Pending
+                  </Button>
+                  <Button
+                    variant={statusFilter === 'closed' ? 'primary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setStatusFilter('closed')}
+                  >
+                    🔒 Closed
+                  </Button>
+                  <Button
+                    variant={statusFilter === 'archived' ? 'primary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setStatusFilter('archived')}
+                  >
+                    📦 Archived
+                  </Button>
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -493,8 +548,26 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
                 <div className="flex-1 min-w-0">
-                  <div className="inline-block px-3 py-1.5 bg-primary-100 dark:bg-primary-900/30 rounded-lg mb-1 group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 transition-colors">
-                    <p className="font-bold text-primary-900 dark:text-primary-100 text-base">{tenant.name}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="inline-block px-3 py-1.5 bg-primary-100 dark:bg-primary-900/30 rounded-lg mb-1 group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 transition-colors">
+                      <p className="font-bold text-primary-900 dark:text-primary-100 text-base">{tenant.name}</p>
+                    </div>
+                    {tenant.locationStatus && tenant.locationStatus !== 'active' && (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
+                        tenant.locationStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                        tenant.locationStatus === 'inactive' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                        tenant.locationStatus === 'closed' ? 'bg-red-100 text-red-800 border-red-300' :
+                        'bg-gray-100 text-gray-800 border-gray-300'
+                      }`}>
+                        <span>
+                          {tenant.locationStatus === 'pending' ? '🚧' :
+                           tenant.locationStatus === 'inactive' ? '⏸️' :
+                           tenant.locationStatus === 'closed' ? '🔒' :
+                           '📦'}
+                        </span>
+                        <span className="capitalize">{tenant.locationStatus}</span>
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">{tenant.id}</p>
                 </div>
