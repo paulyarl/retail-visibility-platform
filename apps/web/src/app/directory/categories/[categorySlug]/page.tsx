@@ -4,17 +4,20 @@ import CategoryViewClient from './CategoryViewClient';
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     categorySlug: string;
-  };
-  searchParams: {
+  }>;
+  searchParams: Promise<{
     lat?: string;
     lng?: string;
     radius?: string;
-  };
+  }>;
 }
 
-export default function CategoryViewPage({ params, searchParams }: PageProps) {
+export default async function CategoryViewPage({ params, searchParams }: PageProps) {
+  const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
+
   return (
     <Suspense
       fallback={
@@ -29,8 +32,8 @@ export default function CategoryViewPage({ params, searchParams }: PageProps) {
       }
     >
       <CategoryViewClient
-        categorySlug={params.categorySlug}
-        searchParams={searchParams}
+        categorySlug={resolvedParams.categorySlug}
+        searchParams={resolvedSearchParams}
       />
     </Suspense>
   );
