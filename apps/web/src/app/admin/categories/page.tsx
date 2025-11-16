@@ -117,9 +117,17 @@ export default function AdminCategoriesPage() {
         await loadCategories();
         setShowCreateModal(false);
         setCategoryName('');
+      } else {
+        const data = await res.json();
+        if (data.error === 'duplicate_slug') {
+          alert(`Category already exists: ${data.message || 'A category with this name already exists'}`);
+        } else {
+          alert(`Failed to create category: ${data.message || data.error || 'Unknown error'}`);
+        }
       }
     } catch (error) {
       console.error('Failed to create category:', error);
+      alert('Failed to create category. Please try again.');
     }
   };
 

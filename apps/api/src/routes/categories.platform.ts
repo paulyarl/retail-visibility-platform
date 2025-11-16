@@ -20,6 +20,10 @@ router.post('/api/platform/categories', authenticateToken, requireAdmin, async (
     const created = await categoryService.createTenantCategory('platform', { name, slug });
     return res.status(201).json({ success: true, data: created });
   } catch (e: any) {
+    // Check for unique constraint violation on slug
+    if (e?.message?.includes('Unique constraint failed') && e?.message?.includes('slug')) {
+      return res.status(409).json({ success: false, error: 'duplicate_slug', message: `A category with slug "${req.body?.slug}" already exists` });
+    }
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
   }
 });
