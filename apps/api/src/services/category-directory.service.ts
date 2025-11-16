@@ -19,38 +19,72 @@ export class CategoryDirectoryService {
     radius?: number
   ): Promise<CategoryWithStores[]> {
     try {
-      console.log('[CategoryService] Fetching categories from materialized view...');
+      console.log('[CategoryService] Fetching categories using Prisma ORM...');
       
-      // Query the materialized view with timeout
-      const query = `
-        SELECT 
-          category_id as id,
-          category_name as name,
-          category_slug as slug,
-          google_category_id as "googleCategoryId",
-          COUNT(DISTINCT tenant_id) as store_count,
-          SUM(product_count)::int as product_count
-        FROM directory_category_stores
-        GROUP BY category_id, category_name, category_slug, google_category_id
-        ORDER BY store_count DESC, product_count DESC
-      `;
-      
-      const results = await Promise.race([
-        prisma.$queryRawUnsafe<any[]>(query),
-        new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Query timeout')), 10000)
-        )
-      ]);
+      // Use Prisma ORM to query TenantCategory with aggregations
+      // This avoids the materialized view and raw SQL protocol issues
+      const categories = await prisma.tenantCategory.findMany({
+        where: {
+          isActive: true,
+          items: {
+            some: {
+              itemStatus: 'active',
+              visibility: 'public',
+              tenant: {
+                googleSyncEnabled: true,
+                directoryVisible: true,
+                locationStatus: 'active',
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          googleCategoryId: true,
+          _count: {
+            select: {
+              items: {
+                where: {
+                  itemStatus: 'active',
+                  visibility: 'public',
+                  tenant: {
+                    googleSyncEnabled: true,
+                    directoryVisible: true,
+                    locationStatus: 'active',
+                  },
+                },
+              },
+            },
+          },
+          items: {
+            where: {
+              itemStatus: 'active',
+              visibility: 'public',
+              tenant: {
+                googleSyncEnabled: true,
+                directoryVisible: true,
+                locationStatus: 'active',
+              },
+            },
+            select: {
+              tenantId: true,
+            },
+            distinct: ['tenantId'],
+          },
+        },
+      });
 
-      console.log(`[CategoryService] Found ${results.length} categories`);
+      console.log(`[CategoryService] Found ${categories.length} categories`);
 
-      return results.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        googleCategoryId: row.googleCategoryId,
-        storeCount: parseInt(row.store_count) || 0,
-        productCount: parseInt(row.product_count) || 0,
+      return categories.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        googleCategoryId: cat.googleCategoryId,
+        storeCount: cat.items.length, // Distinct tenant count
+        productCount: cat._count.items,
       }));
     } catch (error) {
       console.error('[CategoryService] Error fetching categories:', error);

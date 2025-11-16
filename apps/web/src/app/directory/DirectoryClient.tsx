@@ -68,26 +68,26 @@ export default function DirectoryClient() {
   const [locations, setLocations] = useState<Array<{ city: string; state: string; count: number }>>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
 
-  // Fetch categories and locations (once on mount)
+  // Fetch categories (locations endpoint disabled for now)
   useEffect(() => {
     const fetchFilters = async () => {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
       try {
-        const [categoriesRes, locationsRes] = await Promise.all([
-          fetch(`${apiBaseUrl}/api/directory/categories`),
-          fetch(`${apiBaseUrl}/api/directory/locations`),
-        ]);
-
+        // Fetch categories
+        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories`);
         if (categoriesRes.ok) {
           const catData = await categoriesRes.json();
           setCategories(catData.data?.categories || []);
         }
 
-        if (locationsRes.ok) {
-          const locData = await locationsRes.json();
-          setLocations(locData.locations || []);
-        }
+        // Locations endpoint is disabled (old directory system)
+        // TODO: Re-enable when directory_listings table is available
+        // const locationsRes = await fetch(`${apiBaseUrl}/api/directory/locations`);
+        // if (locationsRes.ok) {
+        //   const locData = await locationsRes.json();
+        //   setLocations(locData.locations || []);
+        // }
       } catch (err) {
         console.error('Error fetching filters:', err);
       }
