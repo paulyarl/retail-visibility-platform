@@ -24,7 +24,8 @@ export const basePrisma = new PrismaClient({
   // @ts-ignore - connection_limit is valid but not in types
   __internal: {
     engine: {
-      connection_limit: 1, // One connection per serverless function instance
+      connection_limit: 3, // Increased from 1 to handle concurrent requests
+      pool_timeout: 30, // Increased from default 10s to 30s
     },
   },
 });
@@ -46,10 +47,12 @@ async function withRetry<T>(
       // Retry on connection errors
       const isConnectionError = 
         error.code === 'P1001' || // Can't reach database
+        error.code === 'P2024' || // Connection pool timeout
         error.name === 'PrismaClientInitializationError' || // Client init failed
         error.message?.includes("Can't reach database server") ||
         error.message?.includes('Connection refused') ||
-        error.message?.includes('ECONNREFUSED');
+        error.message?.includes('ECONNREFUSED') ||
+        error.message?.includes('connection pool');
       
       if (isConnectionError && attempt < maxRetries) {
         // Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 3200ms
