@@ -513,6 +513,45 @@ export default function AdminCategoriesPage() {
         </Card>
       </div>
 
+      {/* Create Modal */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          setCategoryName('');
+        }}
+        title="Create Category"
+        description="Add a new product category"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Category Name"
+            placeholder="Enter category name"
+            value={categoryName}
+            onChange={(e) => setCategoryName(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleCreate()}
+          />
+        </div>
+        <ModalFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setShowCreateModal(false);
+              setCategoryName('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleCreate}
+            disabled={!categoryName.trim()}
+          >
+            Create Category
+          </Button>
+        </ModalFooter>
+      </Modal>
+
       {/* Edit Modal */}
       <Modal
         isOpen={showEditModal}

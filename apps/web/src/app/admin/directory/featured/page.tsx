@@ -1,52 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
 import PageHeader from '@/components/PageHeader';
 import Link from 'next/link';
-
-interface FeaturedListing {
-  id: string;
-  tenantId: string;
-  businessName: string;
-  city: string;
-  state: string;
-  subscriptionTier: string;
-  isFeatured: boolean;
-  featuredPriority: number | null;
-  ratingAvg: number;
-  ratingCount: number;
-}
+import { useAdminDirectoryListings } from '@/hooks/admin/useAdminDirectoryListings';
 
 export default function AdminFeaturedDirectoryPage() {
-  const [listings, setListings] = useState<FeaturedListing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadFeaturedListings();
-  }, []);
-
-  const loadFeaturedListings = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/admin/directory/listings?featured=true', {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load featured listings');
-      }
-
-      const data = await response.json();
-      setListings(data.listings || []);
-    } catch (err) {
-      console.error('Error loading featured listings:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load listings');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { listings, loading, error } = useAdminDirectoryListings({ status: 'featured' });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -113,29 +73,27 @@ export default function AdminFeaturedDirectoryPage() {
                       <Badge variant="warning">
                         ⭐ Featured
                       </Badge>
-                      {listing.featuredPriority && (
-                        <Badge variant="default">
-                          Priority: {listing.featuredPriority}
-                        </Badge>
-                      )}
+                      <Badge variant="default">
+                        Quality: {listing.qualityScore}%
+                      </Badge>
                     </div>
                     <div className="mt-1 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <span>
-                        📍 {listing.city}, {listing.state}
+                        🏷️ {listing.tenant.subscriptionTier}
                       </span>
                       <span>
-                        🏷️ {listing.subscriptionTier}
+                        📦 {listing.itemCount} items
                       </span>
-                      {listing.ratingAvg > 0 && (
+                      {listing.primaryCategory && (
                         <span>
-                          ⭐ {listing.ratingAvg.toFixed(1)} ({listing.ratingCount} reviews)
+                          🏪 {listing.primaryCategory}
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Link
-                      href={`/admin/directory/listings/${listing.id}`}
+                      href={`/t/${listing.tenantId}/settings/directory`}
                       className="px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-700"
                     >
                       View Details

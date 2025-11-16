@@ -31,8 +31,23 @@ export function useDirectoryCategories(): DirectoryCategoriesHook {
           throw new Error('Failed to fetch categories');
         }
 
-        const data = await response.json();
-        setCategories(data.categories || []);
+        const result = await response.json();
+        
+        // Handle different response formats
+        // New format: { success: true, data: { categories: [...] } }
+        // Old format: { categories: [...] }
+        const categoriesData = result.success 
+          ? (result.data?.categories || [])
+          : (result.categories || []);
+        
+        // Map to expected format if needed
+        const mappedCategories = categoriesData.map((cat: any) => ({
+          name: cat.name || '',
+          slug: cat.slug || cat.name?.toLowerCase().replace(/\s+/g, '-') || '',
+          count: cat.storeCount || cat.count || 0,
+        }));
+        
+        setCategories(mappedCategories);
       } catch (err) {
         console.error('Error fetching categories:', err);
         setError(err instanceof Error ? err.message : 'Failed to load categories');
