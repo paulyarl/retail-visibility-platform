@@ -2402,34 +2402,18 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
     }
 
     // Search real Google taxonomy data from database
-    const lowerQuery = query.toLowerCase();
+    // Use case-insensitive search with mode: 'insensitive' for better UX
     const categories = await prisma.googleTaxonomy.findMany({
       where: {
         isActive: true,
         OR: [
-          { categoryPath: { contains: query } }, // Try case-sensitive first
-          { categoryId: { contains: query } }
+          { categoryPath: { contains: query, mode: 'insensitive' } },
+          { categoryId: { contains: query, mode: 'insensitive' } }
         ]
       },
       take: parseInt(limit as string, 10),
       orderBy: { categoryPath: 'asc' }
     });
-
-    // If no results with case-sensitive, try case-insensitive approach
-    if (categories.length === 0) {
-      const caseInsensitiveCategories = await prisma.googleTaxonomy.findMany({
-        where: {
-          isActive: true,
-          OR: [
-            { categoryPath: { contains: lowerQuery } },
-            { categoryId: { contains: lowerQuery } }
-          ]
-        },
-        take: parseInt(limit as string, 10),
-        orderBy: { categoryPath: 'asc' }
-      });
-      categories.push(...caseInsensitiveCategories);
-    }
 
     const results = categories.map(cat => ({
       id: cat.categoryId,
