@@ -16,6 +16,11 @@ interface Product {
   stock: number;
   imageUrl?: string;
   availability: 'in_stock' | 'out_of_stock' | 'preorder';
+  tenantCategory?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
 }
 
 interface ProductDisplayProps {
@@ -97,9 +102,16 @@ export default function ProductDisplay({ products, tenantId }: ProductDisplayPro
 
               {/* Product Info */}
               <div className="p-4">
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
-                  {product.brand}
-                </p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {product.brand}
+                  </p>
+                  {product.tenantCategory && (
+                    <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
+                      {product.tenantCategory.name}
+                    </span>
+                  )}
+                </div>
                 <h3 className="font-semibold text-neutral-900 dark:text-white line-clamp-2 mb-2">
                   {product.title}
                 </h3>
@@ -198,9 +210,16 @@ export default function ProductDisplay({ products, tenantId }: ProductDisplayPro
 
               {/* Product Info */}
               <div className="p-4">
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
-                  {product.brand}
-                </p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {product.brand}
+                  </p>
+                  {product.tenantCategory && (
+                    <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
+                      {product.tenantCategory.name}
+                    </span>
+                  )}
+                </div>
                 <h3 className="font-semibold text-neutral-900 dark:text-white line-clamp-2 mb-2">
                   {product.title}
                 </h3>

@@ -1032,6 +1032,7 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
     const limit = parseInt(req.query.limit as string || '12', 10);
     const skip = (page - 1) * limit;
     const search = req.query.search as string;
+    const categorySlug = req.query.category as string;
     
     // Build where clause - only show active, public items
     const where: any = { 
@@ -1039,6 +1040,13 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
       itemStatus: 'active',
       visibility: 'public'
     };
+    
+    // Apply category filter
+    if (categorySlug) {
+      where.tenantCategory = {
+        slug: categorySlug,
+      };
+    }
     
     // Apply search filter
     if (search) {
