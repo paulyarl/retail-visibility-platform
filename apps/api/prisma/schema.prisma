@@ -121,6 +121,11 @@ model Tenant {
   statusChangedBy       String?                @map("status_changed_by")
   reopeningDate         DateTime?              @map("reopening_date")
   closureReason         String?                @map("closure_reason")
+  slug                  String?                @unique // URL-friendly identifier
+  googleSyncEnabled     Boolean                @default(false) @map("google_sync_enabled")
+  googleLastSync        DateTime?              @map("google_last_sync")
+  googleProductCount    Int                    @default(0) @map("google_product_count")
+  directoryVisible      Boolean                @default(true) @map("directory_visible")
   items                 InventoryItem[]
   photos                PhotoAsset[]
   performance           ProductPerformance[]
@@ -154,6 +159,9 @@ model Tenant {
   @@index([serviceLevel])
   @@index([createdBy])
   @@index([locationStatus])
+  @@index([slug])
+  @@index([googleSyncEnabled, googleLastSync])
+  @@index([directoryVisible])
 }
 
 // Location Status Change Audit Log
