@@ -94,12 +94,87 @@ export class CategoryDirectoryService {
   }
   
   async getStoresByCategory(
-    categoryId: string,
+    categorySlug: string,
     location?: { lat: number; lng: number },
     radius?: number
   ) {
-    console.log('[CategoryService] getStoresByCategory called (stub)');
-    return [];
+    try {
+      console.log(`[CategoryService] Fetching stores for category: ${categorySlug}`);
+      
+      // 1. Find category by slug
+      const category = await prisma.tenantCategory.findFirst({
+        where: { 
+          slug: categorySlug, 
+          isActive: true 
+        },
+      });
+
+      if (!category) {
+        console.log(`[CategoryService] Category not found: ${categorySlug}`);
+        return [];
+      }
+      
+      // 2. Find tenants with products in this category
+      const stores = await prisma.tenant.findMany({
+        where: {
+          googleSyncEnabled: true,
+          directoryVisible: true,
+          locationStatus: 'active',
+          items: {
+            some: {
+              tenantCategoryId: category.id,
+              itemStatus: 'active',
+              visibility: 'public',
+            },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          businessProfile: {
+            select: {
+              businessName: true,
+              addressLine1: true,
+              city: true,
+              state: true,
+              postalCode: true,
+              latitude: true,
+              longitude: true,
+            },
+          },
+          _count: {
+            select: {
+              items: {
+                where: {
+                  tenantCategoryId: category.id,
+                  itemStatus: 'active',
+                  visibility: 'public',
+                },
+              },
+            },
+          },
+        },
+      });
+
+      console.log(`[CategoryService] Found ${stores.length} stores`);
+
+      return stores.map((store) => ({
+        id: store.id,
+        name: store.businessProfile?.businessName || store.name,
+        slug: store.slug,
+        address: store.businessProfile?.addressLine1,
+        city: store.businessProfile?.city,
+        state: store.businessProfile?.state,
+        postalCode: store.businessProfile?.postalCode,
+        latitude: store.businessProfile?.latitude,
+        longitude: store.businessProfile?.longitude,
+        productCount: store._count.items,
+      }));
+    } catch (error) {
+      console.error('[CategoryService] Error fetching stores by category:', error);
+      return [];
+    }
   }
   
   async getCategoryHierarchy(categoryId?: string) {
@@ -113,8 +188,36 @@ export class CategoryDirectoryService {
   }
   
   async getCategoryPath(categoryId: string) {
-    console.log('[CategoryService] getCategoryPath called (stub)');
-    return [];
+    try {
+      console.log(`[CategoryService] Building category path for: ${categoryId}`);
+      
+      const path: Array<{ id: string; name: string; slug: string; parentId: string | null }> = [];
+      let currentId: string | null = categoryId;
+      
+      // Walk up the parent chain
+      while (currentId) {
+        const category = await prisma.tenantCategory.findUnique({
+          where: { id: currentId },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            parentId: true,
+          },
+        });
+        
+        if (!category) break;
+        
+        path.unshift(category); // Add to beginning for correct order
+        currentId = category.parentId;
+      }
+      
+      console.log(`[CategoryService] Built path with ${path.length} levels`);
+      return path;
+    } catch (error) {
+      console.error('[CategoryService] Error building category path:', error);
+      return [];
+    }
   }
 }
 
