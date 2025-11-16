@@ -327,14 +327,14 @@ export default function ItemsClient({
   };
 
   const handleStatusToggle = (item: Item) => {
-    const newStatus = item.status === 'active' ? 'inactive' : 'active';
+    const newStatus = item.status === 'active' ? 'archived' : 'active';
     
-    // Only confirm when making inactive (blocks sync)
-    if (newStatus === 'inactive') {
+    // Only confirm when archiving (blocks sync)
+    if (newStatus === 'archived') {
       setConfirmDialog({
         isOpen: true,
-        title: 'Deactivate Item',
-        message: `Making "${item.name}" inactive will prevent it from syncing to Google Merchant Center. Continue?`,
+        title: 'Archive Item',
+        message: `Archiving "${item.name}" will prevent it from syncing to Google Merchant Center. Continue?`,
         variant: 'warning',
         onConfirm: async () => {
           try {

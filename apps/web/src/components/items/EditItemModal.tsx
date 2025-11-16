@@ -12,7 +12,7 @@ interface Item {
   price: number;
   stock?: number;
   description?: string;
-  status?: 'active' | 'inactive' | 'syncing';
+  status?: 'active' | 'inactive' | 'archived' | 'syncing';
   categoryPath?: string[];
 }
 
