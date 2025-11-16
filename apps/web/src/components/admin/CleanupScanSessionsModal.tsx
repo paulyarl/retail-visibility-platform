@@ -51,7 +51,8 @@ export default function CleanupScanSessionsModal({ isOpen, onClose }: CleanupSca
 
       if (!response.ok) throw new Error('Failed to fetch tenants');
       const data = await response.json();
-      setTenants(data.data || []);
+      // API returns array directly, not wrapped in { data: [...] }
+      setTenants(Array.isArray(data) ? data : (data.data || []));
     } catch (err) {
       setError('Failed to load tenants');
     } finally {
