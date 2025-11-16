@@ -68,9 +68,9 @@ SELECT
   t.google_sync_enabled,
   t.directory_visible
 FROM "Tenant" t
-INNER JOIN "TenantBusinessProfile" bp ON bp.tenant_id = t.id
+INNER JOIN tenant_business_profile bp ON bp.tenant_id = t.id
 INNER JOIN "InventoryItem" ii ON ii.tenant_id = t.id
-INNER JOIN "TenantCategory" tc ON ii.tenant_category_id = tc.id
+INNER JOIN tenant_category tc ON ii.tenant_category_id = tc.id
 WHERE 
   t.google_sync_enabled = true
   AND t.google_last_sync > NOW() - INTERVAL '24 hours'
