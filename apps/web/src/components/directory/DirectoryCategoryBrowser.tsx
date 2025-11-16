@@ -41,9 +41,12 @@ export default function DirectoryCategoryBrowser({
   return (
     <div className={`bg-white dark:bg-neutral-800 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
-          Browse by Category
-        </h2>
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🏷️</span>
+          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
+            Browse by Product Category
+          </h2>
+        </div>
         <button
           onClick={() => router.push('/directory/categories')}
           className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
