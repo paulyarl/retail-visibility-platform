@@ -8,6 +8,7 @@ import TenantMapSection from '@/components/tenant/TenantMapSection';
 import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductDisplay from '@/components/storefront/ProductDisplay';
+import CategorySidebar from '@/components/storefront/CategorySidebar';
 import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 import LocationClosedBanner from '@/components/storefront/LocationClosedBanner';
 
@@ -49,12 +50,20 @@ interface PlatformSettings {
   logoUrl?: string;
 }
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string; search?: string }>;
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  count: number;
+  googleCategoryId: string | null;
 }
 
-async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string) {
+interface PageProps {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ page?: string; search?: string; category?: string }>;
+}
+
+async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string) {
   try {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
@@ -108,9 +117,26 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch map location using utility
     const mapLocation = await getTenantMapLocation(tenantId);
 
-    // Fetch products for this tenant with optional search (using public endpoint)
+    // Fetch categories with counts
+    let categories: Category[] = [];
+    let uncategorizedCount = 0;
+    try {
+      const categoriesRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/categories`, {
+        cache: 'no-store',
+      });
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json();
+        categories = categoriesData.categories || [];
+        uncategorizedCount = categoriesData.uncategorizedCount || 0;
+      }
+    } catch (e) {
+      console.error('Failed to fetch categories:', e);
+    }
+
+    // Fetch products for this tenant with optional search and category filter
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-    const productsRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/items?page=${page}&limit=${limit}${searchParam}`, {
+    const categoryParam = category ? `&category=${encodeURIComponent(category)}` : '';
+    const productsRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/items?page=${page}&limit=${limit}${searchParam}${categoryParam}`, {
       cache: 'no-store',
     });
 
@@ -146,7 +172,11 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     const hasLogo = !!tenant.metadata?.logo_url;
     const hasBranding = hasLogo || hasHours;
     const storeStatus = computeStoreStatus(businessHours);
-    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus };
+    
+    // Find current category name if filtering
+    const currentCategory = category ? categories.find(c => c.slug === category) : null;
+    
+    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, uncategorizedCount, currentCategory };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -180,16 +210,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function TenantStorefrontPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { page: pageParam, search } = await searchParams;
+  const { page: pageParam, search, category } = await searchParams;
   const currentPage = parseInt(pageParam || '1', 10);
   
-  const data = await getTenantWithProducts(id, currentPage, 12, search);
+  const data = await getTenantWithProducts(id, currentPage, 12, search, category);
 
   if (!data) {
     notFound();
   }
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, uncategorizedCount, currentCategory } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
   const totalPages = Math.ceil(total / limit);
   
