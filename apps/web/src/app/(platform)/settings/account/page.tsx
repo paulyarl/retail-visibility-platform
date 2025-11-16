@@ -1,7 +1,8 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Pagination } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Shield, User, Building2, Crown } from 'lucide-react';
 import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
@@ -10,6 +11,16 @@ import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionS
 
 export default function AccountPage() {
   const { user } = useAuth();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Paginate tenants
+  const paginatedTenants = useMemo(() => {
+    if (!user?.tenants) return [];
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return user.tenants.slice(startIndex, endIndex);
+  }, [user?.tenants, currentPage, pageSize]);
 
   if (!user) {
     return (
@@ -242,15 +253,22 @@ export default function AccountPage() {
         {user.tenants && user.tenants.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Tenant Access</CardTitle>
-              <CardDescription>Stores and locations you have access to</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Tenant Access</CardTitle>
+                  <CardDescription>Stores and locations you have access to</CardDescription>
+                </div>
+                <Badge variant="info">
+                  {user.tenants.length} {user.tenants.length === 1 ? 'Location' : 'Locations'}
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {user.tenants.map((tenant) => (
+                {paginatedTenants.map((tenant) => (
                   <div
                     key={tenant.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
@@ -267,6 +285,22 @@ export default function AccountPage() {
                   </div>
                 ))}
               </div>
+              
+              {/* Pagination */}
+              {user.tenants.length > 10 && (
+                <div className="mt-6">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={user.tenants.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={(size) => {
+                      setPageSize(size);
+                      setCurrentPage(1);
+                    }}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
