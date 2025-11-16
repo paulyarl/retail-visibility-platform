@@ -1,28 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Use NEXT_PUBLIC_API_BASE_URL for consistency with client-side API calls
-const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_URL || 'http://localhost:4000';
+function buildAuthHeaders(req: Request): HeadersInit {
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+  const cookie = req.headers.get('cookie') || ''
+  let auth = req.headers.get('authorization') || undefined
+  if (!auth) {
+    const jar = Object.fromEntries(cookie.split(';').map(p => p.trim()).filter(Boolean).map(kv => {
+      const i = kv.indexOf('=')
+      return i === -1 ? [kv, ''] : [kv.slice(0, i), decodeURIComponent(kv.slice(1 + i))]
+    })) as Record<string, string>
+    const token = jar['ACCESS_TOKEN'] || jar['access_token'] || jar['token'] || jar['auth_token']
+    if (token) auth = `Bearer ${token}`
+  }
+  if (auth) headers['Authorization'] = auth
+  if (cookie) headers['Cookie'] = cookie
+  return headers
+}
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ organizationId: string }> }
 ) {
-  // Get authorization header from client request
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
   const { organizationId } = await params;
 
   try {
-    const response = await fetch(`${API_URL}/organizations/${organizationId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader,
-      },
+    const base = process.env.API_BASE_URL || 'http://localhost:4000';
+    const headers = buildAuthHeaders(req);
+    const response = await fetch(`${base}/api/organizations/${organizationId}`, {
+      headers,
+      cache: 'no-store',
     });
 
     if (!response.ok) {
