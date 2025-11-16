@@ -286,8 +286,9 @@ app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) =
       ...tenant,
       statusInfo,
     });
-  } catch (_e) {
-    res.status(500).json({ error: "failed_to_get_tenant" });
+  } catch (e: any) {
+    console.error('[GET /tenants/:id] Error:', e);
+    res.status(500).json({ error: "failed_to_get_tenant", details: e?.message });
   }
 });
 
