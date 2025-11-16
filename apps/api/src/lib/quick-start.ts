@@ -6,6 +6,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { suggestCategories, getCategoryById } from './google/taxonomy';
 
 const prisma = new PrismaClient();
 
@@ -14,14 +15,14 @@ const SCENARIOS = {
   grocery: {
     name: 'Grocery Store',
     categories: [
-      { name: 'Dairy & Eggs', slug: 'dairy-eggs', googleCategoryId: '422' },
-      { name: 'Produce', slug: 'produce', googleCategoryId: '2660' },
-      { name: 'Meat & Seafood', slug: 'meat-seafood', googleCategoryId: '2660' },
-      { name: 'Bakery', slug: 'bakery', googleCategoryId: '422' },
-      { name: 'Frozen Foods', slug: 'frozen-foods', googleCategoryId: '422' },
-      { name: 'Beverages', slug: 'beverages', googleCategoryId: '413' },
-      { name: 'Snacks', slug: 'snacks', googleCategoryId: '422' },
-      { name: 'Pantry Staples', slug: 'pantry-staples', googleCategoryId: '422' },
+      { name: 'Dairy & Eggs', slug: 'dairy-eggs', searchTerm: 'dairy eggs milk cheese' },
+      { name: 'Produce', slug: 'produce', searchTerm: 'fresh produce fruits vegetables' },
+      { name: 'Meat & Seafood', slug: 'meat-seafood', searchTerm: 'meat seafood fish chicken beef' },
+      { name: 'Bakery', slug: 'bakery', searchTerm: 'bakery bread pastries' },
+      { name: 'Frozen Foods', slug: 'frozen-foods', searchTerm: 'frozen food ice cream pizza' },
+      { name: 'Beverages', slug: 'beverages', searchTerm: 'beverages drinks juice coffee' },
+      { name: 'Snacks', slug: 'snacks', searchTerm: 'snacks chips cookies candy' },
+      { name: 'Pantry Staples', slug: 'pantry-staples', searchTerm: 'pantry staples pasta rice canned goods' },
     ],
     products: [
       { name: 'Organic Whole Milk', price: 549, category: 'Dairy & Eggs', brand: 'Organic Valley' },
@@ -59,13 +60,13 @@ const SCENARIOS = {
   fashion: {
     name: 'Fashion Boutique',
     categories: [
-      { name: 'Women\'s Tops', slug: 'womens-tops', googleCategoryId: '212' },
-      { name: 'Women\'s Bottoms', slug: 'womens-bottoms', googleCategoryId: '204' },
-      { name: 'Dresses', slug: 'dresses', googleCategoryId: '2271' },
-      { name: 'Men\'s Shirts', slug: 'mens-shirts', googleCategoryId: '212' },
-      { name: 'Men\'s Pants', slug: 'mens-pants', googleCategoryId: '204' },
-      { name: 'Accessories', slug: 'accessories', googleCategoryId: '167' },
-      { name: 'Shoes', slug: 'shoes', googleCategoryId: '187' },
+      { name: 'Women\'s Tops', slug: 'womens-tops', searchTerm: 'women tops shirts blouses' },
+      { name: 'Women\'s Bottoms', slug: 'womens-bottoms', searchTerm: 'women pants jeans skirts' },
+      { name: 'Dresses', slug: 'dresses', searchTerm: 'women dresses gowns' },
+      { name: 'Men\'s Shirts', slug: 'mens-shirts', searchTerm: 'men shirts polo oxford' },
+      { name: 'Men\'s Pants', slug: 'mens-pants', searchTerm: 'men pants jeans chinos' },
+      { name: 'Accessories', slug: 'accessories', searchTerm: 'fashion accessories bags belts' },
+      { name: 'Shoes', slug: 'shoes', searchTerm: 'shoes footwear sneakers boots' },
     ],
     products: [
       { name: 'Classic White T-Shirt', price: 2499, category: 'Women\'s Tops', brand: 'Everlane' },
@@ -89,12 +90,12 @@ const SCENARIOS = {
   electronics: {
     name: 'Electronics Store',
     categories: [
-      { name: 'Smartphones', slug: 'smartphones', googleCategoryId: '267' },
-      { name: 'Laptops', slug: 'laptops', googleCategoryId: '328' },
-      { name: 'Tablets', slug: 'tablets', googleCategoryId: '4745' },
-      { name: 'Accessories', slug: 'accessories', googleCategoryId: '222' },
-      { name: 'Audio', slug: 'audio', googleCategoryId: '249' },
-      { name: 'Smart Home', slug: 'smart-home', googleCategoryId: '222' },
+      { name: 'Smartphones', slug: 'smartphones', searchTerm: 'smartphones mobile phones cell' },
+      { name: 'Laptops', slug: 'laptops', searchTerm: 'laptops computers notebooks' },
+      { name: 'Tablets', slug: 'tablets', searchTerm: 'tablets ipad android' },
+      { name: 'Accessories', slug: 'accessories', searchTerm: 'electronics accessories cables chargers' },
+      { name: 'Audio', slug: 'audio', searchTerm: 'audio headphones speakers earbuds' },
+      { name: 'Smart Home', slug: 'smart-home', searchTerm: 'smart home automation devices' },
     ],
     products: [
       { name: 'iPhone 15 Pro', price: 99999, category: 'Smartphones', brand: 'Apple' },
@@ -113,13 +114,14 @@ const SCENARIOS = {
     ],
   },
   general: {
-    name: 'General Store',
+    name: 'General Retail',
     categories: [
-      { name: 'Home & Garden', slug: 'home-garden', googleCategoryId: '536' },
-      { name: 'Health & Beauty', slug: 'health-beauty', googleCategoryId: '469' },
-      { name: 'Sports & Outdoors', slug: 'sports-outdoors', googleCategoryId: '499' },
-      { name: 'Toys & Games', slug: 'toys-games', googleCategoryId: '1253' },
-      { name: 'Books & Media', slug: 'books-media', googleCategoryId: '783' },
+      { name: 'Home & Garden', slug: 'home-garden', searchTerm: 'home garden furniture decor' },
+      { name: 'Health & Beauty', slug: 'health-beauty', searchTerm: 'health beauty cosmetics skincare' },
+      { name: 'Sports & Outdoors', slug: 'sports-outdoors', searchTerm: 'sports outdoors fitness camping' },
+      { name: 'Toys & Games', slug: 'toys-games', searchTerm: 'toys games puzzles board games' },
+      { name: 'Books & Media', slug: 'books-media', searchTerm: 'books media magazines dvd' },
+      { name: 'Office Supplies', slug: 'office-supplies', searchTerm: 'office supplies stationery paper' },
     ],
     products: [
       { name: 'Throw Pillow', price: 2499, category: 'Home & Garden', brand: 'HomeGoods' },
@@ -182,9 +184,21 @@ export async function generateQuickStartProducts(
   const scenarioData = SCENARIOS[scenario];
   const timestamp = Date.now();
 
-  // Create categories
+  // Create categories with live Google taxonomy alignment
   const categories: Array<{ id: string; name: string; slug: string; originalName: string }> = [];
   for (const cat of scenarioData.categories) {
+    // Use live Google taxonomy to find best matching category
+    const suggestions = suggestCategories(cat.searchTerm, 1);
+    const googleCategoryId = suggestions.length > 0 ? suggestions[0].id : null;
+    
+    // Log the mapping for transparency
+    if (googleCategoryId) {
+      const googleCat = getCategoryById(googleCategoryId);
+      console.log(`[Quick Start] Mapped "${cat.name}" to Google category: ${googleCat?.path.join(' > ')} (ID: ${googleCategoryId})`);
+    } else {
+      console.warn(`[Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
+    }
+    
     const category = await prisma.tenantCategory.upsert({
       where: {
         tenantId_slug: {
@@ -194,14 +208,14 @@ export async function generateQuickStartProducts(
       },
       update: {
         name: cat.name,
-        googleCategoryId: cat.googleCategoryId,
+        googleCategoryId,
         isActive: true,
       },
       create: {
         tenantId,
         name: cat.name,
         slug: cat.slug,
-        googleCategoryId: cat.googleCategoryId,
+        googleCategoryId,
         isActive: true,
         sortOrder: categories.length,
       },
