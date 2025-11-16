@@ -10,6 +10,7 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
   const { tenantId } = await params;
   
   // Check if business hours feature is enabled via feature flag system
+  // Use effective-flags endpoint to check platform + tenant inheritance
   const serverApiBase = process.env.API_BASE_URL || "http://localhost:4000";
   const clientApiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
   let isEnabled = false;
@@ -23,15 +24,15 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    const res = await fetch(`${serverApiBase}/api/admin/tenant-flags/${tenantId}`, {
+    const res = await fetch(`${serverApiBase}/api/admin/effective-flags/${tenantId}`, {
       cache: 'no-store',
       headers
     });
     if (res.ok) {
       const data = await res.json();
-      // Check if FF_TENANT_GBP_HOURS_SYNC is enabled for this tenant
+      // Check if FF_TENANT_GBP_HOURS_SYNC is effectively enabled (platform or tenant)
       const hoursFlag = data.data?.find((f: any) => f.flag === 'FF_TENANT_GBP_HOURS_SYNC');
-      isEnabled = hoursFlag?.enabled === true;
+      isEnabled = hoursFlag?.tenantEffectiveOn === true;
     }
   } catch (e) {
     console.error('Failed to check hours flag:', e);
