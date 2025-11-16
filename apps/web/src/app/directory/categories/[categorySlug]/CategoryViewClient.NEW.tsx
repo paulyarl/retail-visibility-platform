@@ -277,7 +277,6 @@ export default function CategoryViewClient({
         {viewMode === 'map' && (
           <DirectoryMap
             listings={data?.listings || []}
-            loading={loading}
           />
         )}
       </div>
