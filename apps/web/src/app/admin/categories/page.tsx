@@ -29,6 +29,11 @@ export default function AdminCategoriesPage() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [confirmWriteOpen, setConfirmWriteOpen] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [taxonomySearch, setTaxonomySearch] = useState('');
+  const [taxonomyResults, setTaxonomyResults] = useState<Array<{ id: string; name: string; path: string[] }>>([]);
+  const [taxonomyLoading, setTaxonomyLoading] = useState(false);
+  const [selectedTaxonomies, setSelectedTaxonomies] = useState<Set<string>>(new Set());
   const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
   const apiUrl = (path: string) => `${API_BASE}${path}`;
   
@@ -223,6 +228,82 @@ export default function AdminCategoriesPage() {
     setShowDeleteModal(true);
   };
 
+  const searchTaxonomy = async (query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setTaxonomyResults([]);
+      return;
+    }
+    
+    setTaxonomyLoading(true);
+    try {
+      const res = await fetch(`/api/categories/search?q=${encodeURIComponent(query)}&limit=50`);
+      if (res.ok) {
+        const data = await res.json();
+        setTaxonomyResults(data.categories || []);
+      }
+    } catch (error) {
+      console.error('Failed to search taxonomy:', error);
+    } finally {
+      setTaxonomyLoading(false);
+    }
+  };
+
+  const toggleTaxonomySelection = (id: string) => {
+    const newSelected = new Set(selectedTaxonomies);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedTaxonomies(newSelected);
+  };
+
+  const handleImportSelected = async () => {
+    if (selectedTaxonomies.size === 0) return;
+    
+    const selected = taxonomyResults.filter(t => selectedTaxonomies.has(t.id));
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const taxonomy of selected) {
+      try {
+        // Generate slug from the last part of the path (the actual category name)
+        const name = taxonomy.path[taxonomy.path.length - 1];
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        
+        const res = await fetch('/api/platform/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, slug }),
+        });
+        
+        if (res.ok) {
+          successCount++;
+        } else {
+          const data = await res.json();
+          if (data.error !== 'duplicate_slug') {
+            errorCount++;
+          }
+          // Silently skip duplicates
+        }
+      } catch (error) {
+        errorCount++;
+      }
+    }
+    
+    await loadCategories();
+    setShowImportModal(false);
+    setTaxonomySearch('');
+    setTaxonomyResults([]);
+    setSelectedTaxonomies(new Set());
+    
+    if (successCount > 0) {
+      alert(`Successfully imported ${successCount} ${successCount === 1 ? 'category' : 'categories'}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`);
+    } else if (errorCount > 0) {
+      alert(`Failed to import categories. They may already exist.`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -391,12 +472,20 @@ export default function AdminCategoriesPage() {
           <p className="text-sm font-medium text-neutral-700">
             {categories.length} {categories.length === 1 ? 'category' : 'categories'}
           </p>
-          <Button
-            variant="primary"
-            onClick={() => setShowCreateModal(true)}
-          >
-            + Create Category
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setShowImportModal(true)}
+            >
+              📥 Import from Google
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setShowCreateModal(true)}
+            >
+              + Create Category
+            </Button>
+          </div>
         </div>
 
         {/* Categories List */}
@@ -607,6 +696,103 @@ export default function AdminCategoriesPage() {
             disabled={!categoryName.trim()}
           >
             Save Changes
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Import from Google Modal */}
+      <Modal
+        isOpen={showImportModal}
+        onClose={() => {
+          setShowImportModal(false);
+          setTaxonomySearch('');
+          setTaxonomyResults([]);
+          setSelectedTaxonomies(new Set());
+        }}
+        title="Import from Google Product Taxonomy"
+        description="Search and select categories from Google's official product taxonomy"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Search Google Categories"
+            placeholder="e.g., coffee, clothing, electronics..."
+            value={taxonomySearch}
+            onChange={(e) => {
+              setTaxonomySearch(e.target.value);
+              searchTaxonomy(e.target.value);
+            }}
+          />
+          
+          {taxonomyLoading && (
+            <div className="text-center py-4 text-neutral-500">
+              Searching...
+            </div>
+          )}
+          
+          {!taxonomyLoading && taxonomyResults.length > 0 && (
+            <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 rounded-lg p-3">
+              <div className="text-sm text-neutral-600 mb-2">
+                {selectedTaxonomies.size} selected
+              </div>
+              {taxonomyResults.map((result) => (
+                <div
+                  key={result.id}
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                    selectedTaxonomies.has(result.id)
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                  }`}
+                  onClick={() => toggleTaxonomySelection(result.id)}
+                >
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedTaxonomies.has(result.id)}
+                      onChange={() => {}}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-neutral-900">{result.name}</div>
+                      <div className="text-xs text-neutral-600 mt-1">
+                        {result.path.join(' > ')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {!taxonomyLoading && taxonomySearch.length >= 2 && taxonomyResults.length === 0 && (
+            <div className="text-center py-8 text-neutral-500">
+              No categories found. Try a different search term.
+            </div>
+          )}
+          
+          {taxonomySearch.length < 2 && (
+            <div className="text-center py-8 text-neutral-500">
+              Enter at least 2 characters to search
+            </div>
+          )}
+        </div>
+        <ModalFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setShowImportModal(false);
+              setTaxonomySearch('');
+              setTaxonomyResults([]);
+              setSelectedTaxonomies(new Set());
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleImportSelected}
+            disabled={selectedTaxonomies.size === 0}
+          >
+            Import {selectedTaxonomies.size > 0 ? `(${selectedTaxonomies.size})` : ''}
           </Button>
         </ModalFooter>
       </Modal>
