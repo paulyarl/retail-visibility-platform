@@ -1095,6 +1095,31 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
   }
 });
 
+// Public endpoint to get tenant categories with product counts (no auth required)
+app.get("/public/tenant/:tenantId/categories", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    if (!tenantId) return res.status(400).json({ error: "tenant_required" });
+    
+    // Import category count utility
+    const { getCategoryCounts, getUncategorizedCount, getTotalProductCount } = await import('./utils/category-counts');
+    
+    // Get categories with counts (only active, public products)
+    const categories = await getCategoryCounts(tenantId, false);
+    const uncategorizedCount = await getUncategorizedCount(tenantId, false);
+    const totalCount = await getTotalProductCount(tenantId, false);
+    
+    res.json({
+      categories,
+      uncategorizedCount,
+      totalCount,
+    });
+  } catch (e: any) {
+    console.error("[GET /public/tenant/:tenantId/categories] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_categories" });
+  }
+});
+
 // Public endpoint for features showcase config (no auth required)
 app.get("/api/public/features-showcase-config", async (req, res) => {
   try {
@@ -1739,6 +1764,7 @@ const listQuery = z.object({
   search: z.string().optional(), // Search by SKU or name
   status: z.enum(['all', 'active', 'inactive', 'syncing', 'trashed']).optional(), // Filter by status
   visibility: z.enum(['all', 'public', 'private']).optional(), // Filter by visibility
+  category: z.string().optional(), // Filter by category slug
   sortBy: z.enum(['name', 'sku', 'price', 'stock', 'updatedAt', 'createdAt']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
 }).transform((data) => ({
@@ -1791,6 +1817,13 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
           { OR: [{ visibility: 'public' }, { visibility: null }] },
         ];
       }
+    }
+    
+    // Apply category filter
+    if (parsed.data.category) {
+      where.tenantCategory = {
+        slug: parsed.data.category,
+      };
     }
     
     // Apply visibility filter
