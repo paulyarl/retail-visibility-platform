@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import ChangeLocationStatusModal from './ChangeLocationStatusModal';
+
 interface LocationStatusBannerProps {
   locationStatus: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
   reopeningDate?: string | Date | null;
@@ -72,6 +75,8 @@ export default function LocationStatusBanner({
   const config = getStatusConfig();
   if (!config) return null;
 
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+
   if (variant === 'full') {
     return (
       <div className={`rounded-lg border ${config.borderColor} ${config.bgColor} p-6 mb-6`}>
@@ -87,8 +92,8 @@ export default function LocationStatusBanner({
               {config.message}
             </p>
             <div className="flex flex-wrap gap-3">
-              <a
-                href={`/t/${tenantId}/settings`}
+              <button 
+                onClick={() => setIsStatusModalOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,14 +101,14 @@ export default function LocationStatusBanner({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 Manage Location Status
-              </a>
+              </button>
               {locationStatus === 'inactive' && (
-                <a
-                  href={`/t/${tenantId}/settings`}
+                <button 
+                  onClick={() => setIsStatusModalOpen(true)}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
                 >
                   Set Reopening Date
-                </a>
+                </button>
               )}
             </div>
           </div>
@@ -127,13 +132,23 @@ export default function LocationStatusBanner({
             {config.message}
           </p>
         </div>
-        <a
-          href={`/t/${tenantId}/settings`}
+        <button 
+          onClick={() => setIsStatusModalOpen(true)}
           className="text-sm font-medium hover:underline whitespace-nowrap"
         >
           Manage →
-        </a>
+        </button>
       </div>
     </div>
   );
 }
+
+{isStatusModalOpen && (
+  <ChangeLocationStatusModal
+    isOpen={isStatusModalOpen}
+    onClose={() => setIsStatusModalOpen(false)}
+    tenantId={tenantId}
+    tenantName={tenantName}
+    currentStatus={locationStatus}
+  />
+)}

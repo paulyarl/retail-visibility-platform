@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { canSwitchToTenant } from "@/lib/auth/access-control";
 import { navigateToTenant } from "@/lib/tenant-navigation";
 import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
+import ChangeLocationStatusModal from '@/components/tenant/ChangeLocationStatusModal';
 
 type Tenant = { 
   id: string; 
@@ -38,6 +39,7 @@ export default function TenantSwitcher() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
   const { user } = useAuth();
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -103,7 +105,10 @@ export default function TenantSwitcher() {
     return (
       <div className="inline-flex items-center gap-2 text-sm">
         <span className="text-xs text-neutral-500">Location</span>
-        <button onClick={() => onChange(only.id)} className="px-2 py-1 rounded-md hover:bg-neutral-50 flex items-center gap-2">
+        <button
+          onClick={() => setIsStatusModalOpen(true)}
+          className="px-2 py-1 rounded-md hover:bg-neutral-50 flex items-center gap-2"
+        >
           <span className="font-medium text-neutral-900">{only.name}</span>
           {getStatusBadge(only.locationStatus)}
           <MobileCapacityIndicator tenantId={only.id} showText={false} />
@@ -113,6 +118,37 @@ export default function TenantSwitcher() {
             </span>
           )}
         </button>
+        {isStatusModalOpen && (
+          <ChangeLocationStatusModal
+            isOpen={isStatusModalOpen}
+            onClose={() => setIsStatusModalOpen(false)}
+            tenantId={only.id}
+            tenantName={only.name}
+            currentStatus={only.locationStatus || 'active'}
+            onStatusChanged={() => {
+              // Refresh data after status change
+              const load = async () => {
+                // Skip if unauthenticated
+                if (typeof window === 'undefined') return;
+                
+                const token = localStorage.getItem('access_token');
+                if (!token) return;
+                try {
+                  const res = await api.get("/api/tenants", { skipAuthRedirect: true });
+                  if (!res.ok) return;
+                  const data: Tenant[] = await res.json();
+                  // Limit to authorized memberships to avoid confusion
+                  const memberIds = (user?.tenants || []).map(t => t.id);
+                  const filtered = memberIds.length > 0 ? data.filter(t => memberIds.includes(t.id)) : data;
+                  setTenants(filtered);
+                } catch (e) {
+                  // ignore for header
+                }
+              };
+              load();
+            }}
+          />
+        )}
       </div>
     );
   }

@@ -10,6 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { canEditTenant, canDeleteTenant, canRenameTenant } from "@/lib/auth/access-control";
 import { ContextBadges } from "@/components/ContextBadges";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
+import { StatusUpdateModal } from './StatusUpdateModal';
+import ChangeLocationStatusModal from '@/components/tenant/ChangeLocationStatusModal';
 
 type Tenant = { 
   id: string; 
@@ -48,6 +50,9 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     return 'grid';
   };
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(getInitialView);
+
+  // Status modal state
+  const [statusModalTenant, setStatusModalTenant] = useState<Tenant | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -175,7 +180,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
             </Button>
             <Button onClick={refresh} disabled={loading} variant="secondary">
               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
               {loading ? "Loading…" : "Refresh"}
             </Button>
@@ -464,7 +469,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     onEditProfile={() => router.push(`/t/${encodeURIComponent(t.id)}/onboarding`)}
                     onRename={onRename}
                     onDelete={() => onDelete(t.id)}
-                    onStatusChange={(tenantId) => router.push(`/t/${encodeURIComponent(tenantId)}/settings/location-status`)}
+                    onStatusChange={(tenant) => setStatusModalTenant(tenant)}
                     canEdit={canEdit}
                     canDelete={canDelete}
                     canRename={canRename}
@@ -491,6 +496,22 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   );
 }
 
+{/* Status Modal */}
+{statusModalTenant && (
+  <ChangeLocationStatusModal
+    tenantId={statusModalTenant.id}
+    tenantName={statusModalTenant.name}
+    currentStatus={statusModalTenant.locationStatus || 'active'}
+    isOpen={!!statusModalTenant}
+    onClose={() => setStatusModalTenant(null)}
+    onStatusChanged={() => {
+      // Refresh the tenant list after status change
+      refresh();
+      setStatusModalTenant(null);
+    }}
+  />
+)}
+
 function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete, onStatusChange, canEdit = false, canRename = false, canDelete = false }: {
   tenant: Tenant;
   index: number;
@@ -498,7 +519,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
   onEditProfile: () => void;
   onRename: (id: string, newName: string) => void;
   onDelete: () => void;
-  onStatusChange: (tenantId: string) => void;
+  onStatusChange: (tenant: Tenant) => void;
   canEdit?: boolean;
   canRename?: boolean;
   canDelete?: boolean;
@@ -506,6 +527,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(tenant.name);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   useEffect(() => setValue(tenant.name), [tenant.name]);
 
@@ -517,6 +539,12 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
   const handleDelete = () => {
     setShowDeleteModal(false);
     onDelete();
+  };
+
+  const handleStatusChange = () => {
+    setIsStatusModalOpen(false);
+    // Refresh the tenant list after status change
+    // This could be passed down as a prop if needed
   };
 
   return (
@@ -555,12 +583,15 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
                       <p className="font-bold text-primary-900 dark:text-primary-100 text-base">{tenant.name}</p>
                     </div>
                     {tenant.locationStatus && tenant.locationStatus !== 'active' && (
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
-                        tenant.locationStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
-                        tenant.locationStatus === 'inactive' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                        tenant.locationStatus === 'closed' ? 'bg-red-100 text-red-800 border-red-300' :
-                        'bg-gray-100 text-gray-800 border-gray-300'
-                      }`}>
+                      <button
+                        onClick={() => onStatusChange(tenant)}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
+                          tenant.locationStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200' :
+                          tenant.locationStatus === 'inactive' ? 'bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-200' :
+                          tenant.locationStatus === 'closed' ? 'bg-red-100 text-red-800 border-red-300 hover:bg-red-200' :
+                          'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200'
+                        }`}
+                      >
                         <span>
                           {tenant.locationStatus === 'pending' ? '🚧' :
                            tenant.locationStatus === 'inactive' ? '⏸️' :
@@ -568,7 +599,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
                            '📦'}
                         </span>
                         <span className="capitalize">{tenant.locationStatus}</span>
-                      </span>
+                      </button>
                     )}
                   </div>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">{tenant.id}</p>
@@ -586,7 +617,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
               <Button 
                 size="sm" 
                 variant={tenant.locationStatus === 'active' ? 'secondary' : 'danger'}
-                onClick={() => onStatusChange(tenant.id)}
+                onClick={() => onStatusChange(tenant)}
                 title="Change location status"
               >
                 {tenant.locationStatus === 'active' ? (
@@ -673,6 +704,15 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* Status Update Modal */}
+      <ChangeLocationStatusModal
+        tenantId={tenant.id}
+        currentStatus={tenant.locationStatus || 'active'}
+        isOpen={isStatusModalOpen}
+        onClose={() => setIsStatusModalOpen(false)}
+        onStatusUpdated={handleStatusChange}
+      />
     </>
   );
 }

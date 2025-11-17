@@ -62,7 +62,7 @@ const createUserSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   name: z.string().optional(),
-  role: z.enum(['USER', 'ADMIN']).default('USER'),
+  role: z.enum(['PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'PLATFORM_VIEWER', 'ADMIN', 'OWNER', 'USER']).default('USER'),
 });
 
 router.post('/users', requirePlatformAdmin, async (req: Request, res: Response) => {
