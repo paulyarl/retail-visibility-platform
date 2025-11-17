@@ -124,7 +124,7 @@ export default function TenantSwitcher() {
             onClose={() => setIsStatusModalOpen(false)}
             tenantId={only.id}
             tenantName={only.name}
-            currentStatus={only.locationStatus || 'active'}
+            initialStatus={only.locationStatus || 'active'}
             onStatusChanged={() => {
               // Refresh data after status change
               const load = async () => {

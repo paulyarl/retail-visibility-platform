@@ -282,7 +282,7 @@ export default function LocationStatusPage() {
           onClose={() => setShowModal(false)}
           tenantId={tenantId}
           tenantName={tenant.name}
-          currentStatus={currentStatus}
+          initialStatus={currentStatus}
           onStatusChanged={handleStatusChanged}
         />
       )}

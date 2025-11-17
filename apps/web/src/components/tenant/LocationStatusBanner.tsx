@@ -122,7 +122,7 @@ export default function LocationStatusBanner({
             onClose={() => setIsStatusModalOpen(false)}
             tenantId={tenantId}
             tenantName={tenantName}
-            currentStatus={locationStatus}
+            initialStatus={locationStatus}
           />
         )}
       </>
