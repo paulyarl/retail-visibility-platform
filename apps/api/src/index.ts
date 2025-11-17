@@ -431,7 +431,9 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
 
     // Check if user can change status
     const userRole = req.user?.role || 'USER';
-    const tenantRole = req.user?.tenantIds?.includes(id) ? 'TENANT_ADMIN' : userRole;
+    // Map deprecated ADMIN role to PLATFORM_ADMIN for backward compatibility
+    const normalizedRole = userRole === 'ADMIN' ? 'PLATFORM_ADMIN' : userRole;
+    const tenantRole = req.user?.tenantIds?.includes(id) ? 'TENANT_ADMIN' : normalizedRole;
     
     if (!canChangeStatus(tenantRole)) {
       return res.status(403).json({ 

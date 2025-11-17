@@ -1,1 +1,0 @@
-CREATE VIEW v_effective_sku_billing_policy AS SELECT * FROM sku_billing_policy WHERE scope = 'global' OR effective_from <= NOW() AND (effective_to IS NULL OR effective_to > NOW()) ORDER BY effective_from DESC LIMIT 1;

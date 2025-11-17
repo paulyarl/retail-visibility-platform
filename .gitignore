@@ -37,3 +37,18 @@ Thumbs.db
 # Windsurf cache
 .windsurf/
 .vercel
+
+# Database dumps and sensitive data
+*.sql
+!CHECK_*.sql
+!CLEANUP_*.sql
+!CREATE_*.sql
+!INSERT_*.sql
+!UPDATE_*.sql
+!MIGRATE_*.sql
+!MIGRATION_*.sql
+!NUKE_*.sql
+!NUCLEAR_RESET.sql
+!RESET_DATABASE.sql
+!SYNC_*.sql
+!VERIFY_*.sql
