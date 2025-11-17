@@ -568,9 +568,12 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
                       <p className="font-bold text-primary-900 dark:text-primary-100 text-base">{tenant.name}</p>
                     </div>
                     {tenant.locationStatus && tenant.locationStatus !== 'active' && (
-                      <button
-                        onClick={() => onStatusChange(tenant)}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering the parent button
+                          onStatusChange(tenant);
+                        }}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border cursor-pointer ${
                           tenant.locationStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200' :
                           tenant.locationStatus === 'inactive' ? 'bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-200' :
                           tenant.locationStatus === 'closed' ? 'bg-red-100 text-red-800 border-red-300 hover:bg-red-200' :
@@ -584,7 +587,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
                            '📦'}
                         </span>
                         <span className="capitalize">{tenant.locationStatus}</span>
-                      </button>
+                      </div>
                     )}
                   </div>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">{tenant.id}</p>
