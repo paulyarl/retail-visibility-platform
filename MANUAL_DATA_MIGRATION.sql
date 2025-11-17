@@ -23,7 +23,7 @@ INSERT INTO oauth_integrations (
   NULL,
   'google_business',
   '{
-    "access_token": "ACCESS_TOKEN",
+    "access_token": "",
     "token_type": "Bearer",
     "expires_in": 3599
   }'::json,
