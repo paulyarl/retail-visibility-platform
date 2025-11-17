@@ -28,7 +28,7 @@ INSERT INTO oauth_integrations (
   NULL, -- platform-level (not tenant-specific)
   'google_business',
   '{
-    "access_token": "YOUR_ACCESS_TOKEN_HERE",
+    "access_token": "REPLACE_WITH_NEW_TOKEN_HERE",
     "token_type": "Bearer",
     "expires_in": 3599
   }'::json,
