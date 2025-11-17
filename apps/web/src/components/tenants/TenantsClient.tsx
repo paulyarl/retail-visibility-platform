@@ -10,7 +10,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { canEditTenant, canDeleteTenant, canRenameTenant } from "@/lib/auth/access-control";
 import { ContextBadges } from "@/components/ContextBadges";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
-import { StatusUpdateModal } from './StatusUpdateModal';
 import ChangeLocationStatusModal from '@/components/tenant/ChangeLocationStatusModal';
 
 type Tenant = { 
