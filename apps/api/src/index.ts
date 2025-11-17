@@ -183,7 +183,7 @@ import healthRoutes from './routes/health';
 app.use('/health', healthRoutes);
 
 /* ------------------------------ TENANTS ------------------------------ */
-app.get("/tenants", authenticateToken, async (req, res) => {
+app.get("/api/tenants", authenticateToken, async (req, res) => {
   try {
     // Platform users (admin, support, viewer) see all tenants, regular users see only their tenants
     const { isPlatformUser } = await import('./utils/platform-admin');
@@ -232,7 +232,7 @@ app.get("/tenants", authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
+app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     let tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
@@ -298,7 +298,7 @@ const createTenantSchema = z.object({
   name: z.string().min(1),
   ownerId: z.string().optional(), // Optional: specify a different owner (for PLATFORM_SUPPORT)
 });
-app.post("/tenants", authenticateToken, checkTenantCreationLimit, async (req, res) => {
+app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req, res) => {
   const parsed = createTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   
@@ -368,7 +368,7 @@ const updateTenantSchema = z.object({
   language: z.string().min(1).optional(),
   currency: z.string().min(1).optional(),
 });
-app.put("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
+app.put("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   const parsed = updateTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
@@ -391,7 +391,7 @@ const patchTenantSchema = z.object({
   subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
   organizationId: z.string().optional(), // For linking to organization
 });
-app.patch("/tenants/:id", authenticateToken, requireAdmin, validateTierAssignment, validateTierCompatibility, validateTierSKUCompatibility, async (req, res) => {
+app.patch("/api/tenants/:id", authenticateToken, requireAdmin, validateTierAssignment, validateTierCompatibility, validateTierSKUCompatibility, async (req, res) => {
   const parsed = patchTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
@@ -406,7 +406,7 @@ app.patch("/tenants/:id", authenticateToken, requireAdmin, validateTierAssignmen
   }
 });
 
-app.delete("/tenants/:id", authenticateToken, checkTenantAccess, requireTenantOwner, async (req, res) => {
+app.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireTenantOwner, async (req, res) => {
   try {
     await prisma.tenant.delete({ where: { id: req.params.id } });
     res.status(204).end();
