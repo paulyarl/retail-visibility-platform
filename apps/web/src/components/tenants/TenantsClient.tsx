@@ -493,25 +493,24 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       </div>
     </div>
   );
+
+  {/* Status Modal */}
+  {statusModalTenant && (
+    <ChangeLocationStatusModal
+      tenantId={statusModalTenant.id}
+      tenantName={statusModalTenant.name}
+      currentStatus={statusModalTenant.locationStatus || 'active'}
+      isOpen={!!statusModalTenant}
+      onClose={() => setStatusModalTenant(null)}
+      onStatusChanged={() => {
+        // Refresh the tenant list after status change
+        refresh();
+        setStatusModalTenant(null);
+      }}
+    />
+  )}
 }
 
-{/* Status Modal */}
-{statusModalTenant && (
-  <ChangeLocationStatusModal
-    tenantId={statusModalTenant.id}
-    tenantName={statusModalTenant.name}
-    currentStatus={statusModalTenant.locationStatus || 'active'}
-    isOpen={!!statusModalTenant}
-    onClose={() => setStatusModalTenant(null)}
-    onStatusChanged={() => {
-      // Refresh the tenant list after status change
-      refresh();
-      setStatusModalTenant(null);
-    }}
-  />
-)}
-
-function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete, onStatusChange, canEdit = false, canRename = false, canDelete = false }: {
   tenant: Tenant;
   index: number;
   onSelect: () => void;
