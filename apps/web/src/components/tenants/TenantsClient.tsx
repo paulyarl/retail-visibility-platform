@@ -53,6 +53,12 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   // Status modal state
   const [statusModalTenant, setStatusModalTenant] = useState<Tenant | null>(null);
 
+  const openStatusModal = async (tenant: Tenant) => {
+    // Refresh data first to ensure we have the latest status
+    await refresh();
+    setStatusModalTenant(tenant);
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -468,7 +474,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     onEditProfile={() => router.push(`/t/${encodeURIComponent(t.id)}/onboarding`)}
                     onRename={onRename}
                     onDelete={() => onDelete(t.id)}
-                    onStatusChange={(tenant) => setStatusModalTenant(tenant)}
+                    onStatusChange={(tenant) => openStatusModal(tenant)}
                     onRefresh={refresh}
                     canEdit={canEdit}
                     canDelete={canDelete}
@@ -527,9 +533,9 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
   };
 
   const handleStatusChange = () => {
-    setIsStatusModalOpen(false);
+    setStatusModalTenant(null);
     // Refresh the tenant list after status change
-    onRefresh();
+    refresh();
   };
 
   return (
@@ -605,7 +611,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
               <Button 
                 size="sm" 
                 variant={tenant.locationStatus === 'active' ? 'secondary' : 'danger'}
-                onClick={() => setIsStatusModalOpen(true)}
+                onClick={() => openStatusModal(tenant)}
                 title="Change location status"
               >
                 {tenant.locationStatus === 'active' ? (
@@ -694,14 +700,16 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
       </Modal>
 
       {/* Status Update Modal */}
-      <ChangeLocationStatusModal
-        tenantId={tenant.id}
-        tenantName={tenant.name}
-        initialStatus={tenant.locationStatus || 'active'}
-        isOpen={isStatusModalOpen}
-        onClose={() => setIsStatusModalOpen(false)}
-        onStatusChanged={handleStatusChange}
-      />
+      {statusModalTenant && (
+        <ChangeLocationStatusModal
+          tenantId={statusModalTenant.id}
+          tenantName={statusModalTenant.name}
+          initialStatus={statusModalTenant.locationStatus || 'active'}
+          isOpen={true}
+          onClose={() => setStatusModalTenant(null)}
+          onStatusChanged={handleStatusChange}
+        />
+      )}
     </>
   );
 }
