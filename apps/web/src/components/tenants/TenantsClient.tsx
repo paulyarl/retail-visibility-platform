@@ -710,7 +710,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
         currentStatus={tenant.locationStatus || 'active'}
         isOpen={isStatusModalOpen}
         onClose={() => setIsStatusModalOpen(false)}
-        onStatusUpdated={handleStatusChange}
+        onStatusChanged={handleStatusChange}
       />
     </>
   );
