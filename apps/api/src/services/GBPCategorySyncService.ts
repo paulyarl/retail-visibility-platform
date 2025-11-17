@@ -158,7 +158,7 @@ export class GBPCategorySyncService {
   /**
    * Update stored tokens in oauth_integrations table
    */
-  private async updateStoredTokens(accessToken: string, refreshToken: string, expiryDate?: number): Promise<void> {
+  private async updateStoredTokens(accessToken: string, refreshToken: string, expiryDate?: number | null): Promise<void> {
     try {
       const tokenData = {
         access_token: accessToken,
@@ -356,6 +356,12 @@ export class GBPCategorySyncService {
         failed++;
       }
     }
+
+    return { applied, failed };
+  }
+
+  /**
+   * Seed hardcoded GBP categories to database as fallback when OAuth is unavailable
    */
   async seedHardcodedCategories(): Promise<number> {
     const hardcodedCategories = [
