@@ -4,8 +4,8 @@
  * Similar to TaxonomySyncService but for GBP categories
  */
 
+import { google } from 'googleapis';
 import { prisma } from '../prisma';
-import { decryptToken, refreshAccessToken, encryptToken } from '../lib/google/oauth';
 
 interface GBPCategory {
   categoryId: string;
@@ -70,17 +70,107 @@ export class GBPCategorySyncService {
       return null;
     }
   }
+  
+  /**
+   * Get access token from oauth_integrations table (platform-level)
+   */
+  private async getAccessToken(): Promise<string | null> {
+    try {
+      // Check for platform-level Google Business OAuth integration
+      const oauthIntegration = await prisma.$queryRaw<any[]>`
+        SELECT access_token, refresh_token, expires_at, scopes
+        FROM oauth_integrations
+        WHERE provider = 'google_business'
+          AND tenant_id IS NULL
+          AND is_active = true
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+
+      if (!oauthIntegration || oauthIntegration.length === 0) {
+        console.log('[GBPCategorySync] No Google Business OAuth integration found');
+        return null;
+      }
+
+      const integration = oauthIntegration[0];
+      const tokens = JSON.parse(integration.access_token);
+
+      // Check if token is expired
+      if (tokens.expiry_date && tokens.expiry_date < Date.now()) {
+        // Refresh token using existing OAuth service
+        const newAccessToken = await this.refreshAccessToken(tokens.refresh_token);
+        return newAccessToken;
+      }
+
+      return tokens.access_token;
+    } catch (error) {
+      console.error('[GBPCategorySync] Failed to get access token:', error);
+      return null;
+    }
+  }
 
   /**
+   * Refresh access token using existing OAuth credentials
+   */
+  private async refreshAccessToken(refreshToken: string): Promise<string> {
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_BUSINESS_CLIENT_ID,
+      process.env.GOOGLE_BUSINESS_CLIENT_SECRET,
+      process.env.GOOGLE_BUSINESS_REDIRECT_URI
+    );
+
+    oauth2Client.setCredentials({
+      refresh_token: refreshToken
+    });
+
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    const newAccessToken = credentials.access_token!;
+
+    // Update the stored tokens in oauth_integrations table
+    await this.updateStoredTokens(newAccessToken, refreshToken, credentials.expiry_date);
+
+    return newAccessToken;
+  }
+
+  /**
+   * Update stored tokens in oauth_integrations table
+   */
+  private async updateStoredTokens(accessToken: string, refreshToken: string, expiryDate?: number): Promise<void> {
+    try {
+      const tokenData = {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        token_type: 'Bearer',
+        expiry_date: expiryDate
+      };
+
+      await prisma.$executeRaw`
+        UPDATE oauth_integrations
+        SET access_token = ${JSON.stringify(tokenData)},
+            expires_at = ${expiryDate ? new Date(expiryDate) : null},
+            updated_at = NOW()
+        WHERE provider = 'google_business'
+          AND tenant_id IS NULL
+          AND is_active = true
+      `;
+
+      console.log('[GBPCategorySync] Updated stored tokens in oauth_integrations');
+    } catch (error) {
+      console.error('[GBPCategorySync] Failed to update stored tokens:', error);
+      // Don't throw - token refresh succeeded, just couldn't save
+    }
+  }
+
+  
+  /**
    * Fetch latest GBP categories from Google API
-   * Requires OAuth token with business.manage scope
    */
   async fetchLatestCategories(options: {
     regionCode?: string;
     languageCode?: string;
     pageSize?: number;
   } = {}): Promise<{
-    categories: GBPCategory[];
+    categories: any[];
     totalCount: number;
     version: string;
   }> {
@@ -91,75 +181,65 @@ export class GBPCategorySyncService {
     } = options;
 
     try {
-      const accessToken = await this.getAnyValidAccessToken();
-
-      // If we don't have an OAuth token yet, fall back to hardcoded categories
+      // Get access token from existing OAuth integration
+      const accessToken = await this.getAccessToken();
+      
       if (!accessToken) {
-        console.log('[GBPCategorySync] No OAuth token available, using hardcoded GBP categories');
+        console.log('[GBPCategorySync] No OAuth token available, using hardcoded fallback');
         return this.getHardcodedCategories();
       }
 
-      const categories: GBPCategory[] = [];
+      // Create authenticated client
+      const auth = new google.auth.OAuth2();
+      auth.setCredentials({ access_token: accessToken });
+      
+      const mybusiness = google.mybusiness({ version: 'v4', auth });
+
+      const categories: any[] = [];
       let nextPageToken: string | undefined;
       let totalCount = 0;
 
+      console.log('[GBPCategorySync] Fetching categories from Google API...');
+
       do {
-        const params = new URLSearchParams({
+        const response = await mybusiness.categories.list({
           regionCode,
           languageCode,
-          pageSize: pageSize.toString(),
+          pageSize,
+          pageToken: nextPageToken
         });
 
-        if (nextPageToken) {
-          params.set('pageToken', nextPageToken);
+        if (response.data.categories) {
+          categories.push(...response.data.categories.map(cat => ({
+            categoryId: cat.name || '',
+            displayName: cat.displayName || '',
+            serviceTypes: cat.serviceTypes || [],
+            moreHoursTypes: cat.moreHoursTypes || []
+          })));
         }
 
-        const response = await fetch(`${this.API_BASE}/categories?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('[GBPCategorySync] Failed to fetch GBP categories from API:', {
-            status: response.status,
-            statusText: response.statusText,
-            body: errorText,
-          });
-          return this.getHardcodedCategories();
-        }
-
-        const data: any = await response.json();
-
-        if (Array.isArray(data.categories)) {
-          for (const cat of data.categories) {
-            categories.push({
-              categoryId: cat.name || '',
-              displayName: cat.displayName || '',
-              serviceTypes: cat.serviceTypes || [],
-              moreHoursTypes: cat.moreHoursTypes || [],
-            });
-          }
-        }
-
-        totalCount = typeof data.totalCategoryCount === 'number'
-          ? data.totalCategoryCount
-          : categories.length;
-        nextPageToken = data.nextPageToken;
+        totalCount = response.data.totalCategoryCount || 0;
+        nextPageToken = response.data.nextPageToken;
+        
+        console.log(`[GBPCategorySync] Fetched ${categories.length}/${totalCount} categories`);
       } while (nextPageToken);
+
+      console.log(`[GBPCategorySync] Successfully fetched ${categories.length} categories from Google API`);
 
       return {
         categories,
         totalCount,
-        version: this.generateVersion(),
+        version: this.generateVersion()
       };
     } catch (error) {
-      console.error('[GBPCategorySync] Failed to fetch categories:', error);
+      console.error('[GBPCategorySync] Failed to fetch categories from API:', error);
+      
+      // Fallback to hardcoded categories
+      console.log('[GBPCategorySync] Falling back to hardcoded categories');
       return this.getHardcodedCategories();
     }
   }
+
 
   /**
    * Check for updates by comparing with database
