@@ -623,7 +623,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
               <Button 
                 size="sm" 
                 variant={tenant.locationStatus === 'active' ? 'secondary' : 'danger'}
-                onClick={() => openStatusModal(tenant)}
+                onClick={() => onStatusChange(tenant)}
                 title="Change location status"
               >
                 {tenant.locationStatus === 'active' ? (
