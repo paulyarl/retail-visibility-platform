@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       headers['Authorization'] = authHeader;
     }
     
-    const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, { headers });
+    const res = await fetch(`${base}/api/tenants/${encodeURIComponent(id)}`, { headers });
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (_e) {
@@ -35,7 +35,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       headers['Authorization'] = authHeader;
     }
     
-    const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, {
+    const res = await fetch(`${base}/api/tenants/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(body),
@@ -52,7 +52,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     const { id } = await context.params;
     const body = await req.json();
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    console.log('[PATCH /api/tenants/:id] Proxying to:', `${base}/tenants/${id}`);
+    console.log('[PATCH /api/tenants/:id] Proxying to:', `${base}/api/tenants/${id}`);
     console.log('[PATCH /api/tenants/:id] Body:', body);
     
     // Forward Authorization header
@@ -64,7 +64,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       headers['Authorization'] = authHeader;
     }
     
-    const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, {
+    const res = await fetch(`${base}/api/tenants/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify(body),
@@ -102,7 +102,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
       headers['Authorization'] = authHeader;
     }
     
-    const res = await fetch(`${base}/tenants/${encodeURIComponent(id)}`, {
+    const res = await fetch(`${base}/api/tenants/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers,
     });

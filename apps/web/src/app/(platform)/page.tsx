@@ -147,7 +147,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
       
       try {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const tenantRes = await api.get(`${apiBaseUrl}/tenants/${selectedTenantId}`);
+        const tenantRes = await api.get(`${apiBaseUrl}/api/tenants/${selectedTenantId}`);
         if (tenantRes.ok) {
           const tenantInfo = await tenantRes.json();
           setTenantData({

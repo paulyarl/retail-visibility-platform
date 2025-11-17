@@ -15,7 +15,7 @@ export async function POST(
     }
     
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/tenant/${encodeURIComponent(tenantId)}/banner`, {
+    const res = await fetch(`${base}/api/tenant/${encodeURIComponent(tenantId)}/banner`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',

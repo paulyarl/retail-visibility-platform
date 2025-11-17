@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
   const base = process.env.API_BASE_URL || 'http://localhost:4000';
-  console.log('[API Proxy] Fetching tenants from:', `${base}/tenants`);
+  console.log('[API Proxy] Fetching tenants from:', `${base}/api/tenants`);
   
   // Forward Authorization header from client to backend
   const authHeader = req.headers.get('authorization');
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     headers['Authorization'] = authHeader;
   }
   
-  const res = await fetch(`${base}/tenants`, { headers });
+  const res = await fetch(`${base}/api/tenants`, { headers });
   
   console.log('[API Proxy] Response status:', res.status);
   
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       headers['Authorization'] = authHeader;
     }
     
-    const res = await fetch(`${base}/tenants`, {
+    const res = await fetch(`${base}/api/tenants`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),

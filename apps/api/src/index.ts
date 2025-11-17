@@ -956,7 +956,7 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     const { basePrisma } = await import('./prisma');
     const bpResults = await basePrisma.$queryRaw`
-      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, created_at, updated_at FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
+      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, updated_at FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
     `;
     const bp = (bpResults as any[])[0] || null;
     
@@ -1440,7 +1440,7 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
 });
 
 // Banner upload endpoint (similar to logo but for wide banners)
-app.post("/tenant/:id/banner", logoUploadMulter.single("file"), async (req, res) => {
+app.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (req, res) => {
   try {
     const tenantId = req.params.id;
     console.log(`[Banner Upload] Starting upload for tenant ${tenantId}`);

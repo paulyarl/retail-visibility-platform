@@ -75,9 +75,15 @@ export function useDashboardData(isAuthenticated: boolean, authLoading: boolean)
 
       // Get tenant ID from localStorage to fetch correct tenant data
       const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
-      const url = tenantId 
-        ? `/api/dashboard?tenantId=${encodeURIComponent(tenantId)}`
-        : '/api/dashboard';
+
+      // Don't fetch dashboard data if no tenant is selected
+      if (!tenantId) {
+        setData(null);
+        setLoading(false);
+        return;
+      }
+
+      const url = `/api/dashboard?tenantId=${encodeURIComponent(tenantId)}`;
 
       const response = await api.get(url);
 

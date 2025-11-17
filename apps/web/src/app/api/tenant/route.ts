@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
     // Fetch tenant from backend API
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/tenants/${userData.tenantId}`);
+    const res = await fetch(`${base}/api/tenants/${userData.tenantId}`);
     
     if (!res.ok) {
       return NextResponse.json({ error: 'tenant_not_found' }, { status: 404 });

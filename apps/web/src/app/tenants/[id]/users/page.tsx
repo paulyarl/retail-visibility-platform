@@ -205,7 +205,7 @@ export default function TenantUsersPage() {
           description="Add, remove, and manage user roles within this tenant"
           icon={Icons.Users}
           backLink={{
-            href: `/tenants/${tenantId}`,
+            href: `/t/${tenantId}`,
             label: 'Back to Tenant'
           }}
           actions={
