@@ -70,17 +70,17 @@ export default async function handler(
       return res.status(200).json({
         success: false,
         message: 'Sync failed, but fetch succeeded',
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         fetchCount: fetchResult.categories.length,
         usingGoogleAPI: fetchResult.categories.length > 100,
         usingFallback: fetchResult.categories.length <= 100
       });
-    } catch (fallbackError) {
+    } catch (fallbackError: unknown) {
       return res.status(500).json({
         success: false,
-        message: 'Both sync and fetch failed',
-        error: error.message,
-        fallbackError: fallbackError.message
+        message: 'Sync test failed',
+        error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+        details: 'Check OAuth token validity and try again'
       });
     }
   }
