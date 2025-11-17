@@ -59,6 +59,12 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     setStatusModalTenant(tenant);
   };
 
+  const handleStatusChange = () => {
+    setStatusModalTenant(null);
+    // Refresh the tenant list after status change
+    refresh();
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -542,12 +548,6 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
   const handleDelete = () => {
     setShowDeleteModal(false);
     onDelete();
-  };
-
-  const handleStatusChange = () => {
-    setStatusModalTenant(null);
-    // Refresh the tenant list after status change
-    refresh();
   };
 
   return (
