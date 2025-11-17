@@ -497,9 +497,9 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   {/* Status Modal */}
   {statusModalTenant && (
     <ChangeLocationStatusModal
-      tenantId={statusModalTenant.id}
-      tenantName={statusModalTenant.name}
-      currentStatus={statusModalTenant.locationStatus || 'active'}
+      tenantId={statusModalTenant?.id || ''}
+      tenantName={statusModalTenant?.name || ''}
+      currentStatus={statusModalTenant?.locationStatus || 'active'}
       isOpen={!!statusModalTenant}
       onClose={() => setStatusModalTenant(null)}
       onStatusChanged={() => {
