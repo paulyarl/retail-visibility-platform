@@ -6,6 +6,7 @@
 
 import { google } from 'googleapis';
 import { prisma } from '../prisma';
+import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
 
 interface GBPCategory {
   categoryId: string;
@@ -189,12 +190,7 @@ export class GBPCategorySyncService {
         return this.getHardcodedCategories();
       }
 
-      // Create authenticated client
-      const auth = new google.auth.OAuth2();
-      auth.setCredentials({ access_token: accessToken });
-      
-      const mybusiness = google.mybusiness({ version: 'v4', auth });
-
+      // Fetch categories using direct API call
       const categories: any[] = [];
       let nextPageToken: string | undefined;
       let totalCount = 0;
@@ -202,15 +198,31 @@ export class GBPCategorySyncService {
       console.log('[GBPCategorySync] Fetching categories from Google API...');
 
       do {
-        const response = await mybusiness.categories.list({
+        const params = new URLSearchParams({
           regionCode,
           languageCode,
-          pageSize,
-          pageToken: nextPageToken
+          pageSize: pageSize.toString(),
+          ...(nextPageToken && { pageToken: nextPageToken })
         });
 
-        if (response.data.categories) {
-          categories.push(...response.data.categories.map(cat => ({
+        const response = await fetch(
+          `https://mybusinessbusinessinformation.googleapis.com/v1/categories?${params}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Google API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.categories) {
+          categories.push(...data.categories.map((cat: any) => ({
             categoryId: cat.name || '',
             displayName: cat.displayName || '',
             serviceTypes: cat.serviceTypes || [],
@@ -218,8 +230,8 @@ export class GBPCategorySyncService {
           })));
         }
 
-        totalCount = response.data.totalCategoryCount || 0;
-        nextPageToken = response.data.nextPageToken;
+        totalCount = data.totalCategoryCount || 0;
+        nextPageToken = data.nextPageToken;
         
         console.log(`[GBPCategorySync] Fetched ${categories.length}/${totalCount} categories`);
       } while (nextPageToken);
