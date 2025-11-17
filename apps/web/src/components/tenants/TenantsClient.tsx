@@ -498,6 +498,18 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
           )}
         </AnimatedCard>
       </div>
+
+      {/* Status Update Modal */}
+      {statusModalTenant && (
+        <ChangeLocationStatusModal
+          tenantId={statusModalTenant.id}
+          tenantName={statusModalTenant.name}
+          initialStatus={statusModalTenant.locationStatus || 'active'}
+          isOpen={true}
+          onClose={() => setStatusModalTenant(null)}
+          onStatusChanged={handleStatusChange}
+        />
+      )}
     </div>
   );
 }
@@ -698,18 +710,6 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
           </Button>
         </ModalFooter>
       </Modal>
-
-      {/* Status Update Modal */}
-      {statusModalTenant && (
-        <ChangeLocationStatusModal
-          tenantId={statusModalTenant.id}
-          tenantName={statusModalTenant.name}
-          initialStatus={statusModalTenant.locationStatus || 'active'}
-          isOpen={true}
-          onClose={() => setStatusModalTenant(null)}
-          onStatusChanged={handleStatusChange}
-        />
-      )}
     </>
   );
 }
