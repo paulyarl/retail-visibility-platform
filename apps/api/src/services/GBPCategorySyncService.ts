@@ -356,44 +356,28 @@ export class GBPCategorySyncService {
         failed++;
       }
     }
-
-    return { applied, failed };
-  }
-
-  /**
-   * Seed database with hardcoded categories (fallback)
-   * Used when OAuth is not configured or API is unavailable
    */
   async seedHardcodedCategories(): Promise<number> {
     const hardcodedCategories = [
-      // Food & Beverage
       { id: "gcid:grocery_store", name: "Grocery store", displayName: "Grocery store" },
       { id: "gcid:convenience_store", name: "Convenience store", displayName: "Convenience store" },
       { id: "gcid:supermarket", name: "Supermarket", displayName: "Supermarket" },
       { id: "gcid:liquor_store", name: "Liquor store", displayName: "Liquor store" },
       { id: "gcid:specialty_food_store", name: "Specialty food store", displayName: "Specialty food store" },
-      
-      // General Retail
       { id: "gcid:clothing_store", name: "Clothing store", displayName: "Clothing store" },
       { id: "gcid:shoe_store", name: "Shoe store", displayName: "Shoe store" },
       { id: "gcid:electronics_store", name: "Electronics store", displayName: "Electronics store" },
       { id: "gcid:furniture_store", name: "Furniture store", displayName: "Furniture store" },
       { id: "gcid:hardware_store", name: "Hardware store", displayName: "Hardware store" },
-      
-      // Health & Beauty
       { id: "gcid:pharmacy", name: "Pharmacy", displayName: "Pharmacy" },
       { id: "gcid:beauty_supply_store", name: "Beauty supply store", displayName: "Beauty supply store" },
       { id: "gcid:cosmetics_store", name: "Cosmetics store", displayName: "Cosmetics store" },
       { id: "gcid:health_and_beauty_shop", name: "Health and beauty shop", displayName: "Health and beauty shop" },
-      
-      // Specialty Stores
       { id: "gcid:book_store", name: "Book store", displayName: "Book store" },
       { id: "gcid:pet_store", name: "Pet store", displayName: "Pet store" },
       { id: "gcid:toy_store", name: "Toy store", displayName: "Toy store" },
       { id: "gcid:sporting_goods_store", name: "Sporting goods store", displayName: "Sporting goods store" },
       { id: "gcid:gift_shop", name: "Gift shop", displayName: "Gift shop" },
-      
-      // Additional common categories
       { id: "gcid:department_store", name: "Department store", displayName: "Department store" },
       { id: "gcid:discount_store", name: "Discount store", displayName: "Discount store" },
       { id: "gcid:variety_store", name: "Variety store", displayName: "Variety store" },
@@ -406,30 +390,81 @@ export class GBPCategorySyncService {
       { id: "gcid:wine_store", name: "Wine store", displayName: "Wine store" },
     ];
 
-    let seeded = 0;
+    try {
+      console.log(`[GBPCategorySync] Seeding ${hardcodedCategories.length} GBP categories...`);
 
-    for (const category of hardcodedCategories) {
-      try {
-        await prisma.gBPCategory.upsert({
-          where: { id: category.id },
-          update: {
-            displayName: category.displayName,
-            updatedAt: new Date()
-          },
-          create: {
-            id: category.id,
-            name: category.name,
-            displayName: category.displayName,
-            isActive: true
+      // Use a transaction to ensure atomicity and better performance
+      const result = await prisma.$transaction(async (tx) => {
+        let upserted = 0;
+
+        for (const category of hardcodedCategories) {
+          // Check if category exists
+          const existing = await tx.gBPCategory.findUnique({
+            where: { id: category.id },
+            select: { id: true, displayName: true }
+          });
+
+          if (!existing) {
+            // Create new category
+            await tx.gBPCategory.create({
+              data: {
+                id: category.id,
+                name: category.name,
+                displayName: category.displayName,
+                isActive: true
+              }
+            });
+            upserted++;
+          } else if (existing.displayName !== category.displayName) {
+            // Update existing category if displayName changed
+            await tx.gBPCategory.update({
+              where: { id: category.id },
+              data: {
+                displayName: category.displayName,
+                updatedAt: new Date()
+              }
+            });
+            upserted++;
           }
-        });
-        seeded++;
-      } catch (error) {
-        console.error(`[GBPCategorySync] Failed to seed ${category.id}:`, error);
-      }
-    }
+        }
 
-    return seeded;
+        return upserted;
+      });
+
+      console.log(`[GBPCategorySync] Successfully seeded/updated ${result} GBP categories`);
+      return result;
+
+    } catch (error) {
+      console.error('[GBPCategorySync] Failed to seed GBP categories:', error);
+
+      // Fallback: try individual operations with error handling
+      console.log('[GBPCategorySync] Attempting fallback individual seeding...');
+      let seeded = 0;
+
+      for (const category of hardcodedCategories) {
+        try {
+          await prisma.gBPCategory.upsert({
+            where: { id: category.id },
+            update: {
+              displayName: category.displayName,
+              updatedAt: new Date()
+            },
+            create: {
+              id: category.id,
+              name: category.name,
+              displayName: category.displayName,
+              isActive: true
+            }
+          });
+          seeded++;
+        } catch (error) {
+          console.error(`[GBPCategorySync] Failed to seed ${category.id}:`, error);
+        }
+      }
+
+      console.log(`[GBPCategorySync] Fallback seeding completed: ${seeded}/${hardcodedCategories.length} categories`);
+      return seeded;
+    }
   }
 
   /**
