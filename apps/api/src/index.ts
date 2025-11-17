@@ -140,6 +140,8 @@ import tenantTierRoutes from './routes/tenant-tier';
 import promotionRoutes from './routes/promotion';
 import tenantLimitsRoutes from './routes/tenant-limits';
 
+import testGbpSyncRoutes from './routes/test-gbp-sync';
+
 const app = express();
 
 /* ------------------------- middleware ------------------------- */
@@ -3466,6 +3468,9 @@ app.get("/api/gbp/categories", async (req, res) => {
     return res.status(500).json({ error: 'failed_to_search_categories' });
   }
 });
+
+// Mount test GBP sync routes
+app.use('/test', testGbpSyncRoutes);
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
