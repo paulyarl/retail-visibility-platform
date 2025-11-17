@@ -469,6 +469,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     onRename={onRename}
                     onDelete={() => onDelete(t.id)}
                     onStatusChange={(tenant) => setStatusModalTenant(tenant)}
+                    onRefresh={refresh}
                     canEdit={canEdit}
                     canDelete={canDelete}
                     canRename={canRename}
@@ -493,25 +494,9 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       </div>
     </div>
   );
-
-  {/* Status Modal */}
-  {statusModalTenant && (
-    <ChangeLocationStatusModal
-      tenantId={statusModalTenant?.id || ''}
-      tenantName={statusModalTenant?.name || ''}
-      currentStatus={statusModalTenant?.locationStatus || 'active'}
-      isOpen={!!statusModalTenant}
-      onClose={() => setStatusModalTenant(null)}
-      onStatusChanged={() => {
-        // Refresh the tenant list after status change
-        refresh();
-        setStatusModalTenant(null);
-      }}
-    />
-  )}
 }
 
-function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete, onStatusChange, canEdit = false, canRename = false, canDelete = false }: {
+function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete, onStatusChange, onRefresh, canEdit = false, canRename = false, canDelete = false }: {
   tenant: Tenant;
   index: number;
   onSelect: () => void;
@@ -519,6 +504,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
   onRename: (id: string, newName: string) => void;
   onDelete: () => void;
   onStatusChange: (tenant: Tenant) => void;
+  onRefresh: () => void;
   canEdit?: boolean;
   canRename?: boolean;
   canDelete?: boolean;
@@ -543,7 +529,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
   const handleStatusChange = () => {
     setIsStatusModalOpen(false);
     // Refresh the tenant list after status change
-    // This could be passed down as a prop if needed
+    onRefresh();
   };
 
   return (
@@ -616,7 +602,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
               <Button 
                 size="sm" 
                 variant={tenant.locationStatus === 'active' ? 'secondary' : 'danger'}
-                onClick={() => onStatusChange(tenant)}
+                onClick={() => setIsStatusModalOpen(true)}
                 title="Change location status"
               >
                 {tenant.locationStatus === 'active' ? (
