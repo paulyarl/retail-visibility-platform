@@ -96,11 +96,27 @@ export class GBPCategorySyncService {
       const integration = oauthIntegration[0];
       const tokens = JSON.parse(integration.access_token);
 
-      // Check if token is expired
-      if (tokens.expiry_date && tokens.expiry_date < Date.now()) {
-        // Refresh token using existing OAuth service
-        const newAccessToken = await this.refreshAccessToken(tokens.refresh_token);
-        return newAccessToken;
+      // Check if token is expired (use expires_at from database or calculate from expires_in)
+      const now = new Date();
+      const expiresAt = integration.expires_at ? new Date(integration.expires_at) : null;
+      
+      if (expiresAt && expiresAt <= now) {
+        console.log('[GBPCategorySync] Token expired, attempting refresh...');
+        
+        // Try to refresh token if we have a refresh token
+        if (tokens.refresh_token || integration.refresh_token) {
+          try {
+            const refreshToken = tokens.refresh_token || integration.refresh_token;
+            const newAccessToken = await this.refreshAccessToken(refreshToken);
+            return newAccessToken;
+          } catch (refreshError) {
+            console.error('[GBPCategorySync] Token refresh failed:', refreshError);
+            return null;
+          }
+        }
+        
+        console.log('[GBPCategorySync] Token expired and no refresh token available');
+        return null;
       }
 
       return tokens.access_token;
@@ -114,23 +130,29 @@ export class GBPCategorySyncService {
    * Refresh access token using existing OAuth credentials
    */
   private async refreshAccessToken(refreshToken: string): Promise<string> {
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_BUSINESS_CLIENT_ID,
-      process.env.GOOGLE_BUSINESS_CLIENT_SECRET,
-      process.env.GOOGLE_BUSINESS_REDIRECT_URI
-    );
+    try {
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_BUSINESS_CLIENT_ID,
+        process.env.GOOGLE_BUSINESS_CLIENT_SECRET,
+        process.env.GOOGLE_BUSINESS_REDIRECT_URI
+      );
 
-    oauth2Client.setCredentials({
-      refresh_token: refreshToken
-    });
+      oauth2Client.setCredentials({
+        refresh_token: refreshToken
+      });
 
-    const { credentials } = await oauth2Client.refreshAccessToken();
-    const newAccessToken = credentials.access_token!;
+      // Get new access token
+      const { credentials } = await oauth2Client.refreshAccessToken();
+      const newAccessToken = credentials.access_token!;
 
-    // Update the stored tokens in oauth_integrations table
-    await this.updateStoredTokens(newAccessToken, refreshToken, credentials.expiry_date);
+      // Update the stored tokens in oauth_integrations table
+      await this.updateStoredTokens(newAccessToken, refreshToken, credentials.expiry_date);
 
-    return newAccessToken;
+      return newAccessToken;
+    } catch (error) {
+      console.error('[GBPCategorySync] Failed to refresh access token:', error);
+      throw error;
+    }
   }
 
   /**
