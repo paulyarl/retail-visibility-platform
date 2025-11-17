@@ -8,7 +8,7 @@ interface ChangeLocationStatusModalProps {
   onClose: () => void;
   tenantId: string;
   tenantName: string;
-  currentStatus: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
+  initialStatus: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
   onStatusChanged?: () => void;
 }
 
@@ -75,27 +75,58 @@ export default function ChangeLocationStatusModal({
   onClose,
   tenantId,
   tenantName,
-  currentStatus,
+  initialStatus,
   onStatusChanged,
 }: ChangeLocationStatusModalProps) {
-  const [selectedStatus, setSelectedStatus] = useState<string>(currentStatus);
+  const [currentStatus, setCurrentStatus] = useState<string>(initialStatus);
+  const [selectedStatus, setSelectedStatus] = useState<string>(initialStatus);
   const [reason, setReason] = useState('');
   const [reopeningDate, setReopeningDate] = useState('');
   const [impact, setImpact] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  // Fetch current status from backend when modal opens
+  useEffect(() => {
+    if (isOpen && tenantId) {
+      fetchCurrentStatus();
+    }
+  }, [isOpen, tenantId]);
+
+  const fetchCurrentStatus = async () => {
+    setStatusLoading(true);
+    try {
+      const response = await api.get(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tenants/${tenantId}`);
+      if (response.ok) {
+        const tenantData = await response.json();
+        const backendStatus = tenantData.locationStatus || 'active';
+        setCurrentStatus(backendStatus);
+        setSelectedStatus(backendStatus); // Reset selected status to current
+      } else {
+        console.error('Failed to fetch current tenant status');
+        setCurrentStatus(initialStatus); // Fallback to prop
+        setSelectedStatus(initialStatus);
+      }
+    } catch (err) {
+      console.error('Error fetching current status:', err);
+      setCurrentStatus(initialStatus); // Fallback to prop
+      setSelectedStatus(initialStatus);
+    } finally {
+      setStatusLoading(false);
+    }
+  };
 
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setSelectedStatus(currentStatus);
       setReason('');
       setReopeningDate('');
       setImpact(null);
       setError(null);
     }
-  }, [isOpen, currentStatus]);
+  }, [isOpen]);
 
   // Fetch impact preview when status changes
   useEffect(() => {
@@ -165,6 +196,20 @@ export default function ChangeLocationStatusModal({
   };
 
   if (!isOpen) return null;
+
+  if (statusLoading) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const selectedOption = STATUS_OPTIONS.find(opt => opt.value === selectedStatus);
   const allowedTransitions = STATUS_OPTIONS.filter(opt => {

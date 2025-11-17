@@ -697,7 +697,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
       <ChangeLocationStatusModal
         tenantId={tenant.id}
         tenantName={tenant.name}
-        currentStatus={tenant.locationStatus || 'active'}
+        initialStatus={tenant.locationStatus || 'active'}
         isOpen={isStatusModalOpen}
         onClose={() => setIsStatusModalOpen(false)}
         onStatusChanged={handleStatusChange}
