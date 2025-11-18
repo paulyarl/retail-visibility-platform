@@ -88,13 +88,22 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
+    // If user selects archived filter, refresh to include archived tenants
+    if (statusFilter === 'archived') {
+      refresh(true);
+    }
   }, [searchQuery, chainFilter, statusFilter]);
 
-  const refresh = async () => {
+  const refresh = async (includeArchived = false) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get("/api/tenants");
+      const params = new URLSearchParams();
+      if (includeArchived) {
+        params.append('includeArchived', 'true');
+      }
+      const url = `/api/tenants${params.toString() ? '?' + params.toString() : ''}`;
+      const res = await api.get(url);
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
       // The API already filters tenants based on user permissions, so we don't need to filter again
@@ -470,6 +479,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     onDelete={() => onDelete(t.id)}
                     onStatusChange={(tenant) => setStatusModalTenant(tenant)}
                     onRefresh={refresh}
+                    statusFilter={statusFilter}
                     canEdit={canEdit}
                     canDelete={canDelete}
                     canRename={canRename}
@@ -496,7 +506,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   );
 }
 
-function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete, onStatusChange, onRefresh, canEdit = false, canRename = false, canDelete = false }: {
+function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete, onStatusChange, onRefresh, statusFilter, canEdit = false, canRename = false, canDelete = false }: {
   tenant: Tenant;
   index: number;
   onSelect: () => void;
@@ -504,7 +514,8 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
   onRename: (id: string, newName: string) => void;
   onDelete: () => void;
   onStatusChange: (tenant: Tenant) => void;
-  onRefresh: () => void;
+  onRefresh: (includeArchived?: boolean) => void;
+  statusFilter?: 'all' | 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
   canEdit?: boolean;
   canRename?: boolean;
   canDelete?: boolean;
@@ -529,7 +540,8 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
   const handleStatusChange = () => {
     setIsStatusModalOpen(false);
     // Refresh the tenant list after status change
-    onRefresh();
+    // If tenant might be archived, include archived tenants in refresh
+    refresh(statusFilter === 'archived' || statusFilter === 'all');
   };
 
   return (
