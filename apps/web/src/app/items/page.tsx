@@ -1,5 +1,3 @@
-import ItemsClient from "@/components/items/ItemsClient";
-import { headers } from 'next/headers';
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";

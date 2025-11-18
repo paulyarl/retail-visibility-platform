@@ -9,7 +9,7 @@ if (process.env.NODE_ENV === 'production') {
   console.log('⚠️  SSL certificate validation disabled for Supabase compatibility');
 }
 import { Pool } from 'pg';
-import { prisma } from "./prisma";
+import { prisma, basePrisma } from "./prisma";
 import { z } from "zod";
 import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
 
@@ -488,7 +488,8 @@ const {
   validateStatusChange, 
   canChangeStatus, 
   getLocationStatusInfo,
-  getStatusChangeImpact 
+  getStatusChangeImpact,
+  getStatusTransitions 
 } = require('./utils/location-status');
 
 // Change location status
@@ -566,6 +567,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
       });
     }
 
+<<<<<<< HEAD
     console.log(`[PATCH /tenants/${id}/status] Validation passed, preparing transaction`);
 
     // Update tenant status only (audit log is optional and done outside transaction)
@@ -584,6 +586,21 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
     let auditLogId = null;
     try {
       const logEntry = await prisma.locationStatusLog.create({
+=======
+    // Update tenant status and create audit log in a transaction
+    const [updated, auditLog] = await basePrisma.$transaction([
+      basePrisma.tenant.update({
+        where: { id },
+        data: {
+          locationStatus: status,
+          statusChangedAt: new Date(),
+          statusChangedBy: req.user?.userId,
+          reopeningDate: reopeningDate ? new Date(reopeningDate) : null,
+          closureReason: reason || null,
+        },
+      }),
+      basePrisma.locationStatusLog.create({
+>>>>>>> staging
         data: {
           tenantId: id,
           oldStatus: tenant.locationStatus as any,
@@ -667,17 +684,24 @@ app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess
 
     const impact = getStatusChangeImpact(tenant.locationStatus as any, status);
     
+<<<<<<< HEAD
     // For preview, allow self-transitions without requiring a reason
     const isSelfTransition = tenant.locationStatus === status;
     const validation = isSelfTransition 
       ? { valid: true } // Allow self-transitions
       : validateStatusChange(tenant.locationStatus as any, status); // Check normal transitions
+=======
+    // For preview, only check if transition is allowed (don't require reason yet)
+    const allowedTransitions = getStatusTransitions(tenant.locationStatus as any);
+    const valid = allowedTransitions.includes(status);
+    const error = valid ? undefined : `Cannot transition from ${tenant.locationStatus} to ${status}. Allowed transitions: ${allowedTransitions.join(', ')}`;
+>>>>>>> staging
 
     res.json({
       currentStatus: tenant.locationStatus,
       newStatus: status,
-      valid: validation.valid,
-      error: validation.error,
+      valid,
+      error,
       impact,
     });
   } catch (error: any) {
@@ -685,8 +709,6 @@ app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess
     res.status(500).json({ error: "failed_to_preview_status", details: error.message });
   }
 });
-
-// Get location status change history
 app.get("/api/tenants/:id/status-history", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1955,8 +1977,31 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
   // Check tenant access
   const tenantId = parsed.data.tenantId;
   const isAdmin = isPlatformAdmin(req.user);
+<<<<<<< HEAD
   const hasAccess = isAdmin || (tenantId && req.user?.tenantIds.includes(tenantId));
   
+=======
+  let hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenantId) ?? false);
+
+  // Fallback: if JWT tenantIds are empty, verify membership via userTenant table
+  if (!hasAccess && req.user?.userId && tenantId) {
+    try {
+      const userTenant = await prisma.userTenant.findUnique({
+        where: {
+          userId_tenantId: {
+            userId: req.user.userId,
+            tenantId,
+          },
+        },
+        select: { id: true },
+      });
+      hasAccess = !!userTenant;
+    } catch (e) {
+      console.error('[GET /api/items] Error checking tenant membership:', e);
+    }
+  }
+
+>>>>>>> staging
   if (!hasAccess) {
     return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
   }

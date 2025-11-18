@@ -19,7 +19,7 @@ export const STATUS_TRANSITIONS: Record<LocationStatus, LocationStatus[]> = {
   active: ['inactive', 'closed', 'archived'],
   inactive: ['active', 'closed', 'archived'],
   closed: ['archived'],
-  archived: [], // Cannot transition from archived
+  archived: ['active'], // Cannot transition from archived
 };
 
 /**

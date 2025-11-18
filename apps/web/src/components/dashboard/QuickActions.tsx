@@ -29,6 +29,20 @@ export default function QuickActions({ tenantId, canManageSettings = false }: Qu
         </CardContent>
       </Card>
 
+      <Card className="hover:shadow-lg transition-shadow">
+        <CardHeader>
+          <CardTitle>Manage Locations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-neutral-600 mb-4">
+            View and manage all your store locations
+          </p>
+          <Link href="/tenants">
+            <Button className="w-full">Go to Locations</Button>
+          </Link>
+        </CardContent>
+      </Card>
+
       {/* Scan Products */}
       <Card className="hover:shadow-lg transition-shadow">
         <CardHeader>

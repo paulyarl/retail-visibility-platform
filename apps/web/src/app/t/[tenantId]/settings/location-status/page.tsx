@@ -47,7 +47,7 @@ export default function LocationStatusPage() {
     try {
       // Fetch tenant info
       const tenantRes = await api.get(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/tenants/${tenantId}`
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tenants/${tenantId}`
       );
       if (tenantRes.ok) {
         const tenantData = await tenantRes.json();

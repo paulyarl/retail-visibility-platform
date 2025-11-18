@@ -1,7 +1,7 @@
 import SetTenantId from "@/components/client/SetTenantId";
 import ItemsPageClient from "@/components/items/ItemsPageClient";
 
-export default async function TenantScopedItemsPage({
+export default async function TenantScopedItemsPreviewPage({
   params,
 }: {
   params: Promise<{ tenantId: string }>;

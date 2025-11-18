@@ -158,7 +158,7 @@ export function requirePlatformUser(req: Request, res: Response, next: NextFunct
  * Middleware to check if user has access to a specific tenant
  * Uses centralized helper for consistent platform role checking
  */
-export function checkTenantAccess(req: Request, res: Response, next: NextFunction) {
+export async function checkTenantAccess(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
   }
@@ -174,15 +174,36 @@ export function checkTenantAccess(req: Request, res: Response, next: NextFunctio
     return; // Error response already sent by requireTenantId
   }
 
-  // Check if user has access to this tenant
-  if (!req.user.tenantIds.includes(tenantId as string)) {
-    return res.status(403).json({ 
-      error: 'tenant_access_denied', 
-      message: 'You do not have access to this tenant' 
-    });
+  // First, check JWT tenantIds array
+  if (req.user.tenantIds.includes(tenantId as string)) {
+    return next();
   }
 
-  next();
+  // Fallback: if tenantIds array is empty or does not include this tenant,
+  // verify membership via userTenant table so owners/members are not blocked
+  try {
+    const { prisma } = await import('../prisma');
+    const userTenant = await prisma.userTenant.findUnique({
+      where: {
+        userId_tenantId: {
+          userId: req.user.userId,
+          tenantId: tenantId as string,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (userTenant) {
+      return next();
+    }
+  } catch (error) {
+    console.error('[checkTenantAccess] Error checking tenant membership:', error);
+  }
+
+  return res.status(403).json({ 
+    error: 'tenant_access_denied', 
+    message: 'You do not have access to this tenant' 
+  });
 }
 
 /**
