@@ -458,8 +458,8 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
     }
 
     // Update tenant status and create audit log in a transaction
-    const [updated, auditLog] = await prisma.$transaction([
-      prisma.tenant.update({
+    const [updated, auditLog] = await basePrisma.$transaction([
+      basePrisma.tenant.update({
         where: { id },
         data: {
           locationStatus: status,
@@ -469,7 +469,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
           closureReason: reason || null,
         },
       }),
-      prisma.locationStatusLog.create({
+      basePrisma.locationStatusLog.create({
         data: {
           tenantId: id,
           oldStatus: tenant.locationStatus as any,
