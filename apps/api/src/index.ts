@@ -9,7 +9,7 @@ if (process.env.NODE_ENV === 'production') {
   console.log('⚠️  SSL certificate validation disabled for Supabase compatibility');
 }
 import { Pool } from 'pg';
-import { prisma } from "./prisma";
+import { prisma, basePrisma } from "./prisma";
 import { z } from "zod";
 import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
 
@@ -526,13 +526,17 @@ app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess
     }
 
     const impact = getStatusChangeImpact(tenant.locationStatus as any, status);
-    const validation = validateStatusChange(tenant.locationStatus as any, status);
+    
+    // For preview, only check if transition is allowed (don't require reason yet)
+    const allowedTransitions = getStatusTransitions(tenant.locationStatus as any);
+    const valid = allowedTransitions.includes(status);
+    const error = valid ? undefined : `Cannot transition from ${tenant.locationStatus} to ${status}. Allowed transitions: ${allowedTransitions.join(', ')}`;
 
     res.json({
       currentStatus: tenant.locationStatus,
       newStatus: status,
-      valid: validation.valid,
-      error: validation.error,
+      valid,
+      error,
       impact,
     });
   } catch (error: any) {
@@ -540,8 +544,6 @@ app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess
     res.status(500).json({ error: "failed_to_preview_status", details: error.message });
   }
 });
-
-// Get location status change history
 app.get("/api/tenants/:id/status-history", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { id } = req.params;
