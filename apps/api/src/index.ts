@@ -1813,8 +1813,26 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
   // Check tenant access
   const tenantId = parsed.data.tenantId;
   const isAdmin = isPlatformAdmin(req.user);
-  const hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenantId) ?? false);
-  
+  let hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenantId) ?? false);
+
+  // Fallback: if JWT tenantIds are empty, verify membership via userTenant table
+  if (!hasAccess && req.user?.userId && tenantId) {
+    try {
+      const userTenant = await prisma.userTenant.findUnique({
+        where: {
+          userId_tenantId: {
+            userId: req.user.userId,
+            tenantId,
+          },
+        },
+        select: { id: true },
+      });
+      hasAccess = !!userTenant;
+    } catch (e) {
+      console.error('[GET /api/items] Error checking tenant membership:', e);
+    }
+  }
+
   if (!hasAccess) {
     return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
   }

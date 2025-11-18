@@ -40,15 +40,20 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'inactive' | 'closed' | 'archived'>('all');
   
   // View mode toggle
-  const getInitialView = (): 'grid' | 'list' => {
-    if (typeof window === 'undefined') return 'grid';
+  // Important for hydration: default to 'grid' on both server and initial client render,
+  // then read localStorage AFTER hydration to avoid SSR/client mismatch.
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // Read saved view mode on client after hydration
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
       const saved = localStorage.getItem('tenants_view_mode');
-      if (saved === 'grid' || saved === 'list') return saved as 'grid' | 'list';
+      if (saved === 'grid' || saved === 'list') {
+        setViewMode(saved as 'grid' | 'list');
+      }
     } catch {}
-    return 'grid';
-  };
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(getInitialView);
+  }, []);
 
   // Status modal state
   const [statusModalTenant, setStatusModalTenant] = useState<Tenant | null>(null);
@@ -80,28 +85,18 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     return filteredTenants.slice(startIndex, endIndex);
   }, [filteredTenants, currentPage, pageSize]);
 
-  // Load tenants on mount
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  // Reset to page 1 when filters change
+  // Reset to page 1 when status filter changes and reload tenants
   useEffect(() => {
     setCurrentPage(1);
-    // Handle different filter scenarios
-    if (statusFilter === 'all') {
-      // 'all' filter: include archived tenants but no specific status filter
-      refresh(true);
-    } else if (statusFilter === 'archived') {
-      // 'archived' filter: include archived and filter to archived status
-      refresh(true, 'archived');
-    } else {
-      // Specific status filter: don't include archived, filter to specific status
-      refresh(false, statusFilter);
-    }
-  }, [searchQuery, chainFilter, statusFilter]);
+    refresh();
+  }, [statusFilter]);
 
-  const refresh = async (includeArchived = false, statusParam?: string) => {
+  // Reset to page 1 when search or chain filter changes (client-side only)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, chainFilter]);
+
+  const fetchTenants = async (includeArchived = false, statusParam?: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -122,6 +117,19 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       setError("Failed to load tenants");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refresh = async () => {
+    if (statusFilter === 'all') {
+      // 'all' filter: include archived tenants but no specific status filter
+      await fetchTenants(true);
+    } else if (statusFilter === 'archived') {
+      // 'archived' filter: include archived and filter to archived status
+      await fetchTenants(true, 'archived');
+    } else {
+      // Specific status filter: don't include archived, filter to specific status
+      await fetchTenants(false, statusFilter);
     }
   };
 
@@ -479,22 +487,24 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                   const canRename = user ? canRenameTenant(user, t.id) : false;
                   
                   return (
-                  <TenantRow 
-                    key={t.id} 
-                    tenant={t}
-                    index={index}
-                    onSelect={() => router.push(`/items?tenantId=${encodeURIComponent(t.id)}`)}
-                    onEditProfile={() => router.push(`/t/${encodeURIComponent(t.id)}/onboarding`)}
-                    onRename={onRename}
-                    onDelete={() => onDelete(t.id)}
-                    onStatusChange={(tenant) => setStatusModalTenant(tenant)}
-                    onRefresh={refresh}
-                    statusFilter={statusFilter}
-                    canEdit={canEdit}
-                    canDelete={canDelete}
-                    canRename={canRename}
-                  />
-                )})}
+                    <TenantRow 
+                      key={t.id} 
+                      tenant={t}
+                      index={index}
+                      onSelect={() => router.push(`/t/${encodeURIComponent(t.id)}/dashboard`)}
+                      onViewItems={() => router.push(`/t/${encodeURIComponent(t.id)}/items`)}
+                      onEditProfile={() => router.push(`/t/${encodeURIComponent(t.id)}/onboarding`)}
+                      onRename={onRename}
+                      onDelete={() => onDelete(t.id)}
+                      onStatusChange={(tenant) => setStatusModalTenant(tenant)}
+                      onRefresh={refresh}
+                      statusFilter={statusFilter}
+                      canEdit={canEdit}
+                      canDelete={canDelete}
+                      canRename={canRename}
+                    />
+                  )
+                })}
               </div>
             )}
           </CardContent>
@@ -516,10 +526,11 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   );
 }
 
-function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete, onStatusChange, onRefresh, statusFilter, canEdit = false, canRename = false, canDelete = false }: {
+function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRename, onDelete, onStatusChange, onRefresh, statusFilter, canEdit = false, canRename = false, canDelete = false }: {
   tenant: Tenant;
   index: number;
   onSelect: () => void;
+  onViewItems?: () => void;
   onEditProfile: () => void;
   onRename: (id: string, newName: string) => void;
   onDelete: () => void;
@@ -685,7 +696,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
               </svg>
               View Storefront
             </Button>
-            <Button size="sm" onClick={onSelect}>
+            <Button size="sm" onClick={onViewItems ?? onSelect}>
               <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>

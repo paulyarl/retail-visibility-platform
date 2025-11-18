@@ -171,15 +171,13 @@ export default function ChangeLocationStatusModal({
     // Can't transition to current status
     if (opt.value === currentStatus) return false;
     
-    // Archived can't transition to anything
-    if (currentStatus === 'archived') return false;
-    
-    // Define allowed transitions
+    // Define allowed transitions (must stay in sync with backend STATUS_TRANSITIONS)
     const transitions: Record<string, string[]> = {
       pending: ['active', 'archived'],
       active: ['inactive', 'closed', 'archived'],
       inactive: ['active', 'closed', 'archived'],
       closed: ['archived'],
+      archived: ['active'],
     };
     
     return transitions[currentStatus]?.includes(opt.value);

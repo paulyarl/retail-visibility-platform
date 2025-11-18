@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Input, Select, Alert } from '@/components/ui';
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
@@ -36,10 +36,16 @@ export default function StoreIdentityStep({
   const [formData, setFormData] = useState<Partial<BusinessProfile>>(sanitizedInitialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const hasInitializedFromInitialData = useRef(false);
 
   // Update formData when initialData changes (e.g., when API data loads)
   useEffect(() => {
+    // Only hydrate once when non-empty initial data first arrives to avoid
+    // infinite loops with onDataChange -> parent state -> initialData changes.
+    if (hasInitializedFromInitialData.current) return;
+
     if (Object.keys(initialData).length > 0) {
+      hasInitializedFromInitialData.current = true;
       console.log('[StoreIdentityStep] Updating formData with initialData:', initialData);
       const sanitized = sanitizeData(initialData);
       
@@ -77,7 +83,7 @@ export default function StoreIdentityStep({
         onValidationChange(false);
       }
     }
-  }, [initialData, onValidationChange]);
+  }, [initialData, onDataChange, onValidationChange]);
 
   const validateField = (name: string, value: any) => {
     try {
