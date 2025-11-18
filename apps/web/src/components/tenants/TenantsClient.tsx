@@ -541,7 +541,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
     setIsStatusModalOpen(false);
     // Refresh the tenant list after status change
     // If tenant might be archived, include archived tenants in refresh
-    refresh(statusFilter === 'archived' || statusFilter === 'all');
+    onRefresh(statusFilter === 'archived' || statusFilter === 'all');
   };
 
   return (
