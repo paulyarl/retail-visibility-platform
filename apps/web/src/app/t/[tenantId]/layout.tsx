@@ -26,7 +26,7 @@ export default async function TenantLayout({ children, params }: { children: Rea
   const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
   let tenantList: Array<{ id: string; name: string }> = [];
   try {
-    const res = await fetch(`${apiBaseUrl}/tenants`, {
+    const res = await fetch(`${apiBaseUrl}/api/tenants`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     });
@@ -51,7 +51,7 @@ export default async function TenantLayout({ children, params }: { children: Rea
   // Fetch tenant logo
   let tenantLogoUrl: string | undefined;
   try {
-    const tenantRes = await fetch(`${apiBaseUrl}/tenants/${tenantId}`, {
+    const tenantRes = await fetch(`${apiBaseUrl}/api/tenants/${tenantId}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     });
