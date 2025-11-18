@@ -89,8 +89,11 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   useEffect(() => {
     setCurrentPage(1);
     // If user selects archived filter, refresh to include archived tenants
-    if (statusFilter === 'archived') {
+    // If user selects 'all' filter, also include archived tenants
+    if (statusFilter === 'archived' || statusFilter === 'all') {
       refresh(true);
+    } else {
+      refresh(false);
     }
   }, [searchQuery, chainFilter, statusFilter]);
 
