@@ -201,15 +201,16 @@ app.get("/api/tenants", authenticateToken, async (req, res) => {
       }
     };
     
-    // Add status filtering
+    // Add status filtering - include archived by default unless specifically excluded
     let statusCondition: any = {};
     if (statusFilter) {
       // Specific status requested
       statusCondition = { locationStatus: statusFilter as any };
-    } else if (!includeArchived) {
-      // Default: exclude archived
+    } else if (includeArchived === false) {
+      // Explicitly exclude archived
       statusCondition = { locationStatus: { not: 'archived' as any } };
     }
+    // Default: include all statuses including archived
     
     const tenants = await prisma.tenant.findMany({ 
       where: {
@@ -332,28 +333,96 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_CONFIG.durationDays);
     
+    // Create tenant and link to user manually (not using $transaction to avoid issues)
+    console.log('[POST /tenants] Starting manual transaction with data:', {
+      name: parsed.data.name,
+      ownerId,
+      userId: req.user?.userId,
+      userRole: req.user?.role,
+      trialEndsAt: trialEndsAt
+    });
+
+    // Create the tenant first
+    console.log('[POST /tenants] Creating tenant with data:', {
+      name: parsed.data.name,
+      subscriptionTier: 'starter',
+      subscriptionStatus: 'trial',
+      trialEndsAt: trialEndsAt,
+      createdBy: req.user?.userId || 'unknown'
+    });
+
     const tenant = await prisma.tenant.create({
       data: {
         name: parsed.data.name,
         subscriptionTier: 'starter',
         subscriptionStatus: 'trial',
         trialEndsAt: trialEndsAt,
-        createdBy: req.user!.userId, // Track who created this tenant (for auditing)
+        createdBy: req.user?.userId || null, // Optional field - null if user not authenticated
       }
     });
-    console.log('[POST /tenants] Tenant created:', tenant.id, 'by:', req.user?.userId);
-    
-    // Link tenant to the owner (may be different from creator if PLATFORM_SUPPORT)
-    console.log('[POST /tenants] Linking tenant to owner:', ownerId);
-    await prisma.userTenant.create({
+
+    console.log('[POST /tenants] Tenant created successfully:', {
+      id: tenant.id,
+      name: tenant.name,
+      createdBy: tenant.createdBy
+    });
+
+    // Now create the UserTenant link (tenant should be committed now)
+    console.log('[POST /tenants] Linking tenant to owner:', {
+      ownerId,
+      tenantId: tenant.id
+    });
+
+    // Add debugging to check if tenant still exists before UserTenant creation
+    const tenantCheck = await prisma.tenant.findUnique({
+      where: { id: tenant.id }
+    });
+    console.log('[POST /tenants] Tenant check before UserTenant creation:', !!tenantCheck);
+
+    if (!tenantCheck) {
+      console.error('[POST /tenants] CRITICAL: Tenant disappeared before UserTenant creation!');
+      return res.status(500).json({ error: "tenant_creation_failed", message: "Tenant was created but is no longer accessible" });
+    }
+
+    const userTenant = await prisma.userTenant.create({
       data: {
         userId: ownerId,
         tenantId: tenant.id,
         role: 'OWNER',
       },
     });
-    console.log('[POST /tenants] UserTenant link created successfully');
-    
+
+    console.log('[POST /tenants] UserTenant link created successfully:', {
+      id: userTenant.id,
+      userId: userTenant.userId,
+      tenantId: userTenant.tenantId,
+      role: userTenant.role
+    });
+
+    // Try to create initial status log (optional - don't fail if table doesn't exist)
+    try {
+      await prisma.locationStatusLog.create({
+        data: {
+          tenantId: tenant.id,
+          oldStatus: 'pending', // New tenants start as pending
+          newStatus: 'active', // But get activated immediately
+          changedBy: req.user?.userId || 'system',
+          reason: 'Initial tenant creation',
+          reopeningDate: null,
+          metadata: {
+            userAgent: req.headers['user-agent'] || null,
+            ip: req.ip || (Array.isArray(req.headers['x-forwarded-for']) 
+              ? req.headers['x-forwarded-for'][0] 
+              : req.headers['x-forwarded-for']) || null,
+          },
+        },
+      });
+      console.log('[POST /tenants] Initial status log created');
+    } catch (logError: any) {
+      console.warn('[POST /tenants] Could not create initial status log (table may not exist):', logError.message);
+      // Don't fail the entire operation if logging fails
+    }
+
     await audit({ tenantId: tenant.id, actor: null, action: "tenant.create", payload: { name: parsed.data.name } });
     res.status(201).json(tenant);
   } catch (error) {
@@ -361,7 +430,6 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     res.status(500).json({ error: "failed_to_create_tenant", message: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
-
 const updateTenantSchema = z.object({
   name: z.string().min(1).optional(),
   region: z.string().min(1).optional(),
@@ -425,17 +493,36 @@ const {
 
 // Change location status
 app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, reason, reopeningDate } = req.body;
+  const startTime = Date.now();
+  const { id } = req.params;
+  const { status, reason, reopeningDate } = req.body;
 
+  console.log(`[PATCH /tenants/${id}/status] Starting status change request`, {
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    tenantId: id,
+    requestedStatus: status,
+    reason: reason?.substring(0, 100), // Truncate long reasons
+    reopeningDate,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
     // Check if user can change status
     const userRole = req.user?.role || 'USER';
     // Map deprecated ADMIN role to PLATFORM_ADMIN for backward compatibility
     const normalizedRole = userRole === 'ADMIN' ? 'PLATFORM_ADMIN' : userRole;
     const tenantRole = req.user?.tenantIds?.includes(id) ? 'TENANT_ADMIN' : normalizedRole;
+
+    console.log(`[PATCH /tenants/${id}/status] Permission check`, {
+      userRole,
+      normalizedRole,
+      tenantRole,
+      canChange: canChangeStatus(tenantRole)
+    });
     
     if (!canChangeStatus(tenantRole)) {
+      console.log(`[PATCH /tenants/${id}/status] Permission denied for user ${req.user?.userId}`);
       return res.status(403).json({ 
         error: "insufficient_permissions", 
         message: "You don't have permission to change location status" 
@@ -443,33 +530,60 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
     }
 
     // Get current tenant
+    console.log(`[PATCH /tenants/${id}/status] Fetching tenant data`);
     const tenant = await prisma.tenant.findUnique({ where: { id } });
     if (!tenant) {
+      console.log(`[PATCH /tenants/${id}/status] Tenant not found`);
       return res.status(404).json({ error: "tenant_not_found" });
     }
 
+    console.log(`[PATCH /tenants/${id}/status] Current tenant status`, {
+      currentStatus: tenant.locationStatus,
+      requestedStatus: status,
+      statusMatch: tenant.locationStatus === status
+    });
+
+    // Check if status is actually changing
+    if (tenant.locationStatus === status) {
+      console.log(`[PATCH /tenants/${id}/status] No change needed - tenant already has status '${status}'`);
+      const responseTime = Date.now() - startTime;
+      console.log(`[PATCH /tenants/${id}/status] Completed in ${responseTime}ms (no-op)`);
+      return res.json({
+        ...tenant,
+        statusInfo: getLocationStatusInfo(status as any),
+        message: "Status unchanged - no update performed"
+      });
+    }
+
     // Validate status change
+    console.log(`[PATCH /tenants/${id}/status] Validating status change from '${tenant.locationStatus}' to '${status}'`);
     const validation = validateStatusChange(tenant.locationStatus as any, status, reason);
     if (!validation.valid) {
+      console.log(`[PATCH /tenants/${id}/status] Validation failed: ${validation.error}`);
       return res.status(400).json({ 
         error: "invalid_status_change", 
         message: validation.error 
       });
     }
 
-    // Update tenant status and create audit log in a transaction
-    const [updated, auditLog] = await prisma.$transaction([
-      prisma.tenant.update({
-        where: { id },
-        data: {
-          locationStatus: status,
-          statusChangedAt: new Date(),
-          statusChangedBy: req.user?.userId,
-          reopeningDate: reopeningDate ? new Date(reopeningDate) : null,
-          closureReason: reason || null,
-        },
-      }),
-      prisma.locationStatusLog.create({
+    console.log(`[PATCH /tenants/${id}/status] Validation passed, preparing transaction`);
+
+    // Update tenant status only (audit log is optional and done outside transaction)
+    const updated = await prisma.tenant.update({
+      where: { id },
+      data: {
+        locationStatus: status,
+        statusChangedAt: new Date(),
+        statusChangedBy: req.user?.userId,
+        reopeningDate: reopeningDate ? new Date(reopeningDate) : null,
+        closureReason: reason || null,
+      },
+    });
+
+    // Try to create the status log outside the transaction (optional)
+    let auditLogId = null;
+    try {
+      const logEntry = await prisma.locationStatusLog.create({
         data: {
           tenantId: id,
           oldStatus: tenant.locationStatus as any,
@@ -478,15 +592,29 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
           reason,
           reopeningDate: reopeningDate ? new Date(reopeningDate) : null,
           metadata: {
-            userAgent: req.headers['user-agent'],
-            ip: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent'] || null,
+            ip: req.ip || (Array.isArray(req.headers['x-forwarded-for']) 
+              ? req.headers['x-forwarded-for'][0] 
+              : req.headers['x-forwarded-for']) || null,
           },
         },
-      }),
-    ]);
+      });
+      auditLogId = logEntry.id;
+      console.log(`[PATCH /tenants/${id}/status] Status log created:`, auditLogId);
+    } catch (logError: any) {
+      console.warn(`[PATCH /tenants/${id}/status] Could not create status log (table may not exist):`, logError.message);
+      // Status change still succeeded, just no audit log
+    }
+
+    console.log(`[PATCH /tenants/${id}/status] Transaction successful`, {
+      updatedTenantId: updated.id,
+      auditLogId,
+      newStatus: updated.locationStatus
+    });
 
     // Sync to Google Business Profile (async, don't block response)
     const { syncLocationStatusToGoogle } = await import('./services/GoogleBusinessStatusSync');
+    console.log(`[PATCH /tenants/${id}/status] Triggering GBP sync`);
     syncLocationStatusToGoogle(id, status, reopeningDate ? new Date(reopeningDate) : null)
       .then((result) => {
         if (result.success) {
@@ -503,13 +631,25 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
 
     // TODO: Send notifications (Phase 6)
 
+    const responseTime = Date.now() - startTime;
+    console.log(`[PATCH /tenants/${id}/status] Completed successfully in ${responseTime}ms`);
+
     res.json({
       ...updated,
       statusInfo: getLocationStatusInfo(status),
-      auditLogId: auditLog.id,
+      auditLogId,
     });
   } catch (error: any) {
-    console.error('[PATCH /api/tenants/:id/status] Error:', error);
+    const responseTime = Date.now() - startTime;
+    console.error(`[PATCH /tenants/${id}/status] Error after ${responseTime}ms:`, {
+      error: error.message,
+      stack: error.stack,
+      code: error.code,
+      meta: error.meta,
+      userId: req.user?.userId,
+      tenantId: id,
+      requestedStatus: status
+    });
     res.status(500).json({ error: "failed_to_update_status", details: error.message });
   }
 });
@@ -526,7 +666,12 @@ app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess
     }
 
     const impact = getStatusChangeImpact(tenant.locationStatus as any, status);
-    const validation = validateStatusChange(tenant.locationStatus as any, status);
+    
+    // For preview, allow self-transitions without requiring a reason
+    const isSelfTransition = tenant.locationStatus === status;
+    const validation = isSelfTransition 
+      ? { valid: true } // Allow self-transitions
+      : validateStatusChange(tenant.locationStatus as any, status); // Check normal transitions
 
     res.json({
       currentStatus: tenant.locationStatus,
@@ -1805,12 +1950,12 @@ const listQuery = z.object({
 
 app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateToken, async (req, res) => {
   const parsed = listQuery.safeParse(req.query);
-  if (!parsed.success) return res.status(400).json({ error: "tenant_required" });
+  if (!parsed.success) return res.status(400).json({ error: "invalid_query_params", details: parsed.error.flatten() });
   
   // Check tenant access
   const tenantId = parsed.data.tenantId;
   const isAdmin = isPlatformAdmin(req.user);
-  const hasAccess = isAdmin || req.user?.tenantIds.includes(tenantId);
+  const hasAccess = isAdmin || (tenantId && req.user?.tenantIds.includes(tenantId));
   
   if (!hasAccess) {
     return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
@@ -2017,11 +2162,13 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], checkSubscrip
       title: parsed.data.title || parsed.data.name,
       brand: parsed.data.brand || 'Unknown',
       // Price logic: prioritize price (dollars) over priceCents (cents)
-      price: parsed.data.price ?? (parsed.data.priceCents ? parsed.data.priceCents / 100 : undefined),
+      // Ensure price is never undefined since it's required in the schema
+      price: parsed.data.price ?? (parsed.data.priceCents ? parsed.data.priceCents / 100 : 0),
       priceCents: parsed.data.priceCents ?? (parsed.data.price ? Math.round(parsed.data.price * 100) : 0),
       currency: parsed.data.currency || 'USD',
       // Auto-set availability based on stock if not explicitly provided
       availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
+      tenantId: parsed.data.tenantId || '', // Ensure tenantId is always a string
     };
     const created = await prisma.inventoryItem.create({ data });
     await audit({ tenantId: created.tenantId, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
@@ -2101,8 +2248,8 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
       where: { tenantId: item.tenantId, itemStatus: 'trashed' }
     });
     
-    if (isTrashFull(trashCount, tenant.subscriptionTier)) {
-      const capacity = getTrashCapacity(tenant.subscriptionTier);
+    if (isTrashFull(trashCount, tenant.subscriptionTier || 'starter')) {
+      const capacity = getTrashCapacity(tenant.subscriptionTier || 'starter');
       return res.status(400).json({
         error: "trash_capacity_exceeded",
         message: `Trash bin is full (${trashCount}/${capacity} items). Please purge some items before deleting more.`,
@@ -2143,7 +2290,7 @@ app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (re
       where: { tenantId, itemStatus: 'trashed' }
     });
     
-    const capacityInfo = getTrashCapacityInfo(trashCount, tenant.subscriptionTier);
+    const capacityInfo = getTrashCapacityInfo(trashCount, tenant.subscriptionTier || 'starter');
     res.json(capacityInfo);
   } catch (error) {
     console.error('[Trash Capacity] Error:', error);

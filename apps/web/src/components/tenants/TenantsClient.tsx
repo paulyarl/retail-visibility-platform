@@ -37,7 +37,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [chainFilter, setChainFilter] = useState<'all' | 'chain' | 'standalone'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'inactive' | 'closed' | 'archived'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'inactive' | 'closed' | 'archived'>('active');
   
   // View mode toggle
   const getInitialView = (): 'grid' | 'list' => {
@@ -382,7 +382,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
               {/* Location Status Filter */}
               <div>
                 <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2 block">
-                  Location Status
+                  Filter by Status
                 </label>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -390,7 +390,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     size="sm"
                     onClick={() => setStatusFilter('all')}
                   >
-                    All Status
+                    All Statuses
                   </Button>
                   <Button
                     variant={statusFilter === 'active' ? 'primary' : 'ghost'}

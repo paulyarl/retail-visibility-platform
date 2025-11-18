@@ -12,7 +12,7 @@ export async function requireActiveSubscription(
   next: NextFunction
 ) {
   try {
-    const tenantId = req.query.tenantId as string;
+    const tenantId = req.query.tenantId as string || req.body?.tenantId;
 
     if (!tenantId) {
       return res.status(400).json({
@@ -128,7 +128,7 @@ export async function checkSubscriptionLimits(
   next: NextFunction
 ) {
   try {
-    const tenantId = req.query.tenantId as string;
+    const tenantId = req.query.tenantId as string || req.body?.tenantId;
 
     if (!tenantId) {
       return next();
@@ -264,7 +264,7 @@ export async function requireWritableSubscription(
   next: NextFunction
 ) {
   try {
-    const tenantId = req.query.tenantId as string;
+    const tenantId = req.query.tenantId as string || req.body?.tenantId;
 
     if (!tenantId) {
       return res.status(400).json({

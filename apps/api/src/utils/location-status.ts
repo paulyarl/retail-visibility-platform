@@ -108,23 +108,43 @@ export function validateStatusChange(
   toStatus: LocationStatus,
   reason?: string
 ): { valid: boolean; error?: string } {
+  console.log(`[validateStatusChange] Validating transition: ${fromStatus} → ${toStatus}`, {
+    fromStatus,
+    toStatus,
+    reason: reason?.substring(0, 50),
+    timestamp: new Date().toISOString()
+  });
+
+  // Allow no-op transitions (same status)
+  if (fromStatus === toStatus) {
+    console.log(`[validateStatusChange] Allowing no-op transition: ${fromStatus} → ${toStatus}`);
+    return { valid: true };
+  }
+
   // Check if transition is allowed
   const allowedTransitions = getStatusTransitions(fromStatus);
+  console.log(`[validateStatusChange] Allowed transitions from ${fromStatus}:`, allowedTransitions);
+
   if (!allowedTransitions.includes(toStatus)) {
+    const error = `Cannot transition from ${fromStatus} to ${toStatus}. Allowed transitions: ${allowedTransitions.join(', ')}`;
+    console.log(`[validateStatusChange] Transition blocked:`, error);
     return {
       valid: false,
-      error: `Cannot transition from ${fromStatus} to ${toStatus}. Allowed transitions: ${allowedTransitions.join(', ')}`,
+      error,
     };
   }
 
   // Require reason for closed or archived
   if ((toStatus === 'closed' || toStatus === 'archived') && !reason) {
+    const error = `Reason is required when changing status to ${toStatus}`;
+    console.log(`[validateStatusChange] Reason required but missing for ${toStatus}`);
     return {
       valid: false,
-      error: `Reason is required when changing status to ${toStatus}`,
+      error,
     };
   }
 
+  console.log(`[validateStatusChange] Transition validated successfully: ${fromStatus} → ${toStatus}`);
   return { valid: true };
 }
 
