@@ -24,6 +24,7 @@ import {
   Tag
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 
 interface ProductNeedingEnrichment {
   id: string;
@@ -44,34 +45,22 @@ interface ProductEnrichmentBannerProps {
 
 export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentBannerProps = {}) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [products, setProducts] = useState<ProductNeedingEnrichment[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    fetchProductsNeedingEnrichment();
-  }, []);
+    if (isAuthenticated && user) {
+      fetchProductsNeedingEnrichment();
+    } else {
+      setLoading(false);
+    }
+  }, [isAuthenticated, user]);
 
   const fetchProductsNeedingEnrichment = async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      
-      // Get access token from localStorage (same way AuthContext does)
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const response = await fetch(`${API_BASE_URL}/api/products/needs-enrichment`, {
-        headers,
-        credentials: 'include'
-      });
+      const response = await api.get('/api/products/needs-enrichment');
 
       if (response.ok) {
         const data = await response.json();
