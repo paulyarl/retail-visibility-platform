@@ -420,7 +420,8 @@ const {
   validateStatusChange, 
   canChangeStatus, 
   getLocationStatusInfo,
-  getStatusChangeImpact 
+  getStatusChangeImpact,
+  getStatusTransitions 
 } = require('./utils/location-status');
 
 // Change location status
@@ -1812,7 +1813,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
   // Check tenant access
   const tenantId = parsed.data.tenantId;
   const isAdmin = isPlatformAdmin(req.user);
-  const hasAccess = isAdmin || req.user?.tenantIds.includes(tenantId);
+  const hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenantId) ?? false);
   
   if (!hasAccess) {
     return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
