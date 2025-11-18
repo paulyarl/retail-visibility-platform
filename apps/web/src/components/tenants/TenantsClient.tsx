@@ -88,22 +88,32 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-    // If user selects archived filter, refresh to include archived tenants
-    // If user selects 'all' filter, also include archived tenants
-    if (statusFilter === 'archived' || statusFilter === 'all') {
+    // Handle different filter scenarios
+    if (statusFilter === 'all') {
+      // 'all' filter: include archived tenants but no specific status filter
       refresh(true);
+    } else if (statusFilter === 'archived') {
+      // 'archived' filter: include archived and filter to archived status
+      refresh(true, 'archived');
+    } else if (statusFilter !== 'all') {
+      // Specific status filter: don't include archived, filter to specific status
+      refresh(false, statusFilter);
     } else {
+      // Default: don't include archived
       refresh(false);
     }
   }, [searchQuery, chainFilter, statusFilter]);
 
-  const refresh = async (includeArchived = false) => {
+  const refresh = async (includeArchived = false, statusParam?: string) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
       if (includeArchived) {
         params.append('includeArchived', 'true');
+      }
+      if (statusParam) {
+        params.append('status', statusParam);
       }
       const url = `/api/tenants${params.toString() ? '?' + params.toString() : ''}`;
       const res = await api.get(url);
@@ -517,7 +527,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
   onRename: (id: string, newName: string) => void;
   onDelete: () => void;
   onStatusChange: (tenant: Tenant) => void;
-  onRefresh: (includeArchived?: boolean) => void;
+  onRefresh: (includeArchived?: boolean, statusParam?: string) => void;
   statusFilter?: 'all' | 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
   canEdit?: boolean;
   canRename?: boolean;
@@ -542,9 +552,16 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
 
   const handleStatusChange = () => {
     setIsStatusModalOpen(false);
-    // Refresh the tenant list after status change
-    // If tenant might be archived, include archived tenants in refresh
-    onRefresh(statusFilter === 'archived' || statusFilter === 'all');
+    // Refresh the tenant list after status change with current filter settings
+    if (statusFilter === 'all') {
+      onRefresh(true);
+    } else if (statusFilter === 'archived') {
+      onRefresh(true, 'archived');
+    } else if (statusFilter && statusFilter !== 'all') {
+      onRefresh(false, statusFilter);
+    } else {
+      onRefresh(false);
+    }
   };
 
   return (
