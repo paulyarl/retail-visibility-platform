@@ -95,12 +95,9 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     } else if (statusFilter === 'archived') {
       // 'archived' filter: include archived and filter to archived status
       refresh(true, 'archived');
-    } else if (statusFilter !== 'all') {
+    } else {
       // Specific status filter: don't include archived, filter to specific status
       refresh(false, statusFilter);
-    } else {
-      // Default: don't include archived
-      refresh(false);
     }
   }, [searchQuery, chainFilter, statusFilter]);
 
@@ -199,7 +196,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
               </svg>
               Dashboard
             </Button>
-            <Button onClick={refresh} disabled={loading} variant="secondary">
+            <Button onClick={() => refresh()} disabled={loading} variant="secondary">
               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
@@ -557,7 +554,7 @@ function TenantRow({ tenant, index, onSelect, onEditProfile, onRename, onDelete,
       onRefresh(true);
     } else if (statusFilter === 'archived') {
       onRefresh(true, 'archived');
-    } else if (statusFilter && statusFilter !== 'all') {
+    } else if (statusFilter) {
       onRefresh(false, statusFilter);
     } else {
       onRefresh(false);
