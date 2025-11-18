@@ -3411,10 +3411,26 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
 app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) => {
   try {
     const user = (req as any).user;
-    
+    const { isPlatformUser } = await import('./utils/platform-admin');
+
     // Get tenant IDs the user has access to
-    const tenantIds = user.tenantIds || [];
-    
+    let tenantIds: string[] = [];
+
+    if (isPlatformUser(user)) {
+      // Platform users can see all tenants
+      const allTenants = await prisma.tenant.findMany({
+        select: { id: true }
+      });
+      tenantIds = allTenants.map(t => t.id);
+    } else {
+      // Regular users can only see tenants they have access to
+      const userTenants = await prisma.userTenant.findMany({
+        where: { userId: user.userId },
+        select: { tenantId: true }
+      });
+      tenantIds = userTenants.map(ut => ut.tenantId);
+    }
+
     if (tenantIds.length === 0) {
       return res.json({ products: [] });
     }
