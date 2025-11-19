@@ -3600,7 +3600,7 @@ app.get("/api/gbp/categories", async (req, res) => {
 
     // If database has results, use them
     if (dbCategories.length > 0) {
-      const results = dbCategories.map(cat => ({
+      const results = dbCategories.map((cat: any) => ({
         id: cat.id,
         name: cat.displayName || cat.name,
         path: [] // GBP categories don't have hierarchical paths
