@@ -125,6 +125,7 @@ import tierSystemRoutes from './routes/admin/tier-system';
 import testGbpRoutes from './routes/test-gbp';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 import cloverRoutes from './routes/integrations/clover';
+import emailTestRoutes from './routes/email-test';
 // Lazy import Square routes to avoid startup failures
 let squareRoutes: any = null;
 
@@ -2028,6 +2029,15 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     
     // If count=true, return only the count
     if (req.query.count === 'true') {
+      // Check if Prisma client is properly initialized
+      if (!prisma || !prisma.inventoryItem) {
+        console.warn('[GET /items] Prisma client not properly initialized');
+        return res.status(500).json({ 
+          error: 'database_unavailable',
+          message: 'Database client not properly initialized'
+        });
+      }
+      
       const count = await prisma.inventoryItem.count({ where });
       return res.json({ count });
     }
@@ -3153,6 +3163,11 @@ app.put("/admin/email-config", async (req, res) => {
 // Mount auth routes (no authentication required for these endpoints)
 app.use('/auth', authRoutes);
 
+/* ------------------------------ EMAIL MANAGEMENT ------------------------------ */
+// Import and mount email management routes
+import emailManagementRoutes from './routes/email-management';
+app.use('/api/email', emailManagementRoutes);
+
 /* ------------------------------ v3.5 AUDIT & BILLING APIs ------------------------------ */
 // Apply audit middleware globally (logs all write operations)
 app.use(auditLogger);
@@ -3221,6 +3236,8 @@ app.use('/api/admin/tier-management', tierManagementRoutes); // Tier management 
 app.use('/api/admin/tier-system', tierSystemRoutes); // Tier system CRUD (platform staff, auth handled in route)
 app.use('/api/integrations', cloverRoutes); // Clover POS integration (auth handled in route)
 console.log('✅ Clover integration routes mounted');
+app.use('/api/email', emailTestRoutes); // Email testing and configuration routes
+console.log('✅ Email routes mounted');
 
 // Simple Clover connection status endpoint for frontend banners
 app.get('/api/tenants/:tenantId/integrations/clover', authenticateToken, async (req, res) => {
@@ -3742,9 +3759,9 @@ export { app };
 /* ------------------------------ GBP CATEGORY SYNC JOB ------------------------------ */
 
 (async function startGBPCategorySyncJob(){
-  const enabled = String(process.env.FF_GBP_CATEGORY_AUTO_SYNC || 'true').toLowerCase() === 'true';
+  const enabled = String(process.env.FF_GBP_CATEGORY_AUTO_SYNC || 'false').toLowerCase() === 'true';
   if (!enabled) {
-    console.log('📋 GBP category sync job disabled');
+    console.log('📋 GBP category sync job disabled (Prisma client issues)');
     return;
   }
 

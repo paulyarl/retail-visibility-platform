@@ -9,14 +9,14 @@
  * 1. Platform Admin - Full access to everything (can override all checks)
  * 2. Organization Owner - Full access within their organization
  * 3. Organization Admin - Admin access within their organization
- * 4. Tenant Owner - Full access to their specific tenant
- * 5. Tenant Admin - Admin access to their specific tenant
+ * 4. Tenant Owner - Full access to their specific tenant (highest tenant-level role)
+ * 5. Tenant Admin - Support access to their specific tenant (below Tenant Owner)
  * 6. Tenant Member - Basic access to their specific tenant
  * 7. Regular User - No tenant access
  */
 
 export type UserRole = 'OWNER' | 'ADMIN' | 'SUPPORT' | 'MEMBER' | 'VIEWER';
-export type PlatformRole = 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER';
+export type PlatformRole = 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'TENANT_ADMIN' | 'USER';
 
 export interface UserData {
   id: string;
@@ -97,10 +97,14 @@ export function isPlatformAdmin(user: UserData): boolean {
  */
 
 /**
- * Check if user can manage platform users (create, edit, delete)
+ * Check if user can manage users (create, edit, delete)
+ * Platform admins can manage all users
+ * Tenant owners can manage users within their tenants
  */
 export function canManageUsers(user: UserData): boolean {
-  return user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN';
+  return user.role === 'PLATFORM_ADMIN' || 
+         user.role === 'ADMIN' || 
+         user.role === 'OWNER';
 }
 
 /**
@@ -117,6 +121,96 @@ export function canViewUsers(user: UserData): boolean {
  */
 export function canManageFeatureFlags(user: UserData): boolean {
   return user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN';
+}
+
+/**
+ * Check if user is a tenant admin
+ * Tenant admins have support-level access but only for their assigned tenants
+ */
+export function isTenantAdmin(user: UserData): boolean {
+  return user.role === 'TENANT_ADMIN';
+}
+
+/**
+ * Check if user can perform tenant support actions
+ * This includes both platform support (all tenants) and tenant admin (assigned tenants)
+ */
+export function canPerformTenantSupport(user: UserData): boolean {
+  return user.role === 'PLATFORM_ADMIN' || 
+         user.role === 'PLATFORM_SUPPORT' || 
+         user.role === 'TENANT_ADMIN' ||
+         user.role === 'ADMIN'; // Legacy
+}
+
+/**
+ * Check if user has tenant owner access
+ * Tenant owners have the highest level of tenant-scoped access
+ */
+export function isTenantOwner(user: UserData): boolean {
+  return user.role === 'OWNER';
+}
+
+/**
+ * Check if user has tenant-scoped admin access
+ * Includes both tenant owners (highest) and tenant admins (support level)
+ */
+export function hasTenantAdminAccess(user: UserData, tenantId?: string): boolean {
+  // Platform users have access to all tenants
+  if (user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT' || user.role === 'ADMIN') {
+    return true;
+  }
+  
+  // Tenant owners have full admin access to their tenants
+  if (user.role === 'OWNER') {
+    if (!tenantId) return true;
+    return user.tenants?.some(t => (t.tenantId || t.id) === tenantId) || false;
+  }
+  
+  // Tenant admins have support-level access to their assigned tenants (below owner)
+  if (user.role === 'TENANT_ADMIN') {
+    if (!tenantId) return true;
+    return user.tenants?.some(t => (t.tenantId || t.id) === tenantId) || false;
+  }
+  
+  return false;
+}
+
+/**
+ * Check if user can manage tenant settings and billing
+ * Only tenant owners and platform users can manage tenant settings
+ */
+export function canManageTenantSettings(user: UserData, tenantId?: string): boolean {
+  // Platform users can manage all tenant settings
+  if (user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT' || user.role === 'ADMIN') {
+    return true;
+  }
+  
+  // Only tenant owners can manage tenant settings (not tenant admins)
+  if (user.role === 'OWNER') {
+    if (!tenantId) return true;
+    return user.tenants?.some(t => (t.tenantId || t.id) === tenantId) || false;
+  }
+  
+  return false;
+}
+
+/**
+ * Check if user can delete or transfer tenant ownership
+ * Only tenant owners and platform admins can perform ownership operations
+ */
+export function canManageTenantOwnership(user: UserData, tenantId?: string): boolean {
+  // Platform admins can manage any tenant ownership
+  if (user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN') {
+    return true;
+  }
+  
+  // Only tenant owners can manage ownership (not tenant admins or platform support)
+  if (user.role === 'OWNER') {
+    if (!tenantId) return true;
+    return user.tenants?.some(t => (t.tenantId || t.id) === tenantId) || false;
+  }
+  
+  return false;
 }
 
 /**
@@ -222,8 +316,9 @@ export function canRenameTenant(user: UserData, tenantId: string): boolean {
  * Check if user can manage tenant settings (branding, hours, etc.)
  * Platform admins can manage any tenant
  * Tenant owners and admins can manage their tenant
+ * NOTE: This is the legacy version - use the new version above for role hierarchy
  */
-export function canManageTenantSettings(user: UserData, tenantId: string): boolean {
+export function canManageTenantSettingsLegacy(user: UserData, tenantId: string): boolean {
   return canEditTenant(user, tenantId);
 }
 
@@ -298,7 +393,7 @@ export function isTenantOwnerOrAdmin(user: UserData, tenantId: string): boolean 
   return hasTenantRole(user, tenantId, ['OWNER', 'ADMIN']);
 }
 
-export function isTenantOwner(user: UserData, tenantId: string): boolean {
+export function isTenantOwnerLegacy(user: UserData, tenantId: string): boolean {
   return hasTenantRole(user, tenantId, ['OWNER']);
 }
 

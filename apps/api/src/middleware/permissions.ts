@@ -1,9 +1,18 @@
 // Tenant-level permission middleware
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
-import { UserRole, UserTenantRole } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { isPlatformAdmin } from '../utils/platform-admin';
 import { getTenantLimit, getTenantLimitConfig, canCreateTenant, getPlatformSupportLimit } from '../config/tenant-limits';
+
+// Temporary enum definition until Prisma client generation is fixed
+enum UserTenantRole {
+  OWNER = 'OWNER',
+  ADMIN = 'ADMIN',
+  SUPPORT = 'SUPPORT',
+  MEMBER = 'MEMBER',
+  VIEWER = 'VIEWER'
+}
 
 /**
  * Get tenant ID from request

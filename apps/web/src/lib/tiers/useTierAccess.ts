@@ -1,17 +1,16 @@
 /**
  * Tier Access Control Hook
  * 
- * Provides centralized tier-based feature access control for React components.
- * Similar to useAccessControl for role-based access, but for subscription tiers.
+ * @deprecated This hook is deprecated as of Phase 2. Use useTenantAccess instead.
  * 
- * Usage:
- * ```tsx
- * const { hasFeature, requiresUpgrade } = useTierAccess(tenant.subscriptionTier);
+ * MIGRATION GUIDE:
+ * OLD: const { hasFeature } = useTierAccess(tenant.subscriptionTier);
+ * NEW: const { hasFeature } = useTenantAccess(tenantId);
  * 
- * if (!hasFeature('storefront')) {
- *   return <UpgradePrompt />;
- * }
- * ```
+ * The new hook provides the same interface but with better performance,
+ * role-based access control, and modular architecture.
+ * 
+ * This hook will be removed in Phase 3.
  */
 
 import { useMemo } from 'react';
@@ -67,6 +66,13 @@ export interface TierAccessResult {
  * NOTE: Platform admins and support bypass all tier restrictions
  */
 export function useTierAccess(tenantTier: string | null | undefined): TierAccessResult {
+  // DEPRECATION WARNING
+  console.warn(
+    '[useTierAccess] DEPRECATED: This hook will be removed in Phase 3. ' +
+    'Use useTenantAccess from @/hooks/tenant-access instead. ' +
+    'Migration: useTierAccess(tier) → useTenantAccess(tenantId)'
+  );
+  
   const tier = tenantTier || 'starter';
   const { user } = useAuth();
   

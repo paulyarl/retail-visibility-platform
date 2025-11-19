@@ -10,6 +10,7 @@ import {
   getUsagePercentage,
   TierFeature
 } from '@/lib/tiers/tier-resolver';
+import { canBypassTierRestrictions, canBypassRoleRestrictions, forceAdminBypass } from '@/lib/auth/platform-admin';
 
 export interface TenantUsage {
   products: number;
@@ -61,6 +62,7 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
   const [error, setError] = useState<string | null>(null);
   const [canSupport, setCanSupport] = useState(false);
   const [userRole, setUserRole] = useState<UserTenantRole | null>(null);
+  const [userData, setUserData] = useState<any>(null);
 
   const fetchTierData = async () => {
     if (!tenantId) {
@@ -75,22 +77,21 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
       // Check user's platform role and tenant role
       const userResponse = await api.get('auth/me');
       if (userResponse.ok) {
-        const userData = await userResponse.json();
+        const userDataResponse = await userResponse.json();
+        setUserData(userDataResponse.user);  // Store for emergency bypass
         
-        // Level 0: Platform support bypass (full access)
-        const hasSupportAccess =
-          userData.user?.role === 'PLATFORM_ADMIN' ||
-          userData.user?.role === 'PLATFORM_SUPPORT';
+        // Level 0: Platform bypass using centralized utility
+        const hasSupportAccess = canBypassTierRestrictions(userDataResponse.user);
         setCanSupport(hasSupportAccess);
         
         // Platform viewer gets read-only access to all tenants
-        const isPlatformViewer = userData.user?.role === 'PLATFORM_VIEWER';
+        const isPlatformViewer = userDataResponse.user?.role === 'PLATFORM_VIEWER';
         
         // Get user's role on this specific tenant
         // Platform admins bypass role checks, so skip this call
-        if (!hasSupportAccess && userData.user?.id && tenantId) {
+        if (!hasSupportAccess && userDataResponse.user?.id && tenantId) {
           try {
-            const userTenantResponse = await api.get(`api/users/${userData.user.id}/tenants/${tenantId}`);
+            const userTenantResponse = await api.get(`api/users/${userDataResponse.user.id}/tenants/${tenantId}`);
             if (userTenantResponse.ok) {
               const userTenantData = await userTenantResponse.json();
               setUserRole(userTenantData.role as UserTenantRole);
@@ -169,12 +170,31 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
     fetchTierData();
   }, [tenantId]);
 
+  // EMERGENCY: Feature name mapping to fix frontend/backend conflicts
+  const EMERGENCY_FEATURE_MAPPING: Record<string, string> = {
+    'product_scanning': 'barcode_scan',  // Map frontend name to backend
+    'quick_start_wizard_full': 'quick_start_wizard',  // Normalize variants
+    'propagation': 'propagation_products',  // Default propagation to products
+  };
+
+  const normalizeFeatureId = (featureId: string): string => {
+    return EMERGENCY_FEATURE_MAPPING[featureId] || featureId;
+  };
+
   // Helper function wrappers
   const checkFeature = (featureId: string): boolean => {
+    // EMERGENCY: Normalize feature names to match backend
+    const normalizedFeatureId = normalizeFeatureId(featureId);
+    
+    // EMERGENCY: Force bypass for critical features (platform admins)
+    if (forceAdminBypass(userData, normalizedFeatureId)) {
+      return true;
+    }
+    
     // Platform admins and support have access to all features
     if (canSupport) return true;
     if (!tier) return false;
-    return hasFeature(tier, featureId);
+    return hasFeature(tier, normalizedFeatureId);
   };
 
   const getFeatures = (category: TierFeature['category']): TierFeature[] => {
@@ -199,15 +219,18 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
   };
 
   const getBadge = (featureId: string): TierBadge | null => {
+    // EMERGENCY: Normalize feature names to match backend
+    const normalizedFeatureId = normalizeFeatureId(featureId);
+    
     // Platform admins and support never see badges (all features unlocked)
     if (canSupport) return null;
     // If feature is available, no badge needed
     if (checkFeature(featureId)) return null;
 
-    // Feature mapping to required tiers and badge info
+    // Feature mapping to required tiers and badge info (using normalized names)
     const featureTierMap: Record<string, { tier: string; badge: string; tooltip: string; color: string }> = {
       // Organization tier features
-      'propagation': { 
+      'propagation_products': { 
         tier: 'organization', 
         badge: 'ORG', 
         tooltip: 'Requires Organization tier - Upgrade to propagate to all locations',
@@ -221,10 +244,10 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
         tooltip: 'Requires Professional tier or higher - Upgrade for barcode scanning',
         color: 'bg-gradient-to-r from-purple-600 to-pink-600'
       },
-      'quick_start_wizard_full': { 
+      'quick_start_wizard': { 
         tier: 'professional', 
         badge: 'PRO+', 
-        tooltip: 'Requires Professional tier or higher - Upgrade for full Quick Start wizard',
+        tooltip: 'Requires Professional tier or higher - Upgrade for Quick Start wizard',
         color: 'bg-gradient-to-r from-purple-600 to-pink-600'
       },
       
@@ -243,7 +266,7 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
       },
     };
 
-    const featureInfo = featureTierMap[featureId];
+    const featureInfo = featureTierMap[normalizedFeatureId];
     if (!featureInfo) {
       // Default badge for unknown features
       return {

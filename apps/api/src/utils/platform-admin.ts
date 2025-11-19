@@ -10,7 +10,22 @@
  * - PLATFORM_VIEWER: Read-only access (analytics, sales, legal, compliance)
  */
 
-import { UserRole } from '@prisma/client';
+// Temporary enum definition until Prisma client generation is fixed
+enum UserRole {
+  PLATFORM_ADMIN = 'PLATFORM_ADMIN',
+  PLATFORM_SUPPORT = 'PLATFORM_SUPPORT',
+  PLATFORM_VIEWER = 'PLATFORM_VIEWER',
+  ADMIN = 'ADMIN',
+  OWNER = 'OWNER',
+  USER = 'USER',
+  TENANT_OWNER = 'TENANT_OWNER',
+  TENANT_ADMIN = 'TENANT_ADMIN',
+  TENANT_MANAGER = 'TENANT_MANAGER',
+  TENANT_MEMBER = 'TENANT_MEMBER',
+  TENANT_VIEWER = 'TENANT_VIEWER'
+}
+
+// import { UserRole } from '@prisma/client';
 
 /**
  * Check if a user has full platform admin privileges

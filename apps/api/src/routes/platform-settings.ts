@@ -29,6 +29,22 @@ const platformSettingsSchema = z.object({
 // GET /platform-settings - Get platform branding settings
 router.get('/platform-settings', async (_req, res) => {
   try {
+    // Check if Prisma client is properly initialized
+    if (!prisma || !prisma.platformSettings) {
+      console.warn('[Platform Settings] Prisma client not properly initialized, using defaults');
+      return res.json({
+        id: 1,
+        platformName: 'RVP Platform',
+        platformDescription: 'Retail Visibility Platform',
+        logoUrl: null,
+        faviconUrl: null,
+        primaryColor: '#3b82f6',
+        secondaryColor: '#1e40af',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+
     let settings = await prisma.platformSettings.findUnique({
       where: { id: 1 },
     });

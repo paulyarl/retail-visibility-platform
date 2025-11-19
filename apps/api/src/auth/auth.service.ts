@@ -1,8 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient, UserRole } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { UserRole } from '@prisma/client';
+import { prisma } from '../prisma';
 
 // JWT configuration
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'your-super-secret-access-key-change-in-production';
@@ -90,19 +89,19 @@ export class AuthService {
    */
   async register(data: RegisterData) {
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { email: data.email.toLowerCase() },
     });
 
     if (existingUser) {
-      throw new Error('User with this email already exists');
+      throw new Error('User already exists');
     }
 
     // Hash password
     const passwordHash = await this.hashPassword(data.password);
 
     // Create user
-    const user = await prisma.user.create({
+    const user = await prisma.users.create({
       data: {
         email: data.email.toLowerCase(),
         passwordHash,
@@ -129,14 +128,10 @@ export class AuthService {
    */
   async login(data: LoginData) {
     // Find user
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email: data.email.toLowerCase() },
       include: {
-        tenants: {
-          include: {
-            tenant: true,
-          },
-        },
+        user_tenants: true,
       },
     });
 
@@ -145,18 +140,18 @@ export class AuthService {
     }
 
     // Check if user is active
-    if (!user.isActive) {
+    if (!user.is_active) {
       throw new Error('Account is deactivated');
     }
 
     // Verify password
-    const isValidPassword = await this.verifyPassword(data.password, user.passwordHash);
+    const isValidPassword = await this.verifyPassword(data.password, user.password_hash);
     if (!isValidPassword) {
       throw new Error('Invalid email or password');
     }
 
     // Get tenant IDs
-    const tenantIds = user.tenants.map((ut) => ut.tenantId);
+    const tenantIds = user.user_tenants.map((ut) => ut.tenant_id);
 
     // Create JWT payload
     const payload: JWTPayload = {
@@ -171,16 +166,17 @@ export class AuthService {
     const refreshToken = this.generateRefreshToken(payload);
 
     // Update last login
-    await prisma.user.update({
+    await prisma.users.update({
       where: { id: user.id },
-      data: { lastLogin: new Date() },
+      data: { last_login: new Date() },
     });
 
     // Create session
-    await prisma.userSession.create({
+    await prisma.user_sessions.create({
       data: {
-        userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        user_id: user.id,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },
     });
 
@@ -188,13 +184,13 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        firstName: user.first_name,
+        lastName: user.last_name,
         role: user.role,
-        emailVerified: user.emailVerified,
-        tenants: user.tenants.map((ut) => ({
-          id: ut.tenant.id,
-          name: ut.tenant.name,
+        emailVerified: user.email_verified,
+        tenants: user.user_tenants.map((ut) => ({
+          id: ut.tenant_id,
+          name: ut.tenant?.name || 'Unknown',
           role: ut.role,
         })),
       },
@@ -242,27 +238,21 @@ export class AuthService {
    * Get user by ID
    */
   async getUserById(userId: string) {
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
+        first_name: true,
+        last_name: true,
         role: true,
-        emailVerified: true,
-        lastLogin: true,
-        createdAt: true,
-        tenants: {
+        email_verified: true,
+        last_login: true,
+        created_at: true,
+        user_tenants: {
           select: {
-            id: true,
+            tenant_id: true,
             role: true,
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
           },
         },
       },
@@ -273,10 +263,16 @@ export class AuthService {
     }
 
     return {
-      ...user,
-      tenants: user.tenants.map((ut) => ({
-        id: ut.tenant.id,
-        name: ut.tenant.name,
+      id: user.id,
+      email: user.email,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      role: user.role,
+      emailVerified: user.email_verified,
+      lastLogin: user.last_login,
+      createdAt: user.created_at,
+      tenants: user.user_tenants.map((ut) => ({
+        id: ut.tenant_id,
         role: ut.role,
       })),
     };

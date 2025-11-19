@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/tenants`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/tenants`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

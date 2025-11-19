@@ -28,7 +28,7 @@ export const TIER_FEATURES = {
   professional: [
     // ⚠️ CRITICAL REVENUE-PROTECTING FEATURES
     'quick_start_wizard',       // Saves 400+ hours, worth $10K+
-    'product_scanning',          // Worth $375/mo in labor
+    'barcode_scan',          // Worth $375/mo in labor (FIXED: was 'product_scanning')
     'gbp_integration',           // Worth $200-300/mo
     'custom_branding',
     'business_logo',
@@ -125,7 +125,7 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   
   // Professional tier features (CRITICAL)
   quick_start_wizard: 'professional',
-  product_scanning: 'professional',
+  barcode_scan: 'professional',  // FIXED: was 'product_scanning'
   gbp_integration: 'professional',
   custom_branding: 'professional',
   qr_codes_1024: 'professional',
@@ -183,7 +183,7 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
   'quick_start_wizard_full': 'Product Quick Start (Full Access)',
   'category_quick_start': 'Category Quick Start',
   'image_finder': 'Product Image Finder',
-  'product_scanning': 'Product Scanning',
+  'barcode_scan': 'Product Scanning',  // FIXED: canonical name is 'barcode_scan'
   'gbp_integration': 'Google Business Profile Integration',
   'api_access': 'API Access',
   'white_label': 'White Label Branding',

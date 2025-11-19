@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
+import { getUserTenantRole } from '../middleware/permissions';
 
 const router = Router();
 
@@ -302,6 +303,43 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('[DELETE /users/:id] Error:', error);
     res.status(500).json({ error: 'failed_to_delete_user' });
+  }
+});
+
+/**
+ * GET /users/:id/tenants/:tenantId - Get user's role for a specific tenant
+ */
+router.get('/:id/tenants/:tenantId', async (req, res) => {
+  try {
+    const requesterId = req.user?.userId;
+    const { id, tenantId } = req.params;
+
+    if (!requesterId || requesterId !== id) {
+      return res.status(403).json({
+        error: 'forbidden',
+        message: 'You can only view your own tenant membership',
+      });
+    }
+
+    const role = await getUserTenantRole(id, tenantId);
+
+    if (!role) {
+      return res.status(404).json({
+        error: 'user_tenant_not_found',
+        message: 'User is not a member of this tenant',
+      });
+    }
+
+    return res.json({
+      userId: id,
+      tenantId,
+      role,
+    });
+  } catch (error) {
+    console.error('[GET /users/:id/tenants/:tenantId] Error:', error);
+    return res.status(500).json({
+      error: 'failed_to_fetch_user_tenant',
+    });
   }
 });
 
