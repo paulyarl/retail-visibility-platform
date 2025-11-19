@@ -458,86 +458,104 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+                    <CardContent>
             {loading ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {[1, 2, 3, 4].map((n) => (
-                  <div key={n} className="p-4 border border-neutral-200 rounded-lg bg-white animate-pulse">
+                  <div
+                    key={n}
+                    className="p-4 border border-neutral-200 rounded-lg bg-white animate-pulse"
+                  >
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="h-5 w-5 bg-neutral-200 rounded"></div>
+                      <div className="h-5 w-5 bg-neutral-200 rounded" />
                       <div className="flex-1">
-                        <div className="h-6 bg-neutral-200 rounded w-3/4 mb-2"></div>
-                        <div className="h-3 bg-neutral-200 rounded w-1/2"></div>
+                        <div className="h-6 bg-neutral-200 rounded w-3/4 mb-2" />
+                        <div className="h-3 bg-neutral-200 rounded w-1/2" />
                       </div>
                     </div>
                     <div className="pt-3 border-t border-neutral-100 flex gap-2">
-                      <div className="h-8 bg-neutral-200 rounded w-28"></div>
-                      <div className="h-8 bg-neutral-200 rounded w-20"></div>
-                      <div className="h-8 bg-neutral-200 rounded w-24"></div>
+                      <div className="h-8 bg-neutral-200 rounded w-28" />
+                      <div className="h-8 bg-neutral-200 rounded w-20" />
+                      <div className="h-8 bg-neutral-200 rounded w-24" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : filteredTenants.length === 0 ? (
               <div className="text-center py-12">
-                <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                <svg
+                  className="mx-auto h-12 w-12 text-neutral-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                  />
                 </svg>
                 <h3 className="mt-2 text-sm font-medium text-neutral-900 dark:text-white">
-                  {searchQuery ? 'No matching tenants' : 'No tenants'}
+                  {searchQuery ? "No matching tenants" : "No tenants"}
                 </h3>
                 <p className="mt-1 text-sm text-neutral-500">
-                  {searchQuery ? 'Try a different search term' : 'Get started by creating your first tenant.'}
+                  {searchQuery
+                    ? "Try a different search term"
+                    : "Get started by creating your first tenant."}
                 </p>
               </div>
             ) : (
-              <div className={viewMode === 'list' ? 'space-y-3' : 'grid grid-cols-1 lg:grid-cols-2 gap-4'}>
+              <div
+                className={
+                  viewMode === "list"
+                    ? "space-y-3"
+                    : "grid grid-cols-1 lg:grid-cols-2 gap-4"
+                }
+              >
                 {paginatedTenants.map((t, index) => {
                   // Use centralized permission helpers
                   const canEdit = user ? canEditTenant(user, t.id) : false;
                   const canDelete = user ? canDeleteTenant(user, t.id) : false;
-                  const canRename = user ? canRenameTenant(user, t.id) : false;
-                  
+                  const canRename = user
+                    ? canRenameTenant(user, t.id)
+                    : false;
+
                   return (
-<<<<<<< HEAD
-                  <TenantRow 
-                    key={t.id} 
-                    tenant={t}
-                    index={index}
-                    onSelect={() => router.push(`/items?tenantId=${encodeURIComponent(t.id)}`)}
-                    onEditProfile={() => router.push(`/t/${encodeURIComponent(t.id)}/onboarding`)}
-                    onRename={onRename}
-                    onDelete={() => onDelete(t.id)}
-                    onStatusChange={(tenant) => openStatusModal(tenant)}
-                    onRefresh={refresh}
-                    canEdit={canEdit}
-                    canDelete={canDelete}
-                    canRename={canRename}
-                  />
-                )})}
-=======
-                    <TenantRow 
-                      key={t.id} 
+                    <TenantRow
+                      key={t.id}
                       tenant={t}
                       index={index}
-                      onSelect={() => router.push(`/t/${encodeURIComponent(t.id)}/dashboard`)}
-                      onViewItems={() => router.push(`/t/${encodeURIComponent(t.id)}/items`)}
-                      onEditProfile={() => router.push(`/t/${encodeURIComponent(t.id)}/onboarding`)}
+                      onSelect={() =>
+                        router.push(
+                          `/t/${encodeURIComponent(t.id)}/dashboard`,
+                        )
+                      }
+                      onViewItems={() =>
+                        router.push(
+                          `/t/${encodeURIComponent(t.id)}/items`,
+                        )
+                      }
+                      onEditProfile={() =>
+                        router.push(
+                          `/t/${encodeURIComponent(t.id)}/onboarding`,
+                        )
+                      }
                       onRename={onRename}
                       onDelete={() => onDelete(t.id)}
-                      onStatusChange={(tenant) => setStatusModalTenant(tenant)}
+                      onStatusChange={openStatusModal}
                       onRefresh={refresh}
                       statusFilter={statusFilter}
                       canEdit={canEdit}
                       canDelete={canDelete}
                       canRename={canRename}
                     />
-                  )
+                  );
                 })}
->>>>>>> staging
               </div>
             )}
           </CardContent>
+
           {filteredTenants.length > 0 && (
             <Pagination
               currentPage={currentPage}
@@ -599,24 +617,6 @@ function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRena
     setShowDeleteModal(false);
     onDelete();
   };
-
-<<<<<<< HEAD
-=======
-  const handleStatusChange = () => {
-    setIsStatusModalOpen(false);
-    // Refresh the tenant list after status change with current filter settings
-    if (statusFilter === 'all') {
-      onRefresh(true);
-    } else if (statusFilter === 'archived') {
-      onRefresh(true, 'archived');
-    } else if (statusFilter) {
-      onRefresh(false, statusFilter);
-    } else {
-      onRefresh(false);
-    }
-  };
-
->>>>>>> staging
   return (
     <>
       <motion.div
