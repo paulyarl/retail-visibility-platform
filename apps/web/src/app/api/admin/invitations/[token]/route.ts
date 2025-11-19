@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
-    const { token } = params;
+    const { token } = await params;
     
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const res = await fetch(`${base}/api/admin/invitations/${token}`, {
