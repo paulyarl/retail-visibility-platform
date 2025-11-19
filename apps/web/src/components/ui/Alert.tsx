@@ -10,7 +10,7 @@ export interface AlertProps {
 
 export function AlertDescription({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={	ext-sm }>
+    <div className={'text-sm ' + className}>
       {children}
     </div>
   );
@@ -61,9 +61,9 @@ export function Alert({
   };
 
   return (
-    <div className={ounded-lg border p-4  }>
+    <div className={'rounded-lg border p-4 ' + variantStyles[variant] + ' ' + className}>
       <div className="flex">
-        <div className={shrink-0 }>
+        <div className={'shrink-0 ' + iconColors[variant]}>
           {icons[variant]}
         </div>
         <div className="ml-3 flex-1">
