@@ -1958,7 +1958,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
   // Fallback: if JWT tenantIds are empty, verify membership via userTenant table
   if (!hasAccess && req.user?.userId && tenantId) {
     try {
-      const userTenant = await prisma.userTenant.findUnique({
+      const userTenant = await prisma.user_tenants.findUnique({
         where: {
           userId_tenantId: {
             userId: req.user.userId,
@@ -2466,7 +2466,7 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
 
     // Get top-level categories (those without parentId or with specific parent)
     // Instead of relying on level field, get categories that represent top-level groupings
-    const categories = await prisma.googleTaxonomy.findMany({
+    const categories = await prisma.google_taxonomy.findMany({
       where: {
         isActive: true,
         OR: [
@@ -2538,7 +2538,7 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
           children = finalCategories.filter(c => c.parentId === cat.categoryId);
         } else {
           // Get children from database
-          children = await prisma.googleTaxonomy.findMany({
+          children = await prisma.google_taxonomy.findMany({
             where: {
               isActive: true,
               categoryPath: {
@@ -2590,7 +2590,7 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
 
     // Search real Google taxonomy data from database
     // Use case-insensitive search with mode: 'insensitive' for better UX
-    const categories = await prisma.googleTaxonomy.findMany({
+    const categories = await prisma.google_taxonomy.findMany({
       where: {
         isActive: true,
         OR: [
@@ -2672,7 +2672,7 @@ app.get("/google/auth", async (req, res) => {
 
     // Validate NAP (Name, Address, Phone) is complete
     // Check tenant_business_profile table first, fallback to metadata for backwards compatibility
-    const businessProfile = await prisma.tenantBusinessProfile.findUnique({
+    const businessProfile = await prisma.tenant_business_profile.findUnique({
       where: { tenantId }
     });
     
@@ -2739,7 +2739,7 @@ app.get("/google/callback", async (req, res) => {
     const refreshTokenEncrypted = encryptToken(tokens.refresh_token);
 
     // Store in database (upsert pattern)
-    const account = await prisma.googleOAuthAccount.upsert({
+    const account = await prisma.google_oauth_accounts.upsert({
       where: {
         tenantId_googleAccountId: {
           tenantId: stateData.tenantId,
@@ -2813,7 +2813,7 @@ app.get("/google/status", async (req, res) => {
       return res.status(400).json({ error: "tenant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
+    const account = await prisma.google_oauth_accounts.findFirst({
       where: { tenantId },
       include: {
         tokens: true,
@@ -2853,7 +2853,7 @@ app.delete("/google/disconnect", async (req, res) => {
       return res.status(400).json({ error: "tenant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
+    const account = await prisma.google_oauth_accounts.findFirst({
       where: { tenantId },
       include: { tokens: true },
     });
@@ -2869,7 +2869,7 @@ app.delete("/google/disconnect", async (req, res) => {
     }
 
     // Delete from database (cascade will delete tokens, links, locations)
-    await prisma.googleOAuthAccount.delete({
+    await prisma.google_oauth_accounts.delete({
       where: { id: account.id },
     });
 
@@ -2895,7 +2895,7 @@ app.get("/google/gmc/accounts", async (req, res) => {
       return res.status(400).json({ error: "tenant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
+    const account = await prisma.google_oauth_accounts.findFirst({
       where: { tenantId },
     });
 
@@ -2923,7 +2923,7 @@ app.post("/google/gmc/sync", async (req, res) => {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
+    const account = await prisma.google_oauth_accounts.findFirst({
       where: { tenantId },
     });
 
@@ -2956,7 +2956,7 @@ app.get("/google/gmc/products", async (req, res) => {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
+    const account = await prisma.google_oauth_accounts.findFirst({
       where: { tenantId: tenantId as string },
     });
 
@@ -2984,7 +2984,7 @@ app.get("/google/gmc/stats", async (req, res) => {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
+    const account = await prisma.google_oauth_accounts.findFirst({
       where: { tenantId: tenantId as string },
     });
 
@@ -3014,7 +3014,7 @@ app.get("/google/gbp/locations", async (req, res) => {
       return res.status(400).json({ error: "tenant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
+    const account = await prisma.google_oauth_accounts.findFirst({
       where: { tenantId },
     });
 
@@ -3050,7 +3050,7 @@ app.post("/google/gbp/sync", async (req, res) => {
       return res.status(400).json({ error: "tenant_id_and_location_name_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
+    const account = await prisma.google_oauth_accounts.findFirst({
       where: { tenantId },
     });
 
@@ -3106,7 +3106,7 @@ app.get("/google/gbp/insights", async (req, res) => {
  */
 app.get("/admin/email-config", async (_req, res) => {
   try {
-    const configs = await prisma.emailConfiguration.findMany({
+    const configs = await prisma.email_configuration.findMany({
       orderBy: { category: 'asc' }
     });
     res.json(configs);
@@ -3135,7 +3135,7 @@ app.put("/admin/email-config", async (req, res) => {
     // Upsert each configuration
     const results = await Promise.all(
       configs.map(config =>
-        prisma.emailConfiguration.upsert({
+        prisma.email_configuration.upsert({
           where: { category: config.category },
           update: { 
             email: config.email,
@@ -3262,7 +3262,7 @@ app.get('/api/tenants/:tenantId/integrations/clover', authenticateToken, async (
     }
 
     // Check if integration exists and is active
-    const integration = await prisma.cloverIntegration.findUnique({
+    const integration = await prisma.clover_integrations.findUnique({
       where: { tenantId }
     });
 
@@ -3298,7 +3298,7 @@ app.get('/api/admin/taxonomy/status', requireAdmin, async (req, res) => {
     const status = await syncService.checkForUpdates();
 
     // Get current taxonomy version
-    const currentVersion = await prisma.googleTaxonomy.findFirst({
+    const currentVersion = await prisma.google_taxonomy.findFirst({
       select: { version: true },
       orderBy: { createdAt: 'desc' }
     });
@@ -3409,7 +3409,7 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
     if (updateData.categoryPath !== undefined) prismaUpdateData.categoryPath = updateData.categoryPath;
 
     // Update the item
-    const updatedItem = await prisma.inventoryItem.update({
+    const updatedItem = await prisma.inventory_item.update({
       where: { id: itemId },
       data: prismaUpdateData,
     });
@@ -3456,7 +3456,7 @@ app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) =>
       tenantIds = allTenants.map(t => t.id);
     } else {
       // Regular users can only see tenants they have access to
-      const userTenants = await prisma.userTenant.findMany({
+      const userTenants = await prisma.user_tenants.findMany({
         where: { userId: user.userId },
         select: { tenantId: true }
       });
@@ -3469,7 +3469,7 @@ app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) =>
 
     // Find products that need enrichment
     // Products created by Quick Start Wizard typically have source = 'QUICK_START_WIZARD' and are missing details
-    const products = await prisma.inventoryItem.findMany({
+    const products = await prisma.inventory_item.findMany({
       where: {
         tenantId: { in: tenantIds },
         OR: [
@@ -3586,7 +3586,7 @@ app.get("/api/gbp/categories", async (req, res) => {
     }
 
     // Try to search database first (if populated)
-    const dbCategories = await prisma.gBPCategory.findMany({
+    const dbCategories = await prisma.gbp_categories.findMany({
       where: {
         isActive: true,
         OR: [
