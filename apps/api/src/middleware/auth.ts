@@ -26,14 +26,14 @@
  */
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../auth/auth.service';
-import { UserRole } from '@prisma/client';
+import { user_role } from '@prisma/client';
 import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 
 // JWT Payload interface
 export interface JWTPayload {
   userId: string;
   email: string;
-  role: UserRole;
+  role: user_role;
   tenantIds: string[];
 }
 
@@ -91,7 +91,7 @@ export const requireAuth = authenticateToken;
 /**
  * Middleware to check if user has required role
  */
-export function authorize(...roles: UserRole[]) {
+export function authorize(...roles: user_role[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
@@ -183,7 +183,7 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
   // verify membership via userTenant table so owners/members are not blocked
   try {
     const { prisma } = await import('../prisma');
-    const userTenant = await prisma.userTenant.findUnique({
+    const userTenant = await prisma.user_tenants.findUnique({
       where: {
         userId_tenantId: {
           userId: req.user.userId,
@@ -282,7 +282,7 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
   // Check if user has access to this tenant and their role within it
   try {
     const { prisma } = await import('../prisma');
-    const userTenant = await prisma.userTenant.findUnique({
+    const userTenant = await prisma.user_tenants.findUnique({
       where: {
         userId_tenantId: {
           userId: req.user.userId,

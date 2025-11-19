@@ -150,11 +150,11 @@ export async function validateOrganizationTierChange(
         subscriptionTier: true,
         maxLocations: true,
         maxTotalSKUs: true,
-        tenants: {
+        tenant: {
           select: {
             id: true,
             _count: {
-              select: { items: true },
+              include: { inventory_item: true },
             },
           },
         },
@@ -190,7 +190,7 @@ export async function validateOrganizationTierChange(
     }
 
     // Check current location count
-    const currentLocationCount = org.tenants.length;
+    const currentLocationCount = org.tenant.length;
     if (newLimits.maxLocations !== Infinity && currentLocationCount > newLimits.maxLocations) {
       return res.status(403).json({
         error: 'tier_change_blocked',
@@ -202,7 +202,7 @@ export async function validateOrganizationTierChange(
     }
 
     // Check total SKU count
-    const totalSKUs = org.tenants.reduce((sum, tenant) => sum + tenant._count.items, 0);
+    const totalSKUs = org.tenant.reduce((sum, tenant) => sum + tenant._count.inventory_item, 0);
     if (newLimits.maxTotalSKUs !== Infinity && totalSKUs > newLimits.maxTotalSKUs) {
       return res.status(403).json({
         error: 'tier_change_blocked',

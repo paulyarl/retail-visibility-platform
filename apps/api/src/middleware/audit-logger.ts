@@ -64,7 +64,7 @@ async function logAudit(req: Request, res: Response, requestId: string) {
     const entityId = idMatch ? idMatch[1] : 'unknown';
 
     // Create audit log entry
-    await prisma.auditLog.create({
+    const auditEntry = await prisma.audit_log.create({
       data: {
         actorType: user ? 'user' : 'system',
         actorId: (user as any)?.id || 'anonymous',
