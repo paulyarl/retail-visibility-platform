@@ -15,6 +15,14 @@ export function AlertDescription({ children, className = '' }: { children: React
     </div>
   );
 }
+
+export function Alert({
+  variant = 'info',
+  title,
+  children,
+  className = '',
+  onClose,
+}: AlertProps) {
   const variantStyles = {
     info: 'bg-blue-50 border-blue-200 text-blue-800',
     success: 'bg-green-50 border-green-200 text-green-800',
