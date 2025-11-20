@@ -248,6 +248,9 @@ export class AuthService {
    * Get user by ID
    */
   async getUserById(user_id: string) {
+    console.log('[AuthService] getUserById called with:', user_id);
+    console.log('[AuthService] prisma.users exists:', !!prisma.users);
+    
     const user = await prisma.users.findUnique({
       where: { id: user_id },
       select: {
@@ -268,7 +271,13 @@ export class AuthService {
       },
     });
 
+    console.log('[AuthService] Database query result:', user ? 'USER FOUND' : 'USER NOT FOUND');
+    if (user) {
+      console.log('[AuthService] User details:', { id: user.id, email: user.email, role: user.role });
+    }
+
     if (!user) {
+      console.log('[AuthService] Throwing "User not found" error');
       throw new Error('User not found');
     }
 
