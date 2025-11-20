@@ -3154,6 +3154,7 @@ app.put("/admin/email-config", async (req, res) => {
 /* ------------------------------ AUTHENTICATION ------------------------------ */
 // Mount auth routes (no authentication required for these endpoints)
 app.use('/auth', authRoutes);
+app.use('/api/auth', authRoutes);
 
 /* ------------------------------ EMAIL MANAGEMENT ------------------------------ */
 // Import and mount email management routes
