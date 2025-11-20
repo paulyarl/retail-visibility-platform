@@ -8,60 +8,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-model InventoryItem {
-  id                    String
-  tenantId              String
-  sku                   String
-  name                  String
-  priceCents            Int
-  stock                 Int                      @default(0)
-  imageUrl              String?
-  metadata              Json?
-  createdAt             DateTime                 @default(now())
-  updatedAt             DateTime
-  marketingDescription  String?
-  imageGallery          String[]                 @default([])
-  customCta             Json?
-  socialLinks           Json?
-  customBranding        Json?
-  customSections        Json[]                   @default([])
-  landingPageTheme      String?                  @default("default")
-  auditLogId            String?
-  availability          availability_status      @default(in_stock)
-  brand                 String
-  categoryPath          String[]                 @default([])
-  condition             product_condition?       @default(brand_new)
-  currency              String                   @default("USD") @db.Char(3)
-  description           String?
-  eligibilityReason     String?
-  gtin                  String?
-  itemStatus            item_status?             @default(active)
-  locationId            String?
-  manufacturer          String?
-  merchantName          String?
-  mpn                   String?
-  price                 Decimal                  @db.Decimal(12, 2)
-  quantity              Int?
-  searchTsv             Unsupported("tsvector")?
-  syncStatus            sync_status?             @default(pending)
-  syncedAt              DateTime?
-  title                 String
-  visibility            item_visibility?         @default(public)
-  tenant_category_id    String?
-  enriched_at           DateTime?
-  enriched_by           String?
-  enriched_from_barcode String?
-  missing_images        Boolean                  @default(false)
-  missing_description   Boolean                  @default(false)
-  missing_specs         Boolean                  @default(false)
-  missing_brand         Boolean                  @default(false)
-  source                product_source           @default(MANUAL)
-  enrichmentStatus      enrichment_status        @default(COMPLETE)
-
-  @@ignore
-}
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model LocationStatusLog {
@@ -179,8 +125,9 @@ model Tenant {
   business_hours_special      business_hours_special[]
   category_mirror_runs        category_mirror_runs[]
   google_oauth_accounts       google_oauth_accounts[]
-  inventory_item              inventory_item[]
-  invitations                 invitations[]
+  inventoryItems              InventoryItem[]
+  invitations                 Invitation[]
+  userTenants                 UserTenant[]
   photo_asset                 photo_asset[]
   product_performance         product_performance[]
   sync_job                    sync_job[]
@@ -387,7 +334,7 @@ model directory_featured_listings {
   placement_priority Int      @default(5)
   created_by         String?
   created_at         DateTime @default(now())
-  users              users?   @relation(fields: [created_by], references: [id])
+  user               User?    @relation(fields: [created_by], references: [id])
   Tenant             Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([placement_priority, featured_from(sort: Desc)])
@@ -594,7 +541,7 @@ model google_taxonomy {
   @@ignore
 }
 
-model inventory_item {
+model InventoryItem {
   id                    String                   @id
   tenantId              String                   @map("tenant_id")
   sku                   String
@@ -651,25 +598,27 @@ model inventory_item {
   @@index([source])
   @@index([tenantId, enrichmentStatus])
   @@index([tenantId, updatedAt])
+  @@map("inventory_item")
 }
 
-model invitations {
-  id          String           @id @default(dbgenerated("gen_random_uuid()"))
-  email       String
-  token       String           @unique @default(dbgenerated("encode(gen_random_bytes(32), 'hex'::text)"))
-  tenant_id   String
-  role        user_tenant_role @default(MEMBER)
-  invited_by  String
-  expires_at  DateTime         @default(dbgenerated("(now() + '7 days'::interval)"))
-  accepted_at DateTime?
-  created_at  DateTime         @default(now())
-  updated_at  DateTime         @default(now())
-  users       users            @relation(fields: [invited_by], references: [id], onDelete: Cascade)
-  tenant      Tenant           @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+model Invitation {
+  id         String           @id @default(dbgenerated("gen_random_uuid()"))
+  email      String
+  token      String           @unique @default(dbgenerated("encode(gen_random_bytes(32), 'hex'::text)"))
+  tenantId   String           @map("tenant_id")
+  role       user_tenant_role @default(MEMBER)
+  invitedBy  String           @map("invited_by")
+  expiresAt  DateTime         @default(dbgenerated("(now() + '7 days'::interval)")) @map("expires_at")
+  acceptedAt DateTime?        @map("accepted_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @default(now()) @map("updated_at")
+  user       User             @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([email])
-  @@index([expires_at])
-  @@index([tenant_id])
+  @@index([expiresAt])
+  @@index([tenantId])
+  @@map("invitations")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -805,7 +754,7 @@ model photo_asset {
   position          Int            @default(0)
   alt               String?
   caption           String?
-  inventory_item    inventory_item @relation("InventoryItemPhotos", fields: [inventory_item_id], references: [id], onDelete: Cascade)
+  inventoryItem     InventoryItem  @relation("InventoryItemPhotos", fields: [inventory_item_id], references: [id], onDelete: Cascade)
   tenant            Tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@unique([inventory_item_id, position])
@@ -849,7 +798,7 @@ model product_performance {
   search_rank      Int?
   last_updated     DateTime       @default(now())
   created_at       DateTime       @default(now())
-  inventory_item   inventory_item @relation("InventoryItemPerformance", fields: [item_id], references: [id], onDelete: Cascade)
+  inventoryItem    InventoryItem  @relation("InventoryItemPerformance", fields: [item_id], references: [id], onDelete: Cascade)
   tenant           Tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@unique([item_id, date])
@@ -1196,36 +1145,39 @@ model upgrade_requests {
   @@ignore
 }
 
-model user_sessions {
-  id          String   @id
-  user_id     String
-  device_info String?
-  ip_address  String?
-  user_agent  String?
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now())
-  expires_at  DateTime
-  users       users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+model UserSession {
+  id         String   @id
+  userId     String   @map("user_id")
+  deviceInfo String?  @map("device_info")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  expiresAt  DateTime @map("expires_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([expires_at])
-  @@index([user_id])
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("user_sessions")
 }
 
-model user_tenants {
-  id         String           @id
-  user_id    String
-  tenant_id  String
-  role       user_tenant_role @default(MEMBER)
-  created_at DateTime         @default(now())
-  updated_at DateTime
-  users      users            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+model UserTenant {
+  id        String           @id
+  userId    String           @map("user_id")
+  tenantId  String           @map("tenant_id")
+  role      user_tenant_role @default(MEMBER)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @map("updated_at")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([user_id, tenant_id])
-  @@index([tenant_id])
-  @@index([user_id])
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("user_tenants")
 }
 
-model users {
+model User {
   id                          String                        @id
   email                       String                        @unique
   passwordHash                String                        @map("password_hash")
@@ -1241,9 +1193,11 @@ model users {
   createdAt                   DateTime                      @default(now()) @map("created_at")
   updatedAt                   DateTime                      @map("updated_at")
   directoryFeaturedListings   directory_featured_listings[]
-  invitations                 invitations[]
-  userSessions                user_sessions[]
-  userTenants                 user_tenants[]
+  invitations                 Invitation[]
+  userSessions                UserSession[]
+  userTenants                 UserTenant[]
+
+  @@map("users")
 }
 
 enum LocationStatus {
