@@ -243,7 +243,45 @@ app.get("/api/tenants", authenticateToken, async (req, res) => {
 
 app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
-    let tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
+    let tenant = await prisma.tenant.findUnique({ 
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        region: true,
+        language: true,
+        currency: true,
+        subscriptionStatus: true,
+        subscriptionTier: true,
+        trialEndsAt: true,
+        subscriptionEndsAt: true,
+        stripeCustomerId: true,
+        stripeSubscriptionId: true,
+        organizationId: true,
+        serviceLevel: true,
+        managedServicesActive: true,
+        dedicatedManager: true,
+        monthlySkuQuota: true,
+        skusAddedThisMonth: true,
+        googleBusinessAccessToken: true,
+        googleBusinessRefreshToken: true,
+        googleBusinessTokenExpiry: true,
+        createdBy: true,
+        locationStatus: true,
+        statusChangedAt: true,
+        statusChangedBy: true,
+        reopeningDate: true,
+        closureReason: true,
+        slug: true,
+        googleSyncEnabled: true,
+        googleLastSync: true,
+        googleProductCount: true,
+        directoryVisible: true,
+        metadata: true,
+        dataPolicyAccepted: true,
+      }
+    });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
     
     const now = new Date();
