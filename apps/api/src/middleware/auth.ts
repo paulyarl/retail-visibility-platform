@@ -30,8 +30,10 @@ import { user_role } from '@prisma/client';
 import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 
 // JWT Payload interface
+// Note: Universal transform middleware makes both user_id and userId available
 export interface JWTPayload {
   user_id: string;
+  userId?: string; // Added by universal transform middleware
   email: string;
   role: user_role;
   tenantIds: string[];

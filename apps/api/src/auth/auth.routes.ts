@@ -167,7 +167,7 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
       });
     }
     
-    const user = await authService.getUserById(req.user.user_id);
+    const user = await authService.getUserById(req.user.userId || req.user.user_id);
     
     res.json({ user });
   } catch (error) {

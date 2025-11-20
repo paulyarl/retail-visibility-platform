@@ -13,6 +13,7 @@ const JWT_REFRESH_EXPIRY = '730d'; // Was '7d'
 
 export interface JWTPayload {
   user_id: string;
+  userId?: string; // Added by universal transform middleware
   email: string;
   role: user_role;
   tenantIds: string[];
