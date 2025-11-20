@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
       // Tenants with at least one item (active storefronts)
       prisma.tenant.count({
         where: {
-          inventory_item: {
+          inventoryItems: {
             some: {},
           },
         },
