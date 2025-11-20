@@ -26,14 +26,14 @@ router.get('/', async (req, res) => {
       // Active items (synced to Google)
       prisma.inventory_item.count({
         where: {
-          item_status: 'active',
+          itemStatus: 'active',
         },
       }),
       
       // Tenants with at least one item (active storefronts)
       prisma.tenant.count({
         where: {
-          _count: {
+          inventory_item: {
             some: {},
           },
         },

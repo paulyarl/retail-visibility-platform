@@ -53,11 +53,11 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
       // 2. Item counts (all in parallel)
       Promise.all([
         prisma.inventory_item.count({ where: { tenantId } }),
-        prisma.inventory_item.count({ where: { tenantId, item_status: 'active' } }),
+        prisma.inventory_item.count({ where: { tenantId, itemStatus: 'active' } }),
         prisma.inventory_item.count({
           where: {
             tenantId,
-            item_status: 'active',
+            itemStatus: 'active',
             OR: [
               { tenantCategoryId: null },
               { visibility: 'private' },
