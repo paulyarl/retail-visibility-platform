@@ -265,7 +265,7 @@ export class AuthService {
         createdAt: true,
         userTenants: {
           select: {
-            tenant_id: true,
+            tenantId: true,
             role: true,
           },
         },
@@ -292,7 +292,7 @@ export class AuthService {
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
       tenant: user.userTenants.map((ut) => ({
-        id: ut.tenant_id,
+        id: ut.tenantId,
         role: ut.role,
       })),
     };
