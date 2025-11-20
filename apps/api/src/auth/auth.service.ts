@@ -291,7 +291,7 @@ export class AuthService {
       emailVerified: user.emailVerified,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
-      tenant: user.userTenants.map((ut) => ({
+      tenants: user.userTenants.map((ut) => ({
         id: ut.tenantId,
         role: ut.role,
       })),
