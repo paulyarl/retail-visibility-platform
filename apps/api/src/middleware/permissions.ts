@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { isPlatformAdmin } from '../utils/platform-admin';
 import { getTenantLimit, getTenantLimitConfig, canCreateTenant, getPlatformSupportLimit } from '../config/tenant-limits';
-import '../types/express'; // Import type extensions
+// Type extensions are automatically loaded from src/types/express.d.ts
 
 import { user_tenant_role } from '@prisma/client';
 
