@@ -167,7 +167,10 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
       });
     }
     
-    const user = await authService.getUserById(req.user.userId || req.user.user_id);
+    // Universal transform middleware converts user_id to userId
+    const userId = (req.user as any).userId || req.user.user_id;
+    console.log('[Auth Route] Using userId:', userId);
+    const user = await authService.getUserById(userId);
     
     res.json({ user });
   } catch (error) {
