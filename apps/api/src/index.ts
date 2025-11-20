@@ -154,6 +154,13 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// 🌟 UNIVERSAL TRANSFORM MIDDLEWARE - Makes naming conventions irrelevant!
+// Both snake_case AND camelCase work everywhere - API code and frontend get what they expect
+import { universalTransformMiddleware } from './middleware/universal-transform';
+app.use(universalTransformMiddleware);
+console.log('🌟 Universal transform middleware deployed - both naming conventions work everywhere!');
+
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(setRequestContext);
 // CSRF: issue cookie and enforce on write operations when FF_ENFORCE_CSRF=true
@@ -218,7 +225,7 @@ app.get("/api/tenants", authenticateToken, async (req, res) => {
         ...baseWhere,
         ...statusCondition,
       },
-      orderBy: { created_at: "desc" },
+      orderBy: { createdAt: "desc" },
       include: {
         organization: {
           select: {
@@ -365,7 +372,7 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     console.log('[POST /tenants] Tenant created successfully:', {
       id: tenant.id,
       name: tenant.name,
-      created_by: tenant.createdBy
+      created_by: tenant.created_by
     });
 
     // Now create the UserTenant link (tenant should be committed now)
@@ -396,7 +403,7 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     console.log('[POST /tenants] UserTenant link created successfully:', {
       id: userTenant.id,
       user_id: userTenant.user_id,
-      tenant_id: userTenant.tenantId,
+      tenant_id: userTenant.tenant_id,
       role: userTenant.role
     });
 
@@ -514,7 +521,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
     const userRole = req.user?.role || 'USER';
     // Map deprecated ADMIN role to PLATFORM_ADMIN for backward compatibility
     const normalizedRole = userRole === 'ADMIN' ? 'PLATFORM_ADMIN' : userRole;
-    const tenantRole = req.user?.tenantIds?.includes(id) ? 'TENANT_ADMIN' : normalizedRole;
+    const tenantRole = req.user?.tenant_ids?.includes(id) ? 'TENANT_ADMIN' : normalizedRole;
 
     console.log(`[PATCH /tenants/${id}/status] Permission check`, {
       userRole,
@@ -913,9 +920,9 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
     }
 
     // Keep Tenant.name in sync
-    if (profileData.businessName) {
-      console.log('[POST /tenant/profile] Updating tenant name to:', profileData.businessName);
-      await prisma.tenant.update({ where: { id: tenant_id }, data: { name: profileData.businessName } });
+    if (profileData.business_name) {
+      console.log('[POST /tenant/profile] Updating tenant name to:', profileData.business_name);
+      await prisma.tenant.update({ where: { id: tenant_id }, data: { name: profileData.business_name } });
     }
 
     console.log('[POST /tenant/profile] Success, returning result:', (result as any)[0] || result);
@@ -935,7 +942,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
 // GET /tenant/profile - retrieve normalized profile
 app.get("/tenant/profile", authenticateToken, async (req, res) => {
   try {
-    const tenantId = (req.query.tenant_id as string) || (req.query.tenantId as string);
+    const tenantId = (req.query.tenant_id as string) || (req.query.tenant_id as string);
     if (!tenantId) return res.status(400).json({ error: "tenant_required" });
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
@@ -986,17 +993,7 @@ app.get("/public/tenant/:tenantId", async (req, res) => {
     if (!tenantId) return res.status(400).json({ error: "tenant_required" });
     
     const tenant = await prisma.tenant.findUnique({ 
-      where: { id: tenantId },
-      include: {
-        featureOverrides: {
-          where: {
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } }
-            ]
-          }
-        }
-      }
+      where: { id: tenantId }
     });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
 
@@ -1006,18 +1003,9 @@ app.get("/public/tenant/:tenantId", async (req, res) => {
     const canShowStorefront = shouldShowStorefront(locationStatus);
     const storefrontMessage = getStorefrontMessage(locationStatus, tenant.reopeningDate);
 
-    // Check if tenant has storefront access (tier + overrides)
-    const tier = tenant.subscriptionTier || 'trial';
-    const hasStorefrontByTier = tier !== 'google_only'; // google_only doesn't have storefront
-    
-    // Check for storefront override
-    const storefrontOverride = tenant.featureOverrides.find(
-      (override: any) => override.feature === 'storefront'
-    );
-    
-    const hasStorefrontAccess = storefrontOverride 
-      ? storefrontOverride.granted 
-      : hasStorefrontByTier;
+    // Check if tenant has storefront access (tier-based)
+    const tier = tenant.subscriptionTier as string;
+    const hasStorefrontAccess = tier !== 'google_only'; // google_only doesn't have storefront
 
     // Storefront is accessible if: tier allows it AND location status allows it
     const finalStorefrontAccess = hasStorefrontAccess && canShowStorefront;
@@ -1075,7 +1063,7 @@ app.get("/tenant/:tenantId/swis/preview", async (req, res) => {
     
     // Fetch products
     const products = await prisma.inventory_item.findMany({
-      where: { tenantId },
+      where: { tenant_id: tenantId },
       orderBy,
       take: limit,
     });
@@ -1104,9 +1092,9 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     const bp = (bpResults as any[])[0] || null;
     
     // Fetch business hours from BusinessHours table
-    const businessHours = await prisma.business_hours.findUnique({ where: { tenantId } });
+    const businessHours = await prisma.business_hours.findUnique({ where: { tenant_id: tenantId } });
     const specialHours = await prisma.business_hoursSpecial.findMany({ 
-      where: { tenantId },
+      where: { tenant_id: tenantId },
       orderBy: { date: 'asc' }
     });
     let hoursData = null;
@@ -1186,7 +1174,7 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
     
     // Build where clause - only show active, public items
     const where: any = { 
-      tenantId,
+      tenant_id: tenantId,
       item_status: 'active',
       visibility: 'public'
     };
@@ -2082,7 +2070,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     // Return paginated response
     // Hide priceCents from frontend since price is the authoritative field
     const itemsWithoutPriceCents = items.map(item => {
-      const { priceCents, ...itemWithoutPriceCents } = item;
+      const { price_cents, ...itemWithoutPriceCents } = item;
       return {
         ...itemWithoutPriceCents,
         price: item.price ? Number(item.price) : undefined,
@@ -2237,10 +2225,10 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     }
     
     const updated = await prisma.inventory_item.update({ where: { id: req.params.id }, data: updateData });
-    await audit({ tenant_id: updated.tenantId, actor: null, action: "inventory.update", payload: { id: updated.id } });
+    await audit({ tenant_id: updated.tenant_id, actor: null, action: "inventory.update", payload: { id: updated.id } });
     
-    // Convert Decimal price to number and hide priceCents for frontend compatibility
-    const { priceCents, ...itemWithoutPriceCents } = updated;
+    // Convert Decimal price to number and hide price_cents for frontend compatibility
+    const { price_cents, ...itemWithoutPriceCents } = updated;
     const transformed = {
       ...itemWithoutPriceCents,
       price: updated.price ? Number(updated.price) : undefined,
@@ -2262,7 +2250,7 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
     }
 
     // Get tenant to check tier
-    const tenant = await prisma.tenant.findUnique({ where: { id: item.tenantId } });
+    const tenant = await prisma.tenant.findUnique({ where: { id: item.tenant_id } });
     if (!tenant) {
       return res.status(404).json({ error: "tenant_not_found" });
     }
@@ -2270,7 +2258,7 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
     // Check trash capacity
     const { isTrashFull, getTrashCapacity } = await import('./utils/trash-capacity');
     const trashCount = await prisma.inventory_item.count({
-      where: { tenant_id: item.tenantId, item_status: 'trashed' }
+      where: { tenant_id: item.tenant_id, item_status: 'trashed' }
     });
     
     if (isTrashFull(trashCount, tenant.subscriptionTier || 'starter')) {
@@ -2312,7 +2300,7 @@ app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (re
     // Get trash count and capacity info
     const { getTrashCapacityInfo } = await import('./utils/trash-capacity');
     const trashCount = await prisma.inventory_item.count({
-      where: { tenantId, item_status: 'trashed' }
+      where: { tenant_id: tenantId, item_status: 'trashed' }
     });
     
     const capacityInfo = getTrashCapacityInfo(trashCount, tenant.subscriptionTier || 'starter');
@@ -2672,9 +2660,13 @@ app.get("/google/auth", async (req, res) => {
 
     // Validate NAP (Name, Address, Phone) is complete
     // Check tenant_business_profile table first, fallback to metadata for backwards compatibility
-    const businessProfile = await prisma.tenant_business_profile.findUnique({
+    const businessProfileRaw = await prisma.tenant_business_profile.findUnique({
       where: { tenantId }
     });
+    
+    // Enhance business profile to have both naming conventions
+    const { enhanceDatabaseResult } = require('./middleware/universal-transform');
+    const businessProfile = enhanceDatabaseResult(businessProfileRaw);
     
     const hasProfile = businessProfile 
       ? (businessProfile.businessName && businessProfile.city && businessProfile.state)
@@ -2814,7 +2806,7 @@ app.get("/google/status", async (req, res) => {
     }
 
     const account = await prisma.google_oauth_accounts.findFirst({
-      where: { tenantId },
+      where: { tenant_id: tenantId },
       include: {
         tokens: true,
         merchantLinks: true,
@@ -2854,7 +2846,7 @@ app.delete("/google/disconnect", async (req, res) => {
     }
 
     const account = await prisma.google_oauth_accounts.findFirst({
-      where: { tenantId },
+      where: { tenant_id: tenantId },
       include: { tokens: true },
     });
 
@@ -2896,7 +2888,7 @@ app.get("/google/gmc/accounts", async (req, res) => {
     }
 
     const account = await prisma.google_oauth_accounts.findFirst({
-      where: { tenantId },
+      where: { tenant_id: tenantId },
     });
 
     if (!account) {

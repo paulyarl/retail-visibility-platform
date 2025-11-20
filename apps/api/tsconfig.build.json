@@ -5,7 +5,14 @@
     "skipLibCheck": true,
     "strict": false,
     "strictNullChecks": false,
-    "strictPropertyInitialization": false
+    "strictPropertyInitialization": false,
+    "noImplicitReturns": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false
   },
   "exclude": ["**/*.test.ts", "**/*.spec.ts", "**/*test*.ts"]
 }

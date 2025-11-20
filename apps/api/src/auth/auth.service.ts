@@ -116,11 +116,11 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
+      firstName: user.firstName,
+      lastName: user.lastName,
       role: user.role,
-      emailVerified: user.email_verified,
-      created_at: user.created_at,
+      emailVerified: user.emailVerified,
+      createdAt: user.createdAt,
     };
   }
 
@@ -132,7 +132,7 @@ export class AuthService {
     const user = await prisma.users.findUnique({
       where: { email: data.email.toLowerCase() },
       include: {
-        user_tenants: true,
+        userTenants: true,
       },
     });
 
@@ -141,18 +141,18 @@ export class AuthService {
     }
 
     // Check if user is active
-    if (!user.is_active) {
+    if (!user.isActive) {
       throw new Error('Account is deactivated');
     }
 
     // Verify password
-    const isValidPassword = await this.verifyPassword(data.password, user.password_hash);
+    const isValidPassword = await this.verifyPassword(data.password, user.passwordHash);
     if (!isValidPassword) {
       throw new Error('Invalid email or password');
     }
 
     // Get tenant IDs
-    const tenantIds = user.user_tenants.map((ut) => ut.tenant_id);
+    const tenantIds = user.userTenants.map((ut) => ut.tenant_id);
 
     // Create JWT payload
     const payload: JWTPayload = {
@@ -185,11 +185,11 @@ export class AuthService {
       users: {
         id: user.id,
         email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         role: user.role,
-        emailVerified: user.email_verified,
-        tenant: user.user_tenants.map((ut) => ({
+        emailVerified: user.emailVerified,
+        tenant: user.userTenants.map((ut) => ({
           id: ut.tenant_id,
           name: 'Unknown',
           role: ut.role,
@@ -214,8 +214,8 @@ export class AuthService {
           id: true,
           email: true,
           role: true,
-          is_active: true,
-          user_tenants: {
+          isActive: true,
+          userTenants: {
             select: {
               tenant_id: true,
             },
@@ -223,7 +223,7 @@ export class AuthService {
         },
       });
 
-      if (!user || !user.is_active) {
+      if (!user || !user.isActive) {
         throw new Error('Invalid refresh token');
       }
 
@@ -232,7 +232,7 @@ export class AuthService {
         user_id: user.id,
         email: user.email,
         role: user.role,
-        tenantIds: user.user_tenants.map((ut) => ut.tenant_id),
+        tenantIds: user.userTenants.map((ut) => ut.tenant_id),
       };
 
       const accessToken = this.generateAccessToken(newPayload);
@@ -252,13 +252,13 @@ export class AuthService {
       select: {
         id: true,
         email: true,
-        first_name: true,
-        last_name: true,
+        firstName: true,
+        lastName: true,
         role: true,
-        email_verified: true,
-        last_login: true,
-        created_at: true,
-        user_tenants: {
+        emailVerified: true,
+        lastLogin: true,
+        createdAt: true,
+        userTenants: {
           select: {
             tenant_id: true,
             role: true,
@@ -274,13 +274,13 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
+      firstName: user.firstName,
+      lastName: user.lastName,
       role: user.role,
-      emailVerified: user.email_verified,
-      lastLogin: user.last_login,
-      created_at: user.created_at,
-      tenant: user.user_tenants.map((ut) => ({
+      emailVerified: user.emailVerified,
+      lastLogin: user.lastLogin,
+      createdAt: user.createdAt,
+      tenant: user.userTenants.map((ut) => ({
         id: ut.tenant_id,
         role: ut.role,
       })),

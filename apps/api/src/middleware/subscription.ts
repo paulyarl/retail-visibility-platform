@@ -293,7 +293,10 @@ export async function requireWritableSubscription(
     }
 
     // Derive internal status to determine write permissions
-    const internalStatus = deriveInternalStatus(tenant);
+    // Enhance tenant with both naming conventions for compatibility
+    const { enhanceDatabaseResult } = require('../middleware/universal-transform');
+    const enhancedTenant = enhanceDatabaseResult(tenant);
+    const internalStatus = deriveInternalStatus(enhancedTenant);
 
     // Frozen accounts are read-only (visibility only)
     if (internalStatus === 'frozen') {

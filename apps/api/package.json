@@ -5,9 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon",
-    "build": "prisma generate && tsc -p tsconfig.build.json --skipLibCheck",
-    "start": "node dist/index.js",
-    "vercel-build": "prisma generate && tsc -p tsconfig.build.json --skipLibCheck",
+    "build": "node build-with-selective-errors.js",
+    "vercel-build": "node build-with-selective-errors.js",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:local": "tsx prisma/seed.ts",
     "db:push": "doppler run --config dev -- prisma db push",

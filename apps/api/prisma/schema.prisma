@@ -141,54 +141,58 @@ model SyncJob {
 model Tenant {
   id                          String                        @id
   name                        String
-  createdAt                   DateTime                      @default(now())
+  createdAt                   DateTime                      @default(now()) @map("created_at")
   region                      String                        @default("us-east-1")
   language                    String                        @default("en-US")
   currency                    String                        @default("USD")
-  data_policy_accepted        Boolean                       @default(false)
+  dataPolicyAccepted          Boolean                       @default(false) @map("data_policy_accepted")
   metadata                    Json?
-  subscriptionStatus          String?                       @default("trial")
-  subscriptionTier            String?                       @default("starter")
-  trialEndsAt                 DateTime?
-  subscriptionEndsAt          DateTime?
-  stripeCustomerId            String?                       @unique
-  stripeSubscriptionId        String?                       @unique
-  organizationId              String?
-  serviceLevel                String?                       @default("self_service")
-  managedServicesActive       Boolean                       @default(false)
-  dedicatedManager            String?
-  monthlySkuQuota             Int?
-  skusAddedThisMonth          Int                           @default(0)
-  googleBusinessAccessToken   String?
-  googleBusinessRefreshToken  String?
-  googleBusinessTokenExpiry   DateTime?
-  created_by                  String?
-  location_status             location_status               @default(active)
-  status_changed_at           DateTime?
-  status_changed_by           String?
-  reopening_date              DateTime?
-  closure_reason              String?
-  locationStatus              LocationStatus?               @default(active)
-  statusChangedAt             DateTime?
-  statusChangedBy             String?
-  reopeningDate               DateTime?
-  closureReason               String?
+  subscriptionStatus          String?                       @default("trial") @map("subscription_status")
+  subscriptionTier            String?                       @default("starter") @map("subscription_tier")
+  trialEndsAt                 DateTime?                     @map("trial_ends_at")
+  subscriptionEndsAt          DateTime?                     @map("subscription_ends_at")
+  stripeCustomerId            String?                       @unique @map("stripe_customer_id")
+  stripeSubscriptionId        String?                       @unique @map("stripe_subscription_id")
+  organizationId              String?                       @map("organization_id")
+  serviceLevel                String?                       @default("self_service") @map("service_level")
+  managedServicesActive       Boolean                       @default(false) @map("managed_services_active")
+  dedicatedManager            String?                       @map("dedicated_manager")
+  monthlySkuQuota             Int?                          @map("monthly_sku_quota")
+  skusAddedThisMonth          Int                           @default(0) @map("skus_added_this_month")
+  googleBusinessAccessToken   String?                       @map("google_business_access_token")
+  googleBusinessRefreshToken  String?                       @map("google_business_refresh_token")
+  googleBusinessTokenExpiry   DateTime?                     @map("google_business_token_expiry")
+  createdBy                   String?                       @map("created_by")
+  locationStatus              LocationStatus?               @default(active) @map("location_status")
+  statusChangedAt             DateTime?                     @map("status_changed_at")
+  statusChangedBy             String?                       @map("status_changed_by")
+  reopeningDate               DateTime?                     @map("reopening_date")
+  closureReason               String?                       @map("closure_reason")
   slug                        String?                       @unique
-  google_sync_enabled         Boolean?                      @default(false)
-  google_last_sync            DateTime?                     @db.Timestamp(6)
-  google_product_count        Int?                          @default(0)
-  directory_visible           Boolean?                      @default(true)
+  googleSyncEnabled           Boolean?                      @default(false) @map("google_sync_enabled")
+  googleLastSync              DateTime?                     @db.Timestamp(6) @map("google_last_sync")
+  googleProductCount          Int?                          @default(0) @map("google_product_count")
+  directoryVisible            Boolean?                      @default(true) @map("directory_visible")
   organization                organization?                 @relation(fields: [organizationId], references: [id])
   directory_featured_listings directory_featured_listings[]
+  business_hours              business_hours?
+  business_hours_special      business_hours_special[]
+  category_mirror_runs        category_mirror_runs[]
+  google_oauth_accounts       google_oauth_accounts[]
+  inventory_item              inventory_item[]
+  invitations                 invitations[]
+  photo_asset                 photo_asset[]
+  product_performance         product_performance[]
+  sync_job                    sync_job[]
+  tenant_business_profile     tenant_business_profile?
 
-  @@index([directory_visible], map: "idx_tenant_directory_visible")
-  @@index([google_sync_enabled, google_last_sync], map: "idx_tenant_google_sync")
+  @@index([directoryVisible], map: "idx_tenant_directory_visible")
+  @@index([googleSyncEnabled, googleLastSync], map: "idx_tenant_google_sync")
   @@index([slug], map: "idx_tenant_slug")
-  @@index([created_by], map: "tenant_created_by_idx")
-  @@index([directory_visible], map: "tenant_directory_visible_idx")
-  @@index([google_sync_enabled, google_last_sync], map: "tenant_google_sync_enabled_google_last_sync_idx")
-  @@index([location_status], map: "tenant_location_status_idx")
-  @@index([locationStatus], map: "tenant_locationstatus_idx")
+  @@index([createdBy], map: "tenant_created_by_idx")
+  @@index([directoryVisible], map: "tenant_directory_visible_idx")
+  @@index([googleSyncEnabled, googleLastSync], map: "tenant_google_sync_enabled_google_last_sync_idx")
+  @@index([locationStatus], map: "tenant_location_status_idx")
   @@index([name], map: "tenant_name_idx")
   @@index([organizationId], map: "tenant_organizationid_idx")
   @@index([serviceLevel], map: "tenant_servicelevel_idx")
@@ -262,7 +266,7 @@ model business_hours {
   last_error     String?
   created_at     DateTime  @default(now())
   updated_at     DateTime
-  tenant         tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  tenant         Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([tenant_id])
 }
@@ -279,7 +283,7 @@ model business_hours_special {
   last_synced_at DateTime?
   created_at     DateTime  @default(now())
   updated_at     DateTime
-  tenant         tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  tenant         Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@unique([tenant_id, date])
   @@index([tenant_id, date])
@@ -299,7 +303,7 @@ model category_mirror_runs {
   job_id       String?
   started_at   DateTime  @default(now())
   completed_at DateTime?
-  tenant       tenant?   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  tenant       Tenant?   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([tenant_id, strategy, started_at(sort: Desc)], map: "category_mirror_runs_tenant_id_strategy_started_at_sort_desc_id")
 }
@@ -556,7 +560,7 @@ model google_oauth_accounts {
   updated_at            DateTime
   gbp_locations         gbp_locations[]
   google_merchant_links google_merchant_links[]
-  tenant                tenant                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  tenant                Tenant                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   google_oauth_tokens   google_oauth_tokens?
 
   @@unique([tenant_id, google_account_id])
@@ -592,61 +596,61 @@ model google_taxonomy {
 
 model inventory_item {
   id                    String                   @id
-  tenant_id             String
+  tenantId              String                   @map("tenant_id")
   sku                   String
   name                  String
-  price_cents           Int
+  priceCents            Int                      @map("price_cents")
   stock                 Int                      @default(0)
-  image_url             String?
+  imageUrl              String?                  @map("image_url")
   metadata              Json?
-  created_at            DateTime                 @default(now())
-  updated_at            DateTime
-  marketing_description String?
-  image_gallery         String[]                 @default([])
-  custom_cta            Json?
-  social_links          Json?
-  custom_branding       Json?
-  custom_sections       Json[]                   @default([])
-  landing_page_theme    String?                  @default("default")
-  audit_log_id          String?
+  createdAt             DateTime                 @default(now()) @map("created_at")
+  updatedAt             DateTime                 @map("updated_at")
+  marketingDescription  String?                  @map("marketing_description")
+  imageGallery          String[]                 @default([]) @map("image_gallery")
+  customCta             Json?                    @map("custom_cta")
+  socialLinks           Json?                    @map("social_links")
+  customBranding        Json?                    @map("custom_branding")
+  customSections        Json[]                   @default([]) @map("custom_sections")
+  landingPageTheme      String?                  @default("default") @map("landing_page_theme")
+  auditLogId            String?                  @map("audit_log_id")
   availability          availability_status      @default(in_stock)
   brand                 String
-  category_path         String[]                 @default([])
-  tenant_category_id    String?
+  categoryPath          String[]                 @default([]) @map("category_path")
+  tenantCategoryId      String?                  @map("tenant_category_id")
   condition             product_condition?       @default(brand_new)
   currency              String                   @default("USD") @db.Char(3)
   description           String?
-  eligibility_reason    String?
+  eligibilityReason     String?                  @map("eligibility_reason")
   gtin                  String?
-  item_status           item_status?             @default(active)
-  location_id           String?
-  merchant_name         String?
+  itemStatus            item_status?             @default(active) @map("item_status")
+  locationId            String?                  @map("location_id")
+  merchantName          String?                  @map("merchant_name")
   mpn                   String?
   price                 Decimal                  @db.Decimal(12, 2)
   quantity              Int?
-  search_tsv            Unsupported("tsvector")?
-  sync_status           sync_status?             @default(pending)
-  synced_at             DateTime?
+  searchTsv             Unsupported("tsvector")? @map("search_tsv")
+  syncStatus            sync_status?             @default(pending) @map("sync_status")
+  syncedAt              DateTime?                @map("synced_at")
   title                 String
   visibility            item_visibility?         @default(public)
   manufacturer          String?
   source                product_source           @default(MANUAL)
-  enrichment_status     enrichment_status        @default(COMPLETE)
-  enriched_at           DateTime?
-  enriched_by           String?
-  enriched_from_barcode String?
-  missing_images        Boolean                  @default(false)
-  missing_description   Boolean                  @default(false)
-  missing_specs         Boolean                  @default(false)
-  missing_brand         Boolean                  @default(false)
-  tenant                tenant                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  photo_asset           photo_asset[]
-  product_performance   product_performance[]
+  enrichmentStatus      enrichment_status        @default(COMPLETE) @map("enrichment_status")
+  enrichedAt            DateTime?                @map("enriched_at")
+  enrichedBy            String?                  @map("enriched_by")
+  enrichedFromBarcode   String?                  @map("enriched_from_barcode")
+  missingImages         Boolean                  @default(false) @map("missing_images")
+  missingDescription    Boolean                  @default(false) @map("missing_description")
+  missingSpecs          Boolean                  @default(false) @map("missing_specs")
+  missingBrand          Boolean                  @default(false) @map("missing_brand")
+  tenant                Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  photoAsset            photo_asset[]            @relation("InventoryItemPhotos")
+  productPerformance    product_performance[]    @relation("InventoryItemPerformance")
 
-  @@unique([tenant_id, sku])
+  @@unique([tenantId, sku])
   @@index([source])
-  @@index([tenant_id, enrichment_status])
-  @@index([tenant_id, updated_at])
+  @@index([tenantId, enrichmentStatus])
+  @@index([tenantId, updatedAt])
 }
 
 model invitations {
@@ -661,7 +665,7 @@ model invitations {
   created_at  DateTime         @default(now())
   updated_at  DateTime         @default(now())
   users       users            @relation(fields: [invited_by], references: [id], onDelete: Cascade)
-  tenant      tenant           @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  tenant      Tenant           @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([email])
   @@index([expires_at])
@@ -704,33 +708,21 @@ model oauth_integrations {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model organization {
-  id                     String    @id
-  name                   String
-  owner_id               String
-  created_at             DateTime  @default(now())
-  updated_at             DateTime
-  subscription_tier      String?   @default("chain_starter")
-  subscription_status    String?   @default("trial")
-  trial_ends_at          DateTime?
-  subscription_ends_at   DateTime?
-  stripe_customer_id     String?
-  stripe_subscription_id String?
-  max_locations          Int       @default(5)
-  max_total_skus         Int       @default(2500)
-  metadata               Json?
-  ownerId                String
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime
-  subscriptionTier       String?   @default("chain_starter")
-  subscriptionStatus     String?   @default("trial")
-  trialEndsAt            DateTime?
-  subscriptionEndsAt     DateTime?
-  stripeCustomerId       String?
-  stripeSubscriptionId   String?
-  maxLocations           Int       @default(5)
-  maxTotalSKUs           Int       @default(2500)
-  Tenant                 Tenant[]
-  tenant                 tenant[]
+  id                   String    @id
+  name                 String
+  ownerId              String    @map("owner_id")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @map("updated_at")
+  subscriptionTier     String?   @default("chain_starter") @map("subscription_tier")
+  subscriptionStatus   String?   @default("trial") @map("subscription_status")
+  trialEndsAt          DateTime? @map("trial_ends_at")
+  subscriptionEndsAt   DateTime? @map("subscription_ends_at")
+  stripeCustomerId     String?   @map("stripe_customer_id")
+  stripeSubscriptionId String?   @map("stripe_subscription_id")
+  maxLocations         Int       @default(5) @map("max_locations")
+  maxTotalSKUs         Int       @default(2500) @map("max_total_skus")
+  metadata             Json?
+  Tenant               Tenant[]
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -813,8 +805,8 @@ model photo_asset {
   position          Int            @default(0)
   alt               String?
   caption           String?
-  inventory_item    inventory_item @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade)
-  tenant            tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  inventory_item    inventory_item @relation("InventoryItemPhotos", fields: [inventory_item_id], references: [id], onDelete: Cascade)
+  tenant            Tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@unique([inventory_item_id, position])
   @@index([inventory_item_id])
@@ -857,8 +849,8 @@ model product_performance {
   search_rank      Int?
   last_updated     DateTime       @default(now())
   created_at       DateTime       @default(now())
-  inventory_item   inventory_item @relation(fields: [item_id], references: [id], onDelete: Cascade)
-  tenant           tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  inventory_item   inventory_item @relation("InventoryItemPerformance", fields: [item_id], references: [id], onDelete: Cascade)
+  tenant           Tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@unique([item_id, date])
   @@index([tenant_id, date(sort: Desc)], map: "product_performance_tenant_id_date_sort_desc_idx")
@@ -1068,50 +1060,11 @@ model sync_job {
   last_error String?
   created_at DateTime @default(now())
   updated_at DateTime
-  tenant     tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  tenant     Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([tenant_id, status, updated_at])
 }
 
-model tenant {
-  id                            String                   @id
-  name                          String
-  created_at                    DateTime                 @default(now())
-  created_by                    String?
-  region                        String                   @default("us-east-1")
-  language                      String                   @default("en-US")
-  currency                      String                   @default("USD")
-  data_policy_accepted          Boolean                  @default(false)
-  metadata                      Json?
-  subscription_status           String?                  @default("trial")
-  subscription_tier             String?                  @default("starter")
-  trial_ends_at                 DateTime?
-  subscription_ends_at          DateTime?
-  stripe_customer_id            String?
-  stripe_subscription_id        String?
-  organization_id               String?
-  service_level                 String?                  @default("self_service")
-  managed_services_active       Boolean                  @default(false)
-  dedicated_manager             String?
-  monthly_sku_quota             Int?
-  skus_added_this_month         Int                      @default(0)
-  google_business_access_token  String?
-  google_business_refresh_token String?
-  google_business_token_expiry  DateTime?
-  business_hours                business_hours?
-  business_hours_special        business_hours_special[]
-  category_mirror_runs          category_mirror_runs[]
-  google_oauth_accounts         google_oauth_accounts[]
-  inventory_item                inventory_item[]
-  invitations                   invitations[]
-  photo_asset                   photo_asset[]
-  product_performance           product_performance[]
-  sync_job                      sync_job[]
-  organization                  organization?            @relation(fields: [organization_id], references: [id])
-  tenant_business_profile       tenant_business_profile?
-
-  @@index([organization_id])
-}
 
 model tenant_business_profile {
   tenant_id                  String          @id @unique
@@ -1142,7 +1095,7 @@ model tenant_business_profile {
   gbp_category_sync_status   String?
   updated_at                 DateTime
   gbp_categories             gbp_categories? @relation(fields: [gbp_category_id], references: [id])
-  tenant                     tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  tenant                     Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([gbp_category_id])
 }
@@ -1275,22 +1228,22 @@ model user_tenants {
 model users {
   id                          String                        @id
   email                       String                        @unique
-  password_hash               String
-  first_name                  String?
-  last_name                   String?
+  passwordHash                String                        @map("password_hash")
+  firstName                   String?                       @map("first_name")
+  lastName                    String?                       @map("last_name")
   role                        user_role                     @default(USER)
-  email_verified              Boolean                       @default(false)
-  email_verification_token    String?
-  password_reset_token        String?
-  password_reset_expires      DateTime?
-  last_login                  DateTime?
-  is_active                   Boolean                       @default(true)
-  created_at                  DateTime                      @default(now())
-  updated_at                  DateTime
-  directory_featured_listings directory_featured_listings[]
+  emailVerified               Boolean                       @default(false) @map("email_verified")
+  emailVerificationToken      String?                       @map("email_verification_token")
+  passwordResetToken          String?                       @map("password_reset_token")
+  passwordResetExpires        DateTime?                     @map("password_reset_expires")
+  lastLogin                   DateTime?                     @map("last_login")
+  isActive                    Boolean                       @default(true) @map("is_active")
+  createdAt                   DateTime                      @default(now()) @map("created_at")
+  updatedAt                   DateTime                      @map("updated_at")
+  directoryFeaturedListings   directory_featured_listings[]
   invitations                 invitations[]
-  user_sessions               user_sessions[]
-  user_tenants                user_tenants[]
+  userSessions                user_sessions[]
+  userTenants                 user_tenants[]
 }
 
 enum LocationStatus {

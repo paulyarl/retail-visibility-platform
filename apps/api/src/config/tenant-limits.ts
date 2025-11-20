@@ -119,7 +119,7 @@ export function getTenantLimitConfig(tier: string, status?: string): TenantLimit
   if (status === 'trial') {
     return {
       limit: TRIAL_CONFIG.locationLimit,
-      display_name: TRIAL_CONFIG.displayName,
+      display_name: TRIAL_CONFIG.display_name,
       description: TRIAL_CONFIG.description,
       upgradeMessage: TRIAL_CONFIG.upgradeMessage,
       upgradeToTier: tier as TenantLimitTier, // Keep same tier, just convert to paid
