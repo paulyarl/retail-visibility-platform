@@ -168,17 +168,17 @@ export class AuthService {
     const refreshToken = this.generateRefreshToken(payload);
 
     // Update last login
-    await prisma.users.update({
+    await (prisma as any).user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
     });
 
     // Create session
-    await prisma.user_sessions.create({
+    await (prisma as any).userSession.create({
       data: {
         id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        user_id: user.id,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },
     });
 
