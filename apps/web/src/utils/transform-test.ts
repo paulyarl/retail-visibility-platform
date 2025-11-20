@@ -165,7 +165,7 @@ export const runTransformTests = (): { passed: number; failed: number; results: 
       }
       
       // Test snake_case transform
-      const snakeResult = transformToSnake(testCase.input, testCase.options);
+      const snakeResult = transformToSnake(testCase.input);
       if (!deepEqual(snakeResult, testCase.expectedSnake)) {
         result.passed = false;
         result.errors.push(`Snake transform failed. Expected: ${JSON.stringify(testCase.expectedSnake)}, Got: ${JSON.stringify(snakeResult)}`);
@@ -257,7 +257,7 @@ export const benchmarkTransforms = (iterations: number = 1000): {
   // Benchmark snake_case transform
   const snakeStart = performance.now();
   for (let i = 0; i < iterations; i++) {
-    transformToSnake(testData, { deep: true });
+    transformToSnake(testData);
   }
   const snakeEnd = performance.now();
   

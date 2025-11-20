@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -24,7 +24,7 @@ interface InvitationData {
   createdAt: string;
 }
 
-export default function AcceptInvitationPage() {
+function AcceptInvitationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -185,7 +185,7 @@ export default function AcceptInvitationPage() {
             <Button 
               onClick={() => router.push('/login')} 
               className="w-full mt-4"
-              variant="outline"
+              variant="secondary"
             >
               Go to Login
             </Button>
@@ -335,5 +335,21 @@ export default function AcceptInvitationPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AcceptInvitationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center">Loading...</div>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <AcceptInvitationContent />
+    </Suspense>
   );
 }

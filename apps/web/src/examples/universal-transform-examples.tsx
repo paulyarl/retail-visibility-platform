@@ -3,6 +3,7 @@
  * Shows how to use the universal transforms in your React components
  */
 
+import React, { useState } from 'react';
 import { enhanceApiResponse, useUniversalApi, universalFetch, quickTransform } from '../utils/universal-transform';
 
 // ===== EXAMPLE 1: Enhanced API Hook =====
@@ -58,6 +59,8 @@ export const updateBusinessProfile = async (tenantId: string, data: any) => {
 
 // ===== EXAMPLE 4: Form Handling =====
 export const BusinessProfileForm = () => {
+  const [businessName, setBusinessName] = useState<string>('');
+  
   const handleSubmit = async (formData: any) => {
     // Transform form data to have both conventions
     const enhancedData = quickTransform.formData(formData);
