@@ -66,10 +66,14 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
     console.log('[Auth Middleware] Verifying token...');
     const payload = authService.verifyAccessToken(token);
-    console.log('[Auth Middleware] Token verified, payload:', payload);
+    console.log('[Auth Middleware] Token verified, raw payload:', payload);
+    console.log('[Auth Middleware] Payload has user_id:', !!payload.user_id);
+    console.log('[Auth Middleware] Payload has userId:', !!(payload as any).userId);
     
     req.user = payload;
     console.log('[Auth Middleware] User attached to request:', req.user);
+    console.log('[Auth Middleware] req.user has user_id:', !!req.user.user_id);
+    console.log('[Auth Middleware] req.user has userId:', !!(req.user as any).userId);
     next();
   } catch (error) {
     console.log('[Auth Middleware] Token verification failed:', error);
