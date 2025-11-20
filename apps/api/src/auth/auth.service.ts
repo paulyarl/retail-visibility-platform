@@ -169,7 +169,7 @@ export class AuthService {
     // Update last login
     await prisma.users.update({
       where: { id: user.id },
-      data: { last_login: new Date() },
+      data: { lastLogin: new Date() },
     });
 
     // Create session

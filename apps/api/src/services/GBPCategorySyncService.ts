@@ -452,14 +452,16 @@ export class GBPCategorySyncService {
           await prisma.gbp_categories.upsert({
             where: { id: category.id },
             update: {
-              display_name: category.displayName,
+              display_name: category.display_name,
               updated_at: new Date()
             },
             create: {
               id: category.id,
               name: category.name,
-              display_name: category.displayName,
-              isActive: true
+              display_name: category.display_name,
+              is_active: true,
+              created_at: new Date(),
+              updated_at: new Date()
             }
           });
           seeded++;

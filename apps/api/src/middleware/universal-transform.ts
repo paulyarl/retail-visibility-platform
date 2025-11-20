@@ -152,7 +152,14 @@ export const universalRequestTransform = (
     
     // Transform query parameters to have both conventions
     if (req.query && typeof req.query === 'object') {
-      req.query = enhancedMakeBothAvailable(req.query);
+      // Create new object since req.query is readonly
+      const enhancedQuery = enhancedMakeBothAvailable(req.query);
+      Object.defineProperty(req, 'query', {
+        value: enhancedQuery,
+        writable: true,
+        enumerable: true,
+        configurable: true
+      });
     }
     
     // Transform URL parameters to have both conventions
