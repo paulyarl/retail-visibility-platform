@@ -10,11 +10,6 @@ const router = Router();
  */
 router.get('/', async (req, res) => {
   try {
-    // Debug: Check what models are available
-    console.log('[Platform Stats] Available Prisma models:', Object.keys(prisma));
-    console.log('[Platform Stats] inventory_item exists:', !!prisma.inventory_item);
-    console.log('[Platform Stats] inventoryItem exists:', !!(prisma as any).inventoryItem);
-    
     // Run all queries in parallel for performance
     const [
       totalTenants,
