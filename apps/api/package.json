@@ -38,7 +38,12 @@
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "schema:validate": "node scripts/validate-prisma-schema.js",
+    "migration:check": "node scripts/pre-migration-check.js",
+    "migration:dev": "node scripts/migration-wrapper.js dev",
+    "migration:deploy": "node scripts/migration-wrapper.js deploy",
+    "migration:reset": "node scripts/migration-wrapper.js reset"
   },
   "keywords": [],
   "author": "",
