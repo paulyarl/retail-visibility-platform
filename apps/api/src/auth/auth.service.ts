@@ -250,8 +250,9 @@ export class AuthService {
   async getUserById(user_id: string) {
     console.log('[AuthService] getUserById called with:', user_id);
     console.log('[AuthService] prisma.users exists:', !!prisma.users);
+    console.log('[AuthService] prisma.user exists:', !!(prisma as any).user);
     
-    const user = await prisma.users.findUnique({
+    const user = await (prisma as any).user.findUnique({
       where: { id: user_id },
       select: {
         id: true,
