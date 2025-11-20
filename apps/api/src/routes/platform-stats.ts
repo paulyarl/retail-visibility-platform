@@ -21,10 +21,10 @@ router.get('/', async (req, res) => {
       prisma.tenant.count(),
       
       // Total number of items (products)
-      prisma.inventory_item.count(),
+      (prisma as any).inventoryItem.count(),
       
       // Active items (synced to Google)
-      prisma.inventory_item.count({
+      (prisma as any).inventoryItem.count({
         where: {
           itemStatus: 'active',
         },
