@@ -130,7 +130,7 @@ export class AuthService {
    */
   async login(data: LoginData) {
     // Find user
-    const user = await prisma.users.findUnique({
+    const user = await (prisma as any).user.findUnique({
       where: { email: data.email.toLowerCase() },
       include: {
         userTenants: true,
