@@ -24,12 +24,12 @@ export interface FeedItem {
  * Generate product feed for Google Merchant Center
  * Only includes items with itemStatus='active' AND visibility='public'
  */
-export async function generateProductFeed(tenantId: string): Promise<FeedItem[]> {
+export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]> {
   try {
-    const items = await prisma.inventoryItem.findMany({
+    const items = await prisma.inventory_item.findMany({
       where: {
-        tenantId,
-        itemStatus: 'active',  // Only active items
+        tenant_id: tenantId,
+        item_status: 'active',  // Only active items
         visibility: 'public',   // Only public items
       },
       select: {
@@ -42,36 +42,26 @@ export async function generateProductFeed(tenantId: string): Promise<FeedItem[]>
         price: true,
         currency: true,
         availability: true,
-        imageUrl: true,
-        categoryPath: true,
-        tenantCategory: {
-          select: {
-            name: true,
-            googleCategoryId: true,
-          },
-        },
-        photos: {
-          orderBy: { position: 'asc' },
-          select: { url: true, position: true },
-        },
+        image_url: true,
+        category_path: true,
       },
     });
 
     return items.map(item => {
-      // Map photos: position 0 = imageLink, positions 1-10 = additionalImageLinks
-      const primaryPhoto = item.photos.find(p => p.position === 0);
-      const additionalPhotos = item.photos
-        .filter(p => p.position > 0 && p.position <= 10)
-        .map(p => p.url);
-
       return {
-        ...item,
-        price: Number(item.price),
+        id: item.id,
+        sku: item.sku,
+        name: item.name,
+        title: item.title,
+        brand: item.brand,
         description: item.description || undefined,
-        imageUrl: primaryPhoto?.url || item.imageUrl || undefined,
-        additionalImageLinks: additionalPhotos.length > 0 ? additionalPhotos : undefined,
-        photos: undefined, // Remove from output
-      };
+        price: Number(item.price),
+        currency: item.currency,
+        availability: item.availability,
+        image_url: item.image_url || undefined,
+        additionalImageLinks: undefined,
+        category_path: item.categoryPath || undefined,
+      } as FeedItem;
     });
   } catch (error) {
     console.error('[Feed Generator] Error:', error);
@@ -82,19 +72,19 @@ export async function generateProductFeed(tenantId: string): Promise<FeedItem[]>
 /**
  * Get feed statistics
  */
-export async function getFeedStats(tenantId: string) {
+export async function getFeedStats(tenant_id: string) {
   const [total, active, inactive, syncing, notSyncing] = await Promise.all([
-    prisma.inventoryItem.count({ where: { tenantId } }),
-    prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'active' } }),
-    prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'inactive' } }),
-    prisma.inventoryItem.count({ 
-      where: { tenantId, itemStatus: 'active', visibility: 'public' } 
+    prisma.inventory_item.count({ where: { tenant_id: tenantId } }),
+    prisma.inventory_item.count({ where: { tenant_id: tenantId, item_status: 'active' } }),
+    prisma.inventory_item.count({ where: { tenant_id: tenantId, item_status: 'inactive' } }),
+    prisma.inventory_item.count({ 
+      where: { tenant_id: tenantId, item_status: 'active', visibility: 'public' } 
     }),
-    prisma.inventoryItem.count({ 
+    prisma.inventory_item.count({ 
       where: { 
-        tenantId,
+        tenant_id: tenantId,
         OR: [
-          { itemStatus: { not: 'active' } },
+          { item_status: { not: 'active' } },
           { visibility: { not: 'public' } },
         ]
       } 

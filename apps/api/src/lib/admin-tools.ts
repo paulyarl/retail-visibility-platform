@@ -36,7 +36,7 @@ export interface CreateTestChainOptions {
 
 export interface TestChainResult {
   organizationId: string;
-  tenants: Array<{
+  tenant: Array<{
     id: string;
     name: string;
     skuCount: number;
@@ -58,14 +58,19 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
     data: {
       id: orgId,
       name,
+      // Store owner in both legacy snake_case and new camelCase columns
+      owner_id: 'admin_test',
       ownerId: 'admin_test', // Test organizations owned by admin
       maxLocations: config.locations * 2, // Allow room for growth
       maxTotalSKUs: config.skuRange[1] * 2,
+      // Required timestamps
+      updated_at: new Date(),
+      updated_at: new Date(),
     },
   });
 
   // Create tenant locations
-  const tenants: TestChainResult['tenants'] = [];
+  const tenant: TestChainResult['tenants'] = [];
   const locationNames = ['Main Store', 'Downtown Branch', 'Uptown Store', 'Westside Location', 'Eastside Branch'];
   
   for (let i = 0; i < config.locations; i++) {
@@ -81,8 +86,8 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
       data: {
         id: tenantId,
         name: `${name} - ${locationName}`,
-        subscriptionTier: 'professional',
-        subscriptionStatus: 'active',
+        subscription_tier: 'professional',
+        subscription_status: 'active',
         organizationId: org.id,
       },
     });
@@ -91,7 +96,7 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
     let actualSkuCount = 0;
     if (seedProducts) {
       const result = await generateQuickStartProducts({
-        tenantId: tenant.id,
+        tenant_id: tenant.id,
         scenario,
         productCount: skuCount,
         assignCategories: true,
@@ -130,16 +135,16 @@ export async function deleteTestChain(organizationId: string): Promise<{
   });
 
   // Count products before deletion
-  const productCount = await prisma.inventoryItem.count({
+  const productCount = await prisma.inventory_item.count({
     where: {
-      tenantId: { in: tenants.map(t => t.id) },
+      tenant_id: { in: tenants.map(t => t.id) },
     },
   });
 
   // Delete all products
-  await prisma.inventoryItem.deleteMany({
+  await prisma.inventory_item.deleteMany({
     where: {
-      tenantId: { in: tenants.map(t => t.id) },
+      tenant_id: { in: tenants.map(t => t.id) },
     },
   });
 
@@ -198,11 +203,13 @@ export async function createTestTenant(options: {
 
   // Link to owner if provided
   if (ownerId) {
-    await prisma.userTenant.create({
+    await prisma.user_tenants.create({
       data: {
-        userId: ownerId,
-        tenantId: tenant.id,
+        id: `ut_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        user_id: ownerId,
+        tenant_id: tenant.id,
         role: 'OWNER',
+        updated_at: new Date(),
       },
     });
     console.log(`[Admin Tools] Linked tenant ${tenant.id} to owner ${ownerId}`);
@@ -212,7 +219,7 @@ export async function createTestTenant(options: {
   let result = null;
   if (productCount > 0) {
     result = await generateQuickStartProducts({
-      tenantId: tenant.id,
+      tenant_id: tenant.id,
       scenario,
       productCount,
       assignCategories: true,
@@ -221,7 +228,7 @@ export async function createTestTenant(options: {
   }
 
   return {
-    tenantId: tenant.id,
+    tenant_id: tenant.id,
     name: tenant.name,
     productsCreated: result?.productsCreated || 0,
     categoriesCreated: result?.categoriesCreated || 0,
@@ -246,8 +253,8 @@ export async function bulkSeedProducts(options: {
     try {
       // Clear existing products if requested
       if (clearExisting) {
-        await prisma.inventoryItem.deleteMany({
-          where: { tenantId },
+        await prisma.inventory_item.deleteMany({
+          where: { tenant_id: tenantId },
         });
       }
 
@@ -291,8 +298,8 @@ export async function bulkClearProducts(tenantIds: string[]) {
 
   for (const tenantId of tenantIds) {
     try {
-      const result = await prisma.inventoryItem.deleteMany({
-        where: { tenantId },
+      const result = await prisma.inventory_item.deleteMany({
+        where: { tenant_id: tenantId },
       });
 
       results.push({

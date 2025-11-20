@@ -7,10 +7,10 @@ const router = Router()
 
 console.log('[Effective Flags Router] Initializing routes...')
 
-// GET /api/admin/effective-flags - list effective platform flags (platform users: admin/support/viewer)
+// GET /api/admin/effective-flags - list effective platform flags (platform user_tenants: admin/support/viewer)
 router.get('/effective-flags', requirePlatformUser, async (_req, res) => {
   try {
-    const rows = await prisma.platformFeatureFlag.findMany({ orderBy: { flag: 'asc' } })
+    const rows = await prisma.platform_feature_flags.findMany({ orderBy: { flag: 'asc' } })
     const flags = [...new Set(rows.map(r => r.flag))]
     const effective = await Promise.all(flags.map(f => getEffectivePlatform(f)))
     res.json({ success: true, data: effective })
@@ -23,14 +23,14 @@ router.get('/effective-flags', requirePlatformUser, async (_req, res) => {
 // GET /api/admin/effective-flags/:tenantId - list effective tenant flags (tenant access check)
 router.get('/effective-flags/:tenantId', checkTenantAccess, async (req, res) => {
   try {
-    console.log('[GET /effective-flags/:tenantId] Request received for tenant:', req.params.tenantId)
+    console.log('[GET /effective-flags/:tenantId] Request received for tenant:', req.params.tenant_id)
     const { tenantId } = req.params
     if (!tenantId) return res.status(400).json({ success: false, error: 'tenant_id_required' })
 
     // Collect flags from platform and tenant scopes
     const [platform, tenant] = await Promise.all([
-      prisma.platformFeatureFlag.findMany({ orderBy: { flag: 'asc' } }),
-      prisma.tenantFeatureFlag.findMany({ where: { tenantId }, orderBy: { flag: 'asc' } }),
+      prisma.platform_feature_flags.findMany({ orderBy: { flag: 'asc' } }),
+      prisma.tenant_feature_flags.findMany({ where: { tenantId }, orderBy: { flag: 'asc' } }),
     ])
     const allFlags = new Set<string>([...platform.map(p => p.flag), ...tenant.map(t => t.flag)])
     const effective = await Promise.all(Array.from(allFlags).sort().map(f => getEffectiveTenant(f, tenantId)))

@@ -22,7 +22,7 @@ router.get('/api/test', async (req: Request, res: Response) => {
  */
 router.get('/dashboard', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).user?.user_id;
     
     if (!userId) {
       console.error('[Dashboard] No userId found in authenticated request');
@@ -44,15 +44,15 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
         }
       });
       userTenants = allTenants.map(tenant => ({
-        tenantId: tenant.id,
+        tenant_id: tenant.id,
         tenant: tenant
       }));
     } else {
       // Regular user - get only their memberships
-      const user = await prisma.user.findUnique({
+      const user = await prisma.users.findUnique({
         where: { id: userId },
         include: {
-          tenants: {
+          tenant: {
             include: {
               tenant: {
                 select: {
@@ -75,7 +75,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
     }
 
     if (!userTenants.length) {
-      console.warn(`[Dashboard] No tenants found for user: ${userId}`);
+      console.warn(`[Dashboard] No tenants found for users: ${userId}`);
       return res.json({
         stats: {
           totalItems: 0,
@@ -90,11 +90,11 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
     }
 
     // Get tenant ID from query param
-    const requestedTenantId = req.query.tenantId as string | undefined;
+    const requestedTenantId = req.query.tenant_id as string | undefined;
     
     // Find the requested tenant in user's memberships
     let targetMembership = requestedTenantId 
-      ? userTenants.find((m: any) => m.tenantId === requestedTenantId || m.tenant.id === requestedTenantId)
+      ? userTenants.find((m: any) => m.tenant_id === requestedTenantId || m.tenant.id === requestedTenantId)
       : null;
     
     // Fallback to first tenant if not found
@@ -102,14 +102,14 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
       targetMembership = userTenants[0];
     }
     
-    const tenantId = (targetMembership as any).tenantId || (targetMembership as any).tenant.id;
+    const tenantId = (targetMembership as any).tenant_id || (targetMembership as any).tenant.id;
     const organizationId = (targetMembership as any).tenant.organizationId;
 
     // Fetch data with error handling
     let itemStats, tenant, organization;
     try {
       [itemStats, tenant, organization] = await Promise.all([
-        prisma.inventoryItem.aggregate({
+        prisma.inventory_item.aggregate({
           where: { tenantId },
           _count: { id: true },
         }).catch(err => {
@@ -134,7 +134,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
           select: {
             name: true,
             _count: {
-              select: { tenants: true }
+              select: { tenant: true }
             }
           }
         }).catch(err => {
@@ -152,7 +152,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
     let activeItemsCount = 0, syncIssuesCount = 0;
     try {
       [activeItemsCount, syncIssuesCount] = await Promise.all([
-        prisma.inventoryItem.count({
+        prisma.inventory_item.count({
           where: {
             tenantId,
             availability: 'in_stock',
@@ -162,7 +162,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
           return 0;
         }),
         
-        prisma.inventoryItem.count({
+        prisma.inventory_item.count({
           where: {
             tenantId,
             OR: [
@@ -214,7 +214,7 @@ router.get('/api/dashboard-test', async (req: Request, res: Response) => {
   return res.json({
     test: true,
     message: 'Dashboard test route working!',
-    tenantId: req.query.tenantId,
+    tenant_id: req.query.tenant_id,
     timestamp: new Date().toISOString()
   });
 });

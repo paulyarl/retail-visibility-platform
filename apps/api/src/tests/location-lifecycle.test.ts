@@ -95,7 +95,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
       expect(data).toHaveProperty('locationStatus');
       expect(data).toHaveProperty('statusInfo');
       
-      console.log('✓ Current status:', data.locationStatus);
+      console.log('✓ Current status:', data.location_status);
     });
 
     it('should change status from active to inactive', async () => {
@@ -111,7 +111,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
       });
 
       expect(response.status).toBe(200);
-      expect(data.locationStatus).toBe('inactive');
+      expect(data.location_status).toBe('inactive');
       expect(data.reopeningDate).toBeTruthy();
       expect(data.auditLogId).toBeTruthy();
       
@@ -141,7 +141,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
       });
 
       expect(response.status).toBe(200);
-      expect(data.locationStatus).toBe('active');
+      expect(data.location_status).toBe('active');
       
       console.log('✓ Reopened to active');
     });
@@ -155,7 +155,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
       });
 
       expect(response.status).toBe(200);
-      expect(data.locationStatus).toBe('closed');
+      expect(data.location_status).toBe('closed');
       expect(data.closureReason).toBe('Test permanent closure');
       
       console.log('✓ Changed to closed with reason');
@@ -282,7 +282,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
       expect(Array.isArray(data)).toBe(true);
 
       // Check that no archived tenants are returned
-      const archivedCount = data.filter((t: any) => t.locationStatus === 'archived').length;
+      const archivedCount = data.filter((t: any) => t.location_status === 'archived').length;
       expect(archivedCount).toBe(0);
 
       console.log(`✓ Retrieved ${data.length} tenants (archived excluded)`);
@@ -333,7 +333,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.locationStatus).toBe('active');
+      expect(data.location_status).toBe('active');
       expect(data.access.storefront).toBe(true);
       expect(data.storefrontMessage).toBeUndefined();
 
@@ -354,7 +354,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.locationStatus).toBe('inactive');
+      expect(data.location_status).toBe('inactive');
       expect(data.access.storefront).toBe(false);
       expect(data.storefrontMessage).toBeTruthy();
       expect(data.storefrontMessage.title).toContain('Temporarily Closed');
@@ -376,7 +376,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.locationStatus).toBe('archived');
+      expect(data.location_status).toBe('archived');
       expect(data.access.storefront).toBe(false);
 
       console.log('✓ Storefront blocked for archived location');
@@ -451,7 +451,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
         reopeningDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       });
       expect(result.response.status).toBe(200);
-      expect(result.data.locationStatus).toBe('inactive');
+      expect(result.data.location_status).toBe('inactive');
       console.log('  2. ✓ Inactive (with reopening date)');
 
       // 3. Reopen to active
@@ -460,7 +460,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
         reason: 'Reopened after seasonal closure',
       });
       expect(result.response.status).toBe(200);
-      expect(result.data.locationStatus).toBe('active');
+      expect(result.data.location_status).toBe('active');
       console.log('  3. ✓ Active (reopened)');
 
       // 4. Close permanently
@@ -469,7 +469,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
         reason: 'Permanent closure for testing',
       });
       expect(result.response.status).toBe(200);
-      expect(result.data.locationStatus).toBe('closed');
+      expect(result.data.location_status).toBe('closed');
       console.log('  4. ✓ Closed (permanent)');
 
       // 5. Archive
@@ -478,7 +478,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
         reason: 'Archiving closed location',
       });
       expect(result.response.status).toBe(200);
-      expect(result.data.locationStatus).toBe('archived');
+      expect(result.data.location_status).toBe('archived');
       console.log('  5. ✓ Archived (final state)');
 
       // 6. Verify audit trail has all transitions

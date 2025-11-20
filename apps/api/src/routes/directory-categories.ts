@@ -149,7 +149,7 @@ router.get(
       // Get category info for the first store (to get category ID for path)
       // Note: getCategoryPath needs category ID, but we have slug
       // For now, skip the path since we don't need it for the response
-      const categoryPath: any[] = [];
+      const category_path: any[] = [];
 
       res.json({
         success: true,

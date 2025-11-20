@@ -24,7 +24,7 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
     }
 
     // Verify item exists and belongs to tenant
-    const item = await prisma.inventoryItem.findFirst({
+    const item = await prisma.inventory_item.findFirst({
       where: {
         id: itemId,
         tenantId,
@@ -59,7 +59,7 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
     await fs.writeFile(filepath, imageBuffer);
 
     // Create photo record
-    const photo = await prisma.photoAsset.create({
+    const photo = await prisma.photo_asset.create({
       data: {
         tenantId,
         inventoryItemId: itemId,

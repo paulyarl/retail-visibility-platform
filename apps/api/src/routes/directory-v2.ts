@@ -97,8 +97,8 @@ router.get('/search', async (req: Request, res: Response) => {
     // Transform snake_case to camelCase for frontend
     const listings = listingsResult.rows.map((row: any) => ({
       id: row.id,
-      tenantId: row.tenant_id,
-      businessName: row.business_name,
+      tenant_id: row.tenant_id,
+      business_name: row.businessName,
       slug: row.slug,
       address: row.address,
       city: row.city,
@@ -117,11 +117,11 @@ router.get('/search', async (req: Request, res: Response) => {
       ratingCount: row.rating_count || 0,
       productCount: row.product_count || 0,
       isFeatured: row.is_featured || false,
-      subscriptionTier: row.subscription_tier || 'trial',
+      subscription_tier: row.subscriptionTier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      created_at: row.created_at,
+      updated_at: row.updatedAt,
     }));
 
     return res.json({
@@ -227,8 +227,8 @@ router.get('/:slug', async (req: Request, res: Response) => {
     const row = result.rows[0];
     const listing = {
       id: row.id,
-      tenantId: row.tenant_id,
-      businessName: row.business_name,
+      tenant_id: row.tenant_id,
+      business_name: row.businessName,
       slug: row.slug,
       address: row.address,
       city: row.city,
@@ -247,11 +247,11 @@ router.get('/:slug', async (req: Request, res: Response) => {
       ratingCount: row.rating_count || 0,
       productCount: row.product_count || 0,
       isFeatured: row.is_featured || false,
-      subscriptionTier: row.subscription_tier || 'trial',
+      subscription_tier: row.subscriptionTier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      created_at: row.created_at,
+      updated_at: row.updatedAt,
     };
 
     return res.json({ listing });
@@ -319,8 +319,8 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
 
     const relatedListings = related.rows.map((row: any) => ({
       id: row.id,
-      tenantId: row.tenant_id,
-      businessName: row.business_name,
+      tenant_id: row.tenant_id,
+      business_name: row.businessName,
       slug: row.slug,
       address: row.address,
       city: row.city,
@@ -339,11 +339,11 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       ratingCount: row.rating_count || 0,
       productCount: row.product_count || 0,
       isFeatured: row.is_featured || false,
-      subscriptionTier: row.subscription_tier || 'trial',
+      subscription_tier: row.subscriptionTier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      created_at: row.created_at,
+      updated_at: row.updatedAt,
     }));
 
     return res.json({

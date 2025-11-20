@@ -147,14 +147,14 @@ export async function validateOrganizationTierChange(
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
       select: {
-        subscriptionTier: true,
+        subscription_tier: true,
         maxLocations: true,
         maxTotalSKUs: true,
         tenant: {
           select: {
             id: true,
             _count: {
-              include: { inventory_item: true },
+              select: { _count: true },
             },
           },
         },

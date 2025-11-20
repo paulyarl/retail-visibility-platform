@@ -30,7 +30,7 @@ const platformSettingsSchema = z.object({
 router.get('/platform-settings', async (_req, res) => {
   try {
     // Check if Prisma client is properly initialized
-    if (!prisma || !prisma.platformSettings) {
+    if (!prisma || !prisma.platform_settings) {
       console.warn('[Platform Settings] Prisma client not properly initialized, using defaults');
       return res.json({
         id: 1,
@@ -40,18 +40,18 @@ router.get('/platform-settings', async (_req, res) => {
         faviconUrl: null,
         primaryColor: '#3b82f6',
         secondaryColor: '#1e40af',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
     }
 
-    let settings = await prisma.platformSettings.findUnique({
+    let settings = await prisma.platform_settings.findUnique({
       where: { id: 1 },
     });
 
     // Create default settings if they don't exist
     if (!settings) {
-      settings = await prisma.platformSettings.create({
+      settings = await prisma.platform_settings.create({
         data: {
           id: 1,
           platformName: 'Visible Shelf',
@@ -134,7 +134,7 @@ router.post(
       }
 
       // Update or create settings
-      const settings = await prisma.platformSettings.upsert({
+      const settings = await prisma.platform_settings.upsert({
         where: { id: 1 },
         update: updateData,
         create: {

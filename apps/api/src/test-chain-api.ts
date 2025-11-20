@@ -70,8 +70,8 @@ async function testPropagateAPI() {
     console.log(`  ❌ Errors: ${data.summary.errors}`);
     
     if (data.results.created.length > 0) {
-      console.log('\n✅ Created at tenants:');
-      data.results.created.forEach((tenantId: string) => {
+      console.log('\n✅ Created at tenant:');
+      data.results.created.forEach((tenant_id: string) => {
         console.log(`  - ${tenantId}`);
       });
     }
@@ -79,14 +79,14 @@ async function testPropagateAPI() {
     if (data.results.skipped.length > 0) {
       console.log('\n⏭️  Skipped:');
       data.results.skipped.forEach((skip: any) => {
-        console.log(`  - ${skip.tenantId}: ${skip.reason}`);
+        console.log(`  - ${skip.tenant_id}: ${skip.reason}`);
       });
     }
     
     if (data.results.errors.length > 0) {
       console.log('\n❌ Errors:');
       data.results.errors.forEach((err: any) => {
-        console.log(`  - ${err.tenantId}: ${err.error}`);
+        console.log(`  - ${err.tenant_id}: ${err.error}`);
       });
     }
     

@@ -17,7 +17,7 @@ export interface CategoryCount {
  * @returns Array of categories with product counts
  */
 export async function getCategoryCounts(
-  tenantId: string,
+  tenant_id: string,
   includeAll: boolean = false
 ): Promise<CategoryCount[]> {
   try {
@@ -33,7 +33,7 @@ export async function getCategoryCounts(
     }
 
     // Fetch categories with counts using a single efficient query
-    const categories = await prisma.tenantCategory.findMany({
+    const categories = await prisma.tenant_category.findMany({
       where: {
         tenantId,
         isActive: true,
@@ -46,7 +46,7 @@ export async function getCategoryCounts(
         sortOrder: true,
         _count: {
           select: {
-            items: {
+            _count: {
               where: itemWhere,
             },
           },
@@ -63,7 +63,7 @@ export async function getCategoryCounts(
       name: cat.name,
       slug: cat.slug,
       googleCategoryId: cat.googleCategoryId,
-      count: cat._count.items,
+      count: cat._count.inventory_item,
     }));
   } catch (error) {
     console.error('[Category Counts] Error:', error);
@@ -79,7 +79,7 @@ export async function getCategoryCounts(
  * @returns Count of items without a category
  */
 export async function getUncategorizedCount(
-  tenantId: string,
+  tenant_id: string,
   includeAll: boolean = false
 ): Promise<number> {
   try {
@@ -93,7 +93,7 @@ export async function getUncategorizedCount(
       where.visibility = 'public';
     }
 
-    return await prisma.inventoryItem.count({ where });
+    return await prisma.inventory_item.count({ where });
   } catch (error) {
     console.error('[Uncategorized Count] Error:', error);
     return 0;
@@ -108,7 +108,7 @@ export async function getUncategorizedCount(
  * @returns Total count of items
  */
 export async function getTotalProductCount(
-  tenantId: string,
+  tenant_id: string,
   includeAll: boolean = false
 ): Promise<number> {
   try {
@@ -121,7 +121,7 @@ export async function getTotalProductCount(
       where.visibility = 'public';
     }
 
-    return await prisma.inventoryItem.count({ where });
+    return await prisma.inventory_item.count({ where });
   } catch (error) {
     console.error('[Total Product Count] Error:', error);
     return 0;

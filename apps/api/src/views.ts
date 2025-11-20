@@ -17,10 +17,10 @@ export async function ensureFeedCategoryView() {
       SELECT
         ii.id               AS item_id,
         ii.tenant_id        AS tenant_id,
-        ii.category_path    AS local_path,
+        ii.categoryPath    AS local_path,
         -- leaf slug used to resolve tenant category
-        CASE WHEN ii.category_path IS NOT NULL AND array_length(ii.category_path, 1) > 0
-             THEN ii.category_path[array_length(ii.category_path, 1)]
+        CASE WHEN ii.categoryPath IS NOT NULL AND array_length(ii.categoryPath, 1) > 0
+             THEN ii.categoryPath[array_length(ii.categoryPath, 1)]
              ELSE NULL
         END                  AS leaf_slug,
         tc.google_category_id AS google_category_id
@@ -28,8 +28,8 @@ export async function ensureFeedCategoryView() {
       LEFT JOIN tenant_category tc
         ON tc.tenant_id = ii.tenant_id
        AND tc.is_active = TRUE
-       AND CASE WHEN ii.category_path IS NOT NULL AND array_length(ii.category_path, 1) > 0
-                THEN ii.category_path[array_length(ii.category_path, 1)]
+       AND CASE WHEN ii.categoryPath IS NOT NULL AND array_length(ii.categoryPath, 1) > 0
+                THEN ii.categoryPath[array_length(ii.categoryPath, 1)]
                 ELSE NULL
            END = tc.slug;
     `);

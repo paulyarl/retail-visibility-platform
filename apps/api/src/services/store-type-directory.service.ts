@@ -101,7 +101,7 @@ class StoreTypeDirectoryService {
 
       return stores.map((store) => ({
         id: store.tenant_id,
-        name: store.business_name,
+        name: store.businessName,
         slug: store.slug,
         address: store.address_line1,
         city: store.city,

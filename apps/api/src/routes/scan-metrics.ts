@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../prisma';
-import { UserRole } from '@prisma/client';
+import { user_role } from '@prisma/client';
 import { canViewAllTenants } from '../utils/platform-admin';
 
 const router = Router();
@@ -37,7 +37,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
     }
 
     // Get session stats
-    const sessions = await prisma.scanSession.findMany({
+    const sessions = await prisma.scan_sessions.findMany({
       where: {
         startedAt: { gte: startDate },
       },
@@ -49,7 +49,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
         committedCount: true,
         duplicateCount: true,
         startedAt: true,
-        completedAt: true,
+        completed_at: true,
       },
     });
 
@@ -63,10 +63,10 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
     const totalDuplicates = sessions.reduce((sum, s) => sum + s.duplicateCount, 0);
 
     // Calculate average session duration for completed sessions
-    const completedWithDuration = sessions.filter(s => s.completedAt && s.startedAt);
+    const completedWithDuration = sessions.filter(s => s.completed_at && s.startedAt);
     const avgDurationMs = completedWithDuration.length > 0
       ? completedWithDuration.reduce((sum, s) => {
-          const duration = s.completedAt!.getTime() - s.startedAt.getTime();
+          const duration = s.completed_at!.getTime() - s.startedAt.getTime();
           return sum + duration;
         }, 0) / completedWithDuration.length
       : 0;
@@ -79,9 +79,9 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
     }, {} as Record<string, number>);
 
     // Get enrichment stats
-    const enrichmentLogs = await prisma.barcodeLookupLog.findMany({
+    const enrichmentLogs = await prisma.barcode_lookup_log.findMany({
       where: {
-        createdAt: { gte: startDate },
+        created_at: { gte: startDate },
       },
       select: {
         provider: true,
@@ -128,7 +128,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
       : '0';
 
     // Recent activity (last 10 sessions)
-    const recentSessions = await prisma.scanSession.findMany({
+    const recentSessions = await prisma.scan_sessions.findMany({
       where: {
         startedAt: { gte: startDate },
       },
@@ -142,7 +142,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
         committedCount: true,
         duplicateCount: true,
         startedAt: true,
-        completedAt: true,
+        completed_at: true,
         tenant: {
           select: {
             id: true,
@@ -215,13 +215,13 @@ router.get('/api/admin/scan-metrics/timeseries', authenticateToken, async (req: 
     }
 
     // Get all sessions in range
-    const sessions = await prisma.scanSession.findMany({
+    const sessions = await prisma.scan_sessions.findMany({
       where: {
         startedAt: { gte: startDate },
       },
       select: {
         startedAt: true,
-        completedAt: true,
+        completed_at: true,
         status: true,
         scannedCount: true,
         committedCount: true,

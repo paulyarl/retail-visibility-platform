@@ -9,7 +9,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
-import { UserRole } from '@prisma/client';
+import { user_role } from '@prisma/client';
 import { isPlatformAdmin, isPlatformUser, canViewAllTenants, canPerformSupportActions } from '../utils/platform-admin';
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
@@ -24,7 +24,7 @@ const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
  * Check rate limit for quick start
  * Limit: 1 quick start per tenant per 24 hours
  */
-function checkRateLimit(tenantId: string): { allowed: boolean; resetAt?: number } {
+function checkRateLimit(tenant_id: string): { allowed: boolean; resetAt?: number } {
   const now = Date.now();
   const key = `quick-start:${tenantId}`;
   const limit = rateLimitStore.get(key);
@@ -86,7 +86,7 @@ const quickStartSchema = z.object({
 router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quick_start_wizard'), validateSKULimits, async (req, res) => {
   try {
     const { tenantId } = req.params;
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).user?.user_id;
 
     // Verify user is authenticated
     if (!userId) {
@@ -125,9 +125,9 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       const { prisma: prismaClient } = await import('../prisma');
       const userTenant = await prismaClient.userTenant.findUnique({
         where: {
-          userId_tenantId: {
-            userId: userId,
-            tenantId: tenantId,
+          user_id_tenant_id: {
+            user_id: userId,
+            tenant_id: tenantId,
           },
         },
       });
@@ -183,7 +183,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     }
 
     // Check if tenant already has products (warn if > 10)
-    const existingProductCount = await prisma.inventoryItem.count({
+    const existingProductCount = await prisma.inventory_item.count({
       where: { tenantId },
     });
 
@@ -233,7 +233,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
 router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, async (req, res) => {
   try {
     const { tenantId } = req.params;
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).user?.user_id;
 
     // Verify user is authenticated
     if (!userId) {
@@ -247,14 +247,14 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
     const user = (req as any).user;
     const userIsPlatformAdmin = isPlatformAdmin(user);
     const userCanPerformSupport = canPerformSupportActions(user);
-    const userIsPlatformViewer = user.role === UserRole.PLATFORM_VIEWER;
+    const userIsPlatformViewer = user.role === user_role.PLATFORM_VIEWER;
     const userCanView = canViewAllTenants(user);
 
     // Check rate limit (admin/support bypass this - they're helping customers)
     const rateLimit = userCanPerformSupport ? { allowed: true } : checkRateLimit(tenantId);
     
     // Check existing product count
-    const productCount = await prisma.inventoryItem.count({
+    const productCount = await prisma.inventory_item.count({
       where: { tenantId },
     });
 
@@ -303,7 +303,7 @@ const categoryQuickStartSchema = z.object({
 router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('category_quick_start'), async (req, res) => {
   try {
     const { tenantId } = req.params;
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).user?.user_id;
 
     // Verify user is authenticated
     if (!userId) {
@@ -342,9 +342,9 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
       const { prisma: prismaClient } = await import('../prisma');
       const userTenant = await prismaClient.userTenant.findUnique({
         where: {
-          userId_tenantId: {
-            userId: userId,
-            tenantId: tenantId,
+          user_id_tenant_id: {
+            user_id: userId,
+            tenant_id: tenantId,
           },
         },
       });
@@ -384,7 +384,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     const { businessType, categoryCount } = parsed.data;
 
     // Check if tenant already has categories (optional warning, not blocking)
-    const existingCategoryCount = await prisma.tenantCategory.count({
+    const existingCategoryCount = await prisma.tenant_category.count({
       where: { tenantId },
     });
 
@@ -488,7 +488,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
           console.warn(`[Category Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
         }
 
-        return prisma.tenantCategory.create({
+        return prisma.tenant_category.create({
           data: {
             tenantId,
             name: cat.name,

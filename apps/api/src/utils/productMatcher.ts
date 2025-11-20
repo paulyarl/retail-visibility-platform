@@ -5,7 +5,7 @@
  * to enable scan-to-enrich workflow.
  */
 
-import { PrismaClient, InventoryItem } from '@prisma/client';
+import { PrismaClient, inventory_item } from '@prisma/client';
 
 export interface ScannedProductData {
   barcode: string;
@@ -23,7 +23,7 @@ export interface ScannedProductData {
 }
 
 export interface ProductMatch {
-  existingProduct: InventoryItem;
+  existingProduct: inventory_item;
   scannedData: ScannedProductData;
   matchScore: number; // 0-100
   matchReasons: string[];
@@ -46,12 +46,12 @@ export interface EnrichmentOptions {
 export async function findMatchingProducts(
   prisma: PrismaClient,
   scannedData: ScannedProductData,
-  tenantId: string
+  tenant_id: string
 ): Promise<ProductMatch[]> {
   const matches: ProductMatch[] = [];
 
   // Get products that need enrichment
-  const candidateProducts = await prisma.inventoryItem.findMany({
+  const candidateProducts = await prisma.inventory_item.findMany({
     where: {
       tenantId,
       OR: [
@@ -90,7 +90,7 @@ export async function findMatchingProducts(
  * Calculate match score between existing product and scanned data
  */
 function calculateMatchScore(
-  product: InventoryItem,
+  product: inventory_item,
   scanned: ScannedProductData
 ): number {
   let score = 0;
@@ -171,7 +171,7 @@ function calculateMatchScore(
  * Get human-readable match reasons
  */
 function getMatchReasons(
-  product: InventoryItem,
+  product: inventory_item,
   scanned: ScannedProductData,
   score: number
 ): string[] {
@@ -303,17 +303,17 @@ function normalizeString(str: string): string {
 /**
  * Determine what fields are missing from a product
  */
-export function getMissingFields(product: InventoryItem): {
-  missingImages: boolean;
-  missingDescription: boolean;
-  missingSpecs: boolean;
-  missingBrand: boolean;
+export function getMissingFields(product: inventory_item): {
+  missing_images: boolean;
+  missing_description: boolean;
+  missing_specs: boolean;
+  missing_brand: boolean;
 } {
   return {
-    missingImages: Boolean(product.missingImages),
-    missingDescription: Boolean(product.missingDescription) || (!product.description || product.description.length < 20),
-    missingSpecs: Boolean(product.missingSpecs) || !product.metadata || Object.keys(product.metadata as any).length === 0,
-    missingBrand: Boolean(product.missingBrand) || !product.brand
+    missing_images: Boolean(product.missingImages),
+    missing_description: Boolean(product.missingDescription) || (!product.description || product.description.length < 20),
+    missing_specs: Boolean(product.missingSpecs) || !product.metadata || Object.keys(product.metadata as any).length === 0,
+    missing_brand: Boolean(product.missingBrand) || !product.brand
   };
 }
 
@@ -321,7 +321,7 @@ export function getMissingFields(product: InventoryItem): {
  * Determine what fields can be enriched from scanned data
  */
 export function getEnrichableFields(
-  product: InventoryItem,
+  product: inventory_item,
   scannedData: ScannedProductData
 ): EnrichmentOptions {
   const missing = getMissingFields(product);
@@ -341,7 +341,7 @@ export function getEnrichableFields(
  * Calculate potential enrichment value (how much would be improved)
  */
 export function calculateEnrichmentValue(
-  product: InventoryItem,
+  product: inventory_item,
   scannedData: ScannedProductData
 ): {
   score: number; // 0-100

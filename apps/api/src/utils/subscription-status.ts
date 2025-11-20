@@ -1,4 +1,4 @@
-import type { Tenant } from '@prisma/client';
+import { tenant, organization } from "@prisma/client";
 
 /**
  * Internal subscription status enum (derived from Tenant fields)
@@ -80,13 +80,13 @@ export function getMaintenanceState(ctx: MaintenanceContext): MaintenanceState {
  * @returns InternalStatus enum value
  */
 export function deriveInternalStatus(tenant: {
-  subscriptionStatus: string | null;
-  subscriptionTier: string | null;
-  trialEndsAt: Date | null;
-  subscriptionEndsAt: Date | null;
+  subscription_status: string | null;
+  subscription_tier: string | null;
+  trial_ends_at: Date | null;
+  subscription_ends_at: Date | null;
 }): InternalStatus {
   const now = new Date();
-  const status = tenant.subscriptionStatus || 'active';
+  const status = tenant.subscription_status || 'active';
   const tier = tenant.subscriptionTier || 'starter';
 
   // 1. Check for explicit canceled status
@@ -129,7 +129,7 @@ export function deriveInternalStatus(tenant: {
       const maintenanceState = getMaintenanceState({
         tier,
         status,
-        trialEndsAt: tenant.trialEndsAt,
+        trial_ends_at: tenant.trialEndsAt,
       });
 
       if (maintenanceState === 'freeze') {

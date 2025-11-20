@@ -42,7 +42,7 @@ function completenessScore(bp: any) {
 // POST /tenant/:tenantId/profile/validate
 router.post('/tenant/:tenantId/profile/validate', async (req, res) => {
   try {
-    const tenantId = req.params.tenantId
+    const tenantId = req.params.tenant_id
     const parsed = napSchema.safeParse(req.body || {})
     if (!parsed.success) {
       return res.status(400).json({ success: false, error: 'validation_failed', details: parsed.error.flatten() })
@@ -58,8 +58,8 @@ router.post('/tenant/:tenantId/profile/validate', async (req, res) => {
 // GET /tenant/:tenantId/profile/completeness
 router.get('/tenant/:tenantId/profile/completeness', async (req, res) => {
   try {
-    const tenantId = req.params.tenantId
-    const bp = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } })
+    const tenantId = req.params.tenant_id
+    const bp = await prisma.tenant_business_profile.findUnique({ where: { tenantId } })
     if (!bp) return res.status(404).json({ success: false, error: 'profile_not_found' })
 
     const result = completenessScore(bp)
@@ -80,7 +80,7 @@ const geocodeSchema = z.object({
 })
 router.post('/tenant/:tenantId/profile/geocode', async (req, res) => {
   try {
-    const tenantId = req.params.tenantId
+    const tenantId = req.params.tenant_id
     const parsed = geocodeSchema.safeParse(req.body || {})
     if (!parsed.success) return res.status(400).json({ success: false, error: 'invalid_request', details: parsed.error.flatten() })
 
@@ -91,11 +91,11 @@ router.post('/tenant/:tenantId/profile/geocode', async (req, res) => {
 
     let completeness: { score: number; grade: string } | undefined
     if (parsed.data.save) {
-      const updated = await prisma.tenantBusinessProfile.upsert({
+      const updated = await prisma.tenant_business_profile.upsert({
         where: { tenantId },
         create: {
           tenantId,
-          businessName: '',
+          business_name: '',
           addressLine1: parsed.data.address_line1,
           city: parsed.data.city,
           postalCode: parsed.data.postal_code,

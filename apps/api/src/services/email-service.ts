@@ -33,7 +33,7 @@ export interface InvitationEmailData {
   tenantName: string;
   role: string;
   acceptUrl: string;
-  expiresAt: Date;
+  expires_at: Date;
 }
 
 class EmailService {
@@ -383,7 +383,7 @@ class EmailService {
 
         <p>Hi${data.inviteeName ? ` ${data.inviteeName}` : ''},</p>
         
-        <p><strong>${data.inviterName}</strong> has invited you to join <strong>${data.tenantName}</strong> on our platform. You'll have <strong>${data.role.toLowerCase()}</strong> access to help manage and grow the business.</p>
+        <p><strong>${data.usersName}</strong> has invited you to join <strong>${data.tenantName}</strong> on our platform. You'll have <strong>${data.role.toLowerCase()}</strong> access to help manage and grow the business.</p>
 
         <div class="invitation-details">
             <div class="detail-row">
@@ -396,7 +396,7 @@ class EmailService {
             </div>
             <div class="detail-row">
                 <span class="detail-label">Invited by:</span>
-                <span class="detail-value">${data.inviterName}</span>
+                <span class="detail-value">${data.usersName}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Expires:</span>
@@ -417,7 +417,7 @@ class EmailService {
             ⏰ <strong>This invitation expires in 7 days.</strong> Make sure to accept it before ${data.expiresAt.toLocaleDateString()}.
         </div>
 
-        <p>If you have any questions, feel free to reach out to ${data.inviterName} or our support team.</p>
+        <p>If you have any questions, feel free to reach out to ${data.usersName} or our support team.</p>
 
         <div class="footer">
             <p>This invitation was sent to ${data.inviteeEmail}</p>
@@ -435,12 +435,12 @@ You're invited to join ${data.tenantName}!
 
 Hi${data.inviteeName ? ` ${data.inviteeName}` : ''},
 
-${data.inviterName} has invited you to join ${data.tenantName} with ${data.role.toLowerCase()} access.
+${data.usersName} has invited you to join ${data.tenantName} with ${data.role.toLowerCase()} access.
 
 Invitation Details:
 - Organization: ${data.tenantName}
 - Your Role: ${data.role}
-- Invited by: ${data.inviterName}
+- Invited by: ${data.usersName}
 - Expires: ${data.expiresAt.toLocaleDateString()}
 
 To accept this invitation, click the link below:
@@ -448,7 +448,7 @@ ${data.acceptUrl}
 
 This invitation expires in 7 days (${data.expiresAt.toLocaleDateString()}).
 
-If you have any questions, feel free to reach out to ${data.inviterName} or our support team.
+If you have any questions, feel free to reach out to ${data.usersName} or our support team.
 
 This invitation was sent to ${data.inviteeEmail}. If you didn't expect this invitation, you can safely ignore this email.
 `;

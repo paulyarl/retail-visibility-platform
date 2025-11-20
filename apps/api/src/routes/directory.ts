@@ -29,8 +29,8 @@ interface DirectorySearchParams {
 
 interface DirectoryListing {
   id: string;
-  tenantId: string;
-  businessName: string;
+  tenant_id: string;
+  business_name: string;
   slug: string;
   address?: string;
   city?: string;
@@ -49,7 +49,7 @@ interface DirectoryListing {
   ratingCount: number;
   productCount: number;
   isFeatured: boolean;
-  subscriptionTier: string;
+  subscription_tier: string;
   useCustomWebsite: boolean;
   distance?: number;
   isOpen?: boolean;

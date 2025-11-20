@@ -162,15 +162,15 @@ router.get('/organization/billing/counters', requireAuth, async (req, res) => {
         name: true,
         maxLocations: true,
         maxTotalSKUs: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        tenants: {
+        subscription_tier: true,
+        subscription_status: true,
+        tenant: {
           select: {
             id: true,
             name: true,
             _count: {
               select: {
-                items: true,
+                _count: true,
               },
             },
           },
@@ -184,11 +184,11 @@ router.get('/organization/billing/counters', requireAuth, async (req, res) => {
 
     // Calculate totals
     const totalLocations = org.tenants.length;
-    const totalSKUs = org.tenants.reduce((sum, t) => sum + t._count.items, 0);
+    const totalSKUs = org.tenants.reduce((sum, t) => sum + t._count.inventory_item, 0);
     const locationBreakdown = org.tenants.map(t => ({
-      tenantId: t.id,
+      tenant_id: t.id,
       tenantName: t.name,
-      skuCount: t._count.items,
+      skuCount: t._count.inventory_item,
     }));
 
     // Calculate status
@@ -201,8 +201,8 @@ router.get('/organization/billing/counters', requireAuth, async (req, res) => {
     res.json({
       organizationId: org.id,
       organizationName: org.name,
-      subscriptionTier: org.subscriptionTier,
-      subscriptionStatus: org.subscriptionStatus,
+      subscription_tier: org.subscriptionTier,
+      subscription_status: org.subscription_status,
       limits: {
         maxLocations: org.maxLocations,
         maxTotalSKUs: org.maxTotalSKUs,

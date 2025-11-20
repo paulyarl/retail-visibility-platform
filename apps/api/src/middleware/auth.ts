@@ -31,7 +31,7 @@ import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 
 // JWT Payload interface
 export interface JWTPayload {
-  userId: string;
+  user_id: string;
   email: string;
   role: user_role;
   tenantIds: string[];
@@ -185,9 +185,9 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
     const { prisma } = await import('../prisma');
     const userTenant = await prisma.user_tenants.findUnique({
       where: {
-        userId_tenantId: {
-          userId: req.user.userId,
-          tenantId: tenantId as string,
+        user_id_tenant_id: {
+          user_id: req.user.user_id,
+          tenant_id: tenantId as string,
         },
       },
       select: { id: true },
@@ -230,10 +230,10 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
  */
 export function getTenantId(req: Request): string | null {
   return (
-    req.params.tenantId ||
+    req.params.tenant_id ||
     req.params.id ||
-    (req.query.tenantId as string) ||
-    req.body.tenantId ||
+    (req.query.tenant_id as string) ||
+    req.body.tenant_id ||
     (req.user?.tenantIds && req.user.tenantIds[0]) ||
     null
   );
@@ -284,10 +284,14 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
     const { prisma } = await import('../prisma');
     const userTenant = await prisma.user_tenants.findUnique({
       where: {
-        userId_tenantId: {
-          userId: req.user.userId,
-          tenantId: tenantId as string,
+        user_id_tenant_id: {
+          user_id: req.user.user_id,
+          tenant_id: tenantId as string,
         },
+      },
+      select: {
+        id: true,
+        role: true,
       },
     });
 
@@ -370,7 +374,7 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
   }
 
   // Get tenant ID from params
-  const tenantId = req.params.tenantId || req.params.id;
+  const tenantId = req.params.tenant_id || req.params.id;
   if (!tenantId) {
     return res.status(400).json({
       error: 'tenant_id_required',
@@ -382,11 +386,11 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
   const { prisma } = await import('../prisma');
   
   // Check if user is OWNER or ADMIN of this tenant
-  const userTenant = await prisma.userTenant.findUnique({
+  const userTenant = await prisma.user_tenants.findUnique({
     where: {
-      userId_tenantId: {
-        userId: req.user.userId,
-        tenantId: tenantId
+      user_id_tenant_id: {
+        user_id: req.user.user_id,
+        tenant_id: tenantId
       }
     },
     select: {

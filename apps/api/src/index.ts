@@ -197,7 +197,7 @@ app.get("/api/tenants", authenticateToken, async (req, res) => {
     const baseWhere = isPlatformUser(req.user) ? {} : {
       users: {
         some: {
-          userId: req.user?.userId
+          user_id: req.user?.user_id
         }
       }
     };
@@ -218,7 +218,7 @@ app.get("/api/tenants", authenticateToken, async (req, res) => {
         ...baseWhere,
         ...statusCondition,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { created_at: "desc" },
       include: {
         organization: {
           select: {
@@ -253,7 +253,7 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
       tenant = await prisma.tenant.update({
         where: { id: tenant.id },
         data: {
-          trialEndsAt: trialEndsAt,
+          trial_ends_at: trialEndsAt,
           subscriptionStatus: "trial",
         },
       });
@@ -310,9 +310,9 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     // Otherwise, the authenticated user becomes the owner
     const ownerId = (req.user?.role === 'PLATFORM_SUPPORT' && parsed.data.ownerId) 
       ? parsed.data.ownerId 
-      : req.user!.userId;
+      : req.user!.user_id;
     
-    console.log('[POST /tenants] Creating tenant for owner:', ownerId, 'by user:', req.user?.userId);
+    console.log('[POST /tenants] Creating tenant for owner:', ownerId, 'by user:', req.user?.user_id);
     
     // Validate for duplicates (check against the owner, not the creator)
     const { validateTenantCreation } = await import('./utils/tenant-validation');
@@ -338,9 +338,9 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     console.log('[POST /tenants] Starting manual transaction with data:', {
       name: parsed.data.name,
       ownerId,
-      userId: req.user?.userId,
+      user_id: req.user?.user_id,
       userRole: req.user?.role,
-      trialEndsAt: trialEndsAt
+      trial_ends_at: trialEndsAt
     });
 
     // Create the tenant first
@@ -348,8 +348,8 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
       name: parsed.data.name,
       subscriptionTier: 'starter',
       subscriptionStatus: 'trial',
-      trialEndsAt: trialEndsAt,
-      createdBy: req.user?.userId || 'unknown'
+      trial_ends_at: trialEndsAt,
+      created_by: req.user?.user_id || 'unknown'
     });
 
     const tenant = await prisma.tenant.create({
@@ -357,21 +357,21 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
         name: parsed.data.name,
         subscriptionTier: 'starter',
         subscriptionStatus: 'trial',
-        trialEndsAt: trialEndsAt,
-        createdBy: req.user?.userId || null, // Optional field - null if user not authenticated
+        trial_ends_at: trialEndsAt,
+        created_by: req.user?.user_id || null, // Optional field - null if user not authenticated
       }
     });
 
     console.log('[POST /tenants] Tenant created successfully:', {
       id: tenant.id,
       name: tenant.name,
-      createdBy: tenant.createdBy
+      created_by: tenant.createdBy
     });
 
     // Now create the UserTenant link (tenant should be committed now)
     console.log('[POST /tenants] Linking tenant to owner:', {
       ownerId,
-      tenantId: tenant.id
+      tenant_id: tenant.id
     });
 
     // Add debugging to check if tenant still exists before UserTenant creation
@@ -385,29 +385,29 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
       return res.status(500).json({ error: "tenant_creation_failed", message: "Tenant was created but is no longer accessible" });
     }
 
-    const userTenant = await prisma.userTenant.create({
+    const userTenant = await prisma.user_tenants.create({
       data: {
-        userId: ownerId,
-        tenantId: tenant.id,
+        user_id: ownerId,
+        tenant_id: tenant.id,
         role: 'OWNER',
       },
     });
 
     console.log('[POST /tenants] UserTenant link created successfully:', {
       id: userTenant.id,
-      userId: userTenant.userId,
-      tenantId: userTenant.tenantId,
+      user_id: userTenant.user_id,
+      tenant_id: userTenant.tenantId,
       role: userTenant.role
     });
 
     // Try to create initial status log (optional - don't fail if table doesn't exist)
     try {
-      await prisma.locationStatusLog.create({
+      await prisma.location_status_log.create({
         data: {
-          tenantId: tenant.id,
+          tenant_id: tenant.id,
           oldStatus: 'pending', // New tenants start as pending
           newStatus: 'active', // But get activated immediately
-          changedBy: req.user?.userId || 'system',
+          changedBy: req.user?.user_id || 'system',
           reason: 'Initial tenant creation',
           reopeningDate: null,
           metadata: {
@@ -424,7 +424,7 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
       // Don't fail the entire operation if logging fails
     }
 
-    await audit({ tenantId: tenant.id, actor: null, action: "tenant.create", payload: { name: parsed.data.name } });
+    await audit({ tenant_id: tenant.id, actor: null, action: "tenant.create", payload: { name: parsed.data.name } });
     res.status(201).json(tenant);
   } catch (error) {
     console.error('[POST /tenants] Error creating tenant:', error);
@@ -500,9 +500,9 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
   const { status, reason, reopeningDate } = req.body;
 
   console.log(`[PATCH /tenants/${id}/status] Starting status change request`, {
-    userId: req.user?.userId,
+    user_id: req.user?.user_id,
     userRole: req.user?.role,
-    tenantId: id,
+    tenant_id: id,
     requestedStatus: status,
     reason: reason?.substring(0, 100), // Truncate long reasons
     reopeningDate,
@@ -524,7 +524,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
     });
     
     if (!canChangeStatus(tenantRole)) {
-      console.log(`[PATCH /tenants/${id}/status] Permission denied for user ${req.user?.userId}`);
+      console.log(`[PATCH /tenants/${id}/status] Permission denied for user ${req.user?.user_id}`);
       return res.status(403).json({ 
         error: "insufficient_permissions", 
         message: "You don't have permission to change location status" 
@@ -579,17 +579,17 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
         data: {
           locationStatus: status,
           statusChangedAt: new Date(),
-          statusChangedBy: req.user?.userId,
+          statusChangedBy: req.user?.user_id,
           reopeningDate: reopeningDate ? new Date(reopeningDate) : null,
           closureReason: reason || null,
         },
       }),
       basePrisma.locationStatusLog.create({
         data: {
-          tenantId: id,
+          tenant_id: id,
           oldStatus: tenant.locationStatus as any,
           newStatus: status,
-          changedBy: req.user?.userId || 'system',
+          changedBy: req.user?.user_id || 'system',
           reason,
           reopeningDate: reopeningDate ? new Date(reopeningDate) : null,
           metadata: {
@@ -647,8 +647,8 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
       stack: error.stack,
       code: error.code,
       meta: error.meta,
-      userId: req.user?.userId,
-      tenantId: id,
+      user_id: req.user?.user_id,
+      tenant_id: id,
       requestedStatus: status
     });
     res.status(500).json({ error: "failed_to_update_status", details: error.message });
@@ -690,9 +690,9 @@ app.get("/api/tenants/:id/status-history", authenticateToken, checkTenantAccess,
     const { id } = req.params;
     const limit = parseInt(req.query.limit as string) || 50;
 
-    const history = await prisma.locationStatusLog.findMany({
-      where: { tenantId: id },
-      orderBy: { createdAt: 'desc' },
+    const history = await prisma.location_status_log.findMany({
+      where: { tenant_id: id },
+      orderBy: { created_at: 'desc' },
       take: limit,
     });
 
@@ -861,7 +861,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
       const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
       const insertValues = [
         tenant_id,
-        profileData.business_name || existingTenant.name,
+        profileData.businessName || existingTenant.name,
         profileData.address_line1 || '',
         profileData.city || '',
         profileData.postal_code || '',
@@ -913,9 +913,9 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
     }
 
     // Keep Tenant.name in sync
-    if (profileData.business_name) {
-      console.log('[POST /tenant/profile] Updating tenant name to:', profileData.business_name);
-      await prisma.tenant.update({ where: { id: tenant_id }, data: { name: profileData.business_name } });
+    if (profileData.businessName) {
+      console.log('[POST /tenant/profile] Updating tenant name to:', profileData.businessName);
+      await prisma.tenant.update({ where: { id: tenant_id }, data: { name: profileData.businessName } });
     }
 
     console.log('[POST /tenant/profile] Success, returning result:', (result as any)[0] || result);
@@ -950,7 +950,7 @@ app.get("/tenant/profile", authenticateToken, async (req, res) => {
     const md = (tenant.metadata as any) || {};
     const profile = {
       tenant_id: tenant.id,
-      business_name: bp?.business_name || md.business_name || tenant.name || null,
+      business_name: bp?.businessName || md.businessName || tenant.name || null,
       address_line1: bp?.address_line1 || md.address_line1 || null,
       address_line2: bp?.address_line2 || md.address_line2 || null,
       city: bp?.city || md.city || null,
@@ -1051,13 +1051,13 @@ app.get("/tenant/:tenantId/swis/preview", async (req, res) => {
     if (!tenantId) return res.status(400).json({ error: "tenant_required" });
     
     // Build sort order
-    let orderBy: any = { updatedAt: 'desc' };
+    let orderBy: any = { updated_at: 'desc' };
     switch (sort) {
       case 'updated_desc':
-        orderBy = { updatedAt: 'desc' };
+        orderBy = { updated_at: 'desc' };
         break;
       case 'updated_asc':
-        orderBy = { updatedAt: 'asc' };
+        orderBy = { updated_at: 'asc' };
         break;
       case 'alpha_asc':
         orderBy = { name: 'asc' };
@@ -1074,7 +1074,7 @@ app.get("/tenant/:tenantId/swis/preview", async (req, res) => {
     }
     
     // Fetch products
-    const products = await prisma.inventoryItem.findMany({
+    const products = await prisma.inventory_item.findMany({
       where: { tenantId },
       orderBy,
       take: limit,
@@ -1104,8 +1104,8 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     const bp = (bpResults as any[])[0] || null;
     
     // Fetch business hours from BusinessHours table
-    const businessHours = await prisma.businessHours.findUnique({ where: { tenantId } });
-    const specialHours = await prisma.businessHoursSpecial.findMany({ 
+    const businessHours = await prisma.business_hours.findUnique({ where: { tenantId } });
+    const specialHours = await prisma.business_hoursSpecial.findMany({ 
       where: { tenantId },
       orderBy: { date: 'asc' }
     });
@@ -1148,7 +1148,7 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     
     // Return public business information only
     const profile = {
-      business_name: bp?.businessName || md.business_name || tenant.name || null,
+      business_name: bp?.businessName || md.businessName || tenant.name || null,
       address_line1: bp?.addressLine1 || md.address_line1 || null,
       address_line2: bp?.addressLine2 || md.address_line2 || null,
       city: bp?.city || md.city || null,
@@ -1187,7 +1187,7 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
     // Build where clause - only show active, public items
     const where: any = { 
       tenantId,
-      itemStatus: 'active',
+      item_status: 'active',
       visibility: 'public'
     };
     
@@ -1209,9 +1209,9 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
     
     // Fetch items with pagination (includes category for public display)
     const [items, totalCount] = await Promise.all([
-      prisma.inventoryItem.findMany({
+      prisma.inventory_item.findMany({
         where,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updated_at: 'desc' },
         skip,
         take: limit,
         include: {
@@ -1225,7 +1225,7 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
           },
         },
       }),
-      prisma.inventoryItem.count({ where }),
+      prisma.inventory_item.count({ where }),
     ]);
     
     // Return paginated response
@@ -1371,7 +1371,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
       const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
       const insertValues = [
         tenant_id,
-        delta.business_name || existingTenant.name,
+        delta.businessName || existingTenant.name,
         delta.address_line1 || '',
         delta.city || '',
         delta.postal_code || '',
@@ -1414,8 +1414,8 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
     }
 
     // Update tenant name if business_name changed
-    if (delta.business_name && typeof delta.business_name === 'string' && delta.business_name.trim()) {
-      await prisma.tenant.update({ where: { id: tenant_id }, data: { name: delta.business_name } });
+    if (delta.businessName && typeof delta.businessName === 'string' && delta.businessName.trim()) {
+      await prisma.tenant.update({ where: { id: tenant_id }, data: { name: delta.businessName } });
     }
 
     // Handle logo_url clearing from tenant metadata
@@ -1573,7 +1573,7 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
     console.error("[Logo Upload Error] Full error details:", {
       message: e?.message,
       stack: e?.stack,
-      tenantId: req.params.id,
+      tenant_id: req.params.id,
     });
     return res.status(500).json({ 
       error: "failed_to_upload_logo",
@@ -1683,7 +1683,7 @@ app.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (req, 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 const jsonUrlSchema = z.object({
-  tenantId: z.string().min(1).optional(), // optional—can be derived from item
+  tenant_id: z.string().min(1).optional(), // optional—can be derived from item
   url: z.string().url(),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
@@ -1693,7 +1693,7 @@ const jsonUrlSchema = z.object({
 });
 
 const dataUrlSchema = z.object({
-  tenantId: z.string().min(1),
+  tenant_id: z.string().min(1),
   dataUrl: z.string().min(1),
   contentType: z.string().min(1),
 });
@@ -1738,12 +1738,12 @@ const photoUploadHandler = async (req: any, res: any) => {
       supabaseConfigured: !!supabase
     });
     
-    const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+    const item = await prisma.inventory_item.findUnique({ where: { id: itemId } });
     if (!item) {
       console.log(`[Photo Upload] Item not found: ${itemId}`);
       return res.status(404).json({ error: "item_not_found" });
     }
-    console.log(`[Photo Upload] Item found:`, { id: item.id, tenantId: item.tenantId, sku: item.sku });
+    console.log(`[Photo Upload] Item found:`, { id: item.id, tenant_id: item.tenantId, sku: item.sku });
 
     // A) JSON { url, ... } → register the asset
     if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.url === "string") {
@@ -1751,9 +1751,9 @@ const photoUploadHandler = async (req: any, res: any) => {
       if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
       const { url, width, height, bytes, contentType, exifRemoved } = parsed.data;
 
-      const created = await prisma.photoAsset.create({
+      const created = await prisma.photo_asset.create({
         data: {
-          tenantId: item.tenantId,
+          tenant_id: item.tenantId,
           inventoryItemId: item.id,
           url,
           width: width ?? null,
@@ -1765,7 +1765,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       });
 
       // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
+      await prisma.inventory_item.update({ where: { id: item.id }, data: { imageUrl: url } });
       return res.status(201).json(created);
     }
 
@@ -1801,9 +1801,9 @@ const photoUploadHandler = async (req: any, res: any) => {
         return res.status(500).json({ error: "no_upload_backend_configured" });
       }
 
-      const created = await prisma.photoAsset.create({
+      const created = await prisma.photo_asset.create({
         data: {
-          tenantId: item.tenantId,
+          tenant_id: item.tenantId,
           inventoryItemId: item.id,
           url: publicUrl!,
           contentType: f.mimetype,
@@ -1813,7 +1813,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       });
 
       // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl! } });
+      await prisma.inventory_item.update({ where: { id: item.id }, data: { imageUrl: publicUrl! } });
       return res.status(201).json(created);
     }
 
@@ -1865,9 +1865,9 @@ const photoUploadHandler = async (req: any, res: any) => {
         publicUrl = `${baseUrl}/uploads/${encodeURIComponent(filename)}`;
       }
 
-      const created = await prisma.photoAsset.create({
+      const created = await prisma.photo_asset.create({
         data: {
-          tenantId: item.tenantId,
+          tenant_id: item.tenantId,
           inventoryItemId: item.id,
           url: publicUrl,
           contentType: parsed.data.contentType,
@@ -1877,7 +1877,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       });
 
       // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl } });
+      await prisma.inventory_item.update({ where: { id: item.id }, data: { imageUrl: publicUrl } });
       return res.status(201).json(created);
     }
 
@@ -1930,7 +1930,7 @@ console.log("✓ Photos router mounted");
 
 /* --------------------------- ITEMS / INVENTORY --------------------------- */
 const listQuery = z.object({
-  tenantId: z.string().min(1).optional(),
+  tenant_id: z.string().min(1).optional(),
   tenant_id: z.string().min(1).optional(),
   count: z.string().optional(), // Return only count for performance
   page: z.string().optional(), // Page number (1-indexed)
@@ -1943,7 +1943,7 @@ const listQuery = z.object({
   sortOrder: z.enum(['asc', 'desc']).optional(),
 }).transform((data) => ({
   ...data,
-  tenantId: data.tenantId || data.tenant_id, // Use tenantId or tenant_id
+  tenant_id: data.tenantId || data.tenant_id, // Use tenantId or tenant_id
 }));
 
 app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateToken, async (req, res) => {
@@ -1956,12 +1956,12 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
   let hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenantId) ?? false);
 
   // Fallback: if JWT tenantIds are empty, verify membership via userTenant table
-  if (!hasAccess && req.user?.userId && tenantId) {
+  if (!hasAccess && req.user?.user_id && tenantId) {
     try {
       const userTenant = await prisma.user_tenants.findUnique({
         where: {
-          userId_tenantId: {
-            userId: req.user.userId,
+          user_id_tenant_id: {
+            user_id: req.user.user_id,
             tenantId,
           },
         },
@@ -2005,7 +2005,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         where.itemStatus = 'trashed';
       } else if (parsed.data.status === 'syncing') {
         where.AND = [
-          { OR: [{ itemStatus: 'active' }, { itemStatus: null }] },
+          { OR: [{ item_status: 'active' }, { item_status: null }] },
           { OR: [{ visibility: 'public' }, { visibility: null }] },
         ];
       }
@@ -2030,7 +2030,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     // If count=true, return only the count
     if (req.query.count === 'true') {
       // Check if Prisma client is properly initialized
-      if (!prisma || !prisma.inventoryItem) {
+      if (!prisma || !prisma.inventory_item) {
         console.warn('[GET /items] Prisma client not properly initialized');
         return res.status(500).json({ 
           error: 'database_unavailable',
@@ -2038,7 +2038,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         });
       }
       
-      const count = await prisma.inventoryItem.count({ where });
+      const count = await prisma.inventory_item.count({ where });
       return res.json({ count });
     }
     
@@ -2060,7 +2060,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     
     // Fetch items with pagination (includes category relation for better UX)
     const [items, totalCount] = await Promise.all([
-      prisma.inventoryItem.findMany({
+      prisma.inventory_item.findMany({
         where,
         orderBy,
         skip,
@@ -2076,7 +2076,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
           },
         },
       }),
-      prisma.inventoryItem.count({ where }),
+      prisma.inventory_item.count({ where }),
     ]);
     
     // Return paginated response
@@ -2107,7 +2107,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
 });
 
 app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], async (req, res) => {
-  const it = await prisma.inventoryItem.findUnique({
+  const it = await prisma.inventory_item.findUnique({
     where: { id: req.params.id },
     include: {
       tenantCategory: {
@@ -2144,11 +2144,11 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
 });
 
 const baseItemSchema = z.object({
-  tenantId: z.string().min(1).optional(),
+  tenant_id: z.string().min(1).optional(),
   tenant_id: z.string().min(1).optional(),
   sku: z.string().min(1),
   name: z.string().min(1),
-  priceCents: z.number().int().nonnegative().default(0),
+  price_cents: z.number().int().nonnegative().default(0),
   stock: z.number().int().nonnegative().default(0),
   imageUrl: z.string().url().nullable().optional(),
   metadata: z.any().optional(),
@@ -2161,17 +2161,17 @@ const baseItemSchema = z.object({
   currency: z.string().length(3).optional(),
   availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
   // Item status and visibility
-  itemStatus: z.enum(['active', 'inactive', 'archived']).optional(),
+  item_status: z.enum(['active', 'inactive', 'archived']).optional(),
   visibility: z.enum(['public', 'private']).optional(),
   // Category path for Google Shopping
-  categoryPath: z.array(z.string()).optional(),
+  category_path: z.array(z.string()).optional(),
 });
 
 const createItemSchema = baseItemSchema.transform((data) => {
   const { tenant_id, tenantId, ...rest } = data;
   return {
     ...rest,
-    tenantId: tenantId || tenant_id, // Use tenantId or tenant_id
+    tenant_id: tenantId || tenant_id, // Use tenantId or tenant_id
   };
 });
 
@@ -2189,14 +2189,14 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], checkSubscrip
       // Price logic: prioritize price (dollars) over priceCents (cents)
       // Ensure price is never undefined since it's required in the schema
       price: parsed.data.price ?? (parsed.data.priceCents ? parsed.data.priceCents / 100 : 0),
-      priceCents: parsed.data.priceCents ?? (parsed.data.price ? Math.round(parsed.data.price * 100) : 0),
+      price_cents: parsed.data.priceCents ?? (parsed.data.price ? Math.round(parsed.data.price * 100) : 0),
       currency: parsed.data.currency || 'USD',
       // Auto-set availability based on stock if not explicitly provided
       availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
-      tenantId: parsed.data.tenantId || '', // Ensure tenantId is always a string
+      tenant_id: parsed.data.tenantId || '', // Ensure tenantId is always a string
     };
-    const created = await prisma.inventoryItem.create({ data });
-    await audit({ tenantId: created.tenantId, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
+    const created = await prisma.inventory_item.create({ data });
+    await audit({ tenant_id: created.tenantId, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
     
     // Convert Decimal price to number and hide priceCents for frontend compatibility
     const { priceCents, ...itemWithoutPriceCents } = created;
@@ -2236,8 +2236,8 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       updateData.price = updateData.priceCents / 100;
     }
     
-    const updated = await prisma.inventoryItem.update({ where: { id: req.params.id }, data: updateData });
-    await audit({ tenantId: updated.tenantId, actor: null, action: "inventory.update", payload: { id: updated.id } });
+    const updated = await prisma.inventory_item.update({ where: { id: req.params.id }, data: updateData });
+    await audit({ tenant_id: updated.tenantId, actor: null, action: "inventory.update", payload: { id: updated.id } });
     
     // Convert Decimal price to number and hide priceCents for frontend compatibility
     const { priceCents, ...itemWithoutPriceCents } = updated;
@@ -2256,7 +2256,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
 app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     // Get item to find tenant
-    const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
+    const item = await prisma.inventory_item.findUnique({ where: { id: req.params.id } });
     if (!item) {
       return res.status(404).json({ error: "item_not_found" });
     }
@@ -2269,8 +2269,8 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
 
     // Check trash capacity
     const { isTrashFull, getTrashCapacity } = await import('./utils/trash-capacity');
-    const trashCount = await prisma.inventoryItem.count({
-      where: { tenantId: item.tenantId, itemStatus: 'trashed' }
+    const trashCount = await prisma.inventory_item.count({
+      where: { tenant_id: item.tenantId, item_status: 'trashed' }
     });
     
     if (isTrashFull(trashCount, tenant.subscriptionTier || 'starter')) {
@@ -2284,9 +2284,9 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
     }
 
     // Move to trash
-    const updated = await prisma.inventoryItem.update({
+    const updated = await prisma.inventory_item.update({
       where: { id: req.params.id },
-      data: { itemStatus: 'trashed' }
+      data: { item_status: 'trashed' }
     });
     res.json(updated);
   } catch (error) {
@@ -2311,8 +2311,8 @@ app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (re
 
     // Get trash count and capacity info
     const { getTrashCapacityInfo } = await import('./utils/trash-capacity');
-    const trashCount = await prisma.inventoryItem.count({
-      where: { tenantId, itemStatus: 'trashed' }
+    const trashCount = await prisma.inventory_item.count({
+      where: { tenantId, item_status: 'trashed' }
     });
     
     const capacityInfo = getTrashCapacityInfo(trashCount, tenant.subscriptionTier || 'starter');
@@ -2326,9 +2326,9 @@ app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (re
 // Restore from trash
 app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
-    const item = await prisma.inventoryItem.update({
+    const item = await prisma.inventory_item.update({
       where: { id: req.params.id },
-      data: { itemStatus: 'active' }
+      data: { item_status: 'active' }
     });
     res.json(item);
   } catch {
@@ -2340,7 +2340,7 @@ app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, r
 app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     // First check if item is trashed
-    const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
+    const item = await prisma.inventory_item.findUnique({ where: { id: req.params.id } });
     if (!item) {
       return res.status(404).json({ error: "item_not_found" });
     }
@@ -2349,7 +2349,7 @@ app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requ
     }
     
     // Permanently delete
-    await prisma.inventoryItem.delete({ where: { id: req.params.id } });
+    await prisma.inventory_item.delete({ where: { id: req.params.id } });
     res.status(204).end();
   } catch {
     res.status(500).json({ error: "failed_to_purge_item" });
@@ -2396,7 +2396,7 @@ app.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, res) 
     if (visibility) updateData.visibility = visibility;
     if (availability) updateData.availability = availability;
     
-    const updated = await prisma.inventoryItem.update({
+    const updated = await prisma.inventory_item.update({
       where: { id: req.params.id },
       data: updateData,
     });
@@ -2424,7 +2424,7 @@ app.post("/items/sync-availability", authenticateToken, async (req, res) => {
     }
 
     // Get all items for the tenant
-    const items = await prisma.inventoryItem.findMany({
+    const items = await prisma.inventory_item.findMany({
       where: { tenantId },
       select: { id: true, stock: true, availability: true },
     });
@@ -2438,7 +2438,7 @@ app.post("/items/sync-availability", authenticateToken, async (req, res) => {
     // Update out-of-sync items
     const updates = await Promise.all(
       outOfSync.map(item =>
-        prisma.inventoryItem.update({
+        prisma.inventory_item.update({
           where: { id: item.id },
           data: { availability: item.stock > 0 ? 'in_stock' : 'out_of_stock' },
         })
@@ -2474,7 +2474,7 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
           { parentId: { equals: '' } }
         ]
       },
-      orderBy: { categoryPath: 'asc' },
+      orderBy: { category_path: 'asc' },
       take: 20 // Limit for performance
     });
 
@@ -2485,42 +2485,42 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
       finalCategories = [
         {
           categoryId: "8",
-          categoryPath: "Food, Beverages & Tobacco",
+          category_path: "Food, Beverages & Tobacco",
           level: 1,
           parentId: null,
           isActive: true
         },
         {
           categoryId: "7", 
-          categoryPath: "Electronics",
+          category_path: "Electronics",
           level: 1,
           parentId: null,
           isActive: true
         },
         {
           categoryId: "499685",
-          categoryPath: "Food, Beverages & Tobacco > Food Items",
+          category_path: "Food, Beverages & Tobacco > Food Items",
           level: 2,
           parentId: "8",
           isActive: true
         },
         {
           categoryId: "499686",
-          categoryPath: "Food, Beverages & Tobacco > Beverages", 
+          category_path: "Food, Beverages & Tobacco > Beverages", 
           level: 2,
           parentId: "8",
           isActive: true
         },
         {
           categoryId: "499776",
-          categoryPath: "Food, Beverages & Tobacco > Beverages > Coffee",
+          category_path: "Food, Beverages & Tobacco > Beverages > Coffee",
           level: 3,
           parentId: "499686",
           isActive: true
         },
         {
           categoryId: "499777",
-          categoryPath: "Food, Beverages & Tobacco > Beverages > Tea & Infusions",
+          category_path: "Food, Beverages & Tobacco > Beverages > Tea & Infusions",
           level: 3,
           parentId: "499686", 
           isActive: true
@@ -2541,11 +2541,11 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
           children = await prisma.google_taxonomy.findMany({
             where: {
               isActive: true,
-              categoryPath: {
+              category_path: {
                 startsWith: cat.categoryPath + ' > '
               }
             },
-            orderBy: { categoryPath: 'asc' },
+            orderBy: { category_path: 'asc' },
             take: 10 // Limit children for UI performance
           });
         }
@@ -2594,12 +2594,12 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
       where: {
         isActive: true,
         OR: [
-          { categoryPath: { contains: query, mode: 'insensitive' } },
+          { category_path: { contains: query, mode: 'insensitive' } },
           { categoryId: { contains: query, mode: 'insensitive' } }
         ]
       },
       take: parseInt(limit as string, 10),
-      orderBy: { categoryPath: 'asc' }
+      orderBy: { category_path: 'asc' }
     });
 
     const results = categories.map(cat => ({
@@ -2678,7 +2678,7 @@ app.get("/google/auth", async (req, res) => {
     
     const hasProfile = businessProfile 
       ? (businessProfile.businessName && businessProfile.city && businessProfile.state)
-      : ((tenant.metadata as any)?.business_name && (tenant.metadata as any)?.city && (tenant.metadata as any)?.state);
+      : ((tenant.metadata as any)?.businessName && (tenant.metadata as any)?.city && (tenant.metadata as any)?.state);
     
     if (!hasProfile) {
       return res.status(400).json({ 
@@ -2741,17 +2741,17 @@ app.get("/google/callback", async (req, res) => {
     // Store in database (upsert pattern)
     const account = await prisma.google_oauth_accounts.upsert({
       where: {
-        tenantId_googleAccountId: {
-          tenantId: stateData.tenantId,
+        tenant_id_google_account_id: {
+          tenant_id: stateData.tenantId,
           googleAccountId: userInfo.id,
         },
       },
       create: {
-        tenantId: stateData.tenantId,
+        tenant_id: stateData.tenantId,
         googleAccountId: userInfo.id,
         email: userInfo.email,
-        displayName: userInfo.name,
-        profilePictureUrl: userInfo.picture,
+        display_name: userInfo.name,
+        profile_picture_url: userInfo.picture,
         scopes: tokens.scope.split(' '),
         tokens: {
           create: {
@@ -2765,8 +2765,8 @@ app.get("/google/callback", async (req, res) => {
       },
       update: {
         email: userInfo.email,
-        displayName: userInfo.name,
-        profilePictureUrl: userInfo.picture,
+        display_name: userInfo.name,
+        profile_picture_url: userInfo.picture,
         scopes: tokens.scope.split(' '),
         tokens: {
           upsert: {
@@ -2829,8 +2829,8 @@ app.get("/google/status", async (req, res) => {
     res.json({
       connected: true,
       email: account.email,
-      displayName: account.displayName,
-      profilePictureUrl: account.profilePictureUrl,
+      display_name: account.displayName,
+      profile_picture_url: account.profilePictureUrl,
       scopes: account.scopes,
       merchantLinks: account.merchantLinks.length,
       gbpLocations: account.gbpLocations.length,
@@ -2957,7 +2957,7 @@ app.get("/google/gmc/products", async (req, res) => {
     }
 
     const account = await prisma.google_oauth_accounts.findFirst({
-      where: { tenantId: tenantId as string },
+      where: { tenant_id: tenantId as string },
     });
 
     if (!account) {
@@ -2985,7 +2985,7 @@ app.get("/google/gmc/stats", async (req, res) => {
     }
 
     const account = await prisma.google_oauth_accounts.findFirst({
-      where: { tenantId: tenantId as string },
+      where: { tenant_id: tenantId as string },
     });
 
     if (!account) {
@@ -3139,7 +3139,7 @@ app.put("/admin/email-config", async (req, res) => {
           where: { category: config.category },
           update: { 
             email: config.email,
-            updatedAt: new Date()
+            updated_at: new Date()
           },
           create: {
             category: config.category,
@@ -3256,7 +3256,7 @@ app.get('/api/tenants/:tenantId/integrations/clover', authenticateToken, async (
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.users.some((ut: any) => ut.userId === user.id);
+    const hasAccess = tenant.users.some((ut: any) => ut.user_id === user.id);
     if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
       return res.status(403).json({ error: 'access_denied' });
     }
@@ -3300,7 +3300,7 @@ app.get('/api/admin/taxonomy/status', requireAdmin, async (req, res) => {
     // Get current taxonomy version
     const currentVersion = await prisma.google_taxonomy.findFirst({
       select: { version: true },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { created_at: 'desc' }
     });
 
     res.json({
@@ -3369,7 +3369,7 @@ app.use(scanMetricsRoutes);
 // Body: { tenantCategoryId?: string, categorySlug?: string }
 app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) => {
   try {
-    const { tenantId, itemId } = req.params as { tenantId: string; itemId: string };
+    const { tenantId, itemId } = req.params as { tenant_id: string; itemId: string };
     const { tenantCategoryId, categorySlug } = (req.body || {}) as { tenantCategoryId?: string; categorySlug?: string };
 
     const updated = await categoryService.assignItemCategory(tenantId, itemId, { tenantCategoryId, categorySlug });
@@ -3417,7 +3417,7 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
     // Transform snake_case back to camelCase for frontend
     const result = {
       id: updatedItem.id,
-      tenantId: updatedItem.tenantId,
+      tenant_id: updatedItem.tenantId,
       sku: updatedItem.sku,
       name: updatedItem.name,
       price: updatedItem.price,
@@ -3425,9 +3425,9 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
       description: updatedItem.description,
       visibility: updatedItem.visibility,
       status: updatedItem.itemStatus,
-      categoryPath: updatedItem.categoryPath,
-      createdAt: updatedItem.createdAt,
-      updatedAt: updatedItem.updatedAt,
+      category_path: updatedItem.categoryPath,
+      created_at: updatedItem.createdAt,
+      updated_at: updatedItem.updatedAt,
     };
 
     return res.json(result);
@@ -3457,8 +3457,8 @@ app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) =>
     } else {
       // Regular users can only see tenants they have access to
       const userTenants = await prisma.user_tenants.findMany({
-        where: { userId: user.userId },
-        select: { tenantId: true }
+        where: { user_id: user.user_id },
+        select: { tenant_id: true }
       });
       tenantIds = userTenants.map(ut => ut.tenantId);
     }
@@ -3471,16 +3471,16 @@ app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) =>
     // Products created by Quick Start Wizard typically have source = 'QUICK_START_WIZARD' and are missing details
     const products = await prisma.inventory_item.findMany({
       where: {
-        tenantId: { in: tenantIds },
+        tenant_id: { in: tenantIds },
         OR: [
           // Products with missing images
-          { missingImages: true },
+          { missing_images: true },
           // Products with missing descriptions
-          { missingDescription: true },
+          { missing_description: true },
           // Products with missing brand
-          { missingBrand: true },
+          { missing_brand: true },
           // Products with missing specs
-          { missingSpecs: true },
+          { missing_specs: true },
           // Products created by quick start that might need enrichment
           { source: 'QUICK_START_WIZARD' }
         ]
@@ -3489,20 +3489,20 @@ app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) =>
         id: true,
         name: true,
         source: true,
-        missingImages: true,
-        missingDescription: true,
-        missingBrand: true,
-        missingSpecs: true,
+        missing_images: true,
+        missing_description: true,
+        missing_brand: true,
+        missing_specs: true,
         description: true,
         brand: true,
-        tenantId: true,
+        tenant_id: true,
         photos: {
           select: {
             id: true
           }
         }
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
       take: 50 // Limit results for performance
     });
 
@@ -3513,10 +3513,10 @@ app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) =>
       source: product.source,
       enrichmentStatus: 'needs_enrichment',
       missing: {
-        missingImages: product.missingImages,
-        missingDescription: product.missingDescription,
-        missingSpecs: product.missingSpecs,
-        missingBrand: product.missingBrand
+        missing_images: product.missingImages,
+        missing_description: product.missingDescription,
+        missing_specs: product.missingSpecs,
+        missing_brand: product.missingBrand
       }
     }));
 
@@ -3591,7 +3591,7 @@ app.get("/api/gbp/categories", async (req, res) => {
         isActive: true,
         OR: [
           { name: { contains: query, mode: 'insensitive' } },
-          { displayName: { contains: query, mode: 'insensitive' } }
+          { display_name: { contains: query, mode: 'insensitive' } }
         ]
       },
       take: parseInt(limit as string, 10),

@@ -15,18 +15,23 @@ interface Tenant {
   name: string;
 }
 
-interface User {
+// Local user shape for this modal. Named uniquely to avoid clashing with
+// other User interfaces in the codebase while remaining structurally
+// compatible with the admin users page User type.
+interface ManageUserTenantsModalUser {
   id: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
+  // Allow null here so this type is compatible with the admin users page User,
+  // which models firstName/lastName as string | null coming from the backend.
+  firstName?: string | null;
+  lastName?: string | null;
   role: string;
 }
 
 interface ManageUserTenantsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: User | null;
+  user: ManageUserTenantsModalUser | null;
   onSuccess?: () => void;
 }
 

@@ -9,13 +9,13 @@ router.get('/tenant-flags/:tenantId', checkTenantAccess, async (req, res) => {
   const { tenantId } = req.params
   
   // Get tenant-specific flags
-  const tenantFlags = await prisma.tenantFeatureFlag.findMany({ 
+  const tenantFlags = await prisma.tenant_feature_flags.findMany({ 
     where: { tenantId }, 
     orderBy: { flag: 'asc' } 
   })
   
   // Get platform flags that allow tenant override
-  const platformFlags = await prisma.platformFeatureFlag.findMany({
+  const platformFlags = await prisma.platform_feature_flags.findMany({
     where: { allowTenantOverride: true },
     orderBy: { flag: 'asc' }
   })
@@ -37,7 +37,7 @@ router.get('/tenant-flags/:tenantId', checkTenantAccess, async (req, res) => {
       flag: pf.flag,
       enabled: false, // Default to disabled for tenant
       rollout: pf.rollout || `Inherited from platform (override allowed)`,
-      updatedAt: pf.updatedAt,
+      updated_at: pf.updatedAt,
       _isPlatformInherited: true
     }
   })
@@ -54,7 +54,7 @@ router.get('/tenant-flags/:tenantId', checkTenantAccess, async (req, res) => {
 router.put('/tenant-flags/:tenantId/:flag', requireTenantOwner, async (req, res) => {
   const { tenantId, flag } = req.params
   const { enabled, description, rollout } = req.body || {}
-  const row = await prisma.tenantFeatureFlag.upsert({
+  const row = await prisma.tenant_feature_flags.upsert({
     where: { tenantId_flag: { tenantId, flag } },
     update: { enabled: !!enabled, description: description ?? null, rollout: rollout ?? null },
     create: { tenantId, flag, enabled: !!enabled, description: description ?? null, rollout: rollout ?? null },

@@ -11,8 +11,8 @@ export type UpdateCategoryInput = Partial<{
 }>
 
 export const categoryService = {
-  async getTenantCategories(tenantId: string) {
-    const categories = await prisma.tenantCategory.findMany({
+  async getTenantCategories(tenant_id: string) {
+    const categories = await prisma.tenant_category.findMany({
       where: {
         tenantId,
         isActive: true,
@@ -25,8 +25,8 @@ export const categoryService = {
     return categories
   },
 
-  async createTenantCategory(tenantId: string, input: Required<Pick<UpdateCategoryInput, 'name' | 'slug'>> & Partial<UpdateCategoryInput>) {
-    const category = await prisma.tenantCategory.create({
+  async createTenantCategory(tenant_id: string, input: Required<Pick<UpdateCategoryInput, 'name' | 'slug'>> & Partial<UpdateCategoryInput>) {
+    const category = await prisma.tenant_category.create({
       data: {
         tenantId,
         name: input.name,
@@ -56,8 +56,8 @@ export const categoryService = {
     return category
   },
 
-  async updateTenantCategory(tenantId: string, id: string, input: UpdateCategoryInput) {
-    const category = await prisma.tenantCategory.update({ where: { id }, data: input })
+  async updateTenantCategory(tenant_id: string, id: string, input: UpdateCategoryInput) {
+    const category = await prisma.tenant_category.update({ where: { id }, data: input })
     try {
       await audit({
         tenantId,
@@ -70,8 +70,8 @@ export const categoryService = {
     return category
   },
 
-  async softDeleteTenantCategory(tenantId: string, id: string) {
-    const category = await prisma.tenantCategory.update({ where: { id }, data: { isActive: false } })
+  async softDeleteTenantCategory(tenant_id: string, id: string) {
+    const category = await prisma.tenant_category.update({ where: { id }, data: { isActive: false } })
     try {
       await audit({ tenantId, actor: null, action: 'category.delete', payload: { id } })
     } catch {}
@@ -79,8 +79,8 @@ export const categoryService = {
     return category
   },
 
-  async alignCategory(tenantId: string, id: string, googleCategoryId: string) {
-    const category = await prisma.tenantCategory.update({ where: { id }, data: { googleCategoryId } })
+  async alignCategory(tenant_id: string, id: string, googleCategoryId: string) {
+    const category = await prisma.tenant_category.update({ where: { id }, data: { googleCategoryId } })
     try {
       await audit({ tenantId, actor: null, action: 'category.align', payload: { id, googleCategoryId } })
     } catch {}
@@ -89,8 +89,8 @@ export const categoryService = {
   },
 
   async assignItemCategory(
-    tenantId: string,
-    itemId: string,
+    tenant_id: string,
+    item_id: string,
     opts: { tenantCategoryId?: string; categorySlug?: string }
   ) {
     const { tenantCategoryId, categorySlug } = opts
@@ -98,14 +98,14 @@ export const categoryService = {
       throw Object.assign(new Error('tenantCategoryId_or_categorySlug_required'), { statusCode: 400 })
     }
 
-    const item = await prisma.inventoryItem.findFirst({ where: { id: itemId, tenantId } })
+    const item = await prisma.inventory_item.findFirst({ where: { id: itemId, tenantId } })
     if (!item) {
       throw Object.assign(new Error('item_not_found'), { statusCode: 404 })
     }
 
     let category
     if (tenantCategoryId) {
-      category = await prisma.tenantCategory.findFirst({
+      category = await prisma.tenant_category.findFirst({
         where: {
           id: tenantCategoryId,
           tenantId,
@@ -113,7 +113,7 @@ export const categoryService = {
         },
       })
     } else if (categorySlug) {
-      category = await prisma.tenantCategory.findFirst({
+      category = await prisma.tenant_category.findFirst({
         where: {
           tenantId,
           slug: categorySlug,
@@ -138,11 +138,11 @@ export const categoryService = {
       throw Object.assign(new Error('tenant_category_not_found'), { statusCode: 404 })
     }
 
-    const updated = await prisma.inventoryItem.update({
+    const updated = await prisma.inventory_item.update({
       where: { id: itemId },
       data: { 
         tenantCategoryId: category.id,
-        categoryPath: [category.slug] as any, // Keep for backward compatibility
+        category_path: [category.slug] as any, // Keep for backward compatibility
       },
     })
 

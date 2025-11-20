@@ -127,7 +127,7 @@ export async function validateTierCompatibility(
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
-        subscriptionTier: true,
+        subscription_tier: true,
       },
     });
 
@@ -179,7 +179,7 @@ export function requirePropagationTier(
 ) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tenantId = req.params.tenantId || req.params.id;
+      const tenantId = req.params.tenant_id || req.params.id;
       
       if (!tenantId) {
         return res.status(400).json({
@@ -191,12 +191,12 @@ export function requirePropagationTier(
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
         select: {
-          subscriptionTier: true,
+          subscription_tier: true,
           organizationId: true,
           organization: {
             select: {
-              subscriptionTier: true,
-              _count: { select: { tenants: true } }
+              subscription_tier: true,
+              _count: { select: { tenant: true } }
             }
           }
         }

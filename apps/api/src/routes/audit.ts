@@ -8,7 +8,7 @@ const router = Router();
 
 // Query schema
 const auditQuerySchema = z.object({
-  tenantId: z.string().optional(),
+  tenant_id: z.string().optional(),
   entityType: z.enum(['inventory_item', 'tenant', 'policy', 'oauth', 'other']).optional(),
   since: z.string().datetime().optional(),
   until: z.string().datetime().optional(),
@@ -22,7 +22,7 @@ router.get('/admin/audit', requireAdmin, async (req, res) => {
     const query = auditQuerySchema.parse(req.query);
     
     const where: any = {};
-    if (query.tenantId) where.tenantId = query.tenantId;
+    if (query.tenant_id) where.tenant_id = query.tenant_id;
     if (query.entityType) where.entityType = query.entityType;
     if (query.since || query.until) {
       where.occurredAt = {};
@@ -30,7 +30,7 @@ router.get('/admin/audit', requireAdmin, async (req, res) => {
       if (query.until) where.occurredAt.lte = new Date(query.until);
     }
 
-    const logs = await prisma.auditLog.findMany({
+    const logs = await prisma.audit_log.findMany({
       where,
       orderBy: { occurredAt: 'desc' },
       take: query.limit + 1,
@@ -55,7 +55,7 @@ router.get('/admin/audit', requireAdmin, async (req, res) => {
 // GET /admin/audit/:id - Get single audit log
 router.get('/admin/audit/:id', requireAdmin, async (req, res) => {
   try {
-    const log = await prisma.auditLog.findUnique({
+    const log = await prisma.audit_log.findUnique({
       where: { id: req.params.id },
     });
 
@@ -75,7 +75,7 @@ router.get('/admin/exports/audit.csv', requireAdmin, async (req, res) => {
     const query = auditQuerySchema.parse(req.query);
     
     const where: any = {};
-    if (query.tenantId) where.tenantId = query.tenantId;
+    if (query.tenant_id) where.tenant_id = query.tenant_id;
     if (query.entityType) where.entityType = query.entityType;
     if (query.since || query.until) {
       where.occurredAt = {};
@@ -83,7 +83,7 @@ router.get('/admin/exports/audit.csv', requireAdmin, async (req, res) => {
       if (query.until) where.occurredAt.lte = new Date(query.until);
     }
 
-    const logs = await prisma.auditLog.findMany({
+    const logs = await prisma.audit_log.findMany({
       where,
       orderBy: { occurredAt: 'desc' },
       take: 10000, // Max export size
@@ -96,7 +96,7 @@ router.get('/admin/exports/audit.csv', requireAdmin, async (req, res) => {
       log.occurredAt.toISOString(),
       log.actorType,
       log.actorId,
-      log.tenantId,
+      log.tenant_id,
       log.entityType,
       log.entityId,
       log.action,

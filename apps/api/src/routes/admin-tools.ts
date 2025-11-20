@@ -110,8 +110,8 @@ const createTenantSchema = z.object({
   name: z.string().min(1),
   city: z.string().optional(),
   state: z.string().optional(),
-  subscriptionTier: z.enum(['trial', 'google_only', 'starter', 'professional', 'enterprise', 'organization']).optional().default('professional'),
-  subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional().default('trial'),
+  subscription_tier: z.enum(['trial', 'google_only', 'starter', 'professional', 'enterprise', 'organization']).optional().default('professional'),
+  subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional().default('trial'),
   organizationId: z.string().optional(), // Required for organization tier
   ownerId: z.string().optional(), // Link to user as owner
   scenario: z.enum(['grocery', 'fashion', 'electronics', 'general']).optional().default('general'),
@@ -166,12 +166,12 @@ router.delete('/tenants/:tenantId', async (req, res) => {
     console.log('[Admin Tools] Deleting test tenant:', tenantId);
 
     // Delete all products for this tenant
-    const deletedProducts = await prisma.inventoryItem.deleteMany({
+    const deletedProducts = await prisma.inventory_item.deleteMany({
       where: { tenantId },
     });
 
     // Delete all categories for this tenant
-    const deletedCategories = await prisma.tenantCategory.deleteMany({
+    const deletedCategories = await prisma.tenant_category.deleteMany({
       where: { tenantId },
     });
 
@@ -295,10 +295,10 @@ router.get('/scan-sessions/stats', async (req: Request, res: Response) => {
     }
 
     const [active, total] = await Promise.all([
-      prisma.scanSession.count({
+      prisma.scan_sessions.count({
         where: { tenantId, status: 'active' },
       }),
-      prisma.scanSession.count({
+      prisma.scan_sessions.count({
         where: { tenantId },
       }),
     ]);
@@ -318,7 +318,7 @@ router.get('/scan-sessions/stats', async (req: Request, res: Response) => {
  * Close all active scan sessions for a tenant
  */
 const cleanupSessionsSchema = z.object({
-  tenantId: z.string().min(1),
+  tenant_id: z.string().min(1),
 });
 
 router.post('/scan-sessions/cleanup', async (req: Request, res: Response) => {
@@ -334,20 +334,20 @@ router.post('/scan-sessions/cleanup', async (req: Request, res: Response) => {
     const { tenantId } = parsed.data;
 
     // Close all active sessions for this tenant
-    const result = await prisma.scanSession.updateMany({
+    const result = await prisma.scan_sessions.updateMany({
       where: {
         tenantId,
         status: 'active',
       },
       data: {
         status: 'cancelled',
-        completedAt: new Date(),
+        completed_at: new Date(),
       },
     });
 
     await audit({
       tenantId,
-      actor: (req as any).user?.userId || 'system',
+      actor: (req as any).user?.user_id || 'system',
       action: 'admin.scan_sessions.cleanup',
       payload: { tenantId, cleaned: result.count },
     });

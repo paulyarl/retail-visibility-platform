@@ -16,17 +16,17 @@ const router = Router();
 
 // Validation schemas
 const createOverrideSchema = z.object({
-  tenantId: z.string().min(1, 'Tenant ID is required'),
+  tenant_id: z.string().min(1, 'Tenant ID is required'),
   feature: z.string().min(1, 'Feature name is required'),
   granted: z.boolean(),
   reason: z.string().optional(),
-  expiresAt: z.string().datetime().optional(),
+  expires_at: z.string().datetime().optional(),
 });
 
 const updateOverrideSchema = z.object({
   granted: z.boolean().optional(),
   reason: z.string().optional(),
-  expiresAt: z.string().datetime().optional().nullable(),
+  expires_at: z.string().datetime().optional().nullable(),
 });
 
 /**
@@ -56,7 +56,7 @@ router.get('/', authenticateToken, requirePlatformAdmin, async (req: Request, re
     const where: any = {};
     
     if (tenantId) {
-      where.tenantId = String(tenantId);
+      where.tenant_id = String(tenantId);
     }
     
     if (feature) {
@@ -70,24 +70,24 @@ router.get('/', authenticateToken, requirePlatformAdmin, async (req: Request, re
     // Filter for active (non-expired) overrides
     if (active === 'true') {
       where.OR = [
-        { expiresAt: null },
-        { expiresAt: { gt: new Date() } }
+        { expires_at: null },
+        { expires_at: { gt: new Date() } }
       ];
     }
 
-    const overrides = await prisma.tenantFeatureOverride.findMany({
+    const overrides = await prisma.tenant_feature_overrides.findMany({
       where,
       include: {
         tenant: {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
-            subscriptionStatus: true,
+            subscription_tier: true,
+            subscription_status: true,
           }
         }
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
     });
 
     // Add computed fields
@@ -119,15 +119,15 @@ router.get('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
   try {
     const { id } = req.params;
 
-    const override = await prisma.tenantFeatureOverride.findUnique({
+    const override = await prisma.tenant_feature_overrides.findUnique({
       where: { id },
       include: {
         tenant: {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
-            subscriptionStatus: true,
+            subscription_tier: true,
+            subscription_status: true,
           }
         }
       },
@@ -163,7 +163,7 @@ router.get('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
  */
 router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).user?.user_id;
     
     if (!userId) {
       return res.status(401).json({
@@ -177,12 +177,12 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
 
     // Check if tenant exists
     const tenant = await prisma.tenant.findUnique({
-      where: { id: body.tenantId },
+      where: { id: body.tenant_id },
       select: { 
         id: true, 
         name: true, 
-        subscriptionTier: true,
-        subscriptionStatus: true,
+        subscription_tier: true,
+        subscription_status: true,
       },
     });
 
@@ -194,10 +194,10 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
     }
 
     // Check if override already exists
-    const existing = await prisma.tenantFeatureOverride.findUnique({
+    const existing = await prisma.tenant_feature_overrides.findUnique({
       where: {
         tenantId_feature: {
-          tenantId: body.tenantId,
+          tenant_id: body.tenant_id,
           feature: body.feature,
         }
       }
@@ -212,13 +212,13 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
     }
 
     // Create override
-    const override = await prisma.tenantFeatureOverride.create({
+    const override = await prisma.tenant_feature_overrides.create({
       data: {
-        tenantId: body.tenantId,
+        tenant_id: body.tenant_id,
         feature: body.feature,
         granted: body.granted,
         reason: body.reason,
-        expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+        expires_at: body.expiresAt ? new Date(body.expiresAt) : null,
         grantedBy: userId,
       },
       include: {
@@ -226,8 +226,8 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
-            subscriptionStatus: true,
+            subscription_tier: true,
+            subscription_status: true,
           }
         }
       }
@@ -264,7 +264,7 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
 router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).user?.user_id;
 
     if (!userId) {
       return res.status(401).json({
@@ -277,7 +277,7 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
     const body = updateOverrideSchema.parse(req.body);
 
     // Check if override exists
-    const existing = await prisma.tenantFeatureOverride.findUnique({
+    const existing = await prisma.tenant_feature_overrides.findUnique({
       where: { id },
     });
 
@@ -291,7 +291,7 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
     // Update override
     const updateData: any = {
       grantedBy: userId, // Track who made the update
-      updatedAt: new Date(),
+      updated_at: new Date(),
     };
 
     if (body.granted !== undefined) {
@@ -306,7 +306,7 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
       updateData.expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
     }
 
-    const override = await prisma.tenantFeatureOverride.update({
+    const override = await prisma.tenant_feature_overrides.update({
       where: { id },
       data: updateData,
       include: {
@@ -314,8 +314,8 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
-            subscriptionStatus: true,
+            subscription_tier: true,
+            subscription_status: true,
           }
         }
       }
@@ -352,10 +352,10 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
 router.delete('/:id', authenticateToken, requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).user?.user_id;
 
     // Get override details before deleting (for logging)
-    const override = await prisma.tenantFeatureOverride.findUnique({
+    const override = await prisma.tenant_feature_overrides.findUnique({
       where: { id },
       include: {
         tenant: {
@@ -372,7 +372,7 @@ router.delete('/:id', authenticateToken, requirePlatformAdmin, async (req: Reque
     }
 
     // Delete override
-    await prisma.tenantFeatureOverride.delete({
+    await prisma.tenant_feature_overrides.delete({
       where: { id },
     });
 
@@ -406,14 +406,14 @@ router.get('/tenant/:tenantId', authenticateToken, requirePlatformAdmin, async (
     // Filter for active (non-expired) overrides
     if (active === 'true') {
       where.OR = [
-        { expiresAt: null },
-        { expiresAt: { gt: new Date() } }
+        { expires_at: null },
+        { expires_at: { gt: new Date() } }
       ];
     }
 
-    const overrides = await prisma.tenantFeatureOverride.findMany({
+    const overrides = await prisma.tenant_feature_overrides.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
     });
 
     const enrichedOverrides = overrides.map(override => ({
@@ -442,9 +442,9 @@ router.get('/tenant/:tenantId', authenticateToken, requirePlatformAdmin, async (
  */
 router.post('/cleanup-expired', authenticateToken, requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
-    const result = await prisma.tenantFeatureOverride.deleteMany({
+    const result = await prisma.tenant_feature_overrides.deleteMany({
       where: {
-        expiresAt: {
+        expires_at: {
           lte: new Date(),
         }
       }

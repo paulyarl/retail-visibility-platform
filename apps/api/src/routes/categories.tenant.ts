@@ -9,7 +9,7 @@ router.get('/api/tenant/:tenantId/categories', authenticateToken, checkTenantAcc
   try {
     const { tenantId } = req.params;
     // Minimal placeholder implementation to keep API contract stable
-    const rows = await prisma.tenantCategory.findMany({
+    const rows = await prisma.tenant_category.findMany({
       where: { tenantId, isActive: true },
       orderBy: { sortOrder: 'asc' },
       select: { id: true, name: true, slug: true, parentId: true, googleCategoryId: true },

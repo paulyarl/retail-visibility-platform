@@ -100,7 +100,7 @@ router.get('/product/:itemId', async (req, res) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysNum);
 
-    const performance = await prisma.productPerformance.findMany({
+    const performance = await prisma.product_performance.findMany({
       where: {
         itemId,
         date: {
@@ -157,8 +157,8 @@ router.get('/product/:itemId', async (req, res) => {
 router.post('/update', async (req, res) => {
   try {
     const schema = z.object({
-      itemId: z.string(),
-      tenantId: z.string(),
+      item_id: z.string(),
+      tenant_id: z.string(),
       date: z.string().datetime(),
       approvalStatus: z.string().optional(),
       rejectionReason: z.string().optional(),
@@ -180,10 +180,10 @@ router.post('/update', async (req, res) => {
         ? (data.clicks / data.impressions) * 100
         : undefined;
 
-    const performance = await prisma.productPerformance.upsert({
+    const performance = await prisma.product_performance.upsert({
       where: {
         itemId_date: {
-          itemId: data.itemId,
+          item_id: data.item_id,
           date,
         },
       },
@@ -200,8 +200,8 @@ router.post('/update', async (req, res) => {
         lastUpdated: new Date(),
       },
       create: {
-        itemId: data.itemId,
-        tenantId: data.tenantId,
+        item_id: data.item_id,
+        tenant_id: data.tenant_id,
         date,
         approvalStatus: data.approvalStatus || 'not_synced',
         rejectionReason: data.rejectionReason,

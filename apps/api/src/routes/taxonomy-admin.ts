@@ -5,13 +5,13 @@ import { GOOGLE_PRODUCT_TAXONOMY, CategoryNode } from '../lib/google/taxonomy';
 const router = Router();
 
 function collectNodes(nodes: CategoryNode[], opts?: { parentId?: string; level?: number }) {
-  const out: Array<{ categoryId: string; categoryPath: string; parentId: string | null; level: number }>= [];
+  const out: Array<{ categoryId: string; category_path: string; parentId: string | null; level: number }>= [];
   const level = (opts?.level ?? 0);
   for (const node of nodes) {
     const parentId = opts?.parentId ?? null;
     out.push({
       categoryId: node.id,
-      categoryPath: node.path.join(' > '),
+      category_path: node.path.join(' > '),
       parentId,
       level,
     });
@@ -25,18 +25,18 @@ async function upsertInBatches(items: any[], batchSize = 200) {
     const batch = items.slice(i, i + batchSize);
     await prisma.$transaction(
       batch.map((it) =>
-        prisma.googleTaxonomy.upsert({
+        prisma.google_taxonomy.upsert({
           where: { categoryId: it.categoryId },
           create: {
             categoryId: it.categoryId,
-            categoryPath: it.categoryPath,
+            category_path: it.categoryPath,
             parentId: it.parentId,
             level: it.level,
             isActive: true,
             version: '2024-09',
           },
           update: {
-            categoryPath: it.categoryPath,
+            category_path: it.categoryPath,
             parentId: it.parentId,
             level: it.level,
             isActive: true,
@@ -59,8 +59,8 @@ router.post('/sync', async (_req, res) => {
     // Upsert in batches
     await upsertInBatches(flat, 200);
 
-    const total = await prisma.googleTaxonomy.count();
-    const versions = await prisma.googleTaxonomy.groupBy({ by: ['version'], _count: { version: true } });
+    const total = await prisma.google_taxonomy.count();
+    const versions = await prisma.google_taxonomy.groupBy({ by: ['version'], _count: { version: true } });
 
     res.status(201).json({
       success: true,

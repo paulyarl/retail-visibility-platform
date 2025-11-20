@@ -9,7 +9,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { isPlatformAdmin } from '../utils/platform-admin';
 import { getTenantLimitConfig, getRemainingTenantSlots, getPlatformSupportLimit } from '../config/tenant-limits';
-import { UserTenantRole } from '@prisma/client';
+import { user_tenant_role } from '@prisma/client';
 
 const router = Router();
 
@@ -43,9 +43,9 @@ router.get('/status', authenticateToken, async (req, res) => {
 
     // Platform support can create tenants but is limited to 3 tenants per owner
     if (req.user.role === 'PLATFORM_SUPPORT') {
-      const ownedTenants = await prisma.userTenant.count({
+      const ownedTenants = await prisma.user_tenants.count({
         where: {
-          userId: req.user.userId,
+          user_id: req.user.user_id,
           role: 'OWNER',
         },
       });
@@ -79,18 +79,18 @@ router.get('/status', authenticateToken, async (req, res) => {
     }
 
     // Get user's owned tenants
-    const ownedTenants = await prisma.userTenant.findMany({
+    const ownedTenants = await prisma.user_tenants.findMany({
       where: {
-        userId: req.user.userId,
-        role: UserTenantRole.OWNER,
+        user_id: req.user.user_id,
+        role: user_tenant_role.OWNER,
       },
       include: {
         tenant: {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
-            subscriptionStatus: true,
+            subscription_tier: true,
+            subscription_status: true,
           },
         },
       },
@@ -113,7 +113,7 @@ router.get('/status', authenticateToken, async (req, res) => {
 
     for (const ut of ownedTenants) {
       const tier = ut.tenant.subscriptionTier || 'starter';
-      const status = ut.tenant.subscriptionStatus || 'trial';
+      const status = ut.tenant.subscription_status || 'trial';
       const priority = tierPriority[tier] || 0;
       
       if (priority > highestPriority) {
@@ -137,11 +137,11 @@ router.get('/status', authenticateToken, async (req, res) => {
       canCreate: remaining > 0 || remaining === Infinity,
       upgradeMessage: limitConfig.upgradeMessage,
       upgradeToTier: limitConfig.upgradeToTier,
-      tenants: ownedTenants.map(ut => ({
+      tenant: ownedTenants.map(ut => ({
         id: ut.tenant.id,
         name: ut.tenant.name,
         tier: ut.tenant.subscriptionTier,
-        status: ut.tenant.subscriptionStatus,
+        status: ut.tenant.subscription_status,
       })),
     });
   } catch (error) {
@@ -162,7 +162,7 @@ router.get('/tiers', async (_req, res) => {
     const tiers = Object.entries(TENANT_LIMITS).map(([key, config]) => ({
       tier: key,
       limit: config.limit === Infinity ? 'unlimited' : config.limit,
-      displayName: config.displayName,
+      display_name: config.displayName,
       description: config.description,
       upgradeMessage: config.upgradeMessage,
       upgradeToTier: config.upgradeToTier,

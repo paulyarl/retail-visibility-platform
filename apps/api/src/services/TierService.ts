@@ -14,7 +14,7 @@ interface TierWithFeatures {
   id: string;
   tierKey: string;
   name: string;
-  displayName: string;
+  display_name: string;
   priceMonthly: number;
   maxSKUs: number | null;
   maxLocations: number | null;
@@ -185,7 +185,7 @@ export function clearTierCache(): void {
  * Check if tenant has access to a feature (including overrides)
  */
 export async function checkTenantFeatureAccess(
-  tenantId: string,
+  tenant_id: string,
   featureKey: string
 ): Promise<{ hasAccess: boolean; source: 'tier' | 'override' | 'none'; override?: any }> {
   try {
@@ -193,13 +193,13 @@ export async function checkTenantFeatureAccess(
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
-        subscriptionTier: true,
-        featureOverrides: {
+        subscription_tier: true,
+        tenant_feature_overrides: {
           where: {
             feature: featureKey,
             OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } },
+              { expires_at: null },
+              { expires_at: { gt: new Date() } },
             ],
           },
         },
@@ -219,7 +219,7 @@ export async function checkTenantFeatureAccess(
         override: {
           id: override.id,
           reason: override.reason,
-          expiresAt: override.expiresAt,
+          expires_at: override.expiresAt,
           grantedBy: override.grantedBy,
         },
       };

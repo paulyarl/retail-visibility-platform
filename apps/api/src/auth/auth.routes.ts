@@ -167,7 +167,7 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
       });
     }
     
-    const user = await authService.getUserById(req.user.userId);
+    const user = await authService.getUserById(req.user.user_id);
     
     res.json({ user });
   } catch (error) {
@@ -198,7 +198,7 @@ router.post('/logout', authenticateToken, async (req: Request, res: Response) =>
       });
     }
     
-    const result = await authService.logout(req.user.userId);
+    const result = await authService.logout(req.user.user_id);
     
     res.json(result);
   } catch (error) {

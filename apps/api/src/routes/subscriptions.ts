@@ -8,7 +8,7 @@ const router = Router();
 // Get tenant subscription status
 router.get("/status", async (req, res) => {
   try {
-    const tenantId = req.query.tenantId as string;
+    const tenantId = req.query.tenant_id as string;
 
     if (!tenantId) {
       return res.status(400).json({ error: "tenant_required" });
@@ -19,15 +19,15 @@ router.get("/status", async (req, res) => {
       select: {
         id: true,
         name: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
-        stripeCustomerId: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        stripe_customer_id: true,
         _count: {
           select: {
-            items: true,
-            users: true,
+            _count: true,
+            user_tenants: true,
           },
         },
       },
@@ -42,17 +42,17 @@ router.get("/status", async (req, res) => {
     // Calculate days remaining (trial or subscription)
     let daysRemaining = null;
     
-    if (tenant.subscriptionStatus === "trial" && tenant.trialEndsAt) {
+    if (tenant.subscription_status === "trial" && tenant.trialEndsAt) {
       daysRemaining = Math.ceil((tenant.trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     } else if (tenant.subscriptionEndsAt) {
       daysRemaining = Math.ceil((tenant.subscriptionEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     }
 
     // Get tier limits
-    const limits: Record<string, { items: number; users: number }> = {
-      starter: { items: 500, users: 3 },
-      pro: { items: 5000, users: 10 },
-      enterprise: { items: Infinity, users: Infinity },
+    const limits: Record<string, { _count: number; user_tenants: number }> = {
+      starter: { _count: 500, user_tenants: 3 },
+      pro: { _count: 5000, user_tenants: 10 },
+      enterprise: { _count: Infinity, user_tenants: Infinity },
     };
 
     const tier = tenant.subscriptionTier || "starter";
@@ -64,20 +64,20 @@ router.get("/status", async (req, res) => {
         name: tenant.name,
       },
       subscription: {
-        status: tenant.subscriptionStatus,
+        status: tenant.subscription_status,
         tier: tenant.subscriptionTier,
-        trialEndsAt: tenant.trialEndsAt,
-        subscriptionEndsAt: tenant.subscriptionEndsAt,
+        trial_ends_at: tenant.trialEndsAt,
+        subscription_ends_at: tenant.subscriptionEndsAt,
         daysRemaining,
         hasStripeAccount: !!tenant.stripeCustomerId,
       },
       usage: {
-        items: {
-          current: tenant._count.items,
+        _count: {
+          current: tenant._count.inventory_item,
           limit: tierLimits.items,
-          percentage: tierLimits.items === Infinity ? 0 : Math.round((tenant._count.items / tierLimits.items) * 100),
+          percentage: tierLimits.items === Infinity ? 0 : Math.round((tenant._count.inventory_item / tierLimits.items) * 100),
         },
-        users: {
+        user_tenants: {
           current: tenant._count.users,
           limit: tierLimits.users,
           percentage: tierLimits.users === Infinity ? 0 : Math.round((tenant._count.users / tierLimits.users) * 100),
@@ -92,13 +92,13 @@ router.get("/status", async (req, res) => {
 
 // Update subscription status (admin only)
 const updateSchema = z.object({
-  tenantId: z.string(),
-  subscriptionStatus: z.enum(["trial", "active", "past_due", "canceled"]).optional(),
-  subscriptionTier: z.enum(["starter", "pro", "enterprise"]).optional(),
-  trialEndsAt: z.string().datetime().optional(),
-  subscriptionEndsAt: z.string().datetime().optional(),
-  stripeCustomerId: z.string().optional(),
-  stripeSubscriptionId: z.string().optional(),
+  tenant_id: z.string(),
+  subscription_status: z.enum(["trial", "active", "past_due", "canceled"]).optional(),
+  subscription_tier: z.enum(["starter", "pro", "enterprise"]).optional(),
+  trial_ends_at: z.string().datetime().optional(),
+  subscription_ends_at: z.string().datetime().optional(),
+  stripe_customer_id: z.string().optional(),
+  stripe_subscription_id: z.string().optional(),
 });
 
 router.patch("/update", async (req, res) => {
@@ -129,10 +129,10 @@ router.patch("/update", async (req, res) => {
       select: {
         id: true,
         name: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
       },
     });
 
@@ -164,8 +164,8 @@ router.get("/pricing", async (req, res) => {
           `${TRIAL_CONFIG.durationDays}-day trial`,
         ],
         limits: {
-          items: 500,
-          users: 3,
+          _count: 500,
+          user_tenants: 3,
           locations: 1,
         },
       },
@@ -183,8 +183,8 @@ router.get("/pricing", async (req, res) => {
           "Custom reports",
         ],
         limits: {
-          items: 5000,
-          users: 10,
+          _count: 5000,
+          user_tenants: 10,
           locations: 5,
         },
         popular: true,
@@ -203,8 +203,8 @@ router.get("/pricing", async (req, res) => {
           "SLA guarantee",
         ],
         limits: {
-          items: Infinity,
-          users: Infinity,
+          _count: Infinity,
+          user_tenants: Infinity,
           locations: Infinity,
         },
       },

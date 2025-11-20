@@ -18,18 +18,18 @@ router.get('/tenants/:id/tier', authenticateToken, checkTenantAccess, async (req
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
         organizationId: true,
         organization: {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
+            subscription_tier: true,
             _count: {
-              select: { tenants: true }
+              select: { tenant: true }
             }
           }
         }
@@ -49,12 +49,12 @@ router.get('/tenants/:id/tier', authenticateToken, checkTenantAccess, async (req
     const orgTierData = tenant.organization?.subscriptionTier ? await TierService.getTierByKey(tenant.organization.subscriptionTier) : null;
 
     res.json({
-      tenantId: tenant.id,
+      tenant_id: tenant.id,
       tenantName: tenant.name,
       tier: effectiveTier,
-      subscriptionStatus: tenant.subscriptionStatus,
-      trialEndsAt: tenant.trialEndsAt,
-      subscriptionEndsAt: tenant.subscriptionEndsAt,
+      subscription_status: tenant.subscription_status,
+      trial_ends_at: tenant.trialEndsAt,
+      subscription_ends_at: tenant.subscriptionEndsAt,
       isChain,
       organizationId: tenant.organizationId,
       organizationName: tenant.organization?.name,
@@ -91,12 +91,12 @@ router.get('/tenants/:id/usage', authenticateToken, checkTenantAccess, async (re
     }
 
     // Count current items
-    const itemCount = await prisma.inventoryItem.count({
+    const itemCount = await prisma.inventory_item.count({
       where: { tenantId }
     });
 
     // Count active items
-    const activeItemCount = await prisma.inventoryItem.count({
+    const activeItemCount = await prisma.inventory_item.count({
       where: {
         tenantId,
         availability: 'in_stock'
@@ -104,7 +104,7 @@ router.get('/tenants/:id/usage', authenticateToken, checkTenantAccess, async (re
     });
 
     res.json({
-      tenantId: tenant.id,
+      tenant_id: tenant.id,
       currentItems: itemCount,
       activeItems: activeItemCount,
       monthlySkuQuota: tenant.monthlySkuQuota,

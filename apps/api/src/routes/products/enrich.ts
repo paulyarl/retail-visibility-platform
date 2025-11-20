@@ -90,7 +90,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     };
     const user = req.user as any;
     const tenantId = user?.tenantIds?.[0]; // Get first tenant
-    const userId = user?.userId;
+    const userId = user?.user_id;
 
     if (!tenantId || !userId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -99,7 +99,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     // Enforce subscription state with 6-month maintenance window for google_only fallback
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true },
+      select: { subscription_tier: true, subscription_status: true, trial_ends_at: true },
     });
 
     if (!tenant) {
@@ -107,7 +107,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     }
 
     const tier = tenant.subscriptionTier || 'starter';
-    const status = tenant.subscriptionStatus || 'active';
+    const status = tenant.subscription_status || 'active';
     const now = new Date();
     const isInactive = status === 'canceled' || status === 'expired';
 
@@ -125,18 +125,18 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
       return res.status(403).json({
         error: 'subscription_read_only',
         message: 'Your account is in read-only visibility mode. Upgrade to add or update products or sync new changes.',
-        subscriptionTier: tier,
-        subscriptionStatus: status,
+        subscription_tier: tier,
+        subscription_status: status,
       });
     }
 
     // Get existing product
-    const product = await prisma.inventoryItem.findUnique({
+    const product = await prisma.inventory_item.findUnique({
       where: { id: productId },
       include: { photos: true }
     });
 
-    if (!product || product.tenantId !== tenantId) {
+    if (!product || product.tenant_id !== tenantId) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
@@ -201,7 +201,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     }
 
     // Update product
-    const updatedProduct = await prisma.inventoryItem.update({
+    const updatedProduct = await prisma.inventory_item.update({
       where: { id: productId },
       data: updateData
     });
@@ -210,7 +210,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     let addedImages: any[] = [];
     if (enrichmentOptions.useImages && scannedData.images && scannedData.images.length > 0) {
       // Delete existing photos if any
-      await prisma.photoAsset.deleteMany({
+      await prisma.photo_asset.deleteMany({
         where: { inventoryItemId: productId }
       });
 
@@ -224,15 +224,15 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
         alt: `${updatedProduct.name} - Image ${index + 1}`
       }));
 
-      const batchResult = await prisma.photoAsset.createMany({
+      const batchResult = await prisma.photo_asset.createMany({
         data: photoData
       });
       addedImages = photoData; // Return the data we created
 
       // Update missing images flag
-      await prisma.inventoryItem.update({
+      await prisma.inventory_item.update({
         where: { id: productId },
-        data: { missingImages: false }
+        data: { missing_images: false }
       });
     }
 
@@ -244,19 +244,19 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
                           !missing.missingBrand;
 
     if (fullyEnriched) {
-      await prisma.inventoryItem.update({
+      await prisma.inventory_item.update({
         where: { id: productId },
         data: { enrichmentStatus: 'COMPLETE' }
       });
     } else {
-      await prisma.inventoryItem.update({
+      await prisma.inventory_item.update({
         where: { id: productId },
         data: { enrichmentStatus: 'PARTIALLY_ENRICHED' }
       });
     }
 
     // Get final product with photos
-    const enrichedProduct = await prisma.inventoryItem.findUnique({
+    const enrichedProduct = await prisma.inventory_item.findUnique({
       where: { id: productId },
       include: { photos: true }
     });
@@ -305,7 +305,7 @@ router.get('/needs-enrichment', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const products = await prisma.inventoryItem.findMany({
+    const products = await prisma.inventory_item.findMany({
       where: {
         tenantId,
         OR: [
@@ -317,7 +317,7 @@ router.get('/needs-enrichment', async (req: Request, res: Response) => {
         photos: true
       },
       orderBy: {
-        createdAt: 'desc'
+        created_at: 'desc'
       }
     });
 
@@ -360,12 +360,12 @@ router.get('/:productId/enrichment-status', async (req: Request, res: Response) 
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const product = await prisma.inventoryItem.findUnique({
+    const product = await prisma.inventory_item.findUnique({
       where: { id: productId },
       include: { photos: true }
     });
 
-    if (!product || product.tenantId !== tenantId) {
+    if (!product || product.tenant_id !== tenantId) {
       return res.status(404).json({ error: 'Product not found' });
     }
 

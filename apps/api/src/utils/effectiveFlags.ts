@@ -19,7 +19,7 @@ export type EffectivePlatform = {
 }
 
 export type EffectiveTenant = EffectivePlatform & {
-  tenantId: string
+  tenant_id: string
   tenantEffectiveOn: boolean
   tenantSources: {
     tenant_db: boolean
@@ -38,7 +38,7 @@ export async function getEffectivePlatform(flag: string): Promise<EffectivePlatf
 
   const override = platformOverrides.get(flag)
 
-  const dbFlag = await prisma.platformFeatureFlag.findUnique({ where: { flag } })
+  const dbFlag = await prisma.platform_feature_flags.findUnique({ where: { flag } })
   const platformDbOn = !!dbFlag?.enabled
   const allowOverride = !!dbFlag?.allowTenantOverride
 
@@ -73,13 +73,13 @@ export async function getEffectivePlatform(flag: string): Promise<EffectivePlatf
   }
 }
 
-export async function getEffectiveTenant(flag: string, tenantId: string): Promise<EffectiveTenant> {
+export async function getEffectiveTenant(flag: string, tenant_id: string): Promise<EffectiveTenant> {
   const plat = await getEffectivePlatform(flag)
 
   const tenantMap = tenantOverrides.get(flag)
   const tenantOverride = tenantMap?.get(tenantId)
 
-  const row = await prisma.tenantFeatureFlag.findUnique({ where: { tenantId_flag: { tenantId, flag } } })
+  const row = await prisma.tenant_feature_flags.findUnique({ where: { tenantId_flag: { tenantId, flag } } })
   const tenantDbOn = !!row?.enabled
 
   // Apply tenant decision logic mirroring middleware
@@ -134,7 +134,7 @@ export function setPlatformOverride(flag: string, value: boolean | null) {
   }
 }
 
-export function setTenantOverride(flag: string, tenantId: string, value: boolean | null) {
+export function setTenantOverride(flag: string, tenant_id: string, value: boolean | null) {
   if (value === null) {
     const map = tenantOverrides.get(flag)
     map?.delete(tenantId)

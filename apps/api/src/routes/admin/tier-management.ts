@@ -28,7 +28,7 @@ router.get('/tiers', async (req, res) => {
         {
           id: 'google_only',
           name: 'Google-Only',
-          displayName: 'Google-Only',
+          display_name: 'Google-Only',
           price: 29,
           maxSKUs: 250,
           description: 'Get discovered on Google',
@@ -45,7 +45,7 @@ router.get('/tiers', async (req, res) => {
         {
           id: 'starter',
           name: 'Starter',
-          displayName: 'Starter',
+          display_name: 'Starter',
           price: 49,
           maxSKUs: 500,
           description: 'Get started with the basics',
@@ -61,7 +61,7 @@ router.get('/tiers', async (req, res) => {
         {
           id: 'professional',
           name: 'Professional',
-          displayName: 'Professional',
+          display_name: 'Professional',
           price: 499,
           maxSKUs: 5000,
           description: 'For established retail businesses',
@@ -83,7 +83,7 @@ router.get('/tiers', async (req, res) => {
         {
           id: 'enterprise',
           name: 'Enterprise',
-          displayName: 'Enterprise',
+          display_name: 'Enterprise',
           price: 999,
           maxSKUs: Infinity,
           description: 'For large single-location operations',
@@ -106,7 +106,7 @@ router.get('/tiers', async (req, res) => {
         {
           id: 'organization',
           name: 'Organization',
-          displayName: 'Organization',
+          display_name: 'Organization',
           price: 999,
           maxSKUs: 10000,
           description: 'For franchise chains & multi-location businesses',
@@ -132,7 +132,7 @@ router.get('/tiers', async (req, res) => {
         {
           id: 'chain_starter',
           name: 'Chain Starter',
-          displayName: 'Chain Starter',
+          display_name: 'Chain Starter',
           price: 199,
           maxLocations: 5,
           maxSKUs: 2500,
@@ -149,7 +149,7 @@ router.get('/tiers', async (req, res) => {
         {
           id: 'chain_professional',
           name: 'Chain Professional',
-          displayName: 'Chain Professional',
+          display_name: 'Chain Professional',
           price: 1999,
           maxLocations: 25,
           maxSKUs: 25000,
@@ -169,7 +169,7 @@ router.get('/tiers', async (req, res) => {
         {
           id: 'chain_enterprise',
           name: 'Chain Enterprise',
-          displayName: 'Chain Enterprise',
+          display_name: 'Chain Enterprise',
           price: 4999,
           maxLocations: Infinity,
           maxSKUs: Infinity,
@@ -217,7 +217,7 @@ router.get('/tenants', async (req, res) => {
     }
 
     if (status) {
-      where.subscriptionStatus = status;
+      where.subscription_status = status;
     }
 
     if (search) {
@@ -233,26 +233,26 @@ router.get('/tenants', async (req, res) => {
         where,
         skip,
         take: limitNum,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
         select: {
           id: true,
           name: true,
-          subscriptionTier: true,
-          subscriptionStatus: true,
-          trialEndsAt: true,
-          subscriptionEndsAt: true,
-          createdAt: true,
+          subscription_tier: true,
+          subscription_status: true,
+          trial_ends_at: true,
+          subscription_ends_at: true,
+          created_at: true,
           organizationId: true,
           organization: {
             select: {
               id: true,
               name: true,
-              subscriptionTier: true,
+              subscription_tier: true,
             },
           },
           _count: {
             select: {
-              items: true,
+              _count: true,
             },
           },
         },
@@ -291,21 +291,21 @@ router.get('/tenants/:tenantId', async (req, res) => {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
-            subscriptionStatus: true,
+            subscription_tier: true,
+            subscription_status: true,
           },
         },
-        featureOverrides: {
+        tenant_feature_overrides: {
           where: {
             OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } },
+              { expires_at: null },
+              { expires_at: { gt: new Date() } },
             ],
           },
         },
         _count: {
           select: {
-            items: true,
+            _count: true,
           },
         },
       },
@@ -327,7 +327,7 @@ router.get('/tenants/:tenantId', async (req, res) => {
  * Update tenant tier and subscription status
  */
 const updateTenantTierSchema = z.object({
-  subscriptionTier: z.enum([
+  subscription_tier: z.enum([
     'google_only',
     'starter',
     'professional',
@@ -337,7 +337,7 @@ const updateTenantTierSchema = z.object({
     'chain_professional',
     'chain_enterprise',
   ]).optional(),
-  subscriptionStatus: z.enum([
+  subscription_status: z.enum([
     'trial',
     'active',
     'past_due',
@@ -345,8 +345,8 @@ const updateTenantTierSchema = z.object({
     'expired',
   ]).optional(),
   reason: z.string().min(1, 'Reason is required for audit trail'),
-  trialEndsAt: z.string().datetime().optional(),
-  subscriptionEndsAt: z.string().datetime().optional(),
+  trial_ends_at: z.string().datetime().optional(),
+  subscription_ends_at: z.string().datetime().optional(),
 });
 
 router.patch('/tenants/:tenantId', async (req, res) => {
@@ -369,13 +369,13 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
         _count: {
           select: {
-            items: true,
+            _count: true,
           },
         },
       },
@@ -399,7 +399,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       };
 
       const newLimit = tierLimits[updateData.subscriptionTier];
-      const currentSKUs = currentTenant._count.items;
+      const currentSKUs = currentTenant._count.inventory_item;
 
       if (newLimit !== Infinity && currentSKUs > newLimit) {
         return res.status(400).json({
@@ -414,7 +414,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     // Convert date strings to Date objects
     const updatePayload: any = {};
     if (updateData.subscriptionTier) updatePayload.subscriptionTier = updateData.subscriptionTier;
-    if (updateData.subscriptionStatus) updatePayload.subscriptionStatus = updateData.subscriptionStatus;
+    if (updateData.subscription_status) updatePayload.subscription_status = updateData.subscription_status;
     if (updateData.trialEndsAt) updatePayload.trialEndsAt = new Date(updateData.trialEndsAt);
     if (updateData.subscriptionEndsAt) updatePayload.subscriptionEndsAt = new Date(updateData.subscriptionEndsAt);
 
@@ -427,23 +427,23 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     // Create audit log
     await audit({
       tenantId,
-      actor: req.user?.userId || 'system',
+      actor: req.user?.user_id || 'system',
       action: 'tier.update',
       payload: {
         reason,
         before: {
-          subscriptionTier: currentTenant.subscriptionTier,
-          subscriptionStatus: currentTenant.subscriptionStatus,
-          trialEndsAt: currentTenant.trialEndsAt,
-          subscriptionEndsAt: currentTenant.subscriptionEndsAt,
+          subscription_tier: currentTenant.subscriptionTier,
+          subscription_status: currentTenant.subscription_status,
+          trial_ends_at: currentTenant.trialEndsAt,
+          subscription_ends_at: currentTenant.subscriptionEndsAt,
         },
         after: {
-          subscriptionTier: updatedTenant.subscriptionTier,
-          subscriptionStatus: updatedTenant.subscriptionStatus,
-          trialEndsAt: updatedTenant.trialEndsAt,
-          subscriptionEndsAt: updatedTenant.subscriptionEndsAt,
+          subscription_tier: updatedTenant.subscriptionTier,
+          subscription_status: updatedTenant.subscription_status,
+          trial_ends_at: updatedTenant.trialEndsAt,
+          subscription_ends_at: updatedTenant.subscriptionEndsAt,
         },
-        adminUserId: req.user?.userId,
+        adminUserId: req.user?.user_id,
         adminEmail: req.user?.email,
       },
     });
@@ -459,12 +459,12 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       tenant: updatedTenant,
       changes: {
         before: {
-          subscriptionTier: currentTenant.subscriptionTier,
-          subscriptionStatus: currentTenant.subscriptionStatus,
+          subscription_tier: currentTenant.subscriptionTier,
+          subscription_status: currentTenant.subscription_status,
         },
         after: {
-          subscriptionTier: updatedTenant.subscriptionTier,
-          subscriptionStatus: updatedTenant.subscriptionStatus,
+          subscription_tier: updatedTenant.subscriptionTier,
+          subscription_status: updatedTenant.subscription_status,
         },
       },
     });
@@ -500,8 +500,8 @@ router.get('/stats', async (req, res) => {
     const [totalTenants, totalOrganizations, totalTrialTenants, totalActiveTenants] = await Promise.all([
       prisma.tenant.count(),
       prisma.organization.count(),
-      prisma.tenant.count({ where: { subscriptionStatus: 'trial' } }),
-      prisma.tenant.count({ where: { subscriptionStatus: 'active' } }),
+      prisma.tenant.count({ where: { subscription_status: 'trial' } }),
+      prisma.tenant.count({ where: { subscription_status: 'active' } }),
     ]);
 
     // Calculate MRR (Monthly Recurring Revenue) estimate
@@ -517,8 +517,8 @@ router.get('/stats', async (req, res) => {
     };
 
     const activeTenants = await prisma.tenant.findMany({
-      where: { subscriptionStatus: 'active' },
-      select: { subscriptionTier: true },
+      where: { subscription_status: 'active' },
+      select: { subscription_tier: true },
     });
 
     const estimatedMRR = activeTenants.reduce((sum, tenant) => {
@@ -537,7 +537,7 @@ router.get('/stats', async (req, res) => {
         count: t._count.id,
       })),
       statusDistribution: statusDistribution.map(s => ({
-        status: s.subscriptionStatus,
+        status: s.subscription_status,
         count: s._count.id,
       })),
     });
@@ -553,7 +553,7 @@ router.get('/stats', async (req, res) => {
  */
 const bulkUpdateSchema = z.object({
   tenantIds: z.array(z.string()).min(1, 'At least one tenant ID required'),
-  subscriptionTier: z.enum([
+  subscription_tier: z.enum([
     'google_only',
     'starter',
     'professional',
@@ -563,7 +563,7 @@ const bulkUpdateSchema = z.object({
     'chain_professional',
     'chain_enterprise',
   ]).optional(),
-  subscriptionStatus: z.enum([
+  subscription_status: z.enum([
     'trial',
     'active',
     'past_due',
@@ -592,8 +592,8 @@ router.post('/bulk-update', async (req, res) => {
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
+        subscription_tier: true,
+        subscription_status: true,
       },
     });
 
@@ -608,7 +608,7 @@ router.post('/bulk-update', async (req, res) => {
     // Update all tenants
     const updatePayload: any = {};
     if (updateData.subscriptionTier) updatePayload.subscriptionTier = updateData.subscriptionTier;
-    if (updateData.subscriptionStatus) updatePayload.subscriptionStatus = updateData.subscriptionStatus;
+    if (updateData.subscription_status) updatePayload.subscription_status = updateData.subscription_status;
 
     await prisma.tenant.updateMany({
       where: { id: { in: tenantIds } },
@@ -618,17 +618,17 @@ router.post('/bulk-update', async (req, res) => {
     // Create audit logs for each tenant
     for (const tenant of tenants) {
       await audit({
-        tenantId: tenant.id,
-        actor: req.user?.userId || 'system',
+        tenant_id: tenant.id,
+        actor: req.user?.user_id || 'system',
         action: 'tier.bulk_update',
         payload: {
           reason,
           before: {
-            subscriptionTier: tenant.subscriptionTier,
-            subscriptionStatus: tenant.subscriptionStatus,
+            subscription_tier: tenant.subscriptionTier,
+            subscription_status: tenant.subscription_status,
           },
           after: updateData,
-          adminUserId: req.user?.userId,
+          adminUserId: req.user?.user_id,
           adminEmail: req.user?.email,
           bulkOperation: true,
         },
@@ -644,7 +644,7 @@ router.post('/bulk-update', async (req, res) => {
     res.json({
       success: true,
       updatedCount: tenants.length,
-      tenants: tenants.map(t => t.id),
+      tenant: tenants.map(t => t.id),
     });
   } catch (error) {
     console.error('[POST /api/admin/tiers/bulk-update] Error:', error);

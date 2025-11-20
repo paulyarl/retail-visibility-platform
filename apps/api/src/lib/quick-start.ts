@@ -141,7 +141,7 @@ const SCENARIOS = {
 export type QuickStartScenario = keyof typeof SCENARIOS;
 
 export interface QuickStartOptions {
-  tenantId: string;
+  tenant_id: string;
   scenario: QuickStartScenario;
   productCount: number;
   assignCategories?: boolean;
@@ -184,7 +184,7 @@ export async function generateQuickStartProducts(
   const scenarioData = SCENARIOS[scenario];
   const timestamp = Date.now();
 
-  // Create categories with live Google taxonomy alignment
+  // Create categories with live Google taxonomy alignment (in-memory only)
   const categories: Array<{ id: string; name: string; slug: string; originalName: string }> = [];
   for (const cat of scenarioData.categories) {
     // Use live Google taxonomy to find best matching category
@@ -198,29 +198,13 @@ export async function generateQuickStartProducts(
     } else {
       console.warn(`[Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
     }
-    
-    const category = await prisma.tenantCategory.upsert({
-      where: {
-        tenantId_slug: {
-          tenantId,
-          slug: cat.slug,
-        },
-      },
-      update: {
-        name: cat.name,
-        googleCategoryId,
-        isActive: true,
-      },
-      create: {
-        tenantId,
-        name: cat.name,
-        slug: cat.slug,
-        googleCategoryId,
-        isActive: true,
-        sortOrder: categories.length,
-      },
+    const categoryId = `${tenantId}_${cat.slug}`;
+    categories.push({
+      id: categoryId,
+      name: cat.name,
+      slug: cat.slug,
+      originalName: cat.name,
     });
-    categories.push({ ...category, originalName: cat.name });
   }
 
   // Generate products (cycle through available products)
@@ -248,54 +232,58 @@ export async function generateQuickStartProducts(
       const stock = availability === 'in_stock' ? Math.floor(Math.random() * 96) + 5 : 0;
 
       // Assign category if enabled
-      let categoryAssignment: { tenantCategoryId?: string; categoryPath?: string[] } = {};
+      let categoryAssignment: { tenant_category_id?: string; category_path?: string[] } = {};
       if (assignCategories && categories.length > 0) {
         const matchingCat = categories.find((c) => c.originalName === product.category);
         const selectedCat = matchingCat || categories[Math.floor(Math.random() * categories.length)];
         categoryAssignment = {
-          tenantCategoryId: selectedCat.id,
-          categoryPath: [selectedCat.slug],
+          tenant_category_id: selectedCat.id,
+          category_path: [selectedCat.slug],
         };
       }
 
-      // Determine item status
-      const itemStatus = createAsDrafts ? 'draft' as const : (Math.random() > 0.25 ? 'active' as const : 'draft' as const);
+      // Determine item status (map "draft" semantics to inactive in new enum)
+      const itemStatus = createAsDrafts
+        ? 'inactive' as const
+        : (Math.random() > 0.25 ? 'active' as const : 'inactive' as const);
 
       return {
-        tenantId,
+        id: `qs_${tenantId}_${timestamp}_${(i + idx).toString().padStart(5, '0')}`,
+        tenant_id: tenantId,
         sku: `SKU-${timestamp}-${(i + idx).toString().padStart(5, '0')}`,
         name: product.name,
         title: product.name,
         brand: product.brand || 'Generic',
-        priceCents: product.price,
+        price_cents: product.price,
         price: product.price / 100,
         currency: 'USD',
         stock,
         availability,
-        itemStatus,
+        item_status: itemStatus,
+        updated_at: new Date(),
         ...categoryAssignment,
       };
     });
 
-    await prisma.inventoryItem.createMany({ data: items });
+    await prisma.inventory_item.createMany({ data: items });
     createdCount += items.length;
   }
 
   // Get final counts
-  const totalProducts = await prisma.inventoryItem.count({
-    where: { tenantId },
+  const totalProducts = await prisma.inventory_item.count({
+    where: { tenant_id: tenantId },
   });
 
-  const activeProducts = await prisma.inventoryItem.count({
-    where: { tenantId, itemStatus: 'active' },
+  const activeProducts = await prisma.inventory_item.count({
+    where: { tenant_id: tenantId, item_status: 'active' },
   });
 
-  const inStockProducts = await prisma.inventoryItem.count({
-    where: { tenantId, availability: 'in_stock' },
+  const inStockProducts = await prisma.inventory_item.count({
+    where: { tenant_id: tenantId, availability: 'in_stock' },
   });
 
-  const categorizedProducts = await prisma.inventoryItem.count({
-    where: { tenantId, tenantCategoryId: { not: null } },
+  const categorizedProducts = await prisma.inventory_item.count({
+    where: { tenant_id: tenantId, category_path: { isEmpty: false } },
   });
 
   return {

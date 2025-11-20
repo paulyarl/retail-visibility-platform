@@ -9,11 +9,11 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
   try {
     const limit = Math.min(parseInt(String(req.query.limit || '50')), 100);
     const offset = parseInt(String(req.query.offset || '0'));
-    const tenantId = req.query.tenantId ? String(req.query.tenantId) : undefined;
+    const tenantId = req.query.tenant_id ? String(req.query.tenant_id) : undefined;
     const strategy = req.query.strategy ? String(req.query.strategy) : undefined;
 
     const where: any = {};
-    if (tenantId) where.tenantId = tenantId;
+    if (tenantId) where.tenant_id = tenantId;
     if (strategy) where.strategy = strategy;
 
     const [logs, total] = await Promise.all([
@@ -24,7 +24,7 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
         skip: offset,
         select: {
           id: true,
-          tenantId: true,
+          tenant_id: true,
           strategy: true,
           dryRun: true,
           created: true,
@@ -35,7 +35,7 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
           error: true,
           jobId: true,
           startedAt: true,
-          completedAt: true,
+          completed_at: true,
         },
       }),
       (prisma as any).categoryMirrorRun.count({ where }),
@@ -69,18 +69,18 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
       },
       select: {
         id: true,
-        tenantId: true,
+        tenant_id: true,
         error: true,
         skipped: true,
         created: true,
         updated: true,
         deleted: true,
-        completedAt: true,
+        completed_at: true,
       },
     });
 
     const totalRuns = recentRuns.length;
-    const successfulRuns = recentRuns.filter((r: any) => !r.error && r.completedAt).length;
+    const successfulRuns = recentRuns.filter((r: any) => !r.error && r.completed_at).length;
     const failedRuns = recentRuns.filter((r: any) => r.error).length;
     const outOfSyncCount = recentRuns.filter(
       (r: any) => !r.skipped && (r.created > 0 || r.updated > 0 || r.deleted > 0)
@@ -98,7 +98,7 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
       take: 5,
       select: {
         id: true,
-        tenantId: true,
+        tenant_id: true,
         error: true,
         startedAt: true,
       },

@@ -82,10 +82,10 @@ router.get('/google/business/callback', async (req, res) => {
     }
 
     // Parse state to get tenantId
-    let tenantId: string;
+    let tenant_id: string;
     try {
       const stateData = JSON.parse(state as string);
-      tenantId = stateData.tenantId;
+      tenantId = stateData.tenant_id;
     } catch {
       return res.status(400).json({
         success: false,

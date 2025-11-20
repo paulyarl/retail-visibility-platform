@@ -32,8 +32,8 @@ export async function checkImageSearchLimit(
   next: NextFunction
 ) {
   try {
-    const userId = (req as any).user?.userId;
-    const tenantId = req.query.tenantId as string;
+    const userId = (req as any).user?.user_id;
+    const tenantId = req.query.tenant_id as string;
 
     if (!userId) {
       return res.status(401).json({
@@ -47,7 +47,7 @@ export async function checkImageSearchLimit(
     if (tenantId) {
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: { subscriptionTier: true },
+        select: { subscription_tier: true },
       });
       tier = tenant?.subscriptionTier || 'starter';
     }

@@ -228,7 +228,7 @@ export function getTierPricing(tier: string): number {
  * Now uses TierService for database-driven tier lookups
  */
 export async function checkTierAccessWithOverrides(
-  tenantId: string,
+  tenant_id: string,
   feature: string
 ): Promise<{ hasAccess: boolean; source: 'tier' | 'override' | 'none'; override?: any }> {
   // Use TierService which already handles overrides
@@ -251,7 +251,7 @@ export function requireTierFeature(feature: string) {
       }
       
       // Get tenant ID from params, body, or query
-      const tenantId = req.params.tenantId || req.body.tenantId || req.query.tenantId;
+      const tenantId = req.params.tenant_id || req.body.tenant_id || req.query.tenant_id;
       
       if (!tenantId) {
         return res.status(400).json({
@@ -265,8 +265,8 @@ export function requireTierFeature(feature: string) {
         where: { id: String(tenantId || '') },
         select: { 
           id: true,
-          subscriptionTier: true,
-          subscriptionStatus: true,
+          subscription_tier: true,
+          subscription_status: true,
         },
       });
       
@@ -278,11 +278,11 @@ export function requireTierFeature(feature: string) {
       }
       
       // Check subscription status
-      if (tenant.subscriptionStatus === 'canceled' || tenant.subscriptionStatus === 'expired') {
+      if (tenant.subscription_status === 'canceled' || tenant.subscription_status === 'expired') {
         return res.status(403).json({
           error: 'subscription_inactive',
           message: 'Your subscription is inactive. Please renew to access features.',
-          subscriptionStatus: tenant.subscriptionStatus,
+          subscription_status: tenant.subscription_status,
         });
       }
       
@@ -351,7 +351,7 @@ export function requireAnyTierFeature(features: string[]) {
         return next();
       }
       
-      const tenantId = req.params.tenantId || req.body.tenantId || req.query.tenantId;
+      const tenantId = req.params.tenant_id || req.body.tenant_id || req.query.tenant_id;
       
       if (!tenantId) {
         return res.status(400).json({
@@ -362,14 +362,14 @@ export function requireAnyTierFeature(features: string[]) {
       
       const tenant = await prisma.tenant.findUnique({
         where: { id: String(tenantId || '') },
-        select: { subscriptionTier: true, subscriptionStatus: true },
+        select: { subscription_tier: true, subscription_status: true },
       });
       
       if (!tenant) {
         return res.status(404).json({ error: 'tenant_not_found' });
       }
       
-      if (tenant.subscriptionStatus === 'canceled' || tenant.subscriptionStatus === 'expired') {
+      if (tenant.subscription_status === 'canceled' || tenant.subscription_status === 'expired') {
         return res.status(403).json({
           error: 'subscription_inactive',
           message: 'Your subscription is inactive',
@@ -400,7 +400,7 @@ export function requireAnyTierFeature(features: string[]) {
 
 export async function requireWritableSubscription(req: Request, res: Response, next: NextFunction) {
   try {
-    const tenantId = (req.params.tenantId || req.params.id || req.body.tenantId || req.query.tenantId) as string | undefined;
+    const tenantId = (req.params.tenant_id || req.params.id || req.body.tenant_id || req.query.tenant_id) as string | undefined;
 
     if (!tenantId) {
       return res.status(400).json({
@@ -412,9 +412,9 @@ export async function requireWritableSubscription(req: Request, res: Response, n
     const tenant = await prisma.tenant.findUnique({
       where: { id: String(tenantId) },
       select: {
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        trialEndsAt: true,
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
       },
     });
 
@@ -426,11 +426,11 @@ export async function requireWritableSubscription(req: Request, res: Response, n
     }
 
     const tier = tenant.subscriptionTier || 'starter';
-    const status = tenant.subscriptionStatus || 'active';
+    const status = tenant.subscription_status || 'active';
     const maintenanceState = getMaintenanceState({
       tier,
       status,
-      trialEndsAt: tenant.trialEndsAt ?? undefined,
+      trial_ends_at: tenant.trialEndsAt ?? undefined,
     });
 
     // Freeze: read-only visibility mode (canceled/expired or google_only outside maintenance window)
@@ -438,8 +438,8 @@ export async function requireWritableSubscription(req: Request, res: Response, n
       return res.status(403).json({
         error: 'subscription_read_only',
         message: 'Your account is in read-only visibility mode. Upgrade to add or update products or sync new changes.',
-        subscriptionTier: tier,
-        subscriptionStatus: status,
+        subscription_tier: tier,
+        subscription_status: status,
         maintenanceState,
         upgradeUrl: '/settings/subscription',
       });

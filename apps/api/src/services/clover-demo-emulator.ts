@@ -5,7 +5,7 @@
  * Provides realistic sample data for testing and evaluation.
  */
 
-import { AvailabilityStatus, ProductSource } from '@prisma/client';
+import { availability_status, product_source } from '@prisma/client';
 
 export interface DemoItem {
   id: string;
@@ -274,7 +274,7 @@ export function getDemoItem(id: string): DemoItem | undefined {
 /**
  * Simulate inventory update (for future webhook simulation)
  */
-export function simulateInventoryUpdate(itemId: string, newStock: number): DemoItem | null {
+export function simulateInventoryUpdate(item_id: string, newStock: number): DemoItem | null {
   const item = DEMO_ITEMS.find(i => i.id === itemId);
   if (!item) return null;
   
@@ -310,11 +310,11 @@ export function convertDemoItemToRVPFormat(demoItem: DemoItem) {
     brand: 'Demo Brand', // Required field
     description: demoItem.description || '',
     price: demoItem.price / 100, // Convert cents to dollars for price field
-    priceCents: demoItem.price,
+    price_cents: demoItem.price,
     currency: 'USD',
     stock: demoItem.stock,
-    availability: demoItem.stock > 0 ? AvailabilityStatus.in_stock : AvailabilityStatus.out_of_stock,
-    source: ProductSource.CLOVER_DEMO,
+    availability: demoItem.stock > 0 ? availability_status.in_stock : availability_status.out_of_stock,
+    source: product_source.CLOVER_DEMO,
     metadata: {
       cloverItemId: demoItem.id,
       cloverCategory: demoItem.category,

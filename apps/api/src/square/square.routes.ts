@@ -34,11 +34,11 @@ const router = Router();
 // Validation schemas
 const exchangeTokenSchema = z.object({
   code: z.string().min(1, 'Authorization code is required'),
-  tenantId: z.string().uuid('Invalid tenant ID'),
+  tenant_id: z.string().uuid('Invalid tenant ID'),
 });
 
 const disconnectSchema = z.object({
-  tenantId: z.string().uuid('Invalid tenant ID'),
+  tenant_id: z.string().uuid('Invalid tenant ID'),
 });
 
 const syncSchema = z.object({
@@ -74,7 +74,7 @@ router.post('/oauth/exchange', authenticateToken, async (req: Request, res: Resp
         merchantId: integration.merchantId,
         enabled: integration.enabled,
         mode: integration.mode,
-        createdAt: integration.createdAt,
+        created_at: integration.created_at,
       },
     });
   } catch (error) {
@@ -137,8 +137,8 @@ router.get('/integrations/:tenantId', authenticateToken, async (req: Request, re
         mode: integration.mode,
         lastSyncAt: integration.lastSyncAt,
         lastError: integration.lastError,
-        createdAt: integration.createdAt,
-        updatedAt: integration.updatedAt,
+        created_at: integration.created_at,
+        updated_at: integration.updatedAt,
       },
     });
   } catch (error) {
@@ -441,7 +441,7 @@ router.get('/integrations/:tenantId/sync/status', authenticateToken, async (req:
         direction: log.direction,
         status: log.status,
         itemsAffected: log.itemsAffected,
-        createdAt: log.createdAt,
+        created_at: log.created_at,
       })),
     });
   } catch (error: any) {

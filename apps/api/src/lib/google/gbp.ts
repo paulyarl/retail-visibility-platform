@@ -16,8 +16,8 @@ const GBP_INSIGHTS_API = 'https://mybusinessaccountmanagement.googleapis.com/v1'
  */
 async function getValidAccessToken(accountId: string): Promise<string | null> {
   try {
-    const tokenRecord = await prisma.googleOAuthToken.findUnique({
-      where: { accountId },
+    const tokenRecord = await prisma.google_oauth_tokens.findUnique({
+      where: { account_id: accountId },
     });
 
     if (!tokenRecord) {
@@ -27,10 +27,10 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
 
     // Check if token is expired
     const now = new Date();
-    if (tokenRecord.expiresAt <= now) {
+    if (tokenRecord.expires_at <= now) {
       console.log('[GBP] Token expired, refreshing...');
       
-      const refreshToken = decryptToken(tokenRecord.refreshTokenEncrypted);
+      const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
       const newTokens = await refreshAccessToken(refreshToken);
       
       if (!newTokens) {
@@ -39,19 +39,20 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
       }
 
       const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-      await prisma.googleOAuthToken.update({
-        where: { accountId },
+      await prisma.google_oauth_tokens.update({
+        where: { account_id: accountId },
         data: {
-          accessTokenEncrypted: encryptToken(newTokens.access_token),
-          expiresAt: newExpiresAt,
+          access_token_encrypted: encryptToken(newTokens.access_token),
+          expires_at: newExpiresAt,
           scopes: newTokens.scope.split(' '),
+          updated_at: new Date(),
         },
       });
 
       return newTokens.access_token;
     }
 
-    return decryptToken(tokenRecord.accessTokenEncrypted);
+    return decryptToken(tokenRecord.access_token_encrypted);
   } catch (error) {
     console.error('[GBP] Error getting valid token:', error);
     return null;
@@ -174,36 +175,39 @@ export async function syncLocation(
     const address = locationData.storefrontAddress;
     const phone = locationData.phoneNumbers?.primaryPhone;
 
-    await prisma.gbpLocation.upsert({
+    await prisma.gbp_locations.upsert({
       where: {
-        accountId_locationId: {
-          accountId,
-          locationId,
+        account_id_location_id: {
+          account_id: accountId,
+          location_id: locationId,
         },
       },
       create: {
-        accountId,
-        locationId,
-        locationName: locationData.title,
-        storeCode: locationData.storeCode,
+        id: `gbp_loc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        account_id: accountId,
+        location_id: locationId,
+        location_name: locationData.title,
+        store_code: locationData.storeCode,
         address: address ? formatAddress(address) : null,
-        phoneNumber: phone,
-        websiteUrl: locationData.websiteUri,
+        phone_number: phone,
+        website_url: locationData.websiteUri,
         category: locationData.categories?.primaryCategory?.displayName,
-        isVerified: locationData.metadata?.hasVoiceOfMerchant || false,
-        isPublished: !locationData.metadata?.duplicate,
-        lastFetchedAt: new Date(),
+        is_verified: locationData.metadata?.hasVoiceOfMerchant || false,
+        is_published: !locationData.metadata?.duplicate,
+        last_fetched_at: new Date(),
+        updated_at: new Date(),
       },
       update: {
-        locationName: locationData.title,
-        storeCode: locationData.storeCode,
+        location_name: locationData.title,
+        store_code: locationData.storeCode,
         address: address ? formatAddress(address) : null,
-        phoneNumber: phone,
-        websiteUrl: locationData.websiteUri,
+        phone_number: phone,
+        website_url: locationData.websiteUri,
         category: locationData.categories?.primaryCategory?.displayName,
-        isVerified: locationData.metadata?.hasVoiceOfMerchant || false,
-        isPublished: !locationData.metadata?.duplicate,
-        lastFetchedAt: new Date(),
+        is_verified: locationData.metadata?.hasVoiceOfMerchant || false,
+        is_published: !locationData.metadata?.duplicate,
+        last_fetched_at: new Date(),
+        updated_at: new Date(),
       },
     });
 
@@ -308,19 +312,33 @@ export async function storeInsights(
   }
 ): Promise<boolean> {
   try {
-    await prisma.gbpInsightDaily.upsert({
+    await prisma.gbp_insights_daily.upsert({
       where: {
-        locationId_date: {
-          locationId,
+        location_id_date: {
+          location_id: locationId,
           date,
         },
       },
       create: {
-        locationId,
+        id: `gbp_ins_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        location_id: locationId,
         date,
-        ...insights,
+        views_search: insights.viewsSearch,
+        views_maps: insights.viewsMaps,
+        actions_website: insights.actionsWebsite,
+        actions_phone: insights.actionsPhone,
+        actions_directions: insights.actionsDirections,
+        photos_count: insights.photosCount,
+        created_at: new Date(),
       },
-      update: insights,
+      update: {
+        views_search: insights.viewsSearch,
+        views_maps: insights.viewsMaps,
+        actions_website: insights.actionsWebsite,
+        actions_phone: insights.actionsPhone,
+        actions_directions: insights.actionsDirections,
+        photos_count: insights.photosCount,
+      },
     });
 
     return true;
@@ -341,9 +359,9 @@ export async function getAggregatedInsights(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const insights = await prisma.gbpInsightDaily.findMany({
+    const insights = await prisma.gbp_insights_daily.findMany({
       where: {
-        locationId,
+        location_id: locationId,
         date: {
           gte: startDate,
         },
@@ -356,12 +374,12 @@ export async function getAggregatedInsights(
     // Calculate totals
     const totals = insights.reduce(
       (acc, day) => ({
-        viewsSearch: acc.viewsSearch + day.viewsSearch,
-        viewsMaps: acc.viewsMaps + day.viewsMaps,
-        actionsWebsite: acc.actionsWebsite + day.actionsWebsite,
-        actionsPhone: acc.actionsPhone + day.actionsPhone,
-        actionsDirections: acc.actionsDirections + day.actionsDirections,
-        photosCount: acc.photosCount + day.photosCount,
+        viewsSearch: acc.viewsSearch + day.views_search,
+        viewsMaps: acc.viewsMaps + day.views_maps,
+        actionsWebsite: acc.actionsWebsite + day.actions_website,
+        actionsPhone: acc.actionsPhone + day.actions_phone,
+        actionsDirections: acc.actionsDirections + day.actions_directions,
+        photosCount: acc.photosCount + day.photos_count,
       }),
       {
         viewsSearch: 0,

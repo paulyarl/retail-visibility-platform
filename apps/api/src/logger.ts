@@ -12,7 +12,7 @@ export function logWithContext(req: Request, level: "info" | "warn" | "error", m
     timestamp: new Date().toISOString(),
     level,
     message,
-    tenant_id: ctx?.tenantId || null,
+    tenant_id: ctx?.tenant_id || null,
     region: ctx?.region || "us-east-1",
     method: req.method,
     path: req.path,

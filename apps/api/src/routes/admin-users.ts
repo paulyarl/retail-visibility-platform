@@ -10,7 +10,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../prisma';
 import { audit } from '../audit';
-import { UserRole } from '@prisma/client';
+import { user_role } from '@prisma/client';
 import { requirePlatformAdmin, requirePlatformUser } from '../middleware/auth';
 
 const router = Router();
@@ -53,7 +53,7 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
       // This prevents exposure of all user emails to tenant owners
       const ownerTenants = await prisma.user_tenants.findMany({
         where: {
-          user_id: requestingUser.userId,
+          user_id: requestingUser.user_id,
           role: 'OWNER',
         },
         select: {
@@ -112,17 +112,17 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
       firstName: user.first_name,
       lastName: user.last_name,
       lastLoginAt: user.last_login,
-      createdAt: user.created_at,
-      tenants: user.user_tenants?.length || 0,
+      created_at: user.created_at,
+      tenant: user.user_tenants?.length || 0,
       tenantRoles: user.user_tenants?.map((ut: any) => ({
-        tenantId: ut.tenant_id,
+        tenant_id: ut.tenant_id,
         role: ut.role,
       })) || [],
     }));
 
-    res.json({ success: true, users: formattedUsers });
+    res.json({ success: true, user_tenants: formattedUsers });
   } catch (error: any) {
-    console.error('[Admin Users] Error listing users:', error);
+    console.error('[Admin Users] Error listing user_tenants:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to list users',
@@ -156,7 +156,7 @@ router.post('/users', requirePlatformAdmin, async (req: Request, res: Response) 
     const { email, password, name, role } = parsed.data;
 
     // Check if user already exists
-    const existing = await prisma.user.findUnique({
+    const existing = await prisma.users.findUnique({
       where: { email },
     });
 
@@ -176,40 +176,49 @@ router.post('/users', requirePlatformAdmin, async (req: Request, res: Response) 
     const firstName = nameParts[0] || null;
     const lastName = nameParts.slice(1).join(' ') || null;
 
-    // Create user
-    const user = await prisma.user.create({
+    // Create user (snake_case Prisma fields)
+    const user = await prisma.users.create({
       data: {
+        id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         email,
-        passwordHash: hashedPassword,
-        firstName,
-        lastName,
-        role: role as UserRole,
+        password_hash: hashedPassword,
+        first_name: firstName,
+        last_name: lastName,
+        role: role as user_role,
+        updated_at: new Date(),
       },
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
+        first_name: true,
+        last_name: true,
         role: true,
-        createdAt: true,
+        created_at: true,
       },
     });
 
     // Audit
     await audit({
-      tenantId: 'platform',
-      actor: (req as any).user?.userId || 'system',
+      tenant_id: 'platform',
+      actor: (req as any).user?.user_id || 'system',
       action: 'admin.user.create',
-      payload: { userId: user.id, email: user.email, role: user.role },
+      payload: { user_id: user.id, email: user.email, role: user.role },
     });
 
     res.status(201).json({
       success: true,
-      user,
+      users: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        role: user.role,
+        created_at: user.created_at,
+      },
       message: 'User created successfully',
     });
   } catch (error: any) {
-    console.error('[Admin Users] Error creating user:', error);
+    console.error('[Admin Users] Error creating users:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create user',
@@ -242,7 +251,7 @@ router.put('/users/:userId/password', requirePlatformAdmin, async (req: Request,
     const { password } = parsed.data;
 
     // Check if user exists
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: userId },
       select: { id: true, email: true },
     });
@@ -258,15 +267,15 @@ router.put('/users/:userId/password', requirePlatformAdmin, async (req: Request,
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Update password
-    await prisma.user.update({
+    await prisma.users.update({
       where: { id: userId },
-      data: { passwordHash: hashedPassword },
+      data: { password_hash: hashedPassword, updated_at: new Date() },
     });
 
     // Audit
     await audit({
-      tenantId: 'platform',
-      actor: (req as any).user?.userId || 'system',
+      tenant_id: 'platform',
+      actor: (req as any).user?.user_id || 'system',
       action: 'admin.user.password_reset',
       payload: { userId, email: user.email },
     });
@@ -294,7 +303,7 @@ router.delete('/users/:userId', requirePlatformAdmin, async (req: Request, res: 
     const { userId } = req.params;
 
     // Check if user exists
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: userId },
       select: { id: true, email: true, role: true },
     });
@@ -307,7 +316,7 @@ router.delete('/users/:userId', requirePlatformAdmin, async (req: Request, res: 
     }
 
     // Prevent deleting yourself
-    if (userId === (req as any).user?.userId) {
+    if (userId === (req as any).user?.user_id) {
       return res.status(400).json({
         success: false,
         error: 'Cannot delete your own account',
@@ -315,14 +324,14 @@ router.delete('/users/:userId', requirePlatformAdmin, async (req: Request, res: 
     }
 
     // Delete user
-    await prisma.user.delete({
+    await prisma.users.delete({
       where: { id: userId },
     });
 
     // Audit
     await audit({
-      tenantId: 'platform',
-      actor: (req as any).user?.userId || 'system',
+      tenant_id: 'platform',
+      actor: (req as any).user?.user_id || 'system',
       action: 'admin.user.delete',
       payload: { userId, email: user.email, role: user.role },
     });
@@ -332,7 +341,7 @@ router.delete('/users/:userId', requirePlatformAdmin, async (req: Request, res: 
       message: 'User deleted successfully',
     });
   } catch (error: any) {
-    console.error('[Admin Users] Error deleting user:', error);
+    console.error('[Admin Users] Error deleting users:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete user',
@@ -358,7 +367,7 @@ router.get('/tenants', requirePlatformUser, async (req: Request, res: Response) 
         select: {
           id: true,
           name: true,
-          createdAt: true,
+          created_at: true,
         },
         orderBy: {
           name: 'asc',
@@ -368,9 +377,9 @@ router.get('/tenants', requirePlatformUser, async (req: Request, res: Response) 
       // Tenant owners see only their owned tenants
       tenants = await prisma.tenant.findMany({
         where: {
-          users: {
+          user_tenants: {
             some: {
-              userId: requestingUser.userId,
+              user_id: requestingUser.user_id,
               role: 'OWNER',
             },
           },
@@ -378,7 +387,7 @@ router.get('/tenants', requirePlatformUser, async (req: Request, res: Response) 
         select: {
           id: true,
           name: true,
-          createdAt: true,
+          created_at: true,
         },
         orderBy: {
           name: 'asc',
@@ -397,7 +406,7 @@ router.get('/tenants', requirePlatformUser, async (req: Request, res: Response) 
       tenants,
     });
   } catch (error: any) {
-    console.error('[Admin Users] Error listing tenants:', error);
+    console.error('[Admin Users] Error listing tenant:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to list tenants',
@@ -427,10 +436,10 @@ router.post('/users/create', requirePlatformUser, async (req: Request, res: Resp
     if (requestingUser.role !== 'PLATFORM_ADMIN' && requestingUser.role !== 'ADMIN') {
       // For tenant owners, verify they own the target tenant
       if (requestingUser.role === 'OWNER') {
-        const ownershipCheck = await prisma.userTenant.findFirst({
+        const ownershipCheck = await prisma.user_tenants.findFirst({
           where: {
-            userId: requestingUser.userId,
-            tenantId: tenantId,
+            user_id: requestingUser.user_id,
+            tenant_id: tenantId,
             role: 'OWNER',
           },
         });
@@ -450,7 +459,7 @@ router.post('/users/create', requirePlatformUser, async (req: Request, res: Resp
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { email: email.toLowerCase() },
     });
 
@@ -488,8 +497,8 @@ router.post('/users/create', requirePlatformUser, async (req: Request, res: Resp
       // Automatically assign to the tenant
       await tx.userTenant.create({
         data: {
-          userId: newUser.id,
-          tenantId: tenantId,
+          user_id: newUser.id,
+          tenant_id: tenantId,
           role: role,
         },
       });
@@ -500,8 +509,8 @@ router.post('/users/create', requirePlatformUser, async (req: Request, res: Resp
     // Audit log
     await audit({
       action: 'USER_CREATED_AND_ASSIGNED',
-      actor: requestingUser.userId,
-      tenantId: tenantId,
+      actor: requestingUser.user_id,
+      tenant_id: tenantId,
       payload: {
         createdUserId: result.id,
         createdUserEmail: result.email,
@@ -513,7 +522,7 @@ router.post('/users/create', requirePlatformUser, async (req: Request, res: Resp
     res.status(201).json({
       success: true,
       message: `Successfully created user ${result.email} and assigned to tenant with role ${role}`,
-      user: {
+      users: {
         id: result.id,
         email: result.email,
         name: result.firstName && result.lastName ? `${result.firstName} ${result.lastName}` : result.firstName || result.lastName || result.email,
@@ -521,7 +530,7 @@ router.post('/users/create', requirePlatformUser, async (req: Request, res: Resp
       },
     });
   } catch (error: any) {
-    console.error('[Admin Users] Error creating user:', error);
+    console.error('[Admin Users] Error creating users:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create user',
@@ -552,10 +561,10 @@ router.post('/users/invite-by-email', requirePlatformUser, async (req: Request, 
     if (requestingUser.role !== 'PLATFORM_ADMIN' && requestingUser.role !== 'ADMIN') {
       // For tenant owners, verify they own the target tenant
       if (requestingUser.role === 'OWNER') {
-        const ownershipCheck = await prisma.userTenant.findFirst({
+        const ownershipCheck = await prisma.user_tenants.findFirst({
           where: {
-            userId: requestingUser.userId,
-            tenantId: tenantId,
+            user_id: requestingUser.user_id,
+            tenant_id: tenantId,
             role: 'OWNER',
           },
         });
@@ -575,7 +584,7 @@ router.post('/users/invite-by-email', requirePlatformUser, async (req: Request, 
     }
 
     // Check if user exists (but don't expose this information)
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email: email.toLowerCase() },
       select: { id: true, email: true, firstName: true, lastName: true },
     });
@@ -590,11 +599,11 @@ router.post('/users/invite-by-email', requirePlatformUser, async (req: Request, 
     }
 
     // Check if user is already assigned to this tenant
-    const existingAssignment = await prisma.userTenant.findUnique({
+    const existingAssignment = await prisma.user_tenants.findUnique({
       where: {
-        userId_tenantId: {
-          userId: user.id,
-          tenantId: tenantId,
+        user_id_tenant_id: {
+          user_id: user.id,
+          tenant_id: tenantId,
         },
       },
     });
@@ -608,10 +617,10 @@ router.post('/users/invite-by-email', requirePlatformUser, async (req: Request, 
     }
 
     // Create the assignment
-    await prisma.userTenant.create({
+    await prisma.user_tenants.create({
       data: {
-        userId: user.id,
-        tenantId: tenantId,
+        user_id: user.id,
+        tenant_id: tenantId,
         role: role,
       },
     });
@@ -619,8 +628,8 @@ router.post('/users/invite-by-email', requirePlatformUser, async (req: Request, 
     // Audit log
     await audit({
       action: 'USER_TENANT_ASSIGNED',
-      actor: requestingUser.userId,
-      tenantId: tenantId,
+      actor: requestingUser.user_id,
+      tenant_id: tenantId,
       payload: {
         assignedUserId: user.id,
         assignedUserEmail: user.email,
@@ -632,7 +641,7 @@ router.post('/users/invite-by-email', requirePlatformUser, async (req: Request, 
     res.json({
       success: true,
       message: `Successfully assigned ${user.email} to tenant with role ${role}`,
-      user: {
+      users: {
         id: user.id,
         email: user.email,
         name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || user.lastName || user.email,
@@ -668,10 +677,10 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
     // Check if requesting user can invite to this tenant
     if (requestingUser.role !== 'PLATFORM_ADMIN' && requestingUser.role !== 'ADMIN') {
       if (requestingUser.role === 'OWNER') {
-        const ownershipCheck = await prisma.userTenant.findFirst({
+        const ownershipCheck = await prisma.user_tenants.findFirst({
           where: {
-            userId: requestingUser.userId,
-            tenantId: tenantId,
+            user_id: requestingUser.user_id,
+            tenant_id: tenantId,
             role: 'OWNER',
           },
         });
@@ -691,16 +700,16 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
     }
 
     // Check if user already exists and is assigned to this tenant
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { email: email.toLowerCase() },
     });
 
     if (existingUser) {
-      const existingAssignment = await prisma.userTenant.findUnique({
+      const existingAssignment = await prisma.user_tenants.findUnique({
         where: {
-          userId_tenantId: {
-            userId: existingUser.id,
-            tenantId: tenantId,
+          user_id_tenant_id: {
+            user_id: existingUser.id,
+            tenant_id: tenantId,
           },
         },
       });
@@ -715,12 +724,12 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
     }
 
     // Check if there's already a pending invitation
-    const existingInvitation = await prisma.invitation.findFirst({
+    const existingInvitation = await prisma.invitations.findFirst({
       where: {
         email: email.toLowerCase(),
-        tenantId: tenantId,
-        acceptedAt: null,
-        expiresAt: {
+        tenant_id: tenantId,
+        accepted_at: null,
+        expires_at: {
           gt: new Date(),
         },
       },
@@ -742,13 +751,13 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    const invitation = await prisma.invitation.create({
+    const invitation = await prisma.invitations.create({
       data: {
         email: email.toLowerCase(),
         token,
         tenantId,
         role,
-        invitedBy: requestingUser.userId,
+        invited_by: requestingUser.user_id,
         expiresAt,
       },
       include: {
@@ -758,7 +767,7 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
             name: true,
           },
         },
-        inviter: {
+        users: {
           select: {
             id: true,
             firstName: true,
@@ -777,13 +786,13 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
       
       const emailResult = await emailService.sendInvitationEmail({
         inviteeEmail: email,
-        inviterName: invitation.inviter.firstName && invitation.inviter.lastName 
-          ? `${invitation.inviter.firstName} ${invitation.inviter.lastName}`
-          : invitation.inviter.email,
+        inviterName: invitation.users.firstName && invitation.users.lastName 
+          ? `${invitation.users.firstName} ${invitation.users.lastName}`
+          : invitation.users.email,
         tenantName: invitation.tenant.name,
         role: role,
         acceptUrl: acceptUrl,
-        expiresAt: expiresAt,
+        expires_at: expiresAt,
       });
 
       if (!emailResult.success) {
@@ -799,14 +808,14 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
     // Audit log
     await audit({
       action: 'INVITATION_SENT',
-      actor: requestingUser.userId,
-      tenantId: tenantId,
+      actor: requestingUser.user_id,
+      tenant_id: tenantId,
       payload: {
         invitationId: invitation.id,
         invitedEmail: email,
         role: role,
         token: token, // Note: In production, don't log the actual token
-        expiresAt: expiresAt,
+        expires_at: expiresAt,
         message: message,
       },
     });
@@ -814,23 +823,23 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
     res.status(201).json({
       success: true,
       message: `Invitation sent to ${email}`,
-      invitation: {
+      invitations: {
         id: invitation.id,
         email: invitation.email,
         role: invitation.role,
-        expiresAt: invitation.expiresAt,
+        expires_at: invitation.expiresAt,
         tenant: invitation.tenant,
-        inviter: {
-          name: invitation.inviter.firstName && invitation.inviter.lastName 
-            ? `${invitation.inviter.firstName} ${invitation.inviter.lastName}`
-            : invitation.inviter.email,
+        users: {
+          name: invitation.users.firstName && invitation.users.lastName 
+            ? `${invitation.users.firstName} ${invitation.users.lastName}`
+            : invitation.users.email,
         },
         // Include acceptance URL for development/testing
         acceptUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=${token}`,
       },
     });
   } catch (error: any) {
-    console.error('[Admin Users] Error sending invitation:', error);
+    console.error('[Admin Users] Error sending invitations:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send invitation',
@@ -854,19 +863,19 @@ router.get('/invitations', requirePlatformUser, async (req: Request, res: Respon
       whereClause = {};
     } else if (requestingUser.role === 'OWNER') {
       // Tenant owners see invitations for their owned tenants
-      const ownerTenants = await prisma.userTenant.findMany({
+      const ownerTenants = await prisma.user_tenants.findMany({
         where: {
-          userId: requestingUser.userId,
+          user_id: requestingUser.user_id,
           role: 'OWNER',
         },
         select: {
-          tenantId: true,
+          tenant_id: true,
         },
       });
 
-      const tenantIds = ownerTenants.map(ut => ut.tenantId);
+      const tenantIds = ownerTenants.map(ut => ut.tenant_id);
       whereClause = {
-        tenantId: {
+        tenant_id: {
           in: tenantIds,
         },
       };
@@ -877,7 +886,7 @@ router.get('/invitations', requirePlatformUser, async (req: Request, res: Respon
       });
     }
 
-    const invitations = await prisma.invitation.findMany({
+    const invitations = await prisma.invitations.findMany({
       where: whereClause,
       include: {
         tenant: {
@@ -886,7 +895,7 @@ router.get('/invitations', requirePlatformUser, async (req: Request, res: Respon
             name: true,
           },
         },
-        inviter: {
+        users: {
           select: {
             id: true,
             firstName: true,
@@ -896,7 +905,7 @@ router.get('/invitations', requirePlatformUser, async (req: Request, res: Respon
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        created_at: 'desc',
       },
     });
 
@@ -906,14 +915,14 @@ router.get('/invitations', requirePlatformUser, async (req: Request, res: Respon
       role: inv.role,
       status: inv.acceptedAt ? 'accepted' : (inv.expiresAt < new Date() ? 'expired' : 'pending'),
       tenant: inv.tenant,
-      inviter: {
-        name: inv.inviter.firstName && inv.inviter.lastName 
-          ? `${inv.inviter.firstName} ${inv.inviter.lastName}`
-          : inv.inviter.email,
+      users: {
+        name: inv.users.firstName && inv.users.lastName 
+          ? `${inv.users.firstName} ${inv.users.lastName}`
+          : inv.users.email,
       },
-      createdAt: inv.createdAt,
-      expiresAt: inv.expiresAt,
-      acceptedAt: inv.acceptedAt,
+      created_at: inv.created_at,
+      expires_at: inv.expiresAt,
+      accepted_at: inv.acceptedAt,
     }));
 
     res.json({
@@ -955,7 +964,7 @@ router.get('/invitations/:token', async (req: Request, res: Response) => {
             name: true,
           },
         },
-        users: {
+        user_tenants: {
           select: {
             id: true,
             first_name: true,
@@ -990,28 +999,28 @@ router.get('/invitations/:token', async (req: Request, res: Response) => {
         success: false,
         error: 'invitation_already_accepted',
         message: 'This invitation has already been accepted',
-        acceptedAt: invitation.accepted_at,
+        accepted_at: invitation.accepted_at,
       });
     }
 
     res.json({
       success: true,
-      invitation: {
+      invitations: {
         id: invitation.id,
         email: invitation.email,
         role: invitation.role,
         tenant: invitation.tenant,
-        inviter: {
+        users: {
           name: invitation.users.first_name && invitation.users.last_name 
             ? `${invitation.users.first_name} ${invitation.users.last_name}`
             : invitation.users.email,
         },
-        expiresAt: invitation.expires_at,
-        createdAt: invitation.created_at,
+        expires_at: invitation.expires_at,
+        created_at: invitation.created_at,
       },
     });
   } catch (error: any) {
-    console.error('[Admin Users] Error getting invitation:', error);
+    console.error('[Admin Users] Error getting invitations:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get invitation',
@@ -1110,7 +1119,7 @@ router.post('/invitations/:token/accept', async (req: Request, res: Response) =>
     }
 
     // Check if user is already assigned to this tenant
-    const existingAssignment = await prisma.userTenant.findUnique({
+    const existingAssignment = await prisma.user_tenants.findUnique({
       where: {
         user_id_tenant_id: {
           user_id: user.id,
@@ -1156,20 +1165,20 @@ router.post('/invitations/:token/accept', async (req: Request, res: Response) =>
     await audit({
       action: 'INVITATION_ACCEPTED',
       actor: user.id,
-      tenantId: invitation.tenant_id,
+      tenant_id: invitation.tenant_id,
       payload: {
         invitationId: invitation.id,
         userEmail: user.email,
         role: invitation.role,
         userCreated: userCreated,
-        invitedBy: invitation.invited_by,
+        invited_by: invitation.invited_by,
       },
     });
 
     res.json({
       success: true,
       message: `Successfully ${userCreated ? 'created account and ' : ''}joined ${invitation.tenant.name}`,
-      user: {
+      users: {
         id: user.id,
         email: user.email,
         name: user.first_name && user.last_name 
@@ -1181,7 +1190,7 @@ router.post('/invitations/:token/accept', async (req: Request, res: Response) =>
       userCreated,
     });
   } catch (error: any) {
-    console.error('[Admin Users] Error accepting invitation:', error);
+    console.error('[Admin Users] Error accepting invitations:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to accept invitation',
@@ -1232,17 +1241,17 @@ router.get('/users/:userId/tenants', requirePlatformUser, async (req: Request, r
 
     // Format response with actual tenant names
     const formattedTenants = tenantAssignments.map(assignment => ({
-      tenantId: assignment.tenant_id,
+      tenant_id: assignment.tenant_id,
       tenantName: tenantNameMap.get(assignment.tenant_id) || 'Unknown Tenant',
       role: assignment.role,
     }));
 
     res.json({
       success: true,
-      tenants: formattedTenants,
+      tenant: formattedTenants,
     });
   } catch (error: any) {
-    console.error('[Admin Users] Error getting user tenants:', error);
+    console.error('[Admin Users] Error getting user tenant:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get user tenants',
@@ -1262,7 +1271,7 @@ router.post('/users/:userId/tenants', requirePlatformAdmin, async (req: Request,
 
     // Validate input
     const schema = z.object({
-      tenantId: z.string().min(1, 'Tenant ID is required'),
+      tenant_id: z.string().min(1, 'Tenant ID is required'),
       role: z.enum(['OWNER', 'ADMIN', 'SUPPORT', 'MEMBER', 'VIEWER'], {
         errorMap: () => ({ message: 'Invalid role' }),
       }),
@@ -1334,7 +1343,7 @@ router.post('/users/:userId/tenants', requirePlatformAdmin, async (req: Request,
     // Audit
     await audit({
       tenantId,
-      actor: (req as any).user?.userId || 'system',
+      actor: (req as any).user?.user_id || 'system',
       action: 'admin.user.tenant.assign',
       payload: { userId, tenantId, role, userEmail: user.email, tenantName: tenant.name },
     });
@@ -1379,15 +1388,15 @@ router.patch('/users/:userId/tenants/:tenantId', requirePlatformAdmin, async (re
     }
 
     // Check if assignment exists
-    const assignment = await prisma.userTenant.findUnique({
+    const assignment = await prisma.user_tenants.findUnique({
       where: {
-        userId_tenantId: {
+        user_id_tenant_id: {
           userId,
           tenantId,
         },
       },
       include: {
-        user: { select: { email: true } },
+        users: { select: { email: true } },
         tenant: { select: { name: true } },
       },
     });
@@ -1400,9 +1409,9 @@ router.patch('/users/:userId/tenants/:tenantId', requirePlatformAdmin, async (re
     }
 
     // Update role
-    await prisma.userTenant.update({
+    await prisma.user_tenants.update({
       where: {
-        userId_tenantId: {
+        user_id_tenant_id: {
           userId,
           tenantId,
         },
@@ -1413,7 +1422,7 @@ router.patch('/users/:userId/tenants/:tenantId', requirePlatformAdmin, async (re
     // Audit
     await audit({
       tenantId,
-      actor: (req as any).user?.userId || 'system',
+      actor: (req as any).user?.user_id || 'system',
       action: 'admin.user.tenant.role_update',
       payload: { 
         userId, 
@@ -1448,15 +1457,15 @@ router.delete('/users/:userId/tenants/:tenantId', requirePlatformAdmin, async (r
     const { userId, tenantId } = req.params;
 
     // Check if assignment exists
-    const assignment = await prisma.userTenant.findUnique({
+    const assignment = await prisma.user_tenants.findUnique({
       where: {
-        userId_tenantId: {
+        user_id_tenant_id: {
           userId,
           tenantId,
         },
       },
       include: {
-        user: { select: { email: true } },
+        users: { select: { email: true } },
         tenant: { select: { name: true } },
       },
     });
@@ -1469,9 +1478,9 @@ router.delete('/users/:userId/tenants/:tenantId', requirePlatformAdmin, async (r
     }
 
     // Remove assignment
-    await prisma.userTenant.delete({
+    await prisma.user_tenants.delete({
       where: {
-        userId_tenantId: {
+        user_id_tenant_id: {
           userId,
           tenantId,
         },
@@ -1481,7 +1490,7 @@ router.delete('/users/:userId/tenants/:tenantId', requirePlatformAdmin, async (r
     // Audit
     await audit({
       tenantId,
-      actor: (req as any).user?.userId || 'system',
+      actor: (req as any).user?.user_id || 'system',
       action: 'admin.user.tenant.remove',
       payload: { 
         userId, 

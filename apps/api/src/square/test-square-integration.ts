@@ -94,7 +94,7 @@ async function testOAuthService() {
 
     // Test state parsing
     const parsed = (oauthService.constructor as any).parseState(`${state}:${TEST_TENANT_ID}`);
-    if (parsed.state === state && parsed.tenantId === TEST_TENANT_ID) {
+    if (parsed.state === state && parsed.tenant_id === TEST_TENANT_ID) {
       success('State parsing works correctly');
     } else {
       error('State parsing failed');
@@ -151,7 +151,7 @@ async function testDatabaseOperations() {
     // Test creating integration
     info('Creating test integration...');
     await squareIntegrationRepository.createIntegration({
-      tenantId: TEST_TENANT_ID,
+      tenant_id: TEST_TENANT_ID,
       accessToken: 'test-access-token',
       refreshToken: 'test-refresh-token',
       merchantId: 'test-merchant-id',
@@ -182,7 +182,7 @@ async function testDatabaseOperations() {
     // Test creating product mapping
     info('Creating product mapping...');
     await squareIntegrationRepository.createProductMapping({
-      tenantId: TEST_TENANT_ID,
+      tenant_id: TEST_TENANT_ID,
       integrationId: integration.id,
       inventoryItemId: 'test-inventory-item-id',
       squareCatalogObjectId: 'test-catalog-object-id',
@@ -193,7 +193,7 @@ async function testDatabaseOperations() {
     // Test creating sync log
     info('Creating sync log...');
     await squareIntegrationRepository.createSyncLog({
-      tenantId: TEST_TENANT_ID,
+      tenant_id: TEST_TENANT_ID,
       integrationId: integration.id,
       syncType: 'catalog',
       direction: 'to_square',

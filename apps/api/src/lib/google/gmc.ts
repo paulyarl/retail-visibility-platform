@@ -18,8 +18,8 @@ const MERCHANT_API_VERSION = 'v1beta';
  */
 async function getValidAccessToken(accountId: string): Promise<string | null> {
   try {
-    const tokenRecord = await prisma.googleOAuthToken.findUnique({
-      where: { accountId },
+    const tokenRecord = await prisma.google_oauth_tokens.findUnique({
+      where: { account_id: accountId },
     });
 
     if (!tokenRecord) {
@@ -29,11 +29,11 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
 
     // Check if token is expired
     const now = new Date();
-    if (tokenRecord.expiresAt <= now) {
+    if (tokenRecord.expires_at <= now) {
       console.log('[GMC] Token expired, refreshing...');
       
       // Decrypt refresh token
-      const refreshToken = decryptToken(tokenRecord.refreshTokenEncrypted);
+      const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
       
       // Get new access token
       const newTokens = await refreshAccessToken(refreshToken);
@@ -44,12 +44,13 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
 
       // Update in database
       const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-      await prisma.googleOAuthToken.update({
-        where: { accountId },
+      await prisma.google_oauth_tokens.update({
+        where: { account_id: accountId },
         data: {
-          accessTokenEncrypted: encryptToken(newTokens.access_token),
-          expiresAt: newExpiresAt,
+          access_token_encrypted: encryptToken(newTokens.access_token),
+          expires_at: newExpiresAt,
           scopes: newTokens.scope.split(' '),
+          updated_at: new Date(),
         },
       });
 
@@ -57,7 +58,7 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
     }
 
     // Token still valid
-    return decryptToken(tokenRecord.accessTokenEncrypted);
+    return decryptToken(tokenRecord.access_token_encrypted);
   } catch (error) {
     console.error('[GMC] Error getting valid token:', error);
     return null;
@@ -229,34 +230,38 @@ export async function syncMerchantAccount(
     const merchantName = merchantData.accountName || merchantData.name || 'Unknown';
     const websiteUrl = merchantData.homepageUri || merchantData.websiteUrl || null;
 
-    // Upsert merchant link (schema has no composite unique on [accountId, merchantId])
-    // Find existing by (accountId, merchantId), then update by id; else create
-    const existing = await prisma.googleMerchantLink.findFirst({
-      where: { accountId, merchantId },
+    // Upsert merchant link (schema has no composite unique on [account_id, merchant_id])
+    // Find existing by (account_id, merchant_id), then update by id; else create
+    const existing = await prisma.google_merchant_links.findFirst({
+      where: { account_id: accountId, merchant_id: merchantId },
       select: { id: true },
     });
 
     if (existing) {
-      await prisma.googleMerchantLink.update({
+      await prisma.google_merchant_links.update({
         where: { id: existing.id },
         data: {
-          merchantName,
-          websiteUrl,
-          lastSyncAt: new Date(),
-          syncStatus: 'success',
-          syncError: null,
+          merchant_name: merchantName,
+          website_url: websiteUrl,
+          last_sync_at: new Date(),
+          sync_status: 'success',
+          sync_error: null,
+          updated_at: new Date(),
         },
       });
     } else {
-      await prisma.googleMerchantLink.create({
+      await prisma.google_merchant_links.create({
         data: {
-          accountId,
-          merchantId,
-          merchantName,
-          websiteUrl,
-          isActive: true,
-          lastSyncAt: new Date(),
-          syncStatus: 'success',
+          id: `gmc_link_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          account_id: accountId,
+          merchant_id: merchantId,
+          merchant_name: merchantName,
+          website_url: websiteUrl,
+          is_active: true,
+          last_sync_at: new Date(),
+          sync_status: 'success',
+          created_at: new Date(),
+          updated_at: new Date(),
         },
       });
     }
@@ -267,11 +272,12 @@ export async function syncMerchantAccount(
     console.error('[GMC] Error syncing merchant account:', error);
     
     // Update sync status to error
-    await prisma.googleMerchantLink.updateMany({
-      where: { accountId, merchantId },
+    await prisma.google_merchant_links.updateMany({
+      where: { account_id: accountId, merchant_id: merchantId },
       data: {
-        syncStatus: 'error',
-        syncError: error instanceof Error ? error.message : 'Unknown error',
+        sync_status: 'error',
+        sync_error: error instanceof Error ? error.message : 'Unknown error',
+        updated_at: new Date(),
       },
     });
     

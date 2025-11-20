@@ -157,12 +157,12 @@ export class TaxonomySyncService {
     return null;
   }
 
-  private async updateItemCategory(itemId: string, newPath: string[]): Promise<void> {
+  private async updateItemCategory(item_id: string, newPath: string[]): Promise<void> {
     // Update the item's category in the database
     // Implementation would use the existing updateItem API
   }
 
-  private async flagItemForReview(itemId: string, reason: string): Promise<void> {
+  private async flagItemForReview(item_id: string, reason: string): Promise<void> {
     // Mark item for manual review
     // Could add a flag in the database or create a review task
   }

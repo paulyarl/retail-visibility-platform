@@ -16,7 +16,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
     
     if (tenantId) {
-      where.tenantId = tenantId as string;
+      where.tenant_id = tenantId as string;
     }
     
     if (userId) {
@@ -27,7 +27,7 @@ router.get('/', authenticateToken, async (req, res) => {
       where.organizationId = organizationId as string;
     }
 
-    const requests = await prisma.organizationRequest.findMany({
+    const requests = await prisma.organization_requests.findMany({
       where,
       include: {
         tenant: {
@@ -40,12 +40,12 @@ router.get('/', authenticateToken, async (req, res) => {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
+            subscription_tier: true,
           },
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        created_at: 'desc',
       },
     });
 
@@ -61,7 +61,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const organizationRequest = await prisma.organizationRequest.findUnique({
+    const organizationRequest = await prisma.organization_requests.findUnique({
       where: { id },
       include: {
         tenant: {
@@ -74,7 +74,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
+            subscription_tier: true,
           },
         },
       },
@@ -103,7 +103,7 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     // Check if there's already a pending request
-    const existingRequest = await prisma.organizationRequest.findFirst({
+    const existingRequest = await prisma.organization_requests.findFirst({
       where: {
         tenantId,
         organizationId,
@@ -117,7 +117,7 @@ router.post('/', authenticateToken, async (req, res) => {
       });
     }
 
-    const organizationRequest = await prisma.organizationRequest.create({
+    const organizationRequest = await prisma.organization_requests.create({
       data: {
         tenantId,
         organizationId,
@@ -139,7 +139,7 @@ router.post('/', authenticateToken, async (req, res) => {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
+            subscription_tier: true,
           },
         },
       },
@@ -183,7 +183,7 @@ router.patch('/:id', authenticateToken, async (req, res) => {
       }
     }
 
-    const organizationRequest = await prisma.organizationRequest.update({
+    const organizationRequest = await prisma.organization_requests.update({
       where: { id },
       data: updateData,
       include: {
@@ -197,7 +197,7 @@ router.patch('/:id', authenticateToken, async (req, res) => {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
+            subscription_tier: true,
           },
         },
       },
@@ -206,7 +206,7 @@ router.patch('/:id', authenticateToken, async (req, res) => {
     // If approved and cost agreed, assign tenant to organization
     if (status === 'approved' && organizationRequest.costAgreed) {
       await prisma.tenant.update({
-        where: { id: organizationRequest.tenantId },
+        where: { id: organizationRequest.tenant_id },
         data: {
           organizationId: organizationRequest.organizationId,
         },
@@ -225,7 +225,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    await prisma.organizationRequest.delete({
+    await prisma.organization_requests.delete({
       where: { id },
     });
 

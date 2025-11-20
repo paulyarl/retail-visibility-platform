@@ -4,7 +4,7 @@ import { Flags } from "./config";
 export type AuditPayload = Record<string, any> | null | undefined;
 
 export async function audit(opts: {
-  tenantId: string;
+  tenant_id: string;
   actor?: string | null;
   action: string;
   payload?: AuditPayload;
@@ -14,7 +14,7 @@ export async function audit(opts: {
     const payloadJson = opts.payload ? JSON.stringify(opts.payload) : null;
     await prisma.$executeRaw`
       INSERT INTO audit_log (tenant_id, actor, action, payload)
-      VALUES (${opts.tenantId}, ${opts.actor ?? null}, ${opts.action}, ${payloadJson}::jsonb)
+      VALUES (${opts.tenant_id}, ${opts.actor ?? null}, ${opts.action}, ${payloadJson}::jsonb)
     `;
   } catch (e) {
     // swallow errors to avoid impacting hot paths

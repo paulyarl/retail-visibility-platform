@@ -15,18 +15,18 @@ function normalizeSku(v: unknown) {
   return typeof v === 'string' ? v.trim() : null
 }
 
-async function getGoogleCategoryIdForItem(tenantId: string, categoryPath: string[] | null) {
+async function getGoogleCategoryIdForItem(tenant_id: string, category_path: string[] | null) {
   if (!Array.isArray(categoryPath) || categoryPath.length === 0) return null
   const slug = categoryPath[categoryPath.length - 1]
-  const tenantCat = await prisma.tenantCategory.findFirst({ where: { tenantId, slug, isActive: true } })
+  const tenantCat = await prisma.tenant_category.findFirst({ where: { tenantId, slug, isActive: true } })
   return tenantCat?.googleCategoryId || null
 }
 
 router.post('/:tenantId/feed/precheck', async (req, res) => {
   try {
-    const tenantId = req.params.tenantId
+    const tenantId = req.params.tenant_id
     const limit = Math.min(parseInt(String(req.query.limit || '1000')), 5000)
-    const items = await prisma.inventoryItem.findMany({ where: { tenantId }, take: isNaN(limit) ? 1000 : limit })
+    const items = await prisma.inventory_item.findMany({ where: { tenantId }, take: isNaN(limit) ? 1000 : limit })
 
     const missingCategory = [] as any[]
     const unmapped = [] as any[]
@@ -52,8 +52,8 @@ router.post('/:tenantId/feed/precheck', async (req, res) => {
 
 router.get('/:tenantId/feed/validate', async (req, res) => {
   try {
-    const tenantId = req.params.tenantId
-    const items = await prisma.inventoryItem.findMany({ where: { tenantId } })
+    const tenantId = req.params.tenant_id
+    const items = await prisma.inventory_item.findMany({ where: { tenantId } })
 
     const errors: any[] = []
     const warnings: any[] = []
@@ -100,13 +100,13 @@ router.get('/:tenantId/feed/validate', async (req, res) => {
 
 router.post('/:tenantId/feed/serialize', async (req, res) => {
   try {
-    const tenantId = req.params.tenantId
+    const tenantId = req.params.tenant_id
     const opts = serializeOptionsSchema.parse(req.body || {})
     const where: any = { tenantId }
     if (!opts.includeInactive) where.itemStatus = 'active'
     const take = opts.limit ?? 1000
 
-    const items = await prisma.inventoryItem.findMany({ where, take })
+    const items = await prisma.inventory_item.findMany({ where, take })
 
     const output = [] as any[]
     for (const it of items) {
@@ -128,7 +128,7 @@ router.post('/:tenantId/feed/serialize', async (req, res) => {
       })
     }
 
-    res.json({ success: true, data: { total: output.length, items: output } })
+    res.json({ success: true, data: { total: output.length, _count: output } })
   } catch (e) {
     if (e instanceof z.ZodError) return res.status(400).json({ success: false, error: 'invalid_request', details: e.issues })
     res.status(500).json({ success: false, error: 'serialize_failed' })
@@ -143,11 +143,11 @@ router.get('/:tenantId/categories/coverage', async (req, res) => {
   }
 
   try {
-    const tenantId = req.params.tenantId
+    const tenantId = req.params.tenant_id
     // Total active, public items for tenant
-    const total = await prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'active', visibility: 'public' } })
+    const total = await prisma.inventory_item.count({ where: { tenantId, item_status: 'active', visibility: 'public' } })
 
-    // Mapped items: join inventory_item to tenant_category by leaf slug of category_path
+    // Mapped _count: join inventory_item to tenant_category by leaf slug of category_path
     const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `SELECT COUNT(*) AS count
        FROM inventory_item ii
@@ -155,13 +155,13 @@ router.get('/:tenantId/categories/coverage', async (req, res) => {
          ON tc.tenant_id = ii.tenant_id
         AND tc.is_active = TRUE
         AND (
-          CASE WHEN ii.category_path IS NOT NULL AND array_length(ii.category_path, 1) > 0
-               THEN ii.category_path[array_length(ii.category_path, 1)]
+          CASE WHEN ii.categoryPath IS NOT NULL AND array_length(ii.categoryPath, 1) > 0
+               THEN ii.categoryPath[array_length(ii.categoryPath, 1)]
                ELSE NULL
           END
         ) = tc.slug
        WHERE ii.tenant_id = $1
-         AND ii.item_status = 'active'
+         AND ii.itemStatus = 'active'
          AND ii.visibility = 'public'
          AND tc.google_category_id IS NOT NULL`,
       tenantId

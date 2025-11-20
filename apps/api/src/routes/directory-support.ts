@@ -38,8 +38,8 @@ router.get('/tenant/:tenantId/status', authenticateToken, requireSupportAccess, 
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
+        subscription_tier: true,
+        subscription_status: true,
       },
     });
 
@@ -48,22 +48,22 @@ router.get('/tenant/:tenantId/status', authenticateToken, requireSupportAccess, 
     }
 
     // Get directory settings
-    const settings = await prisma.directorySettings.findUnique({
+    const settings = await prisma.directory_settings.findUnique({
       where: { tenantId },
     });
 
     // Get business profile
-    const profile = await prisma.tenantBusinessProfile.findUnique({
+    const profile = await prisma.tenant_business_profile.findUnique({
       where: { tenantId },
     });
 
     // Get item count
-    const itemCount = await prisma.inventoryItem.count({
-      where: { tenantId, itemStatus: 'active' },
+    const itemCount = await prisma.inventory_item.count({
+      where: { tenantId, item_status: 'active' },
     });
 
     // Check if featured
-    const activeFeatured = await prisma.directoryFeaturedListings.findFirst({
+    const activeFeatured = await prisma.directory_featured_listings.findFirst({
       where: {
         tenantId,
         featuredUntil: { gt: new Date() },
@@ -97,15 +97,15 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
       return res.status(404).json({ error: 'tenant_not_found' });
     }
 
-    const profile = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } });
-    const settings = await prisma.directorySettings.findUnique({ where: { tenantId } });
-    const itemCount = await prisma.inventoryItem.count({
-      where: { tenantId, itemStatus: 'active' },
+    const profile = await prisma.tenant_business_profile.findUnique({ where: { tenantId } });
+    const settings = await prisma.directory_settings.findUnique({ where: { tenantId } });
+    const itemCount = await prisma.inventory_item.count({
+      where: { tenantId, item_status: 'active' },
     });
 
     // Calculate completeness
     const checks = {
-      businessName: !!profile?.businessName,
+      business_name: !!profile?.businessName,
       address: !!profile?.addressLine1,
       cityState: !!(profile?.city && profile?.state),
       phone: !!profile?.phoneNumber,
@@ -159,7 +159,7 @@ router.get('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, a
   try {
     const { tenantId } = req.params;
 
-    const notes = await prisma.directorySupportNotes.findMany({
+    const notes = await prisma.directory_support_notes.findMany({
       where: { tenantId },
       include: {
         createdByUser: {
@@ -171,7 +171,7 @@ router.get('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, a
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
     });
 
     return res.json({ notes });
@@ -195,11 +195,11 @@ router.post('/tenant/:tenantId/add-note', authenticateToken, requireSupportAcces
     }
 
     const user = (req as any).user;
-    const note = await prisma.directorySupportNotes.create({
+    const note = await prisma.directory_support_notes.create({
       data: {
         tenantId,
         note: parsed.data.note,
-        createdBy: user.userId,
+        created_by: user.user_id,
       },
       include: {
         createdByUser: {
@@ -246,17 +246,17 @@ router.get('/search', authenticateToken, requireSupportAccess, async (req: Reque
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        directorySettings: {
+        subscription_tier: true,
+        subscription_status: true,
+        directory_settings: {
           select: {
             isPublished: true,
             isFeatured: true,
           },
         },
-        businessProfile: {
+        tenant_business_profile: {
           select: {
-            businessName: true,
+            business_name: true,
             city: true,
             state: true,
           },

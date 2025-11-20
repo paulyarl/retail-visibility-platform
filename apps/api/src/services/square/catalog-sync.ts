@@ -35,7 +35,7 @@ export interface SquareVariation {
 
 export interface PlatformProduct {
   id: string;
-  tenantId: string;
+  tenant_id: string;
   name: string;
   description?: string;
   price?: number;
@@ -54,12 +54,12 @@ export interface ProductMapping {
 }
 
 export class CatalogSync {
-  private tenantId: string;
+  private tenant_id: string;
   private integrationId: string;
   private squareClient: any;
 
-  constructor(tenantId: string, integrationId: string, squareClient: any) {
-    this.tenantId = tenantId;
+  constructor(tenant_id: string, integrationId: string, squareClient: any) {
+    this.tenant_id = tenantId;
     this.integrationId = integrationId;
     this.squareClient = squareClient;
   }
@@ -134,18 +134,18 @@ export class CatalogSync {
         // Update existing product
         console.log(`[CatalogSync] Updating existing product: ${existingMapping.inventory_item_id}`);
         
-        platformProduct = await prisma.inventoryItem.update({
+        platformProduct = await prisma.inventory_item.update({
           where: { id: existingMapping.inventory_item_id },
           data: {
             ...platformData,
-            updatedAt: new Date(),
+            updated_at: new Date(),
           },
         });
 
         // Update mapping
         // Update mapping via upsert
         await squareIntegrationRepository.createProductMapping({
-          tenantId: this.tenantId,
+          tenant_id: this.tenant_id,
           integrationId: this.integrationId,
           inventoryItemId: platformProduct.id,
           squareCatalogObjectId: squareProduct.id,
@@ -155,9 +155,9 @@ export class CatalogSync {
         // Create new product
         console.log(`[CatalogSync] Creating new product: ${squareProduct.item_data.name}`);
         
-        platformProduct = await prisma.inventoryItem.create({
+        platformProduct = await prisma.inventory_item.create({
           data: {
-            tenantId: this.tenantId,
+            tenant_id: this.tenant_id,
             ...platformData,
             source: 'SQUARE_IMPORT',
           } as any,
@@ -166,7 +166,7 @@ export class CatalogSync {
         // Create mapping
         const variation = squareProduct.item_data.variations[0];
         await squareIntegrationRepository.createProductMapping({
-          tenantId: this.tenantId,
+          tenant_id: this.tenant_id,
           integrationId: this.integrationId,
           inventoryItemId: platformProduct.id,
           squareCatalogObjectId: squareProduct.id,
@@ -191,7 +191,7 @@ export class CatalogSync {
 
       // Check if product already exists in Square via mapping
       const existingMapping = await squareIntegrationRepository.getProductMappingByInventoryItemId(
-        this.tenantId,
+        this.tenant_id,
         platformProduct.id
       );
 
@@ -222,7 +222,7 @@ export class CatalogSync {
         // Update mapping
         // Update mapping via upsert
         await squareIntegrationRepository.createProductMapping({
-          tenantId: this.tenantId,
+          tenant_id: this.tenant_id,
           integrationId: this.integrationId,
           inventoryItemId: platformProduct.id,
           squareCatalogObjectId: squareProduct.id,
@@ -248,7 +248,7 @@ export class CatalogSync {
         // Create mapping
         const variation = squareProduct.item_data.variations[0];
         await squareIntegrationRepository.createProductMapping({
-          tenantId: this.tenantId,
+          tenant_id: this.tenant_id,
           integrationId: this.integrationId,
           inventoryItemId: platformProduct.id,
           squareCatalogObjectId: squareProduct.id,
@@ -319,7 +319,7 @@ export class CatalogSync {
    */
   async getMapping(platformProductId: string): Promise<ProductMapping | null> {
     const mapping = await squareIntegrationRepository.getProductMappingByInventoryItemId(
-      this.tenantId,
+      this.tenant_id,
       platformProductId
     );
 
@@ -338,7 +338,7 @@ export class CatalogSync {
    */
   async deleteMapping(platformProductId: string): Promise<void> {
     const mapping = await squareIntegrationRepository.getProductMappingByInventoryItemId(
-      this.tenantId,
+      this.tenant_id,
       platformProductId
     );
 
@@ -352,7 +352,7 @@ export class CatalogSync {
  * Factory function to create catalog sync instance
  */
 export function createCatalogSync(
-  tenantId: string,
+  tenant_id: string,
   integrationId: string,
   squareClient: any
 ): CatalogSync {

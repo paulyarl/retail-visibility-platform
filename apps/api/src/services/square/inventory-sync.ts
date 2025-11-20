@@ -18,11 +18,11 @@ export interface SquareInventoryCount {
 
 export interface PlatformInventory {
   id: string;
-  tenantId: string;
+  tenant_id: string;
   productId: string;
   quantity: number;
   locationId?: string;
-  updatedAt: Date;
+  updated_at: Date;
 }
 
 export interface InventoryChange {
@@ -35,13 +35,13 @@ export interface InventoryChange {
 }
 
 export class InventorySync {
-  private tenantId: string;
+  private tenant_id: string;
   private integrationId: string;
   private squareClient: any;
   private locationId?: string;
 
-  constructor(tenantId: string, integrationId: string, squareClient: any, locationId?: string) {
-    this.tenantId = tenantId;
+  constructor(tenant_id: string, integrationId: string, squareClient: any, locationId?: string) {
+    this.tenant_id = tenantId;
     this.integrationId = integrationId;
     this.squareClient = squareClient;
     this.locationId = locationId;
@@ -55,7 +55,7 @@ export class InventorySync {
       productId: platformProductId,
       quantity: parseInt(squareInventory.quantity, 10) || 0,
       locationId: squareInventory.location_id,
-      updatedAt: new Date(squareInventory.calculated_at),
+      updated_at: new Date(squareInventory.calculated_at),
     };
   }
 
@@ -95,7 +95,7 @@ export class InventorySync {
       }
 
       // Get current platform inventory
-      const currentInventory = await prisma.inventoryItem.findUnique({
+      const currentInventory = await prisma.inventory_item.findUnique({
         where: { id: mapping.inventory_item_id },
         select: { id: true, name: true, quantity: true },
       });
@@ -109,17 +109,17 @@ export class InventorySync {
       const oldQuantity = currentInventory.quantity || 0;
 
       // Update platform inventory
-      await prisma.inventoryItem.update({
+      await prisma.inventory_item.update({
         where: { id: mapping.inventory_item_id },
         data: {
           quantity: newQuantity,
-          updatedAt: new Date(),
+          updated_at: new Date(),
         },
       });
 
       // Update mapping
       await squareIntegrationRepository.createProductMapping({
-        tenantId: this.tenantId,
+        tenant_id: this.tenant_id,
         integrationId: this.integrationId,
         inventoryItemId: mapping.inventory_item_id,
         squareCatalogObjectId: mapping.square_catalog_object_id,
@@ -150,9 +150,9 @@ export class InventorySync {
       console.log(`[InventorySync] Exporting inventory for: ${platformProductId}`);
 
       // Get platform product
-      const platformProduct = await prisma.inventoryItem.findUnique({
+      const platformProduct = await prisma.inventory_item.findUnique({
         where: { id: platformProductId },
-        select: { id: true, name: true, quantity: true, updatedAt: true },
+        select: { id: true, name: true, quantity: true, updated_at: true },
       });
 
       if (!platformProduct) {
@@ -162,7 +162,7 @@ export class InventorySync {
 
       // Find the product mapping
       const mapping = await squareIntegrationRepository.getProductMappingByInventoryItemId(
-        this.tenantId,
+        this.tenant_id,
         platformProductId
       );
 
@@ -186,10 +186,10 @@ export class InventorySync {
       // const inventoryChange = this.transformPlatformToSquare(
       //   {
       //     id: platformProduct.id,
-      //     tenantId: this.tenantId,
+      //     tenant_id: this.tenant_id,
       //     productId: platformProduct.id,
       //     quantity: newQuantity,
-      //     updatedAt: platformProduct.updatedAt,
+      //     updated_at: platformProduct.updatedAt,
       //   },
       //   mapping.square_catalog_object_id
       // );
@@ -281,7 +281,7 @@ export class InventorySync {
       if (direction === 'from_square') {
         // Get mapping first
         const mapping = await squareIntegrationRepository.getProductMappingByInventoryItemId(
-          this.tenantId,
+          this.tenant_id,
           platformProductId
         );
 
@@ -298,7 +298,7 @@ export class InventorySync {
 
       // Auto mode: Compare timestamps and sync from most recent
       const mapping = await squareIntegrationRepository.getProductMappingByInventoryItemId(
-        this.tenantId,
+        this.tenant_id,
         platformProductId
       );
 
@@ -306,9 +306,9 @@ export class InventorySync {
         return null;
       }
 
-      const platformProduct = await prisma.inventoryItem.findUnique({
+      const platformProduct = await prisma.inventory_item.findUnique({
         where: { id: platformProductId },
-        select: { updatedAt: true },
+        select: { updated_at: true },
       });
 
       if (!platformProduct) {
@@ -346,12 +346,12 @@ export class InventorySync {
       // Get all mapped products
       const mappings = await prisma.$queryRaw<any[]>`
         SELECT * FROM square_product_mappings
-        WHERE tenant_id = ${this.tenantId}
+        WHERE tenant_id = ${this.tenant_id}
       `;
 
       for (const mapping of mappings) {
         // Get platform quantity
-        const platformProduct = await prisma.inventoryItem.findUnique({
+        const platformProduct = await prisma.inventory_item.findUnique({
           where: { id: mapping.inventory_item_id },
           select: { id: true, name: true, quantity: true },
         });
@@ -389,7 +389,7 @@ export class InventorySync {
  * Factory function to create inventory sync instance
  */
 export function createInventorySync(
-  tenantId: string,
+  tenant_id: string,
   integrationId: string,
   squareClient: any,
   locationId?: string

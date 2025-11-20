@@ -108,7 +108,7 @@ router.post('/webhooks', async (req: Request, res: Response) => {
   try {
     // Check for duplicate event processing (idempotency)
     try {
-      const existingEvent = await prisma.stripeWebhookEvent.findUnique({
+      const existingEvent = await prisma.stripe_webhook_events.findUnique({
         where: { eventId: event.id },
       });
 
@@ -150,7 +150,7 @@ router.post('/webhooks', async (req: Request, res: Response) => {
 
     // Record event as processed
     try {
-      await prisma.stripeWebhookEvent.create({
+      await prisma.stripe_webhook_events.create({
         data: {
           eventId: event.id,
           eventType: event.type,
@@ -176,7 +176,7 @@ router.post('/webhooks', async (req: Request, res: Response) => {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log('[Stripe Webhooks] Processing checkout.session.completed:', session.id);
 
-  const tenantId = session.metadata?.tenantId || session.client_reference_id;
+  const tenantId = session.metadata?.tenant_id || session.client_reference_id;
 
   if (!tenantId) {
     console.error('[Stripe Webhooks] No tenantId in checkout session metadata');
@@ -194,8 +194,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   await prisma.tenant.update({
     where: { id: tenantId },
     data: {
-      stripeCustomerId: session.customer as string,
-      stripeSubscriptionId: session.subscription as string,
+      stripe_customer_id: session.customer as string,
+      stripe_subscription_id: session.subscription as string,
     },
   });
 
@@ -211,7 +211,7 @@ async function handleSubscriptionCreatedOrUpdated(subscription: any) {
 
   // Find tenant by Stripe customer ID
   const tenant = await prisma.tenant.findFirst({
-    where: { stripeCustomerId: subscription.customer as string },
+    where: { stripe_customer_id: subscription.customer as string },
   });
 
   if (!tenant) {
@@ -238,9 +238,9 @@ async function handleSubscriptionCreatedOrUpdated(subscription: any) {
 
   // Prepare update data
   const updateData: any = {
-    stripeSubscriptionId: subscription.id,
-    subscriptionStatus: internalStatus,
-    subscriptionTier: tier,
+    stripe_subscription_id: subscription.id,
+    subscription_status: internalStatus,
+    subscription_tier: tier,
     subscriptionEndsAt,
   };
 
@@ -257,7 +257,7 @@ async function handleSubscriptionCreatedOrUpdated(subscription: any) {
   }
 
   // If moving from trial to active, clear trial end date
-  if (internalStatus === 'active' && tenant.subscriptionStatus === 'trial') {
+  if (internalStatus === 'active' && tenant.subscription_status === 'trial') {
     console.log(`[Stripe Webhooks] Trial converted to active for tenant ${tenant.id}`);
     // Keep trialEndsAt for historical reference, but status is now active
   }
@@ -283,7 +283,7 @@ async function handleSubscriptionDeleted(subscription: any) {
   console.log('[Stripe Webhooks] Processing subscription deletion:', subscription.id);
 
   const tenant = await prisma.tenant.findFirst({
-    where: { stripeSubscriptionId: subscription.id },
+    where: { stripe_subscription_id: subscription.id },
   });
 
   if (!tenant) {
@@ -295,7 +295,7 @@ async function handleSubscriptionDeleted(subscription: any) {
   await prisma.tenant.update({
     where: { id: tenant.id },
     data: {
-      subscriptionStatus: 'canceled',
+      subscription_status: 'canceled',
       // Keep tier and other fields for reference
       // Don't downgrade to google_only here - let GET /tenants/:id handle that
     },
@@ -317,7 +317,7 @@ async function handlePaymentFailed(invoice: any) {
   }
 
   const tenant = await prisma.tenant.findFirst({
-    where: { stripeSubscriptionId: invoice.subscription as string },
+    where: { stripe_subscription_id: invoice.subscription as string },
   });
 
   if (!tenant) {
@@ -329,7 +329,7 @@ async function handlePaymentFailed(invoice: any) {
   await prisma.tenant.update({
     where: { id: tenant.id },
     data: {
-      subscriptionStatus: 'past_due',
+      subscription_status: 'past_due',
     },
   });
 
@@ -351,7 +351,7 @@ async function handlePaymentSucceeded(invoice: any) {
   }
 
   const tenant = await prisma.tenant.findFirst({
-    where: { stripeSubscriptionId: invoice.subscription as string },
+    where: { stripe_subscription_id: invoice.subscription as string },
   });
 
   if (!tenant) {
@@ -360,11 +360,11 @@ async function handlePaymentSucceeded(invoice: any) {
   }
 
   // If was past_due, restore to active
-  if (tenant.subscriptionStatus === 'past_due') {
+  if (tenant.subscription_status === 'past_due') {
     await prisma.tenant.update({
       where: { id: tenant.id },
       data: {
-        subscriptionStatus: 'active',
+        subscription_status: 'active',
       },
     });
 

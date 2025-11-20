@@ -50,8 +50,8 @@ function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
  */
 async function requireTenantManagement(req: Request, res: Response, next: NextFunction) {
   const user = (req as any).user;
-  const userId = user?.userId;
-  const tenantId = req.params.tenantId;
+  const userId = user?.user_id;
+  const tenantId = req.params.tenant_id;
 
   if (!user || !userId) {
     return res.status(401).json({
@@ -71,9 +71,9 @@ async function requireTenantManagement(req: Request, res: Response, next: NextFu
     const { prisma: prismaClient } = await import('../prisma');
     const userTenant = await prismaClient.userTenant.findUnique({
       where: {
-        userId_tenantId: {
-          userId: userId,
-          tenantId: tenantId,
+        user_id_tenant_id: {
+          user_id: userId,
+          tenant_id: tenantId,
         },
       },
     });
@@ -98,7 +98,7 @@ async function requireTenantManagement(req: Request, res: Response, next: NextFu
 
 // Validation schemas
 const createCategorySchema = z.object({
-  tenantId: z.string().cuid(),
+  tenant_id: z.string().cuid(),
   name: z.string().min(1).max(100),
   slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/),
   parentId: z.string().cuid().optional(),
@@ -179,7 +179,7 @@ router.get('/:tenantId/categories', async (req, res) => {
       findArgs.skip = 1; // skip the cursor item itself
     }
 
-    const result = await prisma.tenantCategory.findMany(findArgs);
+    const result = await prisma.tenant_category.findMany(findArgs);
     const hasMore = result.length > take;
     const categories = hasMore ? result.slice(0, take) : result;
     const nextCursor = hasMore ? categories[categories.length - 1]?.id : undefined;
@@ -219,7 +219,7 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
   try {
     const { tenantId, id } = req.params;
 
-    const category = await prisma.tenantCategory.findFirst({
+    const category = await prisma.tenant_category.findFirst({
       where: {
         id,
         tenantId,
@@ -236,13 +236,13 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
     // Get Google taxonomy info if mapped
     let googleCategory = null;
     if (category.googleCategoryId) {
-      googleCategory = await prisma.googleTaxonomy.findUnique({
+      googleCategory = await prisma.google_taxonomy.findUnique({
         where: { categoryId: category.googleCategoryId },
       });
     }
 
     // Get child categories count
-    const childCount = await prisma.tenantCategory.count({
+    const childCount = await prisma.tenant_category.count({
       where: {
         tenantId,
         parentId: id,
@@ -251,10 +251,10 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
     });
 
     // Get products using this category count
-    const productCount = await prisma.inventoryItem.count({
+    const productCount = await prisma.inventory_item.count({
       where: {
         tenantId,
-        categoryPath: {
+        category_path: {
           has: category.slug,
         },
       },
@@ -289,7 +289,7 @@ router.post('/:tenantId/categories', requireTenantManagement, async (req, res) =
     const body = createCategorySchema.parse({ ...req.body, tenantId });
 
     // Check for duplicate slug
-    const existing = await prisma.tenantCategory.findFirst({
+    const existing = await prisma.tenant_category.findFirst({
       where: {
         tenantId,
         slug: body.slug,
@@ -305,7 +305,7 @@ router.post('/:tenantId/categories', requireTenantManagement, async (req, res) =
 
     // Validate parent exists if provided
     if (body.parentId) {
-      const parent = await prisma.tenantCategory.findFirst({
+      const parent = await prisma.tenant_category.findFirst({
         where: {
           id: body.parentId,
           tenantId,
@@ -360,7 +360,7 @@ router.put('/:tenantId/categories/:id', requireTenantManagement, async (req, res
     const body = updateCategorySchema.parse(req.body);
 
     // Check category exists
-    const existing = await prisma.tenantCategory.findFirst({
+    const existing = await prisma.tenant_category.findFirst({
       where: { id, tenantId },
     });
 
@@ -373,7 +373,7 @@ router.put('/:tenantId/categories/:id', requireTenantManagement, async (req, res
 
     // Check for duplicate slug if changing
     if (body.slug && body.slug !== existing.slug) {
-      const duplicate = await prisma.tenantCategory.findFirst({
+      const duplicate = await prisma.tenant_category.findFirst({
         where: {
           tenantId,
           slug: body.slug,
@@ -391,7 +391,7 @@ router.put('/:tenantId/categories/:id', requireTenantManagement, async (req, res
 
     // Validate parent exists if provided
     if (body.parentId) {
-      const parent = await prisma.tenantCategory.findFirst({
+      const parent = await prisma.tenant_category.findFirst({
         where: {
           id: body.parentId,
           tenantId,
@@ -447,7 +447,7 @@ router.delete('/:tenantId/categories/:id', requireTenantManagement, async (req, 
     const { tenantId, id } = req.params;
 
     // Check category exists
-    const category = await prisma.tenantCategory.findFirst({
+    const category = await prisma.tenant_category.findFirst({
       where: { id, tenantId },
     });
 
@@ -459,7 +459,7 @@ router.delete('/:tenantId/categories/:id', requireTenantManagement, async (req, 
     }
 
     // Check for child categories
-    const childCount = await prisma.tenantCategory.count({
+    const childCount = await prisma.tenant_category.count({
       where: {
         tenantId,
         parentId: id,
@@ -476,10 +476,10 @@ router.delete('/:tenantId/categories/:id', requireTenantManagement, async (req, 
     }
 
     // Check for products using this category
-    const productCount = await prisma.inventoryItem.count({
+    const productCount = await prisma.inventory_item.count({
       where: {
         tenantId,
-        categoryPath: {
+        category_path: {
           has: category.slug,
         },
       },
@@ -519,7 +519,7 @@ router.post('/:tenantId/categories/:id/align', requireTenantManagement, async (r
     const body = alignCategorySchema.parse(req.body);
 
     // Check category exists
-    const category = await prisma.tenantCategory.findFirst({
+    const category = await prisma.tenant_category.findFirst({
       where: { id, tenantId },
     });
 
@@ -579,7 +579,7 @@ router.get('/:tenantId/categories-unmapped', async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    const unmapped = await prisma.tenantCategory.findMany({
+    const unmapped = await prisma.tenant_category.findMany({
       where: {
         tenantId,
         isActive: true,
@@ -611,17 +611,17 @@ router.get('/:tenantId/categories-alignment-status', async (req, res) => {
     const { tenantId } = req.params;
 
     const [total, mapped, unmapped] = await Promise.all([
-      prisma.tenantCategory.count({
+      prisma.tenant_category.count({
         where: { tenantId, isActive: true },
       }),
-      prisma.tenantCategory.count({
+      prisma.tenant_category.count({
         where: {
           tenantId,
           isActive: true,
           googleCategoryId: { not: null },
         },
       }),
-      prisma.tenantCategory.count({
+      prisma.tenant_category.count({
         where: {
           tenantId,
           isActive: true,
@@ -675,7 +675,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
       include: {
         organization: {
           include: {
-            tenants: {
+            tenant: {
               where: {
                 id: { not: tenantId }, // Exclude the hero tenant itself
               },
@@ -713,7 +713,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
     }
 
     // Get all active categories from the hero tenant
-    const heroCategories = await prisma.tenantCategory.findMany({
+    const heroCategories = await prisma.tenant_category.findMany({
       where: {
         tenantId,
         isActive: true,
@@ -744,16 +744,16 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
       created: 0,
       updated: 0,
       skipped: 0,
-      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
       try {
         for (const heroCategory of heroCategories) {
           // Check if category with same slug already exists
-          const existing = await prisma.tenantCategory.findFirst({
+          const existing = await prisma.tenant_category.findFirst({
             where: {
-              tenantId: location.id,
+              tenant_id: location.id,
               slug: heroCategory.slug,
             },
           });
@@ -766,7 +766,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
             }
             
             // Update mode - update existing category
-            await prisma.tenantCategory.update({
+            await prisma.tenant_category.update({
               where: { id: existing.id },
               data: {
                 name: heroCategory.name,
@@ -783,9 +783,9 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
             }
             
             // Create mode - create new category
-            await prisma.tenantCategory.create({
+            await prisma.tenant_category.create({
               data: {
-                tenantId: location.id,
+                tenant_id: location.id,
                 name: heroCategory.name,
                 slug: heroCategory.slug,
                 googleCategoryId: heroCategory.googleCategoryId,
@@ -802,7 +802,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
       } catch (error: any) {
         console.error(`Error propagating to tenant ${location.id}:`, error);
         results.errors.push({
-          tenantId: location.id,
+          tenant_id: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });
@@ -845,7 +845,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
       include: {
         organization: {
           include: {
-            tenants: {
+            tenant: {
               where: { id: { not: tenantId } },
               select: { id: true, name: true },
             },
@@ -871,7 +871,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
     }
 
     // Get feature flags from hero tenant
-    const heroFlags = await prisma.tenantFeatureFlag.findMany({
+    const heroFlags = await prisma.tenant_feature_flags.findMany({
       where: { tenantId },
     });
 
@@ -890,15 +890,15 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
       created: 0,
       updated: 0,
       skipped: 0,
-      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
       try {
         for (const heroFlag of heroFlags) {
-          const existing = await prisma.tenantFeatureFlag.findFirst({
+          const existing = await prisma.tenant_feature_flags.findFirst({
             where: {
-              tenantId: location.id,
+              tenant_id: location.id,
               flag: heroFlag.flag,
             },
           });
@@ -909,7 +909,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
               continue;
             }
             
-            await prisma.tenantFeatureFlag.update({
+            await prisma.tenant_feature_flags.update({
               where: { id: existing.id },
               data: {
                 enabled: heroFlag.enabled,
@@ -924,9 +924,9 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
               continue;
             }
             
-            await prisma.tenantFeatureFlag.create({
+            await prisma.tenant_feature_flags.create({
               data: {
-                tenantId: location.id,
+                tenant_id: location.id,
                 flag: heroFlag.flag,
                 enabled: heroFlag.enabled,
                 description: heroFlag.description,
@@ -939,7 +939,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
       } catch (error: any) {
         console.error(`Error propagating to tenant ${location.id}:`, error);
         results.errors.push({
-          tenantId: location.id,
+          tenant_id: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });
@@ -974,7 +974,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
       include: {
         organization: {
           include: {
-            tenants: {
+            tenant: {
               where: {
                 id: { not: tenantId },
               },
@@ -1012,7 +1012,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
     }
 
     // Get business hours from hero tenant
-    const heroBusinessHours = await prisma.businessHours.findUnique({
+    const heroBusinessHours = await prisma.business_hours.findUnique({
       where: { tenantId },
     });
 
@@ -1026,7 +1026,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
     // Get special hours if requested
     let heroSpecialHours: any[] = [];
     if (includeSpecialHours) {
-      heroSpecialHours = await prisma.businessHoursSpecial.findMany({
+      heroSpecialHours = await prisma.business_hours_special.findMany({
         where: { tenantId },
       });
     }
@@ -1046,16 +1046,16 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
       regularHoursUpdated: 0,
       specialHoursCreated: 0,
       specialHoursUpdated: 0,
-      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
       try {
         // Upsert regular business hours
-        await prisma.businessHours.upsert({
-          where: { tenantId: location.id },
+        await prisma.business_hours.upsert({
+          where: { tenant_id: location.id },
           create: {
-            tenantId: location.id,
+            tenant_id: location.id,
             timezone: heroBusinessHours.timezone,
             periods: heroBusinessHours.periods as any,
           },
@@ -1069,15 +1069,15 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
         // Propagate special hours if requested
         if (includeSpecialHours && heroSpecialHours.length > 0) {
           for (const specialHour of heroSpecialHours) {
-            const existing = await prisma.businessHoursSpecial.findFirst({
+            const existing = await prisma.business_hours_special.findFirst({
               where: {
-                tenantId: location.id,
+                tenant_id: location.id,
                 date: specialHour.date,
               },
             });
 
             if (existing) {
-              await prisma.businessHoursSpecial.update({
+              await prisma.business_hours_special.update({
                 where: { id: existing.id },
                 data: {
                   isClosed: specialHour.isClosed,
@@ -1088,9 +1088,9 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
               });
               results.specialHoursUpdated++;
             } else {
-              await prisma.businessHoursSpecial.create({
+              await prisma.business_hours_special.create({
                 data: {
-                  tenantId: location.id,
+                  tenant_id: location.id,
                   date: specialHour.date,
                   isClosed: specialHour.isClosed,
                   open: specialHour.open,
@@ -1105,7 +1105,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
       } catch (error: any) {
         console.error(`Error propagating to tenant ${location.id}:`, error);
         results.errors.push({
-          tenantId: location.id,
+          tenant_id: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });
@@ -1147,7 +1147,7 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
       include: {
         organization: {
           include: {
-            tenants: {
+            tenant: {
               where: { id: { not: tenantId } },
               select: { id: true, name: true },
             },
@@ -1164,9 +1164,9 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
       return res.status(400).json({ success: false, error: 'Only hero locations can propagate user roles' });
     }
 
-    const heroUserRoles = await prisma.userTenant.findMany({
+    const heroUserRoles = await prisma.user_tenants.findMany({
       where: { tenantId },
-      include: { user: { select: { email: true } } },
+      include: { users: { select: { email: true } } },
     });
 
     if (heroUserRoles.length === 0) {
@@ -1184,16 +1184,16 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
       created: 0,
       updated: 0,
       skipped: 0,
-      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
       try {
         for (const heroRole of heroUserRoles) {
-          const existing = await prisma.userTenant.findFirst({
+          const existing = await prisma.user_tenants.findFirst({
             where: {
-              tenantId: location.id,
-              userId: heroRole.userId,
+              tenant_id: location.id,
+              user_id: heroRole.user_id,
             },
           });
 
@@ -1202,7 +1202,7 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
               results.skipped++;
               continue;
             }
-            await prisma.userTenant.update({
+            await prisma.user_tenants.update({
               where: { id: existing.id },
               data: { role: heroRole.role },
             });
@@ -1212,10 +1212,10 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
               results.skipped++;
               continue;
             }
-            await prisma.userTenant.create({
+            await prisma.user_tenants.create({
               data: {
-                tenantId: location.id,
-                userId: heroRole.userId,
+                tenant_id: location.id,
+                user_id: heroRole.user_id,
                 role: heroRole.role,
               },
             });
@@ -1224,7 +1224,7 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
         }
       } catch (error: any) {
         results.errors.push({
-          tenantId: location.id,
+          tenant_id: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });
@@ -1252,7 +1252,7 @@ router.post('/:tenantId/brand-assets/propagate', requireTenantAdmin, requireProp
       include: {
         organization: {
           include: {
-            tenants: {
+            tenant: {
               where: { id: { not: tenantId } },
               select: { id: true, name: true },
             },
@@ -1289,7 +1289,7 @@ router.post('/:tenantId/brand-assets/propagate', requireTenantAdmin, requireProp
     const results = {
       totalLocations: locationTenants.length,
       updated: 0,
-      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
@@ -1311,7 +1311,7 @@ router.post('/:tenantId/brand-assets/propagate', requireTenantAdmin, requireProp
         results.updated++;
       } catch (error: any) {
         results.errors.push({
-          tenantId: location.id,
+          tenant_id: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });
@@ -1337,10 +1337,10 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       include: {
-        businessProfile: true,
+        tenant_business_profile: true,
         organization: {
           include: {
-            tenants: {
+            tenant: {
               where: { id: { not: tenantId } },
               select: { id: true, name: true },
             },
@@ -1369,16 +1369,16 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
     const results = {
       totalLocations: locationTenants.length,
       updated: 0,
-      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
       try {
-        await prisma.tenantBusinessProfile.upsert({
-          where: { tenantId: location.id },
+        await prisma.tenant_business_profile.upsert({
+          where: { tenant_id: location.id },
           create: {
-            tenantId: location.id,
-            businessName: tenant.businessProfile.businessName,
+            tenant_id: location.id,
+            business_name: tenant.businessProfile.businessName,
             addressLine1: tenant.businessProfile.addressLine1,
             addressLine2: tenant.businessProfile.addressLine2,
             city: tenant.businessProfile.city,
@@ -1389,7 +1389,7 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
             email: tenant.businessProfile.email,
           },
           update: {
-            businessName: tenant.businessProfile.businessName,
+            business_name: tenant.businessProfile.businessName,
             addressLine1: tenant.businessProfile.addressLine1,
             addressLine2: tenant.businessProfile.addressLine2,
             city: tenant.businessProfile.city,
@@ -1403,7 +1403,7 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
         results.updated++;
       } catch (error: any) {
         results.errors.push({
-          tenantId: location.id,
+          tenant_id: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });

@@ -44,7 +44,7 @@ function validateItemAgainstPolicy(item: any, policy: PolicyRules): { valid: boo
   const violations: string[] = [];
 
   // Check image requirement
-  if (policy.requireImage && !item.imageUrl) {
+  if (policy.requireImage && !item.image_url) {
     violations.push('Image is required by policy but not provided');
   }
 
@@ -98,7 +98,7 @@ export async function enforcePolicyCompliance(
       return next();
     }
 
-    const tenantId = req.body?.tenantId || req.query?.tenantId;
+    const tenantId = req.body?.tenant_id || req.query?.tenant_id;
     
     if (!tenantId) {
       // No tenant ID, skip policy check (will fail validation elsewhere)
@@ -145,7 +145,7 @@ export async function enforcePolicyCompliance(
 /**
  * Get compliance report for a tenant
  */
-export async function getComplianceReport(tenantId: string) {
+export async function getComplianceReport(tenant_id: string) {
   try {
     const policy = await getEffectivePolicy(tenantId);
 
@@ -157,16 +157,16 @@ export async function getComplianceReport(tenantId: string) {
     }
 
     // Get all items for tenant
-    const items = await prisma.inventoryItem.findMany({
+    const items = await prisma.inventory_item.findMany({
       where: { tenantId },
       select: {
         id: true,
         sku: true,
         name: true,
-        imageUrl: true,
+        image_url: true,
         currency: true,
         price: true,
-        priceCents: true,
+        price_cents: true,
         availability: true,
         visibility: true,
       },
@@ -174,7 +174,7 @@ export async function getComplianceReport(tenantId: string) {
 
     // Check each item against policy
     const violations: Array<{
-      itemId: string;
+      item_id: string;
       sku: string;
       name: string;
       violations: string[];
@@ -184,7 +184,7 @@ export async function getComplianceReport(tenantId: string) {
       const validation = validateItemAgainstPolicy(item, policy);
       if (!validation.valid) {
         violations.push({
-          itemId: item.id,
+          item_id: item.id,
           sku: item.sku,
           name: item.name,
           violations: validation.violations,

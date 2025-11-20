@@ -55,33 +55,33 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
 
     // Get listings
     const [listings, total] = await Promise.all([
-      prisma.directorySettings.findMany({
+      prisma.directory_settings.findMany({
         where,
         include: {
           tenant: {
             select: {
               id: true,
               name: true,
-              subscriptionTier: true,
+              subscription_tier: true,
             },
           },
         },
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updated_at: 'desc' },
         skip,
         take: limitNum,
       }),
-      prisma.directorySettings.count({ where }),
+      prisma.directory_settings.count({ where }),
     ]);
 
     // Add quality scores (basic calculation)
     const enrichedListings = await Promise.all(
       listings.map(async (listing) => {
-        const profile = await prisma.tenantBusinessProfile.findUnique({
-          where: { tenantId: listing.tenantId },
+        const profile = await prisma.tenant_business_profile.findUnique({
+          where: { tenant_id: listing.tenant_id },
         });
 
-        const itemCount = await prisma.inventoryItem.count({
-          where: { tenantId: listing.tenantId, itemStatus: 'active' },
+        const itemCount = await prisma.inventory_item.count({
+          where: { tenant_id: listing.tenant_id, item_status: 'active' },
         });
 
         // Calculate quality score
@@ -105,7 +105,7 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
           ...listing,
           qualityScore,
           itemCount,
-          businessName: profile?.businessName || listing.tenant.name,
+          business_name: profile?.businessName || listing.tenant.name,
         };
       })
     );
@@ -137,23 +137,23 @@ router.get('/stats', authenticateToken, requireAdmin, async (req: Request, res: 
       featuredListings,
       draftListings,
     ] = await Promise.all([
-      prisma.directorySettings.count(),
-      prisma.directorySettings.count({ where: { isPublished: true } }),
-      prisma.directorySettings.count({ where: { isFeatured: true } }),
-      prisma.directorySettings.count({ where: { isPublished: false } }),
+      prisma.directory_settings.count(),
+      prisma.directory_settings.count({ where: { isPublished: true } }),
+      prisma.directory_settings.count({ where: { isFeatured: true } }),
+      prisma.directory_settings.count({ where: { isPublished: false } }),
     ]);
 
     // Get listings by tier
-    const listingsByTier = await prisma.directorySettings.groupBy({
+    const listingsByTier = await prisma.directory_settings.groupBy({
       by: ['tenantId'],
       _count: true,
     });
 
     // Get tenant tiers
-    const tenantIds = listingsByTier.map(l => l.tenantId);
+    const tenantIds = listingsByTier.map(l => l.tenant_id);
     const tenants = await prisma.tenant.findMany({
       where: { id: { in: tenantIds } },
-      select: { id: true, subscriptionTier: true },
+      select: { id: true, subscription_tier: true },
     });
 
     const tierCounts: Record<string, number> = {};
@@ -181,7 +181,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req: Request, res: 
  */
 router.get('/featured', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const featured = await prisma.directoryFeaturedListings.findMany({
+    const featured = await prisma.directory_featured_listings.findMany({
       where: {
         featuredUntil: { gt: new Date() },
       },
@@ -190,7 +190,7 @@ router.get('/featured', authenticateToken, requireAdmin, async (req: Request, re
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
+            subscription_tier: true,
           },
         },
       },
@@ -226,23 +226,23 @@ router.post('/feature/:tenantId', authenticateToken, requireAdmin, async (req: R
     }
 
     // Create featured listing record
-    const featured = await prisma.directoryFeaturedListings.create({
+    const featured = await prisma.directory_featured_listings.create({
       data: {
         tenantId,
         featuredFrom: new Date(),
         featuredUntil,
         placementPriority: parsed.data.placement_priority || 5,
-        createdBy: (req as any).user?.userId,
+        created_by: (req as any).user?.user_id,
       },
     });
 
     // Update directory settings
-    await prisma.directorySettings.update({
+    await prisma.directory_settings.update({
       where: { tenantId },
       data: {
         isFeatured: true,
         featuredUntil,
-        updatedAt: new Date(),
+        updated_at: new Date(),
       },
     });
 
@@ -262,17 +262,17 @@ router.delete('/unfeature/:tenantId', authenticateToken, requireAdmin, async (re
     const { tenantId } = req.params;
 
     // Update directory settings
-    await prisma.directorySettings.update({
+    await prisma.directory_settings.update({
       where: { tenantId },
       data: {
         isFeatured: false,
         featuredUntil: null,
-        updatedAt: new Date(),
+        updated_at: new Date(),
       },
     });
 
     // Expire any active featured listings
-    await prisma.directoryFeaturedListings.updateMany({
+    await prisma.directory_featured_listings.updateMany({
       where: {
         tenantId,
         featuredUntil: { gt: new Date() },

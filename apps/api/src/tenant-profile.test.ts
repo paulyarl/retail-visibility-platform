@@ -98,7 +98,7 @@ const dbAvailable = !!process.env.DATABASE_URL;
 
     expect(getRes.status).toBe(200);
     expect(getRes.body.tenant_id).toBe(tenantId);
-    expect(getRes.body.business_name).toBe('My Shop');
+    expect(getRes.body.businessName).toBe('My Shop');
     expect(getRes.body.phone_number).toBe('+12025550123');
   });
 

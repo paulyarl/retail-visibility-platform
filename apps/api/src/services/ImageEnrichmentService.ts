@@ -23,9 +23,9 @@ export class ImageEnrichmentService {
    * Uses existing Supabase storage infrastructure
    */
   async downloadAndStoreImage(
-    imageUrl: string,
-    tenantId: string,
-    itemId: string,
+    image_url: string,
+    tenant_id: string,
+    item_id: string,
     sku: string
   ): Promise<ImageDownloadResult | null> {
     if (!supabase) {
@@ -94,14 +94,14 @@ export class ImageEnrichmentService {
    * Integrates with existing photo infrastructure
    */
   async createPhotoAsset(
-    tenantId: string,
-    itemId: string,
+    tenant_id: string,
+    item_id: string,
     imageData: ImageDownloadResult,
     position: number = 0,
     alt?: string
   ): Promise<void> {
     try {
-      await prisma.photoAsset.create({
+      await prisma.photo_asset.create({
         data: {
           tenantId,
           inventoryItemId: itemId,
@@ -119,9 +119,9 @@ export class ImageEnrichmentService {
 
       // Update item's imageUrl to primary photo (position 0)
       if (position === 0) {
-        await prisma.inventoryItem.update({
+        await prisma.inventory_item.update({
           where: { id: itemId },
-          data: { imageUrl: imageData.url },
+          data: { image_url: imageData.url },
         });
       }
     } catch (error: any) {
@@ -135,8 +135,8 @@ export class ImageEnrichmentService {
    * Supports up to 11 images (1 primary + 10 additional) per Google Merchant Center requirements
    */
   async processProductImages(
-    tenantId: string,
-    itemId: string,
+    tenant_id: string,
+    item_id: string,
     sku: string,
     imageUrls: string[],
     productName?: string
@@ -212,8 +212,8 @@ export class ImageEnrichmentService {
     }
 
     // Direct image URL
-    if (enrichment.imageUrl) {
-      urls.push(enrichment.imageUrl);
+    if (enrichment.image_url) {
+      urls.push(enrichment.image_url);
     }
 
     // Thumbnail URL
