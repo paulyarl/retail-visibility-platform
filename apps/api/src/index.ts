@@ -136,14 +136,16 @@ const getSquareRoutes = async () => {
   }
   return squareRoutes;
 };
-import dashboardRoutes from './routes/dashboard'; // FIXED VERSION
-import dashboardConsolidatedRoutes from './routes/dashboard-consolidated';
-import tenantTierRoutes from './routes/tenant-tier';
-import promotionRoutes from './routes/promotion';
-import tenantLimitsRoutes from './routes/tenant-limits';
+// Temporarily disable all route imports except essential ones
+// import dashboardRoutes from './routes/dashboard'; // FIXED VERSION
+// import dashboardConsolidatedRoutes from './routes/dashboard-consolidated';
+// import tenantTierRoutes from './routes/tenant-tier';
+// import promotionRoutes from './routes/promotion';
+// import tenantLimitsRoutes from './routes/tenant-limits';
 
-import testGbpSyncRoutes from './routes/test-gbp-sync';
-import emailManagementRoutes from './routes/email-management';
+// Temporarily disable all route imports to isolate startup issue
+// import testGbpSyncRoutes from './routes/test-gbp-sync';
+// import emailManagementRoutes from './routes/email-management';
 
 const app = express();
 
@@ -3233,46 +3235,39 @@ app.use(auditRoutes);
 app.use(policyRoutes);
 app.use(billingRoutes);
 app.use('/subscriptions', subscriptionRoutes);
-app.use('/api/categories', authenticateToken, categoryRoutes);
-app.use('/performance', performanceRoutes);
-app.use('/api/organizations', authenticateToken, organizationRoutes);
-app.use('/organization-requests', organizationRequestRoutes);
-app.use('/upgrade-requests', upgradeRequestsRoutes);
-app.use('/permissions', permissionRoutes);
-app.use('/users', userRoutes);
-// Directory Categories routes - NEW for category-based discovery (mount FIRST to take precedence)
-app.use('/api/directory', directoryCategoriesRoutes);
-console.log('✅ Directory categories routes mounted (category-based discovery)');
+// Temporarily disable route usages for isolated imports
+// app.use('/api/categories', authenticateToken, categoryRoutes);
+// app.use('/performance', performanceRoutes);
+// app.use('/api/organizations', authenticateToken, organizationRoutes);
+// app.use('/organization-requests', organizationRequestRoutes);
+// app.use('/upgrade-requests', upgradeRequestsRoutes);
+// app.use('/permissions', permissionRoutes);
+// app.use('/users', userRoutes);
+// app.use('/api/directory', directoryCategoriesRoutes);
+// console.log('✅ Directory categories routes mounted (category-based discovery)');
 
-// Directory Store Types routes - NEW for store type browsing (dual category system)
-app.use('/api/directory', directoryStoreTypesRoutes);
-console.log('✅ Directory store types routes mounted (store type discovery)');
+// app.use('/api/directory', directoryStoreTypesRoutes);
+// console.log('✅ Directory store types routes mounted (store type discovery)');
 
-// Directory routes - mount AFTER category routes to avoid conflicts
-// Category routes handle: /api/directory/categories/*
-// These routes handle: /api/directory/search, /api/directory/locations, etc.
-app.use('/api/directory', directoryRoutes); // Public directory endpoint - no auth required
-app.use('/api/admin/directory', directoryAdminRoutes); // Admin directory management (auth in routes)
-app.use('/api/support/directory', directorySupportRoutes); // Support directory tools (auth in routes)
-// Tenant directory routes - MUST come before generic tenant routes
-app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
-console.log('✅ Directory listings routes mounted (directory_listings table)');
-// Generic tenant routes come AFTER directory routes
-app.use('/api/tenants', tenantUserRoutes);
-app.use(platformSettingsRoutes);
-app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
-app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
-console.log('✅ Dashboard routes mounted');
-// Consolidated dashboard endpoint (reduces 4 calls to 1)
-app.use('/api', dashboardConsolidatedRoutes);
-console.log('✅ Consolidated dashboard route mounted');
-app.use('/api', promotionRoutes); // Promotion endpoints
-console.log('✅ Promotion routes mounted');
-app.use('/api', businessHoursRoutes); // Business hours management
-console.log('✅ Business hours routes mounted');
-app.use('/api', tenantTierRoutes); // Tenant tier and usage endpoints
-app.use('/api/tenant-limits', tenantLimitsRoutes); // Tenant creation limits
-console.log('✅ Tenant limits routes mounted');
+// app.use('/api/directory', directoryRoutes); // Public directory endpoint - no auth required
+// app.use('/api/admin/directory', directoryAdminRoutes); // Admin directory management (auth in routes)
+// app.use('/api/support/directory', directorySupportRoutes); // Support directory tools (auth in routes)
+// app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
+// console.log('✅ Directory listings routes mounted (directory_listings table)');
+// app.use('/api/tenants', tenantUserRoutes);
+// app.use(platformSettingsRoutes);
+// app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
+// app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
+// console.log('✅ Dashboard routes mounted');
+// app.use('/api', dashboardConsolidatedRoutes);
+// console.log('✅ Consolidated dashboard route mounted');
+// app.use('/api', promotionRoutes); // Promotion endpoints
+// console.log('✅ Promotion routes mounted');
+// app.use('/api', businessHoursRoutes); // Business hours management
+// console.log('✅ Business hours routes mounted');
+// app.use('/api', tenantTierRoutes); // Tenant tier and usage endpoints
+// app.use('/api/tenant-limits', tenantLimitsRoutes); // Tenant creation limits
+// console.log('✅ Tenant limits routes mounted');
 
 /* ------------------------------ v3.6.2-prep APIs ------------------------------ */
 app.use('/api/feed-jobs', feedJobsRoutes);
