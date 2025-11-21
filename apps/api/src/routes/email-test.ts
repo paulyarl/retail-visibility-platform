@@ -108,6 +108,7 @@ router.post('/test-invitation', requirePlatformUser, async (req: Request, res: R
       role: 'MEMBER',
       acceptUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=test-token-123`,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      usersName: 'Test User', // Required by InvitationEmailData interface
     };
 
     const result = await emailService.sendInvitationEmail(testData);
