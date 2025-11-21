@@ -3240,133 +3240,15 @@ app.put("/admin/email-config", async (req, res) => {
   }
 });
 
-/* ------------------------------ AUTHENTICATION ------------------------------ */
-// Mount auth routes (no authentication required for these endpoints)
-app.use('/auth', authRoutes);
-app.use('/api/auth', authRoutes);
+/* ------------------------------ ROUTE MOUNTING ------------------------------ */
+// Use modular route mounting for better isolation and debugging
+import { mountMinimalRoutes, mountAllRoutes } from './routes';
 
-/* ------------------------------ EMAIL MANAGEMENT ------------------------------ */
-// Import and mount email management routes
-// app.use('/api/email', emailManagementRoutes);
+// For debugging: mount only minimal routes
+mountMinimalRoutes(app);
 
-/* ------------------------------ v3.5 AUDIT & BILLING APIs ------------------------------ */
-// Apply audit middleware globally (logs all write operations)
-// app.use(auditLogger);
-
-// Mount v3.5 routes - temporarily disabled
-// app.use(auditRoutes);
-// app.use(policyRoutes);
-// app.use(billingRoutes);
-// app.use('/subscriptions', subscriptionRoutes);
-// Temporarily disable route usages for isolated imports
-// app.use('/api/categories', authenticateToken, categoryRoutes);
-// app.use('/performance', performanceRoutes);
-// app.use('/api/organizations', authenticateToken, organizationRoutes);
-// app.use('/organization-requests', organizationRequestRoutes);
-// app.use('/upgrade-requests', upgradeRequestsRoutes);
-// app.use('/permissions', permissionRoutes);
-// app.use('/users', userRoutes);
-// app.use('/api/directory', directoryCategoriesRoutes);
-// console.log('✅ Directory categories routes mounted (category-based discovery)');
-
-// app.use('/api/directory', directoryStoreTypesRoutes);
-// console.log('✅ Directory store types routes mounted (store type discovery)');
-
-// app.use('/api/directory', directoryRoutes); // Public directory endpoint - no auth required
-// app.use('/api/admin/directory', directoryAdminRoutes); // Admin directory management (auth in routes)
-// app.use('/api/support/directory', directorySupportRoutes); // Support directory tools (auth in routes)
-// app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
-// console.log('✅ Directory listings routes mounted (directory_listings table)');
-// app.use('/api/tenants', tenantUserRoutes);
-// app.use(platformSettingsRoutes);
-// app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no auth required
-// app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
-// console.log('✅ Dashboard routes mounted');
-// app.use('/api', dashboardConsolidatedRoutes);
-// console.log('✅ Consolidated dashboard route mounted');
-// app.use('/api', promotionRoutes); // Promotion endpoints
-// console.log('✅ Promotion routes mounted');
-// app.use('/api', businessHoursRoutes); // Business hours management
-// console.log('✅ Business hours routes mounted');
-// app.use('/api', tenantTierRoutes); // Tenant tier and usage endpoints
-// app.use('/api/tenant-limits', tenantLimitsRoutes); // Tenant creation limits
-// console.log('✅ Tenant limits routes mounted');
-
-/* ------------------------------ v3.6.2-prep APIs ------------------------------ */
-// app.use('/api/feed-jobs', feedJobsRoutes);
-// app.use('/api/feedback', feedbackRoutes);
-// app.use('/api/v1/tenants', authenticateToken, checkTenantAccess, tenantCategoriesRoutes);
-// app.use('/api/v1', quickStartRoutes);
-// IMPORTANT: Route order matters in Express! More specific routes MUST come before generic ones.
-// Tenant flags: accessible by platform admins OR store owners of that specific tenant
-// MUST be mounted BEFORE the generic /api/admin route below to prevent route matching conflicts
-// app.use('/admin', authenticateToken, tenantFlagsRoutes);
-// app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
-// Admin tools and users - these are more generic and should come after specific routes
-// app.use('/api/admin', authenticateToken, requireAdmin, adminToolsRoutes);
-// app.use('/api/admin/feature-overrides', featureOverridesRoutes); // Feature overrides (admin-only, auth handled in route)
-// app.use('/api/admin/tier-management', tierManagementRoutes); // Tier management (admin-only, auth handled in route)
-// app.use('/api/admin/tier-system', tierSystemRoutes); // Tier system CRUD (platform staff, auth handled in route)
-// app.use('/api/integrations', cloverRoutes); // Clover POS integration (auth handled in route)
-// console.log('✅ Clover integration routes mounted');
-// app.use('/api/email', emailTestRoutes); // Email testing and configuration routes
-// console.log('✅ Email routes mounted');
-
-// Simple Clover connection status endpoint for frontend banners
-app.get('/api/tenants/:tenantId/integrations/clover', authenticateToken, async (req, res) => {
-  try {
-    const { tenantId } = req.params;
-    const user = (req as any).user;
-
-    // Verify tenant access
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      include: {
-        userTenants: {
-          include: {
-            user: true
-          }
-        }
-      }
-    });
-
-    if (!tenant) {
-      return res.status(404).json({ error: 'tenant_not_found' });
-    }
-
-    // Check if user has access to this tenant
-    const hasAccess = tenant.userTenants.some((ut: any) => ut.userId === user.id);
-    if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
-      return res.status(403).json({ error: 'access_denied' });
-    }
-
-    // Check if integration exists and is active
-    const integration = await prisma.cloverIntegrations.findFirst({
-      where: { tenantId: tenantId }
-    });
-
-    const connected = integration && integration.status === 'active';
-
-    return res.json({ connected });
-  } catch (error) {
-    console.error('[GET /api/tenants/:tenantId/integrations/clover] Error:', error);
-    return res.status(500).json({ error: 'failed_to_check_connection' });
-  }
-});
-// Temporarily disabled Square routes to fix production startup
-// app.use('/square', async (req, res, next) => {
-//   try {
-//     const routes = await getSquareRoutes();
-//     return routes(req, res, next);
-//   } catch (error) {
-//     console.error('[Square Routes] Lazy loading error:', error);
-//     res.status(500).json({ error: 'square_integration_unavailable' });
-//   }
-// }); // Square POS integration (auth handled in route)
-// app.use('/admin', authenticateToken, adminUsersRoutes);
-// app.use('/api/admin', authenticateToken, adminUsersRoutes);
-// app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
-// app.use('/api', feedValidationRoutes);
+// For full functionality: mount all routes (can be enabled when debugging is complete)
+// mountAllRoutes(app);
 /* ------------------------------ TAXONOMY ADMIN API ------------------------------ */
 
 // GET /api/admin/taxonomy/status - Check taxonomy sync status
