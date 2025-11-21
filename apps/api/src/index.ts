@@ -147,6 +147,27 @@ const getSquareRoutes = async () => {
 // import testGbpSyncRoutes from './routes/test-gbp-sync';
 // import emailManagementRoutes from './routes/email-management';
 
+// Essential routes only - disable all others
+// import feedJobsRoutes from './routes/feed-jobs';
+// import feedbackRoutes from './routes/feedback';
+// import tenantCategoriesRoutes from './routes/tenant-categories';
+// import quickStartRoutes from './routes/quick-start';
+// import tenantFlagsRoutes from './routes/tenant-flags';
+// import adminToolsRoutes from './routes/admin-tools';
+// import featureOverridesRoutes from './routes/admin/feature-overrides';
+// import tierManagementRoutes from './routes/admin/tier-management';
+// import tierSystemRoutes from './routes/admin/tier-system';
+// import cloverRoutes from './routes/integrations/clover';
+// import emailTestRoutes from './routes/email-test';
+// import categoriesPlatformRoutes from './routes/categories.platform';
+// import categoriesTenantRoutes from './routes/categories.tenant';
+// import categoriesMirrorRoutes from './routes/categories.mirror';
+// import mirrorAdminRoutes from './routes/mirror.admin';
+// import syncLogsRoutes from './routes/sync-logs';
+// import scanRoutes from './routes/scan';
+// import scanMetricsRoutes from './routes/scan-metrics';
+// import testGbpSyncRoutes from './routes/test-gbp-sync';
+
 const app = express();
 
 /* ------------------------- middleware ------------------------- */
@@ -3270,24 +3291,24 @@ app.use('/subscriptions', subscriptionRoutes);
 // console.log('✅ Tenant limits routes mounted');
 
 /* ------------------------------ v3.6.2-prep APIs ------------------------------ */
-app.use('/api/feed-jobs', feedJobsRoutes);
-app.use('/api/feedback', feedbackRoutes);
-app.use('/api/v1/tenants', authenticateToken, checkTenantAccess, tenantCategoriesRoutes);
-app.use('/api/v1', quickStartRoutes);
+// app.use('/api/feed-jobs', feedJobsRoutes);
+// app.use('/api/feedback', feedbackRoutes);
+// app.use('/api/v1/tenants', authenticateToken, checkTenantAccess, tenantCategoriesRoutes);
+// app.use('/api/v1', quickStartRoutes);
 // IMPORTANT: Route order matters in Express! More specific routes MUST come before generic ones.
 // Tenant flags: accessible by platform admins OR store owners of that specific tenant
 // MUST be mounted BEFORE the generic /api/admin route below to prevent route matching conflicts
-app.use('/admin', authenticateToken, tenantFlagsRoutes);
-app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
+// app.use('/admin', authenticateToken, tenantFlagsRoutes);
+// app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
 // Admin tools and users - these are more generic and should come after specific routes
-app.use('/api/admin', authenticateToken, requireAdmin, adminToolsRoutes);
-app.use('/api/admin/feature-overrides', featureOverridesRoutes); // Feature overrides (admin-only, auth handled in route)
-app.use('/api/admin/tier-management', tierManagementRoutes); // Tier management (admin-only, auth handled in route)
-app.use('/api/admin/tier-system', tierSystemRoutes); // Tier system CRUD (platform staff, auth handled in route)
-app.use('/api/integrations', cloverRoutes); // Clover POS integration (auth handled in route)
-console.log('✅ Clover integration routes mounted');
-app.use('/api/email', emailTestRoutes); // Email testing and configuration routes
-console.log('✅ Email routes mounted');
+// app.use('/api/admin', authenticateToken, requireAdmin, adminToolsRoutes);
+// app.use('/api/admin/feature-overrides', featureOverridesRoutes); // Feature overrides (admin-only, auth handled in route)
+// app.use('/api/admin/tier-management', tierManagementRoutes); // Tier management (admin-only, auth handled in route)
+// app.use('/api/admin/tier-system', tierSystemRoutes); // Tier system CRUD (platform staff, auth handled in route)
+// app.use('/api/integrations', cloverRoutes); // Clover POS integration (auth handled in route)
+// console.log('✅ Clover integration routes mounted');
+// app.use('/api/email', emailTestRoutes); // Email testing and configuration routes
+// console.log('✅ Email routes mounted');
 
 // Simple Clover connection status endpoint for frontend banners
 app.get('/api/tenants/:tenantId/integrations/clover', authenticateToken, async (req, res) => {
@@ -3405,21 +3426,21 @@ app.post('/api/admin/taxonomy/sync', requireAdmin, async (req, res) => {
     res.status(500).json({ error: 'Taxonomy sync failed' });
   }
 });
-app.use('/admin', authenticateToken, platformFlagsRoutes);
-app.use('/api/admin', authenticateToken, platformFlagsRoutes);
+// app.use('/admin', authenticateToken, platformFlagsRoutes);
+// app.use('/api/admin', authenticateToken, platformFlagsRoutes);
 // Effective flags: middleware applied per-route (admin for platform, tenant access for tenant)
-app.use('/admin', authenticateToken, effectiveFlagsRoutes);
-app.use('/api/admin', authenticateToken, effectiveFlagsRoutes);
+// app.use('/admin', authenticateToken, effectiveFlagsRoutes);
+// app.use('/api/admin', authenticateToken, effectiveFlagsRoutes);
 // Category scaffolds (M3 start)
-app.use(categoriesPlatformRoutes);
-app.use(categoriesTenantRoutes);
-app.use(categoriesMirrorRoutes);
-app.use(mirrorAdminRoutes);
-app.use(syncLogsRoutes);
+// app.use(categoriesPlatformRoutes);
+// app.use(categoriesTenantRoutes);
+// app.use(categoriesMirrorRoutes);
+// app.use(mirrorAdminRoutes);
+// app.use(syncLogsRoutes);
 // M4: SKU Scanning routes
-app.use('/api', scanRoutes);
-console.log('✅ Scan routes mounted at /api/scan');
-app.use(scanMetricsRoutes);
+// app.use('/api', scanRoutes);
+// console.log('✅ Scan routes mounted at /api/scan');
+// app.use(scanMetricsRoutes);
 
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenantId/items/:itemId/category
@@ -3723,7 +3744,7 @@ app.get("/api/gbp/categories", async (req, res) => {
 });
 
 // Mount test GBP sync routes
-app.use('/test', testGbpSyncRoutes);
+// app.use('/test', testGbpSyncRoutes);
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
