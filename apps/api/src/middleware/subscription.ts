@@ -26,10 +26,10 @@ export async function requireActiveSubscription(
       select: {
         id: true,
         name: true,
-        subscription_status: true,
-        subscription_tier: true,
+        subscriptionStatus: true,
+        subscriptionTier: true,
         trialEndsAt: true,
-        subscription_ends_at: true,
+        subscriptionEndsAt: true,
       },
     });
 
@@ -43,21 +43,21 @@ export async function requireActiveSubscription(
     const now = new Date();
 
     // Check if subscription is canceled
-    if (tenant.subscription_status === "canceled") {
+    if (tenant.subscriptionStatus === "canceled") {
       return res.status(402).json({
         error: "subscription_canceled",
         message: "Your subscription has been canceled. Please contact support to reactivate.",
         tenant: {
           id: tenant.id,
           name: tenant.name,
-          status: tenant.subscription_status,
+          status: tenant.subscriptionStatus,
         },
       });
     }
 
     // Check if trial has expired - convert to active status (keep same tier)
     if (
-      tenant.subscription_status === "trial" &&
+      tenant.subscriptionStatus === "trial" &&
       tenant.trialEndsAt &&
       tenant.trialEndsAt < now
     ) {
@@ -78,7 +78,7 @@ export async function requireActiveSubscription(
 
     // Check if subscription has expired
     if (
-      tenant.subscription_status === "active" &&
+      tenant.subscriptionStatus === "active" &&
       tenant.subscriptionEndsAt &&
       tenant.subscriptionEndsAt < now
     ) {
@@ -89,20 +89,20 @@ export async function requireActiveSubscription(
           id: tenant.id,
           name: tenant.name,
           status: "expired",
-          subscription_ends_at: tenant.subscriptionEndsAt,
+          subscriptionEndsAt: tenant.subscriptionEndsAt,
         },
       });
     }
 
     // Check if payment is past due
-    if (tenant.subscription_status === "past_due") {
+    if (tenant.subscriptionStatus === "past_due") {
       return res.status(402).json({
         error: "payment_past_due",
         message: "Your payment is past due. Please update your payment method.",
         tenant: {
           id: tenant.id,
           name: tenant.name,
-          status: tenant.subscription_status,
+          status: tenant.subscriptionStatus,
         },
       });
     }
@@ -138,8 +138,8 @@ export async function checkSubscriptionLimits(
       where: { id: tenantId },
       select: {
         id: true,
-        subscription_tier: true,
-        subscription_status: true,
+        subscriptionTier: true,
+        subscriptionStatus: true,
         trialEndsAt: true,
         organizationId: true,
         organization: {
@@ -147,12 +147,12 @@ export async function checkSubscriptionLimits(
             id: true,
             name: true,
             maxTotalSKUs: true,
-            subscription_tier: true,
-            tenant: {
+            subscriptionTier: true,
+            Tenant: {
               select: {
                 _count: {
                   select: {
-                    _count: true,
+                    inventoryItems: true,
                   },
                 },
               },
@@ -161,7 +161,7 @@ export async function checkSubscriptionLimits(
         },
         _count: {
           select: {
-            _count: true,
+            inventoryItems: true,
           },
         },
       },
@@ -177,8 +177,8 @@ export async function checkSubscriptionLimits(
       const org = tenant.organization;
       
       // Calculate total SKUs across all locations in the chain
-      const totalChainSKUs = org.tenants.reduce(
-        (sum, t) => sum + t._count.inventory_item,
+      const totalChainSKUs = org.Tenant.reduce(
+        (sum: number, t: any) => sum + t._count.inventoryItems,
         0
       );
 
@@ -202,16 +202,16 @@ export async function checkSubscriptionLimits(
 
     // INDIVIDUAL TENANT LIMIT ENFORCEMENT
     // Define limits per tier for standalone tenants
-    const limits: Record<string, { _count: number }> = {
-      google_only: { _count: 500 },
-      starter: { _count: 500 },
-      professional: { _count: 5000 },
-      enterprise: { _count: Infinity },
+    const limits: Record<string, { items: number }> = {
+      google_only: { items: 500 },
+      starter: { items: 500 },
+      professional: { items: 5000 },
+      enterprise: { items: Infinity },
     };
 
     const tier = tenant.subscriptionTier || "starter";
     const limit = limits[tier] || limits.starter;
-    const status = tenant.subscription_status || "active";
+    const status = tenant.subscriptionStatus || "active";
     const maintenanceState = getMaintenanceState({
       tier,
       status,
@@ -224,22 +224,22 @@ export async function checkSubscriptionLimits(
         error: "maintenance_no_growth",
         message:
           "Your account is in maintenance mode. You can update existing products, but cannot add new products until you upgrade.",
-        subscription_tier: tier,
-        subscription_status: status,
+        subscriptionTier: tier,
+        subscriptionStatus: status,
         maintenanceState,
         limit: limit.items,
-        current: tenant._count.inventory_item,
+        current: tenant._count.inventoryItems,
         upgradeUrl: "/settings/subscription",
       });
     }
 
     // Check if creating new item would exceed numeric tier limit
-    if (req.method === "POST" && tenant._count.inventory_item >= limit.items) {
+    if (req.method === "POST" && tenant._count.inventoryItems >= limit.items) {
       return res.status(402).json({
         error: "item_limit_reached",
         message: `You've reached the ${tier} plan limit of ${limit.items} items. Please upgrade to add more.`,
         limit: limit.items,
-        current: tenant._count.inventory_item,
+        current: tenant._count.inventoryItems,
         tier,
       });
     }
@@ -278,10 +278,10 @@ export async function requireWritableSubscription(
       select: {
         id: true,
         name: true,
-        subscription_status: true,
-        subscription_tier: true,
+        subscriptionStatus: true,
+        subscriptionTier: true,
         trialEndsAt: true,
-        subscription_ends_at: true,
+        subscriptionEndsAt: true,
       },
     });
 
@@ -303,8 +303,8 @@ export async function requireWritableSubscription(
       return res.status(403).json({
         error: "account_frozen",
         message: "Your account is in read-only mode. Your storefront and directory listing remain visible, but you cannot make changes. Please upgrade to regain full access.",
-        subscription_status: tenant.subscription_status,
-        subscription_tier: tenant.subscriptionTier,
+        subscriptionStatus: tenant.subscriptionStatus,
+        subscriptionTier: tenant.subscriptionTier,
         internalStatus,
         upgradeUrl: "/settings/subscription",
       });
@@ -315,7 +315,7 @@ export async function requireWritableSubscription(
       return res.status(403).json({
         error: "subscription_canceled",
         message: "Your subscription has been canceled. Please contact support to reactivate or upgrade to a new plan.",
-        subscription_status: tenant.subscription_status,
+        subscriptionStatus: tenant.subscriptionStatus,
         internalStatus,
       });
     }
@@ -325,8 +325,8 @@ export async function requireWritableSubscription(
       return res.status(402).json({
         error: "subscription_expired",
         message: "Your subscription has expired. Please upgrade to continue making changes.",
-        subscription_status: tenant.subscription_status,
-        subscription_tier: tenant.subscriptionTier,
+        subscriptionStatus: tenant.subscriptionStatus,
+        subscriptionTier: tenant.subscriptionTier,
         internalStatus,
         upgradeUrl: "/settings/subscription",
       });

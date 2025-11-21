@@ -116,6 +116,16 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
           tenantId={tenantId}
         />
 
+        {/* Tenant ID Display */}
+        <div className="flex justify-end">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-100 rounded-lg border border-neutral-200">
+            <span className="text-xs text-neutral-500 font-medium">Platform ID:</span>
+            <code className="text-xs font-mono text-neutral-700 bg-white px-2 py-0.5 rounded border select-all">
+              {tenantId}
+            </code>
+          </div>
+        </div>
+
         {/* Tier Gains Welcome - Celebrate what they unlocked */}
         {tier && tier.effective?.level && tier.effective?.name && (
           <TierGainsWelcome 

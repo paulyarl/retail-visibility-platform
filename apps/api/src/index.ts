@@ -82,7 +82,7 @@ import businessProfileValidationRoutes from './routes/business-profile-validatio
 // Authentication
 import authRoutes from './auth/auth.routes';
 import { authenticateToken, checkTenantAccess, requireAdmin } from './middleware/auth';
-import { isPlatformAdmin } from './utils/platform-admin';
+import { isPlatformAdmin, isPlatformUser } from './utils/platform-admin';
 import { 
   requireTenantAdmin, 
   requireInventoryAccess, 
@@ -137,11 +137,13 @@ const getSquareRoutes = async () => {
   return squareRoutes;
 };
 import dashboardRoutes from './routes/dashboard'; // FIXED VERSION
+import dashboardConsolidatedRoutes from './routes/dashboard-consolidated';
 import tenantTierRoutes from './routes/tenant-tier';
 import promotionRoutes from './routes/promotion';
 import tenantLimitsRoutes from './routes/tenant-limits';
 
 import testGbpSyncRoutes from './routes/test-gbp-sync';
+import emailManagementRoutes from './routes/email-management';
 
 const app = express();
 
@@ -240,6 +242,7 @@ app.get("/api/tenants", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "failed_to_list_tenants" });
   }
 });
+
 
 app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
@@ -353,9 +356,14 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     // Determine who will own this tenant
     // If ownerId is provided and user is PLATFORM_SUPPORT, use that owner
     // Otherwise, the authenticated user becomes the owner
+    const userId = req.user!.userId || req.user!.user_id;
+    if (!userId) {
+      return res.status(401).json({ error: 'authentication_required', message: 'Invalid user ID' });
+    }
+    
     const ownerId = (req.user?.role === 'PLATFORM_SUPPORT' && parsed.data.ownerId) 
       ? parsed.data.ownerId 
-      : req.user!.userId;
+      : userId;
     
     console.log('[POST /tenants] Creating tenant for owner:', ownerId, 'by user:', req.user?.userId);
     
@@ -852,7 +860,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
     
     // Check if profile exists
     const existingProfiles = await basePrisma.$queryRaw`
-      SELECT tenantId FROM "tenant_business_profile" WHERE tenantId = ${tenantId}
+      SELECT tenant_id FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
     `;
     console.log('[POST /tenant/profile] Existing profiles check result:', existingProfiles);
 
@@ -876,7 +884,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
         const updateQuery = `
           UPDATE "tenant_business_profile"
           SET ${updateParts.join(', ')}
-          WHERE tenantId = $${values.length}
+          WHERE tenant_id = $${values.length}
         `;
         console.log('[POST /tenant/profile] Update query:', updateQuery);
         console.log('[POST /tenant/profile] Update values:', values);
@@ -886,13 +894,13 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
 
       // Get updated profile
       result = await basePrisma.$queryRaw`
-        SELECT * FROM "tenant_business_profile" WHERE tenantId = ${tenantId}
+        SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
       `;
       console.log('[POST /tenant/profile] Retrieved updated profile');
     } else {
       console.log('[POST /tenant/profile] Creating new profile');
       // Create new profile
-      const insertFields = ['tenantId', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
+      const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
       const insertValues = [
         tenantId,
         profileData.business_name || existingTenant.name,
@@ -931,7 +939,19 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
         }
       });
 
-      const placeholders = insertFields.map((_, i) => `$${i + 1}`);
+      // Always add updated_at field with current timestamp
+      insertFields.push('updated_at');
+      // Don't push a value for updated_at, we'll use CURRENT_TIMESTAMP in SQL
+
+      const placeholders = insertFields.map((field, i) => {
+        if (field === 'updated_at') {
+          return 'CURRENT_TIMESTAMP';
+        }
+        // Calculate parameter index excluding updated_at
+        const paramIndex = insertFields.slice(0, i).filter(f => f !== 'updated_at').length + 1;
+        return `$${paramIndex}`;
+      });
+      
       const insertQuery = `
         INSERT INTO "tenant_business_profile" (${insertFields.map(f => `"${f}"`).join(', ')})
         VALUES (${placeholders.join(', ')})
@@ -941,7 +961,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
       console.log('[POST /tenant/profile] Final insert values:', insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
-        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profile" WHERE tenantId = ${tenantId}`
+        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}`
       );
       console.log('[POST /tenant/profile] Created new profile');
     }
@@ -977,19 +997,27 @@ app.get("/tenant/profile", authenticateToken, async (req, res) => {
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     const { basePrisma } = await import('./prisma');
     const bpResults = await basePrisma.$queryRaw`
-      SELECT * FROM "tenant_business_profile" WHERE tenantId = ${tenantId}
+      SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
     `;
     const bp = (bpResults as any[])[0] || null;
     
-    // Fetch business hours from BusinessHours table
-    const businessHoursResults = await basePrisma.$queryRaw`
-      SELECT * FROM "businessHours" WHERE tenantId = ${tenantId}
-    `;
-    const businessHours = (businessHoursResults as any[])[0] || null;
-    const specialHoursResults = await basePrisma.$queryRaw`
-      SELECT * FROM "businessHoursSpecial" WHERE tenantId = ${tenantId}
-    `;
-    const specialHours = (specialHoursResults as any[])[0] || null;
+    // Fetch business hours from BusinessHours table (optional - tables may not exist)
+    let businessHours = null;
+    let specialHours = null;
+    try {
+      const businessHoursResults = await basePrisma.$queryRaw`
+        SELECT * FROM "business_hours" WHERE tenant_id = ${tenantId}
+      `;
+      businessHours = (businessHoursResults as any[])[0] || null;
+      
+      const specialHoursResults = await basePrisma.$queryRaw`
+        SELECT * FROM "business_hours_special" WHERE tenant_id = ${tenantId}
+      `;
+      specialHours = (specialHoursResults as any[])[0] || null;
+    } catch (error) {
+      // Business hours tables don't exist yet - continue without them
+      console.log('[GET /tenant/profile] Business hours tables not found, continuing without them');
+    }
     
     const md = (tenant.metadata as any) || {};
     const profile = {
@@ -1124,19 +1152,27 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     const { basePrisma } = await import('./prisma');
     const bpResults = await basePrisma.$queryRaw`
-      SELECT tenantId, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, updated_at FROM "tenant_business_profile" WHERE tenantId = ${tenantId}
+      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, updated_at FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
     `;
     const bp = (bpResults as any[])[0] || null;
     
-    // Fetch business hours from BusinessHours table
-    const businessHoursResults = await basePrisma.$queryRaw`
-      SELECT * FROM "businessHours" WHERE tenantId = ${tenantId}
-    `;
-    const businessHours = (businessHoursResults as any[])[0] || null;
-    const specialHoursResults = await basePrisma.$queryRaw`
-      SELECT * FROM "businessHoursSpecial" WHERE tenantId = ${tenantId}
-    `;
-    const specialHours = (specialHoursResults as any[])[0] || null;
+    // Fetch business hours from BusinessHours table (optional - tables may not exist)
+    let businessHours = null;
+    let specialHours = null;
+    try {
+      const businessHoursResults = await basePrisma.$queryRaw`
+        SELECT * FROM "business_hours" WHERE tenant_id = ${tenantId}
+      `;
+      businessHours = (businessHoursResults as any[])[0] || null;
+      
+      const specialHoursResults = await basePrisma.$queryRaw`
+        SELECT * FROM "business_hours_special" WHERE tenant_id = ${tenantId}
+      `;
+      specialHours = (specialHoursResults as any[])[0] || null;
+    } catch (error) {
+      // Business hours tables don't exist yet - continue without them
+      console.log('[GET /public/tenant/:tenantId/profile] Business hours tables not found, continuing without them');
+    }
     
     let hoursData = null;
     
@@ -1349,7 +1385,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
     
     // Check if profile exists
     const existingProfiles = await basePrisma.$queryRaw`
-      SELECT tenantId FROM "tenant_business_profile" WHERE tenantId = ${tenantId}
+      SELECT tenant_id FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
     `;
     console.log(`[PATCH /tenant/profile] Existing profiles found:`, (existingProfiles as any[]).length);
     let result;
@@ -1372,7 +1408,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
         const updateQuery = `
           UPDATE "tenant_business_profile"
           SET ${updateParts.join(', ')}
-          WHERE tenantId = $${values.length}
+          WHERE tenant_id = $${values.length}
         `;
         console.log(`[PATCH /tenant/profile] Update query:`, updateQuery);
         console.log(`[PATCH /tenant/profile] Update values:`, values);
@@ -1382,13 +1418,13 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
 
       // Get updated profile
       result = await basePrisma.$queryRaw`
-        SELECT * FROM "tenant_business_profile" WHERE tenantId = ${tenantId}
+        SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
       `;
       console.log(`[PATCH /tenant/profile] Retrieved updated profile:`, result);
     } else {
       console.log(`[PATCH /tenant/profile] Creating new profile`);
       // Create new profile
-      const insertFields = ['tenantId', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
+      const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
       const insertValues = [
         tenantId,
         delta.business_name || existingTenant.name,
@@ -1418,6 +1454,10 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
         }
       });
 
+      // Always add updated_at field with current timestamp
+      insertFields.push('updated_at');
+      insertValues.push(new Date().toISOString());
+
       const placeholders = insertFields.map((_, i) => `$${i + 1}`);
       const insertQuery = `
         INSERT INTO "tenant_business_profile" (${insertFields.map(f => `"${f}"`).join(', ')})
@@ -1428,7 +1468,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
       console.log(`[PATCH /tenant/profile] Insert values:`, insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
-        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profile" WHERE tenantId = ${tenantId}`
+        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}`
       );
       console.log(`[PATCH /tenant/profile] Created new profile:`, result);
     }
@@ -1974,6 +2014,8 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
   
   // Check tenant access
   const tenantId = parsed.data.tenantId;
+
+  
   if (!tenantId) {
     return res.status(400).json({ error: "tenantId_required" });
   }
@@ -2182,11 +2224,18 @@ const createItemSchema = baseItemSchema.transform((data) => {
 
 const updateItemSchema = baseItemSchema.partial();
 
-app.post(["/api/items", "/api/inventory", "/items", "/inventory"], checkSubscriptionLimits, enforcePolicyCompliance, async (req, res) => {
+app.post(["/api/items", "/api/inventory", "/items", "/inventory"], checkSubscriptionLimits, async (req, res) => {
+  console.log('[POST /items] Raw request body:', JSON.stringify(req.body, null, 2));
+  
   const parsed = createItemSchema.safeParse(req.body ?? {});
-  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  console.log('[POST /items] Zod validation result:', parsed.success);
+  if (!parsed.success) {
+    console.log('[POST /items] Validation errors:', JSON.stringify(parsed.error.flatten(), null, 2));
+    return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  }
+  
+  console.log('[POST /items] Parsed data:', parsed.data);
   try {
-    // Auto-populate SWIS fields from legacy fields if not provided
     const data = {
       ...parsed.data,
       title: parsed.data.title || parsed.data.name,
@@ -2199,15 +2248,20 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], checkSubscrip
       // Auto-set availability based on stock if not explicitly provided
       availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
       tenantId: parsed.data.tenantId || '', // Ensure tenantId is always a string
+      // Handle both categoryPath and category_path (from transform middleware)
+      categoryPath: parsed.data.category_path || parsed.data.category_path || [],
     };
+    
+    // Remove any conflicting fields that might be added by the middleware
+    const { category_path, ...cleanData } = data;
     const created = await prisma.inventoryItem.create({ 
       data: {
         id: crypto.randomUUID(),
-        ...data,
+        ...cleanData,
         updatedAt: new Date(),
       }
     });
-    await audit({ tenantId: created.tenantId, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
+    // await audit({ tenantId: created.tenantId, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
     
     // Convert Decimal price to number and hide priceCents for frontend compatibility
     const { priceCents, ...itemWithoutPriceCents } = created;
@@ -2310,6 +2364,8 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
 app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (req, res) => {
   try {
     const tenantId = req.query.tenantId as string;
+    
+    console.log('2322 Expects tenantId ' + tenantId);
     if (!tenantId) {
       return res.status(400).json({ error: "tenantId_required" });
     }
@@ -2670,7 +2726,7 @@ app.get("/__ping", (req, res) => {
 app.get("/google/auth", async (req, res) => {
   try {
     const tenantId = req.query.tenantId as string;
-    
+    console.log('2683 Expects tenantId ' + tenantId);
     if (!tenantId) {
       return res.status(400).json({ error: "tenantId_required" });
     }
@@ -2797,6 +2853,7 @@ app.get("/google/status", async (req, res) => {
   try {
     const tenantId = req.query.tenantId as string;
     
+    console.log('2810 Expects tenantId ' + tenantId);
     if (!tenantId) {
       return res.status(400).json({ error: "tenantId_required" });
     }
@@ -2832,6 +2889,7 @@ app.delete("/google/disconnect", async (req, res) => {
   try {
     const tenantId = req.query.tenantId as string;
     
+    console.log('2846 Expects tenantId ' + tenantId);
     if (!tenantId) {
       return res.status(400).json({ error: "tenantId_required" });
     }
@@ -2870,6 +2928,7 @@ app.get("/google/gmc/accounts", async (req, res) => {
   try {
     const tenantId = req.query.tenantId as string;
     
+    console.log('2885 Expects tenantId ' + tenantId);
     if (!tenantId) {
       return res.status(400).json({ error: "tenantId_required" });
     }
@@ -2989,6 +3048,7 @@ app.get("/google/gbp/locations", async (req, res) => {
   try {
     const tenantId = req.query.tenantId as string;
     
+    console.log('3005 Expects tenantId ' + tenantId);
     if (!tenantId) {
       return res.status(400).json({ error: "tenantId_required" });
     }
@@ -3145,7 +3205,6 @@ app.use('/api/auth', authRoutes);
 
 /* ------------------------------ EMAIL MANAGEMENT ------------------------------ */
 // Import and mount email management routes
-import emailManagementRoutes from './routes/email-management';
 app.use('/api/email', emailManagementRoutes);
 
 /* ------------------------------ v3.5 AUDIT & BILLING APIs ------------------------------ */
@@ -3188,14 +3247,13 @@ app.use('/api/platform-stats', platformStatsRoutes); // Public endpoint - no aut
 app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
 console.log('✅ Dashboard routes mounted');
 // Consolidated dashboard endpoint (reduces 4 calls to 1)
-const dashboardConsolidatedRoutes = require('./routes/dashboard-consolidated').default;
-app.use('/api/dashboard', dashboardConsolidatedRoutes);
+app.use('/api', dashboardConsolidatedRoutes);
 console.log('✅ Consolidated dashboard route mounted');
 app.use('/api', promotionRoutes); // Promotion endpoints
 console.log('✅ Promotion routes mounted');
 app.use('/api', businessHoursRoutes); // Business hours management
 console.log('✅ Business hours routes mounted');
-app.use(tenantTierRoutes); // Tenant tier and usage endpoints
+app.use('/api', tenantTierRoutes); // Tenant tier and usage endpoints
 app.use('/api/tenant-limits', tenantLimitsRoutes); // Tenant creation limits
 console.log('✅ Tenant limits routes mounted');
 
@@ -3370,6 +3428,10 @@ app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) =
 });
 
 /* ------------------------------ item updates ------------------------------ */
+// Note: GET /api/items endpoint is handled at line ~1976 with multiple route aliases
+
+// PUT /api/items/:itemId
+// Update an item (general updates, not category assignment)
 // PUT /api/items/:itemId
 // Update an item (general updates, not category assignment)
 app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
@@ -3687,99 +3749,3 @@ if (process.env.NODE_ENV !== "test") {
     });
   });
 }
-
-// Export the app for testing
-export default app;
-export { app };
-
-/* ------------------------------ TAXONOMY SYNC JOB ------------------------------ */
-
-(async function startTaxonomySyncJob(){
-  const enabled = String(process.env.FF_TAXONOMY_AUTO_SYNC || 'true').toLowerCase() === 'true';
-  if (!enabled) {
-    console.log('📋 Taxonomy sync job disabled');
-    return;
-  }
-
-  console.log('📋 Taxonomy sync job enabled - checking weekly');
-
-  // Check for updates every 7 days (604800000 ms)
-  setInterval(async () => {
-    try {
-      console.log('🔄 Checking for Google taxonomy updates...');
-
-      const { TaxonomySyncService } = await import('./services/TaxonomySyncService');
-      const syncService = new TaxonomySyncService();
-
-      const result = await syncService.checkForUpdates();
-
-      if (result.hasUpdates) {
-        console.log(`📈 Found ${result.changes.length} taxonomy changes for version ${result.latestVersion}`);
-
-        // Apply safe updates automatically
-        const migrationResult = await syncService.applySafeUpdates(result.changes);
-        console.log(`✅ Applied ${migrationResult.applied} safe updates, ${migrationResult.needsReview} need review`);
-
-        // Migrate affected items
-        const itemMigration = await syncService.migrateAffectedItems(result.changes);
-        console.log(`🔄 Migrated ${itemMigration.migrated} items, flagged ${itemMigration.flagged} for review`);
-
-        // TODO: Send admin notification for manual review items
-        if (migrationResult.needsReview > 0 || itemMigration.flagged > 0) {
-          console.log('⚠️  Manual review required - check admin dashboard');
-        }
-      } else {
-        console.log('✅ Taxonomy is up to date');
-      }
-    } catch (error) {
-      console.error('❌ Taxonomy sync job failed:', error);
-    }
-  }, 7 * 24 * 60 * 60 * 1000); // 7 days
-})();
-
-/* ------------------------------ GBP CATEGORY SYNC JOB ------------------------------ */
-
-(async function startGBPCategorySyncJob(){
-  const enabled = String(process.env.FF_GBP_CATEGORY_AUTO_SYNC || 'false').toLowerCase() === 'true';
-  if (!enabled) {
-    console.log('📋 GBP category sync job disabled (Prisma client issues)');
-    return;
-  }
-
-  console.log('📋 GBP category sync job enabled - checking weekly');
-
-  // Seed hardcoded categories on startup (fallback for when OAuth is not configured)
-  try {
-    const { GBPCategorySyncService } = await import('./services/GBPCategorySyncService');
-    const syncService = new GBPCategorySyncService();
-    
-    const seeded = await syncService.seedHardcodedCategories();
-    console.log(`✅ Seeded ${seeded} GBP categories to database`);
-  } catch (error) {
-    console.error('❌ GBP category seeding failed:', error);
-  }
-
-  // Check for updates every 7 days (604800000 ms)
-  setInterval(async () => {
-    try {
-      console.log('🔄 Checking for GBP category updates...');
-
-      const { GBPCategorySyncService } = await import('./services/GBPCategorySyncService');
-      const syncService = new GBPCategorySyncService();
-
-      const result = await syncService.checkForUpdates();
-
-      if (result.hasUpdates) {
-        console.log(`📈 Found ${result.changes.length} GBP category changes`);
-
-        // Apply all updates
-        const updateResult = await syncService.applyUpdates(result.changes);
-        console.log(`✅ Applied ${updateResult.applied} updates, ${updateResult.failed} failed`);
-      } else {
-        console.log('✅ GBP categories are up to date');
-      }
-    } catch (error) {
-      console.error('❌ GBP category sync job failed:', error);
-    }
-  }, 7 * 24 * 60 * 60 * 1000); // 7 days
-})();

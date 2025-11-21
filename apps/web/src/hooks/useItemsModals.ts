@@ -2,6 +2,11 @@ import { useState, useCallback } from 'react';
 import { Item } from '@/services/itemsDataService';
 
 interface UseItemsModalsReturn {
+  // Create modal
+  showCreateModal: boolean;
+  openCreateModal: () => void;
+  closeCreateModal: () => void;
+  
   // Edit modal
   editingItem: Item | null;
   showEditModal: boolean;
@@ -46,6 +51,9 @@ interface UseItemsModalsReturn {
  * Centralizes modal state management
  */
 export function useItemsModals(): UseItemsModalsReturn {
+  // Create modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  
   // Edit modal
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -68,6 +76,15 @@ export function useItemsModals(): UseItemsModalsReturn {
   // Propagate modal
   const [propagateItem, setPropagateItem] = useState<Item | null>(null);
   const [showPropagateModal, setShowPropagateModal] = useState(false);
+
+  // Create modal handlers
+  const openCreateModal = useCallback(() => {
+    setShowCreateModal(true);
+  }, []);
+
+  const closeCreateModal = useCallback(() => {
+    setShowCreateModal(false);
+  }, []);
 
   // Edit modal handlers
   const openEditModal = useCallback((item: Item) => {
@@ -135,6 +152,7 @@ export function useItemsModals(): UseItemsModalsReturn {
 
   // Close all modals
   const closeAllModals = useCallback(() => {
+    closeCreateModal();
     closeEditModal();
     closeQRModal();
     closeBulkUpload();
@@ -142,6 +160,7 @@ export function useItemsModals(): UseItemsModalsReturn {
     closeCategoryModal();
     closePropagateModal();
   }, [
+    closeCreateModal,
     closeEditModal,
     closeQRModal,
     closeBulkUpload,
@@ -151,6 +170,11 @@ export function useItemsModals(): UseItemsModalsReturn {
   ]);
 
   return {
+    // Create modal
+    showCreateModal,
+    openCreateModal,
+    closeCreateModal,
+    
     // Edit modal
     editingItem,
     showEditModal,

@@ -33,6 +33,7 @@ import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 // Note: Universal transform middleware makes both userId and userId available
 export interface JWTPayload {
   userId?: string; // Added by universal transform middleware
+  user_id?: string; // JWT token contains this
   email: string;
   role: UserRole;
   tenantIds: string[];
@@ -46,6 +47,57 @@ declare global {
     }
   }
 }
+
+/**
+ * Convert camelCase to snake_case
+ */
+const toSnake = (str: string): string => {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+};
+
+/**
+ * Convert snake_case to camelCase
+ */
+const toCamel = (str: string): string => {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+};
+
+/**
+ * Transform object to have BOTH naming conventions
+ */
+const makeBothConventionsAvailable = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  
+  if (Array.isArray(obj)) {
+    return obj.map(makeBothConventionsAvailable);
+  }
+  
+  if (typeof obj === 'object' && obj.constructor === Object) {
+    const enhanced: any = {};
+    
+    for (const [key, value] of Object.entries(obj)) {
+      const snakeKey = toSnake(key);
+      const camelKey = toCamel(key);
+      
+      // Add the original key
+      enhanced[key] = makeBothConventionsAvailable(value);
+      
+      // Add snake_case version if different
+      if (snakeKey !== key) {
+        enhanced[snakeKey] = makeBothConventionsAvailable(value);
+      }
+      
+      // Add camelCase version if different
+      if (camelKey !== key) {
+        enhanced[camelKey] = makeBothConventionsAvailable(value);
+      }
+    }
+    
+    return enhanced;
+  }
+  
+  return obj;
+};
 
 /**
  * Middleware to authenticate JWT token
@@ -65,14 +117,11 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
     console.log('[Auth Middleware] Verifying token...');
     const payload = authService.verifyAccessToken(token);
-    console.log('[Auth Middleware] Token verified, raw payload:', payload);
-    console.log('[Auth Middleware] Payload has userId:', !!payload.userId);
-    console.log('[Auth Middleware] Payload has userId:', !!(payload as any).userId);
     
-    req.user = payload;
-    console.log('[Auth Middleware] User attached to request:', req.user);
-    console.log('[Auth Middleware] req.user has userId:', !!req.user.userId);
-    console.log('[Auth Middleware] req.user has userId:', !!(req.user as any).userId);
+    // Apply universal transform to JWT payload to ensure both naming conventions
+    const transformedPayload = makeBothConventionsAvailable(payload);
+    
+    req.user = transformedPayload;
     next();
   } catch (error) {
     console.log('[Auth Middleware] Token verification failed:', error);
@@ -169,7 +218,7 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
   }
 
   // Ensure userId is present (should be added by universal transform middleware)
-  if (!req.user.userId) {
+  if (!req.user.userId && !req.user.user_id) {
     return res.status(401).json({ error: 'authentication_required', message: 'Invalid authentication data' });
   }
 
@@ -193,10 +242,11 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
   // verify membership via userTenant table so owners/members are not blocked
   try {
     const { prisma } = await import('../prisma');
+    const userId = req.user.userId || req.user.user_id;
     const userTenant = await prisma.userTenant.findUnique({
       where: {
         userId_tenantId: {
-          userId: req.user.userId, // Now guaranteed to be string
+          userId: userId!, // Now guaranteed to be string
           tenantId: tenantId as string,
         },
       },
@@ -243,7 +293,9 @@ export function getTenantId(req: Request): string | null {
     req.params.tenantId ||
     req.params.id ||
     (req.query.tenantId as string) ||
+    (req.query.tenant_id as string) ||
     req.body.tenantId ||
+    req.body.tenant_id ||
     (req.user?.tenantIds && req.user.tenantIds[0]) ||
     null
   );
@@ -279,7 +331,7 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
   }
 
   // Ensure userId is present (should be added by universal transform middleware)
-  if (!req.user.userId) {
+  if (!req.user.userId && !req.user.user_id) {
     return res.status(401).json({ error: 'authentication_required', message: 'Invalid authentication data' });
   }
 
@@ -297,10 +349,11 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
   // Check if user has access to this tenant and their role within it
   try {
     const { prisma } = await import('../prisma');
+    const userId = req.user.userId || req.user.user_id;
     const userTenant = await prisma.userTenant.findUnique({
       where: {
         userId_tenantId: {
-          userId: req.user.userId, // Now guaranteed to be string
+          userId: userId!, // Now guaranteed to be string
           tenantId: tenantId as string,
         },
       },
@@ -384,7 +437,7 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
   }
 
   // Ensure userId is present (should be added by universal transform middleware)
-  if (!req.user.userId) {
+  if (!req.user.userId && !req.user.user_id) {
     return res.status(401).json({ error: 'authentication_required', message: 'Invalid authentication data' });
   }
 
@@ -406,10 +459,11 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
   const { prisma } = await import('../prisma');
   
   // Check if user is OWNER or ADMIN of this tenant
+  const userId = req.user.userId || req.user.user_id;
   const userTenant = await prisma.userTenant.findUnique({
     where: {
       userId_tenantId: {
-        userId: req.user.userId, // Now guaranteed to be string
+        userId: userId!, // Now guaranteed to be string
         tenantId: tenantId
       }
     },

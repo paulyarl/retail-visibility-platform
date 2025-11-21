@@ -228,11 +228,11 @@ export function getTierPricing(tier: string): number {
  * Now uses TierService for database-driven tier lookups
  */
 export async function checkTierAccessWithOverrides(
-  tenantId: string,
+  tenant_id: string,
   feature: string
 ): Promise<{ hasAccess: boolean; source: 'tier' | 'override' | 'none'; override?: any }> {
   // Use TierService which already handles overrides
-  return await TierService.checkTenantFeatureAccess(tenantId, feature);
+  return await TierService.checkTenantFeatureAccess(tenant_id, feature);
 }
 
 /**
@@ -265,8 +265,8 @@ export function requireTierFeature(feature: string) {
         where: { id: String(tenantId || '') },
         select: { 
           id: true,
-          subscription_tier: true,
-          subscription_status: true,
+          subscriptionTier: true,
+          subscriptionStatus: true,
         },
       });
       
@@ -278,11 +278,11 @@ export function requireTierFeature(feature: string) {
       }
       
       // Check subscription status
-      if (tenant.subscription_status === 'canceled' || tenant.subscription_status === 'expired') {
+      if (tenant.subscriptionStatus === 'canceled' || tenant.subscriptionStatus === 'expired') {
         return res.status(403).json({
           error: 'subscription_inactive',
           message: 'Your subscription is inactive. Please renew to access features.',
-          subscription_status: tenant.subscription_status,
+          subscription_status: tenant.subscriptionStatus,
         });
       }
       
@@ -362,14 +362,14 @@ export function requireAnyTierFeature(features: string[]) {
       
       const tenant = await prisma.tenant.findUnique({
         where: { id: String(tenantId || '') },
-        select: { subscription_tier: true, subscription_status: true },
+        select: { subscriptionTier: true, subscriptionStatus: true },
       });
       
       if (!tenant) {
         return res.status(404).json({ error: 'tenant_not_found' });
       }
       
-      if (tenant.subscription_status === 'canceled' || tenant.subscription_status === 'expired') {
+      if (tenant.subscriptionStatus === 'canceled' || tenant.subscriptionStatus === 'expired') {
         return res.status(403).json({
           error: 'subscription_inactive',
           message: 'Your subscription is inactive',
@@ -412,8 +412,8 @@ export async function requireWritableSubscription(req: Request, res: Response, n
     const tenant = await prisma.tenant.findUnique({
       where: { id: String(tenantId) },
       select: {
-        subscription_tier: true,
-        subscription_status: true,
+        subscriptionTier: true,
+        subscriptionStatus: true,
         trialEndsAt: true,
       },
     });
@@ -426,7 +426,7 @@ export async function requireWritableSubscription(req: Request, res: Response, n
     }
 
     const tier = tenant.subscriptionTier || 'starter';
-    const status = tenant.subscription_status || 'active';
+    const status = tenant.subscriptionStatus || 'active';
     const maintenanceState = getMaintenanceState({
       tier,
       status,

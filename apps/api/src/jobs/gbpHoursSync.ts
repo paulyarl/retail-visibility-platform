@@ -3,7 +3,7 @@ import { prisma } from '../prisma'
 import { audit } from '../audit'
 
 export type GbpHoursPayload = {
-  tenantId: string
+  tenant_id: string
 }
 
 async function sleep(ms: number) {
@@ -13,18 +13,18 @@ async function sleep(ms: number) {
 export async function runGbpHoursSync(payload: GbpHoursPayload) {
   const { tenantId } = payload
   // Load platform hours (source of truth)
-  const hours = await prisma.business_hours.upsert({
-    where: { tenantId: tenantId },
+  const hours = await prisma.businessHours.upsert({
+    where: { tenant_id: tenantId },
     update: {},
     create: {
       id: randomUUID(),
-      tenantId: tenantId,
+      tenant_id: tenantId,
       timezone: 'America/New_York',
       periods: [] as any,
       updatedAt: new Date(),
     },
   })
-  const specials = await prisma.business_hours_special.findMany({ where: { tenantId: tenantId } })
+  const specials = await prisma.businessHoursSpecial.findMany({ where: { tenant_id: tenantId } })
 
   // Build GBP payload (shape simplified)
   // Note: GBP supports multiple special hour periods per date
@@ -85,8 +85,8 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
         await sleep(150)
       }
 
-      await prisma.business_hours.update({
-        where: { tenantId: tenantId },
+      await prisma.businessHours.update({
+        where: { tenant_id: tenantId },
         data: { last_synced_at: new Date(), sync_attempts: attempt, last_error: null, updatedAt: new Date() },
       })
 
@@ -102,7 +102,7 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
     }
   }
 
-  await prisma.business_hours.update({ where: { tenantId: tenantId }, data: { sync_attempts: attempt, last_error: lastError, updatedAt: new Date() } })
+  await prisma.businessHours.update({ where: { tenant_id: tenantId }, data: { sync_attempts: attempt, last_error: lastError, updatedAt: new Date() } })
   try {
     await audit({ tenantId, actor: null, action: 'sync', payload: { entity: 'gbp.hours', ok: false, error: lastError } as any })
   } catch {}

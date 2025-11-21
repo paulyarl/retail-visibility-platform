@@ -1,11 +1,11 @@
 // Tenant User Management Routes
-// Allows Tenant Owners/Admins to manage users within their tenants
+// Allows Tenant Owners/Admins to manage user within their tenants
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { requireTenantAdmin } from '../middleware/permissions';
-import { user_tenant_role } from '@prisma/client';
+import { UserTenantRole } from '@prisma/client';
 import { isPlatformAdmin, isPlatformUser } from '../utils/platform-admin';
 import { getTenantLimitConfig, canCreateTenant } from '../config/tenant-limits';
 
@@ -23,10 +23,10 @@ router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
     const { tenantId } = req.params;
 
     // Get all users in this tenant
-    const userTenants = await prisma.user_tenants.findMany({
+    const userTenants = await prisma.userTenant.findMany({
       where: { tenantId },
       include: {
-        users: {
+        user: {
           select: {
             id: true,
             email: true,
@@ -50,13 +50,13 @@ router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
       tenantRole: ut.role,
       isActive: ut.user.isActive,
       lastLogin: ut.user.lastLogin ? ut.user.lastLogin.toISOString() : 'Never',
-      addedAt: ut.created_at.toISOString(),
+      addedAt: ut.createdAt.toISOString(),
     }));
 
     res.json(users);
   } catch (error) {
-    console.error('[GET /tenants/:tenantId/users] Error:', error);
-    res.status(500).json({ error: 'failed_to_fetch_tenant_users' });
+    console.error('[GET /tenants/:tenantId/user] Error:', error);
+    res.status(500).json({ error: 'failed_to_fetch_tenant_user' });
   }
 });
 
@@ -82,7 +82,7 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     }
 
     // Find user by email
-    const user = await prisma.users.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: parsed.data.email },
     });
 
@@ -94,7 +94,7 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     }
 
     // Check if user is already in tenant
-    const existing = await prisma.user_tenants.findUnique({
+    const existing = await prisma.userTenant.findUnique({
       where: {
         userId_tenantId: {
           userId: user.id,
@@ -111,14 +111,14 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     }
 
     // Add user to tenant
-    const userTenant = await prisma.user_tenants.create({
+    const userTenant = await prisma.userTenant.create({
       data: {
         userId: user.id,
         tenantId,
-        role: parsed.data.role as user_tenant_role,
+        role: parsed.data.role as UserTenantRole,
       },
       include: {
-        users: {
+        user: {
           select: {
             id: true,
             email: true,
@@ -131,12 +131,12 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     });
 
     res.status(201).json({
-      id: userTenant.user.id,
-      email: userTenant.user.email,
-      name: `${userTenant.user.firstName || ''} ${userTenant.user.lastName || ''}`.trim() || userTenant.user.email,
-      platformRole: userTenant.user.role,
+      id: user.id,
+      email: user.email,
+      name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+      platformRole: user.role,
       tenantRole: userTenant.role,
-      addedAt: userTenant.created_at.toISOString(),
+      addedAt: userTenant.createdAt.toISOString(),
     });
   } catch (error: any) {
     console.error('[POST /tenants/:tenantId/users] Error:', error);
@@ -164,7 +164,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
       });
     }
 
-    // Prevent users from changing their own role
+    // Prevent user from changing their own role
     if (req.user?.userId === userId) {
       return res.status(400).json({
         error: 'cannot_modify_own_role',
@@ -175,7 +175,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
     // CRITICAL: Check if changing TO OWNER role (ownership transfer)
     if (parsed.data.role === 'OWNER') {
       // Get the target user to check if they're a platform user
-      const targetUser = await prisma.users.findUnique({
+      const targetUser = await prisma.user.findUnique({
         where: { id: userId },
         select: { role: true },
       });
@@ -187,23 +187,23 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
         });
       }
 
-      // Platform users (except PLATFORM_VIEWER) can receive unlimited tenants
+      // Platform user (except PLATFORM_VIEWER) can receive unlimited tenants
       const isPlatformUserRole = isPlatformUser({ role: targetUser.role } as any);
       
       if (!isPlatformUserRole || targetUser.role === 'PLATFORM_VIEWER') {
         // Regular user or platform viewer - check their tenant limits
         
         // Count target user's current owned tenants
-        const ownedTenants = await prisma.user_tenants.findMany({
+        const ownedTenants = await prisma.userTenant.findMany({
           where: {
             userId: userId,
-            role: user_tenant_role.OWNER,
+            role: UserTenantRole.OWNER,
           },
           include: {
             tenant: {
               select: {
-                subscription_tier: true,
-                subscription_status: true,
+                subscriptionTier: true,
+                subscriptionStatus: true,
               },
             },
           },
@@ -226,7 +226,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
 
         for (const ut of ownedTenants) {
           const tier = ut.tenant.subscriptionTier || 'starter';
-          const status = ut.tenant.subscription_status || 'trial';
+          const status = ut.tenant.subscriptionStatus || 'trial';
           const priority = tierPriority[tier] || 0;
           
           if (priority > highestPriority) {
@@ -256,7 +256,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
     }
 
     // Update user's role
-    const userTenant = await prisma.user_tenants.update({
+    const userTenant = await prisma.userTenant.update({
       where: {
         userId_tenantId: {
           userId,
@@ -264,7 +264,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
         },
       },
       data: {
-        role: parsed.data.role as user_tenant_role,
+        role: parsed.data.role as UserTenantRole,
       },
     });
 
@@ -291,7 +291,7 @@ router.delete('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) =
   try {
     const { tenantId, userId } = req.params;
 
-    // Prevent users from removing themselves
+    // Prevent user from removing themselves
     if (req.user?.userId === userId) {
       return res.status(400).json({
         error: 'cannot_remove_self',
@@ -300,7 +300,7 @@ router.delete('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) =
     }
 
     // Remove user from tenant
-    await prisma.user_tenants.delete({
+    await prisma.userTenant.delete({
       where: {
         userId_tenantId: {
           userId,

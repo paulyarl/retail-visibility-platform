@@ -58,6 +58,7 @@ model Tenant {
   syncJobs                    SyncJob[]
   userTenants                 UserTenant[]
   tenantBusinessProfile       TenantBusinessProfile?
+  tenantFeatureOverrides     TenantFeatureOverrides[]
 
   @@index([directoryVisible], map: "idx_tenant_directory_visible")
   @@index([googleSyncEnabled, googleLastSync], map: "idx_tenant_google_sync")
@@ -303,7 +304,7 @@ model DirectoryListings {
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model DirectorySettings {
   id                   String @id
-  tenantId            String @map("tenant_id")
+  tenantId            String @unique @map("tenant_id")
   isPublished         Boolean   @default(false) @map("is_published")
   seoDescription      String? @map("seo_description")
   seoKeywords         String[] @map("seo_keywords")
@@ -311,7 +312,7 @@ model DirectorySettings {
   secondaryCategories String[] @map("secondary_categories")
   is_featured          Boolean   @default(false) @map("is_featured")
   featured_until       DateTime? @map("featured_until")
-  slug                 String? @map("slug")
+  slug                 String? @unique @map("slug")
   created_at           DateTime  @default(now()) @map("created_at")
   updated_at           DateTime @map("updated_at")
 
@@ -1020,6 +1021,7 @@ model TenantFeatureOverrides {
   grantedBy String @map("granted_by")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime @map("updated_at")
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   @@map("tenant_feature_overrides")
 }
 

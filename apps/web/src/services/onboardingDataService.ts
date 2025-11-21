@@ -43,7 +43,7 @@ export class OnboardingDataService {
    */
   private async fetchProfile(tenantId: string): Promise<any> {
     try {
-      const response = await api.get(`/api/tenant/profile?tenant_id=${tenantId}`);
+      const response = await api.get(`/api/tenant/profile?tenantId=${tenantId}`);
       if (response.ok) {
         const data = await response.json();
         return data?.data || data || null;
@@ -120,7 +120,7 @@ export class OnboardingDataService {
    */
   async saveProfile(tenantId: string, data: Partial<BusinessProfile>): Promise<void> {
     const response = await api.post('/api/tenant/profile', {
-      tenant_id: tenantId,
+      tenantId: tenantId,
       ...data,
     });
 

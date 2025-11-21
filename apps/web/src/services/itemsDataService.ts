@@ -72,8 +72,8 @@ export class ItemsDataService {
       if (filters.status && filters.status !== 'all') params.append('status', filters.status);
       if (filters.visibility && filters.visibility !== 'all') params.append('visibility', filters.visibility);
 
-      // Add tenant identifier (snake_case preferred by backend)
-      params.append('tenant_id', tenantId);
+      // Add tenant identifier (camelCase as expected by backend)
+      params.append('tenantId', tenantId);
       
       const response = await api.get(`api/items?${params.toString()}`);
       
@@ -130,7 +130,7 @@ export class ItemsDataService {
   async createItem(tenantId: string, data: CreateItemData): Promise<Item> {
     try {
       const response = await api.post('api/items', {
-        tenant_id: tenantId,
+        tenantId: tenantId,
         ...data,
       });
 

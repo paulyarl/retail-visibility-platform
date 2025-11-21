@@ -78,8 +78,8 @@ let FEATURE_FLAGS: Record<FeatureFlag, FeatureFlagConfig> = {
   },
   FF_TENANT_URLS: {
     flag: 'FF_TENANT_URLS',
-    strategy: 'off',
-    percentage: 0,
+    strategy: 'on',
+    percentage: 100,
   },
   FF_CATEGORY_MANAGEMENT_PAGE: {
     flag: 'FF_CATEGORY_MANAGEMENT_PAGE',

@@ -14,9 +14,9 @@ const GBP_INSIGHTS_API = 'https://mybusinessaccountmanagement.googleapis.com/v1'
 /**
  * Get valid access token (refresh if expired)
  */
-async function getValidAccessToken(accountId: string): Promise<string | null> {
+async function getValidAccessToken(account_id: string): Promise<string | null> {
   try {
-    const tokenRecord = await prisma.google_oauth_tokens.findUnique({
+    const tokenRecord = await prisma.googleOauthTokens.findUnique({
       where: { account_id: accountId },
     });
 
@@ -27,10 +27,10 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
 
     // Check if token is expired
     const now = new Date();
-    if (tokenRecord.expires_at <= now) {
+    if (tokenRecord.expiresAt <= now) {
       console.log('[GBP] Token expired, refreshing...');
       
-      const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
+      const refreshToken = decryptToken(tokenRecord.refreshTokenEncrypted);
       const newTokens = await refreshAccessToken(refreshToken);
       
       if (!newTokens) {
@@ -39,11 +39,11 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
       }
 
       const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-      await prisma.google_oauth_tokens.update({
+      await prisma.googleOauthTokens.update({
         where: { account_id: accountId },
         data: {
-          access_token_encrypted: encryptToken(newTokens.access_token),
-          expires_at: newExpiresAt,
+          accessTokenEncrypted: encryptToken(newTokens.access_token),
+          expiresAt: newExpiresAt,
           scopes: newTokens.scope.split(' '),
           updatedAt: new Date(),
         },
@@ -52,7 +52,7 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
       return newTokens.access_token;
     }
 
-    return decryptToken(tokenRecord.access_token_encrypted);
+    return decryptToken(tokenRecord.accessTokenEncrypted);
   } catch (error) {
     console.error('[GBP] Error getting valid token:', error);
     return null;
@@ -62,7 +62,7 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
 /**
  * List business accounts
  */
-export async function listBusinessAccounts(accountId: string): Promise<any[]> {
+export async function listBusinessAccounts(account_id: string): Promise<any[]> {
   try {
     const accessToken = await getValidAccessToken(accountId);
     if (!accessToken) {
@@ -94,7 +94,7 @@ export async function listBusinessAccounts(accountId: string): Promise<any[]> {
  * List locations for a business account
  */
 export async function listLocations(
-  accountId: string,
+  account_id: string,
   businessAccountName: string
 ): Promise<any[]> {
   try {
@@ -131,7 +131,7 @@ export async function listLocations(
  * Get location details
  */
 export async function getLocation(
-  accountId: string,
+  account_id: string,
   locationName: string
 ): Promise<any | null> {
   try {
@@ -167,7 +167,7 @@ export async function getLocation(
  * Sync location to database
  */
 export async function syncLocation(
-  accountId: string,
+  account_id: string,
   locationData: any
 ): Promise<boolean> {
   try {
@@ -175,7 +175,7 @@ export async function syncLocation(
     const address = locationData.storefrontAddress;
     const phone = locationData.phoneNumbers?.primaryPhone;
 
-    await prisma.gbp_locations.upsert({
+    await prisma.gbpLocations.upsert({
       where: {
         account_id_location_id: {
           account_id: accountId,
@@ -186,8 +186,8 @@ export async function syncLocation(
         id: `gbp_loc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         account_id: accountId,
         location_id: locationId,
-        location_name: locationData.title,
-        store_code: locationData.storeCode,
+        locationName: locationData.title,
+        storeCode: locationData.storeCode,
         address: address ? formatAddress(address) : null,
         phone_number: phone,
         website_url: locationData.websiteUri,
@@ -198,8 +198,8 @@ export async function syncLocation(
         updatedAt: new Date(),
       },
       update: {
-        location_name: locationData.title,
-        store_code: locationData.storeCode,
+        locationName: locationData.title,
+        storeCode: locationData.storeCode,
         address: address ? formatAddress(address) : null,
         phone_number: phone,
         website_url: locationData.websiteUri,
@@ -237,7 +237,7 @@ function formatAddress(address: any): string {
  * Get location insights (last 30 days)
  */
 export async function getLocationInsights(
-  accountId: string,
+  account_id: string,
   locationName: string
 ): Promise<any | null> {
   try {
@@ -300,7 +300,7 @@ export async function getLocationInsights(
  * Store daily insights in database
  */
 export async function storeInsights(
-  locationId: string,
+  location_id: string,
   date: Date,
   insights: {
     viewsSearch: number;
@@ -312,7 +312,7 @@ export async function storeInsights(
   }
 ): Promise<boolean> {
   try {
-    await prisma.gbp_insights_daily.upsert({
+    await prisma.gbpInsightsDaily.upsert({
       where: {
         location_id_date: {
           location_id: locationId,
@@ -323,21 +323,21 @@ export async function storeInsights(
         id: `gbp_ins_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         location_id: locationId,
         date,
-        views_search: insights.viewsSearch,
-        views_maps: insights.viewsMaps,
-        actions_website: insights.actionsWebsite,
-        actions_phone: insights.actionsPhone,
-        actions_directions: insights.actionsDirections,
-        photos_count: insights.photosCount,
+        viewsSearch: insights.viewsSearch,
+        viewsMaps: insights.viewsMaps,
+        actionsWebsite: insights.actionsWebsite,
+        actionsPhone: insights.actionsPhone,
+        actionsDirections: insights.actionsDirections,
+        photosCount: insights.photosCount,
         createdAt: new Date(),
       },
       update: {
-        views_search: insights.viewsSearch,
-        views_maps: insights.viewsMaps,
-        actions_website: insights.actionsWebsite,
-        actions_phone: insights.actionsPhone,
-        actions_directions: insights.actionsDirections,
-        photos_count: insights.photosCount,
+        viewsSearch: insights.viewsSearch,
+        viewsMaps: insights.viewsMaps,
+        actionsWebsite: insights.actionsWebsite,
+        actionsPhone: insights.actionsPhone,
+        actionsDirections: insights.actionsDirections,
+        photosCount: insights.photosCount,
       },
     });
 
@@ -352,14 +352,14 @@ export async function storeInsights(
  * Get aggregated insights for location
  */
 export async function getAggregatedInsights(
-  locationId: string,
+  location_id: string,
   days: number = 30
 ): Promise<any> {
   try {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const insights = await prisma.gbp_insights_daily.findMany({
+    const insights = await prisma.gbpInsightsDaily.findMany({
       where: {
         location_id: locationId,
         date: {
@@ -374,12 +374,12 @@ export async function getAggregatedInsights(
     // Calculate totals
     const totals = insights.reduce(
       (acc, day) => ({
-        viewsSearch: acc.viewsSearch + day.views_search,
-        viewsMaps: acc.viewsMaps + day.views_maps,
-        actionsWebsite: acc.actionsWebsite + day.actions_website,
-        actionsPhone: acc.actionsPhone + day.actions_phone,
-        actionsDirections: acc.actionsDirections + day.actions_directions,
-        photosCount: acc.photosCount + day.photos_count,
+        viewsSearch: acc.viewsSearch + day.viewsSearch,
+        viewsMaps: acc.viewsMaps + day.viewsMaps,
+        actionsWebsite: acc.actionsWebsite + day.actionsWebsite,
+        actionsPhone: acc.actionsPhone + day.actionsPhone,
+        actionsDirections: acc.actionsDirections + day.actionsDirections,
+        photosCount: acc.photosCount + day.photosCount,
       }),
       {
         viewsSearch: 0,

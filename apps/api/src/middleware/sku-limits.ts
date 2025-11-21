@@ -27,7 +27,7 @@ export async function validateSKULimits(
 ) {
   try {
     const { tenantId, productCount } = req.body;
-    const { tenantId: paramTenantId } = req.params;
+    const { tenant_id: paramTenantId } = req.params;
     
     const actualTenantId = tenantId || paramTenantId;
     
@@ -39,8 +39,8 @@ export async function validateSKULimits(
     const tenant = await prisma.tenant.findUnique({
       where: { id: actualTenantId },
       select: {
-        subscription_tier: true,
-        subscription_status: true,
+        subscriptionTier: true,
+        subscriptionStatus: true,
         trialEndsAt: true,
         _count: {
           select: { _count: true },
@@ -127,7 +127,7 @@ export async function validateTierSKUCompatibility(
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
-        subscription_tier: true,
+        subscriptionTier: true,
         _count: {
           select: { _count: true },
         },

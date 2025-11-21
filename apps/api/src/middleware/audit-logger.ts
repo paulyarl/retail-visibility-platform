@@ -64,18 +64,18 @@ async function logAudit(req: Request, res: Response, requestId: string) {
     const entityId = idMatch ? idMatch[1] : 'unknown';
 
     // Create audit log entry
-    await prisma.audit_log.create({
+    await prisma.auditLog.create({
       data: {
         id: randomUUID(),
         tenantId: (user as any)?.tenantId || 'system',
-        actor_id: (user as any)?.id || 'anonymous',
-        actor_type: user ? 'user' : 'system',
-        entity_type: entityType,
-        entity_id: entityId,
+        actorId: (user as any)?.id || 'anonymous',
+        actorType: user ? 'user' : 'system',
+        entityType: entityType,
+        entityId: entityId,
         action,
-        request_id: requestId,
+        requestId: requestId,
         ip: req.ip || (req.headers['x-forwarded-for'] as string) || 'unknown',
-        user_agent: (req.headers['user-agent'] as string) || null,
+        userAgent: (req.headers['user-agent'] as string) || null,
         diff: {
           method: req.method,
           path: req.path,

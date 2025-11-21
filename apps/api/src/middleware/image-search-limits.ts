@@ -47,7 +47,7 @@ export async function checkImageSearchLimit(
     if (tenantId) {
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: { subscription_tier: true },
+        select: { subscriptionTier: true },
       });
       tier = tenant?.subscriptionTier || 'starter';
     }

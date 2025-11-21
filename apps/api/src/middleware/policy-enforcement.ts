@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
+import { Prisma } from '@prisma/client';
 
 interface PolicyRules {
   scope: string;
@@ -17,7 +18,7 @@ async function getEffectivePolicy(tenantId?: string): Promise<PolicyRules | null
   try {
     const scope = tenantId || 'global';
 
-    const result = await prisma.$queryRaw<PolicyRules[]>`
+    const result = await prisma.$queryRaw<PolicyRules[]>(Prisma.sql`
       SELECT
         tenantId as scope,
         count_active_private,
@@ -28,7 +29,7 @@ async function getEffectivePolicy(tenantId?: string): Promise<PolicyRules | null
       FROM v_effective_sku_billing_policy
       WHERE tenantId = ${scope}
       LIMIT 1
-    `;
+    `);
 
     return result[0] || null;
   } catch (error) {
@@ -44,7 +45,7 @@ function validateItemAgainstPolicy(item: any, policy: PolicyRules): { valid: boo
   const violations: string[] = [];
 
   // Check image requirement
-  if (policy.requireImage && !item.image_url) {
+  if (policy.requireImage && !item.imageUrl) {
     violations.push('Image is required by policy but not provided');
   }
 
@@ -157,13 +158,13 @@ export async function getComplianceReport(tenantId: string) {
     }
 
     // Get all items for tenant
-    const items = await prisma.inventory_item.findMany({
+    const items = await prisma.inventoryItem.findMany({
       where: { tenantId },
       select: {
         id: true,
         sku: true,
         name: true,
-        image_url: true,
+        imageUrl: true,
         currency: true,
         price: true,
         priceCents: true,

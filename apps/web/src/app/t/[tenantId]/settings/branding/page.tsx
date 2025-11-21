@@ -43,7 +43,7 @@ export default function TenantBrandingPage() {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
       // Fetch tenant info for name, logo, and banner
-      const tenantResponse = await api.get(`${apiBaseUrl}/tenants/${encodeURIComponent(tenantId)}`);
+      const tenantResponse = await api.get(`${apiBaseUrl}/api/tenants/${encodeURIComponent(tenantId)}`);
       let tenantName = '';
       let logoUrl = '';
       let bannerUrl = '';
@@ -198,7 +198,7 @@ export default function TenantBrandingPage() {
       const token = localStorage.getItem('access_token');
       
       // Update tenant name
-      const tenantResponse = await fetch(`${apiBaseUrl}/tenants/${encodeURIComponent(tenantId)}`, {
+      const tenantResponse = await fetch(`${apiBaseUrl}/api/tenants/${encodeURIComponent(tenantId)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -77,7 +77,10 @@ export function useSubscriptionUsage(tenantIdProp?: string) {
         const [tenantRes, itemsRes, limitsRes] = await Promise.all([
           api.get(`/api/tenants/${tenantId}`),
           api.get(`/api/items?tenantId=${tenantId}&count=true`),
-          api.get(`/api/tenant-limits/status`)
+          api.get(`/api/tenant-limits/status`).catch(err => {
+            console.warn('[useSubscriptionUsage] Failed to fetch tenant limits, continuing without them:', err);
+            return { ok: false, status: 401, json: () => Promise.resolve({}) } as Response;
+          })
         ]);
 
         if (!tenantRes.ok) {

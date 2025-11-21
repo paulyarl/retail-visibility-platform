@@ -13,18 +13,18 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
     const strategy = req.query.strategy ? String(req.query.strategy) : undefined;
 
     const where: any = {};
-    if (tenantId) where.tenantId = tenantId;
+    if (tenantId) where.tenant_id = tenantId;
     if (strategy) where.strategy = strategy;
 
     const [logs, total] = await Promise.all([
-      prisma.category_mirror_runs.findMany({
+      prisma.categoryMirrorRuns.findMany({
         where,
         orderBy: { started_at: 'desc' },
         take: limit,
         skip: offset,
         select: {
           id: true,
-          tenantId: true,
+          tenant_id: true,
           strategy: true,
           dry_run: true,
           created: true,
@@ -38,7 +38,7 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
           completed_at: true,
         },
       }),
-      prisma.category_mirror_runs.count({ where }),
+      prisma.categoryMirrorRuns.count({ where }),
     ]);
 
     return res.json({
@@ -63,13 +63,13 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
     const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     // Get recent runs
-    const recentRuns = await prisma.category_mirror_runs.findMany({
+    const recentRuns = await prisma.categoryMirrorRuns.findMany({
       where: {
         started_at: { gte: last24h },
       },
       select: {
         id: true,
-        tenantId: true,
+        tenant_id: true,
         error: true,
         skipped: true,
         created: true,
@@ -89,7 +89,7 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
     const successRate = totalRuns > 0 ? (successfulRuns / totalRuns) * 100 : 0;
 
     // Get recent errors
-    const recentErrors = await prisma.category_mirror_runs.findMany({
+    const recentErrors = await prisma.categoryMirrorRuns.findMany({
       where: {
         error: { not: null },
         started_at: { gte: last24h },
@@ -98,7 +98,7 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
       take: 5,
       select: {
         id: true,
-        tenantId: true,
+        tenant_id: true,
         error: true,
         started_at: true,
       },

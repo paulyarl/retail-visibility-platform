@@ -141,7 +141,7 @@ const SCENARIOS = {
 export type QuickStartScenario = keyof typeof SCENARIOS;
 
 export interface QuickStartOptions {
-  tenantId: string;
+  tenant_id: string;
   scenario: QuickStartScenario;
   productCount: number;
   assignCategories?: boolean;
@@ -249,7 +249,7 @@ export async function generateQuickStartProducts(
 
       return {
         id: `qs_${tenantId}_${timestamp}_${(i + idx).toString().padStart(5, '0')}`,
-        tenantId: tenantId,
+        tenant_id: tenantId,
         sku: `SKU-${timestamp}-${(i + idx).toString().padStart(5, '0')}`,
         name: product.name,
         title: product.name,
@@ -265,25 +265,25 @@ export async function generateQuickStartProducts(
       };
     });
 
-    await prisma.inventory_item.createMany({ data: items });
+    await prisma.inventoryItem.createMany({ data: items });
     createdCount += items.length;
   }
 
   // Get final counts
-  const totalProducts = await prisma.inventory_item.count({
-    where: { tenantId: tenantId },
+  const totalProducts = await prisma.inventoryItem.count({
+    where: { tenant_id: tenantId },
   });
 
-  const activeProducts = await prisma.inventory_item.count({
-    where: { tenantId: tenantId, itemStatus: 'active' },
+  const activeProducts = await prisma.inventoryItem.count({
+    where: { tenant_id: tenantId, itemStatus: 'active' },
   });
 
-  const inStockProducts = await prisma.inventory_item.count({
-    where: { tenantId: tenantId, availability: 'in_stock' },
+  const inStockProducts = await prisma.inventoryItem.count({
+    where: { tenant_id: tenantId, availability: 'in_stock' },
   });
 
-  const categorizedProducts = await prisma.inventory_item.count({
-    where: { tenantId: tenantId, category_path: { isEmpty: false } },
+  const categorizedProducts = await prisma.inventoryItem.count({
+    where: { tenant_id: tenantId, category_path: { isEmpty: false } },
   });
 
   return {

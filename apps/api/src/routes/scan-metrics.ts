@@ -37,7 +37,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
     }
 
     // Get session stats
-    const sessions = await prisma.scan_sessions.findMany({
+    const sessions = await prisma.scanSessions.findMany({
       where: {
         startedAt: { gte: startDate },
       },
@@ -79,7 +79,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
     }, {} as Record<string, number>);
 
     // Get enrichment stats
-    const enrichmentLogs = await prisma.barcode_lookup_log.findMany({
+    const enrichmentLogs = await prisma.barcodeLookupLog.findMany({
       where: {
         createdAt: { gte: startDate },
       },
@@ -128,7 +128,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
       : '0';
 
     // Recent activity (last 10 sessions)
-    const recentSessions = await prisma.scan_sessions.findMany({
+    const recentSessions = await prisma.scanSessions.findMany({
       where: {
         startedAt: { gte: startDate },
       },
@@ -156,7 +156,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
       success: true,
       timeRange,
       stats: {
-        sessions: {
+        scanSessions: {
           total: totalSessions,
           active: activeSessions,
           completed: completedSessions,
@@ -215,7 +215,7 @@ router.get('/api/admin/scan-metrics/timeseries', authenticateToken, async (req: 
     }
 
     // Get all sessions in range
-    const sessions = await prisma.scan_sessions.findMany({
+    const sessions = await prisma.scanSessions.findMany({
       where: {
         startedAt: { gte: startDate },
       },

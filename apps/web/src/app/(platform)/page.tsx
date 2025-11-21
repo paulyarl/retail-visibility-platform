@@ -167,9 +167,11 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
   // Compute tenant-scoped quick action links independently for faster UI readiness
   useLayoutEffect(() => {
-    const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') || undefined : undefined;
     const override = typeof window !== 'undefined' ? localStorage.getItem('ff_tenant_urls') === 'on' : false;
-    const on = override || isFeatureEnabled('FF_TENANT_URLS', tenantId);
+    // Try to get tenantId from multiple sources
+    const tenantId = selectedTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+    const on = override || isFeatureEnabled('FF_TENANT_URLS', tenantId || undefined);
+    
     if (on && tenantId) {
       setScopedLinks({
         items: `/t/${tenantId}/items`,
@@ -180,7 +182,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     } else {
       setScopedLinks({ items: "/items", createItem: "/items?create=true", tenants: "/tenants", settingsTenant: "/settings" });
     }
-  }, []);
+  }, [selectedTenantId, loading]);
   
   // Animated counts for metrics
   const inventoryCount = useCountUp(stats.total);

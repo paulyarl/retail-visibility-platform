@@ -59,7 +59,7 @@ async function loadTiers(): Promise<Map<string, TierWithFeatures>> {
   // Build cache map
   const cache = new Map<string, TierWithFeatures>();
   for (const tier of tiers) {
-    cache.set(tier.tierKey, tier as TierWithFeatures);
+    cache.set(tier.tierKey, tier as unknown as TierWithFeatures);
   }
 
   tierCache = cache;
@@ -132,7 +132,7 @@ export async function getTierPrice(tierKey: string): Promise<number> {
  */
 export async function getTierDisplayName(tierKey: string): Promise<string> {
   const tier = await getTierByKey(tierKey);
-  return tier?.displayName || tierKey;
+  return tier?.display_name || tierKey;
 }
 
 /**
@@ -193,13 +193,13 @@ export async function checkTenantFeatureAccess(
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
-        subscription_tier: true,
-        tenant_feature_overrides: {
+        subscriptionTier: true,
+        tenantFeatureOverrides: {
           where: {
             feature: featureKey,
             OR: [
-              { expires_at: null },
-              { expires_at: { gt: new Date() } },
+              { expiresAt: null },
+              { expiresAt: { gt: new Date() } },
             ],
           },
         },
@@ -211,7 +211,7 @@ export async function checkTenantFeatureAccess(
     }
 
     // 1. Check for active override first (highest priority)
-    const override = tenant.featureOverrides[0];
+    const override = tenant.tenantFeatureOverrides[0];
     if (override) {
       return {
         hasAccess: override.granted,

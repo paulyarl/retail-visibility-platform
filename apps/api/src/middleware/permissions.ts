@@ -65,14 +65,23 @@ export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
         });
       }
 
-      if (!req.user.userId) {
+      if (!req.user.userId && !req.user.user_id) {
         return res.status(401).json({
           error: 'authentication_required',
           message: 'User ID is required',
         });
       }
 
-      const userRole = await getUserTenantRole(req.user.userId, tenantId);
+      const userId = req.user.userId || req.user.user_id;
+      
+      if (!userId) {
+        return res.status(401).json({
+          error: 'authentication_required',
+          message: 'User ID is required',
+        });
+      }
+
+      const userRole = await getUserTenantRole(userId, tenantId);
 
       if (!userRole || !allowedRoles.includes(userRole)) {
         return res.status(403).json({
@@ -187,7 +196,7 @@ export async function checkTenantCreationLimit(
       });
     }
 
-    if (!req.user.userId) {
+    if (!req.user.userId && !req.user.user_id) {
       return res.status(401).json({
         error: 'authentication_required',
         message: 'User ID is required',
@@ -195,9 +204,10 @@ export async function checkTenantCreationLimit(
     }
 
     // Count user's owned tenants
+    const userId = req.user.userId || req.user.user_id;
     const ownedTenants = await prisma.userTenant.findMany({
       where: {
-        userId: req.user.userId,
+        userId: userId,
         role: UserTenantRole.OWNER,
       },
       include: {
@@ -296,14 +306,16 @@ export async function requireTenantOwner(
       });
     }
 
-    if (!req.user.userId) {
+    if (!req.user.userId && !req.user.user_id) {
       return res.status(401).json({
         error: 'authentication_required',
         message: 'User ID is required',
       });
     }
 
-    const userRole = await getUserTenantRole(req.user.userId, tenantId);
+    const userId = req.user.userId || req.user.user_id;
+
+    const userRole = await getUserTenantRole(userId, tenantId);
 
     if (userRole !== UserTenantRole.OWNER) {
       return res.status(403).json({

@@ -224,7 +224,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
 /**
  * TEST ROUTE - No authentication required
  */
-router.get('/api/dashboard-test', async (req: Request, res: Response) => {
+router.get('/dashboard-test', async (req: Request, res: Response) => {
   console.log('🧪 TEST ROUTE HIT!');
   return res.json({
     test: true,

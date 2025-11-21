@@ -30,7 +30,7 @@ const platformSettingsSchema = z.object({
 router.get('/platform-settings', async (_req, res) => {
   try {
     // Check if Prisma client is properly initialized
-    if (!prisma || !prisma.platform_settings) {
+    if (!prisma || !prisma.platformSettings) {
       console.warn('[Platform Settings] Prisma client not properly initialized, using defaults');
       return res.json({
         id: 1,
@@ -45,17 +45,18 @@ router.get('/platform-settings', async (_req, res) => {
       });
     }
 
-    let settings = await prisma.platform_settings.findUnique({
+    let settings = await prisma.platformSettings.findUnique({
       where: { id: 1 },
     });
 
     // Create default settings if they don't exist
     if (!settings) {
-      settings = await prisma.platform_settings.create({
+      settings = await prisma.platformSettings.create({
         data: {
           id: 1,
           platformName: 'Visible Shelf',
           platformDescription: 'Manage your retail operations with ease',
+          updatedAt: new Date(),
         },
       });
     }
@@ -134,7 +135,7 @@ router.post(
       }
 
       // Update or create settings
-      const settings = await prisma.platform_settings.upsert({
+      const settings = await prisma.platformSettings.upsert({
         where: { id: 1 },
         update: updateData,
         create: {
@@ -143,6 +144,7 @@ router.post(
           platformDescription: updateData.platformDescription || 'Manage your retail operations with ease',
           logoUrl: updateData.logoUrl,
           faviconUrl: updateData.faviconUrl,
+          updatedAt: new Date(),
         },
       });
 

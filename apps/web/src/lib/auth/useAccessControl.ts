@@ -74,7 +74,7 @@ export function useAccessControl(
 
       // Fetch tenant data if tenantId provided
       if (tenantId) {
-        const tenantRes = await api.get(`${API_BASE_URL}/tenants/${tenantId}`);
+        const tenantRes = await api.get(`${API_BASE_URL}/api/tenants/${tenantId}`);
         if (tenantRes.ok) {
           const tenant = await tenantRes.json();
           setTenantData(tenant);

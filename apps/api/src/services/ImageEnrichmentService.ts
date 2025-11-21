@@ -35,7 +35,7 @@ export class ImageEnrichmentService {
 
     try {
       // Download image from external URL
-      const response = await fetch(imageUrl, {
+      const response = await fetch(image_url, {
         signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
@@ -57,7 +57,7 @@ export class ImageEnrichmentService {
       // Generate storage path
       const ext = this.getExtensionFromContentType(contentType);
       const filename = `${Date.now()}.${ext}`;
-      const path = `${tenantId}/${sku || itemId}/${filename}`;
+      const path = `${tenantId}/${sku || item_id}/${filename}`;
 
       // Upload to Supabase Storage
       const { error, data } = await supabase.storage
@@ -101,10 +101,10 @@ export class ImageEnrichmentService {
     alt?: string
   ): Promise<void> {
     try {
-      await prisma.photo_asset.create({
+      await prisma.photoAsset.create({
         data: {
           tenantId,
-          inventoryItemId: itemId,
+          inventoryItemId: item_id,
           url: imageData.url,
           width: imageData.width ?? null,
           height: imageData.height ?? null,
@@ -119,9 +119,9 @@ export class ImageEnrichmentService {
 
       // Update item's imageUrl to primary photo (position 0)
       if (position === 0) {
-        await prisma.inventory_item.update({
-          where: { id: itemId },
-          data: { image_url: imageData.url },
+        await prisma.inventoryItem.update({
+          where: { id: item_id },
+          data: { imageUrl: imageData.url },
         });
       }
     } catch (error: any) {
@@ -157,7 +157,7 @@ export class ImageEnrichmentService {
         const imageData = await this.downloadAndStoreImage(
           imageUrl,
           tenantId,
-          itemId,
+          item_id,
           sku
         );
 
@@ -168,7 +168,7 @@ export class ImageEnrichmentService {
 
         // Create PhotoAsset record
         const alt = i === 0 ? productName : `${productName} - Image ${i + 1}`;
-        await this.createPhotoAsset(tenantId, itemId, imageData, i, alt);
+        await this.createPhotoAsset(tenantId, item_id, imageData, i, alt);
         
         successCount++;
       } catch (error) {

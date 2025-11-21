@@ -147,14 +147,14 @@ export async function validateOrganizationTierChange(
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
       select: {
-        subscription_tier: true,
+        subscriptionTier: true,
         maxLocations: true,
         maxTotalSKUs: true,
-        tenant: {
+        Tenant: {
           select: {
             id: true,
             _count: {
-              select: { _count: true },
+              select: { inventoryItems: true },
             },
           },
         },
@@ -190,7 +190,7 @@ export async function validateOrganizationTierChange(
     }
 
     // Check current location count
-    const currentLocationCount = org.tenant.length;
+    const currentLocationCount = org.Tenant.length;
     if (newLimits.maxLocations !== Infinity && currentLocationCount > newLimits.maxLocations) {
       return res.status(403).json({
         error: 'tier_change_blocked',
@@ -202,7 +202,7 @@ export async function validateOrganizationTierChange(
     }
 
     // Check total SKU count
-    const totalSKUs = org.tenant.reduce((sum, tenant) => sum + tenant._count.inventory_item, 0);
+    const totalSKUs = org.Tenant.reduce((sum: number, tenant) => sum + tenant._count.inventoryItems, 0);
     if (newLimits.maxTotalSKUs !== Infinity && totalSKUs > newLimits.maxTotalSKUs) {
       return res.status(403).json({
         error: 'tier_change_blocked',

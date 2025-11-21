@@ -27,6 +27,7 @@ export interface EmailResult {
 }
 
 export interface InvitationEmailData {
+  usersName: any;
   inviteeEmail: string;
   inviteeName?: string;
   inviterName: string;
@@ -400,7 +401,7 @@ class EmailService {
             </div>
             <div class="detail-row">
                 <span class="detail-label">Expires:</span>
-                <span class="detail-value">${data.expiresAt.toLocaleDateString('en-US', { 
+                <span class="detail-value">${data.expires_at.toLocaleDateString('en-US', { 
                   weekday: 'long', 
                   year: 'numeric', 
                   month: 'long', 
@@ -414,7 +415,7 @@ class EmailService {
         </div>
 
         <div class="expires-warning">
-            ⏰ <strong>This invitation expires in 7 days.</strong> Make sure to accept it before ${data.expiresAt.toLocaleDateString()}.
+            ⏰ <strong>This invitation expires in 7 days.</strong> Make sure to accept it before ${data.expires_at.toLocaleDateString()}.
         </div>
 
         <p>If you have any questions, feel free to reach out to ${data.usersName} or our support team.</p>
@@ -441,12 +442,12 @@ Invitation Details:
 - Organization: ${data.tenantName}
 - Your Role: ${data.role}
 - Invited by: ${data.usersName}
-- Expires: ${data.expiresAt.toLocaleDateString()}
+- Expires: ${data.expires_at.toLocaleDateString()}
 
 To accept this invitation, click the link below:
 ${data.acceptUrl}
 
-This invitation expires in 7 days (${data.expiresAt.toLocaleDateString()}).
+This invitation expires in 7 days (${data.expires_at.toLocaleDateString()}).
 
 If you have any questions, feel free to reach out to ${data.usersName} or our support team.
 

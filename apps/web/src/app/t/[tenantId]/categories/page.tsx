@@ -130,7 +130,7 @@ export default function CategoriesPage() {
         setAlignmentStatus(statusData.data)
 
         // Check if this is a hero location and get organization info
-        const tenantRes = await api.get(`${API_BASE_URL}/tenants/${tenantId}`)
+        const tenantRes = await api.get(`${API_BASE_URL}/api/tenants/${tenantId}`)
         if (tenantRes.ok) {
           const tenantData = await tenantRes.json()
           const metadata = tenantData.metadata || {}

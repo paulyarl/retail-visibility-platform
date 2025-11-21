@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Button, Input, Modal, ModalFooter, ConfirmDialog } from "@/components/ui";
 import { useTenantItems } from "@/hooks/useTenantItems";
 import { useItemsViewMode } from "@/hooks/useItemsViewMode";
@@ -47,6 +47,9 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   const stats = useMemo(() => itemsDataService.calculateStats(items), [items]);
 
   const {
+    showCreateModal,
+    openCreateModal,
+    closeCreateModal,
     editingItem,
     showEditModal,
     openEditModal,
@@ -87,6 +90,25 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     variant: "warning",
   });
 
+  // Check URL params for create=true to auto-open create modal
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    console.log('[ItemsPageClient] Checking URL params:', {
+      search: window.location.search,
+      createParam: params.get('create'),
+      shouldOpenModal: params.get('create') === 'true'
+    });
+    if (params.get('create') === 'true') {
+      console.log('[ItemsPageClient] Opening create modal...');
+      openCreateModal();
+    }
+  }, [openCreateModal]);
+
+  // Debug: Monitor modal state changes
+  useEffect(() => {
+    console.log('[ItemsPageClient] Create modal state changed:', showCreateModal);
+  }, [showCreateModal]);
+
   const hasGlobalEmptyState =
     !loading &&
     !error &&
@@ -103,6 +125,40 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       closeEditModal();
     } catch (error) {
       console.error("[ItemsPageClient] Update failed:", error);
+    }
+  };
+
+  const handleCreate = async (data: Partial<Item>) => {
+    try {
+      console.log('[ItemsPageClient] Creating item with data:', data);
+      console.log('[ItemsPageClient] Data keys:', Object.keys(data));
+      
+      // Use the items API to create a new item
+      const payload = {
+        ...data,
+        tenantId,
+      };
+      console.log('[ItemsPageClient] Full payload:', payload);
+      
+      const response = await fetch(`/api/items`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[ItemsPageClient] Response status:', response.status);
+        console.error('[ItemsPageClient] Response body:', errorText);
+        throw new Error('Failed to create item');
+      }
+
+      closeCreateModal();
+      refresh();
+    } catch (error) {
+      console.error("[ItemsPageClient] Create failed:", error);
     }
   };
 
@@ -376,6 +432,15 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       </div>
 
       {/* Modals for item actions */}
+      {/* Create Item Modal */}
+      <EditItemModal
+        isOpen={showCreateModal}
+        item={null}
+        onSave={handleCreate}
+        onClose={closeCreateModal}
+      />
+
+      {/* Edit Item Modal */}
       <EditItemModal
         isOpen={showEditModal}
         item={editingItem}

@@ -90,22 +90,17 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
         // Get user's role on this specific tenant
         // Platform admins bypass role checks, so skip this call
         if (!hasSupportAccess && userDataResponse.user?.id && tenantId) {
-          try {
-            const userTenantResponse = await api.get(`api/users/${userDataResponse.user.id}/tenants/${tenantId}`);
-            if (userTenantResponse.ok) {
-              const userTenantData = await userTenantResponse.json();
-              setUserRole(userTenantData.role as UserTenantRole);
-            } else if (isPlatformViewer) {
-              // Platform viewers act as VIEWER role on any tenant
-              setUserRole('VIEWER');
-            }
-          } catch (err) {
-            console.warn('[useTenantTier] Failed to fetch user tenant role:', err);
-            if (isPlatformViewer) {
-              // Fallback: Platform viewers act as VIEWER role
-              setUserRole('VIEWER');
-            }
+          // Find the user's role for this tenant from the already-loaded user data
+          const userTenant = userDataResponse.user.tenants?.find((t: any) => t.id === tenantId);
+          if (userTenant) {
+            setUserRole(userTenant.role as UserTenantRole);
+          } else if (isPlatformViewer) {
+            // Platform viewers act as VIEWER role on any tenant
+            setUserRole('VIEWER');
           }
+        } else if (isPlatformViewer) {
+          // Platform viewers act as VIEWER role on any tenant
+          setUserRole('VIEWER');
         }
         
         // Platform admins and support bypass tier checks, but still fetch tier data for display

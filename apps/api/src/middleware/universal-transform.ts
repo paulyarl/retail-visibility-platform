@@ -82,6 +82,7 @@ export const UNIVERSAL_FIELD_MAPPINGS = {
   'inventoryItemId': 'inventory_item_id',
   'priceCents': 'priceCents',
   'itemStatus': 'itemStatus',
+  'categoryPath': 'categoryPath',
   
   // Business profile
   'businessName': 'business_name',

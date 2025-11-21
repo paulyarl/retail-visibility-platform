@@ -103,8 +103,6 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   }, [isOpen, ffQuick, item, sku, name, brand, manufacturer, price, stock, description]);
 
   const handleSave = async () => {
-    if (!item) return;
-
     if (!name.trim()) {
       setError('Product name is required');
       return;
@@ -124,7 +122,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         stock: stock ? parseInt(stock) : undefined,
         description: description.trim() || undefined,
         status,
-        itemStatus: status, // Backend uses itemStatus field
+        itemStatus: status === 'draft' ? 'active' : status, // Map draft to active for API
         categoryPath,
       } as Item;
 
@@ -144,14 +142,12 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
     }
   };
 
-  if (!item) return null;
-
   return (
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Edit Item"
-      description="Update item details"
+      title={item ? "Edit Item" : "Add New Item"}
+      description={item ? "Update item details" : "Create a new item"}
       size="md"
     >
       <div className="space-y-4">
@@ -392,30 +388,32 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </p>
         </div>
 
-        {/* Current Values Display */}
-        <div className="p-4 bg-neutral-50 rounded-lg">
-          <p className="text-sm font-medium text-neutral-700 mb-2">Current Values</p>
-          <div className="space-y-1 text-sm text-neutral-600">
-            <p><span className="font-medium">SKU:</span> {item.sku}</p>
-            <p><span className="font-medium">Name:</span> {item.name}</p>
-            {item.brand && (
-              <p><span className="font-medium">Brand:</span> {item.brand}</p>
-            )}
-            {item.manufacturer && (
-              <p><span className="font-medium">Manufacturer:</span> {item.manufacturer}</p>
-            )}
-            {item.price !== undefined && (
-              <p><span className="font-medium">Price:</span> ${item.price.toFixed(2)}</p>
-            )}
-            {item.stock !== undefined && (
-              <p><span className="font-medium">Stock:</span> {item.stock}</p>
-            )}
-            <p><span className="font-medium">Category:</span> {item.categoryPath && item.categoryPath.length > 0 ? item.categoryPath.join(' › ') : 'None'}</p>
-            {item.description && (
-              <p><span className="font-medium">Description:</span> {item.description.substring(0, 100)}{item.description.length > 100 ? '...' : ''}</p>
-            )}
+        {/* Current Values Display - Only show when editing existing item */}
+        {item && (
+          <div className="p-4 bg-neutral-50 rounded-lg">
+            <p className="text-sm font-medium text-neutral-700 mb-2">Current Values</p>
+            <div className="space-y-1 text-sm text-neutral-600">
+              <p><span className="font-medium">SKU:</span> {item.sku}</p>
+              <p><span className="font-medium">Name:</span> {item.name}</p>
+              {item.brand && (
+                <p><span className="font-medium">Brand:</span> {item.brand}</p>
+              )}
+              {item.manufacturer && (
+                <p><span className="font-medium">Manufacturer:</span> {item.manufacturer}</p>
+              )}
+              {item.price !== undefined && (
+                <p><span className="font-medium">Price:</span> ${item.price.toFixed(2)}</p>
+              )}
+              {item.stock !== undefined && (
+                <p><span className="font-medium">Stock:</span> {item.stock}</p>
+              )}
+              <p><span className="font-medium">Category:</span> {item.categoryPath && item.categoryPath.length > 0 ? item.categoryPath.join(' › ') : 'None'}</p>
+              {item.description && (
+                <p><span className="font-medium">Description:</span> {item.description.substring(0, 100)}{item.description.length > 100 ? '...' : ''}</p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Sticky Quick Actions Footer (gated) */}

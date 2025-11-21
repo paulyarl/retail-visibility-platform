@@ -1,4 +1,4 @@
-import { tenant, organization } from "@prisma/client";
+import { Tenant, Organization } from "@prisma/client";
 
 /**
  * Internal subscription status enum (derived from Tenant fields)
@@ -87,7 +87,7 @@ export function deriveInternalStatus(tenant: {
 }): InternalStatus {
   const now = new Date();
   const status = tenant.subscription_status || 'active';
-  const tier = tenant.subscriptionTier || 'starter';
+  const tier = tenant.subscription_tier || 'starter';
 
   // 1. Check for explicit canceled status
   if (status === 'canceled') {
@@ -118,7 +118,7 @@ export function deriveInternalStatus(tenant: {
   // 5. Check for active paid subscription
   if (status === 'active') {
     // Check if subscription has expired
-    if (tenant.subscriptionEndsAt && tenant.subscriptionEndsAt < now) {
+    if (tenant.subscription_ends_at && tenant.subscription_ends_at < now) {
       return 'expired';
     }
 

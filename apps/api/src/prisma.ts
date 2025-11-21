@@ -103,7 +103,8 @@ const basePrismaWithRetry = new Proxy(basePrisma, {
 });
 
 // Apply flexible naming convention wrapper
-export const prisma = createFlexiblePrisma(basePrismaWithRetry);
+// export const prisma = createFlexiblePrisma(basePrismaWithRetry);
+export const prisma = basePrismaWithRetry;
 
 // Graceful shutdown for production
 if (process.env.NODE_ENV === 'production') {

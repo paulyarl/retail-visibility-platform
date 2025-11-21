@@ -24,11 +24,11 @@ export interface FeedItem {
  * Generate product feed for Google Merchant Center
  * Only includes items with itemStatus='active' AND visibility='public'
  */
-export async function generateProductFeed(tenantId: string): Promise<FeedItem[]> {
+export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]> {
   try {
-    const items = await prisma.inventory_item.findMany({
+    const items = await prisma.inventoryItem.findMany({
       where: {
-        tenantId: tenantId,
+        tenant_id: tenantId,
         itemStatus: 'active',  // Only active items
         visibility: 'public',   // Only public items
       },
@@ -42,8 +42,8 @@ export async function generateProductFeed(tenantId: string): Promise<FeedItem[]>
         price: true,
         currency: true,
         availability: true,
-        image_url: true,
-        category_path: true,
+        imageUrl: true,
+        categoryPath: true,
       },
     });
 
@@ -58,7 +58,7 @@ export async function generateProductFeed(tenantId: string): Promise<FeedItem[]>
         price: Number(item.price),
         currency: item.currency,
         availability: item.availability,
-        image_url: item.image_url || undefined,
+        image_url: item.imageUrl || undefined,
         additionalImageLinks: undefined,
         category_path: item.categoryPath || undefined,
       } as FeedItem;
@@ -72,17 +72,17 @@ export async function generateProductFeed(tenantId: string): Promise<FeedItem[]>
 /**
  * Get feed statistics
  */
-export async function getFeedStats(tenantId: string) {
+export async function getFeedStats(tenant_id: string) {
   const [total, active, inactive, syncing, notSyncing] = await Promise.all([
-    prisma.inventory_item.count({ where: { tenantId: tenantId } }),
-    prisma.inventory_item.count({ where: { tenantId: tenantId, itemStatus: 'active' } }),
-    prisma.inventory_item.count({ where: { tenantId: tenantId, itemStatus: 'inactive' } }),
-    prisma.inventory_item.count({ 
-      where: { tenantId: tenantId, itemStatus: 'active', visibility: 'public' } 
+    prisma.inventoryItem.count({ where: { tenant_id: tenantId } }),
+    prisma.inventoryItem.count({ where: { tenant_id: tenantId, itemStatus: 'active' } }),
+    prisma.inventoryItem.count({ where: { tenant_id: tenantId, itemStatus: 'inactive' } }),
+    prisma.inventoryItem.count({ 
+      where: { tenant_id: tenantId, itemStatus: 'active', visibility: 'public' } 
     }),
-    prisma.inventory_item.count({ 
+    prisma.inventoryItem.count({ 
       where: { 
-        tenantId: tenantId,
+        tenant_id: tenantId,
         OR: [
           { itemStatus: { not: 'active' } },
           { visibility: { not: 'public' } },

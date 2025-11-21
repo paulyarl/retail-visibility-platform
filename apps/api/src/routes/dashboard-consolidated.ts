@@ -15,7 +15,7 @@ const router = Router();
  * 
  * This reduces 4 separate API calls to 1, preventing connection pool exhaustion
  */
-router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, async (req, res) => {
+router.get('/dashboard/consolidated/:tenantId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     
@@ -28,12 +28,12 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
           id: true,
           name: true,
           metadata: true,
-          location_status: true,
+          locationStatus: true,
           reopeningDate: true,
-          subscription_tier: true,
-          subscription_status: true,
+          subscriptionTier: true,
+          subscriptionStatus: true,
           trialEndsAt: true,
-          subscription_ends_at: true,
+          subscriptionEndsAt: true,
           organizationId: true,
           monthlySkuQuota: true,
           skusAddedThisMonth: true,
@@ -41,9 +41,9 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
             select: {
               id: true,
               name: true,
-              subscription_tier: true,
+              subscriptionTier: true,
               _count: {
-                select: { tenant: true }
+                select: { Tenant: true }
               }
             }
           }
@@ -52,9 +52,9 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
       
       // 2. Item counts (all in parallel)
       Promise.all([
-        prisma.inventory_item.count({ where: { tenantId } }),
-        prisma.inventory_item.count({ where: { tenantId, itemStatus: 'active' } }),
-        prisma.inventory_item.count({
+        prisma.inventoryItem.count({ where: { tenantId } }),
+        prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'active' } }),
+        prisma.inventoryItem.count({
           where: {
             tenantId,
             itemStatus: 'active',
@@ -75,7 +75,7 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
 
     // Calculate tier info (from tenant-tier.ts logic)
     const effectiveTier = tenant.organization?.subscriptionTier || tenant.subscriptionTier || 'starter';
-    const isChain = tenant.organization ? tenant.organization._count.tenants > 1 : false;
+    const isChain = tenant.organization ? tenant.organization._count.Tenant > 1 : false;
     const tenantTierData = tenant.subscriptionTier ? await TierService.getTierByKey(tenant.subscriptionTier) : null;
     const orgTierData = tenant.organization?.subscriptionTier ? await TierService.getTierByKey(tenant.organization.subscriptionTier) : null;
 
@@ -85,7 +85,7 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
     const skuPercentage = Math.round((skuUsage / skuLimit) * 100);
 
     // Count tenant's owned locations for location usage
-    const ownedTenants = await prisma.user_tenants.count({
+    const ownedTenants = await prisma.userTenant.count({
       where: {
         userId: (req as any).user?.userId,
         role: 'OWNER',
@@ -100,7 +100,7 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
 
     // Add location status info
     const { getLocationStatusInfo } = await import('../utils/location-status');
-    const statusInfo = getLocationStatusInfo(tenant.location_status as any);
+    const statusInfo = getLocationStatusInfo(tenant.locationStatus as any);
 
     // Consolidated response
     res.json({
@@ -109,7 +109,7 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
         name: tenant.name,
         logoUrl: (tenant.metadata as any)?.logo_url,
         bannerUrl: (tenant.metadata as any)?.banner_url,
-        location_status: tenant.location_status,
+        location_status: tenant.locationStatus,
         reopeningDate: tenant.reopeningDate,
         statusInfo,
       },
@@ -120,10 +120,10 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
         locations: 1,
       },
       tier: {
-        tenantId: tenant.id,
+        tenant_id: tenant.id,
         tenantName: tenant.name,
         tier: effectiveTier,
-        subscription_status: tenant.subscription_status,
+        subscription_status: tenant.subscriptionStatus,
         trialEndsAt: tenant.trialEndsAt,
         subscription_ends_at: tenant.subscriptionEndsAt,
         isChain,

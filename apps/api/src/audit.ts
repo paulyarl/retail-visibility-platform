@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { Flags } from "./config";
+import { Prisma } from '@prisma/client';
 
 export type AuditPayload = Record<string, any> | null | undefined;
 
@@ -12,10 +13,10 @@ export async function audit(opts: {
   if (!Flags.AUDIT_LOG) return; // feature-guarded noop
   try {
     const payloadJson = opts.payload ? JSON.stringify(opts.payload) : null;
-    await prisma.$executeRaw`
+    await prisma.$executeRaw(Prisma.sql`
       INSERT INTO audit_log (tenantId, actor, action, payload)
       VALUES (${opts.tenantId}, ${opts.actor ?? null}, ${opts.action}, ${payloadJson}::jsonb)
-    `;
+    `);
   } catch (e) {
     // swallow errors to avoid impacting hot paths
     // optionally add sampling/logging later under observability work

@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../prisma';
+import { JWTPayload } from '../middleware/auth';
 
 // JWT configuration
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'your-super-secret-access-key-change-in-production';
@@ -10,13 +11,6 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-super-secret-
 // Setting very long expiry until system time issue is resolved
 const JWT_ACCESS_EXPIRY = '365d'; // Was '15m'
 const JWT_REFRESH_EXPIRY = '730d'; // Was '7d'
-
-export interface JWTPayload { 
-  userId?: string; // Added by universal transform middleware
-  email: string;
-  role: UserRole;
-  tenantIds: string[];
-}
 
 export interface RegisterData {
   email: string;
@@ -249,8 +243,6 @@ export class AuthService {
    */
   async getUserById(userId: string) {
     console.log('[AuthService] getUserById called with:', userId);
-    console.log('[AuthService] prisma.users exists:', !!prisma.user);
-    console.log('[AuthService] prisma.user exists:', !!prisma.user);
     
     // First get user without relations to avoid Prisma relation issues
     const user = await prisma.user.findUnique({
@@ -268,7 +260,6 @@ export class AuthService {
     });
 
     if (!user) {
-      console.log('[AuthService] Throwing "User not found" error');
       throw new Error('User not found');
     }
 
@@ -282,21 +273,8 @@ export class AuthService {
           role: true,
         },
       });
-      console.log('[AuthService] Found', userTenants.length, 'tenant associations');
     } catch (tenantError) {
-      const errorMessage = tenantError instanceof Error ? tenantError.message : String(tenantError);
-      console.log('[AuthService] Could not fetch tenant associations:', errorMessage);
       // Continue with empty tenants array
-    }
-
-    console.log('[AuthService] Database query result:', user ? 'USER FOUND' : 'USER NOT FOUND');
-    if (user) {
-      console.log('[AuthService] User details:', { id: user.id, email: user.email, role: user.role });
-    }
-
-    if (!user) {
-      console.log('[AuthService] Throwing "User not found" error');
-      throw new Error('User not found');
     }
 
     return {

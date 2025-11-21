@@ -1,15 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { authService, JWTPayload } from './auth.service';
+import { authService } from './auth.service';
+import { JWTPayload } from '../middleware/auth';
 import { isPlatformAdmin } from '../utils/platform-admin';
-
-// Extend Express Request to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JWTPayload;
-    }
-  }
-}
 
 /**
  * Middleware to authenticate JWT token

@@ -70,7 +70,6 @@ router.post('/login', async (req: Request, res: Response) => {
     const result = await authService.login(validatedData);
     
     res.json({
-      message: 'Login successful',
       ...result,
     });
   } catch (error) {
@@ -169,7 +168,14 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
     
     // Universal transform middleware converts userId to userId
     const userId = (req.user as any).userId || req.user.userId;
-    console.log('[Auth Route] Using userId:', userId);
+    
+    if (!userId) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'Invalid authentication data',
+      });
+    }
+    
     const user = await authService.getUserById(userId);
     
     res.json({ user });
@@ -201,7 +207,15 @@ router.post('/logout', authenticateToken, async (req: Request, res: Response) =>
       });
     }
     
-    const result = await authService.logout(req.user.userId);
+    const userId = (req.user as any).userId || req.user.userId;
+    if (!userId) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'Invalid authentication data',
+      });
+    }
+    
+    const result = await authService.logout(userId);
     
     res.json(result);
   } catch (error) {
