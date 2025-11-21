@@ -31,7 +31,7 @@ export class GBPCategorySyncService {
    */
   private async getAnyValidAccessToken(): Promise<string | null> {
     try {
-      const tokenRecord = await prisma.google_oauth_tokens.findFirst({
+      const tokenRecord = await prisma.googleOauthTokens.findFirst({
         orderBy: { createdAt: 'desc' },
       });
 
@@ -53,7 +53,7 @@ export class GBPCategorySyncService {
         }
 
         const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-        await prisma.google_oauth_tokens.update({
+        await prisma.googleOauthTokens.update({
           where: { accountId: tokenRecord.accountId },
           data: {
             accessTokenEncrypted: encryptToken(newTokens.access_token),
@@ -287,7 +287,7 @@ export class GBPCategorySyncService {
       const latest = await this.fetchLatestCategories();
       
       // Get current categories from database
-      const current = await prisma.gbp_categories.findMany({
+      const current = await prisma.gbpCategories.findMany({
         where: { isActive: true }
       });
 
@@ -318,7 +318,7 @@ export class GBPCategorySyncService {
       try {
         switch (change.type) {
           case 'new':
-            await prisma.gbp_categories.create({
+            await prisma.gbpCategories.create({
               data: {
                 id: change.categoryId,
                 name: change.newData.displayName,
@@ -330,7 +330,7 @@ export class GBPCategorySyncService {
             break;
 
           case 'updated':
-            await prisma.gbp_categories.update({
+            await prisma.gbpCategories.update({
               where: { id: change.categoryId },
               data: {
                 display_name: change.newData.displayName,
@@ -341,7 +341,7 @@ export class GBPCategorySyncService {
             break;
 
           case 'deleted':
-            await prisma.gbp_categories.update({
+            await prisma.gbpCategories.update({
               where: { id: change.categoryId },
               data: {
                 isActive: false,
@@ -405,28 +405,28 @@ export class GBPCategorySyncService {
 
         for (const category of hardcodedCategories) {
           // Check if category exists
-          const existing = await tx.gBPCategory.findUnique({
+          const existing = await tx.gbpCategories.findUnique({
             where: { id: category.id },
             select: { id: true, display_name: true }
           });
 
           if (!existing) {
             // Create new category
-            await tx.gBPCategory.create({
+            await tx.gbpCategories.create({
               data: {
                 id: category.id,
                 name: category.name,
-                display_name: category.displayName,
+                display_name: category.display_name,
                 isActive: true
               }
             });
             upserted++;
-          } else if (existing.displayName !== category.displayName) {
+          } else if (existing.display_name !== category.display_name) {
             // Update existing category if displayName changed
-            await tx.gBPCategory.update({
+            await tx.gbpCategories.update({
               where: { id: category.id },
               data: {
-                display_name: category.displayName,
+                display_name: category.display_name,
                 updatedAt: new Date()
               }
             });
@@ -449,17 +449,17 @@ export class GBPCategorySyncService {
 
       for (const category of hardcodedCategories) {
         try {
-          await prisma.gbp_categories.upsert({
+          await prisma.gbpCategories.upsert({
             where: { id: category.id },
             update: {
-              display_name: category.display_name,
+              displayName: category.display_name,
               updatedAt: new Date()
             },
             create: {
               id: category.id,
               name: category.name,
-              display_name: category.display_name,
-              is_active: true,
+              displayName: category.display_name,
+              isActive: true,
               createdAt: new Date(),
               updatedAt: new Date()
             }
@@ -552,7 +552,7 @@ export class GBPCategorySyncService {
           categoryId: id,
           newData: latestCat
         });
-      } else if (currentCat.displayName !== latestCat.displayName) {
+      } else if (currentCat.display_name !== latestCat.display_name) {
         changes.push({
           type: 'updated',
           categoryId: id,

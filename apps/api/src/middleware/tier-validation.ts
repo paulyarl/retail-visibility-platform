@@ -191,11 +191,13 @@ export function requirePropagationTier(
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
         select: {
-          subscription_tier: true,
-          organizationId: true,
+          subscriptionTier: true,
+          organizationId: true
+        },
+        include: {
           organization: {
             select: {
-              subscription_tier: true,
+              subscriptionTier: true,
               _count: { select: { tenant: true } }
             }
           }
@@ -213,7 +215,7 @@ export function requirePropagationTier(
       const effectiveTier = tenant.organization?.subscriptionTier || tenant.subscriptionTier || 'starter';
       
       // Check if user has 2+ locations
-      const locationCount = tenant.organization?._count.tenants || 1;
+      const locationCount = tenant.organization?._count.tenant || 1;
       if (locationCount < 2) {
         return res.status(403).json({
           error: 'insufficient_locations',
