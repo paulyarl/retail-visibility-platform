@@ -3245,7 +3245,7 @@ app.use('/api/auth', authRoutes);
 
 /* ------------------------------ EMAIL MANAGEMENT ------------------------------ */
 // Import and mount email management routes
-app.use('/api/email', emailManagementRoutes);
+// app.use('/api/email', emailManagementRoutes);
 
 /* ------------------------------ v3.5 AUDIT & BILLING APIs ------------------------------ */
 // Apply audit middleware globally (logs all write operations)
