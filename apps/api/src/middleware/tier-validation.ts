@@ -179,11 +179,11 @@ export function requirePropagationTier(
 ) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tenantId = req.params.tenant_id || req.params.id;
+      const tenantId = req.params.tenantId || req.params.id;
       
       if (!tenantId) {
         return res.status(400).json({
-          error: 'tenant_id_required',
+          error: 'tenantId_required',
           message: 'Tenant ID is required'
         });
       }

@@ -10,7 +10,7 @@ router.get('/dashboard', async (req, res) => {
     const { tenantId, days = '30' } = req.query;
 
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     const daysNum = parseInt(days as string);
@@ -158,7 +158,7 @@ router.post('/update', async (req, res) => {
   try {
     const schema = z.object({
       item_id: z.string(),
-      tenant_id: z.string(),
+      tenantId: z.string(),
       date: z.string().datetime(),
       approvalStatus: z.string().optional(),
       rejectionReason: z.string().optional(),
@@ -201,7 +201,7 @@ router.post('/update', async (req, res) => {
       },
       create: {
         item_id: data.item_id,
-        tenant_id: data.tenant_id,
+        tenantId: data.tenantId,
         date,
         approvalStatus: data.approvalStatus || 'not_synced',
         rejectionReason: data.rejectionReason,
@@ -231,7 +231,7 @@ router.get('/approval-status', async (req, res) => {
     const { tenantId } = req.query;
 
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     // Get latest approval status for each product

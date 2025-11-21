@@ -82,7 +82,7 @@ export function getMaintenanceState(ctx: MaintenanceContext): MaintenanceState {
 export function deriveInternalStatus(tenant: {
   subscription_status: string | null;
   subscription_tier: string | null;
-  trial_ends_at: Date | null;
+  trialEndsAt: Date | null;
   subscription_ends_at: Date | null;
 }): InternalStatus {
   const now = new Date();
@@ -129,7 +129,7 @@ export function deriveInternalStatus(tenant: {
       const maintenanceState = getMaintenanceState({
         tier,
         status,
-        trial_ends_at: tenant.trialEndsAt,
+        trialEndsAt: tenant.trialEndsAt,
       });
 
       if (maintenanceState === 'freeze') {

@@ -176,7 +176,7 @@ router.post('/webhooks', async (req: Request, res: Response) => {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log('[Stripe Webhooks] Processing checkout.session.completed:', session.id);
 
-  const tenantId = session.metadata?.tenant_id || session.client_reference_id;
+  const tenantId = session.metadata?.tenantId || session.client_reference_id;
 
   if (!tenantId) {
     console.error('[Stripe Webhooks] No tenantId in checkout session metadata');

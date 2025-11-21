@@ -24,12 +24,12 @@ export interface FeedItem {
  * Generate product feed for Google Merchant Center
  * Only includes items with itemStatus='active' AND visibility='public'
  */
-export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]> {
+export async function generateProductFeed(tenantId: string): Promise<FeedItem[]> {
   try {
     const items = await prisma.inventory_item.findMany({
       where: {
-        tenant_id: tenantId,
-        item_status: 'active',  // Only active items
+        tenantId: tenantId,
+        itemStatus: 'active',  // Only active items
         visibility: 'public',   // Only public items
       },
       select: {
@@ -72,19 +72,19 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
 /**
  * Get feed statistics
  */
-export async function getFeedStats(tenant_id: string) {
+export async function getFeedStats(tenantId: string) {
   const [total, active, inactive, syncing, notSyncing] = await Promise.all([
-    prisma.inventory_item.count({ where: { tenant_id: tenantId } }),
-    prisma.inventory_item.count({ where: { tenant_id: tenantId, item_status: 'active' } }),
-    prisma.inventory_item.count({ where: { tenant_id: tenantId, item_status: 'inactive' } }),
+    prisma.inventory_item.count({ where: { tenantId: tenantId } }),
+    prisma.inventory_item.count({ where: { tenantId: tenantId, itemStatus: 'active' } }),
+    prisma.inventory_item.count({ where: { tenantId: tenantId, itemStatus: 'inactive' } }),
     prisma.inventory_item.count({ 
-      where: { tenant_id: tenantId, item_status: 'active', visibility: 'public' } 
+      where: { tenantId: tenantId, itemStatus: 'active', visibility: 'public' } 
     }),
     prisma.inventory_item.count({ 
       where: { 
-        tenant_id: tenantId,
+        tenantId: tenantId,
         OR: [
-          { item_status: { not: 'active' } },
+          { itemStatus: { not: 'active' } },
           { visibility: { not: 'public' } },
         ]
       } 

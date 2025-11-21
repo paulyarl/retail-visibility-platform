@@ -141,7 +141,7 @@ const SCENARIOS = {
 export type QuickStartScenario = keyof typeof SCENARIOS;
 
 export interface QuickStartOptions {
-  tenant_id: string;
+  tenantId: string;
   scenario: QuickStartScenario;
   productCount: number;
   assignCategories?: boolean;
@@ -249,18 +249,18 @@ export async function generateQuickStartProducts(
 
       return {
         id: `qs_${tenantId}_${timestamp}_${(i + idx).toString().padStart(5, '0')}`,
-        tenant_id: tenantId,
+        tenantId: tenantId,
         sku: `SKU-${timestamp}-${(i + idx).toString().padStart(5, '0')}`,
         name: product.name,
         title: product.name,
         brand: product.brand || 'Generic',
-        price_cents: product.price,
+        priceCents: product.price,
         price: product.price / 100,
         currency: 'USD',
         stock,
         availability,
-        item_status: itemStatus,
-        updated_at: new Date(),
+        itemStatus: itemStatus,
+        updatedAt: new Date(),
         ...categoryAssignment,
       };
     });
@@ -271,19 +271,19 @@ export async function generateQuickStartProducts(
 
   // Get final counts
   const totalProducts = await prisma.inventory_item.count({
-    where: { tenant_id: tenantId },
+    where: { tenantId: tenantId },
   });
 
   const activeProducts = await prisma.inventory_item.count({
-    where: { tenant_id: tenantId, item_status: 'active' },
+    where: { tenantId: tenantId, itemStatus: 'active' },
   });
 
   const inStockProducts = await prisma.inventory_item.count({
-    where: { tenant_id: tenantId, availability: 'in_stock' },
+    where: { tenantId: tenantId, availability: 'in_stock' },
   });
 
   const categorizedProducts = await prisma.inventory_item.count({
-    where: { tenant_id: tenantId, category_path: { isEmpty: false } },
+    where: { tenantId: tenantId, category_path: { isEmpty: false } },
   });
 
   return {

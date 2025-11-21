@@ -39,7 +39,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.users.some((ut: any) => ut.user_id === user.id);
+    const hasAccess = tenant.users.some((ut: any) => ut.userId === user.id);
     if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
       return res.status(403).json({ error: 'access_denied' });
     }
@@ -186,7 +186,7 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, async (req: Req
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.users.some((ut: any) => ut.user_id === user.id);
+    const hasAccess = tenant.users.some((ut: any) => ut.userId === user.id);
     if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
       return res.status(403).json({ error: 'access_denied' });
     }
@@ -265,7 +265,7 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.users.some((ut: any) => ut.user_id === user.id);
+    const hasAccess = tenant.users.some((ut: any) => ut.userId === user.id);
     if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
       return res.status(403).json({ error: 'access_denied' });
     }
@@ -276,7 +276,7 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
       include: {
         itemMappings: {
           take: 10, // Limit to recent mappings
-          orderBy: { updated_at: 'desc' }
+          orderBy: { updatedAt: 'desc' }
         },
         syncLogs: {
           take: 5, // Last 5 sync logs
@@ -360,7 +360,7 @@ router.get('/:tenantId/clover/oauth/authorize', authenticateToken, async (req: R
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.users.some((ut: any) => ut.user_id === user.id);
+    const hasAccess = tenant.users.some((ut: any) => ut.userId === user.id);
     if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
       return res.status(403).json({ error: 'access_denied' });
     }
@@ -496,7 +496,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[OAuth Callback] Error:', error);
     // Try to redirect with error, fallback to error page
-    const tenantId = req.query.state ? decodeState(req.query.state as string).tenant_id : null;
+    const tenantId = req.query.state ? decodeState(req.query.state as string).tenantId : null;
     if (tenantId) {
       return res.redirect(`/t/${tenantId}/settings/integrations?error=connection_failed&message=${encodeURIComponent(error.message)}`);
     }

@@ -38,7 +38,7 @@ router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
           },
         },
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     // Transform data for frontend
@@ -96,8 +96,8 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     // Check if user is already in tenant
     const existing = await prisma.user_tenants.findUnique({
       where: {
-        user_id_tenant_id: {
-          user_id: user.id,
+        userId_tenantId: {
+          userId: user.id,
           tenantId,
         },
       },
@@ -113,7 +113,7 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     // Add user to tenant
     const userTenant = await prisma.user_tenants.create({
       data: {
-        user_id: user.id,
+        userId: user.id,
         tenantId,
         role: parsed.data.role as user_tenant_role,
       },
@@ -165,7 +165,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
     }
 
     // Prevent users from changing their own role
-    if (req.user?.user_id === userId) {
+    if (req.user?.userId === userId) {
       return res.status(400).json({
         error: 'cannot_modify_own_role',
         message: 'You cannot change your own role',
@@ -196,7 +196,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
         // Count target user's current owned tenants
         const ownedTenants = await prisma.user_tenants.findMany({
           where: {
-            user_id: userId,
+            userId: userId,
             role: user_tenant_role.OWNER,
           },
           include: {
@@ -258,7 +258,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
     // Update user's role
     const userTenant = await prisma.user_tenants.update({
       where: {
-        user_id_tenant_id: {
+        userId_tenantId: {
           userId,
           tenantId,
         },
@@ -292,7 +292,7 @@ router.delete('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) =
     const { tenantId, userId } = req.params;
 
     // Prevent users from removing themselves
-    if (req.user?.user_id === userId) {
+    if (req.user?.userId === userId) {
       return res.status(400).json({
         error: 'cannot_remove_self',
         message: 'You cannot remove yourself from the tenant',
@@ -302,7 +302,7 @@ router.delete('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) =
     // Remove user from tenant
     await prisma.user_tenants.delete({
       where: {
-        user_id_tenant_id: {
+        userId_tenantId: {
           userId,
           tenantId,
         },

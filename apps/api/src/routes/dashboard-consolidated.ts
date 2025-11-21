@@ -32,7 +32,7 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
           reopeningDate: true,
           subscription_tier: true,
           subscription_status: true,
-          trial_ends_at: true,
+          trialEndsAt: true,
           subscription_ends_at: true,
           organizationId: true,
           monthlySkuQuota: true,
@@ -87,7 +87,7 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
     // Count tenant's owned locations for location usage
     const ownedTenants = await prisma.user_tenants.count({
       where: {
-        user_id: (req as any).user?.user_id,
+        userId: (req as any).user?.userId,
         role: 'OWNER',
       },
     });
@@ -120,11 +120,11 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
         locations: 1,
       },
       tier: {
-        tenant_id: tenant.id,
+        tenantId: tenant.id,
         tenantName: tenant.name,
         tier: effectiveTier,
         subscription_status: tenant.subscription_status,
-        trial_ends_at: tenant.trialEndsAt,
+        trialEndsAt: tenant.trialEndsAt,
         subscription_ends_at: tenant.subscriptionEndsAt,
         isChain,
         organizationId: tenant.organizationId,

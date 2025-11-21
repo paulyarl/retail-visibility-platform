@@ -59,18 +59,16 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
       id: orgId,
       name,
       // Store owner in both legacy snake_case and new camelCase columns
-      owner_id: 'admin_test',
       ownerId: 'admin_test', // Test organizations owned by admin
       maxLocations: config.locations * 2, // Allow room for growth
       maxTotalSKUs: config.skuRange[1] * 2,
       // Required timestamps
-      updated_at: new Date(),
-      updated_at: new Date(),
+      updatedAt: new Date(),
     },
   });
 
   // Create tenant locations
-  const tenant: TestChainResult['tenants'] = [];
+  const tenants: TestChainResult['tenant'] = [];
   const locationNames = ['Main Store', 'Downtown Branch', 'Uptown Store', 'Westside Location', 'Eastside Branch'];
   
   for (let i = 0; i < config.locations; i++) {
@@ -82,12 +80,12 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
     const skuCount = Math.floor(minSkus + (maxSkus - minSkus) * (1 - i * 0.3));
     
     // Create tenant
-    const tenant = await prisma.tenant.create({
+    const currentTenant = await prisma.tenant.create({
       data: {
         id: tenantId,
         name: `${name} - ${locationName}`,
-        subscription_tier: 'professional',
-        subscription_status: 'active',
+        subscriptionTier: 'professional',
+        subscriptionStatus: 'active',
         organizationId: org.id,
       },
     });
@@ -96,7 +94,7 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
     let actualSkuCount = 0;
     if (seedProducts) {
       const result = await generateQuickStartProducts({
-        tenant_id: tenant.id,
+        tenantId: currentTenant.id,
         scenario,
         productCount: skuCount,
         assignCategories: true,
@@ -106,17 +104,17 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
     }
 
     tenants.push({
-      id: tenant.id,
-      name: tenant.name,
+      id: currentTenant.id,
+      name: currentTenant.name,
       skuCount: actualSkuCount,
     });
   }
 
-  const totalSkus = tenants.reduce((sum, t) => sum + t.skuCount, 0);
+  const totalSkus = tenants.reduce((sum: number, t: { skuCount: number }) => sum + t.skuCount, 0);
 
   return {
     organizationId: org.id,
-    tenants,
+    tenant: tenants,
     totalSkus,
   };
 }
@@ -135,16 +133,16 @@ export async function deleteTestChain(organizationId: string): Promise<{
   });
 
   // Count products before deletion
-  const productCount = await prisma.inventory_item.count({
+  const productCount = await prisma.inventoryItem.count({
     where: {
-      tenant_id: { in: tenants.map(t => t.id) },
+      tenantId: { in: tenants.map(t => t.id) },
     },
   });
 
   // Delete all products
-  await prisma.inventory_item.deleteMany({
+  await prisma.inventoryItem.deleteMany({
     where: {
-      tenant_id: { in: tenants.map(t => t.id) },
+      tenantId: { in: tenants.map(t => t.id) },
     },
   });
 
@@ -203,13 +201,13 @@ export async function createTestTenant(options: {
 
   // Link to owner if provided
   if (ownerId) {
-    await prisma.user_tenants.create({
+    await prisma.userTenant.create({
       data: {
         id: `ut_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        user_id: ownerId,
-        tenant_id: tenant.id,
+        userId: ownerId,
+        tenantId: tenant.id,
         role: 'OWNER',
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
     });
     console.log(`[Admin Tools] Linked tenant ${tenant.id} to owner ${ownerId}`);
@@ -219,7 +217,7 @@ export async function createTestTenant(options: {
   let result = null;
   if (productCount > 0) {
     result = await generateQuickStartProducts({
-      tenant_id: tenant.id,
+      tenantId: tenant.id,
       scenario,
       productCount,
       assignCategories: true,
@@ -228,7 +226,7 @@ export async function createTestTenant(options: {
   }
 
   return {
-    tenant_id: tenant.id,
+    tenantId: tenant.id,
     name: tenant.name,
     productsCreated: result?.productsCreated || 0,
     categoriesCreated: result?.categoriesCreated || 0,
@@ -253,8 +251,8 @@ export async function bulkSeedProducts(options: {
     try {
       // Clear existing products if requested
       if (clearExisting) {
-        await prisma.inventory_item.deleteMany({
-          where: { tenant_id: tenantId },
+        await prisma.inventoryItem.deleteMany({
+          where: { tenantId: tenantId },
         });
       }
 
@@ -298,8 +296,8 @@ export async function bulkClearProducts(tenantIds: string[]) {
 
   for (const tenantId of tenantIds) {
     try {
-      const result = await prisma.inventory_item.deleteMany({
-        where: { tenant_id: tenantId },
+      const result = await prisma.inventoryItem.deleteMany({
+        where: { tenantId: tenantId },
       });
 
       results.push({

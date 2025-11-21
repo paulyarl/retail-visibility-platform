@@ -68,20 +68,20 @@ async function logTierChange(params: {
   userAgent?: string;
 }) {
   try {
-    await prisma.tier_change_logs.create({
+    await prisma.tierChangeLogs.create({
       data: {
         entityType: params.entityType,
         entityId: params.entityId,
         action: params.action,
         changeType: params.changeType,
-        beforeState: params.beforeState || null,
-        afterState: params.afterState || null,
+        beforeState: params.beforeState as any,
+        afterState: params.afterState as any,
         changedBy: params.changedBy,
         changedByEmail: params.changedByEmail || null,
         reason: params.reason || null,
         ipAddress: params.ipAddress || null,
         userAgent: params.userAgent || null,
-      },
+      } as any,
     });
   } catch (error) {
     console.error('[Tier Change Log] Failed to log change:', error);
@@ -106,7 +106,7 @@ router.get('/tiers', requirePlatformStaff, async (req, res) => {
       where,
       orderBy: [
         { sortOrder: 'asc' },
-        { created_at: 'asc' },
+        { createdAt: 'asc' },
       ],
       include: {
         features: {
@@ -206,14 +206,15 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
     const tier = await prisma.subscriptionTier.create({
       data: {
         ...tierData,
-        created_by: req.user?.user_id,
-        updatedBy: req.user?.user_id,
+        createdBy: req.user?.userId,
+        updatedBy: req.user?.userId,
         features: features ? {
           create: features.map(f => ({
             featureKey: f.featureKey,
             featureName: f.featureName,
+            isEnabled: true, // Default to enabled for new features
             isInherited: f.isInherited || false,
-            metadata: f.metadata || null,
+            metadata: f.metadata as any,
           })),
         } : undefined,
       },
@@ -229,7 +230,7 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
       action: 'create',
       changeType: 'tier_created',
       afterState: tier,
-      changedBy: req.user?.user_id || 'system',
+      changedBy: req.user?.userId || 'system',
       changedByEmail: req.user?.email,
       reason,
       ipAddress: req.ip,
@@ -293,7 +294,7 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
       where: { id: tierId },
       data: {
         ...updateData,
-        updatedBy: req.user?.user_id,
+        updatedBy: req.user?.userId,
       },
       include: {
         features: true,
@@ -308,7 +309,7 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
       changeType: 'tier_updated',
       beforeState: currentTier,
       afterState: updatedTier,
-      changedBy: req.user?.user_id || 'system',
+      changedBy: req.user?.userId || 'system',
       changedByEmail: req.user?.email,
       reason,
       ipAddress: req.ip,
@@ -360,7 +361,7 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
 
     // Check if any tenants are using this tier
     const tenantCount = await prisma.tenant.count({
-      where: { subscription_tier: currentTier.tierKey },
+      where: { subscriptionTier: currentTier.tierKey },
     });
 
     if (tenantCount > 0 && hardDelete) {
@@ -383,7 +384,7 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
         action: 'delete',
         changeType: 'tier_deleted_hard',
         beforeState: currentTier,
-        changedBy: req.user?.user_id || 'system',
+        changedBy: req.user?.userId || 'system',
         changedByEmail: req.user?.email,
         reason,
         ipAddress: req.ip,
@@ -399,7 +400,7 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
         where: { id: tierId },
         data: {
           isActive: false,
-          updatedBy: req.user?.user_id,
+          updatedBy: req.user?.userId,
         },
       });
 
@@ -410,7 +411,7 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
         changeType: 'tier_deleted_soft',
         beforeState: currentTier,
         afterState: updatedTier,
-        changedBy: req.user?.user_id || 'system',
+        changedBy: req.user?.userId || 'system',
         changedByEmail: req.user?.email,
         reason,
         ipAddress: req.ip,
@@ -464,7 +465,7 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
     }
 
     // Check if feature already exists
-    const existing = await prisma.tier_features.findUnique({
+    const existing = await prisma.tierFeatures.findUnique({
       where: {
         tierId_featureKey: {
           tierId,
@@ -481,10 +482,14 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
     }
 
     // Add feature
-    const feature = await prisma.tier_features.create({
+    const feature = await prisma.tierFeatures.create({
       data: {
         tierId,
-        ...featureData,
+        featureKey: featureData.featureKey,
+        featureName: featureData.featureName,
+        isEnabled: true, // Default to enabled for new features
+        isInherited: featureData.isInherited || false,
+        metadata: featureData.metadata as any,
       },
     });
 
@@ -495,7 +500,7 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
       action: 'create',
       changeType: 'feature_added',
       afterState: feature,
-      changedBy: req.user?.user_id || 'system',
+      changedBy: req.user?.userId || 'system',
       changedByEmail: req.user?.email,
       reason,
       ipAddress: req.ip,
@@ -535,7 +540,7 @@ router.delete('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async 
     const { reason } = parsed.data;
 
     // Get current state
-    const feature = await prisma.tier_features.findUnique({
+    const feature = await prisma.tierFeatures.findUnique({
       where: { id: featureId },
       include: { tier: true },
     });
@@ -545,7 +550,7 @@ router.delete('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async 
     }
 
     // Delete feature
-    await prisma.tier_features.delete({
+    await prisma.tierFeatures.delete({
       where: { id: featureId },
     });
 
@@ -556,7 +561,7 @@ router.delete('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async 
       action: 'delete',
       changeType: 'feature_removed',
       beforeState: feature,
-      changedBy: req.user?.user_id || 'system',
+      changedBy: req.user?.userId || 'system',
       changedByEmail: req.user?.email,
       reason,
       ipAddress: req.ip,
@@ -585,9 +590,9 @@ router.get('/change-logs', requirePlatformStaff, async (req, res) => {
     if (entityType) where.entityType = entityType;
     if (entityId) where.entityId = entityId;
 
-    const logs = await prisma.tier_change_logs.findMany({
+    const logs = await prisma.tierChangeLogs.findMany({
       where,
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string, 10),
     });
 

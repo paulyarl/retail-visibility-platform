@@ -12,7 +12,7 @@ export async function requireActiveSubscription(
   next: NextFunction
 ) {
   try {
-    const tenantId = req.query.tenant_id as string || req.body?.tenant_id;
+    const tenantId = req.query.tenantId as string || req.body?.tenantId;
 
     if (!tenantId) {
       return res.status(400).json({
@@ -28,7 +28,7 @@ export async function requireActiveSubscription(
         name: true,
         subscription_status: true,
         subscription_tier: true,
-        trial_ends_at: true,
+        trialEndsAt: true,
         subscription_ends_at: true,
       },
     });
@@ -71,7 +71,7 @@ export async function requireActiveSubscription(
           id: tenant.id,
           name: tenant.name,
           tier: tenant.subscriptionTier,
-          trial_ends_at: tenant.trialEndsAt,
+          trialEndsAt: tenant.trialEndsAt,
         },
       });
     }
@@ -128,7 +128,7 @@ export async function checkSubscriptionLimits(
   next: NextFunction
 ) {
   try {
-    const tenantId = req.query.tenant_id as string || req.body?.tenant_id;
+    const tenantId = req.query.tenantId as string || req.body?.tenantId;
 
     if (!tenantId) {
       return next();
@@ -140,7 +140,7 @@ export async function checkSubscriptionLimits(
         id: true,
         subscription_tier: true,
         subscription_status: true,
-        trial_ends_at: true,
+        trialEndsAt: true,
         organizationId: true,
         organization: {
           select: {
@@ -215,7 +215,7 @@ export async function checkSubscriptionLimits(
     const maintenanceState = getMaintenanceState({
       tier,
       status,
-      trial_ends_at: tenant.trialEndsAt ?? undefined,
+      trialEndsAt: tenant.trialEndsAt ?? undefined,
     });
 
     // In maintenance mode, block growth (new items) even if numeric limits not reached
@@ -264,7 +264,7 @@ export async function requireWritableSubscription(
   next: NextFunction
 ) {
   try {
-    const tenantId = req.query.tenant_id as string || req.body?.tenant_id;
+    const tenantId = req.query.tenantId as string || req.body?.tenantId;
 
     if (!tenantId) {
       return res.status(400).json({
@@ -280,7 +280,7 @@ export async function requireWritableSubscription(
         name: true,
         subscription_status: true,
         subscription_tier: true,
-        trial_ends_at: true,
+        trialEndsAt: true,
         subscription_ends_at: true,
       },
     });

@@ -40,8 +40,8 @@ router.get('/platform-settings', async (_req, res) => {
         faviconUrl: null,
         primaryColor: '#3b82f6',
         secondaryColor: '#1e40af',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
     }
 

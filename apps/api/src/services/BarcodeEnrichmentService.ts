@@ -42,7 +42,7 @@ export class BarcodeEnrichmentService {
   /**
    * Main enrichment method with fallback chain
    */
-  async enrich(barcode: string, tenant_id: string): Promise<EnrichmentResult> {
+  async enrich(barcode: string, tenantId: string): Promise<EnrichmentResult> {
     const startTime = Date.now();
     
     try {
@@ -160,7 +160,7 @@ export class BarcodeEnrichmentService {
       description: data.description || null,
       brand: data.brand || 'Unknown',
       category_path: data.category ? [data.category] : [],
-      price_cents: data.msrp ? Math.round(parseFloat(data.msrp) * 100) : undefined,
+      priceCents: data.msrp ? Math.round(parseFloat(data.msrp) * 100) : undefined,
       image_url: data.images?.[0] || null,
       imageThumbnailUrl: data.images?.[0] || null,
       metadata: {
@@ -418,7 +418,7 @@ export class BarcodeEnrichmentService {
         brand: cached.brand || undefined,
         description: cached.description || undefined,
         category_path: cached.categoryPath || undefined,
-        price_cents: cached.priceCents || undefined,
+        priceCents: cached.priceCents || undefined,
         image_url: cached.image_url || undefined,
         imageThumbnailUrl: cached.imageThumbnailUrl || undefined,
         metadata: (cached.metadata as Record<string, any>) || undefined,
@@ -440,7 +440,7 @@ export class BarcodeEnrichmentService {
           brand: data.brand || null,
           description: data.description || null,
           category_path: data.categoryPath || [],
-          price_cents: data.priceCents || null,
+          priceCents: data.priceCents || null,
           image_url: data.image_url || null,
           imageThumbnailUrl: data.imageThumbnailUrl || null,
           metadata: data.metadata ? data.metadata : undefined,
@@ -453,7 +453,7 @@ export class BarcodeEnrichmentService {
           brand: data.brand || null,
           description: data.description || null,
           category_path: data.categoryPath || [],
-          price_cents: data.priceCents || null,
+          priceCents: data.priceCents || null,
           image_url: data.image_url || null,
           imageThumbnailUrl: data.imageThumbnailUrl || null,
           metadata: data.metadata ? data.metadata : undefined,
@@ -497,7 +497,7 @@ export class BarcodeEnrichmentService {
    * Log lookup to database
    */
   private async logLookup(
-    tenant_id: string,
+    tenantId: string,
     barcode: string,
     provider: string,
     status: string,

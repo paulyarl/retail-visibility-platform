@@ -15,13 +15,13 @@ export const DB_FIELD_MAPPINGS = {
   // User fields  
   'password_hash': 'passwordHash',
   'last_login': 'lastLogin',
-  'user_id': 'userId',
-  'tenant_id': 'tenantId',
+  'userId': 'userId',
+  'tenantId': 'tenantId',
   
   // Item fields
   'inventory_item_id': 'inventoryItemId',
-  'price_cents': 'priceCents',
-  'item_status': 'itemStatus',
+  'priceCents': 'priceCents',
+  'itemStatus': 'itemStatus',
   
   // Business profile fields
   'business_name': 'businessName',
@@ -36,7 +36,7 @@ export const DB_FIELD_MAPPINGS = {
   'profile_picture_url': 'profilePictureUrl',
   
   // JWT payload fields
-  'tenant_ids': 'tenantIds'
+  'tenantIds': 'tenantIds'
 };
 
 /**
@@ -74,9 +74,9 @@ export const fixCommonPatterns = {
     return {
       ...payload,
       // Add camelCase versions
-      userId: payload.user_id || payload.userId,
-      tenantId: payload.tenant_id || payload.tenantId,
-      tenantIds: payload.tenant_ids || payload.tenantIds
+      userId: payload.userId || payload.userId,
+      tenantId: payload.tenantId || payload.tenantId,
+      tenantIds: payload.tenantIds || payload.tenantIds
     };
   },
 
@@ -102,9 +102,9 @@ export const fixCommonPatterns = {
     if (!item) return item;
     return {
       ...item,
-      tenantId: item.tenant_id || item.tenantId,
-      priceCents: item.price_cents || item.priceCents,
-      itemStatus: item.item_status || item.itemStatus,
+      tenantId: item.tenantId || item.tenantId,
+      priceCents: item.priceCents || item.priceCents,
+      itemStatus: item.itemStatus || item.itemStatus,
       inventoryItemId: item.inventory_item_id || item.inventoryItemId
     };
   },
@@ -119,7 +119,7 @@ export const fixCommonPatterns = {
       googleAccountId: account.google_account_id || account.googleAccountId,
       displayName: account.display_name || account.displayName,
       profilePictureUrl: account.profile_picture_url || account.profilePictureUrl,
-      tenantId: account.tenant_id || account.tenantId
+      tenantId: account.tenantId || account.tenantId
     };
   },
 
@@ -132,7 +132,7 @@ export const fixCommonPatterns = {
       ...tenant,
       createdBy: tenant.created_by || tenant.createdBy,
       trialEndsAt: tenant.trial_ends_at || tenant.trialEndsAt,
-      tenantId: tenant.tenant_id || tenant.tenantId
+      tenantId: tenant.tenantId || tenant.tenantId
     };
   }
 };

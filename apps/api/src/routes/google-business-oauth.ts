@@ -15,7 +15,7 @@ router.get('/google/business', async (req, res) => {
     if (!tenantId) {
       return res.status(400).json({
         success: false,
-        error: 'missing_tenant_id',
+        error: 'missing_tenantId',
         message: 'tenantId query parameter is required'
       });
     }
@@ -82,10 +82,10 @@ router.get('/google/business/callback', async (req, res) => {
     }
 
     // Parse state to get tenantId
-    let tenant_id: string;
+    let tenantId: string;
     try {
       const stateData = JSON.parse(state as string);
-      tenantId = stateData.tenant_id;
+      tenantId = stateData.tenantId;
     } catch {
       return res.status(400).json({
         success: false,
@@ -151,7 +151,7 @@ router.post('/google/business/disconnect', async (req, res) => {
     if (!tenantId) {
       return res.status(400).json({
         success: false,
-        error: 'missing_tenant_id',
+        error: 'missing_tenantId',
         message: 'tenantId is required'
       });
     }

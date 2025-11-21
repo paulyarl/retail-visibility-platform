@@ -11,7 +11,7 @@ export type UpdateCategoryInput = Partial<{
 }>
 
 export const categoryService = {
-  async getTenantCategories(tenant_id: string) {
+  async getTenantCategories(tenantId: string) {
     const categories = await prisma.tenant_category.findMany({
       where: {
         tenantId,
@@ -25,7 +25,7 @@ export const categoryService = {
     return categories
   },
 
-  async createTenantCategory(tenant_id: string, input: Required<Pick<UpdateCategoryInput, 'name' | 'slug'>> & Partial<UpdateCategoryInput>) {
+  async createTenantCategory(tenantId: string, input: Required<Pick<UpdateCategoryInput, 'name' | 'slug'>> & Partial<UpdateCategoryInput>) {
     const category = await prisma.tenant_category.create({
       data: {
         tenantId,
@@ -56,7 +56,7 @@ export const categoryService = {
     return category
   },
 
-  async updateTenantCategory(tenant_id: string, id: string, input: UpdateCategoryInput) {
+  async updateTenantCategory(tenantId: string, id: string, input: UpdateCategoryInput) {
     const category = await prisma.tenant_category.update({ where: { id }, data: input })
     try {
       await audit({
@@ -70,7 +70,7 @@ export const categoryService = {
     return category
   },
 
-  async softDeleteTenantCategory(tenant_id: string, id: string) {
+  async softDeleteTenantCategory(tenantId: string, id: string) {
     const category = await prisma.tenant_category.update({ where: { id }, data: { isActive: false } })
     try {
       await audit({ tenantId, actor: null, action: 'category.delete', payload: { id } })
@@ -79,7 +79,7 @@ export const categoryService = {
     return category
   },
 
-  async alignCategory(tenant_id: string, id: string, googleCategoryId: string) {
+  async alignCategory(tenantId: string, id: string, googleCategoryId: string) {
     const category = await prisma.tenant_category.update({ where: { id }, data: { googleCategoryId } })
     try {
       await audit({ tenantId, actor: null, action: 'category.align', payload: { id, googleCategoryId } })
@@ -89,7 +89,7 @@ export const categoryService = {
   },
 
   async assignItemCategory(
-    tenant_id: string,
+    tenantId: string,
     item_id: string,
     opts: { tenantCategoryId?: string; categorySlug?: string }
   ) {

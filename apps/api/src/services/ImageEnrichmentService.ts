@@ -24,7 +24,7 @@ export class ImageEnrichmentService {
    */
   async downloadAndStoreImage(
     image_url: string,
-    tenant_id: string,
+    tenantId: string,
     item_id: string,
     sku: string
   ): Promise<ImageDownloadResult | null> {
@@ -94,7 +94,7 @@ export class ImageEnrichmentService {
    * Integrates with existing photo infrastructure
    */
   async createPhotoAsset(
-    tenant_id: string,
+    tenantId: string,
     item_id: string,
     imageData: ImageDownloadResult,
     position: number = 0,
@@ -135,7 +135,7 @@ export class ImageEnrichmentService {
    * Supports up to 11 images (1 primary + 10 additional) per Google Merchant Center requirements
    */
   async processProductImages(
-    tenant_id: string,
+    tenantId: string,
     item_id: string,
     sku: string,
     imageUrls: string[],

@@ -17,7 +17,7 @@ export interface CategoryCount {
  * @returns Array of categories with product counts
  */
 export async function getCategoryCounts(
-  tenant_id: string,
+  tenantId: string,
   includeAll: boolean = false
 ): Promise<CategoryCount[]> {
   try {
@@ -79,7 +79,7 @@ export async function getCategoryCounts(
  * @returns Count of items without a category
  */
 export async function getUncategorizedCount(
-  tenant_id: string,
+  tenantId: string,
   includeAll: boolean = false
 ): Promise<number> {
   try {
@@ -108,7 +108,7 @@ export async function getUncategorizedCount(
  * @returns Total count of items
  */
 export async function getTotalProductCount(
-  tenant_id: string,
+  tenantId: string,
   includeAll: boolean = false
 ): Promise<number> {
   try {

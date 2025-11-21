@@ -22,7 +22,7 @@ router.get('/api/test', async (req: Request, res: Response) => {
  */
 router.get('/dashboard', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.user_id;
+    const userId = (req as any).user?.userId;
     
     if (!userId) {
       console.error('[Dashboard] No userId found in authenticated request');
@@ -44,7 +44,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
         }
       });
       userTenants = allTenants.map(tenant => ({
-        tenant_id: tenant.id,
+        tenantId: tenant.id,
         tenant: tenant
       }));
     } else {
@@ -77,7 +77,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
           userTenants = userTenantMemberships.map(membership => {
             const tenant = tenants.find(t => t.id === membership.tenantId);
             return {
-              tenant_id: membership.tenantId,
+              tenantId: membership.tenantId,
               role: membership.role,
               tenant: tenant || { id: membership.tenantId, name: 'Unknown', organizationId: null }
             };
@@ -104,12 +104,12 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
       });
     }
 
-    // Get tenant ID from query param (support both tenantId and tenant_id)
-    const requestedTenantId = (req.query.tenantId || req.query.tenant_id) as string | undefined;
+    // Get tenant ID from query param (support both tenantId and tenantId)
+    const requestedTenantId = (req.query.tenantId || req.query.tenantId) as string | undefined;
     
     // Find the requested tenant in user's memberships
     let targetMembership = requestedTenantId 
-      ? userTenants.find((m: any) => m.tenant_id === requestedTenantId || m.tenant.id === requestedTenantId)
+      ? userTenants.find((m: any) => m.tenantId === requestedTenantId || m.tenant.id === requestedTenantId)
       : null;
     
     // Fallback to first tenant if not found
@@ -117,7 +117,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
       targetMembership = userTenants[0];
     }
     
-    const tenantId = (targetMembership as any).tenant_id || (targetMembership as any).tenant.id;
+    const tenantId = (targetMembership as any).tenantId || (targetMembership as any).tenant.id;
     const organizationId = (targetMembership as any).tenant.organizationId;
 
     // Fetch data with error handling
@@ -229,7 +229,7 @@ router.get('/api/dashboard-test', async (req: Request, res: Response) => {
   return res.json({
     test: true,
     message: 'Dashboard test route working!',
-    tenant_id: req.query.tenant_id,
+    tenantId: req.query.tenantId,
     timestamp: new Date().toISOString()
   });
 });

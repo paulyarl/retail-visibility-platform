@@ -95,7 +95,7 @@ router.put('/:id', async (req, res) => {
         action: current.action,
         oldValue: current.allowed,
         newValue: parsed.data.allowed,
-        changedBy: req.user!.user_id,
+        changedBy: req.user!.userId,
         reason: parsed.data.reason,
       },
     });
@@ -155,7 +155,7 @@ router.post('/bulk-update', async (req, res) => {
         action: current.action,
         oldValue: current.allowed,
         newValue: update.allowed,
-        changedBy: req.user!.user_id,
+        changedBy: req.user!.userId,
         reason: parsed.data.reason,
       });
     }

@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
-import { user_role } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { getUserTenantRole } from '../middleware/permissions';
 
 const router = Router();
@@ -17,17 +17,26 @@ router.use(authenticateToken);
  */
 router.get('/profile', async (req, res) => {
   try {
-    const userId = req.user?.user_id;
+    const userId = req.user?.userId;
     
     if (!userId) {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
     // Fetch user with all related data
-    const user = await prisma.users.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        tenant: {
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        emailVerified: true,
+        lastLogin: true,
+        createdAt: true,
+        userTenants: {
           include: {
             tenant: {
               select: {
@@ -39,7 +48,9 @@ router.get('/profile', async (req, res) => {
                     id: true,
                     name: true,
                     _count: {
-                      select: { tenant: true }
+                      select: { 
+                        Tenant: true
+                      }
                     }
                   }
                 }
@@ -56,11 +67,11 @@ router.get('/profile', async (req, res) => {
 
     // Determine role context
     const isPlatformAdmin = user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN';
-    const primaryTenant = user.tenants[0];
+    const primaryTenant = user.userTenants[0];
     const organization = primaryTenant?.tenant.organization;
     
     // Check if user is org admin (has OWNER/ADMIN role in any tenant of an org)
-    const isOrgAdmin = user.tenants.some(ut => 
+    const isOrgAdmin = user.userTenants.some(ut => 
       (ut.role === 'OWNER' || ut.role === 'ADMIN') && 
       ut.tenant.organizationId
     );
@@ -68,7 +79,7 @@ router.get('/profile', async (req, res) => {
     // Calculate permissions
     const canManageOrganization = isPlatformAdmin || isOrgAdmin;
     const canManageTenants = isPlatformAdmin || isOrgAdmin || 
-      user.tenants.some(ut => ut.role === 'OWNER' || ut.role === 'ADMIN');
+      user.userTenants.some(ut => ut.role === 'OWNER' || ut.role === 'ADMIN');
     const canManageUsers = canManageTenants;
 
     // Build profile response
@@ -89,14 +100,14 @@ router.get('/profile', async (req, res) => {
       isOrgAdmin,
       
       // Tenant context
-      tenantsCount: user.tenants.length,
-      locationsServed: organization?._count.tenants || user.tenants.length,
-      primaryTenantId: primaryTenant?.tenant_id,
+      tenantsCount: user.userTenants.length,
+      locationsServed: organization?._count.Tenant || user.userTenants.length,
+      primaryTenantId: primaryTenant?.tenantId,
       primaryTenantName: primaryTenant?.tenant.name,
       
       // Tenant memberships
-      tenantMemberships: user.tenants.map(ut => ({
-        tenant_id: ut.tenant_id,
+      tenantMemberships: user.userTenants.map(ut => ({
+        tenantId: ut.tenantId,
         tenantName: ut.tenant.name,
         role: ut.role,
         organizationId: ut.tenant.organizationId,
@@ -110,7 +121,7 @@ router.get('/profile', async (req, res) => {
       
       // Activity
       lastActive: user.lastLogin,
-      memberSince: user.created_at,
+      memberSince: user.createdAt,
       emailVerified: user.emailVerified,
       isActive: user.isActive
     };
@@ -127,7 +138,7 @@ router.get('/profile', async (req, res) => {
  */
 router.get('/', requireAdmin, async (req, res) => {
   try {
-    const users = await prisma.users.findMany({
+    const users = await prisma.user.findMany({
       select: {
         id: true,
         email: true,
@@ -137,8 +148,8 @@ router.get('/', requireAdmin, async (req, res) => {
         isActive: true,
         emailVerified: true,
         lastLogin: true,
-        created_at: true,
-        tenant: {
+        createdAt: true,
+        userTenants: {
           include: {
             tenant: {
               select: {
@@ -149,7 +160,7 @@ router.get('/', requireAdmin, async (req, res) => {
           },
         },
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     // Transform data for frontend
@@ -160,9 +171,9 @@ router.get('/', requireAdmin, async (req, res) => {
       role: user.role,
       status: user.isActive ? (user.emailVerified ? 'active' : 'pending') : 'inactive',
       lastActive: user.lastLogin ? user.lastLogin.toISOString() : 'Never',
-      tenant: user.tenants.length,
-      tenantRoles: user.tenants.map(ut => ({
-        tenant_id: ut.tenant.id,
+      tenant: user.userTenants.length,
+      tenantRoles: user.userTenants.map(ut => ({
+        tenantId: ut.tenant.id,
         tenantName: ut.tenant.name,
         role: ut.role,
       })),
@@ -180,7 +191,7 @@ router.get('/', requireAdmin, async (req, res) => {
  */
 router.get('/:id', requireAdmin, async (req, res) => {
   try {
-    const user = await prisma.users.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: req.params.id },
       select: {
         id: true,
@@ -191,8 +202,8 @@ router.get('/:id', requireAdmin, async (req, res) => {
         isActive: true,
         emailVerified: true,
         lastLogin: true,
-        created_at: true,
-        tenant: {
+        createdAt: true,
+        userTenants: {
           include: {
             tenant: {
               select: {
@@ -238,7 +249,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     }
 
     // Check if user exists
-    const existingUser = await prisma.users.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { id: req.params.id },
     });
 
@@ -247,11 +258,11 @@ router.put('/:id', requireAdmin, async (req, res) => {
     }
 
     // Update user
-    const updatedUser = await prisma.users.update({
+    const updatedUser = await prisma.user.update({
       where: { id: req.params.id },
       data: {
         ...parsed.data,
-        role: parsed.data.role as user_role,
+        role: parsed.data.role as UserRole,
       },
       select: {
         id: true,
@@ -278,7 +289,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     // Check if user exists
-    const existingUser = await prisma.users.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { id: req.params.id },
     });
 
@@ -287,7 +298,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     }
 
     // Prevent deleting yourself
-    if (req.user?.user_id === req.params.id) {
+    if (req.user?.userId === req.params.id) {
       return res.status(400).json({
         error: 'cannot_delete_self',
         message: 'You cannot delete your own account',
@@ -295,7 +306,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     }
 
     // Delete user (cascade will handle related records)
-    await prisma.users.delete({
+    await prisma.user.delete({
       where: { id: req.params.id },
     });
 
@@ -311,7 +322,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
  */
 router.get('/:id/tenants/:tenantId', async (req, res) => {
   try {
-    const requesterId = req.user?.user_id;
+    const requesterId = req.user?.userId;
     const { id, tenantId } = req.params;
 
     if (!requesterId || requesterId !== id) {
@@ -331,7 +342,7 @@ router.get('/:id/tenants/:tenantId', async (req, res) => {
     }
 
     return res.json({
-      user_id: id,
+      userId: id,
       tenantId,
       role,
     });
@@ -347,7 +358,7 @@ router.get('/:id/tenants/:tenantId', async (req, res) => {
  * POST /users/:id/tenants - Add user to tenant (admin only)
  */
 const addUserToTenantSchema = z.object({
-  tenant_id: z.string(),
+  tenantId: z.string(),
   role: z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER']),
 });
 
@@ -362,7 +373,7 @@ router.post('/:id/tenants', requireAdmin, async (req, res) => {
     }
 
     // Check if user exists
-    const user = await prisma.users.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: req.params.id },
     });
 
@@ -372,7 +383,7 @@ router.post('/:id/tenants', requireAdmin, async (req, res) => {
 
     // Check if tenant exists
     const tenant = await prisma.tenant.findUnique({
-      where: { id: parsed.data.tenant_id },
+      where: { id: parsed.data.tenantId },
     });
 
     if (!tenant) {
@@ -380,11 +391,13 @@ router.post('/:id/tenants', requireAdmin, async (req, res) => {
     }
 
     // Create user-tenant relationship
-    const userTenant = await prisma.user_tenants.create({
+    const userTenant = await prisma.userTenant.create({
       data: {
-        user_id: req.params.id,
-        tenant_id: parsed.data.tenant_id,
+        id: crypto.randomUUID(),
+        userId: req.params.id,
+        tenantId: parsed.data.tenantId,
         role: parsed.data.role,
+        updatedAt: new Date(),
       },
     });
 
@@ -410,11 +423,11 @@ router.post('/:id/tenants', requireAdmin, async (req, res) => {
 router.delete('/:id/tenants/:tenantId', requireAdmin, async (req, res) => {
   try {
     // Find the user-tenant relationship
-    const userTenant = await prisma.user_tenants.findUnique({
+    const userTenant = await prisma.userTenant.findUnique({
       where: {
-        user_id_tenant_id: {
-          user_id: req.params.id,
-          tenant_id: req.params.tenant_id,
+        userId_tenantId: {
+          userId: req.params.id,
+          tenantId: req.params.tenantId,
         },
       },
     });
@@ -424,11 +437,11 @@ router.delete('/:id/tenants/:tenantId', requireAdmin, async (req, res) => {
     }
 
     // Delete the relationship
-    await prisma.user_tenants.delete({
+    await prisma.userTenant.delete({
       where: {
-        user_id_tenant_id: {
-          user_id: req.params.id,
-          tenant_id: req.params.tenant_id,
+        userId_tenantId: {
+          userId: req.params.id,
+          tenantId: req.params.tenantId,
         },
       },
     });
@@ -446,11 +459,11 @@ router.delete('/:id/tenants/:tenantId', requireAdmin, async (req, res) => {
 router.get('/stats/summary', requireAdmin, async (req, res) => {
   try {
     const [total, active, pending, inactive, admins] = await Promise.all([
-      prisma.users.count(),
-      prisma.users.count({ where: { isActive: true, emailVerified: true } }),
-      prisma.users.count({ where: { isActive: true, emailVerified: false } }),
-      prisma.users.count({ where: { isActive: false } }),
-      prisma.users.count({ where: { role: user_role.ADMIN } }),
+      prisma.user.count(),
+      prisma.user.count({ where: { isActive: true, emailVerified: true } }),
+      prisma.user.count({ where: { isActive: true, emailVerified: false } }),
+      prisma.user.count({ where: { isActive: false } }),
+      prisma.user.count({ where: { role: UserRole.ADMIN } }),
     ]);
 
     res.json({

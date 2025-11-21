@@ -12,10 +12,10 @@ import { UserTenantRole } from '@prisma/client';
  */
 function getTenantIdFromRequest(req: Request): string | null {
   return (
-    req.params.tenant_id ||
+    req.params.tenantId ||
     req.params.id ||
-    (req.query.tenant_id as string) ||
-    req.body.tenant_id ||
+    (req.query.tenantId as string) ||
+    req.body.tenantId ||
     null
   );
 }
@@ -24,14 +24,14 @@ function getTenantIdFromRequest(req: Request): string | null {
  * Get user's role for a specific tenant
  */
 export async function getUserTenantRole(
-  user_id: string,
-  tenant_id: string
+  userId: string,
+  tenantId: string
 ): Promise<UserTenantRole | null> {
   const userTenant = await prisma.user_tenants.findUnique({
     where: {
-      user_id_tenant_id: {
-        user_id: user_id,
-        tenant_id: tenant_id,
+      userId_tenantId: {
+        userId: userId,
+        tenantId: tenantId,
       },
     },
   });
@@ -60,12 +60,12 @@ export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
       const tenantId = getTenantIdFromRequest(req);
       if (!tenantId) {
         return res.status(400).json({
-          error: 'tenant_id_required',
+          error: 'tenantId_required',
           message: 'Tenant ID is required',
         });
       }
 
-      const userRole = await getUserTenantRole(req.user.user_id, tenantId);
+      const userRole = await getUserTenantRole(req.user.userId, tenantId);
 
       if (!userRole || !allowedRoles.includes(userRole)) {
         return res.status(403).json({
@@ -139,17 +139,17 @@ export async function checkTenantCreationLimit(
       // Determine who will own the tenant being created
       // Check if ownerId is provided in request body (for creating on behalf of others)
       const requestBody = req.body as { ownerId?: string };
-      const ownerId = requestBody.ownerId || req.user.user_id;
+      const ownerId = requestBody.ownerId || req.user.userId;
       
       // Count tenants created by THIS support user FOR this owner
       // First get all tenant IDs created by this support user
       const tenantsCreatedBySupport = await prisma.$queryRaw`
         SELECT COUNT(*)::int as count
         FROM user_tenants ut
-        JOIN tenant t ON ut.tenant_id = t.id
-        WHERE ut.user_id = ${ownerId}
+        JOIN tenant t ON ut.tenantId = t.id
+        WHERE ut.userId = ${ownerId}
         AND ut.role = 'OWNER'
-        AND t.createdBy = ${req.user.user_id}
+        AND t.createdBy = ${req.user.userId}
       `;
       
       const supportCount = (tenantsCreatedBySupport as any)[0]?.count || 0;
@@ -163,7 +163,7 @@ export async function checkTenantCreationLimit(
           current: supportCount,
           limit: supportLimit,
           role: 'PLATFORM_SUPPORT',
-          creatorId: req.user.user_id,
+          creatorId: req.user.userId,
           ownerId: ownerId,
         });
       }
@@ -183,7 +183,7 @@ export async function checkTenantCreationLimit(
     // Count user's owned tenants
     const ownedTenants = await prisma.user_tenants.findMany({
       where: {
-        user_id: req.user.user_id,
+        userId: req.user.userId,
         role: user_tenant_role.OWNER,
       },
       include: {
@@ -277,12 +277,12 @@ export async function requireTenantOwner(
     const tenantId = getTenantIdFromRequest(req);
     if (!tenantId) {
       return res.status(400).json({
-        error: 'tenant_id_required',
+        error: 'tenantId_required',
         message: 'Tenant ID is required',
       });
     }
 
-    const userRole = await getUserTenantRole(req.user.user_id, tenantId);
+    const userRole = await getUserTenantRole(req.user.userId, tenantId);
 
     if (userRole !== user_tenant_role.OWNER) {
       return res.status(403).json({

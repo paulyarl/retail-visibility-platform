@@ -79,7 +79,7 @@ export function mapToGoogleStatus(
  * Sync location status to Google Business Profile
  */
 export async function syncLocationStatusToGoogle(
-  tenant_id: string,
+  tenantId: string,
   status: LocationStatus,
   reopeningDate?: Date | null
 ): Promise<StatusSyncResult> {
@@ -209,7 +209,7 @@ export async function syncLocationStatusToGoogle(
  * Sync status change with retry logic
  */
 export async function syncWithRetry(
-  tenant_id: string,
+  tenantId: string,
   status: LocationStatus,
   reopeningDate?: Date | null,
   maxRetries: number = 3
@@ -252,7 +252,7 @@ export async function syncWithRetry(
  * Log sync result to database (optional audit trail)
  */
 export async function logSyncResult(
-  tenant_id: string,
+  tenantId: string,
   status: LocationStatus,
   result: StatusSyncResult
 ): Promise<void> {

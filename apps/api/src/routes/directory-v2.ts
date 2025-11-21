@@ -97,7 +97,7 @@ router.get('/search', async (req: Request, res: Response) => {
     // Transform snake_case to camelCase for frontend
     const listings = listingsResult.rows.map((row: any) => ({
       id: row.id,
-      tenant_id: row.tenant_id,
+      tenantId: row.tenantId,
       business_name: row.businessName,
       slug: row.slug,
       address: row.address,
@@ -120,8 +120,8 @@ router.get('/search', async (req: Request, res: Response) => {
       subscription_tier: row.subscriptionTier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
-      created_at: row.created_at,
-      updated_at: row.updatedAt,
+      createdAt: row.created_at,
+      updatedAt: row.updatedAt,
     }));
 
     return res.json({
@@ -227,7 +227,7 @@ router.get('/:slug', async (req: Request, res: Response) => {
     const row = result.rows[0];
     const listing = {
       id: row.id,
-      tenant_id: row.tenant_id,
+      tenantId: row.tenantId,
       business_name: row.businessName,
       slug: row.slug,
       address: row.address,
@@ -250,8 +250,8 @@ router.get('/:slug', async (req: Request, res: Response) => {
       subscription_tier: row.subscriptionTier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
-      created_at: row.created_at,
-      updated_at: row.updatedAt,
+      createdAt: row.created_at,
+      updatedAt: row.updatedAt,
     };
 
     return res.json({ listing });
@@ -319,7 +319,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
 
     const relatedListings = related.rows.map((row: any) => ({
       id: row.id,
-      tenant_id: row.tenant_id,
+      tenantId: row.tenantId,
       business_name: row.businessName,
       slug: row.slug,
       address: row.address,
@@ -342,8 +342,8 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       subscription_tier: row.subscriptionTier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
-      created_at: row.created_at,
-      updated_at: row.updatedAt,
+      createdAt: row.created_at,
+      updatedAt: row.updatedAt,
     }));
 
     return res.json({

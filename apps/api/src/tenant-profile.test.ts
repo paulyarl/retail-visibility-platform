@@ -59,7 +59,7 @@ const dbAvailable = !!process.env.DATABASE_URL;
       .post('/tenant/profile')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        tenant_id: tenantId,
+        tenantId: tenantId,
         business_name: 'My Shop',
         address_line1: '123 Main',
         city: 'City',
@@ -78,7 +78,7 @@ const dbAvailable = !!process.env.DATABASE_URL;
       .post('/tenant/profile')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        tenant_id: tenantId,
+        tenantId: tenantId,
         business_name: 'My Shop',
         address_line1: '123 Main',
         city: 'City',
@@ -94,10 +94,10 @@ const dbAvailable = !!process.env.DATABASE_URL;
     const getRes = await request(app)
       .get('/tenant/profile')
       .set('Authorization', `Bearer ${token}`)
-      .query({ tenant_id: tenantId });
+      .query({ tenantId: tenantId });
 
     expect(getRes.status).toBe(200);
-    expect(getRes.body.tenant_id).toBe(tenantId);
+    expect(getRes.body.tenantId).toBe(tenantId);
     expect(getRes.body.businessName).toBe('My Shop');
     expect(getRes.body.phone_number).toBe('+12025550123');
   });
@@ -108,7 +108,7 @@ const dbAvailable = !!process.env.DATABASE_URL;
       .post('/tenant/profile')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        tenant_id: tenantId,
+        tenantId: tenantId,
         business_name: 'Original Name',
         address_line1: '123 Main',
         city: 'City',
@@ -120,7 +120,7 @@ const dbAvailable = !!process.env.DATABASE_URL;
     const patchRes = await request(app)
       .patch('/tenant/profile')
       .set('Authorization', `Bearer ${token}`)
-      .send({ tenant_id: tenantId, business_name: 'Updated Name' });
+      .send({ tenantId: tenantId, business_name: 'Updated Name' });
 
     expect(patchRes.status).toBe(200);
 

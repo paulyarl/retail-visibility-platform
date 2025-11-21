@@ -51,7 +51,7 @@ router.post('/test-chains', async (req, res) => {
     const result = await createTestChain(parsed.data);
 
     // Log successful creation
-    console.log(`[Audit] Admin created test chain: ${result.organizationId} with ${result.tenants.length} tenants`);
+    console.log(`[Audit] Admin created test chain: ${result.organizationId} with ${result.tenant.length} tenants`);
 
     res.json({
       success: true,
@@ -166,12 +166,12 @@ router.delete('/tenants/:tenantId', async (req, res) => {
     console.log('[Admin Tools] Deleting test tenant:', tenantId);
 
     // Delete all products for this tenant
-    const deletedProducts = await prisma.inventory_item.deleteMany({
+    const deletedProducts = await prisma.inventoryItem.deleteMany({
       where: { tenantId },
     });
 
     // Delete all categories for this tenant
-    const deletedCategories = await prisma.tenant_category.deleteMany({
+    const deletedCategories = await prisma.tenantCategory.deleteMany({
       where: { tenantId },
     });
 
@@ -295,10 +295,10 @@ router.get('/scan-sessions/stats', async (req: Request, res: Response) => {
     }
 
     const [active, total] = await Promise.all([
-      prisma.scan_sessions.count({
+      prisma.scanSessions.count({
         where: { tenantId, status: 'active' },
       }),
-      prisma.scan_sessions.count({
+      prisma.scanSessions.count({
         where: { tenantId },
       }),
     ]);
@@ -318,7 +318,7 @@ router.get('/scan-sessions/stats', async (req: Request, res: Response) => {
  * Close all active scan sessions for a tenant
  */
 const cleanupSessionsSchema = z.object({
-  tenant_id: z.string().min(1),
+  tenantId: z.string().min(1),
 });
 
 router.post('/scan-sessions/cleanup', async (req: Request, res: Response) => {
@@ -334,20 +334,20 @@ router.post('/scan-sessions/cleanup', async (req: Request, res: Response) => {
     const { tenantId } = parsed.data;
 
     // Close all active sessions for this tenant
-    const result = await prisma.scan_sessions.updateMany({
+    const result = await prisma.scanSessions.updateMany({
       where: {
         tenantId,
         status: 'active',
       },
       data: {
         status: 'cancelled',
-        completed_at: new Date(),
+        completedAt: new Date(),
       },
     });
 
     await audit({
       tenantId,
-      actor: (req as any).user?.user_id || 'system',
+      actor: (req as any).user?.userId || 'system',
       action: 'admin.scan_sessions.cleanup',
       payload: { tenantId, cleaned: result.count },
     });

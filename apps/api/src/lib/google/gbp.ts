@@ -45,7 +45,7 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
           access_token_encrypted: encryptToken(newTokens.access_token),
           expires_at: newExpiresAt,
           scopes: newTokens.scope.split(' '),
-          updated_at: new Date(),
+          updatedAt: new Date(),
         },
       });
 
@@ -195,7 +195,7 @@ export async function syncLocation(
         is_verified: locationData.metadata?.hasVoiceOfMerchant || false,
         is_published: !locationData.metadata?.duplicate,
         last_fetched_at: new Date(),
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
       update: {
         location_name: locationData.title,
@@ -207,7 +207,7 @@ export async function syncLocation(
         is_verified: locationData.metadata?.hasVoiceOfMerchant || false,
         is_published: !locationData.metadata?.duplicate,
         last_fetched_at: new Date(),
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
     });
 
@@ -329,7 +329,7 @@ export async function storeInsights(
         actions_phone: insights.actionsPhone,
         actions_directions: insights.actionsDirections,
         photos_count: insights.photosCount,
-        created_at: new Date(),
+        createdAt: new Date(),
       },
       update: {
         views_search: insights.viewsSearch,

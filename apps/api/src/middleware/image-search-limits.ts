@@ -32,8 +32,8 @@ export async function checkImageSearchLimit(
   next: NextFunction
 ) {
   try {
-    const userId = (req as any).user?.user_id;
-    const tenantId = req.query.tenant_id as string;
+    const userId = (req as any).user?.userId;
+    const tenantId = req.query.tenantId as string;
 
     if (!userId) {
       return res.status(401).json({

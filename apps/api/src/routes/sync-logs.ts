@@ -9,11 +9,11 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
   try {
     const limit = Math.min(parseInt(String(req.query.limit || '50')), 100);
     const offset = parseInt(String(req.query.offset || '0'));
-    const tenantId = req.query.tenant_id ? String(req.query.tenant_id) : undefined;
+    const tenantId = req.query.tenantId ? String(req.query.tenantId) : undefined;
     const strategy = req.query.strategy ? String(req.query.strategy) : undefined;
 
     const where: any = {};
-    if (tenantId) where.tenant_id = tenantId;
+    if (tenantId) where.tenantId = tenantId;
     if (strategy) where.strategy = strategy;
 
     const [logs, total] = await Promise.all([
@@ -24,7 +24,7 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
         skip: offset,
         select: {
           id: true,
-          tenant_id: true,
+          tenantId: true,
           strategy: true,
           dry_run: true,
           created: true,
@@ -69,7 +69,7 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
       },
       select: {
         id: true,
-        tenant_id: true,
+        tenantId: true,
         error: true,
         skipped: true,
         created: true,
@@ -98,7 +98,7 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
       take: 5,
       select: {
         id: true,
-        tenant_id: true,
+        tenantId: true,
         error: true,
         started_at: true,
       },

@@ -54,7 +54,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
         return res.status(500).json({ error: "server is not configured for direct uploads (missing SUPABASE envs)" });
       }
       const f = req.file; // buffer + mimetype + originalname
-      const path = `${item.tenant_id}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
+      const path = `${item.tenantId}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
 
       const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(path, f.buffer, {
         cacheControl: "3600",
@@ -90,7 +90,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
         
         const ext = mimeType.split('/')[1] || 'jpg';
         const filename = `${Date.now()}.${ext}`;
-        const path = `${item.tenant_id}/${item.sku || item.id}/${filename}`;
+        const path = `${item.tenantId}/${item.sku || item.id}/${filename}`;
         
         const { error: uploadError, data: uploadData } = await supabase.storage
           .from(StorageBuckets.PHOTOS.name)
@@ -135,7 +135,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
     const created = await prisma.photo_asset.create({
       data: {
         id: `photo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        tenant_id: item.tenant_id,
+        tenantId: item.tenantId,
         inventory_item_id: item.id,
         url,
         width: width ?? null,

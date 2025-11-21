@@ -42,13 +42,13 @@ export interface SyncProgress {
 }
 
 export class SquareSyncService {
-  private tenant_id: string;
+  private tenantId: string;
   private integrationId: string;
   private squareClient: any;
   private progressCallback?: (progress: SyncProgress) => void;
 
-  constructor(tenant_id: string, integrationId: string, squareClient: any) {
-    this.tenant_id = tenantId;
+  constructor(tenantId: string, integrationId: string, squareClient: any) {
+    this.tenantId = tenantId;
     this.integrationId = integrationId;
     this.squareClient = squareClient;
   }
@@ -85,7 +85,7 @@ export class SquareSyncService {
 
       // Create sync log
       const syncLog = await squareIntegrationRepository.createSyncLog({
-        tenant_id: this.tenant_id,
+        tenantId: this.tenantId,
         integrationId: this.integrationId,
         syncType: (options.syncType === 'full' ? 'catalog' : options.syncType) || 'catalog',
         direction: 'from_square',
@@ -130,7 +130,7 @@ export class SquareSyncService {
 
       // Update sync log
       await squareIntegrationRepository.createSyncLog({
-        tenant_id: this.tenant_id,
+        tenantId: this.tenantId,
         integrationId: this.integrationId,
         syncType: (options.syncType === 'full' ? 'catalog' : options.syncType) || 'catalog',
         direction: 'from_square',
@@ -176,7 +176,7 @@ export class SquareSyncService {
 
       // Create sync log
       const syncLog = await squareIntegrationRepository.createSyncLog({
-        tenant_id: this.tenant_id,
+        tenantId: this.tenantId,
         integrationId: this.integrationId,
         syncType: (options.syncType === 'full' ? 'catalog' : options.syncType) || 'catalog',
         direction: 'to_square',
@@ -221,7 +221,7 @@ export class SquareSyncService {
 
       // Update sync log
       await squareIntegrationRepository.createSyncLog({
-        tenant_id: this.tenant_id,
+        tenantId: this.tenantId,
         integrationId: this.integrationId,
         syncType: (options.syncType === 'full' ? 'catalog' : options.syncType) || 'catalog',
         direction: 'to_square',
@@ -303,7 +303,7 @@ export class SquareSyncService {
       
       // TODO: Implement actual Platform database query
       // const products = await prisma.inventory_item.findMany({
-      //   where: { tenant_id: this.tenant_id },
+      //   where: { tenantId: this.tenantId },
       // });
       
       // For now, return empty array
@@ -358,7 +358,7 @@ export class SquareSyncService {
 /**
  * Factory function to create sync service for a tenant
  */
-export async function createSquareSyncService(tenant_id: string): Promise<SquareSyncService> {
+export async function createSquareSyncService(tenantId: string): Promise<SquareSyncService> {
   // Get integration
   const integration = await squareIntegrationRepository.getIntegrationByTenantId(tenantId);
   if (!integration) {

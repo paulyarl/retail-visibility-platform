@@ -22,7 +22,7 @@ export class SquareIntegrationService {
    * Connect a tenant to Square
    * Exchanges authorization code for tokens and saves to database
    */
-  async connectTenant(tenant_id: string, authorizationCode: string) {
+  async connectTenant(tenantId: string, authorizationCode: string) {
     try {
       console.log(`[SquareIntegration] Connecting tenant ${tenantId}...`);
 
@@ -68,7 +68,7 @@ export class SquareIntegrationService {
    * Disconnect a tenant from Square
    * Revokes tokens and removes integration from database
    */
-  async disconnectTenant(tenant_id: string) {
+  async disconnectTenant(tenantId: string) {
     try {
       console.log(`[SquareIntegration] Disconnecting tenant ${tenantId}...`);
 
@@ -101,7 +101,7 @@ export class SquareIntegrationService {
   /**
    * Get integration status for a tenant
    */
-  async getIntegrationStatus(tenant_id: string) {
+  async getIntegrationStatus(tenantId: string) {
     try {
       const integration = await squareIntegrationRepository.getIntegrationByTenantId(tenantId);
 
@@ -164,7 +164,7 @@ export class SquareIntegrationService {
   /**
    * Get sync logs for a tenant
    */
-  async getSyncLogs(tenant_id: string, limit: number = 100) {
+  async getSyncLogs(tenantId: string, limit: number = 100) {
     try {
       return await squareIntegrationRepository.getSyncLogsByTenantId(tenantId, limit);
     } catch (error) {
@@ -176,7 +176,7 @@ export class SquareIntegrationService {
   /**
    * Test connection to Square
    */
-  async testConnection(tenant_id: string): Promise<boolean> {
+  async testConnection(tenantId: string): Promise<boolean> {
     try {
       const integration = await squareIntegrationRepository.getIntegrationByTenantId(tenantId);
 

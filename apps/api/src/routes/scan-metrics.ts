@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../prisma';
-import { user_role } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { canViewAllTenants } from '../utils/platform-admin';
 
 const router = Router();
@@ -81,7 +81,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
     // Get enrichment stats
     const enrichmentLogs = await prisma.barcode_lookup_log.findMany({
       where: {
-        created_at: { gte: startDate },
+        createdAt: { gte: startDate },
       },
       select: {
         provider: true,

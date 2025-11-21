@@ -32,7 +32,7 @@ export class GBPCategorySyncService {
   private async getAnyValidAccessToken(): Promise<string | null> {
     try {
       const tokenRecord = await prisma.google_oauth_tokens.findFirst({
-        orderBy: { created_at: 'desc' },
+        orderBy: { createdAt: 'desc' },
       });
 
       if (!tokenRecord) {
@@ -82,7 +82,7 @@ export class GBPCategorySyncService {
         SELECT access_token, refresh_token, expires_at, scopes
         FROM oauth_integrations
         WHERE provider = 'google_business'
-          AND tenant_id IS NULL
+          AND tenantId IS NULL
           AND is_active = true
         ORDER BY created_at DESC
         LIMIT 1
@@ -173,7 +173,7 @@ export class GBPCategorySyncService {
             expires_at = ${expiryDate ? new Date(expiryDate) : null},
             updated_at = NOW()
         WHERE provider = 'google_business'
-          AND tenant_id IS NULL
+          AND tenantId IS NULL
           AND is_active = true
       `;
 
@@ -334,7 +334,7 @@ export class GBPCategorySyncService {
               where: { id: change.categoryId },
               data: {
                 display_name: change.newData.displayName,
-                updated_at: new Date()
+                updatedAt: new Date()
               }
             });
             applied++;
@@ -345,7 +345,7 @@ export class GBPCategorySyncService {
               where: { id: change.categoryId },
               data: {
                 isActive: false,
-                updated_at: new Date()
+                updatedAt: new Date()
               }
             });
             applied++;
@@ -427,7 +427,7 @@ export class GBPCategorySyncService {
               where: { id: category.id },
               data: {
                 display_name: category.displayName,
-                updated_at: new Date()
+                updatedAt: new Date()
               }
             });
             upserted++;
@@ -453,15 +453,15 @@ export class GBPCategorySyncService {
             where: { id: category.id },
             update: {
               display_name: category.display_name,
-              updated_at: new Date()
+              updatedAt: new Date()
             },
             create: {
               id: category.id,
               name: category.name,
               display_name: category.display_name,
               is_active: true,
-              created_at: new Date(),
-              updated_at: new Date()
+              createdAt: new Date(),
+              updatedAt: new Date()
             }
           });
           seeded++;

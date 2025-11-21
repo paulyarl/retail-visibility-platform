@@ -20,7 +20,7 @@ router.get('/tenants/:id/tier', authenticateToken, checkTenantAccess, async (req
         name: true,
         subscription_tier: true,
         subscription_status: true,
-        trial_ends_at: true,
+        trialEndsAt: true,
         subscription_ends_at: true,
         organizationId: true,
         organization: {
@@ -49,11 +49,11 @@ router.get('/tenants/:id/tier', authenticateToken, checkTenantAccess, async (req
     const orgTierData = tenant.organization?.subscriptionTier ? await TierService.getTierByKey(tenant.organization.subscriptionTier) : null;
 
     res.json({
-      tenant_id: tenant.id,
+      tenantId: tenant.id,
       tenantName: tenant.name,
       tier: effectiveTier,
       subscription_status: tenant.subscription_status,
-      trial_ends_at: tenant.trialEndsAt,
+      trialEndsAt: tenant.trialEndsAt,
       subscription_ends_at: tenant.subscriptionEndsAt,
       isChain,
       organizationId: tenant.organizationId,
@@ -104,7 +104,7 @@ router.get('/tenants/:id/usage', authenticateToken, checkTenantAccess, async (re
     });
 
     res.json({
-      tenant_id: tenant.id,
+      tenantId: tenant.id,
       currentItems: itemCount,
       activeItems: activeItemCount,
       monthlySkuQuota: tenant.monthlySkuQuota,

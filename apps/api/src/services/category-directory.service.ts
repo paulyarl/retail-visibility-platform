@@ -28,7 +28,7 @@ export class CategoryDirectoryService {
           isActive: true,
           _count: {
             some: {
-              item_status: 'active',
+              itemStatus: 'active',
               visibility: 'public',
               tenant: {
                 googleSyncEnabled: true,
@@ -47,7 +47,7 @@ export class CategoryDirectoryService {
             select: {
               _count: {
                 where: {
-                  item_status: 'active',
+                  itemStatus: 'active',
                   visibility: 'public',
                   tenant: {
                     googleSyncEnabled: true,
@@ -60,7 +60,7 @@ export class CategoryDirectoryService {
           },
           _count: {
             where: {
-              item_status: 'active',
+              itemStatus: 'active',
               visibility: 'public',
               tenant: {
                 googleSyncEnabled: true,
@@ -69,7 +69,7 @@ export class CategoryDirectoryService {
               },
             },
             select: {
-              tenant_id: true,
+              tenantId: true,
             },
             distinct: ['tenantId'],
           },
@@ -123,7 +123,7 @@ export class CategoryDirectoryService {
           _count: {
             some: {
               tenantCategoryId: category.id,
-              item_status: 'active',
+              itemStatus: 'active',
               visibility: 'public',
             },
           },
@@ -148,7 +148,7 @@ export class CategoryDirectoryService {
               _count: {
                 where: {
                   tenantCategoryId: category.id,
-                  item_status: 'active',
+                  itemStatus: 'active',
                   visibility: 'public',
                 },
               },
@@ -182,7 +182,7 @@ export class CategoryDirectoryService {
     return [];
   }
   
-  async verifyStoreCategory(tenant_id: string, categoryId: string) {
+  async verifyStoreCategory(tenantId: string, categoryId: string) {
     console.log('[CategoryService] verifyStoreCategory called (stub)');
     return false;
   }

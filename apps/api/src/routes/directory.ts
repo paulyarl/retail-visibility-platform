@@ -29,7 +29,7 @@ interface DirectorySearchParams {
 
 interface DirectoryListing {
   id: string;
-  tenant_id: string;
+  tenantId: string;
   business_name: string;
   slug: string;
   address?: string;
@@ -91,7 +91,7 @@ router.get('/search', async (req, res) => {
     let query = Prisma.sql`
       SELECT 
         id,
-        tenant_id as "tenantId",
+        tenantId as "tenantId",
         business_name as "businessName",
         slug,
         address,
@@ -371,7 +371,7 @@ router.get('/:slug', async (req, res) => {
     const result = await prisma.$queryRaw<Array<any>>`
       SELECT 
         id,
-        tenant_id as "tenantId",
+        tenantId as "tenantId",
         business_name as "businessName",
         slug,
         address,

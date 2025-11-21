@@ -18,11 +18,11 @@ export interface SquareInventoryCount {
 
 export interface PlatformInventory {
   id: string;
-  tenant_id: string;
+  tenantId: string;
   productId: string;
   quantity: number;
   locationId?: string;
-  updated_at: Date;
+  updatedAt: Date;
 }
 
 export interface InventoryChange {
@@ -35,13 +35,13 @@ export interface InventoryChange {
 }
 
 export class InventorySync {
-  private tenant_id: string;
+  private tenantId: string;
   private integrationId: string;
   private squareClient: any;
   private locationId?: string;
 
-  constructor(tenant_id: string, integrationId: string, squareClient: any, locationId?: string) {
-    this.tenant_id = tenantId;
+  constructor(tenantId: string, integrationId: string, squareClient: any, locationId?: string) {
+    this.tenantId = tenantId;
     this.integrationId = integrationId;
     this.squareClient = squareClient;
     this.locationId = locationId;
@@ -55,7 +55,7 @@ export class InventorySync {
       productId: platformProductId,
       quantity: parseInt(squareInventory.quantity, 10) || 0,
       locationId: squareInventory.location_id,
-      updated_at: new Date(squareInventory.calculated_at),
+      updatedAt: new Date(squareInventory.calculated_at),
     };
   }
 
@@ -113,13 +113,13 @@ export class InventorySync {
         where: { id: mapping.inventory_item_id },
         data: {
           quantity: newQuantity,
-          updated_at: new Date(),
+          updatedAt: new Date(),
         },
       });
 
       // Update mapping
       await squareIntegrationRepository.createProductMapping({
-        tenant_id: this.tenant_id,
+        tenantId: this.tenantId,
         integrationId: this.integrationId,
         inventoryItemId: mapping.inventory_item_id,
         squareCatalogObjectId: mapping.square_catalog_object_id,
@@ -152,7 +152,7 @@ export class InventorySync {
       // Get platform product
       const platformProduct = await prisma.inventory_item.findUnique({
         where: { id: platformProductId },
-        select: { id: true, name: true, quantity: true, updated_at: true },
+        select: { id: true, name: true, quantity: true, updatedAt: true },
       });
 
       if (!platformProduct) {
@@ -162,7 +162,7 @@ export class InventorySync {
 
       // Find the product mapping
       const mapping = await squareIntegrationRepository.getProductMappingByInventoryItemId(
-        this.tenant_id,
+        this.tenantId,
         platformProductId
       );
 
@@ -186,10 +186,10 @@ export class InventorySync {
       // const inventoryChange = this.transformPlatformToSquare(
       //   {
       //     id: platformProduct.id,
-      //     tenant_id: this.tenant_id,
+      //     tenantId: this.tenantId,
       //     productId: platformProduct.id,
       //     quantity: newQuantity,
-      //     updated_at: platformProduct.updatedAt,
+      //     updatedAt: platformProduct.updatedAt,
       //   },
       //   mapping.square_catalog_object_id
       // );
@@ -281,7 +281,7 @@ export class InventorySync {
       if (direction === 'from_square') {
         // Get mapping first
         const mapping = await squareIntegrationRepository.getProductMappingByInventoryItemId(
-          this.tenant_id,
+          this.tenantId,
           platformProductId
         );
 
@@ -298,7 +298,7 @@ export class InventorySync {
 
       // Auto mode: Compare timestamps and sync from most recent
       const mapping = await squareIntegrationRepository.getProductMappingByInventoryItemId(
-        this.tenant_id,
+        this.tenantId,
         platformProductId
       );
 
@@ -308,7 +308,7 @@ export class InventorySync {
 
       const platformProduct = await prisma.inventory_item.findUnique({
         where: { id: platformProductId },
-        select: { updated_at: true },
+        select: { updatedAt: true },
       });
 
       if (!platformProduct) {
@@ -346,7 +346,7 @@ export class InventorySync {
       // Get all mapped products
       const mappings = await prisma.$queryRaw<any[]>`
         SELECT * FROM square_product_mappings
-        WHERE tenant_id = ${this.tenant_id}
+        WHERE tenantId = ${this.tenantId}
       `;
 
       for (const mapping of mappings) {
@@ -389,7 +389,7 @@ export class InventorySync {
  * Factory function to create inventory sync instance
  */
 export function createInventorySync(
-  tenant_id: string,
+  tenantId: string,
   integrationId: string,
   squareClient: any,
   locationId?: string

@@ -1,4 +1,4 @@
-export async function triggerRevalidate(tenant_id: string, paths?: string[]) {
+export async function triggerRevalidate(tenantId: string, paths?: string[]) {
   try {
     const WEB_URL = process.env.WEB_URL || 'http://localhost:3000'
     const secret = process.env.REVALIDATE_SECRET || ''

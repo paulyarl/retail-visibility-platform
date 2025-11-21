@@ -196,7 +196,7 @@ async function testPhase2OAuth() {
     if (encodedState) {
       const decoded = decodeState(encodedState);
       
-      if (decoded.tenant_id === TEST_TENANT_ID && decoded.token === 'test-state-123') {
+      if (decoded.tenantId === TEST_TENANT_ID && decoded.token === 'test-state-123') {
         passed++;
         success('State encoding/decoding works correctly');
       } else {
@@ -371,7 +371,7 @@ async function testPhase4Database() {
     
     const integration = await prisma.clover_integrations.create({
       data: {
-        tenant_id: TEST_TENANT_ID,
+        tenantId: TEST_TENANT_ID,
         merchantId: 'test-merchant-123',
         accessToken: encryptToken('test-access-token'),
         refreshToken: encryptToken('test-refresh-token'),
@@ -385,7 +385,7 @@ async function testPhase4Database() {
       // Test 4.2: Retrieve Integration
       subsection('Test 4.2: Retrieve Integration');
       const retrieved = await prisma.clover_integrations.findUnique({
-        where: { tenant_id: TEST_TENANT_ID },
+        where: { tenantId: TEST_TENANT_ID },
       });
       
       if (retrieved && retrieved.id === integration.id) {

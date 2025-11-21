@@ -75,13 +75,13 @@ export const UNIVERSAL_FIELD_MAPPINGS = {
   // Tenant fields
   'trialEndsAt': 'trial_ends_at',
   'createdBy': 'created_by',
-  'tenantId': 'tenant_id',
-  'userId': 'user_id',
+  'tenantId': 'tenantId',
+  'userId': 'userId',
   
   // Item fields
   'inventoryItemId': 'inventory_item_id',
-  'priceCents': 'price_cents',
-  'itemStatus': 'item_status',
+  'priceCents': 'priceCents',
+  'itemStatus': 'itemStatus',
   
   // Business profile
   'businessName': 'business_name',
@@ -96,7 +96,7 @@ export const UNIVERSAL_FIELD_MAPPINGS = {
   'profilePictureUrl': 'profile_picture_url',
   
   // JWT payload
-  'tenantIds': 'tenant_ids'
+  'tenantIds': 'tenantIds'
 };
 
 /**

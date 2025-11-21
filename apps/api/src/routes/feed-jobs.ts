@@ -7,7 +7,7 @@ const router = Router();
 
 // Validation schemas
 const createFeedJobSchema = z.object({
-  tenant_id: z.string().cuid(),
+  tenantId: z.string().cuid(),
   sku: z.string().optional(),
   payload: z.record(z.string(), z.any()).optional(),
 });
@@ -30,8 +30,8 @@ router.post('/', async (req, res) => {
     // Block feed pushes for fully frozen tenants, but allow google_only fallback
     // tenants to push feeds while they are active and within the maintenance window.
     const tenant = await prisma.tenant.findUnique({
-      where: { id: body.tenant_id },
-      select: { subscription_tier: true, subscription_status: true, trial_ends_at: true },
+      where: { id: body.tenantId },
+      select: { subscription_tier: true, subscription_status: true, trialEndsAt: true },
     });
 
     if (!tenant) {
@@ -65,12 +65,12 @@ router.post('/', async (req, res) => {
 
     // Optional enforcement: block feed pushes when categories are missing/unmapped
     if (Flags.FEED_ALIGNMENT_ENFORCE === true) {
-      const tenantId = body.tenant_id;
+      const tenantId = body.tenantId;
 
       // Build item filter: active + public items
       const baseWhere: any = {
         tenantId,
-        item_status: 'active',
+        itemStatus: 'active',
         visibility: 'public',
       };
       if (body.sku) {
@@ -146,7 +146,7 @@ router.post('/', async (req, res) => {
 
     const job = await prisma.feed_push_jobs.create({
       data: {
-        tenant_id: body.tenant_id,
+        tenantId: body.tenantId,
         sku: body.sku,
         payload: body.payload as any || {},
         jobStatus: 'queued',
@@ -190,7 +190,7 @@ router.get('/', async (req, res) => {
     const where: any = {};
     
     if (tenantId) {
-      where.tenant_id = tenantId as string;
+      where.tenantId = tenantId as string;
     }
     
     if (status) {
@@ -200,7 +200,7 @@ router.get('/', async (req, res) => {
     const [jobs, total] = await Promise.all([
       prisma.feed_push_jobs.findMany({
         where,
-        orderBy: { created_at: 'desc' },
+        orderBy: { createdAt: 'desc' },
         take: parseInt(limit as string),
         skip: parseInt(offset as string),
       }),
@@ -268,7 +268,7 @@ router.patch('/:id/status', async (req, res) => {
 
     const updateData: any = {
       jobStatus: body.jobStatus,
-      updated_at: new Date(),
+      updatedAt: new Date(),
     };
 
     if (body.jobStatus === 'processing') {
@@ -347,7 +347,7 @@ router.get('/queue/ready', async (req, res) => {
           { nextRetry: { lte: new Date() } },
         ],
       },
-      orderBy: { created_at: 'asc' },
+      orderBy: { createdAt: 'asc' },
       take: parseInt(limit as string),
     });
 
@@ -373,7 +373,7 @@ router.get('/stats/summary', async (req, res) => {
   try {
     const { tenantId } = req.query;
 
-    const where: any = tenantId ? { tenant_id: tenantId as string } : {};
+    const where: any = tenantId ? { tenantId: tenantId as string } : {};
 
     const [
       totalJobs,

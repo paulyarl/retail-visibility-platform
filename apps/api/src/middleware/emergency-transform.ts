@@ -95,13 +95,13 @@ export const FIELD_MAPPINGS = {
   // Tenant errors
   'trialEndsAt': 'trial_ends_at',
   'createdBy': 'created_by',
-  'tenantId': 'tenant_id',
-  'userId': 'user_id',
+  'tenantId': 'tenantId',
+  'userId': 'userId',
   
   // Item errors
   'inventoryItemId': 'inventory_item_id',
-  'priceCents': 'price_cents',
-  'itemStatus': 'item_status',
+  'priceCents': 'priceCents',
+  'itemStatus': 'itemStatus',
   
   // Business profile errors
   'businessName': 'business_name',
@@ -110,7 +110,7 @@ export const FIELD_MAPPINGS = {
   'profilePictureUrl': 'profile_picture_url',
   
   // JWT payload errors
-  'tenantIds': 'tenant_ids'
+  'tenantIds': 'tenantIds'
 };
 
 /**

@@ -34,11 +34,11 @@ const router = Router();
 // Validation schemas
 const exchangeTokenSchema = z.object({
   code: z.string().min(1, 'Authorization code is required'),
-  tenant_id: z.string().uuid('Invalid tenant ID'),
+  tenantId: z.string().uuid('Invalid tenant ID'),
 });
 
 const disconnectSchema = z.object({
-  tenant_id: z.string().uuid('Invalid tenant ID'),
+  tenantId: z.string().uuid('Invalid tenant ID'),
 });
 
 const syncSchema = z.object({
@@ -74,7 +74,7 @@ router.post('/oauth/exchange', authenticateToken, async (req: Request, res: Resp
         merchantId: integration.merchantId,
         enabled: integration.enabled,
         mode: integration.mode,
-        created_at: integration.created_at,
+        createdAt: integration.created_at,
       },
     });
   } catch (error) {
@@ -112,7 +112,7 @@ router.get('/integrations/:tenantId', authenticateToken, async (req: Request, re
 
     if (!tenantId) {
       return res.status(400).json({
-        error: 'missing_tenant_id',
+        error: 'missing_tenantId',
         message: 'Tenant ID is required',
       });
     }
@@ -137,8 +137,8 @@ router.get('/integrations/:tenantId', authenticateToken, async (req: Request, re
         mode: integration.mode,
         lastSyncAt: integration.lastSyncAt,
         lastError: integration.lastError,
-        created_at: integration.created_at,
-        updated_at: integration.updatedAt,
+        createdAt: integration.created_at,
+        updatedAt: integration.updatedAt,
       },
     });
   } catch (error) {
@@ -161,7 +161,7 @@ router.post('/integrations/:tenantId/disconnect', authenticateToken, async (req:
 
     if (!tenantId) {
       return res.status(400).json({
-        error: 'missing_tenant_id',
+        error: 'missing_tenantId',
         message: 'Tenant ID is required',
       });
     }
@@ -200,7 +200,7 @@ router.post('/integrations/:tenantId/sync', authenticateToken, async (req: Reque
 
     if (!tenantId) {
       return res.status(400).json({
-        error: 'missing_tenant_id',
+        error: 'missing_tenantId',
         message: 'Tenant ID is required',
       });
     }
@@ -231,7 +231,7 @@ router.get('/integrations/:tenantId/logs', authenticateToken, async (req: Reques
 
     if (!tenantId) {
       return res.status(400).json({
-        error: 'missing_tenant_id',
+        error: 'missing_tenantId',
         message: 'Tenant ID is required',
       });
     }
@@ -263,7 +263,7 @@ router.post('/integrations/:tenantId/sync', authenticateToken, async (req: Reque
 
     if (!tenantId) {
       return res.status(400).json({
-        error: 'missing_tenant_id',
+        error: 'missing_tenantId',
         message: 'Tenant ID is required',
       });
     }
@@ -316,7 +316,7 @@ router.post('/integrations/:tenantId/sync/products', authenticateToken, async (r
 
     if (!tenantId) {
       return res.status(400).json({
-        error: 'missing_tenant_id',
+        error: 'missing_tenantId',
         message: 'Tenant ID is required',
       });
     }
@@ -365,7 +365,7 @@ router.post('/integrations/:tenantId/sync/inventory', authenticateToken, async (
 
     if (!tenantId) {
       return res.status(400).json({
-        error: 'missing_tenant_id',
+        error: 'missing_tenantId',
         message: 'Tenant ID is required',
       });
     }
@@ -413,7 +413,7 @@ router.get('/integrations/:tenantId/sync/status', authenticateToken, async (req:
 
     if (!tenantId) {
       return res.status(400).json({
-        error: 'missing_tenant_id',
+        error: 'missing_tenantId',
         message: 'Tenant ID is required',
       });
     }
@@ -441,7 +441,7 @@ router.get('/integrations/:tenantId/sync/status', authenticateToken, async (req:
         direction: log.direction,
         status: log.status,
         itemsAffected: log.itemsAffected,
-        created_at: log.created_at,
+        createdAt: log.created_at,
       })),
     });
   } catch (error: any) {

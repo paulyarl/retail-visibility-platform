@@ -185,7 +185,7 @@ export function clearTierCache(): void {
  * Check if tenant has access to a feature (including overrides)
  */
 export async function checkTenantFeatureAccess(
-  tenant_id: string,
+  tenantId: string,
   featureKey: string
 ): Promise<{ hasAccess: boolean; source: 'tier' | 'override' | 'none'; override?: any }> {
   try {

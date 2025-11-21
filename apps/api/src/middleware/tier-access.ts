@@ -228,7 +228,7 @@ export function getTierPricing(tier: string): number {
  * Now uses TierService for database-driven tier lookups
  */
 export async function checkTierAccessWithOverrides(
-  tenant_id: string,
+  tenantId: string,
   feature: string
 ): Promise<{ hasAccess: boolean; source: 'tier' | 'override' | 'none'; override?: any }> {
   // Use TierService which already handles overrides
@@ -251,11 +251,11 @@ export function requireTierFeature(feature: string) {
       }
       
       // Get tenant ID from params, body, or query
-      const tenantId = req.params.tenant_id || req.body.tenant_id || req.query.tenant_id;
+      const tenantId = req.params.tenantId || req.body.tenantId || req.query.tenantId;
       
       if (!tenantId) {
         return res.status(400).json({
-          error: 'tenant_id_required',
+          error: 'tenantId_required',
           message: 'Tenant ID is required for feature access check',
         });
       }
@@ -351,11 +351,11 @@ export function requireAnyTierFeature(features: string[]) {
         return next();
       }
       
-      const tenantId = req.params.tenant_id || req.body.tenant_id || req.query.tenant_id;
+      const tenantId = req.params.tenantId || req.body.tenantId || req.query.tenantId;
       
       if (!tenantId) {
         return res.status(400).json({
-          error: 'tenant_id_required',
+          error: 'tenantId_required',
           message: 'Tenant ID is required for feature access check',
         });
       }
@@ -400,11 +400,11 @@ export function requireAnyTierFeature(features: string[]) {
 
 export async function requireWritableSubscription(req: Request, res: Response, next: NextFunction) {
   try {
-    const tenantId = (req.params.tenant_id || req.params.id || req.body.tenant_id || req.query.tenant_id) as string | undefined;
+    const tenantId = (req.params.tenantId || req.params.id || req.body.tenantId || req.query.tenantId) as string | undefined;
 
     if (!tenantId) {
       return res.status(400).json({
-        error: 'tenant_id_required',
+        error: 'tenantId_required',
         message: 'Tenant ID is required for write operations',
       });
     }
@@ -414,7 +414,7 @@ export async function requireWritableSubscription(req: Request, res: Response, n
       select: {
         subscription_tier: true,
         subscription_status: true,
-        trial_ends_at: true,
+        trialEndsAt: true,
       },
     });
 
@@ -430,7 +430,7 @@ export async function requireWritableSubscription(req: Request, res: Response, n
     const maintenanceState = getMaintenanceState({
       tier,
       status,
-      trial_ends_at: tenant.trialEndsAt ?? undefined,
+      trialEndsAt: tenant.trialEndsAt ?? undefined,
     });
 
     // Freeze: read-only visibility mode (canceled/expired or google_only outside maintenance window)

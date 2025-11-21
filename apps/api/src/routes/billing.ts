@@ -11,7 +11,7 @@ router.get('/tenant/billing/counters', requireAuth, async (req, res) => {
     const tenantId = getTenantId(req);
     
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     // Query the tenant_sku_counters view
@@ -76,7 +76,7 @@ router.get('/tenant/billing/status', requireAuth, async (req, res) => {
     const tenantId = getTenantId(req);
     
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     // Query the tenant_tier_status view
@@ -116,7 +116,7 @@ router.post('/admin/billing/override', requireAdmin, async (req, res) => {
     const { tenantId, skuLimit } = req.body;
 
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     // Get existing metadata
@@ -186,7 +186,7 @@ router.get('/organization/billing/counters', requireAuth, async (req, res) => {
     const totalLocations = org.tenants.length;
     const totalSKUs = org.tenants.reduce((sum, t) => sum + t._count.inventory_item, 0);
     const locationBreakdown = org.tenants.map(t => ({
-      tenant_id: t.id,
+      tenantId: t.id,
       tenantName: t.name,
       skuCount: t._count.inventory_item,
     }));

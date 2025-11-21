@@ -42,7 +42,7 @@ export class SquareOAuthService {
    * @param state - Random state for CSRF protection
    * @param tenantId - Tenant ID to associate with the integration
    */
-  generateAuthorizationUrl(state: string, tenant_id: string): string {
+  generateAuthorizationUrl(state: string, tenantId: string): string {
     const baseUrl = this.config.environment === 'production'
       ? 'https://connect.squareup.com/oauth2/authorize'
       : 'https://connect.squareupsandbox.com/oauth2/authorize';
@@ -148,7 +148,7 @@ export class SquareOAuthService {
    * Parse state parameter to extract tenant ID
    * @param state - State string in format "randomState:tenantId"
    */
-  static parseState(state: string): { state: string; tenant_id: string } {
+  static parseState(state: string): { state: string; tenantId: string } {
     const [randomState, tenantId] = state.split(':');
     return { state: randomState, tenantId };
   }

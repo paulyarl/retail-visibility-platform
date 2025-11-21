@@ -19,14 +19,14 @@ async function getEffectivePolicy(tenantId?: string): Promise<PolicyRules | null
 
     const result = await prisma.$queryRaw<PolicyRules[]>`
       SELECT
-        tenant_id as scope,
+        tenantId as scope,
         count_active_private,
         count_preorder,
         count_zero_price,
         require_image,
         require_currency
       FROM v_effective_sku_billing_policy
-      WHERE tenant_id = ${scope}
+      WHERE tenantId = ${scope}
       LIMIT 1
     `;
 
@@ -98,7 +98,7 @@ export async function enforcePolicyCompliance(
       return next();
     }
 
-    const tenantId = req.body?.tenant_id || req.query?.tenant_id;
+    const tenantId = req.body?.tenantId || req.query?.tenantId;
     
     if (!tenantId) {
       // No tenant ID, skip policy check (will fail validation elsewhere)
@@ -145,7 +145,7 @@ export async function enforcePolicyCompliance(
 /**
  * Get compliance report for a tenant
  */
-export async function getComplianceReport(tenant_id: string) {
+export async function getComplianceReport(tenantId: string) {
   try {
     const policy = await getEffectivePolicy(tenantId);
 
@@ -166,7 +166,7 @@ export async function getComplianceReport(tenant_id: string) {
         image_url: true,
         currency: true,
         price: true,
-        price_cents: true,
+        priceCents: true,
         availability: true,
         visibility: true,
       },

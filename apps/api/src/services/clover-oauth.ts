@@ -68,7 +68,7 @@ export function getCloverUrls(environment: 'sandbox' | 'production' = 'sandbox')
 /**
  * Generate authorization URL for OAuth flow
  */
-export function generateAuthorizationUrl(tenant_id: string, state?: string): string {
+export function generateAuthorizationUrl(tenantId: string, state?: string): string {
   const config = getCloverConfig();
   const urls = getCloverUrls(config.environment);
   
@@ -98,7 +98,7 @@ export function generateAuthorizationUrl(tenant_id: string, state?: string): str
 /**
  * Decode state parameter from OAuth callback
  */
-export function decodeState(encodedState: string): { tenant_id: string; token: string; timestamp: number } {
+export function decodeState(encodedState: string): { tenantId: string; token: string; timestamp: number } {
   try {
     const decoded = Buffer.from(encodedState, 'base64').toString('utf-8');
     return JSON.parse(decoded);

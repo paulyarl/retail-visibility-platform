@@ -201,7 +201,7 @@ async function testPhase2OAuth() {
     const state = 'test-state-123';
     const parsed = (createSquareOAuthService().constructor as any).parseState(`${state}:${TEST_TENANT_ID}`);
     
-    if (parsed.state === state && parsed.tenant_id === TEST_TENANT_ID) {
+    if (parsed.state === state && parsed.tenantId === TEST_TENANT_ID) {
       passed++;
       success('State parsing works correctly');
     } else {
@@ -220,7 +220,7 @@ async function testPhase2OAuth() {
     
     // Create test integration
     await squareIntegrationRepository.createIntegration({
-      tenant_id: TEST_TENANT_ID,
+      tenantId: TEST_TENANT_ID,
       accessToken: 'test-token',
       refreshToken: 'test-refresh',
       merchantId: 'test-merchant',
@@ -241,7 +241,7 @@ async function testPhase2OAuth() {
 
     // Create sync log
     await squareIntegrationRepository.createSyncLog({
-      tenant_id: TEST_TENANT_ID,
+      tenantId: TEST_TENANT_ID,
       integrationId: integration.id,
       syncType: 'catalog',
       direction: 'from_square',

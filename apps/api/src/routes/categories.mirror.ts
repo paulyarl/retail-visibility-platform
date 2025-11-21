@@ -13,7 +13,7 @@ router.post('/api/categories/mirror', authenticateToken, requireAdmin, async (re
   }
 
   const strategy = String(req.body?.strategy || '').trim();
-  const tenantId = req.body?.tenant_id ? String(req.body.tenant_id) : undefined;
+  const tenantId = req.body?.tenantId ? String(req.body.tenantId) : undefined;
   const dryRun = Boolean(req.body?.dryRun);
 
   if (!strategy || (strategy !== 'platform_to_gbp' && strategy !== 'gbp_to_platform')) {
@@ -21,8 +21,8 @@ router.post('/api/categories/mirror', authenticateToken, requireAdmin, async (re
   }
 
   // Enqueue a background job (skeleton worker with retry/backoff)
-  const { jobId } = queueGbpCategoryMirrorJob({ strategy: strategy as any, tenant_id: tenantId ?? null, requestedBy: (req.user as any)?.user_id ?? null, dryRun });
-  return res.status(202).json({ success: true, accepted: true, jobId, strategy, tenant_id: tenantId ?? null, dryRun });
+  const { jobId } = queueGbpCategoryMirrorJob({ strategy: strategy as any, tenantId: tenantId ?? null, requestedBy: (req.user as any)?.userId ?? null, dryRun });
+  return res.status(202).json({ success: true, accepted: true, jobId, strategy, tenantId: tenantId ?? null, dryRun });
 });
 
 export default router;

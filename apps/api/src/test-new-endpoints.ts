@@ -15,7 +15,7 @@ async function testFeedPushJobs() {
     console.log('1. Creating test feed push job...');
     const job = await prisma.feed_push_jobs.create({
       data: {
-        tenant_id: 'test-tenant-id',
+        tenantId: 'test-tenant-id',
         sku: 'TEST-SKU-001',
         jobStatus: 'queued',
         payload: {
@@ -30,7 +30,7 @@ async function testFeedPushJobs() {
     console.log('\n2. Listing all jobs...');
     const jobs = await prisma.feed_push_jobs.findMany({
       take: 5,
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
     console.log(`✅ Found ${jobs.length} jobs`);
 
@@ -76,7 +76,7 @@ async function testFeedPushJobs() {
     console.log('\n6. Testing retry logic...');
     const failedJob = await prisma.feed_push_jobs.create({
       data: {
-        tenant_id: 'test-tenant-id',
+        tenantId: 'test-tenant-id',
         sku: 'TEST-SKU-002',
         jobStatus: 'queued',
       },
@@ -100,7 +100,7 @@ async function testFeedPushJobs() {
     console.log('\n7. Cleaning up test jobs...');
     await prisma.feed_push_jobs.deleteMany({
       where: {
-        tenant_id: 'test-tenant-id',
+        tenantId: 'test-tenant-id',
       },
     });
     console.log('✅ Test jobs cleaned up');
@@ -120,8 +120,8 @@ async function testOutreachFeedback() {
     console.log('1. Submitting test feedback...');
     const feedback = await prisma.outreach_feedback.create({
       data: {
-        tenant_id: 'test-tenant-id',
-        user_id: 'test-user-id',
+        tenantId: 'test-tenant-id',
+        userId: 'test-user-id',
         feedback: {
           comment: 'Great feature! Very easy to use.',
           features_used: ['category_alignment', 'feed_push'],
@@ -140,21 +140,21 @@ async function testOutreachFeedback() {
     await prisma.outreach_feedback.createMany({
       data: [
         {
-          tenant_id: 'test-tenant-id',
+          tenantId: 'test-tenant-id',
           feedback: { comment: 'Good but slow' },
           score: 3,
           category: 'performance',
           context: 'feed_push',
         },
         {
-          tenant_id: 'test-tenant-id',
+          tenantId: 'test-tenant-id',
           feedback: { comment: 'Excellent support!' },
           score: 5,
           category: 'support',
           context: 'onboarding',
         },
         {
-          tenant_id: 'test-tenant-id',
+          tenantId: 'test-tenant-id',
           feedback: { comment: 'Needs more features' },
           score: 4,
           category: 'features',
@@ -167,7 +167,7 @@ async function testOutreachFeedback() {
     // 3. Get feedback analytics
     console.log('\n3. Calculating feedback analytics...');
     const allFeedback = await prisma.outreach_feedback.findMany({
-      where: { tenant_id: 'test-tenant-id' },
+      where: { tenantId: 'test-tenant-id' },
     });
 
     const avgScore = allFeedback.reduce((sum, f) => sum + f.score, 0) / allFeedback.length;
@@ -183,7 +183,7 @@ async function testOutreachFeedback() {
     console.log('\n4. Grouping feedback by category...');
     const byCategory = await prisma.outreach_feedback.groupBy({
       by: ['category'],
-      where: { tenant_id: 'test-tenant-id' },
+      where: { tenantId: 'test-tenant-id' },
       _count: true,
       _avg: { score: true },
     });
@@ -207,7 +207,7 @@ async function testOutreachFeedback() {
     // Cleanup test feedback
     console.log('\n6. Cleaning up test feedback...');
     await prisma.outreach_feedback.deleteMany({
-      where: { tenant_id: 'test-tenant-id' },
+      where: { tenantId: 'test-tenant-id' },
     });
     console.log('✅ Test feedback cleaned up');
 

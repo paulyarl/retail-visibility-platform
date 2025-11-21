@@ -46,7 +46,7 @@ export interface EnrichmentOptions {
 export async function findMatchingProducts(
   prisma: PrismaClient,
   scannedData: ScannedProductData,
-  tenant_id: string
+  tenantId: string
 ): Promise<ProductMatch[]> {
   const matches: ProductMatch[] = [];
 
@@ -304,16 +304,16 @@ function normalizeString(str: string): string {
  * Determine what fields are missing from a product
  */
 export function getMissingFields(product: inventory_item): {
-  missing_images: boolean;
-  missing_description: boolean;
-  missing_specs: boolean;
-  missing_brand: boolean;
+  missingImages: boolean;
+  missingDescription: boolean;
+  missingSpecs: boolean;
+  missingBrand: boolean;
 } {
   return {
-    missing_images: Boolean(product.missingImages),
-    missing_description: Boolean(product.missingDescription) || (!product.description || product.description.length < 20),
-    missing_specs: Boolean(product.missingSpecs) || !product.metadata || Object.keys(product.metadata as any).length === 0,
-    missing_brand: Boolean(product.missingBrand) || !product.brand
+    missingImages: Boolean(product.missingImages),
+    missingDescription: Boolean(product.missingDescription) || (!product.description || product.description.length < 20),
+    missingSpecs: Boolean(product.missingSpecs) || !product.metadata || Object.keys(product.metadata as any).length === 0,
+    missingBrand: Boolean(product.missingBrand) || !product.brand
   };
 }
 

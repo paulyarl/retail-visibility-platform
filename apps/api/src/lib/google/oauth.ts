@@ -30,7 +30,7 @@ export const GOOGLE_SCOPES = [
 /**
  * Generate authorization URL for OAuth flow
  */
-export function getAuthorizationUrl(tenant_id: string): string {
+export function getAuthorizationUrl(tenantId: string): string {
   const state = generateState(tenantId);
   
   const params = new URLSearchParams({
@@ -49,7 +49,7 @@ export function getAuthorizationUrl(tenant_id: string): string {
 /**
  * Generate and encode state parameter with tenant ID
  */
-function generateState(tenant_id: string): string {
+function generateState(tenantId: string): string {
   const nonce = crypto.randomBytes(16).toString('hex');
   const state = {
     tenantId,
@@ -62,7 +62,7 @@ function generateState(tenant_id: string): string {
 /**
  * Decode and validate state parameter
  */
-export function decodeState(state: string): { tenant_id: string; nonce: string; timestamp: number } | null {
+export function decodeState(state: string): { tenantId: string; nonce: string; timestamp: number } | null {
   try {
     const decoded = JSON.parse(Buffer.from(state, 'base64url').toString());
     

@@ -90,7 +90,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     };
     const user = req.user as any;
     const tenantId = user?.tenantIds?.[0]; // Get first tenant
-    const userId = user?.user_id;
+    const userId = user?.userId;
 
     if (!tenantId || !userId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -99,7 +99,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     // Enforce subscription state with 6-month maintenance window for google_only fallback
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { subscription_tier: true, subscription_status: true, trial_ends_at: true },
+      select: { subscription_tier: true, subscription_status: true, trialEndsAt: true },
     });
 
     if (!tenant) {
@@ -136,7 +136,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
       include: { photos: true }
     });
 
-    if (!product || product.tenant_id !== tenantId) {
+    if (!product || product.tenantId !== tenantId) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
@@ -232,7 +232,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
       // Update missing images flag
       await prisma.inventory_item.update({
         where: { id: productId },
-        data: { missing_images: false }
+        data: { missingImages: false }
       });
     }
 
@@ -317,7 +317,7 @@ router.get('/needs-enrichment', async (req: Request, res: Response) => {
         photos: true
       },
       orderBy: {
-        created_at: 'desc'
+        createdAt: 'desc'
       }
     });
 
@@ -365,7 +365,7 @@ router.get('/:productId/enrichment-status', async (req: Request, res: Response) 
       include: { photos: true }
     });
 
-    if (!product || product.tenant_id !== tenantId) {
+    if (!product || product.tenantId !== tenantId) {
       return res.status(404).json({ error: 'Product not found' });
     }
 

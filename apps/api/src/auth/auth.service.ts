@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { user_role } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { prisma } from '../prisma';
 
 // JWT configuration
@@ -11,11 +11,10 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-super-secret-
 const JWT_ACCESS_EXPIRY = '365d'; // Was '15m'
 const JWT_REFRESH_EXPIRY = '730d'; // Was '7d'
 
-export interface JWTPayload {
-  user_id: string;
+export interface JWTPayload { 
   userId?: string; // Added by universal transform middleware
   email: string;
-  role: user_role;
+  role: UserRole;
   tenantIds: string[];
 }
 
@@ -109,7 +108,7 @@ export class AuthService {
         passwordHash: passwordHash,
         firstName: data.firstName,
         lastName: data.lastName,
-        role: user_role.USER,
+        role: UserRole.USER,
         updatedAt: new Date(),
       },
     });
@@ -157,7 +156,7 @@ export class AuthService {
 
     // Create JWT payload
     const payload: JWTPayload = {
-      user_id: user.id,
+      userId: user.id,
       email: user.email,
       role: user.role,
       tenantIds,
@@ -211,7 +210,7 @@ export class AuthService {
 
       // Verify user still exists and is active
       const user = await prisma.user.findUnique({
-        where: { id: payload.user_id },
+        where: { id: payload.userId },
         select: {
           id: true,
           email: true,
@@ -231,7 +230,7 @@ export class AuthService {
 
       // Generate new access token
       const newPayload: JWTPayload = {
-        user_id: user.id,
+        userId: user.id,
         email: user.email,
         role: user.role,
         tenantIds: user.userTenants.map((ut) => ut.tenantId),
@@ -248,14 +247,14 @@ export class AuthService {
   /**
    * Get user by ID
    */
-  async getUserById(user_id: string) {
-    console.log('[AuthService] getUserById called with:', user_id);
+  async getUserById(userId: string) {
+    console.log('[AuthService] getUserById called with:', userId);
     console.log('[AuthService] prisma.users exists:', !!prisma.user);
     console.log('[AuthService] prisma.user exists:', !!prisma.user);
     
     // First get user without relations to avoid Prisma relation issues
     const user = await prisma.user.findUnique({
-      where: { id: user_id },
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -277,7 +276,7 @@ export class AuthService {
     let userTenants: { tenantId: string; role: any }[] = [];
     try {
       userTenants = await prisma.userTenant.findMany({
-        where: { userId: user_id },
+        where: { userId: userId },
         select: {
           tenantId: true,
           role: true,
@@ -285,7 +284,8 @@ export class AuthService {
       });
       console.log('[AuthService] Found', userTenants.length, 'tenant associations');
     } catch (tenantError) {
-      console.log('[AuthService] Could not fetch tenant associations:', tenantError.message);
+      const errorMessage = tenantError instanceof Error ? tenantError.message : String(tenantError);
+      console.log('[AuthService] Could not fetch tenant associations:', errorMessage);
       // Continue with empty tenants array
     }
 
@@ -318,10 +318,10 @@ export class AuthService {
   /**
    * Logout user (invalidate session)
    */
-  async logout(user_id: string) {
+  async logout(userId: string) {
     // Deactivate all user sessions
     await prisma.userSession.updateMany({
-      where: { userId: user_id, isActive: true },
+      where: { userId: userId, isActive: true },
       data: { isActive: false },
     });
 

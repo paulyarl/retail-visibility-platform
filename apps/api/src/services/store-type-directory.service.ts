@@ -65,7 +65,7 @@ class StoreTypeDirectoryService {
       // Get stores from directory_listings using raw SQL
       const stores = await prisma.$queryRaw<Array<{
         id: string;
-        tenant_id: string;
+        tenantId: string;
         business_name: string;
         slug: string;
         address_line1: string | null;
@@ -79,7 +79,7 @@ class StoreTypeDirectoryService {
       }>>`
         SELECT 
           id,
-          tenant_id,
+          tenantId,
           business_name,
           slug,
           address_line1,
@@ -100,7 +100,7 @@ class StoreTypeDirectoryService {
       console.log(`[StoreTypeService] Found ${stores.length} stores`);
 
       return stores.map((store) => ({
-        id: store.tenant_id,
+        id: store.tenantId,
         name: store.businessName,
         slug: store.slug,
         address: store.address_line1,

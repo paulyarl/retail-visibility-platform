@@ -26,16 +26,15 @@
  */
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../auth/auth.service';
-import { user_role } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 
 // JWT Payload interface
-// Note: Universal transform middleware makes both user_id and userId available
+// Note: Universal transform middleware makes both userId and userId available
 export interface JWTPayload {
-  user_id: string;
   userId?: string; // Added by universal transform middleware
   email: string;
-  role: user_role;
+  role: UserRole;
   tenantIds: string[];
 }
 
@@ -67,12 +66,12 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     console.log('[Auth Middleware] Verifying token...');
     const payload = authService.verifyAccessToken(token);
     console.log('[Auth Middleware] Token verified, raw payload:', payload);
-    console.log('[Auth Middleware] Payload has user_id:', !!payload.user_id);
+    console.log('[Auth Middleware] Payload has userId:', !!payload.userId);
     console.log('[Auth Middleware] Payload has userId:', !!(payload as any).userId);
     
     req.user = payload;
     console.log('[Auth Middleware] User attached to request:', req.user);
-    console.log('[Auth Middleware] req.user has user_id:', !!req.user.user_id);
+    console.log('[Auth Middleware] req.user has userId:', !!req.user.userId);
     console.log('[Auth Middleware] req.user has userId:', !!(req.user as any).userId);
     next();
   } catch (error) {
@@ -97,7 +96,7 @@ export const requireAuth = authenticateToken;
 /**
  * Middleware to check if user has required role
  */
-export function authorize(...roles: user_role[]) {
+export function authorize(...roles: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
@@ -169,6 +168,11 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
     return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
   }
 
+  // Ensure userId is present (should be added by universal transform middleware)
+  if (!req.user.userId) {
+    return res.status(401).json({ error: 'authentication_required', message: 'Invalid authentication data' });
+  }
+
   // Platform users (admin, support, viewer) have access to all tenants
   if (isPlatformUser(req.user)) {
     return next();
@@ -189,11 +193,11 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
   // verify membership via userTenant table so owners/members are not blocked
   try {
     const { prisma } = await import('../prisma');
-    const userTenant = await prisma.user_tenants.findUnique({
+    const userTenant = await prisma.userTenant.findUnique({
       where: {
-        user_id_tenant_id: {
-          user_id: req.user.user_id,
-          tenant_id: tenantId as string,
+        userId_tenantId: {
+          userId: req.user.userId, // Now guaranteed to be string
+          tenantId: tenantId as string,
         },
       },
       select: { id: true },
@@ -236,10 +240,10 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
  */
 export function getTenantId(req: Request): string | null {
   return (
-    req.params.tenant_id ||
+    req.params.tenantId ||
     req.params.id ||
-    (req.query.tenant_id as string) ||
-    req.body.tenant_id ||
+    (req.query.tenantId as string) ||
+    req.body.tenantId ||
     (req.user?.tenantIds && req.user.tenantIds[0]) ||
     null
   );
@@ -254,7 +258,7 @@ export function requireTenantId(req: Request, res: Response): string | null {
   
   if (!tenantId) {
     res.status(400).json({ 
-      error: 'tenant_id_required', 
+      error: 'tenantId_required', 
       message: 'Tenant ID is required' 
     });
     return null;
@@ -274,6 +278,11 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
     return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
   }
 
+  // Ensure userId is present (should be added by universal transform middleware)
+  if (!req.user.userId) {
+    return res.status(401).json({ error: 'authentication_required', message: 'Invalid authentication data' });
+  }
+
   // Platform admins can manage any tenant
   if (isPlatformAdmin(req.user)) {
     return next();
@@ -288,11 +297,11 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
   // Check if user has access to this tenant and their role within it
   try {
     const { prisma } = await import('../prisma');
-    const userTenant = await prisma.user_tenants.findUnique({
+    const userTenant = await prisma.userTenant.findUnique({
       where: {
-        user_id_tenant_id: {
-          user_id: req.user.user_id,
-          tenant_id: tenantId as string,
+        userId_tenantId: {
+          userId: req.user.userId, // Now guaranteed to be string
+          tenantId: tenantId as string,
         },
       },
       select: {
@@ -374,16 +383,21 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
     });
   }
 
+  // Ensure userId is present (should be added by universal transform middleware)
+  if (!req.user.userId) {
+    return res.status(401).json({ error: 'authentication_required', message: 'Invalid authentication data' });
+  }
+
   // Platform admins can always access
   if (isPlatformAdmin(req.user)) {
     return next();
   }
 
   // Get tenant ID from params
-  const tenantId = req.params.tenant_id || req.params.id;
+  const tenantId = req.params.tenantId || req.params.id;
   if (!tenantId) {
     return res.status(400).json({
-      error: 'tenant_id_required',
+      error: 'tenantId_required',
       message: 'Tenant ID is required'
     });
   }
@@ -392,11 +406,11 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
   const { prisma } = await import('../prisma');
   
   // Check if user is OWNER or ADMIN of this tenant
-  const userTenant = await prisma.user_tenants.findUnique({
+  const userTenant = await prisma.userTenant.findUnique({
     where: {
-      user_id_tenant_id: {
-        user_id: req.user.user_id,
-        tenant_id: tenantId
+      userId_tenantId: {
+        userId: req.user.userId, // Now guaranteed to be string
+        tenantId: tenantId
       }
     },
     select: {

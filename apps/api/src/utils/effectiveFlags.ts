@@ -19,7 +19,7 @@ export type EffectivePlatform = {
 }
 
 export type EffectiveTenant = EffectivePlatform & {
-  tenant_id: string
+  tenantId: string
   tenantEffectiveOn: boolean
   tenantSources: {
     tenant_db: boolean
@@ -73,7 +73,7 @@ export async function getEffectivePlatform(flag: string): Promise<EffectivePlatf
   }
 }
 
-export async function getEffectiveTenant(flag: string, tenant_id: string): Promise<EffectiveTenant> {
+export async function getEffectiveTenant(flag: string, tenantId: string): Promise<EffectiveTenant> {
   const plat = await getEffectivePlatform(flag)
 
   const tenantMap = tenantOverrides.get(flag)
@@ -134,7 +134,7 @@ export function setPlatformOverride(flag: string, value: boolean | null) {
   }
 }
 
-export function setTenantOverride(flag: string, tenant_id: string, value: boolean | null) {
+export function setTenantOverride(flag: string, tenantId: string, value: boolean | null) {
   if (value === null) {
     const map = tenantOverrides.get(flag)
     map?.delete(tenantId)

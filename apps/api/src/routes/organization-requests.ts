@@ -16,7 +16,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
     
     if (tenantId) {
-      where.tenant_id = tenantId as string;
+      where.tenantId = tenantId as string;
     }
     
     if (userId) {
@@ -45,7 +45,7 @@ router.get('/', authenticateToken, async (req, res) => {
         },
       },
       orderBy: {
-        created_at: 'desc',
+        createdAt: 'desc',
       },
     });
 
@@ -206,7 +206,7 @@ router.patch('/:id', authenticateToken, async (req, res) => {
     // If approved and cost agreed, assign tenant to organization
     if (status === 'approved' && organizationRequest.costAgreed) {
       await prisma.tenant.update({
-        where: { id: organizationRequest.tenant_id },
+        where: { id: organizationRequest.tenantId },
         data: {
           organizationId: organizationRequest.organizationId,
         },

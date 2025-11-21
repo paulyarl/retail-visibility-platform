@@ -64,7 +64,7 @@ export class EmailTrackingService {
           delivered_at: status === 'delivered' ? new Date() : undefined,
           error_message: errorMessage,
           webhook_data: webhookData,
-          updated_at: new Date(),
+          updatedAt: new Date(),
         },
       });
     } catch (error) {

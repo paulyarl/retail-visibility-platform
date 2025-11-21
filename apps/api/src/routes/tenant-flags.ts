@@ -37,7 +37,7 @@ router.get('/tenant-flags/:tenantId', checkTenantAccess, async (req, res) => {
       flag: pf.flag,
       enabled: false, // Default to disabled for tenant
       rollout: pf.rollout || `Inherited from platform (override allowed)`,
-      updated_at: pf.updatedAt,
+      updatedAt: pf.updatedAt,
       _isPlatformInherited: true
     }
   })

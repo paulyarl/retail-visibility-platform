@@ -8,7 +8,7 @@ const router = Router();
 // Get tenant subscription status
 router.get("/status", async (req, res) => {
   try {
-    const tenantId = req.query.tenant_id as string;
+    const tenantId = req.query.tenantId as string;
 
     if (!tenantId) {
       return res.status(400).json({ error: "tenant_required" });
@@ -21,7 +21,7 @@ router.get("/status", async (req, res) => {
         name: true,
         subscription_status: true,
         subscription_tier: true,
-        trial_ends_at: true,
+        trialEndsAt: true,
         subscription_ends_at: true,
         stripe_customer_id: true,
         _count: {
@@ -66,7 +66,7 @@ router.get("/status", async (req, res) => {
       subscription: {
         status: tenant.subscription_status,
         tier: tenant.subscriptionTier,
-        trial_ends_at: tenant.trialEndsAt,
+        trialEndsAt: tenant.trialEndsAt,
         subscription_ends_at: tenant.subscriptionEndsAt,
         daysRemaining,
         hasStripeAccount: !!tenant.stripeCustomerId,
@@ -92,10 +92,10 @@ router.get("/status", async (req, res) => {
 
 // Update subscription status (admin only)
 const updateSchema = z.object({
-  tenant_id: z.string(),
+  tenantId: z.string(),
   subscription_status: z.enum(["trial", "active", "past_due", "canceled"]).optional(),
   subscription_tier: z.enum(["starter", "pro", "enterprise"]).optional(),
-  trial_ends_at: z.string().datetime().optional(),
+  trialEndsAt: z.string().datetime().optional(),
   subscription_ends_at: z.string().datetime().optional(),
   stripe_customer_id: z.string().optional(),
   stripe_subscription_id: z.string().optional(),
@@ -131,7 +131,7 @@ router.patch("/update", async (req, res) => {
         name: true,
         subscription_status: true,
         subscription_tier: true,
-        trial_ends_at: true,
+        trialEndsAt: true,
         subscription_ends_at: true,
       },
     });

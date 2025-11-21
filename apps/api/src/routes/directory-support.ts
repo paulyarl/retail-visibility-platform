@@ -59,7 +59,7 @@ router.get('/tenant/:tenantId/status', authenticateToken, requireSupportAccess, 
 
     // Get item count
     const itemCount = await prisma.inventory_item.count({
-      where: { tenantId, item_status: 'active' },
+      where: { tenantId, itemStatus: 'active' },
     });
 
     // Check if featured
@@ -100,7 +100,7 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
     const profile = await prisma.tenant_business_profile.findUnique({ where: { tenantId } });
     const settings = await prisma.directory_settings.findUnique({ where: { tenantId } });
     const itemCount = await prisma.inventory_item.count({
-      where: { tenantId, item_status: 'active' },
+      where: { tenantId, itemStatus: 'active' },
     });
 
     // Calculate completeness
@@ -171,7 +171,7 @@ router.get('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, a
           },
         },
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     return res.json({ notes });
@@ -199,7 +199,7 @@ router.post('/tenant/:tenantId/add-note', authenticateToken, requireSupportAcces
       data: {
         tenantId,
         note: parsed.data.note,
-        created_by: user.user_id,
+        createdBy: user.userId,
       },
       include: {
         createdByUser: {

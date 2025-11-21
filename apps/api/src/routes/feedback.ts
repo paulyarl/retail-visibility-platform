@@ -6,8 +6,8 @@ const router = Router();
 
 // Validation schemas
 const submitFeedbackSchema = z.object({
-  tenant_id: z.string().cuid().optional(),
-  user_id: z.string().cuid().optional(),
+  tenantId: z.string().cuid().optional(),
+  userId: z.string().cuid().optional(),
   feedback: z.record(z.string(), z.any()),
   score: z.number().int().min(1).max(5),
   category: z.enum(['usability', 'performance', 'features', 'support']).optional(),
@@ -24,8 +24,8 @@ router.post('/', async (req, res) => {
 
     const feedback = await prisma.outreach_feedback.create({
       data: {
-        tenant_id: body.tenant_id,
-        user_id: body.user_id,
+        tenantId: body.tenantId,
+        userId: body.userId,
         feedback: body.feedback as any,
         score: body.score,
         category: body.category,
@@ -75,11 +75,11 @@ router.get('/', async (req, res) => {
     const where: any = {};
     
     if (tenantId) {
-      where.tenant_id = tenantId as string;
+      where.tenantId = tenantId as string;
     }
     
     if (userId) {
-      where.user_id = userId as string;
+      where.userId = userId as string;
     }
     
     if (category) {
@@ -99,7 +99,7 @@ router.get('/', async (req, res) => {
     const [feedbacks, total] = await Promise.all([
       prisma.outreach_feedback.findMany({
         where,
-        orderBy: { created_at: 'desc' },
+        orderBy: { createdAt: 'desc' },
         take: parseInt(limit as string),
         skip: parseInt(offset as string),
       }),
@@ -165,13 +165,13 @@ router.get('/analytics/summary', async (req, res) => {
     const { tenantId, days = '30' } = req.query;
 
     const where: any = {
-      created_at: {
+      createdAt: {
         gte: new Date(Date.now() - parseInt(days as string) * 24 * 60 * 60 * 1000),
       },
     };
 
     if (tenantId) {
-      where.tenant_id = tenantId as string;
+      where.tenantId = tenantId as string;
     }
 
     const feedbacks = await prisma.outreach_feedback.findMany({
@@ -256,20 +256,20 @@ router.get('/pilot/kpis', async (req, res) => {
     const { tenantId } = req.query;
 
     const where: any = {
-      created_at: {
+      createdAt: {
         gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
       },
     };
 
     if (tenantId) {
-      where.tenant_id = tenantId as string;
+      where.tenantId = tenantId as string;
     }
 
     const feedbacks = await prisma.outreach_feedback.findMany({
       where,
       select: {
         score: true,
-        tenant_id: true,
+        tenantId: true,
       },
     });
 
@@ -285,13 +285,13 @@ router.get('/pilot/kpis', async (req, res) => {
 
     // Get feed accuracy (from feed_push_jobs)
     const feedJobsWhere: any = {
-      created_at: {
+      createdAt: {
         gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
       },
     };
 
     if (tenantId) {
-      feedJobsWhere.tenant_id = tenantId as string;
+      feedJobsWhere.tenantId = tenantId as string;
     }
 
     const [totalJobs, successJobs] = await Promise.all([

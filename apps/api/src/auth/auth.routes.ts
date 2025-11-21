@@ -167,8 +167,8 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
       });
     }
     
-    // Universal transform middleware converts user_id to userId
-    const userId = (req.user as any).userId || req.user.user_id;
+    // Universal transform middleware converts userId to userId
+    const userId = (req.user as any).userId || req.user.userId;
     console.log('[Auth Route] Using userId:', userId);
     const user = await authService.getUserById(userId);
     
@@ -201,7 +201,7 @@ router.post('/logout', authenticateToken, async (req: Request, res: Response) =>
       });
     }
     
-    const result = await authService.logout(req.user.user_id);
+    const result = await authService.logout(req.user.userId);
     
     res.json(result);
   } catch (error) {

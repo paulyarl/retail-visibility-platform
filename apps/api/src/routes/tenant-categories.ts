@@ -50,8 +50,8 @@ function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
  */
 async function requireTenantManagement(req: Request, res: Response, next: NextFunction) {
   const user = (req as any).user;
-  const userId = user?.user_id;
-  const tenantId = req.params.tenant_id;
+  const userId = user?.userId;
+  const tenantId = req.params.tenantId;
 
   if (!user || !userId) {
     return res.status(401).json({
@@ -71,9 +71,9 @@ async function requireTenantManagement(req: Request, res: Response, next: NextFu
     const { prisma: prismaClient } = await import('../prisma');
     const userTenant = await prismaClient.userTenant.findUnique({
       where: {
-        user_id_tenant_id: {
-          user_id: userId,
-          tenant_id: tenantId,
+        userId_tenantId: {
+          userId: userId,
+          tenantId: tenantId,
         },
       },
     });
@@ -98,7 +98,7 @@ async function requireTenantManagement(req: Request, res: Response, next: NextFu
 
 // Validation schemas
 const createCategorySchema = z.object({
-  tenant_id: z.string().cuid(),
+  tenantId: z.string().cuid(),
   name: z.string().min(1).max(100),
   slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/),
   parentId: z.string().cuid().optional(),
@@ -744,7 +744,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
       created: 0,
       updated: 0,
       skipped: 0,
-      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
@@ -753,7 +753,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
           // Check if category with same slug already exists
           const existing = await prisma.tenant_category.findFirst({
             where: {
-              tenant_id: location.id,
+              tenantId: location.id,
               slug: heroCategory.slug,
             },
           });
@@ -785,7 +785,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
             // Create mode - create new category
             await prisma.tenant_category.create({
               data: {
-                tenant_id: location.id,
+                tenantId: location.id,
                 name: heroCategory.name,
                 slug: heroCategory.slug,
                 googleCategoryId: heroCategory.googleCategoryId,
@@ -802,7 +802,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
       } catch (error: any) {
         console.error(`Error propagating to tenant ${location.id}:`, error);
         results.errors.push({
-          tenant_id: location.id,
+          tenantId: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });
@@ -890,7 +890,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
       created: 0,
       updated: 0,
       skipped: 0,
-      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
@@ -898,7 +898,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
         for (const heroFlag of heroFlags) {
           const existing = await prisma.tenant_feature_flags.findFirst({
             where: {
-              tenant_id: location.id,
+              tenantId: location.id,
               flag: heroFlag.flag,
             },
           });
@@ -926,7 +926,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
             
             await prisma.tenant_feature_flags.create({
               data: {
-                tenant_id: location.id,
+                tenantId: location.id,
                 flag: heroFlag.flag,
                 enabled: heroFlag.enabled,
                 description: heroFlag.description,
@@ -939,7 +939,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
       } catch (error: any) {
         console.error(`Error propagating to tenant ${location.id}:`, error);
         results.errors.push({
-          tenant_id: location.id,
+          tenantId: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });
@@ -1046,16 +1046,16 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
       regularHoursUpdated: 0,
       specialHoursCreated: 0,
       specialHoursUpdated: 0,
-      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
       try {
         // Upsert regular business hours
         await prisma.business_hours.upsert({
-          where: { tenant_id: location.id },
+          where: { tenantId: location.id },
           create: {
-            tenant_id: location.id,
+            tenantId: location.id,
             timezone: heroBusinessHours.timezone,
             periods: heroBusinessHours.periods as any,
           },
@@ -1071,7 +1071,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
           for (const specialHour of heroSpecialHours) {
             const existing = await prisma.business_hours_special.findFirst({
               where: {
-                tenant_id: location.id,
+                tenantId: location.id,
                 date: specialHour.date,
               },
             });
@@ -1090,7 +1090,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
             } else {
               await prisma.business_hours_special.create({
                 data: {
-                  tenant_id: location.id,
+                  tenantId: location.id,
                   date: specialHour.date,
                   isClosed: specialHour.isClosed,
                   open: specialHour.open,
@@ -1105,7 +1105,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
       } catch (error: any) {
         console.error(`Error propagating to tenant ${location.id}:`, error);
         results.errors.push({
-          tenant_id: location.id,
+          tenantId: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });
@@ -1147,7 +1147,7 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
       include: {
         organization: {
           include: {
-            tenant: {
+            Tenant: {
               where: { id: { not: tenantId } },
               select: { id: true, name: true },
             },
@@ -1184,7 +1184,7 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
       created: 0,
       updated: 0,
       skipped: 0,
-      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
@@ -1192,8 +1192,8 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
         for (const heroRole of heroUserRoles) {
           const existing = await prisma.user_tenants.findFirst({
             where: {
-              tenant_id: location.id,
-              user_id: heroRole.user_id,
+              tenantId: location.id,
+              userId: heroRole.userId,
             },
           });
 
@@ -1214,8 +1214,8 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
             }
             await prisma.user_tenants.create({
               data: {
-                tenant_id: location.id,
-                user_id: heroRole.user_id,
+                tenantId: location.id,
+                userId: heroRole.userId,
                 role: heroRole.role,
               },
             });
@@ -1224,7 +1224,7 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
         }
       } catch (error: any) {
         results.errors.push({
-          tenant_id: location.id,
+          tenantId: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });
@@ -1289,7 +1289,7 @@ router.post('/:tenantId/brand-assets/propagate', requireTenantAdmin, requireProp
     const results = {
       totalLocations: locationTenants.length,
       updated: 0,
-      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
@@ -1311,7 +1311,7 @@ router.post('/:tenantId/brand-assets/propagate', requireTenantAdmin, requireProp
         results.updated++;
       } catch (error: any) {
         results.errors.push({
-          tenant_id: location.id,
+          tenantId: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });
@@ -1369,15 +1369,15 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
     const results = {
       totalLocations: locationTenants.length,
       updated: 0,
-      errors: [] as Array<{ tenant_id: string; tenantName: string; error: string }>,
+      errors: [] as Array<{ tenantId: string; tenantName: string; error: string }>,
     };
 
     for (const location of locationTenants) {
       try {
         await prisma.tenant_business_profile.upsert({
-          where: { tenant_id: location.id },
+          where: { tenantId: location.id },
           create: {
-            tenant_id: location.id,
+            tenantId: location.id,
             business_name: tenant.businessProfile.businessName,
             addressLine1: tenant.businessProfile.addressLine1,
             addressLine2: tenant.businessProfile.addressLine2,
@@ -1403,7 +1403,7 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
         results.updated++;
       } catch (error: any) {
         results.errors.push({
-          tenant_id: location.id,
+          tenantId: location.id,
           tenantName: location.name,
           error: error.message || 'Unknown error',
         });

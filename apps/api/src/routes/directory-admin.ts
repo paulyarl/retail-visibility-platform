@@ -66,7 +66,7 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
             },
           },
         },
-        orderBy: { updated_at: 'desc' },
+        orderBy: { updatedAt: 'desc' },
         skip,
         take: limitNum,
       }),
@@ -77,11 +77,11 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
     const enrichedListings = await Promise.all(
       listings.map(async (listing) => {
         const profile = await prisma.tenant_business_profile.findUnique({
-          where: { tenant_id: listing.tenant_id },
+          where: { tenantId: listing.tenantId },
         });
 
         const itemCount = await prisma.inventory_item.count({
-          where: { tenant_id: listing.tenant_id, item_status: 'active' },
+          where: { tenantId: listing.tenantId, itemStatus: 'active' },
         });
 
         // Calculate quality score
@@ -150,7 +150,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req: Request, res: 
     });
 
     // Get tenant tiers
-    const tenantIds = listingsByTier.map(l => l.tenant_id);
+    const tenantIds = listingsByTier.map(l => l.tenantId);
     const tenants = await prisma.tenant.findMany({
       where: { id: { in: tenantIds } },
       select: { id: true, subscription_tier: true },
@@ -232,7 +232,7 @@ router.post('/feature/:tenantId', authenticateToken, requireAdmin, async (req: R
         featuredFrom: new Date(),
         featuredUntil,
         placementPriority: parsed.data.placement_priority || 5,
-        created_by: (req as any).user?.user_id,
+        createdBy: (req as any).user?.userId,
       },
     });
 
@@ -242,7 +242,7 @@ router.post('/feature/:tenantId', authenticateToken, requireAdmin, async (req: R
       data: {
         isFeatured: true,
         featuredUntil,
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
     });
 
@@ -267,7 +267,7 @@ router.delete('/unfeature/:tenantId', authenticateToken, requireAdmin, async (re
       data: {
         isFeatured: false,
         featuredUntil: null,
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
     });
 

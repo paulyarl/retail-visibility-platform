@@ -50,7 +50,7 @@ async function getValidAccessToken(accountId: string): Promise<string | null> {
           access_token_encrypted: encryptToken(newTokens.access_token),
           expires_at: newExpiresAt,
           scopes: newTokens.scope.split(' '),
-          updated_at: new Date(),
+          updatedAt: new Date(),
         },
       });
 
@@ -246,7 +246,7 @@ export async function syncMerchantAccount(
           last_sync_at: new Date(),
           sync_status: 'success',
           sync_error: null,
-          updated_at: new Date(),
+          updatedAt: new Date(),
         },
       });
     } else {
@@ -260,8 +260,8 @@ export async function syncMerchantAccount(
           is_active: true,
           last_sync_at: new Date(),
           sync_status: 'success',
-          created_at: new Date(),
-          updated_at: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       });
     }
@@ -277,7 +277,7 @@ export async function syncMerchantAccount(
       data: {
         sync_status: 'error',
         sync_error: error instanceof Error ? error.message : 'Unknown error',
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
     });
     

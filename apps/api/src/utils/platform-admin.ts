@@ -10,7 +10,7 @@
  * - PLATFORM_VIEWER: Read-only access (analytics, sales, legal, compliance)
  */
 
-import { user_role } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 
 /**
  * Check if a user has full platform admin privileges
@@ -18,7 +18,7 @@ import { user_role } from '@prisma/client';
  * @param user - User object with role property (Prisma user_role enum or string)
  * @returns true if user is PLATFORM_ADMIN or legacy ADMIN
  */
-export function isPlatformAdmin(user: { role?: user_role | string } | null | undefined): boolean {
+export function isPlatformAdmin(user: { role?: UserRole | string } | null | undefined): boolean {
   const role = user?.role;
   if (!role) return false;
 
@@ -32,7 +32,7 @@ export function isPlatformAdmin(user: { role?: user_role | string } | null | und
  * @param user - User object with role property (Prisma user_role enum or string)
  * @returns true if user has any platform role
  */
-export function isPlatformUser(user: { role?: user_role | string } | null | undefined): boolean {
+export function isPlatformUser(user: { role?: UserRole | string } | null | undefined): boolean {
   const role = user?.role;
   if (!role) return false;
 
@@ -48,7 +48,7 @@ export function isPlatformUser(user: { role?: user_role | string } | null | unde
  * @param user - User object with role property
  * @returns true if user can view all tenants
  */
-export function canViewAllTenants(user: { role?: user_role | string } | null | undefined): boolean {
+export function canViewAllTenants(user: { role?: UserRole | string } | null | undefined): boolean {
   return isPlatformUser(user);
 }
 
@@ -58,7 +58,7 @@ export function canViewAllTenants(user: { role?: user_role | string } | null | u
  * @param user - User object with role property
  * @returns true if user can modify tenants
  */
-export function canModifyTenants(user: { role?: user_role | string } | null | undefined): boolean {
+export function canModifyTenants(user: { role?: UserRole | string } | null | undefined): boolean {
   return isPlatformAdmin(user);
 }
 
@@ -68,7 +68,7 @@ export function canModifyTenants(user: { role?: user_role | string } | null | un
  * @param user - User object with role property
  * @returns true if user can perform support actions
  */
-export function canPerformSupportActions(user: { role?: user_role | string } | null | undefined): boolean {
+export function canPerformSupportActions(user: { role?: UserRole | string } | null | undefined): boolean {
   const role = user?.role;
   if (!role) return false;
 
@@ -83,7 +83,7 @@ export function canPerformSupportActions(user: { role?: user_role | string } | n
  * @param user - User object with role property
  * @returns true if user is platform viewer
  */
-export function isPlatformViewer(user: { role?: user_role | string } | null | undefined): boolean {
+export function isPlatformViewer(user: { role?: UserRole | string } | null | undefined): boolean {
   const role = user?.role;
   if (!role) return false;
   return role === 'PLATFORM_VIEWER';
@@ -92,7 +92,7 @@ export function isPlatformViewer(user: { role?: user_role | string } | null | un
 /**
  * Type guard for platform admin check
  */
-export function assertPlatformAdmin(user: any): asserts user is { role: user_role | string } {
+export function assertPlatformAdmin(user: any): asserts user is { role: UserRole | string } {
   if (!isPlatformAdmin(user)) {
     throw new Error('Platform administrator access required');
   }
@@ -101,7 +101,7 @@ export function assertPlatformAdmin(user: any): asserts user is { role: user_rol
 /**
  * Type guard for any platform user check
  */
-export function assertPlatformUser(user: any): asserts user is { role: user_role | string } {
+export function assertPlatformUser(user: any): asserts user is { role: UserRole | string } {
   if (!isPlatformUser(user)) {
     throw new Error('Platform-level access required');
   }

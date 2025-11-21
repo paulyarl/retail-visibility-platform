@@ -161,7 +161,7 @@ router.get('/admin/policy/effective', requireAdmin, async (req, res) => {
     // For tenant-specific scope, get from the view
     const result = await prisma.$queryRaw<any[]>`
       SELECT
-        tenant_id as scope,
+        tenantId as scope,
         count_active_private,
         count_preorder,
         count_zero_price,
@@ -169,7 +169,7 @@ router.get('/admin/policy/effective', requireAdmin, async (req, res) => {
         require_currency,
         updated_at
       FROM v_effective_sku_billing_policy
-      WHERE tenant_id = ${scope}
+      WHERE tenantId = ${scope}
       LIMIT 1
     `;
 
@@ -205,7 +205,7 @@ router.get('/admin/policy/compliance', requireAdmin, async (req, res) => {
     const { tenantId } = req.query;
 
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     const report = await getComplianceReport(tenantId as string);

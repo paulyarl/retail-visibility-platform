@@ -23,9 +23,9 @@ router.get('/effective-flags', requirePlatformUser, async (_req, res) => {
 // GET /api/admin/effective-flags/:tenantId - list effective tenant flags (tenant access check)
 router.get('/effective-flags/:tenantId', checkTenantAccess, async (req, res) => {
   try {
-    console.log('[GET /effective-flags/:tenantId] Request received for tenant:', req.params.tenant_id)
+    console.log('[GET /effective-flags/:tenantId] Request received for tenant:', req.params.tenantId)
     const { tenantId } = req.params
-    if (!tenantId) return res.status(400).json({ success: false, error: 'tenant_id_required' })
+    if (!tenantId) return res.status(400).json({ success: false, error: 'tenantId_required' })
 
     // Collect flags from platform and tenant scopes
     const [platform, tenant] = await Promise.all([
@@ -57,7 +57,7 @@ router.post('/flags/override/platform/:flag', async (req, res) => {
 router.post('/flags/override/tenant/:tenantId/:flag', async (req, res) => {
   const { tenantId, flag } = req.params
   const { value } = (req.body || {}) as { value?: boolean | null }
-  if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' })
+  if (!tenantId) return res.status(400).json({ error: 'tenantId_required' })
   if (value === undefined) return res.status(400).json({ error: 'value_required' })
   setTenantOverride(flag, tenantId, value === null ? null : !!value)
   const eff = await getEffectiveTenant(flag, tenantId)

@@ -27,7 +27,7 @@ export async function validateSKULimits(
 ) {
   try {
     const { tenantId, productCount } = req.body;
-    const { tenant_id: paramTenantId } = req.params;
+    const { tenantId: paramTenantId } = req.params;
     
     const actualTenantId = tenantId || paramTenantId;
     
@@ -41,7 +41,7 @@ export async function validateSKULimits(
       select: {
         subscription_tier: true,
         subscription_status: true,
-        trial_ends_at: true,
+        trialEndsAt: true,
         _count: {
           select: { _count: true },
         },
@@ -61,7 +61,7 @@ export async function validateSKULimits(
     const maintenanceState = getMaintenanceState({
       tier,
       status,
-      trial_ends_at: tenant.trialEndsAt ?? undefined,
+      trialEndsAt: tenant.trialEndsAt ?? undefined,
     });
 
     // In maintenance mode, block growth (bulk product creation) even if numeric limits not reached

@@ -73,10 +73,10 @@ export const checkTenantAccess = (req: Request, res: Response, next: NextFunctio
   }
 
   // Get tenant ID from request (params, query, or body)
-  const tenantId = req.params.tenant_id || req.params.id || req.query.tenant_id || req.body.tenant_id;
+  const tenantId = req.params.tenantId || req.params.id || req.query.tenantId || req.body.tenantId;
 
   if (!tenantId) {
-    return res.status(400).json({ error: 'tenant_id_required', message: 'Tenant ID is required' });
+    return res.status(400).json({ error: 'tenantId_required', message: 'Tenant ID is required' });
   }
 
   // Check if user has access to this tenant

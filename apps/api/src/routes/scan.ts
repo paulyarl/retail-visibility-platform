@@ -5,7 +5,7 @@ import { prisma } from '../prisma';
 // import { Flags } from '../config';
 import { audit } from '../audit';
 import { z } from 'zod';
-import { user_role, Prisma } from '@prisma/client';
+import { UserRole, Prisma } from '@prisma/client';
 // import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
 // import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
@@ -23,7 +23,7 @@ import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
 // } from '../metrics';
 
 // Helper to check tenant access
-function hasAccessToTenant(req: Request, tenant_id: string): boolean {
+function hasAccessToTenant(req: Request, tenantId: string): boolean {
   if (!req.user) return false;
   if (isPlatformAdmin(req.user as any)) return true;
   return (req.user as any).tenantIds?.includes(tenantId) || false;
@@ -33,7 +33,7 @@ const router = Router();
 
 // Validation schemas
 const startSessionSchema = z.object({
-  tenant_id: z.string(),
+  tenantId: z.string(),
   templateId: z.string().optional(),
   deviceType: z.enum(['camera', 'usb', 'manual']).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
@@ -66,7 +66,7 @@ router.post('/scan/start', authenticateToken, requireWritableSubscription, /* re
     }
 
     const { tenantId, templateId, deviceType, metadata } = parsed.data;
-    const userId = (req.user as any)?.user_id;
+    const userId = (req.user as any)?.userId;
 
     // Check tenant access
     if (!hasAccessToTenant(req, tenantId)) {
@@ -121,14 +121,14 @@ router.get('/scan/my-sessions', authenticateToken, async (req: Request, res: Res
   console.log('[GET /scan/my-sessions] Called with query:', (req as any).query);
   try {
     const { tenantId } = (req as any).query;
-    const userId = ((req as any).user)?.user_id;
+    const userId = ((req as any).user)?.userId;
 
     if (!userId) {
       return res.status(401).json({ success: false, error: 'unauthorized' });
     }
 
     if (!tenantId || typeof tenantId !== 'string') {
-      return res.status(400).json({ success: false, error: 'tenant_id_required' });
+      return res.status(400).json({ success: false, error: 'tenantId_required' });
     }
 
     // Check tenant access
@@ -182,13 +182,13 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
     }
 
     // Check tenant access
-    if (!hasAccessToTenant(req, session.tenant_id)) {
+    if (!hasAccessToTenant(req, session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
     // Block commit for read-only or inactive subscriptions
     const tenant = await prisma.tenant.findUnique({
-      where: { id: session.tenant_id },
+      where: { id: session.tenantId },
       select: { subscription_tier: true, subscription_status: true },
     });
 
@@ -217,14 +217,14 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
     });
 
     if (existing) {
-      // scanBarcodeDuplicate.inc({ tenant: session.tenant_id });
+      // scanBarcodeDuplicate.inc({ tenant: session.tenantId });
       return res.status(409).json({ success: false, error: 'duplicate_barcode', result: existing });
     }
 
     // Check for duplicates in inventory
     const duplicateItem = await prisma.inventory_item.findFirst({
       where: {
-        tenant_id: session.tenant_id,
+        tenantId: session.tenantId,
         sku: sku || barcode,
       },
       select: { id: true, name: true, sku: true },
@@ -232,13 +232,13 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
 
     // Perform barcode lookup/enrichment using the service
     // const enrichment = Flags.SCAN_ENRICHMENT
-    //   ? await barcodeEnrichmentService.enrich(barcode, session.tenant_id)
+    //   ? await barcodeEnrichmentService.enrich(barcode, session.tenantId)
     //   : null;
 
     // Create scan result
     const result = await prisma.scan_results.create({
       data: {
-        tenant_id: session.tenant_id,
+        tenantId: session.tenantId,
         sessionId,
         barcode,
         sku: sku || barcode,
@@ -259,9 +259,9 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
     });
 
     // Emit metrics
-    // scanBarcodeSuccess.inc({ tenant: session.tenant_id, hasDuplicate: String(!!duplicateItem) });
+    // scanBarcodeSuccess.inc({ tenant: session.tenantId, hasDuplicate: String(!!duplicateItem) });
     // if (duplicateItem) {
-    //   scanBarcodeDuplicate.inc({ tenant: session.tenant_id });
+    //   scanBarcodeDuplicate.inc({ tenant: session.tenantId });
     // }
 
     return res.status(201).json({
@@ -287,7 +287,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
     }
 
     const { skipValidation } = parsed.data;
-    const userId = (req.user as any)?.user_id;
+    const userId = (req.user as any)?.userId;
 
     const session = await prisma.scan_sessions.findUnique({
       where: { id: sessionId },
@@ -308,13 +308,13 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
     }
 
     // Check tenant access
-    if (!hasAccessToTenant(req, session.tenant_id)) {
+    if (!hasAccessToTenant(req, session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
     // Block commit for read-only or inactive subscriptions
     const tenant = await prisma.tenant.findUnique({
-      where: { id: session.tenant_id },
+      where: { id: session.tenantId },
       select: { subscription_tier: true, subscription_status: true },
     });
 
@@ -347,7 +347,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
       if (!validation.valid) {
         // Emit validation error metrics
         // validation.errors.forEach(() => {
-        //   scanValidationError.inc({ tenant: session.tenant_id });
+        //   scanValidationError.inc({ tenant: session.tenantId });
         // });
         return res.status(422).json({ success: false, error: 'validation_failed', validation });
       }
@@ -367,14 +367,14 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
         const stock = enrichment.stock || 0;
         const item = await prisma.inventory_item.create({
           data: {
-            tenant_id: session.tenant_id,
+            tenantId: session.tenantId,
             name: enrichment.name || `Product ${result.barcode}`,
             title: enrichment.name || `Product ${result.barcode}`,
             brand: enrichment.brand || 'Unknown',
             description: enrichment.description || null,
             sku: result.sku || result.barcode,
             price: (enrichment.priceCents || session.template?.defaultPriceCents || 0) / 100,
-            price_cents: enrichment.priceCents || session.template?.defaultPriceCents || 0,
+            priceCents: enrichment.priceCents || session.template?.defaultPriceCents || 0,
             stock: stock,
             currency: session.template?.defaultCurrency || 'USD',
             visibility: (session.template?.defaultVisibility as any) || 'private',
@@ -394,7 +394,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
         //     const imageUrls = imageEnrichmentService.extractImageUrls(enrichment);
         //     if (imageUrls.length > 0) {
         //       const imageCount = await imageEnrichmentService.processProductImages(
-        //         session.tenant_id,
+        //         session.tenantId,
         //         item.id,
         //         item.sku,
         //         imageUrls,
@@ -425,7 +425,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
     // Audit
     try {
       await audit({
-        tenant_id: session.tenant_id,
+        tenantId: session.tenantId,
         actor: userId,
         action: 'scan.session.commit',
         payload: { sessionId, committedCount: committed.length, itemIds: committed },
@@ -434,9 +434,9 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
 
     // Emit metrics
     // const duration = Date.now() - startTime;
-    // scanCommitSuccess.inc({ tenant: session.tenant_id, itemCount: String(committed.length) });
-    // scanCommitDurationMs.observe(duration, { tenant: session.tenant_id });
-    // scanSessionCompleted.inc({ tenant: session.tenant_id });
+    // scanCommitSuccess.inc({ tenant: session.tenantId, itemCount: String(committed.length) });
+    // scanCommitDurationMs.observe(duration, { tenant: session.tenantId });
+    // scanSessionCompleted.inc({ tenant: session.tenantId });
 
     return res.json({ success: true, committed: committed.length, itemIds: committed });
   } catch (error: any) {
@@ -455,7 +455,7 @@ router.get('/scan/:sessionId', authenticateToken, async (req: Request, res: Resp
       include: {
         template: true,
         results: {
-          orderBy: { created_at: 'desc' },
+          orderBy: { createdAt: 'desc' },
           take: 100,
         },
       },
@@ -466,7 +466,7 @@ router.get('/scan/:sessionId', authenticateToken, async (req: Request, res: Resp
     }
 
     // Check tenant access
-    if (!hasAccessToTenant(req, session.tenant_id)) {
+    if (!hasAccessToTenant(req, session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
@@ -481,14 +481,14 @@ router.get('/scan/:sessionId', authenticateToken, async (req: Request, res: Resp
 router.post('/scan/cleanup-my-sessions', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.body;
-    const userId = (req.user as any)?.user_id;
+    const userId = (req.user as any)?.userId;
 
     if (!userId) {
       return res.status(401).json({ success: false, error: 'unauthorized' });
     }
 
     if (!tenantId) {
-      return res.status(400).json({ success: false, error: 'tenant_id_required' });
+      return res.status(400).json({ success: false, error: 'tenantId_required' });
     }
 
     // Check tenant access
@@ -539,7 +539,7 @@ router.post('/scan/cleanup-idle-sessions', async (req: Request, res: Response) =
     // First, find sessions that have recent results (active in last hour)
     const activeSessionIds = await prisma.scan_results.findMany({
       where: {
-        created_at: { gte: oneHourAgo },
+        createdAt: { gte: oneHourAgo },
       },
       select: { sessionId: true },
       distinct: ['sessionId'],
@@ -684,7 +684,7 @@ router.post('/scan/cleanup-idle-sessions', async (req: Request, res: Response) =
 //     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 //     const recentAdditions = await prisma.barcode_enrichment.count({
 //       where: {
-//         created_at: { gte: oneDayAgo },
+//         createdAt: { gte: oneDayAgo },
 //       },
 //     });
 
@@ -760,7 +760,7 @@ router.post('/scan/cleanup-idle-sessions', async (req: Request, res: Response) =
 //           source: true,
 //           fetchCount: true,
 //           lastFetchedAt: true,
-//           created_at: true,
+//           createdAt: true,
 //         },
 //       }),
 //       prisma.barcode_enrichment.count({ where }),
@@ -813,7 +813,7 @@ router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Re
     const user = req.user as any;
 
     // Check tenant access
-    if (!isPlatformAdmin(user) && user.tenant_id !== tenantId) {
+    if (!isPlatformAdmin(user) && user.tenantId !== tenantId) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
@@ -830,7 +830,7 @@ router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Re
         brand: true,
         metadata: true,
         image_url: true,
-        created_at: true,
+        createdAt: true,
       },
     });
 
@@ -855,7 +855,7 @@ router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Re
       where: {
         tenantId,
         sku: { not: '' },
-        created_at: { gte: thirtyDaysAgo },
+        createdAt: { gte: thirtyDaysAgo },
       },
     });
 
@@ -864,7 +864,7 @@ router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Re
       where: {
         tenantId,
         sku: { not: '' },
-        created_at: { gte: sevenDaysAgo },
+        createdAt: { gte: sevenDaysAgo },
       },
     });
 
@@ -1057,7 +1057,7 @@ router.patch('/scan/:sessionId/results/:resultId/enrichment', authenticateToken,
     }
 
     // Check tenant access
-    if (!hasAccessToTenant(req, result.tenant_id)) {
+    if (!hasAccessToTenant(req, result.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
@@ -1100,7 +1100,7 @@ router.delete('/scan/:sessionId/results/:resultId', authenticateToken, async (re
     }
 
     // Check tenant access
-    if (!hasAccessToTenant(req, result.session.tenant_id)) {
+    if (!hasAccessToTenant(req, result.session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
@@ -1137,7 +1137,7 @@ router.delete('/scan/:sessionId', authenticateToken, async (req, res) => {
     }
 
     // Check tenant access
-    if (!hasAccessToTenant(req, session.tenant_id)) {
+    if (!hasAccessToTenant(req, session.tenantId)) {
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 

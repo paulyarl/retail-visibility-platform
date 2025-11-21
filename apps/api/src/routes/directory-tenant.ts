@@ -99,7 +99,7 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
 router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   console.log('[PATCH /tenants/:id/directory/listing] ===== REQUEST RECEIVED =====');
   console.log('[PATCH /tenants/:id/directory/listing] Tenant ID:', req.params.id);
-  console.log('[PATCH /tenants/:id/directory/listing] User:', req.user?.user_id);
+  console.log('[PATCH /tenants/:id/directory/listing] User:', req.user?.userId);
   console.log('[PATCH /tenants/:id/directory/listing] Body:', JSON.stringify(req.body, null, 2));
   console.log('[PATCH /tenants/:id/directory/listing] Headers:', {
     'content-type': req.headers['content-type'],
@@ -126,7 +126,7 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
         seoKeywords: parsed.data.seo_keywords,
         primaryCategory: parsed.data.primary_category,
         secondaryCategories: parsed.data.secondary_categories,
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
       create: {
         tenantId,
@@ -177,7 +177,7 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
 
     const updated = await prisma.directory_settings.upsert({
       where: { tenantId },
-      update: { isPublished: true, updated_at: new Date() },
+      update: { isPublished: true, updatedAt: new Date() },
       create: { tenantId, isPublished: true },
     });
 
@@ -198,7 +198,7 @@ router.post('/:id/directory/unpublish', authenticateToken, checkTenantAccess, as
 
     const updated = await prisma.directory_settings.update({
       where: { tenantId },
-      data: { isPublished: false, updated_at: new Date() },
+      data: { isPublished: false, updatedAt: new Date() },
     });
 
     return res.json({ success: true, listing: updated });

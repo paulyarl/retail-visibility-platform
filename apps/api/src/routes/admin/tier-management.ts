@@ -233,15 +233,15 @@ router.get('/tenants', async (req, res) => {
         where,
         skip,
         take: limitNum,
-        orderBy: { created_at: 'desc' },
+        orderBy: { createdAt: 'desc' },
         select: {
           id: true,
           name: true,
           subscription_tier: true,
           subscription_status: true,
-          trial_ends_at: true,
+          trialEndsAt: true,
           subscription_ends_at: true,
-          created_at: true,
+          createdAt: true,
           organizationId: true,
           organization: {
             select: {
@@ -345,7 +345,7 @@ const updateTenantTierSchema = z.object({
     'expired',
   ]).optional(),
   reason: z.string().min(1, 'Reason is required for audit trail'),
-  trial_ends_at: z.string().datetime().optional(),
+  trialEndsAt: z.string().datetime().optional(),
   subscription_ends_at: z.string().datetime().optional(),
 });
 
@@ -371,7 +371,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
         name: true,
         subscription_tier: true,
         subscription_status: true,
-        trial_ends_at: true,
+        trialEndsAt: true,
         subscription_ends_at: true,
         _count: {
           select: {
@@ -427,23 +427,23 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     // Create audit log
     await audit({
       tenantId,
-      actor: req.user?.user_id || 'system',
+      actor: req.user?.userId || 'system',
       action: 'tier.update',
       payload: {
         reason,
         before: {
           subscription_tier: currentTenant.subscriptionTier,
           subscription_status: currentTenant.subscription_status,
-          trial_ends_at: currentTenant.trialEndsAt,
+          trialEndsAt: currentTenant.trialEndsAt,
           subscription_ends_at: currentTenant.subscriptionEndsAt,
         },
         after: {
           subscription_tier: updatedTenant.subscriptionTier,
           subscription_status: updatedTenant.subscription_status,
-          trial_ends_at: updatedTenant.trialEndsAt,
+          trialEndsAt: updatedTenant.trialEndsAt,
           subscription_ends_at: updatedTenant.subscriptionEndsAt,
         },
-        adminUserId: req.user?.user_id,
+        adminUserId: req.user?.userId,
         adminEmail: req.user?.email,
       },
     });
@@ -618,8 +618,8 @@ router.post('/bulk-update', async (req, res) => {
     // Create audit logs for each tenant
     for (const tenant of tenants) {
       await audit({
-        tenant_id: tenant.id,
-        actor: req.user?.user_id || 'system',
+        tenantId: tenant.id,
+        actor: req.user?.userId || 'system',
         action: 'tier.bulk_update',
         payload: {
           reason,
@@ -628,7 +628,7 @@ router.post('/bulk-update', async (req, res) => {
             subscription_status: tenant.subscription_status,
           },
           after: updateData,
-          adminUserId: req.user?.user_id,
+          adminUserId: req.user?.userId,
           adminEmail: req.user?.email,
           bulkOperation: true,
         },

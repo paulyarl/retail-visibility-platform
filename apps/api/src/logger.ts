@@ -1,5 +1,5 @@
 /**
- * Logger with observability tags (tenant_id, region)
+ * Logger with observability tags (tenantId, region)
  * REQ: REQ-2025-904
  */
 import type { Request } from "express";
@@ -12,7 +12,7 @@ export function logWithContext(req: Request, level: "info" | "warn" | "error", m
     timestamp: new Date().toISOString(),
     level,
     message,
-    tenant_id: ctx?.tenant_id || null,
+    tenantId: ctx?.tenantId || null,
     region: ctx?.region || "us-east-1",
     method: req.method,
     path: req.path,

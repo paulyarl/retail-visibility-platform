@@ -48,7 +48,7 @@ async function cleanup() {
     // Delete all items from tenants
     for (const tenant of org.tenants) {
       await prisma.inventory_item.deleteMany({
-        where: { tenant_id: tenant.id },
+        where: { tenantId: tenant.id },
       });
     }
     
@@ -132,19 +132,19 @@ async function createTestProducts(ctx: TestContext): Promise<void> {
   for (let i = 1; i <= NUM_TEST_PRODUCTS; i++) {
     const item = await prisma.inventory_item.create({
       data: {
-        tenant_id: ctx.heroTenantId,
+        tenantId: ctx.heroTenantId,
         sku: `TEST-SKU-${String(i).padStart(3, '0')}`,
         name: `Test Product ${i}`,
         title: `Test Product ${i} - Full Title`,
         brand: 'Test Brand',
         description: `This is a test product #${i} for chain propagation testing`,
         price: 19.99 + i,
-        price_cents: Math.round((19.99 + i) * 100),
+        priceCents: Math.round((19.99 + i) * 100),
         stock: 100,
         quantity: 100,
         currency: 'USD',
         availability: 'in_stock',
-        item_status: 'active',
+        itemStatus: 'active',
         visibility: 'public',
         source: 'MANUAL',
         enrichmentStatus: 'COMPLETE',
@@ -177,14 +177,14 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
   // Create copy at target
   const newItem = await prisma.inventory_item.create({
     data: {
-      tenant_id: targetTenantIds[0],
+      tenantId: targetTenantIds[0],
       sku: sourceItem.sku,
       name: sourceItem.name,
       title: sourceItem.title,
       brand: sourceItem.brand,
       description: sourceItem.description,
       price: sourceItem.price,
-      price_cents: sourceItem.priceCents,
+      priceCents: sourceItem.priceCents,
       stock: sourceItem.stock,
       quantity: sourceItem.quantity,
       image_url: sourceItem.image_url,
@@ -196,7 +196,7 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
       condition: sourceItem.condition,
       currency: sourceItem.currency,
       gtin: sourceItem.gtin,
-      item_status: sourceItem.itemStatus,
+      itemStatus: sourceItem.itemStatus,
       mpn: sourceItem.mpn,
       visibility: sourceItem.visibility,
       manufacturer: sourceItem.manufacturer,
@@ -210,7 +210,7 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
   // Verify
   const targetItem = await prisma.inventory_item.findFirst({
     where: {
-      tenant_id: targetTenantIds[0],
+      tenantId: targetTenantIds[0],
       sku: sourceItem.sku,
     },
   });
@@ -234,7 +234,7 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
   
   // Get all items from hero location
   const heroItems = await prisma.inventory_item.findMany({
-    where: { tenant_id: ctx.heroTenantId },
+    where: { tenantId: ctx.heroTenantId },
     include: { photos: true },
   });
   
@@ -250,7 +250,7 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
         // Check if already exists
         const existing = await prisma.inventory_item.findFirst({
           where: {
-            tenant_id: targetTenantId,
+            tenantId: targetTenantId,
             sku: item.sku,
           },
         });
@@ -263,14 +263,14 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
         // Create copy
         await prisma.inventory_item.create({
           data: {
-            tenant_id: targetTenantId,
+            tenantId: targetTenantId,
             sku: item.sku,
             name: item.name,
             title: item.title,
             brand: item.brand,
             description: item.description,
             price: item.price,
-            price_cents: item.priceCents,
+            priceCents: item.priceCents,
             stock: item.stock,
             quantity: item.quantity,
             image_url: item.image_url,
@@ -282,7 +282,7 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
             condition: item.condition,
             currency: item.currency,
             gtin: item.gtin,
-            item_status: item.itemStatus,
+            itemStatus: item.itemStatus,
             mpn: item.mpn,
             visibility: item.visibility,
             manufacturer: item.manufacturer,

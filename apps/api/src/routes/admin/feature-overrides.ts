@@ -16,7 +16,7 @@ const router = Router();
 
 // Validation schemas
 const createOverrideSchema = z.object({
-  tenant_id: z.string().min(1, 'Tenant ID is required'),
+  tenantId: z.string().min(1, 'Tenant ID is required'),
   feature: z.string().min(1, 'Feature name is required'),
   granted: z.boolean(),
   reason: z.string().optional(),
@@ -56,7 +56,7 @@ router.get('/', authenticateToken, requirePlatformAdmin, async (req: Request, re
     const where: any = {};
     
     if (tenantId) {
-      where.tenant_id = String(tenantId);
+      where.tenantId = String(tenantId);
     }
     
     if (feature) {
@@ -87,7 +87,7 @@ router.get('/', authenticateToken, requirePlatformAdmin, async (req: Request, re
           }
         }
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     // Add computed fields
@@ -163,7 +163,7 @@ router.get('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
  */
 router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.user_id;
+    const userId = (req as any).user?.userId;
     
     if (!userId) {
       return res.status(401).json({
@@ -177,7 +177,7 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
 
     // Check if tenant exists
     const tenant = await prisma.tenant.findUnique({
-      where: { id: body.tenant_id },
+      where: { id: body.tenantId },
       select: { 
         id: true, 
         name: true, 
@@ -197,7 +197,7 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
     const existing = await prisma.tenant_feature_overrides.findUnique({
       where: {
         tenantId_feature: {
-          tenant_id: body.tenant_id,
+          tenantId: body.tenantId,
           feature: body.feature,
         }
       }
@@ -214,7 +214,7 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
     // Create override
     const override = await prisma.tenant_feature_overrides.create({
       data: {
-        tenant_id: body.tenant_id,
+        tenantId: body.tenantId,
         feature: body.feature,
         granted: body.granted,
         reason: body.reason,
@@ -264,7 +264,7 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
 router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.user_id;
+    const userId = (req as any).user?.userId;
 
     if (!userId) {
       return res.status(401).json({
@@ -291,7 +291,7 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
     // Update override
     const updateData: any = {
       grantedBy: userId, // Track who made the update
-      updated_at: new Date(),
+      updatedAt: new Date(),
     };
 
     if (body.granted !== undefined) {
@@ -352,7 +352,7 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
 router.delete('/:id', authenticateToken, requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.user_id;
+    const userId = (req as any).user?.userId;
 
     // Get override details before deleting (for logging)
     const override = await prisma.tenant_feature_overrides.findUnique({
@@ -413,7 +413,7 @@ router.get('/tenant/:tenantId', authenticateToken, requirePlatformAdmin, async (
 
     const overrides = await prisma.tenant_feature_overrides.findMany({
       where,
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     const enrichedOverrides = overrides.map(override => ({

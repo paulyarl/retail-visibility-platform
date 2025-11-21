@@ -15,7 +15,7 @@ function normalizeSku(v: unknown) {
   return typeof v === 'string' ? v.trim() : null
 }
 
-async function getGoogleCategoryIdForItem(tenant_id: string, category_path: string[] | null) {
+async function getGoogleCategoryIdForItem(tenantId: string, category_path: string[] | null) {
   if (!Array.isArray(categoryPath) || categoryPath.length === 0) return null
   const slug = categoryPath[categoryPath.length - 1]
   const tenantCat = await prisma.tenant_category.findFirst({ where: { tenantId, slug, isActive: true } })
@@ -24,7 +24,7 @@ async function getGoogleCategoryIdForItem(tenant_id: string, category_path: stri
 
 router.post('/:tenantId/feed/precheck', async (req, res) => {
   try {
-    const tenantId = req.params.tenant_id
+    const tenantId = req.params.tenantId
     const limit = Math.min(parseInt(String(req.query.limit || '1000')), 5000)
     const items = await prisma.inventory_item.findMany({ where: { tenantId }, take: isNaN(limit) ? 1000 : limit })
 
@@ -52,7 +52,7 @@ router.post('/:tenantId/feed/precheck', async (req, res) => {
 
 router.get('/:tenantId/feed/validate', async (req, res) => {
   try {
-    const tenantId = req.params.tenant_id
+    const tenantId = req.params.tenantId
     const items = await prisma.inventory_item.findMany({ where: { tenantId } })
 
     const errors: any[] = []
@@ -100,7 +100,7 @@ router.get('/:tenantId/feed/validate', async (req, res) => {
 
 router.post('/:tenantId/feed/serialize', async (req, res) => {
   try {
-    const tenantId = req.params.tenant_id
+    const tenantId = req.params.tenantId
     const opts = serializeOptionsSchema.parse(req.body || {})
     const where: any = { tenantId }
     if (!opts.includeInactive) where.itemStatus = 'active'
@@ -143,16 +143,16 @@ router.get('/:tenantId/categories/coverage', async (req, res) => {
   }
 
   try {
-    const tenantId = req.params.tenant_id
+    const tenantId = req.params.tenantId
     // Total active, public items for tenant
-    const total = await prisma.inventory_item.count({ where: { tenantId, item_status: 'active', visibility: 'public' } })
+    const total = await prisma.inventory_item.count({ where: { tenantId, itemStatus: 'active', visibility: 'public' } })
 
     // Mapped _count: join inventory_item to tenant_category by leaf slug of category_path
     const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `SELECT COUNT(*) AS count
        FROM inventory_item ii
        JOIN tenant_category tc
-         ON tc.tenant_id = ii.tenant_id
+         ON tc.tenantId = ii.tenantId
         AND tc.is_active = TRUE
         AND (
           CASE WHEN ii.categoryPath IS NOT NULL AND array_length(ii.categoryPath, 1) > 0
@@ -160,7 +160,7 @@ router.get('/:tenantId/categories/coverage', async (req, res) => {
                ELSE NULL
           END
         ) = tc.slug
-       WHERE ii.tenant_id = $1
+       WHERE ii.tenantId = $1
          AND ii.itemStatus = 'active'
          AND ii.visibility = 'public'
          AND tc.google_category_id IS NOT NULL`,

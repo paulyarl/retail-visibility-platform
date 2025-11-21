@@ -310,7 +310,7 @@ export function convertDemoItemToRVPFormat(demoItem: DemoItem) {
     brand: 'Demo Brand', // Required field
     description: demoItem.description || '',
     price: demoItem.price / 100, // Convert cents to dollars for price field
-    price_cents: demoItem.price,
+    priceCents: demoItem.price,
     currency: 'USD',
     stock: demoItem.stock,
     availability: demoItem.stock > 0 ? availability_status.in_stock : availability_status.out_of_stock,

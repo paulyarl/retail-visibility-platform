@@ -45,7 +45,7 @@ router.get('/status', authenticateToken, async (req, res) => {
     if (req.user.role === 'PLATFORM_SUPPORT') {
       const ownedTenants = await prisma.user_tenants.count({
         where: {
-          user_id: req.user.user_id,
+          userId: req.user.userId,
           role: 'OWNER',
         },
       });
@@ -81,7 +81,7 @@ router.get('/status', authenticateToken, async (req, res) => {
     // Get user's owned tenants
     const ownedTenants = await prisma.user_tenants.findMany({
       where: {
-        user_id: req.user.user_id,
+        userId: req.user.userId,
         role: user_tenant_role.OWNER,
       },
       include: {

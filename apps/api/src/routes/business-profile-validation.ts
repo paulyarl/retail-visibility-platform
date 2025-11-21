@@ -42,7 +42,7 @@ function completenessScore(bp: any) {
 // POST /tenant/:tenantId/profile/validate
 router.post('/tenant/:tenantId/profile/validate', async (req, res) => {
   try {
-    const tenantId = req.params.tenant_id
+    const tenantId = req.params.tenantId
     const parsed = napSchema.safeParse(req.body || {})
     if (!parsed.success) {
       return res.status(400).json({ success: false, error: 'validation_failed', details: parsed.error.flatten() })
@@ -58,7 +58,7 @@ router.post('/tenant/:tenantId/profile/validate', async (req, res) => {
 // GET /tenant/:tenantId/profile/completeness
 router.get('/tenant/:tenantId/profile/completeness', async (req, res) => {
   try {
-    const tenantId = req.params.tenant_id
+    const tenantId = req.params.tenantId
     const bp = await prisma.tenant_business_profile.findUnique({ where: { tenantId } })
     if (!bp) return res.status(404).json({ success: false, error: 'profile_not_found' })
 
@@ -80,7 +80,7 @@ const geocodeSchema = z.object({
 })
 router.post('/tenant/:tenantId/profile/geocode', async (req, res) => {
   try {
-    const tenantId = req.params.tenant_id
+    const tenantId = req.params.tenantId
     const parsed = geocodeSchema.safeParse(req.body || {})
     if (!parsed.success) return res.status(400).json({ success: false, error: 'invalid_request', details: parsed.error.flatten() })
 

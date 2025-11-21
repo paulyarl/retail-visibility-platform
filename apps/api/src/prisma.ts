@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { createFlexiblePrisma } from './lib/prisma-flexible';
 
 // Ensure a single PrismaClient in dev (nodemon hot reload safe)
 const globalForPrisma = global as unknown as { prisma?: PrismaClient };
@@ -75,7 +76,7 @@ async function withRetry<T>(
 }
 
 // Wrap Prisma client with retry logic
-export const prisma = new Proxy(basePrisma, {
+const basePrismaWithRetry = new Proxy(basePrisma, {
   get(target, prop) {
     const original = target[prop as keyof typeof target];
     
@@ -101,6 +102,9 @@ export const prisma = new Proxy(basePrisma, {
   },
 });
 
+// Apply flexible naming convention wrapper
+export const prisma = createFlexiblePrisma(basePrismaWithRetry);
+
 // Graceful shutdown for production
 if (process.env.NODE_ENV === 'production') {
   // Vercel serverless functions should disconnect after each request
@@ -110,7 +114,7 @@ if (process.env.NODE_ENV === 'production') {
   });
 } else {
   // Development: reuse connection
-  globalForPrisma.prisma = prisma;
+  globalForPrisma.prisma = basePrismaWithRetry;
 }
 
 // Health check helper

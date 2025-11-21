@@ -7,11 +7,11 @@ const router = Router();
 // GET /api/admin/mirror/last-run?tenantId=...&strategy=platform_to_gbp|gbp_to_platform
 router.get('/api/admin/mirror/last-run', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const tenantId = (req.query.tenant_id ? String(req.query.tenant_id) : null) as string | null;
+    const tenantId = (req.query.tenantId ? String(req.query.tenantId) : null) as string | null;
     const strategy = req.query.strategy ? String(req.query.strategy) : 'platform_to_gbp';
 
     const row = await prisma.category_mirror_runs.findFirst({
-      where: { tenant_id: tenantId ?? null, strategy },
+      where: { tenantId: tenantId ?? null, strategy },
       orderBy: { started_at: 'desc' },
     });
 

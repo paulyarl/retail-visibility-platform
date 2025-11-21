@@ -9,7 +9,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export interface CreateIntegrationData {
-  tenant_id: string;
+  tenantId: string;
   accessToken: string;
   refreshToken?: string;
   merchantId: string;
@@ -29,7 +29,7 @@ export interface UpdateIntegrationData {
 }
 
 export interface CreateProductMappingData {
-  tenant_id: string;
+  tenantId: string;
   integrationId: string;
   inventoryItemId: string;
   squareCatalogObjectId: string;
@@ -37,7 +37,7 @@ export interface CreateProductMappingData {
 }
 
 export interface CreateSyncLogData {
-  tenant_id: string;
+  tenantId: string;
   integrationId: string;
   mappingId?: string;
   syncType: 'inventory' | 'catalog' | 'webhook' | 'manual';
@@ -58,9 +58,9 @@ export class SquareIntegrationRepository {
    */
   async createIntegration(data: CreateIntegrationData) {
     return await prisma.square_integrations.upsert({
-      where: { tenant_id: data.tenant_id },
+      where: { tenantId: data.tenantId },
       create: {
-        tenant_id: data.tenant_id,
+        tenantId: data.tenantId,
         accessToken: data.accessToken,
         refreshToken: data.refreshToken || null,
         merchantId: data.merchantId,
@@ -84,7 +84,7 @@ export class SquareIntegrationRepository {
   /**
    * Get integration by tenant ID
    */
-  async getIntegrationByTenantId(tenant_id: string) {
+  async getIntegrationByTenantId(tenantId: string) {
     return await prisma.square_integrations.findUnique({
       where: { tenantId },
     });
@@ -161,16 +161,16 @@ export class SquareIntegrationRepository {
   async createProductMapping(data: CreateProductMappingData) {
     return prisma.$executeRaw`
       INSERT INTO square_product_mappings (
-        tenant_id, integration_id, inventory_item_id,
+        tenantId, integration_id, inventory_item_id,
         square_catalog_object_id, square_item_variation_id
       ) VALUES (
-        ${data.tenant_id}::uuid,
+        ${data.tenantId}::uuid,
         ${data.integrationId}::uuid,
         ${data.inventoryItemId}::uuid,
         ${data.squareCatalogObjectId},
         ${data.squareItemVariationId || null}
       )
-      ON CONFLICT (tenant_id, inventory_item_id) DO UPDATE SET
+      ON CONFLICT (tenantId, inventory_item_id) DO UPDATE SET
         square_catalog_object_id = EXCLUDED.square_catalog_object_id,
         square_item_variation_id = EXCLUDED.square_item_variation_id,
         updated_at = NOW()
@@ -181,10 +181,10 @@ export class SquareIntegrationRepository {
   /**
    * Get product mapping by inventory item ID
    */
-  async getProductMappingByInventoryItemId(tenant_id: string, inventoryItemId: string) {
+  async getProductMappingByInventoryItemId(tenantId: string, inventoryItemId: string) {
     const result = await prisma.$queryRaw<any[]>`
       SELECT * FROM square_product_mappings
-      WHERE tenant_id = ${tenantId}::uuid
+      WHERE tenantId = ${tenantId}::uuid
         AND inventory_item_id = ${inventoryItemId}::uuid
       LIMIT 1
     `;
@@ -207,10 +207,10 @@ export class SquareIntegrationRepository {
   /**
    * Get all product mappings for a tenant
    */
-  async getProductMappingsByTenantId(tenant_id: string) {
+  async getProductMappingsByTenantId(tenantId: string) {
     return prisma.$queryRaw<any[]>`
       SELECT * FROM square_product_mappings
-      WHERE tenant_id = ${tenantId}::uuid
+      WHERE tenantId = ${tenantId}::uuid
       ORDER BY created_at DESC
     `;
   }
@@ -231,11 +231,11 @@ export class SquareIntegrationRepository {
   async createSyncLog(data: CreateSyncLogData) {
     return prisma.$executeRaw`
       INSERT INTO square_sync_logs (
-        tenant_id, integration_id, mapping_id, sync_type, direction,
+        tenantId, integration_id, mapping_id, sync_type, direction,
         operation, status, error_message, error_code, request_payload,
         response_payload, items_affected, duration_ms
       ) VALUES (
-        ${data.tenant_id}::uuid,
+        ${data.tenantId}::uuid,
         ${data.integrationId}::uuid,
         ${data.mappingId || null}::uuid,
         ${data.syncType},
@@ -256,10 +256,10 @@ export class SquareIntegrationRepository {
   /**
    * Get recent sync logs for a tenant
    */
-  async getSyncLogsByTenantId(tenant_id: string, limit: number = 100) {
+  async getSyncLogsByTenantId(tenantId: string, limit: number = 100) {
     return prisma.$queryRaw<any[]>`
       SELECT * FROM square_sync_logs
-      WHERE tenant_id = ${tenantId}::uuid
+      WHERE tenantId = ${tenantId}::uuid
       ORDER BY created_at DESC
       LIMIT ${limit}
     `;
@@ -268,10 +268,10 @@ export class SquareIntegrationRepository {
   /**
    * Get sync logs by status
    */
-  async getSyncLogsByStatus(tenant_id: string, status: string, limit: number = 100) {
+  async getSyncLogsByStatus(tenantId: string, status: string, limit: number = 100) {
     return prisma.$queryRaw<any[]>`
       SELECT * FROM square_sync_logs
-      WHERE tenant_id = ${tenantId}::uuid
+      WHERE tenantId = ${tenantId}::uuid
         AND status = ${status}
       ORDER BY created_at DESC
       LIMIT ${limit}

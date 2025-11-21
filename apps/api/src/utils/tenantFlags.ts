@@ -4,7 +4,7 @@ type CacheVal = { enabled: boolean; ts: number }
 const cache = new Map<string, CacheVal>()
 const TTL_MS = 30_000
 
-export async function isTenantFlagOn(tenant_id: string, flag: string): Promise<boolean> {
+export async function isTenantFlagOn(tenantId: string, flag: string): Promise<boolean> {
   const key = `${tenantId}:${flag}`
   const now = Date.now()
   const hit = cache.get(key)

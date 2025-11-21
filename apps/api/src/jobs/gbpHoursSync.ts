@@ -3,7 +3,7 @@ import { prisma } from '../prisma'
 import { audit } from '../audit'
 
 export type GbpHoursPayload = {
-  tenant_id: string
+  tenantId: string
 }
 
 async function sleep(ms: number) {
@@ -14,17 +14,17 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
   const { tenantId } = payload
   // Load platform hours (source of truth)
   const hours = await prisma.business_hours.upsert({
-    where: { tenant_id: tenantId },
+    where: { tenantId: tenantId },
     update: {},
     create: {
       id: randomUUID(),
-      tenant_id: tenantId,
+      tenantId: tenantId,
       timezone: 'America/New_York',
       periods: [] as any,
-      updated_at: new Date(),
+      updatedAt: new Date(),
     },
   })
-  const specials = await prisma.business_hours_special.findMany({ where: { tenant_id: tenantId } })
+  const specials = await prisma.business_hours_special.findMany({ where: { tenantId: tenantId } })
 
   // Build GBP payload (shape simplified)
   // Note: GBP supports multiple special hour periods per date
@@ -86,8 +86,8 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
       }
 
       await prisma.business_hours.update({
-        where: { tenant_id: tenantId },
-        data: { last_synced_at: new Date(), sync_attempts: attempt, last_error: null, updated_at: new Date() },
+        where: { tenantId: tenantId },
+        data: { last_synced_at: new Date(), sync_attempts: attempt, last_error: null, updatedAt: new Date() },
       })
 
       try {
@@ -102,7 +102,7 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
     }
   }
 
-  await prisma.business_hours.update({ where: { tenant_id: tenantId }, data: { sync_attempts: attempt, last_error: lastError, updated_at: new Date() } })
+  await prisma.business_hours.update({ where: { tenantId: tenantId }, data: { sync_attempts: attempt, last_error: lastError, updatedAt: new Date() } })
   try {
     await audit({ tenantId, actor: null, action: 'sync', payload: { entity: 'gbp.hours', ok: false, error: lastError } as any })
   } catch {}
