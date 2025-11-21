@@ -11,7 +11,7 @@ console.log('[Effective Flags Router] Initializing routes...')
 router.get('/effective-flags', requirePlatformUser, async (_req, res) => {
   try {
     const rows = await prisma.platform_feature_flags.findMany({ orderBy: { flag: 'asc' } })
-    const flags = [...new Set(rows.map(r => r.flag))]
+    const flags = [...new Set(rows.map(r => r.flag as string))]
     const effective = await Promise.all(flags.map(f => getEffectivePlatform(f)))
     res.json({ success: true, data: effective })
   } catch (e: any) {
@@ -32,7 +32,7 @@ router.get('/effective-flags/:tenantId', checkTenantAccess, async (req, res) => 
       prisma.platform_feature_flags.findMany({ orderBy: { flag: 'asc' } }),
       prisma.tenant_feature_flags.findMany({ where: { tenantId }, orderBy: { flag: 'asc' } }),
     ])
-    const allFlags = new Set<string>([...platform.map(p => p.flag), ...tenant.map(t => t.flag)])
+    const allFlags = new Set<string>([...platform.map(p => p.flag as string), ...tenant.map(t => t.flag as string)])
     const effective = await Promise.all(Array.from(allFlags).sort().map(f => getEffectiveTenant(f, tenantId)))
     res.json({ success: true, data: effective })
   } catch (e: any) {
