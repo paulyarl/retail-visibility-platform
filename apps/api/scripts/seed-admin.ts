@@ -3,8 +3,9 @@
  * Run with: doppler run --config local -- npx tsx scripts/seed-admin.ts
  */
 
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, user_role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -16,7 +17,7 @@ async function seedAdmin() {
     password: 'Admin123!',
     firstName: 'Admin',
     lastName: 'User',
-    role: UserRole.ADMIN,
+    role: user_role.ADMIN,
   };
 
   try {
@@ -42,12 +43,14 @@ async function seedAdmin() {
     // Create admin user
     const admin = await prisma.user.create({
       data: {
+        id: crypto.randomUUID(),
         email: adminData.email,
         passwordHash,
         firstName: adminData.firstName,
         lastName: adminData.lastName,
         role: adminData.role,
         emailVerified: true, // Auto-verify admin
+        updatedAt: new Date(),
       },
     });
 

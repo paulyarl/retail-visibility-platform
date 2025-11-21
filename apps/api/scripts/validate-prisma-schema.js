@@ -54,9 +54,9 @@ class PrismaSchemaValidator {
         currentModel = modelMatch[1];
         modelHasMap = false;
         
-        // Check if model name is camelCase
-        if (!this.isCamelCase(currentModel)) {
-          this.errors.push(`❌ Model "${currentModel}" should use camelCase (line ${i + 1})`);
+        // Check if model name is PascalCase
+        if (!this.isPascalCase(currentModel)) {
+          this.errors.push(`❌ Model "${currentModel}" should use PascalCase (line ${i + 1})`);
         }
         continue;
       }
@@ -117,7 +117,7 @@ class PrismaSchemaValidator {
         }
 
         // Check if field name is camelCase
-        if (!this.isCamelCase(fieldName)) {
+        if (!this.isCamelCaseField(fieldName)) {
           this.errors.push(`❌ Field "${fieldName}" should use camelCase (line ${i + 1})`);
         }
 
@@ -164,21 +164,33 @@ class PrismaSchemaValidator {
         const modelName = relationMatch[2].replace(/\?|\[\]$/, '');
         
         // Check if relation field is camelCase
-        if (!this.isCamelCase(fieldName)) {
+        if (!this.isCamelCaseField(fieldName)) {
           this.errors.push(`❌ Relation field "${fieldName}" should use camelCase (line ${i + 1})`);
         }
 
-        // Check if referenced model is camelCase
-        if (!this.isCamelCase(modelName)) {
-          this.warnings.push(`⚠️  Referenced model "${modelName}" should use camelCase (line ${i + 1})`);
+        // Check if referenced model is PascalCase
+        if (!this.isPascalCase(modelName)) {
+          this.warnings.push(`⚠️  Referenced model "${modelName}" should use PascalCase (line ${i + 1})`);
         }
       }
     }
   }
 
   isCamelCase(str) {
+    // For models: PascalCase (starts with uppercase)
+    // For fields: camelCase (starts with lowercase)
+    // This function handles both cases
+    return /^[a-zA-Z][a-zA-Z0-9]*$/.test(str) && !str.includes('_');
+  }
+
+  isPascalCase(str) {
+    // Must start with uppercase letter, can contain uppercase letters
+    return /^[A-Z][a-zA-Z0-9]*$/.test(str) && !str.includes('_');
+  }
+
+  isCamelCaseField(str) {
     // Must start with lowercase letter, can contain uppercase letters
-    return /^[a-z][a-zA-Z0-9]*$/.test(str);
+    return /^[a-z][a-zA-Z0-9]*$/.test(str) && !str.includes('_');
   }
 
   isSnakeCase(str) {

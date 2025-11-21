@@ -48,30 +48,45 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
         tenant: tenant
       }));
     } else {
-      // Regular user - get only their memberships
-      const user = await prisma.users.findUnique({
-        where: { id: userId },
-        include: {
-          tenant: {
-            include: {
-              tenant: {
-                select: {
-                  id: true,
-                  name: true,
-                  organizationId: true,
-                }
-              }
-            }
+      // Regular user - get only their memberships (avoid complex relations)
+      try {
+        const userTenantMemberships = await prisma.userTenant.findMany({
+          where: { userId },
+          select: {
+            tenantId: true,
+            role: true,
           }
-        }
-      });
+        });
 
-      if (!user) {
-        console.error(`[Dashboard] User not found: ${userId}`);
-        return res.status(404).json({ error: 'User not found' });
+        if (userTenantMemberships.length === 0) {
+          console.warn(`[Dashboard] No tenant memberships found for user: ${userId}`);
+          userTenants = [];
+        } else {
+          // Get tenant details separately
+          const tenantIds = userTenantMemberships.map(ut => ut.tenantId);
+          const tenants = await prisma.tenant.findMany({
+            where: { id: { in: tenantIds } },
+            select: {
+              id: true,
+              name: true,
+              organizationId: true,
+            }
+          });
+
+          // Combine membership and tenant data
+          userTenants = userTenantMemberships.map(membership => {
+            const tenant = tenants.find(t => t.id === membership.tenantId);
+            return {
+              tenant_id: membership.tenantId,
+              role: membership.role,
+              tenant: tenant || { id: membership.tenantId, name: 'Unknown', organizationId: null }
+            };
+          });
+        }
+      } catch (userError) {
+        console.error(`[Dashboard] Error fetching user tenants: ${userError.message}`);
+        userTenants = [];
       }
-      
-      userTenants = user.tenants;
     }
 
     if (!userTenants.length) {
@@ -89,8 +104,8 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
       });
     }
 
-    // Get tenant ID from query param
-    const requestedTenantId = req.query.tenant_id as string | undefined;
+    // Get tenant ID from query param (support both tenantId and tenant_id)
+    const requestedTenantId = (req.query.tenantId || req.query.tenant_id) as string | undefined;
     
     // Find the requested tenant in user's memberships
     let targetMembership = requestedTenantId 
@@ -109,7 +124,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
     let itemStats, tenant, organization;
     try {
       [itemStats, tenant, organization] = await Promise.all([
-        prisma.inventory_item.aggregate({
+        prisma.inventoryItem.aggregate({
           where: { tenantId },
           _count: { id: true },
         }).catch(err => {
@@ -134,7 +149,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
           select: {
             name: true,
             _count: {
-              select: { tenant: true }
+              select: { Tenant: true }
             }
           }
         }).catch(err => {
@@ -152,7 +167,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
     let activeItemsCount = 0, syncIssuesCount = 0;
     try {
       [activeItemsCount, syncIssuesCount] = await Promise.all([
-        prisma.inventory_item.count({
+        prisma.inventoryItem.count({
           where: {
             tenantId,
             availability: 'in_stock',
@@ -162,7 +177,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
           return 0;
         }),
         
-        prisma.inventory_item.count({
+        prisma.inventoryItem.count({
           where: {
             tenantId,
             OR: [
@@ -179,8 +194,8 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
       console.log('[Dashboard FIXED] Count queries error:', err);
     }
 
-    const isChain = organization ? (organization._count.tenants > 1) : false;
-    const locationCount = organization?._count.tenants || 1;
+    const isChain = organization ? (organization._count.Tenant > 1) : false;
+    const locationCount = organization?._count.Tenant || 1;
 
     const result = {
       stats: {

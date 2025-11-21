@@ -5,7 +5,7 @@ import { isPlatformAdmin } from '../utils/platform-admin';
 import { getTenantLimit, getTenantLimitConfig, canCreateTenant, getPlatformSupportLimit } from '../config/tenant-limits';
 // Type extensions are automatically loaded from src/types/express.d.ts
 
-import { user_tenant_role } from '@prisma/client';
+import { UserTenantRole } from '@prisma/client';
 
 /**
  * Get tenant ID from request
@@ -26,7 +26,7 @@ function getTenantIdFromRequest(req: Request): string | null {
 export async function getUserTenantRole(
   user_id: string,
   tenant_id: string
-): Promise<user_tenant_role | null> {
+): Promise<UserTenantRole | null> {
   const userTenant = await prisma.user_tenants.findUnique({
     where: {
       user_id_tenant_id: {
@@ -42,7 +42,7 @@ export async function getUserTenantRole(
 /**
  * Middleware to check if user has required tenant-level role
  */
-export function requireTenantRole(...allowedRoles: user_tenant_role[]) {
+export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
@@ -91,17 +91,17 @@ export function requireTenantRole(...allowedRoles: user_tenant_role[]) {
  * Middleware to check if user can manage tenant (OWNER or ADMIN only)
  */
 export const requireTenantAdmin = requireTenantRole(
-  user_tenant_role.OWNER,
-  user_tenant_role.ADMIN
+  UserTenantRole.OWNER,
+  UserTenantRole.ADMIN
 );
 
 /**
  * Middleware to check if user can manage inventory (all except VIEWER)
  */
 export const requireInventoryAccess = requireTenantRole(
-  user_tenant_role.OWNER,
-  user_tenant_role.ADMIN,
-  user_tenant_role.MEMBER
+  UserTenantRole.OWNER,
+  UserTenantRole.ADMIN,
+  UserTenantRole.MEMBER
 );
 
 /**

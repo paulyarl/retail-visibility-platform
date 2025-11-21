@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(data.user);
         
         // Set current tenant if not set
-        if (!currentTenantId && data.user.tenants.length > 0) {
+        if (!currentTenantId && data.user && data.user.tenants && data.user.tenants.length > 0) {
           const savedTenantId = localStorage.getItem(TENANT_KEY);
           const tenantExists = data.user.tenants.find((t: any) => t.id === savedTenantId);
           setCurrentTenantId(tenantExists ? savedTenantId : data.user.tenants[0].id);
@@ -185,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[AuthContext] Tokens saved to localStorage');
       
       // Set current tenant
-      if (data.user.tenants.length > 0) {
+      if (data.user && data.user.tenants && data.user.tenants.length > 0) {
         setCurrentTenantId(data.user.tenants[0].id);
         localStorage.setItem(TENANT_KEY, data.user.tenants[0].id);
       }

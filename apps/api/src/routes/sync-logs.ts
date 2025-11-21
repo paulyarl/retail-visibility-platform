@@ -17,28 +17,28 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
     if (strategy) where.strategy = strategy;
 
     const [logs, total] = await Promise.all([
-      (prisma as any).categoryMirrorRun.findMany({
+      prisma.category_mirror_runs.findMany({
         where,
-        orderBy: { startedAt: 'desc' },
+        orderBy: { started_at: 'desc' },
         take: limit,
         skip: offset,
         select: {
           id: true,
           tenant_id: true,
           strategy: true,
-          dryRun: true,
+          dry_run: true,
           created: true,
           updated: true,
           deleted: true,
           skipped: true,
           reason: true,
           error: true,
-          jobId: true,
-          startedAt: true,
+          job_id: true,
+          started_at: true,
           completed_at: true,
         },
       }),
-      (prisma as any).categoryMirrorRun.count({ where }),
+      prisma.category_mirror_runs.count({ where }),
     ]);
 
     return res.json({
@@ -63,9 +63,9 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
     const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     // Get recent runs
-    const recentRuns = await (prisma as any).categoryMirrorRun.findMany({
+    const recentRuns = await prisma.category_mirror_runs.findMany({
       where: {
-        startedAt: { gte: last24h },
+        started_at: { gte: last24h },
       },
       select: {
         id: true,
@@ -89,18 +89,18 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
     const successRate = totalRuns > 0 ? (successfulRuns / totalRuns) * 100 : 0;
 
     // Get recent errors
-    const recentErrors = await (prisma as any).categoryMirrorRun.findMany({
+    const recentErrors = await prisma.category_mirror_runs.findMany({
       where: {
         error: { not: null },
-        startedAt: { gte: last24h },
+        started_at: { gte: last24h },
       },
-      orderBy: { startedAt: 'desc' },
+      orderBy: { started_at: 'desc' },
       take: 5,
       select: {
         id: true,
         tenant_id: true,
         error: true,
-        startedAt: true,
+        started_at: true,
       },
     });
 

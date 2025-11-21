@@ -90,7 +90,7 @@ export class AuthService {
    */
   async register(data: RegisterData) {
     // Check if user already exists
-    const existingUser = await prisma.users.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { email: data.email.toLowerCase() },
     });
 
@@ -102,15 +102,15 @@ export class AuthService {
     const passwordHash = await this.hashPassword(data.password);
 
     // Create user using snake_case Prisma fields, then map to camelCase DTO
-    const user = await prisma.users.create({
+    const user = await prisma.user.create({
       data: {
         id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         email: data.email.toLowerCase(),
-        password_hash: passwordHash,
-        first_name: data.firstName,
-        last_name: data.lastName,
+        passwordHash: passwordHash,
+        firstName: data.firstName,
+        lastName: data.lastName,
         role: user_role.USER,
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
     });
 
@@ -130,7 +130,7 @@ export class AuthService {
    */
   async login(data: LoginData) {
     // Find user
-    const user = await (prisma as any).user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: data.email.toLowerCase() },
       include: {
         userTenants: true,
@@ -153,7 +153,7 @@ export class AuthService {
     }
 
     // Get tenant IDs
-    const tenantIds = user.userTenants.map((ut) => ut.tenant_id);
+    const tenantIds = user.userTenants.map((ut) => ut.tenantId);
 
     // Create JWT payload
     const payload: JWTPayload = {
@@ -168,13 +168,13 @@ export class AuthService {
     const refreshToken = this.generateRefreshToken(payload);
 
     // Update last login
-    await (prisma as any).user.update({
+    await prisma.user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
     });
 
     // Create session
-    await (prisma as any).userSession.create({
+    await prisma.userSession.create({
       data: {
         id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: user.id,
@@ -183,15 +183,16 @@ export class AuthService {
     });
 
     return {
-      users: {
+      message: 'Login successful',
+      user: {
         id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
         emailVerified: user.emailVerified,
-        tenant: user.userTenants.map((ut) => ({
-          id: ut.tenant_id,
+        tenants: user.userTenants.map((ut) => ({
+          id: ut.tenantId,
           name: 'Unknown',
           role: ut.role,
         })),
@@ -209,7 +210,7 @@ export class AuthService {
       const payload = this.verifyRefreshToken(refreshToken);
 
       // Verify user still exists and is active
-      const user = await prisma.users.findUnique({
+      const user = await prisma.user.findUnique({
         where: { id: payload.user_id },
         select: {
           id: true,
@@ -218,7 +219,7 @@ export class AuthService {
           isActive: true,
           userTenants: {
             select: {
-              tenant_id: true,
+              tenantId: true,
             },
           },
         },
@@ -233,7 +234,7 @@ export class AuthService {
         user_id: user.id,
         email: user.email,
         role: user.role,
-        tenantIds: user.userTenants.map((ut) => ut.tenant_id),
+        tenantIds: user.userTenants.map((ut) => ut.tenantId),
       };
 
       const accessToken = this.generateAccessToken(newPayload);
@@ -249,10 +250,11 @@ export class AuthService {
    */
   async getUserById(user_id: string) {
     console.log('[AuthService] getUserById called with:', user_id);
-    console.log('[AuthService] prisma.users exists:', !!prisma.users);
-    console.log('[AuthService] prisma.user exists:', !!(prisma as any).user);
+    console.log('[AuthService] prisma.users exists:', !!prisma.user);
+    console.log('[AuthService] prisma.user exists:', !!prisma.user);
     
-    const user = await (prisma as any).user.findUnique({
+    // First get user without relations to avoid Prisma relation issues
+    const user = await prisma.user.findUnique({
       where: { id: user_id },
       select: {
         id: true,
@@ -263,14 +265,29 @@ export class AuthService {
         emailVerified: true,
         lastLogin: true,
         createdAt: true,
-        userTenants: {
-          select: {
-            tenantId: true,
-            role: true,
-          },
-        },
       },
     });
+
+    if (!user) {
+      console.log('[AuthService] Throwing "User not found" error');
+      throw new Error('User not found');
+    }
+
+    // Get user tenants separately to avoid relation issues
+    let userTenants: { tenantId: string; role: any }[] = [];
+    try {
+      userTenants = await prisma.userTenant.findMany({
+        where: { userId: user_id },
+        select: {
+          tenantId: true,
+          role: true,
+        },
+      });
+      console.log('[AuthService] Found', userTenants.length, 'tenant associations');
+    } catch (tenantError) {
+      console.log('[AuthService] Could not fetch tenant associations:', tenantError.message);
+      // Continue with empty tenants array
+    }
 
     console.log('[AuthService] Database query result:', user ? 'USER FOUND' : 'USER NOT FOUND');
     if (user) {
@@ -291,7 +308,7 @@ export class AuthService {
       emailVerified: user.emailVerified,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
-      tenants: user.userTenants.map((ut) => ({
+      tenants: userTenants.map((ut: { tenantId: string; role: any }) => ({
         id: ut.tenantId,
         role: ut.role,
       })),
@@ -303,9 +320,9 @@ export class AuthService {
    */
   async logout(user_id: string) {
     // Deactivate all user sessions
-    await prisma.user_sessions.updateMany({
-      where: { user_id: user_id, is_active: true },
-      data: { is_active: false },
+    await prisma.userSession.updateMany({
+      where: { userId: user_id, isActive: true },
+      data: { isActive: false },
     });
 
     return { message: 'Logged out successfully' };

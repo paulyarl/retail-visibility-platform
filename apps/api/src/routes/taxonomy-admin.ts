@@ -25,18 +25,18 @@ async function upsertInBatches(items: any[], batchSize = 200) {
     const batch = items.slice(i, i + batchSize);
     await prisma.$transaction(
       batch.map((it) =>
-        prisma.google_taxonomy.upsert({
+        prisma.googleTaxonomy.upsert({
           where: { categoryId: it.categoryId },
           create: {
             categoryId: it.categoryId,
-            category_path: it.categoryPath,
+            categoryPath: it.categoryPath,
             parentId: it.parentId,
             level: it.level,
             isActive: true,
             version: '2024-09',
           },
           update: {
-            category_path: it.categoryPath,
+            categoryPath: it.categoryPath,
             parentId: it.parentId,
             level: it.level,
             isActive: true,
@@ -59,8 +59,8 @@ router.post('/sync', async (_req, res) => {
     // Upsert in batches
     await upsertInBatches(flat, 200);
 
-    const total = await prisma.google_taxonomy.count();
-    const versions = await prisma.google_taxonomy.groupBy({ by: ['version'], _count: { version: true } });
+    const total = await prisma.googleTaxonomy.count();
+    const versions = await prisma.googleTaxonomy.groupBy({ by: ['version'], _count: { version: true } });
 
     res.status(201).json({
       success: true,

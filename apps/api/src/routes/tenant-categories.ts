@@ -236,7 +236,7 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
     // Get Google taxonomy info if mapped
     let googleCategory = null;
     if (category.googleCategoryId) {
-      googleCategory = await prisma.google_taxonomy.findUnique({
+      googleCategory = await prisma.googleTaxonomy.findUnique({
         where: { categoryId: category.googleCategoryId },
       });
     }
