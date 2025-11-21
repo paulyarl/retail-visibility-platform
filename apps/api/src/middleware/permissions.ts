@@ -27,7 +27,7 @@ export async function getUserTenantRole(
   userId: string,
   tenantId: string
 ): Promise<UserTenantRole | null> {
-  const userTenant = await prisma.user_tenants.findUnique({
+  const userTenant = await prisma.userTenant.findUnique({
     where: {
       userId_tenantId: {
         userId: userId,
@@ -62,6 +62,13 @@ export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
         return res.status(400).json({
           error: 'tenantId_required',
           message: 'Tenant ID is required',
+        });
+      }
+
+      if (!req.user.userId) {
+        return res.status(401).json({
+          error: 'authentication_required',
+          message: 'User ID is required',
         });
       }
 
@@ -180,17 +187,24 @@ export async function checkTenantCreationLimit(
       });
     }
 
+    if (!req.user.userId) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'User ID is required',
+      });
+    }
+
     // Count user's owned tenants
-    const ownedTenants = await prisma.user_tenants.findMany({
+    const ownedTenants = await prisma.userTenant.findMany({
       where: {
         userId: req.user.userId,
-        role: user_tenant_role.OWNER,
+        role: UserTenantRole.OWNER,
       },
       include: {
         tenant: {
           select: {
-            subscription_tier: true,
-            subscription_status: true,
+            subscriptionTier: true,
+            subscriptionStatus: true,
           },
         },
       },
@@ -214,7 +228,7 @@ export async function checkTenantCreationLimit(
 
     for (const ut of ownedTenants) {
       const tier = ut.tenant.subscriptionTier || 'starter';
-      const status = ut.tenant.subscription_status || 'trial';
+      const status = ut.tenant.subscriptionStatus || 'trial';
       const priority = tierPriority[tier] || 0;
       
       if (priority > highestPriority) {
@@ -282,9 +296,16 @@ export async function requireTenantOwner(
       });
     }
 
+    if (!req.user.userId) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'User ID is required',
+      });
+    }
+
     const userRole = await getUserTenantRole(req.user.userId, tenantId);
 
-    if (userRole !== user_tenant_role.OWNER) {
+    if (userRole !== UserTenantRole.OWNER) {
       return res.status(403).json({
         error: 'owner_required',
         message: 'Only the tenant owner can perform this action',
