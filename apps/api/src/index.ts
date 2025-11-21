@@ -543,13 +543,14 @@ app.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireTena
 });
 
 // Location Status Management Endpoints
-const { 
-  validateStatusChange, 
-  canChangeStatus, 
+import {
+  validateStatusChange,
+  canChangeStatus,
   getLocationStatusInfo,
   getStatusChangeImpact,
-  getStatusTransitions 
-} = require('./utils/location-status');
+  getStatusTransitions,
+  UserRole
+} from './utils/location-status';
 
 // Change location status
 app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async (req, res) => {
@@ -570,8 +571,24 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
   try {
     // Check if user can change status
     const userRole = req.user?.role || 'USER';
-    // Map deprecated ADMIN role to PLATFORM_ADMIN for backward compatibility
-    const normalizedRole = userRole === 'ADMIN' ? 'PLATFORM_ADMIN' : userRole;
+    // Map deprecated roles to valid UserRole values
+    let normalizedRole: UserRole;
+    switch (userRole) {
+      case 'ADMIN':
+        normalizedRole = 'PLATFORM_ADMIN';
+        break;
+      case 'OWNER':
+        normalizedRole = 'TENANT_OWNER';
+        break;
+      case 'USER':
+        normalizedRole = 'TENANT_VIEWER';
+        break;
+      default:
+        // Try to map existing valid roles, default to viewer for safety
+        normalizedRole = (['PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'PLATFORM_VIEWER', 'TENANT_OWNER', 'TENANT_ADMIN', 'TENANT_MANAGER', 'TENANT_MEMBER', 'TENANT_VIEWER'] as const).includes(userRole as UserRole)
+          ? userRole as UserRole
+          : 'TENANT_VIEWER';
+    }
     const tenantRole = req.user?.tenantIds?.includes(id) ? 'TENANT_ADMIN' : normalizedRole;
 
     console.log(`[PATCH /tenants/${id}/status] Permission check`, {
