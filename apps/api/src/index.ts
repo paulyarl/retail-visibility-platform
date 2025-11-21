@@ -3318,15 +3318,16 @@ app.get('/api/tenants/:tenantId/integrations/clover', authenticateToken, async (
     return res.status(500).json({ error: 'failed_to_check_connection' });
   }
 });
-app.use('/square', async (req, res, next) => {
-  try {
-    const routes = await getSquareRoutes();
-    return routes(req, res, next);
-  } catch (error) {
-    console.error('[Square Routes] Lazy loading error:', error);
-    res.status(500).json({ error: 'square_routes_unavailable' });
-  }
-}); // Square POS integration (auth handled in route)
+// Temporarily disabled Square routes to fix production startup
+// app.use('/square', async (req, res, next) => {
+//   try {
+//     const routes = await getSquareRoutes();
+//     return routes(req, res, next);
+//   } catch (error) {
+//     console.error('[Square Routes] Lazy loading error:', error);
+//     res.status(500).json({ error: 'square_integration_unavailable' });
+//   }
+// }); // Square POS integration (auth handled in route)
 app.use('/admin', authenticateToken, adminUsersRoutes);
 app.use('/api/admin', authenticateToken, adminUsersRoutes);
 app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
