@@ -73,7 +73,7 @@ model Tenant {
   @@index([slug], map: "tenant_slug_idx")
   @@index([subscriptionStatus], map: "tenant_subscriptionstatus_idx")
   @@index([locationStatus], map: "tenant_locationstatus_idx")
-  @@map("tenant")
+  @@map("Tenant")
 }
 
 model AuditLog {
@@ -536,7 +536,7 @@ model InventoryItem {
   @@index([source])
   @@index([tenantId, enrichmentStatus])
   @@index([tenantId, updatedAt])
-  @@map("inventory_item")
+  @@map("InventoryItem")
 }
 
 model Invitation {
@@ -702,7 +702,7 @@ model PhotoAsset {
   @@unique([inventoryItemId, position])
   @@index([inventoryItemId])
   @@index([tenantId])
-  @@map("photo_asset")
+  @@map("PhotoAsset")
 }
 
 model PlatformFeatureFlags {
