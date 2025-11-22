@@ -183,10 +183,9 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // 🌟 UNIVERSAL TRANSFORM MIDDLEWARE - Makes naming conventions irrelevant!
 // Both snake_case AND camelCase work everywhere - API code and frontend get what they expect
-// Temporarily disable universal transform middleware for debugging
-// import { universalTransformMiddleware } from './middleware/universal-transform';
-// app.use(universalTransformMiddleware);
-// console.log('🌟 Universal transform middleware deployed - both naming conventions work everywhere!');
+import { universalTransformMiddleware } from './middleware/universal-transform';
+app.use(universalTransformMiddleware);
+console.log('🌟 Universal transform middleware deployed - both naming conventions work everywhere!');
 
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(setRequestContext);
@@ -2727,32 +2726,31 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
   }
 });
 
-// Temporarily disable routes introspection for debugging
-// app.get("/__routes", (_req, res) => {
-//   const out: any[] = [];
-//   // Always include known core routes
-//   out.push({ methods: ["GET"], path: "/health" });
-//   out.push({ methods: ["GET"], path: "/__ping" });
-//   function collect(stack: any[], base = "") {
-//     stack?.forEach((layer: any) => {
-//       if (layer.route && layer.route.path) {
-//         const methods = layer.route.methods
-//           ? Array.isArray(layer.route.methods)
-//             ? layer.route.methods
-//           : Object.keys(layer.route.methods)
-//           : [];
-//         const path = base + layer.route.path;
-//         out.push({ methods: methods.map((m: string) => m.toUpperCase()), path });
-//       } else if (layer.name === 'router' && layer.handle?.stack) {
-//         const match = layer.regexp && layer.regexp.fast_slash ? "" : (layer.regexp?.source || "");
-//         collect(layer.handle.stack, base);
-//       }
-//     });
-//   }
-//   const stack = (app as any)._router?.stack || [];
-//   collect(stack);
-//   res.json(out);
-// });
+app.get("/__routes", (_req, res) => {
+  const out: any[] = [];
+  // Always include known core routes
+  out.push({ methods: ["GET"], path: "/health" });
+  out.push({ methods: ["GET"], path: "/__ping" });
+  function collect(stack: any[], base = "") {
+    stack?.forEach((layer: any) => {
+      if (layer.route && layer.route.path) {
+        const methods = layer.route.methods
+          ? Array.isArray(layer.route.methods)
+            ? layer.route.methods
+          : Object.keys(layer.route.methods)
+          : [];
+        const path = base + layer.route.path;
+        out.push({ methods: methods.map((m: string) => m.toUpperCase()), path });
+      } else if (layer.name === 'router' && layer.handle?.stack) {
+        const match = layer.regexp && layer.regexp.fast_slash ? "" : (layer.regexp?.source || "");
+        collect(layer.handle.stack, base);
+      }
+    });
+  }
+  const stack = (app as any)._router?.stack || [];
+  collect(stack);
+  res.json(out);
+});
 app.get("/__ping", (req, res) => {
   console.log("PING from", req.ip, "at", new Date().toISOString());
   res.json({ ok: true, when: new Date().toISOString() });
@@ -3245,10 +3243,10 @@ app.put("/admin/email-config", async (req, res) => {
 import { mountMinimalRoutes, mountAllRoutes } from './routes';
 
 // For debugging: mount only minimal routes
-mountMinimalRoutes(app);
+// mountMinimalRoutes(app);
 
-// For full functionality: mount all routes (can be enabled when debugging is complete)
-// mountAllRoutes(app);
+// For full functionality: mount all routes (enabled for localhost testing)
+mountAllRoutes(app);
 /* ------------------------------ TAXONOMY ADMIN API ------------------------------ */
 
 // GET /api/admin/taxonomy/status - Check taxonomy sync status
@@ -3647,7 +3645,7 @@ if (process.env.NODE_ENV !== "test") {
     console.log('🔧 About to start server...');
     const server = app.listen(port, '0.0.0.0', () => {
       console.log(`\n✅ API server running → http://localhost:${port}/health`);
-      // console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
+      console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
     });
 
     // Handle server errors

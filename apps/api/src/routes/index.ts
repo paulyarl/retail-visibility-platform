@@ -1,5 +1,4 @@
 import { Express } from 'express';
-import { authenticateToken, checkTenantAccess, requireAdmin } from '../middleware/auth';
 
 // Route group imports - can be enabled/disabled independently
 import { mountAuthRoutes } from './mounts/auth-routes';
@@ -10,63 +9,34 @@ import { mountDirectoryRoutes } from './mounts/directory-routes';
 import { mountDashboardRoutes } from './mounts/dashboard-routes';
 
 /**
- * Mount all application routes
- * Each mount function can be enabled/disabled independently for isolation
- */
-export function mountAllRoutes(app: Express) {
-  console.log('🔧 Mounting application routes...');
-
-  // Phase 1: Essential routes (always enabled)
-  mountAuthRoutes(app);
-  
-  // Phase 2: Core business routes (can be disabled for isolation)
-  try {
-    mountCoreRoutes(app);
-    console.log('✅ Core routes mounted');
-  } catch (error) {
-    console.error('❌ Core routes failed:', error);
-  }
-
-  // Phase 3: Admin routes (can be disabled for isolation)
-  try {
-    mountAdminRoutes(app);
-    console.log('✅ Admin routes mounted');
-  } catch (error) {
-    console.error('❌ Admin routes failed:', error);
-  }
-
-  // Phase 4: Integration routes (can be disabled for isolation)
-  try {
-    mountIntegrationRoutes(app);
-    console.log('✅ Integration routes mounted');
-  } catch (error) {
-    console.error('❌ Integration routes failed:', error);
-  }
-
-  // Phase 5: Directory routes (can be disabled for isolation)
-  try {
-    mountDirectoryRoutes(app);
-    console.log('✅ Directory routes mounted');
-  } catch (error) {
-    console.error('❌ Directory routes failed:', error);
-  }
-
-  // Phase 6: Dashboard routes (can be disabled for isolation)
-  try {
-    mountDashboardRoutes(app);
-    console.log('✅ Dashboard routes mounted');
-  } catch (error) {
-    console.error('❌ Dashboard routes failed:', error);
-  }
-
-  console.log('🚀 All routes mounted successfully');
-}
-
-/**
- * Mount only essential routes for minimal server
+ * Mount minimal routes (always enabled)
+ * These are the core routes needed for basic functionality
  */
 export function mountMinimalRoutes(app: Express) {
   console.log('🔧 Mounting minimal routes only...');
+  
+  // Authentication routes (always needed)
   mountAuthRoutes(app);
+  
   console.log('✅ Minimal routes mounted');
+}
+
+/**
+ * Mount all routes (for full functionality)
+ * This includes all feature routes and integrations
+ */
+export function mountAllRoutes(app: Express) {
+  console.log('🚀 Mounting ALL routes for full functionality...');
+  
+  // Core authentication (always first)
+  mountAuthRoutes(app);
+  
+  // All feature routes
+  mountCoreRoutes(app);
+  mountDashboardRoutes(app);
+  mountAdminRoutes(app);
+  mountIntegrationRoutes(app);
+  mountDirectoryRoutes(app);
+  
+  console.log('✅ ALL routes mounted - full functionality enabled');
 }
