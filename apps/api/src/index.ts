@@ -79,8 +79,8 @@ import {
 // import feedValidationRoutes from './routes/feed-validation';
 // import businessProfileValidationRoutes from './routes/business-profile-validation';
 
-// Authentication
-import authRoutes from './auth/auth.routes';
+// Authentication middleware and utilities
+// import authRoutes from './auth/auth.routes'; // Now handled by modular mounting
 import { authenticateToken, checkTenantAccess, requireAdmin } from './middleware/auth';
 import { isPlatformAdmin, isPlatformUser } from './utils/platform-admin';
 import { 
