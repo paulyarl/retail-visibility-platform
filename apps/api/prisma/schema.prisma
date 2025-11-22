@@ -1238,11 +1238,11 @@ enum ProductCondition {
 }
 
 enum ProductSource {
-  MANUAL @map("manual")
-  BARCODE_SCAN @map("barcode_scan")
-  BULK_UPLOAD @map("bulk_upload")
-  API_IMPORT @map("api_import")
-  QUICK_START_WIZARD @map("quick_start_wizard")
+  MANUAL @map("MANUAL")
+  BARCODE_SCAN @map("BARCODE_SCAN")
+  BULK_UPLOAD @map("BULK_UPLOAD")
+  API_IMPORT @map("API_IMPORT")
+  QUICK_START_WIZARD @map("QUICK_START_WIZARD")
   @@map("product_source")
 }
 
