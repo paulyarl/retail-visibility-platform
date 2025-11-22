@@ -378,7 +378,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
             stock: stock,
             currency: session.template?.defaultCurrency || 'USD',
             visibility: (session.template?.defaultVisibility as any) || 'private',
-            availability: stock > 0 ? 'in_stock' : 'out_of_stock',
+            availability: stock > 0 ? 'inStock' : 'outOfStock',
             category_path: (enrichment.categoryPath && enrichment.categoryPath.length > 0)
               ? enrichment.categoryPath
               : (session.template?.defaultCategory ? [session.template.defaultCategory] : []),

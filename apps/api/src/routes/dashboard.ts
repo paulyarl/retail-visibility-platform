@@ -170,7 +170,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
         prisma.inventoryItem.count({
           where: {
             tenantId,
-            availability: 'in_stock',
+            availability: 'inStock',
           }
         }).catch(err => {
           console.log('[Dashboard FIXED] Active items count error:', err.message);
