@@ -117,7 +117,7 @@ import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 // import scanMetricsRoutes from './routes/scan-metrics';
 // import quickStartRoutes from './routes/quick-start';
 // import adminToolsRoutes from './routes/admin-tools';
-// import adminUsersRoutes from './routes/admin-users';
+import adminUsersRoutes from './routes/admin-users';
 // import featureOverridesRoutes from './routes/admin/feature-overrides';
 // import tierManagementRoutes from './routes/admin/tier-management';
 // import tierSystemRoutes from './routes/admin/tier-system';
@@ -3586,6 +3586,10 @@ app.get("/api/gbp/categories", async (req, res) => {
 
 // Mount test GBP sync routes
 // app.use('/test', testGbpSyncRoutes);
+
+/* ------------------------------ admin users ------------------------------ */
+app.use('/api/admin', adminUsersRoutes);
+console.log('✅ Admin users routes mounted at /api/admin');
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);

@@ -24,10 +24,19 @@ const router = Router();
 router.get('/users', requirePlatformUser, async (req: Request, res: Response) => {
   try {
     const requestingUser = (req as any).user;
+    console.log('[ADMIN USERS] Request received from user:', {
+      userId: requestingUser?.userId,
+      email: requestingUser?.email,
+      role: requestingUser?.role,
+      userAgent: req.headers['user-agent'],
+      origin: req.headers.origin,
+      referer: req.headers.referer
+    });
     let users;
 
     if (requestingUser.role === 'PLATFORM_ADMIN' || requestingUser.role === 'ADMIN') {
       // Platform admins see all users
+      console.log('[ADMIN USERS] Platform admin detected, fetching all users...');
       users = await prisma.user.findMany({
         select: {
           id: true,
@@ -105,6 +114,8 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
       });
     }
 
+    console.log('[ADMIN USERS] Raw users from database:', users?.length || 0, 'users found');
+    
     // Format response
     const formattedUsers = users.map(user => ({
       ...user,
@@ -119,6 +130,14 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
         role: ut.role,
       })) || [],
     }));
+
+    console.log('[ADMIN USERS] Formatted users for response:', formattedUsers?.length || 0, 'users');
+    console.log('[ADMIN USERS] Sample user data:', formattedUsers[0] ? {
+      id: formattedUsers[0].id,
+      email: formattedUsers[0].email,
+      role: formattedUsers[0].role,
+      tenantCount: formattedUsers[0].tenant
+    } : 'No users found');
 
     res.json({ success: true, user_tenants: formattedUsers });
   } catch (error: any) {
