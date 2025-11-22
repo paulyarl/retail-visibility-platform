@@ -183,9 +183,10 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // 🌟 UNIVERSAL TRANSFORM MIDDLEWARE - Makes naming conventions irrelevant!
 // Both snake_case AND camelCase work everywhere - API code and frontend get what they expect
-import { universalTransformMiddleware } from './middleware/universal-transform';
-app.use(universalTransformMiddleware);
-console.log('🌟 Universal transform middleware deployed - both naming conventions work everywhere!');
+// Temporarily disable universal transform middleware for debugging
+// import { universalTransformMiddleware } from './middleware/universal-transform';
+// app.use(universalTransformMiddleware);
+// console.log('🌟 Universal transform middleware deployed - both naming conventions work everywhere!');
 
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(setRequestContext);
