@@ -1087,7 +1087,7 @@ model UserSession {
 
   @@index([expiresAt])
   @@index([userId])
-  @@map("user_session")
+  @@map("user_sessions")
 }
 
 model UserTenant {
