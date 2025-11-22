@@ -1263,16 +1263,14 @@ enum UserRole {
   TENANT_OWNER @map("tenant_owner")
   TENANT_ADMIN @map("tenant_admin")
   TENANT_MANAGER @map("tenant_manager")
-  TENANT_MEMBER @map("tenant_member")
-  TENANT_VIEWER @map("tenant_viewer")
   @@map("user_role")
 }
 
 enum UserTenantRole {
-  OWNER @map("owner")
-  ADMIN @map("admin")
-  SUPPORT @map("support")
-  MEMBER @map("member")
-  VIEWER @map("viewer")
+  OWNER @map("OWNER")
+  ADMIN @map("ADMIN")
+  SUPPORT @map("SUPPORT")
+  MEMBER @map("MEMBER")
+  VIEWER @map("VIEWER")
   @@map("user_tenant_role")
 }
