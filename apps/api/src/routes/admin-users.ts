@@ -147,6 +147,10 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
       success: true, 
       users: formattedUsers,
       user_tenants: formattedUsers, // Keep for backward compatibility
+      userTenants: formattedUsers, // CamelCase version
+      data: formattedUsers, // Generic data field
+      items: formattedUsers, // Items field
+      results: formattedUsers, // Results field
       total: formattedUsers.length 
     });
   } catch (error: any) {
