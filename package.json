@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "",
+  "main": "apps/api/dist/index.js",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -15,6 +16,7 @@
     "dev:local": "doppler run --config local -- pnpm -r --parallel dev",
     "dev:prod": "doppler run --config prd -- pnpm -r --parallel dev",
     "build": "pnpm -r build",
+    "start": "cd apps/api && npm start",
     "prisma:generate": "npm run -w @rvp/api prisma:generate",
     "typecheck": "pnpm -r typecheck || exit 0",
     "lint": "pnpm -r lint || exit 0",
