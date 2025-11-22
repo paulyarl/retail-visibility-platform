@@ -168,9 +168,9 @@ model BusinessHoursSpecial {
 
 model CategoryMirrorRuns {
   id           String    @id @default(cuid())
-  tenantId    String?
+  tenantId    String?   @map("tenant_id")
   strategy     String
-  dryRun      Boolean   @default(true)
+  dryRun      Boolean   @default(true) @map("dry_run")
   created      Int       @default(0)
   updated      Int       @default(0)
   deleted      Int       @default(0)
