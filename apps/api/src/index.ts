@@ -13,10 +13,8 @@ import { prisma, basePrisma } from "./prisma";
 import { z } from "zod";
 import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
 
-// Debug: Log DATABASE_URL to verify it's correct
 // Migration fix applied: ProductCondition enum renamed 'new' to 'brand_new'
 // Force rebuild v3: Railway build cache bypass
-console.log('[DEBUG] DATABASE_URL:', process.env.DATABASE_URL?.substring(0, 50) + '...');
 import fs from "fs";
 import path from "path";
 import multer from "multer";
@@ -185,7 +183,6 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 // Both snake_case AND camelCase work everywhere - API code and frontend get what they expect
 import { universalTransformMiddleware } from './middleware/universal-transform';
 app.use(universalTransformMiddleware);
-console.log('🌟 Universal transform middleware deployed - both naming conventions work everywhere!');
 
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(setRequestContext);
@@ -200,7 +197,6 @@ app.use(csrfProtect);
 // TEMP: Commented out due to Prisma JsonBody error in Railway
 // ensureFeedCategoryView().catch(() => {});
 
-console.log("✓ Express configured with 50mb body limit");
 
 /* -------------------- static uploads (filesystem for MVP) -------------------- */
 const DEV = process.env.NODE_ENV !== "production";
@@ -318,7 +314,6 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
       tenant.subscriptionStatus === "trial" &&
       !tenant.trialEndsAt
     ) {
-      console.log(`[GET /tenants/:id] Trial date missing for tenant ${tenant.id}. Setting trial to expire in ${TRIAL_CONFIG.durationDays} days.`);
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_CONFIG.durationDays);
       
@@ -329,7 +324,6 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
           subscriptionStatus: "trial",
         },
       });
-      console.log(`[GET /tenants/:id] Trial date set for tenant ${tenant.id}: ${trialEndsAt.toISOString()}`);
     }
     
     // Check if trial has expired and mark as expired
@@ -341,7 +335,6 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     ) {
       const hasStripeSubscription = !!tenant.stripeSubscriptionId;
 
-      console.log(`[GET /tenants/:id] Trial expired for tenant ${tenant.id}.`);
 
       tenant = await prisma.tenant.update({
         where: { id: tenant.id },
@@ -351,7 +344,6 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
           subscriptionTier: hasStripeSubscription ? tenant.subscriptionTier : "google_only",
         },
       });
-      console.log(`[GET /tenants/:id] Tenant ${tenant.id} marked as expired with tier ${tenant.subscriptionTier}.`);
     }
     
     // Add location status info
@@ -389,7 +381,6 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
       ? parsed.data.ownerId 
       : userId;
     
-    console.log('[POST /tenants] Creating tenant for owner:', ownerId, 'by user:', req.user?.userId);
     
     // Validate for duplicates (check against the owner, not the creator)
     const { validateTenantCreation } = await import('./utils/tenant-validation');
@@ -399,7 +390,6 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     );
     
     if (!validation.valid) {
-      console.log('[POST /tenants] Validation failed:', validation.errors);
       return res.status(409).json({
         error: 'duplicate_tenant',
         message: 'A location with this information already exists',
@@ -412,22 +402,8 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_CONFIG.durationDays);
     
     // Create tenant and link to user manually (not using $transaction to avoid issues)
-    console.log('[POST /tenants] Starting manual transaction with data:', {
-      name: parsed.data.name,
-      ownerId,
-      userId: req.user?.userId,
-      userRole: req.user?.role,
-      trialEndsAt: trialEndsAt
-    });
 
     // Create the tenant first
-    console.log('[POST /tenants] Creating tenant with data:', {
-      name: parsed.data.name,
-      subscriptionTier: 'starter',
-      subscriptionStatus: 'trial',
-      trialEndsAt: trialEndsAt,
-      createdBy: req.user?.userId || 'unknown'
-    });
 
     const tenant = await prisma.tenant.create({
       data: {
@@ -440,23 +416,13 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
       }
     });
 
-    console.log('[POST /tenants] Tenant created successfully:', {
-      id: tenant.id,
-      name: tenant.name,
-      createdBy: tenant.createdBy
-    });
 
     // Now create the UserTenant link (tenant should be committed now)
-    console.log('[POST /tenants] Linking tenant to owner:', {
-      ownerId,
-      tenantId: tenant.id
-    });
 
     // Add debugging to check if tenant still exists before UserTenant creation
     const tenantCheck = await prisma.tenant.findUnique({
       where: { id: tenant.id }
     });
-    console.log('[POST /tenants] Tenant check before UserTenant creation:', !!tenantCheck);
 
     if (!tenantCheck) {
       console.error('[POST /tenants] CRITICAL: Tenant disappeared before UserTenant creation!');
@@ -473,12 +439,6 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
       },
     });
 
-    console.log('[POST /tenants] UserTenant link created successfully:', {
-      id: userTenant.id,
-      userId: userTenant.userId,
-      tenantId: userTenant.tenantId,
-      role: userTenant.role
-    });
 
     // Try to create initial status log (optional - don't fail if table doesn't exist)
     try {
@@ -500,7 +460,6 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
       //     },
       //   },
       // });
-      console.log('[POST /tenants] Initial status log creation skipped (model ignored)');
     } catch (logError: any) {
       console.warn('[POST /tenants] Could not create initial status log (table may not exist):', logError.message);
       // Don't fail the entire operation if logging fails
