@@ -118,13 +118,17 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
     
     // Format response
     const formattedUsers = users.map(user => ({
-      ...user,
-      name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || user.lastName || null,
+      id: user.id,
+      email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      lastLoginAt: user.lastLogin,
+      name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || user.lastName || null,
+      role: user.role,
       createdAt: user.createdAt,
-      tenant: user.userTenants?.length || 0,
+      lastLogin: user.lastLogin,
+      lastLoginAt: user.lastLogin, // Alias for compatibility
+      tenantCount: user.userTenants?.length || 0,
+      tenant: user.userTenants?.length || 0, // Alias for compatibility
       tenantRoles: user.userTenants?.map((ut: any) => ({
         tenantId: ut.tenantId,
         role: ut.role,
@@ -139,7 +143,12 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
       tenantCount: formattedUsers[0].tenant
     } : 'No users found');
 
-    res.json({ success: true, user_tenants: formattedUsers });
+    res.json({ 
+      success: true, 
+      users: formattedUsers,
+      user_tenants: formattedUsers, // Keep for backward compatibility
+      total: formattedUsers.length 
+    });
   } catch (error: any) {
     console.error('[Admin Users] Error listing user_tenants:', error);
     res.status(500).json({
