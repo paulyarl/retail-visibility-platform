@@ -24,10 +24,19 @@ const router = Router();
 router.get('/users', requirePlatformUser, async (req: Request, res: Response) => {
   try {
     const requestingUser = (req as any).user;
+    console.log('[ADMIN USERS] Request received from user:', {
+      userId: requestingUser?.userId,
+      email: requestingUser?.email,
+      role: requestingUser?.role,
+      userAgent: req.headers['user-agent'],
+      origin: req.headers.origin,
+      referer: req.headers.referer
+    });
     let users;
 
     if (requestingUser.role === 'PLATFORM_ADMIN' || requestingUser.role === 'ADMIN') {
       // Platform admins see all users
+      console.log('[ADMIN USERS] Platform admin detected, fetching all users...');
       users = await prisma.user.findMany({
         select: {
           id: true,
@@ -105,22 +114,45 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
       });
     }
 
+    console.log('[ADMIN USERS] Raw users from database:', users?.length || 0, 'users found');
+    
     // Format response
     const formattedUsers = users.map(user => ({
-      ...user,
-      name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || user.lastName || null,
+      id: user.id,
+      email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      lastLoginAt: user.lastLogin,
+      name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || user.lastName || null,
+      role: user.role,
       createdAt: user.createdAt,
-      tenant: user.userTenants?.length || 0,
+      lastLogin: user.lastLogin,
+      lastLoginAt: user.lastLogin, // Alias for compatibility
+      tenantCount: user.userTenants?.length || 0,
+      tenant: user.userTenants?.length || 0, // Alias for compatibility
       tenantRoles: user.userTenants?.map((ut: any) => ({
         tenantId: ut.tenantId,
         role: ut.role,
       })) || [],
     }));
 
-    res.json({ success: true, user_tenants: formattedUsers });
+    console.log('[ADMIN USERS] Formatted users for response:', formattedUsers?.length || 0, 'users');
+    console.log('[ADMIN USERS] Sample user data:', formattedUsers[0] ? {
+      id: formattedUsers[0].id,
+      email: formattedUsers[0].email,
+      role: formattedUsers[0].role,
+      tenantCount: formattedUsers[0].tenant
+    } : 'No users found');
+
+    res.json({ 
+      success: true, 
+      users: formattedUsers,
+      user_tenants: formattedUsers, // Keep for backward compatibility
+      userTenants: formattedUsers, // CamelCase version
+      data: formattedUsers, // Generic data field
+      items: formattedUsers, // Items field
+      results: formattedUsers, // Results field
+      total: formattedUsers.length 
+    });
   } catch (error: any) {
     console.error('[Admin Users] Error listing user_tenants:', error);
     res.status(500).json({

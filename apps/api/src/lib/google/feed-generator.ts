@@ -28,7 +28,7 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
   try {
     const items = await prisma.inventoryItem.findMany({
       where: {
-        tenantId: tenant_id,
+        tenantId: tenant_id, 
         itemStatus: 'active',  // Only active items
         visibility: 'public',   // Only public items
       },

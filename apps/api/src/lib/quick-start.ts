@@ -163,7 +163,7 @@ export async function generateQuickStartProducts(
   options: QuickStartOptions
 ): Promise<QuickStartResult> {
   const {
-    tenantId,
+    tenant_id,
     scenario,
     productCount,
     assignCategories = true,
@@ -176,9 +176,9 @@ export async function generateQuickStartProducts(
   }
 
   // Validate tenant exists
-  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenant_id } });
   if (!tenant) {
-    throw new Error(`Tenant not found: ${tenantId}`);
+    throw new Error(`Tenant not found: ${tenant_id}`);
   }
 
   const scenarioData = SCENARIOS[scenario];
@@ -198,7 +198,7 @@ export async function generateQuickStartProducts(
     } else {
       console.warn(`[Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
     }
-    const categoryId = `${tenantId}_${cat.slug}`;
+    const categoryId = `${tenant_id}_${cat.slug}`;
     categories.push({
       id: categoryId,
       name: cat.name,
@@ -248,8 +248,8 @@ export async function generateQuickStartProducts(
         : (Math.random() > 0.25 ? 'active' as const : 'inactive' as const);
 
       return {
-        id: `qs_${tenantId}_${timestamp}_${(i + idx).toString().padStart(5, '0')}`,
-        tenantId: tenantId,
+        id: `qs_${tenant_id}_${timestamp}_${(i + idx).toString().padStart(5, '0')}`,
+        tenantId: tenant_id,
         sku: `SKU-${timestamp}-${(i + idx).toString().padStart(5, '0')}`,
         name: product.name,
         title: product.name,
@@ -271,19 +271,19 @@ export async function generateQuickStartProducts(
 
   // Get final counts
   const totalProducts = await prisma.inventoryItem.count({
-    where: { tenantId: tenantId },
+    where: { tenant_id: tenant_id },
   });
 
   const activeProducts = await prisma.inventoryItem.count({
-    where: { tenantId: tenantId, itemStatus: 'active' },
+    where: { tenant_id: tenant_id, itemStatus: 'active' },
   });
 
   const inStockProducts = await prisma.inventoryItem.count({
-    where: { tenantId: tenantId, availability: 'inStock' },
+    where: { tenant_id: tenant_id, availability: 'inStock' },
   });
 
   const categorizedProducts = await prisma.inventoryItem.count({
-    where: { tenantId: tenantId, categoryPath: { isEmpty: false } },
+    where: { tenant_id: tenant_id, categoryPath: { isEmpty: false } },
   });
 
   return {

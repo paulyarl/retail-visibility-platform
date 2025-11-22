@@ -13,7 +13,7 @@ async function testFeedPushJobs() {
   try {
     // 1. Create a test job
     console.log('1. Creating test feed push job...');
-    const job = await prisma.feed_push_jobs.create({
+    const job = await prisma.feedPushJobs.create({
       data: {
         tenantId: 'test-tenant-id',
         sku: 'TEST-SKU-001',
@@ -28,7 +28,7 @@ async function testFeedPushJobs() {
 
     // 2. List jobs
     console.log('\n2. Listing all jobs...');
-    const jobs = await prisma.feed_push_jobs.findMany({
+    const jobs = await prisma.feedPushJobs.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
     });
@@ -36,7 +36,7 @@ async function testFeedPushJobs() {
 
     // 3. Update job status
     console.log('\n3. Updating job status to processing...');
-    const updatedJob = await prisma.feed_push_jobs.update({
+    const updatedJob = await prisma.feedPushJobs.update({
       where: { id: job.id },
       data: {
         jobStatus: 'processing',
@@ -47,7 +47,7 @@ async function testFeedPushJobs() {
 
     // 4. Mark as success
     console.log('\n4. Marking job as success...');
-    const completedJob = await prisma.feed_push_jobs.update({
+    const completedJob = await prisma.feedPushJobs.update({
       where: { id: job.id },
       data: {
         jobStatus: 'success',
@@ -63,7 +63,7 @@ async function testFeedPushJobs() {
 
     // 5. Get job statistics
     console.log('\n5. Getting job statistics...');
-    const stats = await prisma.feed_push_jobs.groupBy({
+    const stats = await prisma.feedPushJobs.groupBy({
       by: ['jobStatus'],
       _count: true,
     });
@@ -74,7 +74,7 @@ async function testFeedPushJobs() {
 
     // 6. Test retry logic
     console.log('\n6. Testing retry logic...');
-    const failedJob = await prisma.feed_push_jobs.create({
+    const failedJob = await prisma.feedPushJobs.create({
       data: {
         tenantId: 'test-tenant-id',
         sku: 'TEST-SKU-002',
@@ -83,7 +83,7 @@ async function testFeedPushJobs() {
     });
 
     // Simulate failure with retry
-    const retriedJob = await prisma.feed_push_jobs.update({
+    const retriedJob = await prisma.feedPushJobs.update({
       where: { id: failedJob.id },
       data: {
         jobStatus: 'queued',
@@ -98,7 +98,7 @@ async function testFeedPushJobs() {
 
     // Cleanup test jobs
     console.log('\n7. Cleaning up test jobs...');
-    await prisma.feed_push_jobs.deleteMany({
+    await prisma.feedPushJobs.deleteMany({
       where: {
         tenantId: 'test-tenant-id',
       },
@@ -118,7 +118,7 @@ async function testOutreachFeedback() {
   try {
     // 1. Submit feedback
     console.log('1. Submitting test feedback...');
-    const feedback = await prisma.outreach_feedback.create({
+    const feedback = await prisma.outreachFeedback.create({
       data: {
         tenantId: 'test-tenant-id',
         userId: 'test-user-id',
@@ -137,10 +137,11 @@ async function testOutreachFeedback() {
 
     // 2. Submit more feedback with different scores
     console.log('\n2. Submitting additional feedback...');
-    await prisma.outreach_feedback.createMany({
+    await prisma.outreachFeedback.createMany({
       data: [
         {
           tenantId: 'test-tenant-id',
+          userId: 'test-user-id',
           feedback: { comment: 'Good but slow' },
           score: 3,
           category: 'performance',
@@ -148,6 +149,7 @@ async function testOutreachFeedback() {
         },
         {
           tenantId: 'test-tenant-id',
+          userId: 'test-user-id',
           feedback: { comment: 'Excellent support!' },
           score: 5,
           category: 'support',
@@ -155,6 +157,7 @@ async function testOutreachFeedback() {
         },
         {
           tenantId: 'test-tenant-id',
+          userId: 'test-user-id',
           feedback: { comment: 'Needs more features' },
           score: 4,
           category: 'features',
@@ -166,7 +169,7 @@ async function testOutreachFeedback() {
 
     // 3. Get feedback analytics
     console.log('\n3. Calculating feedback analytics...');
-    const allFeedback = await prisma.outreach_feedback.findMany({
+    const allFeedback = await prisma.outreachFeedback.findMany({
       where: { tenantId: 'test-tenant-id' },
     });
 
@@ -181,7 +184,7 @@ async function testOutreachFeedback() {
 
     // 4. Group by category
     console.log('\n4. Grouping feedback by category...');
-    const byCategory = await prisma.outreach_feedback.groupBy({
+    const byCategory = await prisma.outreachFeedback.groupBy({
       by: ['category'],
       where: { tenantId: 'test-tenant-id' },
       _count: true,
@@ -206,7 +209,7 @@ async function testOutreachFeedback() {
 
     // Cleanup test feedback
     console.log('\n6. Cleaning up test feedback...');
-    await prisma.outreach_feedback.deleteMany({
+    await prisma.outreachFeedback.deleteMany({
       where: { tenantId: 'test-tenant-id' },
     });
     console.log('✅ Test feedback cleaned up');

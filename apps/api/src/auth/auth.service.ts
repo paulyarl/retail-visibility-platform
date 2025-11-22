@@ -44,14 +44,9 @@ export class AuthService {
    * Generate JWT access token
    */
   generateAccessToken(payload: JWTPayload): string {
-    const now = Math.floor(Date.now() / 1000);
-    console.log('[AuthService] Generating access token at:', new Date().toISOString(), 'timestamp:', now);
     const token = jwt.sign(payload, JWT_ACCESS_SECRET, {
       expiresIn: JWT_ACCESS_EXPIRY,
     });
-    console.log('[AuthService] Token generated, decoding to verify timestamp...');
-    const decoded = jwt.decode(token) as any;
-    console.log('[AuthService] Token iat:', decoded.iat, 'exp:', decoded.exp);
     return token;
   }
 
@@ -242,7 +237,7 @@ export class AuthService {
    * Get user by ID
    */
   async getUserById(userId: string) {
-    console.log('[AuthService] getUserById called with:', userId);
+    // Get user by ID
     
     // First get user without relations to avoid Prisma relation issues
     const user = await prisma.user.findUnique({

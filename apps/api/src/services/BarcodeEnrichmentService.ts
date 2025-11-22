@@ -159,9 +159,9 @@ export class BarcodeEnrichmentService {
       name: data.title || 'Unknown Product',
       description: data.description || null,
       brand: data.brand || 'Unknown',
-      category_path: data.category ? [data.category] : [],
+      categoryPath: data.category ? [data.category] : [], 
       priceCents: data.msrp ? Math.round(parseFloat(data.msrp) * 100) : undefined,
-      image_url: data.images?.[0] || null,
+      imageUrl: data.images?.[0] || null,
       imageThumbnailUrl: data.images?.[0] || null,
       metadata: {
         // Identifiers
@@ -188,8 +188,8 @@ export class BarcodeEnrichmentService {
         pricing: {
           msrp: data.msrp,
           currency: data.currency,
-          lowest_recorded_price: data.lowest_recorded_price,
-          highest_recorded_price: data.highest_recorded_price,
+          lowestRecordedPrice: data.lowest_recorded_price,
+          highestRecordedPrice: data.highest_recorded_price,
         },
         
         // Offers from retailers
@@ -239,8 +239,8 @@ export class BarcodeEnrichmentService {
       name: product.product_name || product.product_name_en || 'Unknown Product',
       description: product.generic_name || null,
       brand: product.brands || 'Unknown',
-      category_path: product.categories_tags?.slice(0, 3) || [],
-      image_url: product.image_url || product.image_front_url || null,
+      categoryPath: product.categories_tags?.slice(0, 3) || [],
+      imageUrl: product.image_url || product.image_front_url || null,
       imageThumbnailUrl: product.image_small_url || product.image_thumb_url || null,
       metadata: {
         barcode: product.code,
@@ -276,8 +276,8 @@ export class BarcodeEnrichmentService {
             calcium: product.nutriments.calcium_100g,
             iron: product.nutriments.iron_100g,
           } : null,
-          serving_size: product.serving_size,
-          serving_quantity: product.serving_quantity,
+          servingSize: product.serving_size,
+          servingQuantity: product.serving_quantity,
         },
         
         // Allergens & Dietary
@@ -342,7 +342,7 @@ export class BarcodeEnrichmentService {
       name: `Product ${barcode}`,
       description: 'Product information not available',
       brand: 'Unknown',
-      category_path: [],
+      categoryPath: [],
       metadata: {
         barcode,
         note: 'Please update product information manually',
@@ -395,7 +395,7 @@ export class BarcodeEnrichmentService {
    */
   private async getFromDatabase(barcode: string): Promise<EnrichmentResult | null> {
     try {
-      const cached = await prisma.barcode_enrichment.findUnique({
+      const cached = await prisma.barcodeEnrichment.findUnique({
         where: { barcode },
       });
 
@@ -404,7 +404,7 @@ export class BarcodeEnrichmentService {
       }
 
       // Update fetch count and last fetched timestamp
-      await prisma.barcode_enrichment.update({
+      await prisma.barcodeEnrichment.update({
         where: { barcode },
         data: {
           fetchCount: { increment: 1 },
@@ -417,9 +417,9 @@ export class BarcodeEnrichmentService {
         name: cached.name || undefined,
         brand: cached.brand || undefined,
         description: cached.description || undefined,
-        category_path: cached.categoryPath || undefined,
+        categoryPath: cached.categoryPath || undefined,
         priceCents: cached.priceCents || undefined,
-        image_url: cached.image_url || undefined,
+        imageUrl: cached.imageUrl || undefined,
         imageThumbnailUrl: cached.imageThumbnailUrl || undefined,
         metadata: (cached.metadata as Record<string, any>) || undefined,
         source: cached.source as any,
@@ -432,16 +432,16 @@ export class BarcodeEnrichmentService {
 
   private async saveToDatabase(barcode: string, data: EnrichmentResult): Promise<void> {
     try {
-      await prisma.barcode_enrichment.upsert({
+      await prisma.barcodeEnrichment.upsert({
         where: { barcode },
         create: {
           barcode,
           name: data.name || null,
           brand: data.brand || null,
           description: data.description || null,
-          category_path: data.categoryPath || [],
+          categoryPath: data.categoryPath || [],
           priceCents: data.priceCents || null,
-          image_url: data.image_url || null,
+          imageUrl: data.imageUrl || null,
           imageThumbnailUrl: data.imageThumbnailUrl || null,
           metadata: data.metadata ? data.metadata : undefined,
           source: data.source,
@@ -452,9 +452,9 @@ export class BarcodeEnrichmentService {
           name: data.name || null,
           brand: data.brand || null,
           description: data.description || null,
-          category_path: data.categoryPath || [],
+          categoryPath: data.categoryPath || [],
           priceCents: data.priceCents || null,
-          image_url: data.image_url || null,
+          imageUrl: data.imageUrl || null,
           imageThumbnailUrl: data.imageThumbnailUrl || null,
           metadata: data.metadata ? data.metadata : undefined,
           source: data.source,
@@ -506,7 +506,7 @@ export class BarcodeEnrichmentService {
     error?: string
   ): Promise<void> {
     try {
-      await prisma.barcode_lookup_log.create({
+      await prisma.barcodeLookupLog.create({
         data: {
           tenantId,
           barcode,
