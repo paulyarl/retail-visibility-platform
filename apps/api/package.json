@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon",
     "build": "node build-with-selective-errors.js",
+    "start": "node dist/index.js",
     "vercel-build": "node build-with-selective-errors.js",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:local": "tsx prisma/seed.ts",
