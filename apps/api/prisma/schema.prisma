@@ -1121,7 +1121,7 @@ model User {
   isActive                  Boolean                       @default(true) @map("is_active")
   createdAt                 DateTime                      @default(now()) @map("created_at")
   updatedAt                 DateTime                      @map("updated_at")
-  @@map("user")
+  @@map("users")
   directoryFeaturedListings DirectoryFeaturedListings[]
   invitations               Invitation[]
   userSessions              UserSession[] 
