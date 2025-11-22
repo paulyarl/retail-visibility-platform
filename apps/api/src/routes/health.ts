@@ -74,11 +74,11 @@ router.get('/critical', async (_req: Request, res: Response) => {
     checks.database = true;
     
     // Check 2: User table query (critical for login)
-    const userCount = await prisma.users.count();
+    const userCount = await prisma.user.count();
     checks.userQuery = true;
     
     // Check 3: Session table query (critical for auth)
-    const sessionCount = await prisma.user_sessions.count();
+    const sessionCount = await prisma.userSession.count();
     checks.sessionQuery = true;
     
     const latency = Date.now() - start;

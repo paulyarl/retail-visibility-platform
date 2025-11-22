@@ -32,13 +32,9 @@ async function cleanup() {
   
   // Find and delete test organizations
   const testOrgs = await prisma.organization.findMany({
-    where: {
-      name: {
-        contains: 'Test Chain - Auto Generated',
-      },
-    },
+    where: { name: { startsWith: 'Test Chain' } },
     include: {
-      tenant: true,
+      Tenant: true,
     },
   });
 
@@ -46,8 +42,8 @@ async function cleanup() {
     console.log(`  Deleting organization: ${org.name} (${org.id})`);
     
     // Delete all items from tenants
-    for (const tenant of org.tenants) {
-      await prisma.inventory_item.deleteMany({
+    for (const tenant of org.Tenant) {
+      await prisma.inventoryItem.deleteMany({
         where: { tenantId: tenant.id },
       });
     }
@@ -75,8 +71,8 @@ async function createTestChain(): Promise<TestContext> {
     data: {
       name: TEST_ORG_NAME,
       ownerId: 'test-owner',
-      subscription_tier: 'chain_professional',
-      subscription_status: 'active',
+      subscriptionTier: 'chain_professional',
+      subscriptionStatus: 'active',
       maxLocations: 15,
       maxTotalSKUs: 25000,
     },
@@ -88,7 +84,7 @@ async function createTestChain(): Promise<TestContext> {
     data: {
       name: HERO_LOCATION_NAME,
       organizationId: organization.id,
-      subscription_tier: 'professional',
+      subscriptionTier: 'professional',
       metadata: {
         business_name: HERO_LOCATION_NAME,
         city: 'New York',
@@ -106,7 +102,7 @@ async function createTestChain(): Promise<TestContext> {
       data: {
         name: `Location ${i}`,
         organizationId: organization.id,
-        subscription_tier: 'professional',
+        subscriptionTier: 'professional',
         metadata: {
           business_name: `Test Store ${i}`,
           city: `City ${i}`,
@@ -130,8 +126,8 @@ async function createTestProducts(ctx: TestContext): Promise<void> {
   console.log('\n📦 Creating test products at hero location...\n');
   
   for (let i = 1; i <= NUM_TEST_PRODUCTS; i++) {
-    const item = await prisma.inventory_item.create({
-      data: {
+    const item = await prisma.inventoryItem.create({
+      data: { 
         tenantId: ctx.heroTenantId,
         sku: `TEST-SKU-${String(i).padStart(3, '0')}`,
         name: `Test Product ${i}`,
@@ -143,7 +139,7 @@ async function createTestProducts(ctx: TestContext): Promise<void> {
         stock: 100,
         quantity: 100,
         currency: 'USD',
-        availability: 'in_stock',
+        availability: 'inStock',
         itemStatus: 'active',
         visibility: 'public',
         source: 'MANUAL',
@@ -165,7 +161,7 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
   console.log(`  Target: ${targetTenantIds[0]}`);
   
   // Simulate the API call logic
-  const sourceItem = await prisma.inventory_item.findUnique({
+  const sourceItem = await prisma.inventoryItem.findUnique({
     where: { id: sourceItemId },
     include: { photos: true },
   });
@@ -175,7 +171,7 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
   }
   
   // Create copy at target
-  const newItem = await prisma.inventory_item.create({
+  const newItem = await prisma.inventoryItem.create({
     data: {
       tenantId: targetTenantIds[0],
       sku: sourceItem.sku,
@@ -187,12 +183,12 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
       priceCents: sourceItem.priceCents,
       stock: sourceItem.stock,
       quantity: sourceItem.quantity,
-      image_url: sourceItem.image_url,
+      imageUrl: sourceItem.imageUrl,
       imageGallery: sourceItem.imageGallery,
       marketingDescription: sourceItem.marketingDescription,
       metadata: sourceItem.metadata as any,
       availability: sourceItem.availability,
-      category_path: sourceItem.categoryPath,
+      categoryPath: sourceItem.categoryPath,
       condition: sourceItem.condition,
       currency: sourceItem.currency,
       gtin: sourceItem.gtin,
@@ -208,7 +204,7 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
   console.log(`✅ Item propagated successfully: ${newItem.id}`);
   
   // Verify
-  const targetItem = await prisma.inventory_item.findFirst({
+  const targetItem = await prisma.inventoryItem.findFirst({
     where: {
       tenantId: targetTenantIds[0],
       sku: sourceItem.sku,
@@ -233,7 +229,7 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
   };
   
   // Get all items from hero location
-  const heroItems = await prisma.inventory_item.findMany({
+  const heroItems = await prisma.inventoryItem.findMany({
     where: { tenantId: ctx.heroTenantId },
     include: { photos: true },
   });
@@ -248,7 +244,7 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
       
       try {
         // Check if already exists
-        const existing = await prisma.inventory_item.findFirst({
+        const existing = await prisma.inventoryItem.findFirst({
           where: {
             tenantId: targetTenantId,
             sku: item.sku,
@@ -261,7 +257,7 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
         }
         
         // Create copy
-        await prisma.inventory_item.create({
+        await prisma.inventoryItem.create({
           data: {
             tenantId: targetTenantId,
             sku: item.sku,
@@ -273,12 +269,12 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
             priceCents: item.priceCents,
             stock: item.stock,
             quantity: item.quantity,
-            image_url: item.image_url,
+            imageUrl: item.imageUrl,
             imageGallery: item.imageGallery,
             marketingDescription: item.marketingDescription,
             metadata: item.metadata as any,
             availability: item.availability,
-            category_path: item.categoryPath,
+            categoryPath: item.categoryPath,
             condition: item.condition,
             currency: item.currency,
             gtin: item.gtin,
@@ -311,7 +307,7 @@ async function validateResults(ctx: TestContext): Promise<void> {
   
   // Check each location has the items
   for (const tenantId of ctx.otherTenantIds) {
-    const itemCount = await prisma.inventory_item.count({
+    const itemCount = await prisma.inventoryItem.count({
       where: { tenantId },
     });
     
@@ -330,11 +326,11 @@ async function validateResults(ctx: TestContext): Promise<void> {
   const org = await prisma.organization.findUnique({
     where: { id: ctx.organizationId },
     include: {
-      tenant: {
+      Tenant: {
         select: {
           _count: {
             select: {
-              _count: true,
+              inventoryItems: true,
             },
           },
         },
@@ -342,7 +338,7 @@ async function validateResults(ctx: TestContext): Promise<void> {
     },
   });
   
-  const totalSKUs = org?.tenants.reduce((sum, t) => sum + t._count.inventory_item, 0) || 0;
+  const totalSKUs = org?.Tenant.reduce((sum: any, t: { _count: { inventoryItems: any; }; }) => sum + t._count.inventoryItems, 0) || 0;
   const expectedTotal = NUM_TEST_PRODUCTS * (NUM_LOCATIONS + 1); // +1 for hero location
   
   console.log(`\n  Total SKUs across chain: ${totalSKUs}`);

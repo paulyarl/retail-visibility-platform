@@ -5,7 +5,7 @@
  * Provides realistic sample data for testing and evaluation.
  */
 
-import { availability_status, product_source } from '@prisma/client';
+import { AvailabilityStatus, ProductSource } from '@prisma/client';
 
 export interface DemoItem {
   id: string;
@@ -275,7 +275,7 @@ export function getDemoItem(id: string): DemoItem | undefined {
  * Simulate inventory update (for future webhook simulation)
  */
 export function simulateInventoryUpdate(item_id: string, newStock: number): DemoItem | null {
-  const item = DEMO_ITEMS.find(i => i.id === itemId);
+  const item = DEMO_ITEMS.find(i => i.id === item_id);
   if (!item) return null;
   
   // In a real implementation, this would emit an event
@@ -313,8 +313,8 @@ export function convertDemoItemToRVPFormat(demoItem: DemoItem) {
     priceCents: demoItem.price,
     currency: 'USD',
     stock: demoItem.stock,
-    availability: demoItem.stock > 0 ? availability_status.in_stock : availability_status.out_of_stock,
-    source: product_source.CLOVER_DEMO,
+    availability: demoItem.stock > 0 ? AvailabilityStatus.inStock : AvailabilityStatus.outOfStock,
+    source: ProductSource.CLOVER_DEMO,
     metadata: {
       cloverItemId: demoItem.id,
       cloverCategory: demoItem.category,

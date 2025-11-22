@@ -40,11 +40,11 @@ async function logAudit(req: Request, res: Response, requestId: string) {
     const user = req.user;
 
     // Determine entity type and action from path
-    let entityType: 'inventory_item' | 'tenant' | 'policy' | 'oauth' | 'other' = 'other';
-    let action: 'create' | 'update' | 'delete' | 'sync' | 'policy_apply' | 'oauth_connect' | 'oauth_refresh' = 'update';
+    let entityType: 'inventoryItem' | 'tenant' | 'policy' | 'oauth' | 'other' = 'other';
+    let action: 'create' | 'update' | 'delete' | 'sync' | 'policyApply' | 'oauthConnect' | 'oauthRefresh' = 'update';
 
     if (path.includes('/inventory') || path.includes('/items')) {
-      entityType = 'inventory_item';
+      entityType = 'inventoryItem';
       if (req.method === 'POST') action = 'create';
       if (req.method === 'DELETE') action = 'delete';
       if (req.method === 'PUT' || req.method === 'PATCH') action = 'update';
@@ -52,11 +52,11 @@ async function logAudit(req: Request, res: Response, requestId: string) {
       entityType = 'tenant';
     } else if (path.includes('/policy')) {
       entityType = 'policy';
-      action = 'policy_apply';
+      action = 'policyApply';
     } else if (path.includes('/google') || path.includes('/oauth')) {
       entityType = 'oauth';
-      if (path.includes('/connect')) action = 'oauth_connect';
-      if (path.includes('/refresh')) action = 'oauth_refresh';
+      if (path.includes('/connect')) action = 'oauthConnect';
+      if (path.includes('/refresh')) action = 'oauthRefresh';
     }
 
     // Extract entity ID from path

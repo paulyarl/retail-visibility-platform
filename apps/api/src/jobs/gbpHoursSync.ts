@@ -3,7 +3,7 @@ import { prisma } from '../prisma'
 import { audit } from '../audit'
 
 export type GbpHoursPayload = {
-  tenant_id: string
+  tenantId: string
 }
 
 async function sleep(ms: number) {
@@ -14,17 +14,17 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
   const { tenantId } = payload
   // Load platform hours (source of truth)
   const hours = await prisma.businessHours.upsert({
-    where: { tenant_id: tenantId },
+    where: { tenantId: tenantId },
     update: {},
     create: {
       id: randomUUID(),
-      tenant_id: tenantId,
+      tenantId: tenantId,
       timezone: 'America/New_York',
       periods: [] as any,
       updatedAt: new Date(),
     },
   })
-  const specials = await prisma.businessHoursSpecial.findMany({ where: { tenant_id: tenantId } })
+  const specials = await prisma.businessHoursSpecial.findMany({ where: { tenantId: tenantId } })
 
   // Build GBP payload (shape simplified)
   // Note: GBP supports multiple special hour periods per date
@@ -34,7 +34,7 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
     },
     specialHours: specials.map((s) => ({
       date: s.date.toISOString().slice(0, 10),
-      isClosed: s.is_closed,
+      isClosed: s.isClosed,
       openTime: s.open || undefined,
       closeTime: s.close || undefined,
       note: s.note || undefined,
@@ -48,7 +48,7 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
   const locationName = process.env.GBP_LOCATION_NAME // e.g. accounts/123/locations/456
   const accessToken = process.env.GBP_ACCESS_TOKEN // ideally retrieved per-tenant; env for pilot simplicity
 
-  let attempt = (hours.sync_attempts || 0) + 1
+  let attempt = (hours.syncAttempts || 0) + 1
   let lastError: string | null = null
 
   for (let i = 0; i < 5; i++) {
@@ -86,8 +86,8 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
       }
 
       await prisma.businessHours.update({
-        where: { tenant_id: tenantId },
-        data: { last_synced_at: new Date(), sync_attempts: attempt, last_error: null, updatedAt: new Date() },
+        where: { tenantId: tenantId },
+        data: { lastSyncedAt: new Date(), syncAttempts: attempt, lastError: null, updatedAt: new Date() },
       })
 
       try {
@@ -102,7 +102,7 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
     }
   }
 
-  await prisma.businessHours.update({ where: { tenant_id: tenantId }, data: { sync_attempts: attempt, last_error: lastError, updatedAt: new Date() } })
+  await prisma.businessHours.update({ where: { tenantId: tenantId }, data: { syncAttempts: attempt, lastError: lastError, updatedAt: new Date() } })
   try {
     await audit({ tenantId, actor: null, action: 'sync', payload: { entity: 'gbp.hours', ok: false, error: lastError } as any })
   } catch {}

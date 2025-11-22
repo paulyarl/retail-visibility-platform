@@ -73,7 +73,7 @@ async function seedPlatformFlags() {
 
   for (const flagData of DEFAULT_FLAGS) {
     try {
-      const flag = await prisma.platform_feature_flags.upsert({
+      const flag = await prisma.platformFeatureFlags.upsert({
         where: { flag: flagData.flag },
         update: {
           enabled: flagData.enabled,

@@ -32,8 +32,8 @@ export async function getCategoryCounts(
       itemWhere.visibility = 'public';
     }
 
-    // Fetch categories with counts using a single efficient query
-    const categories = await prisma.tenant_category.findMany({
+    // Fetch categories first
+    const categories = await prisma.tenantCategory.findMany({
       where: {
         tenantId,
         isActive: true,
@@ -44,18 +44,34 @@ export async function getCategoryCounts(
         slug: true,
         googleCategoryId: true,
         sortOrder: true,
-        _count: {
-          select: {
-            _count: {
-              where: itemWhere,
-            },
-          },
-        },
       },
       orderBy: {
         sortOrder: 'asc',
       },
     });
+
+    // Get counts for each category
+    const categoryIds = categories.map(cat => cat.id);
+    const counts = await prisma.inventoryItem.groupBy({
+      by: ['tenantCategoryId'],
+      where: {
+        tenantId,
+        tenantCategoryId: { in: categoryIds },
+        ...(!includeAll && {
+          itemStatus: 'active',
+          visibility: 'public',
+        }),
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Create a map of category ID to count
+    const countMap = counts.reduce((acc, count) => {
+      acc[count.tenantCategoryId || 'uncategorized'] = count._count.id;
+      return acc;
+    }, {} as Record<string, number>);
 
     // Transform to CategoryCount format
     return categories.map(cat => ({
@@ -63,7 +79,7 @@ export async function getCategoryCounts(
       name: cat.name,
       slug: cat.slug,
       googleCategoryId: cat.googleCategoryId,
-      count: cat._count.inventory_item,
+      count: countMap[cat.id] || 0,
     }));
   } catch (error) {
     console.error('[Category Counts] Error:', error);
@@ -93,7 +109,7 @@ export async function getUncategorizedCount(
       where.visibility = 'public';
     }
 
-    return await prisma.inventory_item.count({ where });
+    return await prisma.inventoryItem.count({ where });
   } catch (error) {
     console.error('[Uncategorized Count] Error:', error);
     return 0;
@@ -121,7 +137,7 @@ export async function getTotalProductCount(
       where.visibility = 'public';
     }
 
-    return await prisma.inventory_item.count({ where });
+    return await prisma.inventoryItem.count({ where });
   } catch (error) {
     console.error('[Total Product Count] Error:', error);
     return 0;

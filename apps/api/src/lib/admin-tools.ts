@@ -94,7 +94,7 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
     let actualSkuCount = 0;
     if (seedProducts) {
       const result = await generateQuickStartProducts({
-        tenantId: currentTenant.id,
+        tenant_id: currentTenant.id,
         scenario,
         productCount: skuCount,
         assignCategories: true,
@@ -217,7 +217,7 @@ export async function createTestTenant(options: {
   let result = null;
   if (productCount > 0) {
     result = await generateQuickStartProducts({
-      tenantId: tenant.id,
+      tenant_id: tenant.id,
       scenario,
       productCount,
       assignCategories: true,
@@ -258,7 +258,7 @@ export async function bulkSeedProducts(options: {
 
       // Seed products
       const result = await generateQuickStartProducts({
-        tenantId,
+        tenant_id: tenantId,
         scenario,
         productCount,
         assignCategories: true,

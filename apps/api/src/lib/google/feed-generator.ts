@@ -28,7 +28,7 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
   try {
     const items = await prisma.inventoryItem.findMany({
       where: {
-        tenant_id: tenantId,
+        tenantId: tenant_id,
         itemStatus: 'active',  // Only active items
         visibility: 'public',   // Only public items
       },
@@ -74,15 +74,15 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
  */
 export async function getFeedStats(tenant_id: string) {
   const [total, active, inactive, syncing, notSyncing] = await Promise.all([
-    prisma.inventoryItem.count({ where: { tenant_id: tenantId } }),
-    prisma.inventoryItem.count({ where: { tenant_id: tenantId, itemStatus: 'active' } }),
-    prisma.inventoryItem.count({ where: { tenant_id: tenantId, itemStatus: 'inactive' } }),
+    prisma.inventoryItem.count({ where: { tenantId: tenant_id } }),
+    prisma.inventoryItem.count({ where: { tenantId: tenant_id, itemStatus: 'active' } }),
+    prisma.inventoryItem.count({ where: { tenantId: tenant_id, itemStatus: 'inactive' } }),
     prisma.inventoryItem.count({ 
-      where: { tenant_id: tenantId, itemStatus: 'active', visibility: 'public' } 
+      where: { tenantId: tenant_id, itemStatus: 'active', visibility: 'public' } 
     }),
     prisma.inventoryItem.count({ 
       where: { 
-        tenant_id: tenantId,
+        tenantId: tenant_id,
         OR: [
           { itemStatus: { not: 'active' } },
           { visibility: { not: 'public' } },

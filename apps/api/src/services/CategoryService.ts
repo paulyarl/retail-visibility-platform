@@ -12,7 +12,7 @@ export type UpdateCategoryInput = Partial<{
 
 export const categoryService = {
   async getTenantCategories(tenantId: string) {
-    const categories = await prisma.tenant_category.findMany({
+    const categories = await prisma.tenantCategory.findMany({
       where: {
         tenantId,
         isActive: true,
@@ -26,7 +26,7 @@ export const categoryService = {
   },
 
   async createTenantCategory(tenantId: string, input: Required<Pick<UpdateCategoryInput, 'name' | 'slug'>> & Partial<UpdateCategoryInput>) {
-    const category = await prisma.tenant_category.create({
+    const category = await prisma.tenantCategory.create({
       data: {
         tenantId,
         name: input.name,
@@ -57,7 +57,7 @@ export const categoryService = {
   },
 
   async updateTenantCategory(tenantId: string, id: string, input: UpdateCategoryInput) {
-    const category = await prisma.tenant_category.update({ where: { id }, data: input })
+    const category = await prisma.tenantCategory.update({ where: { id }, data: input })
     try {
       await audit({
         tenantId,
@@ -71,7 +71,7 @@ export const categoryService = {
   },
 
   async softDeleteTenantCategory(tenantId: string, id: string) {
-    const category = await prisma.tenant_category.update({ where: { id }, data: { isActive: false } })
+    const category = await prisma.tenantCategory.update({ where: { id }, data: { isActive: false } })
     try {
       await audit({ tenantId, actor: null, action: 'category.delete', payload: { id } })
     } catch {}
@@ -80,7 +80,7 @@ export const categoryService = {
   },
 
   async alignCategory(tenantId: string, id: string, googleCategoryId: string) {
-    const category = await prisma.tenant_category.update({ where: { id }, data: { googleCategoryId } })
+    const category = await prisma.tenantCategory.update({ where: { id }, data: { googleCategoryId } })
     try {
       await audit({ tenantId, actor: null, action: 'category.align', payload: { id, googleCategoryId } })
     } catch {}
@@ -98,14 +98,14 @@ export const categoryService = {
       throw Object.assign(new Error('tenantCategoryId_or_categorySlug_required'), { statusCode: 400 })
     }
 
-    const item = await prisma.inventory_item.findFirst({ where: { id: itemId, tenantId } })
+    const item = await prisma.inventoryItem.findFirst({ where: { id: item_id, tenantId } })
     if (!item) {
       throw Object.assign(new Error('item_not_found'), { statusCode: 404 })
     }
 
     let category
     if (tenantCategoryId) {
-      category = await prisma.tenant_category.findFirst({
+      category = await prisma.tenantCategory.findFirst({
         where: {
           id: tenantCategoryId,
           tenantId,
@@ -113,7 +113,7 @@ export const categoryService = {
         },
       })
     } else if (categorySlug) {
-      category = await prisma.tenant_category.findFirst({
+      category = await prisma.tenantCategory.findFirst({
         where: {
           tenantId,
           slug: categorySlug,
@@ -138,11 +138,11 @@ export const categoryService = {
       throw Object.assign(new Error('tenant_category_not_found'), { statusCode: 404 })
     }
 
-    const updated = await prisma.inventory_item.update({
-      where: { id: itemId },
+    const updated = await prisma.inventoryItem.update({
+      where: { id: item_id },
       data: { 
         tenantCategoryId: category.id,
-        category_path: [category.slug] as any, // Keep for backward compatibility
+        categoryPath: [category.slug] as any, // Keep for backward compatibility
       },
     })
 
@@ -152,7 +152,7 @@ export const categoryService = {
         actor: null,
         action: 'item.category.assign',
         payload: {
-          itemId,
+          item_id,
           tenantCategoryId: category.id,
           categorySlug: category.slug,
         },
