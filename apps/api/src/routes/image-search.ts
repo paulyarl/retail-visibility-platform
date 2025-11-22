@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { checkImageSearchLimit } from '../middleware/image-search-limits';
 import { requireTierFeature } from '../middleware/tier-access';
-import fetch from 'node-fetch';
 
 const router = Router();
 

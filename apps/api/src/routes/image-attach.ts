@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { prisma } from '../prisma';
-import fetch from 'node-fetch';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
