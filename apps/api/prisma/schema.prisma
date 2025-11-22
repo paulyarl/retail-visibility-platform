@@ -1254,15 +1254,15 @@ enum SyncStatus {
 }
 
 enum UserRole {
-  PLATFORM_ADMIN @map("platform_admin")
-  PLATFORM_SUPPORT @map("platform_support")
-  PLATFORM_VIEWER @map("platform_viewer")
-  ADMIN @map("admin")
-  OWNER @map("owner")
-  USER @map("user")
-  TENANT_OWNER @map("tenant_owner")
-  TENANT_ADMIN @map("tenant_admin")
-  TENANT_MANAGER @map("tenant_manager")
+  PLATFORM_ADMIN @map("PLATFORM_ADMIN")
+  PLATFORM_SUPPORT @map("PLATFORM_SUPPORT")
+  PLATFORM_VIEWER @map("PLATFORM_VIEWER")
+  ADMIN @map("ADMIN")
+  OWNER @map("OWNER")
+  USER @map("USER")
+  TENANT_OWNER @map("TENANT_OWNER")
+  TENANT_ADMIN @map("TENANT_ADMIN")
+  TENANT_MANAGER @map("TENANT_MANAGER")
   @@map("user_role")
 }
 
