@@ -73,7 +73,7 @@ model Tenant {
   @@index([slug], map: "tenant_slug_idx")
   @@index([subscriptionStatus], map: "tenant_subscriptionstatus_idx")
   @@index([locationStatus], map: "tenant_locationstatus_idx")
-  @@map("tenant")
+  @@map("Tenant")
 }
 
 model AuditLog {
