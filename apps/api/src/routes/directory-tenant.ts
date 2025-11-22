@@ -63,7 +63,7 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
           tenantId,
           slug,
           isPublished: false,
-          updated_at: new Date(),
+          updatedAt: new Date(),
         },
       });
     }
@@ -128,7 +128,7 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
         seoKeywords: parsed.data.seo_keywords,
         primaryCategory: parsed.data.primary_category,
         secondaryCategories: parsed.data.secondary_categories,
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
       create: {
         id: `dir_${tenantId}`,
@@ -137,7 +137,7 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
         seoKeywords: parsed.data.seo_keywords,
         primaryCategory: parsed.data.primary_category,
         secondaryCategories: parsed.data.secondary_categories,
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
     });
 
@@ -181,12 +181,12 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
 
     const updated = await prisma.directorySettings.upsert({
       where: { tenantId },
-      update: { isPublished: true, updated_at: new Date() },
+      update: { isPublished: true, updatedAt: new Date() },
       create: { 
         id: `dir_${tenantId}`,
         tenantId, 
         isPublished: true,
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
     });
 
@@ -207,7 +207,7 @@ router.post('/:id/directory/unpublish', authenticateToken, checkTenantAccess, as
 
     const updated = await prisma.directorySettings.update({
       where: { tenantId },
-      data: { isPublished: false, updated_at: new Date() },
+      data: { isPublished: false, updatedAt: new Date() },
     });
 
     return res.json({ success: true, listing: updated });
