@@ -3667,3 +3667,6 @@ if (process.env.NODE_ENV !== "test") {
     });
   });
 }
+
+// Export the Express app for Vercel compatibility
+export default app;
