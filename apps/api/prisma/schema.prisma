@@ -1049,7 +1049,7 @@ model TierFeatures {
   tierId      String @map("tier_id")
   featureKey  String @map("feature_key")
   featureName String @map("feature_name")
-  isEnabled   Boolean  @default(true)
+  isEnabled   Boolean  @default(true) @map("is_enabled")
   isInherited Boolean  @default(false) @map("is_inherited")
   metadata     Json?  @map("metadata")
   createdAt   DateTime @default(now()) @map("created_at")
