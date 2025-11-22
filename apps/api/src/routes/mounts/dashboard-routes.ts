@@ -60,5 +60,5 @@ export function mountDashboardRoutes(app: Express) {
   app.use(mirrorAdminRoutes);
   app.use(syncLogsRoutes);
 
-  console.log('✅ Dashboard routes mounted');
+  console.log('✅ Category scaffold routes mounted');
 }
