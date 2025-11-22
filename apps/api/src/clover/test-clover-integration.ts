@@ -371,7 +371,7 @@ async function testPhase4Database() {
     
     const integration = await prisma.cloverIntegrations.create({
       data: {
-        tenant_id: TEST_TENANT_ID,
+        tenantId: TEST_TENANT_ID, 
         merchantId: 'test-merchant-123',
         accessToken: encryptToken('test-access-token'),
         refreshToken: encryptToken('test-refresh-token'),
@@ -385,7 +385,7 @@ async function testPhase4Database() {
       // Test 4.2: Retrieve Integration
       subsection('Test 4.2: Retrieve Integration');
       const retrieved = await prisma.cloverIntegrations.findUnique({
-        where: { tenant_id: TEST_TENANT_ID },
+        where: { tenantId: TEST_TENANT_ID },
       });
       
       if (retrieved && retrieved.id === integration.id) {

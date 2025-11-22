@@ -57,7 +57,7 @@ export class GBPCategorySyncService {
           where: { accountId: tokenRecord.accountId },
           data: {
             accessTokenEncrypted: encryptToken(newTokens.access_token),
-            expires_at: newExpiresAt,
+            expiresAt: newExpiresAt,
             scopes: newTokens.scope.split(' '),
           },
         });
@@ -322,7 +322,7 @@ export class GBPCategorySyncService {
               data: {
                 id: change.categoryId,
                 name: change.newData.displayName,
-                display_name: change.newData.displayName,
+                displayName: change.newData.displayName,
                 isActive: true
               }
             });
@@ -333,7 +333,7 @@ export class GBPCategorySyncService {
             await prisma.gbpCategories.update({
               where: { id: change.categoryId },
               data: {
-                display_name: change.newData.displayName,
+                displayName: change.newData.displayName,
                 updatedAt: new Date()
               }
             });
@@ -407,7 +407,7 @@ export class GBPCategorySyncService {
           // Check if category exists
           const existing = await tx.gbpCategories.findUnique({
             where: { id: category.id },
-            select: { id: true, display_name: true }
+            select: { id: true, displayName: true }
           });
 
           if (!existing) {
@@ -416,17 +416,17 @@ export class GBPCategorySyncService {
               data: {
                 id: category.id,
                 name: category.name,
-                display_name: category.display_name,
+                displayName: category.display_name,
                 isActive: true
               }
             });
             upserted++;
-          } else if (existing.display_name !== category.display_name) {
+          } else if (existing.displayName !== category.display_name) { 
             // Update existing category if displayName changed
             await tx.gbpCategories.update({
               where: { id: category.id },
               data: {
-                display_name: category.display_name,
+                displayName: category.display_name,
                 updatedAt: new Date()
               }
             });

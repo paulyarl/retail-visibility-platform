@@ -132,57 +132,57 @@ model BarcodeLookupLog {
 
 model BusinessHours {
   id             String    @id
-  tenant_id      String    @unique
+  tenantId      String    @unique @map("tenant_id")
   timezone       String    @default("America/New_York")
   periods        Json      @default("[]")
-  source_hash    String?
-  last_synced_at DateTime?
-  sync_attempts  Int       @default(0)
-  last_error     String?
-  created_at     DateTime  @default(now())
-  updated_at     DateTime
-  tenant         Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  sourceHash    String? @map("source_hash")
+  lastSyncedAt DateTime? @map("last_synced_at") 
+  syncAttempts  Int       @default(0) @map("sync_attempts")
+  lastError     String? @map("last_error")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime @map("updated_at")
+  tenant         Tenant    @relation(fields: tenantId, references: [id], onDelete: Cascade) 
 
-  @@index([tenant_id])
+  @@index(tenantId)
    @@map("business_hours")
 }
 
 model BusinessHoursSpecial {
   id             String    @id
-  tenant_id      String
+  tenantId      String    @map("tenant_id")
   date           DateTime  @db.Date
-  is_closed      Boolean   @default(false)
-  open           String?
+  isClosed      Boolean   @default(false)
+  open           String? 
   close          String?
   note           String?
-  source_hash    String?
-  last_synced_at DateTime?
-  created_at     DateTime  @default(now())
-  updated_at     DateTime
-  tenant         Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  sourceHash    String? @map("source_hash")
+  lastSyncedAt DateTime? @map("last_synced_at") 
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime @map("updated_at")
+  tenant         Tenant    @relation(fields: tenantId, references: [id], onDelete: Cascade)
 
-  @@unique([tenant_id, date])
-  @@index([tenant_id, date])
+  @@unique([tenantId, date])
+  @@index([tenantId, date])
   @@map("business_hours_special")
 }
 
 model CategoryMirrorRuns {
-  id           String    @id
-  tenant_id    String?
+  id           String    @id @default(cuid())
+  tenantId    String?
   strategy     String
-  dry_run      Boolean   @default(true)
+  dryRun      Boolean   @default(true)
   created      Int       @default(0)
   updated      Int       @default(0)
   deleted      Int       @default(0)
   skipped      Boolean   @default(false)
   reason       String?
   error        String?
-  job_id       String?
-  started_at   DateTime  @default(now())
-  completed_at DateTime?
-  tenant       Tenant?   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  jobId       String? @map("job_id")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  tenant       Tenant?   @relation(fields: tenantId, references: [id], onDelete: Cascade) 
 
-  @@index([tenant_id, strategy, started_at(sort: Desc)], map: "category_mirror_runs_tenant_id_strategy_started_at_sort_desc_")
+  @@index([tenantId, strategy, startedAt(sort: Desc)], map: "category_mirror_runs_tenant_id_strategy_started_at_sort_desc_")
   @@map("category_mirror_runs")
 }
 
@@ -284,19 +284,19 @@ model DirectoryListings {
   website              String? @map("website")
   latitude             Float? @map("latitude")
   longitude            Float? @map("longitude")
-  primary_category     String? @map("primary_category")
-  secondary_categories String[] @map("secondary_categories")
-  logo_url             String? @map("logo_url")
+  primaryCategory     String? @map("primary_category") 
+  secondaryCategories String[] @map("secondary_categories")
+  logoUrl             String? @map("logo_url")
   description          String? @map("description")
-  rating_avg           Float?    @default(0) @map("rating_avg")
-  rating_count         Int?      @default(0) @map("rating_count")
+  ratingAvg           Float?    @default(0) @map("rating_avg")
+  ratingCount         Int?      @default(0) @map("rating_count")
   product_count        Int?      @default(0) @map("product_count")
-  is_featured          Boolean?  @default(false) @map("is_featured")
-  subscription_tier    String?   @default("trial") @map("subscription_tier")
-  use_custom_website   Boolean?  @default(false) @map("use_custom_website")
-  is_published         Boolean?  @default(true) @map("is_published")
-  created_at           DateTime? @default(now()) @db.Timestamptz(6) @map("created_at")
-  updated_at           DateTime? @default(now()) @db.Timestamptz(6) @map("updated_at")
+  isFeatured          Boolean?  @default(false) @map("is_featured") 
+  subscriptionTier    String?   @default("trial") @map("subscription_tier")
+  useCustomWebsite   Boolean?  @default(false) @map("use_custom_website")
+  isPublished         Boolean?  @default(true) @map("is_published")
+  createdAt           DateTime? @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt           DateTime? @default(now()) @db.Timestamptz(6) @map("updated_at")
 
   @@map("directory_listings")
 }
@@ -310,11 +310,11 @@ model DirectorySettings {
   seoKeywords         String[] @map("seo_keywords")
   primaryCategory     String? @map("primary_category")
   secondaryCategories String[] @map("secondary_categories")
-  is_featured          Boolean   @default(false) @map("is_featured")
-  featured_until       DateTime? @map("featured_until")
+  isFeatured          Boolean   @default(false) @map("is_featured") 
+  featuredUntil       DateTime? @map("featured_until")
   slug                 String? @unique @map("slug")
-  created_at           DateTime  @default(now()) @map("created_at")
-  updated_at           DateTime @map("updated_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime @map("updated_at")
 
   @@map("directory_settings")
 }
@@ -334,8 +334,8 @@ model EmailConfiguration {
   id         String   @id
   category   String   @unique
   email      String @map("email")
-  updated_at DateTime @map("updated_at")
-  updated_by String? @map("updated_by")
+  updatedAt DateTime @map("updated_at") 
+  updatedBy String? @map("updated_by")
 
   @@map("email_configuration")
 }
@@ -434,7 +434,7 @@ model GoogleOauthAccounts {
   id                  String                @id
   tenantId            String                @map("tenant_id")
   googleAccountId     String                @map("google_account_id")
-  email               String
+  email               String                @map("email")
   displayName         String?               @map("display_name")
   profilePictureUrl   String?               @map("profile_picture_url")
   scopes              String[]              @map("scopes")
@@ -498,12 +498,12 @@ model InventoryItem {
   customSections       Json[]                   @default([]) @map("custom_sections")
   landingPageTheme     String?                  @default("default") @map("landing_page_theme")
   auditLogId           String?                  @map("audit_log_id")
-  availability         AvailabilityStatus      @default(in_stock)
+  availability         AvailabilityStatus      @default(inStock) @map("availability") 
   brand                String
   categoryPath         String[]                 @default([]) @map("category_path")
   tenantCategoryId     String?                  @map("tenant_category_id")
-  condition            ProductCondition?       @default(brand_new)
-  currency             String                   @default("USD") @db.Char(3)
+  condition            ProductCondition?       @default(brand_new) @map("condition")
+  currency             String                   @default("USD") @db.Char(3) @map("currency")
   description          String?
   eligibilityReason    String?                  @map("eligibility_reason")
   gtin                 String?
@@ -532,7 +532,7 @@ model InventoryItem {
   photoAsset           PhotoAsset[]            @relation("InventoryItemPhotos")
   productPerformance   ProductPerformance[]    @relation("InventoryItemPerformance")
 
-  @@unique([tenantId, sku])
+  @@unique([tenantId, sku]) 
   @@index([source])
   @@index([tenantId, enrichmentStatus])
   @@index([tenantId, updatedAt])
@@ -587,10 +587,10 @@ model OauthIntegrations {
   refreshToken String? @map("refresh_token")
   scopes        String[]  @default([])
   expiresAt    DateTime? @db.Timestamptz(6)
-  is_active     Boolean?  @default(true)
+  isActive     Boolean?  @default(true) 
   metadata      Json? @map("metadata")
-  created_at    DateTime? @default(now()) @db.Timestamptz(6) @map("created_at")
-  updated_at    DateTime? @default(now()) @db.Timestamptz(6) @map("updated_at")
+  createdAt    DateTime? @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt    DateTime? @default(now()) @db.Timestamptz(6) @map("updated_at")
 
   @@map("oauth_integrations")
 }
@@ -624,15 +624,15 @@ model OrganizationRequests {
   status          String    @default("pending") @map("status")
   requestType    String    @default("join") @map("request_type")
   estimatedCost  Float? @map("estimated_cost")
-  cost_currency   String?   @default("USD") @map("cost_currency")
+  costCurrency   String?   @default("USD") @map("cost_currency") 
   notes           String? @map("notes")
-  admin_notes     String? @map("admin_notes")
-  cost_agreed     Boolean   @default(false) @map("cost_agreed")
-  cost_agreed_at  DateTime? @map("cost_agreed_at")
-  processed_by    String? @map("processed_by")
-  processed_at    DateTime? @map("processed_at")
-  created_at      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updated_at      DateTime @map("updated_at") @db.Timestamptz(6)
+  adminNotes     String? @map("admin_notes")
+  costAgreed     Boolean   @default(false) @map("cost_agreed")
+  costAgreedAt  DateTime? @map("cost_agreed_at")
+  processedBy    String? @map("processed_by")
+  processedAt    DateTime? @map("processed_at")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6) 
+  updatedAt      DateTime @map("updated_at") @db.Timestamptz(6)
 
   @@map("organization_requests")
 }
@@ -680,7 +680,7 @@ model PermissionMatrix {
 }
 
 model PhotoAsset {
-  id                String        @id
+  id                String        @id @default(cuid())
   tenantId         String @map("tenant_id")
   inventoryItemId String @map("inventory_item_id")
   url               String @map("url")
@@ -1008,6 +1008,7 @@ model TenantFeatureFlags {
   rollout     String? @map("rollout")
   updatedAt  DateTime @map("updated_at")
   description String? @map("description")
+  @@unique([tenantId, flag])
   @@map("tenant_feature_flags")
 }
 
@@ -1022,6 +1023,7 @@ model TenantFeatureOverrides {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime @map("updated_at")
   tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, feature])
   @@map("tenant_feature_overrides")
 }
 
@@ -1130,89 +1132,91 @@ model User {
 
 
 enum LocationStatus {
-  pending
-  active
-  inactive
-  closed
-  archived
+  pending @map("pending")
+  active @map("active")
+  inactive @map("inactive")
+  closed @map("closed")
+  archived @map("archived")
   @@map("location_status")
 }
 
 enum Action {
-  create
-  update
-  delete
-  sync
-  policy_apply
-  oauth_connect
-  oauth_refresh
+  create @map("create")
+  update @map("update")
+  delete @map("delete")
+  sync @map("sync")
+  policyApply @map("policy_apply")
+  oauthConnect @map("oauth_connect")
+  oauthRefresh @map("oauth_refresh")
   @@map("action")
 }
 
 enum ActorType {
-  user
-  system
-  integration
+  user @map("user")
+  system @map("system")
+  integration @map("integration")
   @@map("actor_type")
 }
 
 enum AvailabilityStatus {
-  in_stock
-  out_of_stock
-  preorder
+  inStock @map("in_stock")
+  outOfStock @map("out_of_stock")
+  preorder @map("preorder")
   @@map("availability_status")
 }
 
 enum EnrichmentStatus {
-  PENDING
-  COMPLETE
-  FAILED
+  NEEDS_ENRICHMENT @map("needs_enrichment")
+  PARTIALLY_ENRICHED @map("partially_enriched")
+  PENDING @map("pending")
+  COMPLETE @map("complete")
+  FAILED @map("failed")
   @@map("enrichment_status")
 }
 
 enum EntityType {
-  inventory_item
-  tenant
-  policy
-  oauth
-  other
+  inventoryItem @map("inventory_item")
+  tenant @map("tenant")
+  policy @map("policy")
+  oauth @map("oauth")
+  other @map("other")
   @@map("entity_type")
 }
 
 enum ItemStatus {
-  active
-  inactive
-  archived
-  trashed
+  active @map("active")
+  inactive @map("inactive")
+  archived @map("archived")
+  trashed @map("trashed")
   @@map("item_status")
 }
 
 enum ItemVisibility {
-  public
-  private
+  public @map("public")
+  private @map("private")
   @@map("item_visibility")
 }
 
 enum JobStatus {
-  queued
-  processing
-  success
-  failed
+  queued @map("queued")
+  processing @map("processing")
+  success @map("success")
+  failed @map("failed")
   @@map("job_status")
 }
 
 enum EntityStatus {
-  pending
-  active
-  inactive
-  closed
-  archived
+  pending @map("pending")
+  active @map("active")
+  inactive @map("inactive")
+  closed @map("closed")
+  archived @map("archived")
   @@map("entity_status")
 }
 
 enum PermissionAction {
   tenant_create          @map("tenant.create")
-  tenant_read            @map("tenant.read")
+  tenant_read            @map("tenant.read") 
   tenant_update          @map("tenant.update")
   tenant_delete          @map("tenant.delete")
   tenant_manage_users    @map("tenant.manage_users")
@@ -1227,47 +1231,48 @@ enum PermissionAction {
 }
 
 enum ProductCondition {
-  brand_new
-  refurbished
-  used
+  brand_new @map("brand_new")
+  refurbished @map("refurbished")
+  used @map("used")
   @@map("product_condition")
 }
 
 enum ProductSource {
-  MANUAL
-  BARCODE_SCAN
-  BULK_UPLOAD
-  API_IMPORT
+  MANUAL @map("manual")
+  BARCODE_SCAN @map("barcode_scan")
+  BULK_UPLOAD @map("bulk_upload")
+  API_IMPORT @map("api_import")
+  QUICK_START_WIZARD @map("quick_start_wizard")
   @@map("product_source")
 }
 
 enum SyncStatus {
-  pending
-  success
-  error
+  pending @map("pending")
+  success @map("success")
+  error @map("error")
  @@map("sync_status")
 }
 
 enum UserRole {
-  PLATFORM_ADMIN
-  PLATFORM_SUPPORT
-  PLATFORM_VIEWER
-  ADMIN
-  OWNER
-  USER
-  TENANT_OWNER
-  TENANT_ADMIN
-  TENANT_MANAGER
-  TENANT_MEMBER
-  TENANT_VIEWER
+  PLATFORM_ADMIN @map("platform_admin")
+  PLATFORM_SUPPORT @map("platform_support")
+  PLATFORM_VIEWER @map("platform_viewer")
+  ADMIN @map("admin")
+  OWNER @map("owner")
+  USER @map("user")
+  TENANT_OWNER @map("tenant_owner")
+  TENANT_ADMIN @map("tenant_admin")
+  TENANT_MANAGER @map("tenant_manager")
+  TENANT_MEMBER @map("tenant_member")
+  TENANT_VIEWER @map("tenant_viewer")
   @@map("user_role")
 }
 
 enum UserTenantRole {
-  OWNER
-  ADMIN
-  SUPPORT
-  MEMBER
-  VIEWER
+  OWNER @map("owner")
+  ADMIN @map("admin")
+  SUPPORT @map("support")
+  MEMBER @map("member")
+  VIEWER @map("viewer")
   @@map("user_tenant_role")
 }

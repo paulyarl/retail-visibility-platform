@@ -64,7 +64,7 @@ export class BatchProcessor<T> {
    * Process items in batches
    */
   async process<R>(
-    _count: T[],
+    items: T[],
     processor: (item: T) => Promise<R>
   ): Promise<BatchResult<R>> {
     const startTime = Date.now();

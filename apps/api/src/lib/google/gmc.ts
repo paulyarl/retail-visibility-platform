@@ -19,11 +19,11 @@ const MERCHANT_API_VERSION = 'v1beta';
 async function getValidAccessToken(account_id: string): Promise<string | null> {
   try {
     const tokenRecord = await prisma.googleOauthTokens.findUnique({
-      where: { account_id: accountId },
+      where: { accountId: account_id },
     });
 
     if (!tokenRecord) {
-      console.error('[GMC] No token found for account:', accountId);
+      console.error('[GMC] No token found for account:', account_id);
       return null;
     }
 
@@ -45,7 +45,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
       // Update in database
       const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
       await prisma.googleOauthTokens.update({
-        where: { account_id: accountId },
+        where: { accountId: account_id }, 
         data: {
           accessTokenEncrypted: encryptToken(newTokens.access_token),
           expiresAt: newExpiresAt,
@@ -71,7 +71,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
  */
 export async function listMerchantAccounts(account_id: string): Promise<any[]> {
   try {
-    const accessToken = await getValidAccessToken(accountId);
+    const accessToken = await getValidAccessToken(account_id);
     if (!accessToken) {
       throw new Error('No valid access token');
     }
@@ -107,7 +107,7 @@ export async function getMerchantAccount(
   merchantId: string
 ): Promise<any | null> {
   try {
-    const accessToken = await getValidAccessToken(accountId);
+    const accessToken = await getValidAccessToken(account_id);
     if (!accessToken) {
       throw new Error('No valid access token');
     }
@@ -143,7 +143,7 @@ export async function listProducts(
   maxResults: number = 50
 ): Promise<any[]> {
   try {
-    const accessToken = await getValidAccessToken(accountId);
+    const accessToken = await getValidAccessToken(account_id);
     if (!accessToken) {
       throw new Error('No valid access token');
     }
@@ -183,7 +183,7 @@ export async function getProduct(
   productId: string
 ): Promise<any | null> {
   try {
-    const accessToken = await getValidAccessToken(accountId);
+    const accessToken = await getValidAccessToken(account_id);
     if (!accessToken) {
       throw new Error('No valid access token');
     }
@@ -221,7 +221,7 @@ export async function syncMerchantAccount(
   merchantId: string
 ): Promise<boolean> {
   try {
-    const merchantData = await getMerchantAccount(accountId, merchantId);
+    const merchantData = await getMerchantAccount(account_id, merchantId);
     if (!merchantData) {
       return false;
     }
@@ -233,7 +233,7 @@ export async function syncMerchantAccount(
     // Upsert merchant link (schema has no composite unique on [account_id, merchant_id])
     // Find existing by (account_id, merchant_id), then update by id; else create
     const existing = await prisma.googleMerchantLinks.findFirst({
-      where: { account_id: accountId, merchantId: merchantId },
+      where: { accountId: account_id, merchantId: merchantId }, 
       select: { id: true },
     });
 
@@ -241,11 +241,11 @@ export async function syncMerchantAccount(
       await prisma.googleMerchantLinks.update({
         where: { id: existing.id },
         data: {
-          merchant_name: merchantName,
-          website_url: websiteUrl,
-          last_sync_at: new Date(),
-          sync_status: 'success',
-          sync_error: null,
+          merchantName: merchantName, 
+          websiteUrl: websiteUrl,
+          lastSyncAt: new Date(),
+          syncStatus: 'success',
+          syncError: null,
           updatedAt: new Date(),
         },
       });
@@ -253,13 +253,13 @@ export async function syncMerchantAccount(
       await prisma.googleMerchantLinks.create({
         data: {
           id: `gmc_link_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          account_id: accountId,
+          accountId: account_id,
           merchantId: merchantId,
-          merchant_name: merchantName,
-          website_url: websiteUrl,
-          is_active: true,
-          last_sync_at: new Date(),
-          sync_status: 'success',
+          merchantName: merchantName,
+          websiteUrl: websiteUrl,
+          isActive: true,
+          lastSyncAt: new Date(),
+          syncStatus: 'success', 
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -273,10 +273,10 @@ export async function syncMerchantAccount(
     
     // Update sync status to error
     await prisma.googleMerchantLinks.updateMany({
-      where: { account_id: accountId, merchantId: merchantId },
+      where: { accountId: account_id, merchantId: merchantId },
       data: {
-        sync_status: 'error',
-        sync_error: error instanceof Error ? error.message : 'Unknown error',
+        syncStatus: 'error',
+        syncError: error instanceof Error ? error.message : 'Unknown error',
         updatedAt: new Date(),
       },
     });
@@ -299,7 +299,7 @@ export async function getProductStats(
   disapproved: number;
 } | null> {
   try {
-    const accessToken = await getValidAccessToken(accountId);
+    const accessToken = await getValidAccessToken(account_id);
     if (!accessToken) {
       throw new Error('No valid access token');
     }

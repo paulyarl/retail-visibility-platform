@@ -8,6 +8,7 @@
  */
 
 import { prisma } from '../prisma';
+import { Prisma } from '@prisma/client';
 
 export interface TenantValidationError {
   field: string;
@@ -124,7 +125,7 @@ async function checkDuplicateAddress(
   // Check TenantBusinessProfile table
   const existingProfile = await prisma.tenantBusinessProfile.findFirst({
     where: {
-      addressLine1: {
+      businessLine1: {
         contains: normalizedAddress,
         mode: 'insensitive',
       },
@@ -155,8 +156,8 @@ async function checkDuplicateAddress(
 
   if (existingProfile) {
     return {
-      id: existingProfile.tenantId.id,
-      name: existingProfile.tenantId.name,
+      id: existingProfile.tenant.id,
+      name: existingProfile.tenant.name,
     };
   }
 
@@ -164,11 +165,11 @@ async function checkDuplicateAddress(
   const tenantsWithMetadata = await prisma.tenant.findMany({
     where: {
       AND: [
-        { metadata: { not: null } },
+        { metadata: { not: Prisma.JsonNull } },
         {
           metadata: {
             path: ['address_line1'],
-            not: null,
+            not: Prisma.JsonNull,
           },
         },
       ],
@@ -218,7 +219,7 @@ async function checkDuplicateBusinessAtAddress(
         equals: normalizedBusinessName,
         mode: 'insensitive',
       },
-      addressLine1: {
+      businessLine1: {
         contains: normalizedAddress,
         mode: 'insensitive',
       },
@@ -243,8 +244,8 @@ async function checkDuplicateBusinessAtAddress(
 
   if (existingProfile) {
     return {
-      id: existingProfile.tenantId.id,
-      name: existingProfile.tenantId.name,
+      id: existingProfile.tenant.id,
+      name: existingProfile.tenant.name,
     };
   }
 

@@ -10,7 +10,7 @@ export async function isTenantFlagOn(tenantId: string, flag: string): Promise<bo
   const hit = cache.get(key)
   if (hit && now - hit.ts < TTL_MS) return hit.enabled
 
-  const row = await prisma.tenant_feature_flags.findUnique({ where: { tenantId_flag: { tenantId, flag } } })
+  const row = await prisma.tenantFeatureFlags.findUnique({ where: { tenantId_flag: { tenantId, flag } } })
   const enabled = !!row?.enabled
   cache.set(key, { enabled, ts: now })
   return enabled

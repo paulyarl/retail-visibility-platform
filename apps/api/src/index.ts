@@ -2246,7 +2246,7 @@ const baseItemSchema = z.object({
   manufacturer: z.string().optional(),
   price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
   currency: z.string().length(3).optional(),
-  availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
+  availability: z.enum(['inStock', 'outOfStock', 'preorder']).optional(),
   // Item status and visibility
   itemStatus: z.enum(['active', 'inactive', 'archived']).optional(),
   visibility: z.enum(['public', 'private']).optional(),
@@ -2286,7 +2286,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       priceCents: parsed.data.priceCents ?? (parsed.data.price ? Math.round(parsed.data.price * 100) : 0),
       currency: parsed.data.currency || 'USD',
       // Auto-set availability based on stock if not explicitly provided
-      availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
+      availability: parsed.data.availability || (parsed.data.stock > 0 ? 'inStock' : 'outOfStock'),
       tenantId: parsed.data.tenantId || '', // Ensure tenantId is always a string
       // Handle both categoryPath and category_path (from transform middleware)
       categoryPath: parsed.data.category_path || parsed.data.category_path || [],
@@ -2329,7 +2329,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     const updateData = { ...parsed.data };
     if (updateData.stock !== undefined) {
       // If stock is being updated, automatically set availability
-      updateData.availability = updateData.stock > 0 ? 'in_stock' : 'out_of_stock';
+      updateData.availability = updateData.stock > 0 ? 'inStock' : 'outOfStock';
     }
 
     // Sync price and priceCents fields
@@ -2538,7 +2538,7 @@ app.post("/items/sync-availability", authenticateToken, async (req, res) => {
 
     // Find items that are out of sync
     const outOfSync = items.filter(item => {
-      const expectedAvailability = item.stock > 0 ? 'in_stock' : 'out_of_stock';
+      const expectedAvailability = item.stock > 0 ? 'inStock' : 'outOfStock';
       return item.availability !== expectedAvailability;
     });
 
@@ -2547,7 +2547,7 @@ app.post("/items/sync-availability", authenticateToken, async (req, res) => {
       outOfSync.map(item =>
         prisma.inventoryItem.update({
           where: { id: item.id },
-          data: { availability: item.stock > 0 ? 'in_stock' : 'out_of_stock' },
+          data: { availability: item.stock > 0 ? 'inStock' : 'outOfStock' },
         })
       )
     );

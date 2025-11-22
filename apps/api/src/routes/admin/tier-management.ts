@@ -217,7 +217,7 @@ router.get('/tenants', async (req, res) => {
     }
 
     if (status) {
-      where.subscription_status = status;
+      where.subscriptionStatus = status;
     }
 
     if (search) {
@@ -237,8 +237,8 @@ router.get('/tenants', async (req, res) => {
         select: {
           id: true,
           name: true,
-          subscription_tier: true,
-          subscription_status: true,
+          subscriptionTier: true,
+          subscriptionStatus: true,
           trialEndsAt: true,
           subscription_ends_at: true,
           createdAt: true,
@@ -247,7 +247,7 @@ router.get('/tenants', async (req, res) => {
             select: {
               id: true,
               name: true,
-              subscription_tier: true,
+              subscriptionTier: true,
             },
           },
           _count: {
@@ -291,15 +291,15 @@ router.get('/tenants/:tenantId', async (req, res) => {
           select: {
             id: true,
             name: true,
-            subscription_tier: true,
-            subscription_status: true,
+            subscriptionTier: true, 
+            subscriptionStatus: true,
           },
         },
-        tenant_feature_overrides: {
+        tenantFeatureOverrides: {
           where: {
             OR: [
-              { expires_at: null },
-              { expires_at: { gt: new Date() } },
+              { expiresAt: null }, 
+              { expiresAt: { gt: new Date() } }, 
             ],
           },
         },
@@ -327,7 +327,7 @@ router.get('/tenants/:tenantId', async (req, res) => {
  * Update tenant tier and subscription status
  */
 const updateTenantTierSchema = z.object({
-  subscription_tier: z.enum([
+  subscriptionTier: z.enum([
     'google_only',
     'starter',
     'professional',
@@ -369,13 +369,13 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       select: {
         id: true,
         name: true,
-        subscription_tier: true,
-        subscription_status: true,
+        subscriptionTier: true,
+        subscriptionStatus: true,
         trialEndsAt: true,
-        subscription_ends_at: true,
+        subscriptionEndsAt: true,
         _count: {
           select: {
-            _count: true,
+            inventoryItems: true,
           },
         },
       },
@@ -399,7 +399,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       };
 
       const newLimit = tierLimits[updateData.subscriptionTier];
-      const currentSKUs = currentTenant._count.inventory_item;
+      const currentSKUs = currentTenant._count.inventoryItems;
 
       if (newLimit !== Infinity && currentSKUs > newLimit) {
         return res.status(400).json({
@@ -414,9 +414,9 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     // Convert date strings to Date objects
     const updatePayload: any = {};
     if (updateData.subscriptionTier) updatePayload.subscriptionTier = updateData.subscriptionTier;
-    if (updateData.subscription_status) updatePayload.subscription_status = updateData.subscription_status;
+    if (updateData.subscription_status) updatePayload.subscriptionStatus = updateData.subscription_status;
     if (updateData.trialEndsAt) updatePayload.trialEndsAt = new Date(updateData.trialEndsAt);
-    if (updateData.subscriptionEndsAt) updatePayload.subscriptionEndsAt = new Date(updateData.subscriptionEndsAt);
+    if (updateData.subscription_ends_at) updatePayload.subscriptionEndsAt = new Date(updateData.subscription_ends_at);
 
     // Update tenant
     const updatedTenant = await prisma.tenant.update({
@@ -432,16 +432,16 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       payload: {
         reason,
         before: {
-          subscription_tier: currentTenant.subscriptionTier,
-          subscription_status: currentTenant.subscription_status,
+          subscriptionTier: currentTenant.subscriptionTier,
+          subscriptionStatus: currentTenant.subscriptionStatus,
           trialEndsAt: currentTenant.trialEndsAt,
-          subscription_ends_at: currentTenant.subscriptionEndsAt,
+          subscriptionEndsAt: currentTenant.subscriptionEndsAt,
         },
         after: {
-          subscription_tier: updatedTenant.subscriptionTier,
-          subscription_status: updatedTenant.subscription_status,
+          subscriptionTier: updatedTenant.subscriptionTier,
+          subscriptionStatus: updatedTenant.subscriptionStatus,
           trialEndsAt: updatedTenant.trialEndsAt,
-          subscription_ends_at: updatedTenant.subscriptionEndsAt,
+          subscriptionEndsAt: updatedTenant.subscriptionEndsAt,
         },
         adminUserId: req.user?.userId,
         adminEmail: req.user?.email,
@@ -459,12 +459,12 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       tenant: updatedTenant,
       changes: {
         before: {
-          subscription_tier: currentTenant.subscriptionTier,
-          subscription_status: currentTenant.subscription_status,
+          subscriptionTier: currentTenant.subscriptionTier,
+          subscriptionStatus: currentTenant.subscriptionStatus,
         },
         after: {
-          subscription_tier: updatedTenant.subscriptionTier,
-          subscription_status: updatedTenant.subscription_status,
+          subscriptionTier: updatedTenant.subscriptionTier,
+          subscriptionStatus: updatedTenant.subscriptionStatus,
         },
       },
     });
@@ -500,8 +500,8 @@ router.get('/stats', async (req, res) => {
     const [totalTenants, totalOrganizations, totalTrialTenants, totalActiveTenants] = await Promise.all([
       prisma.tenant.count(),
       prisma.organization.count(),
-      prisma.tenant.count({ where: { subscription_status: 'trial' } }),
-      prisma.tenant.count({ where: { subscription_status: 'active' } }),
+      prisma.tenant.count({ where: { subscriptionStatus: 'trial' } }),
+      prisma.tenant.count({ where: { subscriptionStatus: 'active' } }),
     ]);
 
     // Calculate MRR (Monthly Recurring Revenue) estimate
@@ -517,8 +517,8 @@ router.get('/stats', async (req, res) => {
     };
 
     const activeTenants = await prisma.tenant.findMany({
-      where: { subscription_status: 'active' },
-      select: { subscription_tier: true },
+      where: { subscriptionStatus: 'active' },
+      select: { subscriptionTier: true },
     });
 
     const estimatedMRR = activeTenants.reduce((sum, tenant) => {
@@ -537,7 +537,7 @@ router.get('/stats', async (req, res) => {
         count: t._count.id,
       })),
       statusDistribution: statusDistribution.map(s => ({
-        status: s.subscription_status,
+        status: s.subscriptionStatus,
         count: s._count.id,
       })),
     });
@@ -553,7 +553,7 @@ router.get('/stats', async (req, res) => {
  */
 const bulkUpdateSchema = z.object({
   tenantIds: z.array(z.string()).min(1, 'At least one tenant ID required'),
-  subscription_tier: z.enum([
+  subscriptionTier: z.enum([
     'google_only',
     'starter',
     'professional',
@@ -563,7 +563,7 @@ const bulkUpdateSchema = z.object({
     'chain_professional',
     'chain_enterprise',
   ]).optional(),
-  subscription_status: z.enum([
+  subscriptionStatus: z.enum([
     'trial',
     'active',
     'past_due',
@@ -592,8 +592,8 @@ router.post('/bulk-update', async (req, res) => {
       select: {
         id: true,
         name: true,
-        subscription_tier: true,
-        subscription_status: true,
+        subscriptionTier: true,
+        subscriptionStatus: true,
       },
     });
 
@@ -608,7 +608,7 @@ router.post('/bulk-update', async (req, res) => {
     // Update all tenants
     const updatePayload: any = {};
     if (updateData.subscriptionTier) updatePayload.subscriptionTier = updateData.subscriptionTier;
-    if (updateData.subscription_status) updatePayload.subscription_status = updateData.subscription_status;
+    if (updateData.subscriptionStatus) updatePayload.subscriptionStatus = updateData.subscriptionStatus;
 
     await prisma.tenant.updateMany({
       where: { id: { in: tenantIds } },
@@ -624,8 +624,8 @@ router.post('/bulk-update', async (req, res) => {
         payload: {
           reason,
           before: {
-            subscription_tier: tenant.subscriptionTier,
-            subscription_status: tenant.subscription_status,
+            subscriptionTier: tenant.subscriptionTier,
+            subscriptionStatus: tenant.subscriptionStatus,
           },
           after: updateData,
           adminUserId: req.user?.userId,

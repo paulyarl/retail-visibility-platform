@@ -17,11 +17,11 @@ const GBP_INSIGHTS_API = 'https://mybusinessaccountmanagement.googleapis.com/v1'
 async function getValidAccessToken(account_id: string): Promise<string | null> {
   try {
     const tokenRecord = await prisma.googleOauthTokens.findUnique({
-      where: { account_id: accountId },
+      where: { accountId: account_id },
     });
 
     if (!tokenRecord) {
-      console.error('[GBP] No token found for account:', accountId);
+      console.error('[GBP] No token found for account:', account_id);
       return null;
     }
 
@@ -40,7 +40,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
 
       const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
       await prisma.googleOauthTokens.update({
-        where: { account_id: accountId },
+        where: { accountId: account_id }, 
         data: {
           accessTokenEncrypted: encryptToken(newTokens.access_token),
           expiresAt: newExpiresAt,
@@ -64,7 +64,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
  */
 export async function listBusinessAccounts(account_id: string): Promise<any[]> {
   try {
-    const accessToken = await getValidAccessToken(accountId);
+    const accessToken = await getValidAccessToken(account_id);
     if (!accessToken) {
       throw new Error('No valid access token');
     }
@@ -98,7 +98,7 @@ export async function listLocations(
   businessAccountName: string
 ): Promise<any[]> {
   try {
-    const accessToken = await getValidAccessToken(accountId);
+    const accessToken = await getValidAccessToken(account_id);
     if (!accessToken) {
       throw new Error('No valid access token');
     }
@@ -135,7 +135,7 @@ export async function getLocation(
   locationName: string
 ): Promise<any | null> {
   try {
-    const accessToken = await getValidAccessToken(accountId);
+    const accessToken = await getValidAccessToken(account_id);
     if (!accessToken) {
       throw new Error('No valid access token');
     }
@@ -177,36 +177,36 @@ export async function syncLocation(
 
     await prisma.gbpLocations.upsert({
       where: {
-        account_id_location_id: {
-          account_id: accountId,
-          location_id: locationId,
+        accountId_locationId: { 
+          accountId: account_id,
+          locationId: locationId,
         },
       },
       create: {
         id: `gbp_loc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        account_id: accountId,
-        location_id: locationId,
+        accountId: account_id,
+        locationId: locationId,
         locationName: locationData.title,
         storeCode: locationData.storeCode,
         address: address ? formatAddress(address) : null,
-        phone_number: phone,
-        website_url: locationData.websiteUri,
+        phoneNumber: phone,
+        websiteUrl: locationData.websiteUri,
         category: locationData.categories?.primaryCategory?.displayName,
-        is_verified: locationData.metadata?.hasVoiceOfMerchant || false,
-        is_published: !locationData.metadata?.duplicate,
-        last_fetched_at: new Date(),
+        isVerified: locationData.metadata?.hasVoiceOfMerchant || false,
+        isPublished: !locationData.metadata?.duplicate,
+        lastFetchedAt: new Date(),
         updatedAt: new Date(),
       },
       update: {
         locationName: locationData.title,
         storeCode: locationData.storeCode,
         address: address ? formatAddress(address) : null,
-        phone_number: phone,
-        website_url: locationData.websiteUri,
+        phoneNumber: phone,
+        websiteUrl: locationData.websiteUri,
         category: locationData.categories?.primaryCategory?.displayName,
-        is_verified: locationData.metadata?.hasVoiceOfMerchant || false,
-        is_published: !locationData.metadata?.duplicate,
-        last_fetched_at: new Date(),
+        isVerified: locationData.metadata?.hasVoiceOfMerchant || false,
+        isPublished: !locationData.metadata?.duplicate,
+        lastFetchedAt: new Date(),
         updatedAt: new Date(),
       },
     });
@@ -241,7 +241,7 @@ export async function getLocationInsights(
   locationName: string
 ): Promise<any | null> {
   try {
-    const accessToken = await getValidAccessToken(accountId);
+    const accessToken = await getValidAccessToken(account_id);
     if (!accessToken) {
       throw new Error('No valid access token');
     }
@@ -314,14 +314,14 @@ export async function storeInsights(
   try {
     await prisma.gbpInsightsDaily.upsert({
       where: {
-        location_id_date: {
-          location_id: locationId,
+        locationId_date: { 
+          locationId: location_id,
           date,
         },
       },
       create: {
         id: `gbp_ins_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        location_id: locationId,
+        locationId: location_id,
         date,
         viewsSearch: insights.viewsSearch,
         viewsMaps: insights.viewsMaps,
@@ -361,7 +361,7 @@ export async function getAggregatedInsights(
 
     const insights = await prisma.gbpInsightsDaily.findMany({
       where: {
-        location_id: locationId,
+        locationId: location_id,
         date: {
           gte: startDate,
         },

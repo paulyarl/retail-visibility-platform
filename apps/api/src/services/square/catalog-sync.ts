@@ -132,10 +132,10 @@ export class CatalogSync {
 
       if (existingMapping) {
         // Update existing product
-        console.log(`[CatalogSync] Updating existing product: ${existingMapping.inventory_item_id}`);
+        console.log(`[CatalogSync] Updating existing product: ${existingMapping.inventoryItemId}`);
         
-        platformProduct = await prisma.inventory_item.update({
-          where: { id: existingMapping.inventory_item_id },
+        platformProduct = await prisma.inventoryItem.update({
+          where: { id: existingMapping.inventoryItemId },
           data: {
             ...platformData,
             updatedAt: new Date(),
@@ -155,7 +155,7 @@ export class CatalogSync {
         // Create new product
         console.log(`[CatalogSync] Creating new product: ${squareProduct.item_data.name}`);
         
-        platformProduct = await prisma.inventory_item.create({
+        platformProduct = await prisma.inventoryItem.create({
           data: {
             tenantId: this.tenantId,
             ...platformData,

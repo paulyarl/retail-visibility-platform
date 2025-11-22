@@ -43,7 +43,7 @@ export async function validateSKULimits(
         subscriptionStatus: true,
         trialEndsAt: true,
         _count: {
-          select: { _count: true },
+          select: { inventoryItems: true },
         },
       },
     });
@@ -56,7 +56,7 @@ export async function validateSKULimits(
     }
 
     const tier = tenant.subscriptionTier || 'starter';
-    const status = tenant.subscription_status || 'active';
+    const status = tenant.subscriptionStatus || 'active';
 
     const maintenanceState = getMaintenanceState({
       tier,
@@ -80,7 +80,7 @@ export async function validateSKULimits(
 
     // Try database-driven limit first, fallback to utility function
     const skuLimit = await TierService.getTierSKULimit(tier).catch(() => getSKULimit(tier));
-    const currentCount = tenant._count.inventory_item;
+    const currentCount = tenant._count.inventoryItems;
     const totalAfter = currentCount + productCount;
 
     // Check if adding products would exceed limit
@@ -129,7 +129,7 @@ export async function validateTierSKUCompatibility(
       select: {
         subscriptionTier: true,
         _count: {
-          select: { _count: true },
+          select: { inventoryItems: true },
         },
       },
     });
@@ -143,7 +143,7 @@ export async function validateTierSKUCompatibility(
 
     // Try database-driven limit first, fallback to utility function
     const newLimit = await TierService.getTierSKULimit(subscriptionTier).catch(() => getSKULimit(subscriptionTier));
-    const currentCount = tenant._count.inventory_item;
+    const currentCount = tenant._count.inventoryItems; 
 
     // Check if current SKU count exceeds new tier limit
     if (newLimit !== Infinity && currentCount > newLimit) {

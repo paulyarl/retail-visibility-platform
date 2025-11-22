@@ -141,7 +141,7 @@ router.get('/tenants/:id/usage', authenticateToken, checkTenantAccess, async (re
     const activeItemCount = await prisma.inventoryItem.count({
       where: {
         tenantId,
-        availability: 'in_stock'
+        availability: 'inStock'
       }
     });
 

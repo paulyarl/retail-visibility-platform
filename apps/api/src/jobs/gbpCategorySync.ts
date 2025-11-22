@@ -37,7 +37,7 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
   try {
     const run = await prisma.categoryMirrorRuns.create({
       data: {
-        tenant_id: payload.tenantId ?? null,
+        tenantId: payload.tenantId ?? null,
         strategy: payload.strategy,
         dryRun: !!(payload as any).dryRun,
         jobId,
@@ -59,7 +59,7 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
         try {
           await prisma.categoryMirrorRuns.create({
             data: {
-              tenant_id: payload.tenantId ?? null,
+              tenantId: payload.tenantId ?? null,
               strategy: payload.strategy,
               dryRun,
               created: 0,
@@ -121,7 +121,7 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
         } else {
           await prisma.categoryMirrorRuns.create({
             data: {
-              tenant_id: payload.tenantId ?? null,
+              tenantId: payload.tenantId ?? null,
               strategy: payload.strategy,
               dryRun,
               created: diff.counts.created,
@@ -155,7 +155,7 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
     } else {
       await prisma.categoryMirrorRuns.create({
         data: {
-          tenant_id: payload.tenantId ?? null,
+          tenantId: payload.tenantId ?? null,
           strategy: payload.strategy,
           dryRun: !!(payload as any).dryRun,
           created: 0,
@@ -176,7 +176,7 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
 // Types and helper functions
 type Cat = { id?: string | null; slug?: string | null; name: string };
 
-async function fetchPlatformCategories(tenant_id: string | null): Promise<Cat[]> {
+async function fetchPlatformCategories(tenantId: string | null): Promise<Cat[]> {
   if (!tenantId) return [];
   try {
     const rows = await prisma.tenantCategory.findMany({
@@ -190,7 +190,7 @@ async function fetchPlatformCategories(tenant_id: string | null): Promise<Cat[]>
   }
 }
 
-async function fetchGbpCategories(tenant_id: string | null): Promise<Cat[]> {
+async function fetchGbpCategories(tenantId: string | null): Promise<Cat[]> {
   const rows = await gbpClient.listCategories(tenantId);
   return rows.map(r => ({ id: r.id ?? null, slug: r.slug ?? null, name: r.name }));
 }
@@ -203,7 +203,11 @@ function computeDiff(source: Cat[], target: Cat[]) {
   const toUpdate: { from: Cat; to: Cat }[] = [];
   const toDelete: Cat[] = [];
 
-  for (const [slug, sc] of s) {
+  const sKeys = Array.from(s.keys());
+  const tKeys = Array.from(t.keys());
+  
+  for (const slug of sKeys) {
+    const sc = s.get(slug)!;
     const tc = t.get(slug);
     if (!tc) {
       toCreate.push(sc);
@@ -211,7 +215,8 @@ function computeDiff(source: Cat[], target: Cat[]) {
       toUpdate.push({ from: tc, to: sc });
     }
   }
-  for (const [slug, tc] of t) {
+  for (const slug of tKeys) {
+    const tc = t.get(slug)!;
     if (!s.has(slug)) toDelete.push(tc);
   }
 
@@ -223,7 +228,7 @@ function computeDiff(source: Cat[], target: Cat[]) {
   };
 }
 
-async function applyDiffToGbp(diff: ReturnType<typeof computeDiff>, tenant_id: string | null) {
+async function applyDiffToGbp(diff: ReturnType<typeof computeDiff>, tenantId: string | null) {
   for (const c of diff.toCreate) {
     await gbpClient.createCategory(tenantId, { slug: c.slug ?? null, name: c.name });
   }

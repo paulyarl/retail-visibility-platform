@@ -83,7 +83,7 @@ export class SquareOAuthService {
       return {
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken,
-        expires_at: result.expiresAt ? new Date(result.expiresAt) : undefined,
+        expiresAt: result.expiresAt ? new Date(result.expiresAt) : undefined, 
         merchantId: result.merchantId!,
         scopes: result.scopes,
       };
@@ -111,7 +111,7 @@ export class SquareOAuthService {
       return {
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken || refreshToken, // Use new or keep old
-        expires_at: result.expiresAt ? new Date(result.expiresAt) : undefined,
+        expiresAt: result.expiresAt ? new Date(result.expiresAt) : undefined,
         merchantId: result.merchantId!,
         scopes: result.scopes,
       };
