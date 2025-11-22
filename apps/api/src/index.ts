@@ -2727,31 +2727,32 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
   }
 });
 
-app.get("/__routes", (_req, res) => {
-  const out: any[] = [];
-  // Always include known core routes
-  out.push({ methods: ["GET"], path: "/health" });
-  out.push({ methods: ["GET"], path: "/__ping" });
-  function collect(stack: any[], base = "") {
-    stack?.forEach((layer: any) => {
-      if (layer.route && layer.route.path) {
-        const methods = layer.route.methods
-          ? Array.isArray(layer.route.methods)
-            ? layer.route.methods
-          : Object.keys(layer.route.methods)
-          : [];
-        const path = base + layer.route.path;
-        out.push({ methods: methods.map((m: string) => m.toUpperCase()), path });
-      } else if (layer.name === 'router' && layer.handle?.stack) {
-        const match = layer.regexp && layer.regexp.fast_slash ? "" : (layer.regexp?.source || "");
-        collect(layer.handle.stack, base);
-      }
-    });
-  }
-  const stack = (app as any)._router?.stack || [];
-  collect(stack);
-  res.json(out);
-});
+// Temporarily disable routes introspection for debugging
+// app.get("/__routes", (_req, res) => {
+//   const out: any[] = [];
+//   // Always include known core routes
+//   out.push({ methods: ["GET"], path: "/health" });
+//   out.push({ methods: ["GET"], path: "/__ping" });
+//   function collect(stack: any[], base = "") {
+//     stack?.forEach((layer: any) => {
+//       if (layer.route && layer.route.path) {
+//         const methods = layer.route.methods
+//           ? Array.isArray(layer.route.methods)
+//             ? layer.route.methods
+//           : Object.keys(layer.route.methods)
+//           : [];
+//         const path = base + layer.route.path;
+//         out.push({ methods: methods.map((m: string) => m.toUpperCase()), path });
+//       } else if (layer.name === 'router' && layer.handle?.stack) {
+//         const match = layer.regexp && layer.regexp.fast_slash ? "" : (layer.regexp?.source || "");
+//         collect(layer.handle.stack, base);
+//       }
+//     });
+//   }
+//   const stack = (app as any)._router?.stack || [];
+//   collect(stack);
+//   res.json(out);
+// });
 app.get("/__ping", (req, res) => {
   console.log("PING from", req.ip, "at", new Date().toISOString());
   res.json({ ok: true, when: new Date().toISOString() });
@@ -3644,7 +3645,7 @@ console.log(`   WEB_URL: ${process.env.WEB_URL || 'Not set'}\n`);
 if (process.env.NODE_ENV !== "test") {
   const server = app.listen(port, '0.0.0.0', () => {
     console.log(`\n✅ API server running → http://localhost:${port}/health`);
-    console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
+    // console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
   });
 
   // Handle server errors
