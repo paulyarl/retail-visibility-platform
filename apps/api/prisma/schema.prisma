@@ -1103,7 +1103,7 @@ model UserTenant {
   @@unique([userId, tenantId])
   @@index([tenantId])
   @@index([userId])
-  @@map("user_tenant")
+  @@map("user_tenants")
 }
 
 model User {
