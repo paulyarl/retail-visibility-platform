@@ -18,7 +18,7 @@ model Tenant {
   language                    String                        @default("en-US") @map("language")
   currency                    String                        @default("USD") @map("currency")
   dataPolicyAccepted          Boolean                       @default(false) @map("data_policy_accepted")
-  metadata                    Json? @map("metadata")
+  metadata                    Json?                         @map("metadata")
   subscriptionStatus          String?                       @default("trial") @map("subscription_status")
   subscriptionTier            String?                       @default("starter") @map("subscription_tier")
   trialEndsAt                 DateTime?                     @map("trial_ends_at")
@@ -46,8 +46,8 @@ model Tenant {
   googleProductCount          Int?                          @default(0) @map("google_product_count")
   directoryVisible            Boolean?                      @default(true) @map("directory_visible")
   organization                Organization?                 @relation(fields: [organizationId], references: [id])
-  directoryFeaturedListings   DirectoryFeaturedListings[] 
-  businessHours               BusinessHours?
+  directoryFeaturedListings   DirectoryFeaturedListings[]  @relation("DirectoryFeaturedListings")
+  businessHours               BusinessHours? 
   businessHoursSpecial        BusinessHoursSpecial[]
   categoryMirrorRuns          CategoryMirrorRuns[]
   googleOauthAccounts         GoogleOauthAccounts[]
@@ -56,7 +56,7 @@ model Tenant {
   photoAssets                 PhotoAsset[]
   productPerformance          ProductPerformance[]
   syncJobs                    SyncJob[]
-  userTenants                 UserTenant[]
+  userTenants                 UserTenant[] @relation("UserTenants")
   tenantBusinessProfile       TenantBusinessProfile?
   tenantFeatureOverrides     TenantFeatureOverrides[]
 
@@ -135,12 +135,12 @@ model BusinessHours {
   tenant_id      String    @unique
   timezone       String    @default("America/New_York")
   periods        Json      @default("[]")
-  source_hash    String?
-  last_synced_at DateTime?
-  sync_attempts  Int       @default(0)
-  last_error     String?
-  created_at     DateTime  @default(now())
-  updated_at     DateTime
+  source_hash    String? 
+  lastSyncAt DateTime? 
+  syncAttempts  Int       @default(0)
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime
   tenant         Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([tenant_id])
@@ -149,16 +149,16 @@ model BusinessHours {
 
 model BusinessHoursSpecial {
   id             String    @id
-  tenant_id      String
+  tenantId      String      map("tenant_id")
   date           DateTime  @db.Date
-  is_closed      Boolean   @default(false)
+  isClosed      Boolean   @default(false)
   open           String?
   close          String?
   note           String?
   source_hash    String?
-  last_synced_at DateTime?
-  created_at     DateTime  @default(now())
-  updated_at     DateTime
+  lastSyncAt DateTime? 
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime
   tenant         Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@unique([tenant_id, date])
@@ -482,8 +482,8 @@ model GoogleTaxonomy {
 model InventoryItem {
   id                   String                   @id
   tenantId             String                   @map("tenant_id")
-  sku                  String
-  name                 String
+  sku                  String                   @map("sku")
+  name                 String                   @map("name")
   priceCents           Int                      @map("price_cents")
   stock                Int                      @default(0)
   imageUrl             String?                  @map("image_url")
@@ -499,7 +499,7 @@ model InventoryItem {
   landingPageTheme     String?                  @default("default") @map("landing_page_theme")
   auditLogId           String?                  @map("audit_log_id")
   availability         AvailabilityStatus      @default(in_stock)
-  brand                String
+  brand                String                   @map("brand")
   categoryPath         String[]                 @default([]) @map("category_path")
   tenantCategoryId     String?                  @map("tenant_category_id")
   condition            ProductCondition?       @default(brand_new)
@@ -516,7 +516,7 @@ model InventoryItem {
   searchTsv            Unsupported("tsvector")? @map("search_tsv")
   syncStatus           SyncStatus?             @default(pending) @map("sync_status")
   syncedAt             DateTime?                @map("synced_at") @db.Timestamptz(6)
-  title                String
+  title                String                   @map("title")
   visibility           ItemVisibility?         @default(public) @map("visibility")
   manufacturer         String?
   source               ProductSource           @default(MANUAL)
@@ -561,12 +561,12 @@ model Invitation {
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model LocationStatusLog {
-  id             String
-  tenantId      String @map("tenant_id")
-  oldStatus     LocationStatus @map("old_status")
-  newStatus     LocationStatus @map("new_status")
-  changedBy     String @map("changed_by")
-  reason         String? @map("reason")
+  id             String                   @id
+  tenantId      String                   @map("tenant_id")
+  oldStatus     LocationStatus           @map("old_status")
+  newStatus     LocationStatus           @map("new_status")
+  changedBy     String                   @map("changed_by")
+  reason         String?                  @map("reason")
   reopeningDate DateTime? @map("reopening_date")
   metadata       Json? @map("metadata")
   createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -598,7 +598,7 @@ model OauthIntegrations {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model Organization {
   id                   String    @id
-  name                 String @map("name")
+  name                 String    @map("name")
   ownerId              String    @map("owner_id")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @map("updated_at")
