@@ -73,7 +73,7 @@ model Tenant {
   @@index([slug], map: "tenant_slug_idx")
   @@index([subscriptionStatus], map: "tenant_subscriptionstatus_idx")
   @@index([locationStatus], map: "tenant_locationstatus_idx")
-  @@map("Tenant")
+  @@map("tenant")
 }
 
 model AuditLog {
@@ -482,8 +482,8 @@ model GoogleTaxonomy {
 model InventoryItem {
   id                   String                   @id
   tenantId             String                   @map("tenant_id")
-  sku                  String
-  name                 String
+  sku                  String @map("sku")
+  name                 String @map("name")
   priceCents           Int                      @map("price_cents")
   stock                Int                      @default(0)
   imageUrl             String?                  @map("image_url")
@@ -510,7 +510,7 @@ model InventoryItem {
   itemStatus           ItemStatus?             @default(active) @map("item_status")
   locationId           String?                  @map("location_id")
   merchantName         String?                  @map("merchant_name")
-  mpn                  String?
+  mpn                  String?                  @map("mpn")
   price                Decimal                  @db.Decimal(12, 2)
   quantity             Int?                     @map("quantity")
   searchTsv            Unsupported("tsvector")? @map("search_tsv")
@@ -536,7 +536,7 @@ model InventoryItem {
   @@index([source])
   @@index([tenantId, enrichmentStatus])
   @@index([tenantId, updatedAt])
-  @@map("InventoryItem")
+  @@map("inventory_item")
 }
 
 model Invitation {
@@ -702,7 +702,7 @@ model PhotoAsset {
   @@unique([inventoryItemId, position])
   @@index([inventoryItemId])
   @@index([tenantId])
-  @@map("PhotoAsset")
+  @@map("photo_asset")
 }
 
 model PlatformFeatureFlags {
