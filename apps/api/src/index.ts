@@ -2009,10 +2009,8 @@ const photoUploadHandler = async (req: any, res: any) => {
 };
 
 // Mount photos router (handles all photo endpoints with position support)
-console.log(" Mounting photos router...");
 // Temporarily disable photos router
 // app.use('/photos', photosRouter);
-// console.log(' Photos router mounted');
 
 // Legacy photo upload handler removed - now handled by photos router
 // Old routes:
