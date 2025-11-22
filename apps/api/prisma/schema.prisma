@@ -933,7 +933,7 @@ model SubscriptionTier {
   updatedBy    String? @map("updated_by")
   createdBy    String? @map("created_by")
   features      TierFeatures[]
-  @@map("subscription_tier")
+  @@map("subscription_tiers")
 }
 
 model SyncJob {
