@@ -1132,45 +1132,45 @@ model User {
 
 
 enum LocationStatus {
-  pending @map("pending")
-  active @map("active")
-  inactive @map("inactive")
-  closed @map("closed")
-  archived @map("archived")
+  pending  
+  active 
+  inactive 
+  closed 
+  archived 
   @@map("location_status")
 }
 
 enum Action {
-  create @map("create")
-  update @map("update")
-  delete @map("delete")
-  sync @map("sync")
-  policyApply @map("policy_apply")
-  oauthConnect @map("oauth_connect")
-  oauthRefresh @map("oauth_refresh")
+  create  
+  update 
+  delete 
+  sync 
+  policyApply 
+  oauthConnect 
+  oauthRefresh 
   @@map("action")
 }
 
 enum ActorType {
-  user @map("user")
-  system @map("system")
-  integration @map("integration")
+  user 
+  system 
+  integration 
   @@map("actor_type")
 }
 
 enum AvailabilityStatus {
-  inStock @map("in_stock")
-  outOfStock @map("out_of_stock")
-  preorder @map("preorder")
+  inStock 
+  outOfStock 
+  preorder 
   @@map("availability_status")
 }
 
 enum EnrichmentStatus {
-  NEEDS_ENRICHMENT @map("needs_enrichment")
-  PARTIALLY_ENRICHED @map("partially_enriched")
-  PENDING @map("pending")
-  COMPLETE @map("complete")
-  FAILED @map("failed")
+  NEEDS_ENRICHMENT  
+  PARTIALLY_ENRICHED 
+  PENDING 
+  COMPLETE 
+  FAILED 
   @@map("enrichment_status")
 }
 
@@ -1179,38 +1179,38 @@ enum EntityType {
   tenant @map("tenant")
   policy @map("policy")
   oauth @map("oauth")
-  other @map("other")
+  other 
   @@map("entity_type")
 }
 
 enum ItemStatus {
-  active @map("active")
-  inactive @map("inactive")
-  archived @map("archived")
-  trashed @map("trashed")
+  active  
+  inactive 
+  archived 
+  trashed 
   @@map("item_status")
 }
 
 enum ItemVisibility {
-  public @map("public")
-  private @map("private")
+  public 
+  private 
   @@map("item_visibility")
 }
 
 enum JobStatus {
-  queued @map("queued")
-  processing @map("processing")
-  success @map("success")
-  failed @map("failed")
+  queued 
+  processing 
+  success 
+  failed 
   @@map("job_status")
 }
 
 enum EntityStatus {
-  pending @map("pending")
-  active @map("active")
-  inactive @map("inactive")
-  closed @map("closed")
-  archived @map("archived")
+  pending 
+  active 
+  inactive 
+  closed 
+  archived 
   @@map("entity_status")
 }
 
@@ -1231,48 +1231,48 @@ enum PermissionAction {
 }
 
 enum ProductCondition {
-  brand_new @map("brand_new")
-  refurbished @map("refurbished")
-  used @map("used")
+  brand_new 
+  refurbished 
+  used 
   @@map("product_condition")
 }
 
 enum ProductSource {
-  MANUAL @map("manual")
-  BARCODE_SCAN @map("barcode_scan")
-  BULK_UPLOAD @map("bulk_upload")
-  API_IMPORT @map("api_import")
-  QUICK_START_WIZARD @map("quick_start_wizard")
+  MANUAL 
+  BARCODE_SCAN 
+  BULK_UPLOAD 
+  API_IMPORT 
+  QUICK_START_WIZARD 
   @@map("product_source")
 }
 
 enum SyncStatus {
-  pending @map("pending")
-  success @map("success")
-  error @map("error")
+  pending  
+  success 
+  error 
  @@map("sync_status")
 }
 
 enum UserRole {
-  PLATFORM_ADMIN @map("platform_admin")
-  PLATFORM_SUPPORT @map("platform_support")
-  PLATFORM_VIEWER @map("platform_viewer")
-  ADMIN @map("admin")
-  OWNER @map("owner")
-  USER @map("user")
-  TENANT_OWNER @map("tenant_owner")
-  TENANT_ADMIN @map("tenant_admin")
-  TENANT_MANAGER @map("tenant_manager")
-  TENANT_MEMBER @map("tenant_member")
-  TENANT_VIEWER @map("tenant_viewer")
+  PLATFORM_ADMIN  
+  PLATFORM_SUPPORT  
+  PLATFORM_VIEWER  
+  ADMIN  
+  OWNER  
+  USER 
+  TENANT_OWNER  
+  TENANT_ADMIN 
+  TENANT_MANAGER  
+  TENANT_MEMBER  
+  TENANT_VIEWER 
   @@map("user_role")
 }
 
 enum UserTenantRole {
-  OWNER @map("owner")
-  ADMIN @map("admin")
-  SUPPORT @map("support")
-  MEMBER @map("member")
-  VIEWER @map("viewer")
+  OWNER  
+  ADMIN 
+  SUPPORT  
+  MEMBER  
+  VIEWER 
   @@map("user_tenant_role")
 }
