@@ -81,7 +81,7 @@ export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
         });
       }
 
-      const userRole = await getUserTenantRole(userId, tenantId);
+      const userRole = await getUserTenantRole(userId, tenantId!);
 
       if (!userRole || !allowedRoles.includes(userRole)) {
         return res.status(403).json({
@@ -315,7 +315,7 @@ export async function requireTenantOwner(
 
     const userId = req.user.userId || req.user.user_id;
 
-    const userRole = await getUserTenantRole(userId, tenantId);
+    const userRole = await getUserTenantRole(userId, tenantId!);
 
     if (userRole !== UserTenantRole.OWNER) {
       return res.status(403).json({

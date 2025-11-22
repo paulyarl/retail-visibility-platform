@@ -26,7 +26,9 @@
  */
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../auth/auth.service';
-import { UserRole } from '@prisma/client';
+import { prisma } from '../prisma';
+import jwt from 'jsonwebtoken';
+import { UserTenantRole } from '@prisma/client';
 import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 
 // JWT Payload interface
@@ -371,7 +373,7 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
     }
 
     // Must be OWNER or ADMIN role within the tenant to manage settings
-    if (userTenant.role !== 'OWNER' && userTenant.role !== 'ADMIN') {
+    if (userTenant.role !== UserTenantRole.OWNER && userTenant.role !== UserTenantRole.ADMIN) {
       return res.status(403).json({ 
         error: 'owner_or_admin_required', 
         message: 'Only tenant owners/admins can manage feature flags' 
@@ -472,7 +474,7 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
     }
   });
 
-  if (!userTenant || (userTenant.role !== 'OWNER' && userTenant.role !== 'ADMIN')) {
+  if (!userTenant || (userTenant.role !== UserTenantRole.OWNER && userTenant.role !== UserTenantRole.ADMIN)) {
     return res.status(403).json({
       error: 'tenant_admin_required',
       message: 'Tenant owner or administrator access required for this operation',
