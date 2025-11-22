@@ -3643,29 +3643,36 @@ console.log(`   WEB_URL: ${process.env.WEB_URL || 'Not set'}\n`);
 
 // Only start the server when not running tests
 if (process.env.NODE_ENV !== "test") {
-  const server = app.listen(port, '0.0.0.0', () => {
-    console.log(`\n✅ API server running → http://localhost:${port}/health`);
-    // console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
-  });
-
-  // Handle server errors
-  server.on('error', (error: NodeJS.ErrnoException) => {
-    if (error.code === 'EADDRINUSE') {
-      console.error(`❌ Port ${port} is already in use`);
-    } else {
-      console.error('❌ Server error:', error);
-    }
-    process.exit(1);
-  });
-
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('\n⚠️  SIGTERM received, shutting down gracefully...');
-    server.close(() => {
-      console.log('✅ Server closed');
-      process.exit(0);
+  try {
+    console.log('🔧 About to start server...');
+    const server = app.listen(port, '0.0.0.0', () => {
+      console.log(`\n✅ API server running → http://localhost:${port}/health`);
+      // console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
     });
-  });
+
+    // Handle server errors
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} is already in use`);
+      } else {
+        console.error('❌ Server error:', error);
+      }
+      process.exit(1);
+    });
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('\n⚠️  SIGTERM received, shutting down gracefully...');
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
+    });
+  } catch (error) {
+    console.error('❌ Fatal error during server startup:', error);
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
+    process.exit(1);
+  }
 }
 
 // Export the Express app for Vercel compatibility
