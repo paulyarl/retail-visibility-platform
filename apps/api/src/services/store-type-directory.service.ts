@@ -143,8 +143,15 @@ class StoreTypeDirectoryService {
     try {
       const typeName = this.unslugify(typeSlug);
       
-      const result = await prisma.$queryRaw<Array<{ primary_category: string }>>`
-        SELECT primary_category
+      const result = await prisma.$queryRaw<Array<{ 
+        primary_category: string; 
+        store_count: bigint; 
+        total_products: bigint; 
+      }>>`
+        SELECT 
+          primary_category,
+          COUNT(*) as store_count,
+          SUM(product_count) as total_products
         FROM directory_listings_list
         WHERE is_published = true
           AND primary_category ILIKE ${`%${typeName}%`}
