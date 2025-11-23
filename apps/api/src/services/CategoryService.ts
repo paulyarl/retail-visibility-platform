@@ -98,7 +98,7 @@ export const categoryService = {
       throw Object.assign(new Error('tenantCategoryId_or_categorySlug_required'), { statusCode: 400 })
     }
 
-    const item = await prisma.inventoryItem.findFirst({ where: { id: item_id, tenantId } })
+    const item = await prisma.InventoryItem.findFirst({ where: { id: item_id, tenantId } })
     if (!item) {
       throw Object.assign(new Error('item_not_found'), { statusCode: 404 })
     }
@@ -138,7 +138,7 @@ export const categoryService = {
       throw Object.assign(new Error('tenant_category_not_found'), { statusCode: 404 })
     }
 
-    const updated = await prisma.inventoryItem.update({
+    const updated = await prisma.InventoryItem.update({
       where: { id: item_id },
       data: { 
         tenantCategoryId: category.id,

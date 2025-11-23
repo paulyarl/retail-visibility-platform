@@ -58,7 +58,7 @@ router.get('/tenant/:tenantId/status', authenticateToken, requireSupportAccess, 
     });
 
     // Get item count
-    const itemCount = await prisma.inventoryItem.count({
+    const itemCount = await prisma.InventoryItem.count({
       where: { tenantId, itemStatus: 'active' },
     });
 
@@ -99,7 +99,7 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
 
     const profile = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } });
     const settings = await prisma.directorySettings.findUnique({ where: { tenantId } });
-    const itemCount = await prisma.inventoryItem.count({
+    const itemCount = await prisma.InventoryItem.count({
       where: { tenantId, itemStatus: 'active' },
     });
 

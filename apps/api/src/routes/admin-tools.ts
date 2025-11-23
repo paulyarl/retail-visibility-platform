@@ -166,7 +166,7 @@ router.delete('/tenants/:tenantId', async (req, res) => {
     console.log('[Admin Tools] Deleting test tenant:', tenantId);
 
     // Delete all products for this tenant
-    const deletedProducts = await prisma.inventoryItem.deleteMany({
+    const deletedProducts = await prisma.InventoryItem.deleteMany({
       where: { tenantId },
     });
 

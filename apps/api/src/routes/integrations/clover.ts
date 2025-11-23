@@ -92,7 +92,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
       
       try {
         // Check if item with this SKU already exists
-        const existingItem = await prisma.inventoryItem.findFirst({
+        const existingItem = await prisma.InventoryItem.findFirst({
           where: {
             tenantId,
             sku: rvpItem.sku
@@ -105,7 +105,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
         }
 
         // Create inventory item
-        const createdItem = await prisma.inventoryItem.create({
+        const createdItem = await prisma.InventoryItem.create({
           data: {
             tenantId,
             ...rvpItem

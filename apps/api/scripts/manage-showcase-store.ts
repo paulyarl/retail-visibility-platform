@@ -98,7 +98,7 @@ async function refreshProducts() {
   
   // Delete existing products
   console.log('🗑️  Removing old products...');
-  const deleted = await prisma.inventoryItem.deleteMany({
+  const deleted = await prisma.InventoryItem.deleteMany({
     where: { tenantId: store.id },
   });
   console.log(`✅ Deleted ${deleted.count} products\n`);

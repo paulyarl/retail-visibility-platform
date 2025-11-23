@@ -1127,7 +1127,7 @@ app.get("/tenant/:tenantId/swis/preview", async (req, res) => {
     }
     
     // Fetch products
-    const products = await prisma.inventoryItem.findMany({
+    const products = await prisma.InventoryItem.findMany({
       where: { tenantId: tenantId },
       orderBy,
       take: limit,
@@ -1274,14 +1274,14 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
     
     // Fetch items with pagination (includes category relation for better UX)
     const [items, totalCount] = await Promise.all([
-      prisma.inventoryItem.findMany({
+      prisma.InventoryItem.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
         skip,
         take: limit,
         include: {},
       }),
-      prisma.inventoryItem.count({ where }),
+      prisma.InventoryItem.count({ where }),
     ]);
     
     // Return paginated response
@@ -1798,7 +1798,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       supabaseConfigured: !!supabase
     });
     
-    const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+    const item = await prisma.InventoryItem.findUnique({ where: { id: itemId } });
     if (!item) {
       console.log(`[Photo Upload] Item not found: ${itemId}`);
       return res.status(404).json({ error: "item_not_found" });
@@ -1826,7 +1826,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       });
 
       // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
+      await prisma.InventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
       return res.status(201).json(created);
     }
 
@@ -1875,7 +1875,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       });
 
       // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl! } });
+      await prisma.InventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl! } });
       return res.status(201).json(created);
     }
 
@@ -1940,7 +1940,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       });
 
       // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl } });
+      await prisma.InventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl } });
       return res.status(201).json(created);
     }
 
@@ -2104,7 +2104,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         });
       }
       
-      const count = await prisma.inventoryItem.count({ where });
+      const count = await prisma.InventoryItem.count({ where });
       return res.json({ count });
     }
     
@@ -2126,14 +2126,14 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     
     // Fetch items with pagination (includes category relation for better UX)
     const [items, totalCount] = await Promise.all([
-      prisma.inventoryItem.findMany({
+      prisma.InventoryItem.findMany({
         where,
         orderBy,
         skip,
         take: limit,
         include: {},
       }),
-      prisma.inventoryItem.count({ where }),
+      prisma.InventoryItem.count({ where }),
     ]);
     
     // Return paginated response
@@ -2164,7 +2164,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
 });
 
 app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], async (req, res) => {
-  const it = await prisma.inventoryItem.findUnique({
+  const it = await prisma.InventoryItem.findUnique({
     where: { id: req.params.id },
   });
   if (!it) return res.status(404).json({ error: "not_found" });
@@ -2253,7 +2253,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
     
     // Remove any conflicting fields that might be added by the middleware
     const { category_path, ...cleanData } = data;
-    const created = await prisma.inventoryItem.create({ 
+    const created = await prisma.InventoryItem.create({ 
       data: {
         id: crypto.randomUUID(),
         ...cleanData,
@@ -2300,7 +2300,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       updateData.price = updateData.priceCents / 100;
     }
     
-    const updated = await prisma.inventoryItem.update({ where: { id: req.params.id }, data: updateData });
+    const updated = await prisma.InventoryItem.update({ where: { id: req.params.id }, data: updateData });
     await audit({ tenantId: updated.tenantId, actor: null, action: "inventory.update", payload: { id: updated.id } });
     
     // Convert Decimal price to number and hide priceCents for frontend compatibility
@@ -2320,7 +2320,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
 app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     // Get item to find tenant
-    const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
+    const item = await prisma.InventoryItem.findUnique({ where: { id: req.params.id } });
     if (!item) {
       return res.status(404).json({ error: "item_not_found" });
     }
@@ -2333,7 +2333,7 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
 
     // Check trash capacity
     const { isTrashFull, getTrashCapacity } = await import('./utils/trash-capacity');
-    const trashCount = await prisma.inventoryItem.count({
+    const trashCount = await prisma.InventoryItem.count({
       where: { tenantId: item.tenantId, itemStatus: 'trashed' }
     });
     
@@ -2348,7 +2348,7 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
     }
 
     // Move to trash
-    const updated = await prisma.inventoryItem.update({
+    const updated = await prisma.InventoryItem.update({
       where: { id: req.params.id },
       data: { itemStatus: 'trashed' }
     });
@@ -2377,7 +2377,7 @@ app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (re
 
     // Get trash count and capacity info
     const { getTrashCapacityInfo } = await import('./utils/trash-capacity');
-    const trashCount = await prisma.inventoryItem.count({
+    const trashCount = await prisma.InventoryItem.count({
       where: { tenantId: tenantId, itemStatus: 'trashed' }
     });
     
@@ -2392,7 +2392,7 @@ app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (re
 // Restore from trash
 app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
-    const item = await prisma.inventoryItem.update({
+    const item = await prisma.InventoryItem.update({
       where: { id: req.params.id },
       data: { itemStatus: 'active' }
     });
@@ -2406,7 +2406,7 @@ app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, r
 app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     // First check if item is trashed
-    const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
+    const item = await prisma.InventoryItem.findUnique({ where: { id: req.params.id } });
     if (!item) {
       return res.status(404).json({ error: "item_not_found" });
     }
@@ -2415,7 +2415,7 @@ app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requ
     }
     
     // Permanently delete
-    await prisma.inventoryItem.delete({ where: { id: req.params.id } });
+    await prisma.InventoryItem.delete({ where: { id: req.params.id } });
     res.status(204).end();
   } catch {
     res.status(500).json({ error: "failed_to_purge_item" });
@@ -2462,7 +2462,7 @@ app.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, res) 
     if (visibility) updateData.visibility = visibility;
     if (availability) updateData.availability = availability;
     
-    const updated = await prisma.inventoryItem.update({
+    const updated = await prisma.InventoryItem.update({
       where: { id: req.params.id },
       data: updateData,
     });
@@ -2490,7 +2490,7 @@ app.post("/items/sync-availability", authenticateToken, async (req, res) => {
     }
 
     // Get all items for the tenant
-    const items = await prisma.inventoryItem.findMany({
+    const items = await prisma.InventoryItem.findMany({
       where: { tenantId },
       select: { id: true, stock: true, availability: true },
     });
@@ -2504,7 +2504,7 @@ app.post("/items/sync-availability", authenticateToken, async (req, res) => {
     // Update out-of-sync items
     const updates = await Promise.all(
       outOfSync.map(item =>
-        prisma.inventoryItem.update({
+        prisma.InventoryItem.update({
           where: { id: item.id },
           data: { availability: item.stock > 0 ? 'inStock' : 'outOfStock' },
         })
@@ -3332,7 +3332,7 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
     if (updateData.categoryPath !== undefined) prismaUpdateData.categoryPath = updateData.categoryPath;
 
     // Update the item
-    const updatedItem = await prisma.inventoryItem.update({
+    const updatedItem = await prisma.InventoryItem.update({
       where: { id: itemId },
       data: prismaUpdateData,
     });
@@ -3392,7 +3392,7 @@ app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) =>
 
     // Find products that need enrichment
     // Products created by Quick Start Wizard typically have source = 'QUICK_START_WIZARD' and are missing details
-    const products = await prisma.inventoryItem.findMany({
+    const products = await prisma.InventoryItem.findMany({
       where: {
         tenantId: { in: tenantIds },
         OR: [
