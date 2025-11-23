@@ -1,4 +1,13 @@
-import { prisma } from '../prisma';
+import { Pool } from 'pg';
+
+// Create a direct database connection pool that bypasses Prisma's issues
+const directPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  min: 1,
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
 
 /**
  * Store Type Directory Service
@@ -18,14 +27,27 @@ class StoreTypeDirectoryService {
     try {
       console.log('[StoreTypeService] Fetching store types from directory_listings_list');
 
-      // Get unique store types with counts - simplest possible query
-      const storeTypes = await prisma.$queryRaw<Array<{
-        primary_category: string;
-        store_count: number;
-      }>>`
-        SELECT 'test' as primary_category, 1 as store_count
-        LIMIT 1
-      `;
+      // Get unique store types with counts using direct database connection
+      const result = await directPool.query(`
+        WITH category_counts AS (
+          SELECT
+            primary_category,
+            COUNT(*) as store_count
+          FROM directory_listings_list
+          WHERE is_published = true
+            AND primary_category IS NOT NULL
+            AND primary_category != ''
+          GROUP BY primary_category
+          ORDER BY COUNT(*) DESC
+        )
+        SELECT
+          primary_category,
+          store_count::integer
+        FROM category_counts
+        ORDER BY store_count DESC
+      `);
+
+      const storeTypes = result.rows;
 
       console.log(`[StoreTypeService] Found ${storeTypes.length} store types`);
 
@@ -55,29 +77,8 @@ class StoreTypeDirectoryService {
       // Convert slug back to category name (approximate)
       const typeName = this.unslugify(typeSlug);
 
-      // Get stores from directory_listings_list using raw SQL with CTE to avoid JSON fields
-      const stores = await prisma.$queryRaw<Array<{
-        id: string;
-        tenantId: string;
-        business_name: string;
-        slug: string;
-        address: string | null;
-        city: string | null;
-        state: string | null;
-        postal_code: string | null;
-        latitude: number | null;
-        longitude: number | null;
-        primary_category: string | null;
-        rating_avg: number | null;
-        rating_count: number | null;
-        product_count: number | null;
-        logo_url: string | null;
-        description: string | null;
-        is_featured: boolean | null;
-        subscription_tier: string | null;
-        created_at: Date | null;
-        updated_at: Date | null;
-      }>>`
+      // Get stores using direct database connection
+      const result = await directPool.query(`
         WITH store_data AS (
           SELECT
             id,
@@ -102,12 +103,14 @@ class StoreTypeDirectoryService {
             updatedAt as updated_at
           FROM directory_listings_list
           WHERE is_published = true
-            AND primary_category ILIKE ${`%${typeName}%`}
+            AND primary_category ILIKE $1
         )
         SELECT * FROM store_data
         ORDER BY product_count DESC
         LIMIT 100
-      `;
+      `, [`%${typeName}%`]);
+
+      const stores = result.rows;
 
       console.log(`[StoreTypeService] Found ${stores.length} stores`);
 
@@ -145,12 +148,8 @@ class StoreTypeDirectoryService {
     try {
       const typeName = this.unslugify(typeSlug);
       
-      // Get store type details using raw SQL with CTE
-      const result = await prisma.$queryRaw<Array<{
-        primary_category: string;
-        store_count: number;
-        total_products: number;
-      }>>`
+      // Get store type details using direct database connection
+      const result = await directPool.query(`
         WITH type_details AS (
           SELECT
             primary_category,
@@ -158,7 +157,7 @@ class StoreTypeDirectoryService {
             SUM(product_count) as total_products
           FROM directory_listings_list
           WHERE is_published = true
-            AND primary_category ILIKE ${`%${typeName}%`}
+            AND primary_category ILIKE $1
           GROUP BY primary_category
           LIMIT 1
         )
@@ -167,13 +166,13 @@ class StoreTypeDirectoryService {
           store_count::integer,
           COALESCE(total_products, 0)::integer as total_products
         FROM type_details
-      `;
+      `, [`%${typeName}%`]);
 
-      if (result.length === 0) {
+      if (result.rows.length === 0) {
         return null;
       }
 
-      const type = result[0];
+      const type = result.rows[0];
       return {
         name: type.primary_category,
         slug: this.slugify(type.primary_category),
