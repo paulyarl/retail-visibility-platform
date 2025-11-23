@@ -124,7 +124,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
     let itemStats, tenant, organization;
     try {
       [itemStats, tenant, organization] = await Promise.all([
-        prisma.InventoryItem.aggregate({
+        prisma.inventoryItem.aggregate({
           where: { tenantId },
           _count: { id: true },
         }).catch(err => {
@@ -167,17 +167,17 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
     let activeItemsCount = 0, syncIssuesCount = 0;
     try {
       [activeItemsCount, syncIssuesCount] = await Promise.all([
-        prisma.InventoryItem.count({
+        prisma.inventoryItem.count({
           where: {
             tenantId,
-            availability: 'inStock',
+            availability: 'in_stock',
           }
         }).catch(err => {
           console.log('[Dashboard FIXED] Active items count error:', err.message);
           return 0;
         }),
         
-        prisma.InventoryItem.count({
+        prisma.inventoryItem.count({
           where: {
             tenantId,
             OR: [

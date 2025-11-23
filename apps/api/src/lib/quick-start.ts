@@ -228,8 +228,8 @@ export async function generateQuickStartProducts(
   for (let i = 0; i < allProducts.length; i += batchSize) {
     const batch = allProducts.slice(i, i + batchSize);
     const items = batch.map((product, idx) => {
-      const availability = Math.random() > 0.25 ? 'inStock' as const : 'outOfStock' as const;
-      const stock = availability === 'inStock' ? Math.floor(Math.random() * 96) + 5 : 0;
+      const availability = Math.random() > 0.25 ? 'in_stock' as const : 'out_of_stock' as const;
+      const stock = availability === 'in_stock' ? Math.floor(Math.random() * 96) + 5 : 0;
 
       // Assign category if enabled
       let categoryAssignment: { tenantCategoryId?: string; categoryPath?: string[] } = {};
@@ -265,24 +265,24 @@ export async function generateQuickStartProducts(
       };
     });
 
-    await prisma.InventoryItem.createMany({ data: items });
+    await prisma.inventoryItem.createMany({ data: items });
     createdCount += items.length;
   }
 
   // Get final counts
-  const totalProducts = await prisma.InventoryItem.count({
+  const totalProducts = await prisma.inventoryItem.count({
     where: { tenantId: tenant_id },
   });
 
-  const activeProducts = await prisma.InventoryItem.count({
+  const activeProducts = await prisma.inventoryItem.count({
     where: { tenantId: tenant_id, itemStatus: 'active' },
   });
 
-  const inStockProducts = await prisma.InventoryItem.count({
-    where: { tenantId: tenant_id, availability: 'inStock' }, 
+  const inStockProducts = await prisma.inventoryItem.count({
+    where: { tenantId: tenant_id, availability: 'in_stock' }, 
   });
 
-  const categorizedProducts = await prisma.InventoryItem.count({
+  const categorizedProducts = await prisma.inventoryItem.count({
     where: { tenantId: tenant_id, categoryPath: { isEmpty: false } },
   });
 

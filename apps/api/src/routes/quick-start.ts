@@ -183,7 +183,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     }
 
     // Check if tenant already has products (warn if > 10)
-    const existingProductCount = await prisma.InventoryItem.count({
+    const existingProductCount = await prisma.inventoryItem.count({
       where: { tenantId },
     });
 
@@ -254,7 +254,7 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
     const rateLimit = userCanPerformSupport ? { allowed: true } : checkRateLimit(tenantId);
     
     // Check existing product count
-    const productCount = await prisma.InventoryItem.count({
+    const productCount = await prisma.inventoryItem.count({
       where: { tenantId },
     });
 

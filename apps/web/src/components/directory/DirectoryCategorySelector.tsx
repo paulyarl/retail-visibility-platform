@@ -61,8 +61,8 @@ export default function DirectoryCategorySelector({
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
         >
           <option value="">Select a category...</option>
-          {categories.map((cat) => (
-            <option key={cat.name} value={cat.name}>
+          {categories.map((cat, index) => (
+            <option key={`${cat.slug}-${index}`} value={cat.name}>
               {cat.name} {cat.count ? `(${cat.count})` : ''}
             </option>
           ))}
@@ -97,14 +97,14 @@ export default function DirectoryCategorySelector({
               No categories found
             </p>
           ) : (
-            filteredCategories.map((cat) => {
+            filteredCategories.map((cat, index) => {
               const isSelected = secondaryCategories.includes(cat.name);
               const isPrimary = primaryCategory === cat.name;
               const isDisabled = isPrimary || (!isSelected && secondaryCategories.length >= maxSecondaryCategories);
 
               return (
                 <label
-                  key={cat.name}
+                  key={`${cat.slug}-${index}`}
                   className={`flex items-center p-2 rounded-md cursor-pointer transition-colors ${
                     isDisabled
                       ? 'opacity-50 cursor-not-allowed'
@@ -140,9 +140,9 @@ export default function DirectoryCategorySelector({
         {/* Selected Secondary Categories */}
         {secondaryCategories.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {secondaryCategories.map((cat) => (
+            {secondaryCategories.map((cat, index) => (
               <span
-                key={cat}
+                key={`${cat}-${index}`}
                 className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
               >
                 {cat}

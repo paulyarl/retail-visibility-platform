@@ -52,7 +52,7 @@ export async function getCategoryCounts(
 
     // Get counts for each category
     const categoryIds = categories.map(cat => cat.id);
-    const counts = await prisma.InventoryItem.groupBy({
+    const counts = await prisma.inventoryItem.groupBy({
       by: ['tenantCategoryId'],
       where: {
         tenantId,
@@ -109,7 +109,7 @@ export async function getUncategorizedCount(
       where.visibility = 'public';
     }
 
-    return await prisma.InventoryItem.count({ where });
+    return await prisma.inventoryItem.count({ where });
   } catch (error) {
     console.error('[Uncategorized Count] Error:', error);
     return 0;
@@ -137,7 +137,7 @@ export async function getTotalProductCount(
       where.visibility = 'public';
     }
 
-    return await prisma.InventoryItem.count({ where });
+    return await prisma.inventoryItem.count({ where });
   } catch (error) {
     console.error('[Total Product Count] Error:', error);
     return 0;

@@ -51,7 +51,7 @@ export async function findMatchingProducts(
   const matches: ProductMatch[] = [];
 
   // Get products that need enrichment
-  const candidateProducts = await prisma.InventoryItem.findMany({
+  const candidateProducts = await prisma.inventoryItem.findMany({
     where: {
       tenantId,
       OR: [

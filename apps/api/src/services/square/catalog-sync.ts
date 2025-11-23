@@ -134,7 +134,7 @@ export class CatalogSync {
         // Update existing product
         console.log(`[CatalogSync] Updating existing product: ${existingMapping.inventoryItemId}`);
         
-        platformProduct = await prisma.InventoryItem.update({
+        platformProduct = await prisma.inventoryItem.update({
           where: { id: existingMapping.inventoryItemId },
           data: {
             ...platformData,
@@ -155,7 +155,7 @@ export class CatalogSync {
         // Create new product
         console.log(`[CatalogSync] Creating new product: ${squareProduct.item_data.name}`);
         
-        platformProduct = await prisma.InventoryItem.create({
+        platformProduct = await prisma.inventoryItem.create({
           data: {
             tenantId: this.tenantId,
             ...platformData,

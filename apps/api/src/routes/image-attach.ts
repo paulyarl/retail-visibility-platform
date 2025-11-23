@@ -23,7 +23,7 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
     }
 
     // Verify item exists and belongs to tenant
-    const item = await prisma.InventoryItem.findFirst({
+    const item = await prisma.inventoryItem.findFirst({
       where: {
         id: itemId,
         tenantId,

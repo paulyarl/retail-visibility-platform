@@ -80,7 +80,7 @@ router.post('/', async (req, res) => {
         ];
       }
 
-      const items = await prisma.InventoryItem.findMany({
+      const items = await prisma.inventoryItem.findMany({
         where: baseWhere,
         select: { id: true, sku: true, categoryPath: true },
         take: body.sku ? 1 : 2000, // cap to avoid huge scans; job processor can chunk

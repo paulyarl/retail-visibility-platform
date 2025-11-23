@@ -251,7 +251,7 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
     });
 
     // Get products using this category count
-    const productCount = await prisma.InventoryItem.count({
+    const productCount = await prisma.inventoryItem.count({
       where: {
         tenantId,
         categoryPath: {
@@ -476,7 +476,7 @@ router.delete('/:tenantId/categories/:id', requireTenantManagement, async (req, 
     }
 
     // Check for products using this category
-    const productCount = await prisma.InventoryItem.count({
+    const productCount = await prisma.inventoryItem.count({
       where: {
         tenantId,
         categoryPath: { 

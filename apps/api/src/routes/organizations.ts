@@ -319,7 +319,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
     }
 
     // Get source item
-    const sourceItem = await prisma.InventoryItem.findUnique({
+    const sourceItem = await prisma.inventoryItem.findUnique({
       where: { id: sourceItemId },
       include: {
         photoAsset: true,
@@ -355,7 +355,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
         }
 
         // Check if SKU already exists for this tenant
-        const existing = await prisma.InventoryItem.findFirst({
+        const existing = await prisma.inventoryItem.findFirst({
           where: {
             tenantId,
             sku: sourceItem.sku,
@@ -370,7 +370,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
           }
           
           // Update mode - update existing item
-          const updatedItem = await prisma.InventoryItem.update({
+          const updatedItem = await prisma.inventoryItem.update({
             where: { id: existing.id },
             data: {
               name: sourceItem.name,
@@ -439,7 +439,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
         }
 
         // Create mode - create new item
-        const newItem = await prisma.InventoryItem.create({
+        const newItem = await prisma.inventoryItem.create({
           data: {
             id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             updatedAt: new Date(),
@@ -570,7 +570,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
     }
 
     // Get all source items
-    const sourceItems = await prisma.InventoryItem.findMany({
+    const sourceItems = await prisma.inventoryItem.findMany({
       where: { 
         id: { in: sourceItemIds },
       },
@@ -614,7 +614,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
           }
 
           // Check if SKU already exists for this tenant
-          const existing = await prisma.InventoryItem.findFirst({
+          const existing = await prisma.inventoryItem.findFirst({
             where: {
               tenantId,
               sku: sourceItem.sku,
@@ -632,7 +632,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
           }
 
           // Create the item for this tenant
-          const newItem = await prisma.InventoryItem.create({
+          const newItem = await prisma.inventoryItem.create({
             data: {
               tenantId,
               sku: sourceItem.sku,
@@ -820,7 +820,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
     }
 
     // Get all items from hero location
-    const heroItems = await prisma.InventoryItem.findMany({
+    const heroItems = await prisma.inventoryItem.findMany({
       where: { tenantId: heroTenant.id },
       include: { photoAsset: true },
     });
@@ -853,7 +853,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
       for (const targetTenant of targetTenants) {
         try {
           // Check if SKU already exists for this tenant
-          const existing = await prisma.InventoryItem.findFirst({
+          const existing = await prisma.inventoryItem.findFirst({
             where: {
               tenantId: targetTenant.id,
               sku: sourceItem.sku,
@@ -871,7 +871,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
           }
 
           // Create the item for this tenant
-          const newItem = await prisma.InventoryItem.create({
+          const newItem = await prisma.inventoryItem.create({
             data: {
               id: crypto.randomUUID(),
               tenantId: targetTenant.id,

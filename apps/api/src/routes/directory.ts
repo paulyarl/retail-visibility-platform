@@ -196,10 +196,10 @@ router.get('/search', async (req, res) => {
       const currentTime = now.toTimeString().slice(0, 5); // HH:MM
       
       query = Prisma.sql`${query}
-        AND business_hours IS NOT NULL
-        AND business_hours->>${dayOfWeek}->>'isOpen' = 'true'
-        AND business_hours->>${dayOfWeek}->>'open' <= ${currentTime}
-        AND business_hours->>${dayOfWeek}->>'close' >= ${currentTime}
+        AND business_hours_list IS NOT NULL
+        AND business_hours_list->>${dayOfWeek}->>'isOpen' = 'true'
+        AND business_hours_list->>${dayOfWeek}->>'open' <= ${currentTime}
+        AND business_hours_list->>${dayOfWeek}->>'close' >= ${currentTime}
       `;
     }
 

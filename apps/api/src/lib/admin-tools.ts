@@ -133,14 +133,14 @@ export async function deleteTestChain(organizationId: string): Promise<{
   });
 
   // Count products before deletion
-  const productCount = await prisma.InventoryItem.count({
+  const productCount = await prisma.inventoryItem.count({
     where: {
       tenantId: { in: tenants.map(t => t.id) },
     },
   });
 
   // Delete all products
-  await prisma.InventoryItem.deleteMany({
+  await prisma.inventoryItem.deleteMany({
     where: {
       tenantId: { in: tenants.map(t => t.id) },
     },
@@ -251,7 +251,7 @@ export async function bulkSeedProducts(options: {
     try {
       // Clear existing products if requested
       if (clearExisting) {
-        await prisma.InventoryItem.deleteMany({
+        await prisma.inventoryItem.deleteMany({
           where: { tenantId: tenantId },
         });
       }
@@ -296,7 +296,7 @@ export async function bulkClearProducts(tenantIds: string[]) {
 
   for (const tenantId of tenantIds) {
     try {
-      const result = await prisma.InventoryItem.deleteMany({
+      const result = await prisma.inventoryItem.deleteMany({
         where: { tenantId: tenantId },
       });
 

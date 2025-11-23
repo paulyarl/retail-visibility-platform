@@ -26,7 +26,7 @@ router.post('/:tenantId/feed/precheck', async (req, res) => {
   try {
     const tenantId = req.params.tenantId
     const limit = Math.min(parseInt(String(req.query.limit || '1000')), 5000)
-    const items = await prisma.InventoryItem.findMany({ where: { tenantId }, take: isNaN(limit) ? 1000 : limit })
+    const items = await prisma.inventoryItem.findMany({ where: { tenantId }, take: isNaN(limit) ? 1000 : limit })
 
     const missingCategory = [] as any[]
     const unmapped = [] as any[]
@@ -53,7 +53,7 @@ router.post('/:tenantId/feed/precheck', async (req, res) => {
 router.get('/:tenantId/feed/validate', async (req, res) => {
   try {
     const tenantId = req.params.tenantId
-    const items = await prisma.InventoryItem.findMany({ where: { tenantId } })
+    const items = await prisma.inventoryItem.findMany({ where: { tenantId } })
 
     const errors: any[] = []
     const warnings: any[] = []
@@ -106,7 +106,7 @@ router.post('/:tenantId/feed/serialize', async (req, res) => {
     if (!opts.includeInactive) where.itemStatus = 'active'
     const take = opts.limit ?? 1000
 
-    const items = await prisma.InventoryItem.findMany({ where, take })
+    const items = await prisma.inventoryItem.findMany({ where, take })
 
     const output = [] as any[]
     for (const it of items) {
@@ -145,7 +145,7 @@ router.get('/:tenantId/categories/coverage', async (req, res) => {
   try {
     const tenantId = req.params.tenantId
     // Total active, public items for tenant
-    const total = await prisma.InventoryItem.count({ where: { tenantId, itemStatus: 'active', visibility: 'public' } })
+    const total = await prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'active', visibility: 'public' } })
 
     // Mapped _count: join inventory_item to tenant_category by leaf slug of category_path
     const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(

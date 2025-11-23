@@ -235,10 +235,10 @@ app.get("/api/tenants", authenticateToken, async (req, res) => {
     let statusCondition: any = {};
     if (statusFilter) {
       // Specific status requested
-      statusCondition = { locationStatus: statusFilter as any };
+      statusCondition = { locationStatus: statusFilter };
     } else if (includeArchived === false) {
       // Explicitly exclude archived
-      statusCondition = { locationStatus: { not: 'archived' as any } };
+      statusCondition = { locationStatus: { not: 'archived' } };
     }
     // Default: include all statuses including archived
     
@@ -348,7 +348,7 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     
     // Add location status info
     const { getLocationStatusInfo } = await import('./utils/location-status');
-    const statusInfo = getLocationStatusInfo(tenant.locationStatus as any);
+    const statusInfo = getLocationStatusInfo(tenant.locationStatus);
     
     res.json({
       ...tenant,
@@ -610,14 +610,14 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
       console.log(`[PATCH /tenants/${id}/status] Completed in ${responseTime}ms (no-op)`);
       return res.json({
         ...tenant,
-        statusInfo: getLocationStatusInfo(status as any),
+        statusInfo: getLocationStatusInfo(status),
         message: "Status unchanged - no update performed"
       });
     }
 
     // Validate status change
     console.log(`[PATCH /tenants/${id}/status] Validating status change from '${tenant.locationStatus}' to '${status}'`);
-    const validation = validateStatusChange(tenant.locationStatus as any, status, reason);
+    const validation = validateStatusChange(tenant.locationStatus, status, reason);
     if (!validation.valid) {
       console.log(`[PATCH /tenants/${id}/status] Validation failed: ${validation.error}`);
       return res.status(400).json({ 
@@ -860,7 +860,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
     
     // Check if profile exists
     const existingProfiles = await basePrisma.$queryRaw`
-      SELECT tenant_id FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
+      SELECT tenant_id FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenantId}
     `;
     console.log('[POST /tenant/profile] Existing profiles check result:', existingProfiles);
 
@@ -882,7 +882,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
         updateParts.push(`updated_at = CURRENT_TIMESTAMP`);
         values.push(tenantId); // Add tenantId at the end
         const updateQuery = `
-          UPDATE "tenant_business_profile"
+          UPDATE "tenant_business_profiles_list"
           SET ${updateParts.join(', ')}
           WHERE tenant_id = $${values.length}
         `;
@@ -894,7 +894,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
 
       // Get updated profile
       result = await basePrisma.$queryRaw`
-        SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
+        SELECT * FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenantId}
       `;
       console.log('[POST /tenant/profile] Retrieved updated profile');
     } else {
@@ -953,7 +953,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
       });
       
       const insertQuery = `
-        INSERT INTO "tenant_business_profile" (${insertFields.map(f => `"${f}"`).join(', ')})
+        INSERT INTO "tenant_business_profiles_list" (${insertFields.map(f => `"${f}"`).join(', ')})
         VALUES (${placeholders.join(', ')})
         RETURNING *
       `;
@@ -961,7 +961,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
       console.log('[POST /tenant/profile] Final insert values:', insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
-        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}`
+        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenantId}`
       );
       console.log('[POST /tenant/profile] Created new profile');
     }
@@ -989,7 +989,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
 // GET /tenant/profile - retrieve normalized profile
 app.get("/tenant/profile", authenticateToken, async (req, res) => {
   try {
-    const tenantId = (req.query.tenantId as string) || (req.query.tenantId as string);
+    const tenantId = (req.query.tenantId as string) || (req.query.tenant_id as string);
     if (!tenantId) return res.status(400).json({ error: "tenant_required" });
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
@@ -997,7 +997,7 @@ app.get("/tenant/profile", authenticateToken, async (req, res) => {
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     const { basePrisma } = await import('./prisma');
     const bpResults = await basePrisma.$queryRaw`
-      SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
+      SELECT * FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenantId}
     `;
     const bp = (bpResults as any[])[0] || null;
     
@@ -1006,12 +1006,12 @@ app.get("/tenant/profile", authenticateToken, async (req, res) => {
     let specialHours = null;
     try {
       const businessHoursResults = await basePrisma.$queryRaw`
-        SELECT * FROM "business_hours" WHERE tenant_id = ${tenantId}
+        SELECT * FROM "business_hours_list" WHERE tenant_id = ${tenantId}
       `;
       businessHours = (businessHoursResults as any[])[0] || null;
       
       const specialHoursResults = await basePrisma.$queryRaw`
-        SELECT * FROM "business_hours_special" WHERE tenant_id = ${tenantId}
+        SELECT * FROM "business_hours_special_list" WHERE tenant_id = ${tenantId}
       `;
       specialHours = (specialHoursResults as any[])[0] || null;
     } catch (error) {
@@ -1127,7 +1127,7 @@ app.get("/tenant/:tenantId/swis/preview", async (req, res) => {
     }
     
     // Fetch products
-    const products = await prisma.InventoryItem.findMany({
+    const products = await prisma.inventoryItem.findMany({
       where: { tenantId: tenantId },
       orderBy,
       take: limit,
@@ -1152,7 +1152,7 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     const { basePrisma } = await import('./prisma');
     const bpResults = await basePrisma.$queryRaw`
-      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, updated_at FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
+      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenantId}
     `;
     const bp = (bpResults as any[])[0] || null;
     
@@ -1161,12 +1161,12 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     let specialHours = null;
     try {
       const businessHoursResults = await basePrisma.$queryRaw`
-        SELECT * FROM "business_hours" WHERE tenant_id = ${tenantId}
+        SELECT * FROM "business_hours_list" WHERE tenant_id = ${tenantId}
       `;
       businessHours = (businessHoursResults as any[])[0] || null;
       
       const specialHoursResults = await basePrisma.$queryRaw`
-        SELECT * FROM "business_hours_special" WHERE tenant_id = ${tenantId}
+        SELECT * FROM "business_hours_special_list" WHERE tenant_id = ${tenantId}
       `;
       specialHours = (specialHoursResults as any[])[0] || null;
     } catch (error) {
@@ -1274,14 +1274,14 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
     
     // Fetch items with pagination (includes category relation for better UX)
     const [items, totalCount] = await Promise.all([
-      prisma.InventoryItem.findMany({
+      prisma.inventoryItem.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
         skip,
         take: limit,
         include: {},
       }),
-      prisma.InventoryItem.count({ where }),
+      prisma.inventoryItem.count({ where }),
     ]);
     
     // Return paginated response
@@ -1385,7 +1385,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
     
     // Check if profile exists
     const existingProfiles = await basePrisma.$queryRaw`
-      SELECT tenant_id FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
+      SELECT tenant_id FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenantId}
     `;
     console.log(`[PATCH /tenant/profile] Existing profiles found:`, (existingProfiles as any[]).length);
     let result;
@@ -1406,7 +1406,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
         updateParts.push(`updated_at = CURRENT_TIMESTAMP`);
         values.push(tenantId); // Add tenantId at the end
         const updateQuery = `
-          UPDATE "tenant_business_profile"
+          UPDATE "tenant_business_profiles_list"
           SET ${updateParts.join(', ')}
           WHERE tenant_id = $${values.length}
         `;
@@ -1418,7 +1418,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
 
       // Get updated profile
       result = await basePrisma.$queryRaw`
-        SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}
+        SELECT * FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenantId}
       `;
       console.log(`[PATCH /tenant/profile] Retrieved updated profile:`, result);
     } else {
@@ -1460,7 +1460,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
 
       const placeholders = insertFields.map((_, i) => `$${i + 1}`);
       const insertQuery = `
-        INSERT INTO "tenant_business_profile" (${insertFields.map(f => `"${f}"`).join(', ')})
+        INSERT INTO "tenant_business_profiles_list" (${insertFields.map(f => `"${f}"`).join(', ')})
         VALUES (${placeholders.join(', ')})
         RETURNING *
       `;
@@ -1468,7 +1468,7 @@ app.patch("/tenant/profile", authenticateToken, async (req, res) => {
       console.log(`[PATCH /tenant/profile] Insert values:`, insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
-        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profile" WHERE tenant_id = ${tenantId}`
+        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenantId}`
       );
       console.log(`[PATCH /tenant/profile] Created new profile:`, result);
     }
@@ -1798,7 +1798,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       supabaseConfigured: !!supabase
     });
     
-    const item = await prisma.InventoryItem.findUnique({ where: { id: itemId } });
+    const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
     if (!item) {
       console.log(`[Photo Upload] Item not found: ${itemId}`);
       return res.status(404).json({ error: "item_not_found" });
@@ -1826,7 +1826,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       });
 
       // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.InventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
+      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
       return res.status(201).json(created);
     }
 
@@ -1875,7 +1875,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       });
 
       // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.InventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl! } });
+      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl! } });
       return res.status(201).json(created);
     }
 
@@ -1940,7 +1940,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       });
 
       // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.InventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl } });
+      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl } });
       return res.status(201).json(created);
     }
 
@@ -2104,7 +2104,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         });
       }
       
-      const count = await prisma.InventoryItem.count({ where });
+      const count = await prisma.inventoryItem.count({ where });
       return res.json({ count });
     }
     
@@ -2126,14 +2126,14 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     
     // Fetch items with pagination (includes category relation for better UX)
     const [items, totalCount] = await Promise.all([
-      prisma.InventoryItem.findMany({
+      prisma.inventoryItem.findMany({
         where,
         orderBy,
         skip,
         take: limit,
         include: {},
       }),
-      prisma.InventoryItem.count({ where }),
+      prisma.inventoryItem.count({ where }),
     ]);
     
     // Return paginated response
@@ -2164,7 +2164,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
 });
 
 app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], async (req, res) => {
-  const it = await prisma.InventoryItem.findUnique({
+  const it = await prisma.inventoryItem.findUnique({
     where: { id: req.params.id },
   });
   if (!it) return res.status(404).json({ error: "not_found" });
@@ -2205,7 +2205,7 @@ const baseItemSchema = z.object({
   manufacturer: z.string().optional(),
   price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
   currency: z.string().length(3).optional(),
-  availability: z.enum(['inStock', 'outOfStock', 'preorder']).optional(),
+  availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
   // Item status and visibility
   itemStatus: z.enum(['active', 'inactive', 'archived']).optional(),
   visibility: z.enum(['public', 'private']).optional(),
@@ -2245,7 +2245,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       priceCents: parsed.data.priceCents ?? (parsed.data.price ? Math.round(parsed.data.price * 100) : 0),
       currency: parsed.data.currency || 'USD',
       // Auto-set availability based on stock if not explicitly provided
-      availability: parsed.data.availability || (parsed.data.stock > 0 ? 'inStock' : 'outOfStock'),
+      availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
       tenantId: parsed.data.tenantId || '', // Ensure tenantId is always a string
       // Handle both categoryPath and category_path (from transform middleware)
       categoryPath: parsed.data.category_path || parsed.data.category_path || [],
@@ -2253,7 +2253,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
     
     // Remove any conflicting fields that might be added by the middleware
     const { category_path, ...cleanData } = data;
-    const created = await prisma.InventoryItem.create({ 
+    const created = await prisma.inventoryItem.create({ 
       data: {
         id: crypto.randomUUID(),
         ...cleanData,
@@ -2288,7 +2288,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     const updateData = { ...parsed.data };
     if (updateData.stock !== undefined) {
       // If stock is being updated, automatically set availability
-      updateData.availability = updateData.stock > 0 ? 'inStock' : 'outOfStock';
+      updateData.availability = updateData.stock > 0 ? 'in_stock' : 'out_of_stock';
     }
 
     // Sync price and priceCents fields
@@ -2300,7 +2300,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       updateData.price = updateData.priceCents / 100;
     }
     
-    const updated = await prisma.InventoryItem.update({ where: { id: req.params.id }, data: updateData });
+    const updated = await prisma.inventoryItem.update({ where: { id: req.params.id }, data: updateData });
     await audit({ tenantId: updated.tenantId, actor: null, action: "inventory.update", payload: { id: updated.id } });
     
     // Convert Decimal price to number and hide priceCents for frontend compatibility
@@ -2320,7 +2320,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
 app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     // Get item to find tenant
-    const item = await prisma.InventoryItem.findUnique({ where: { id: req.params.id } });
+    const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
     if (!item) {
       return res.status(404).json({ error: "item_not_found" });
     }
@@ -2333,7 +2333,7 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
 
     // Check trash capacity
     const { isTrashFull, getTrashCapacity } = await import('./utils/trash-capacity');
-    const trashCount = await prisma.InventoryItem.count({
+    const trashCount = await prisma.inventoryItem.count({
       where: { tenantId: item.tenantId, itemStatus: 'trashed' }
     });
     
@@ -2348,7 +2348,7 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
     }
 
     // Move to trash
-    const updated = await prisma.InventoryItem.update({
+    const updated = await prisma.inventoryItem.update({
       where: { id: req.params.id },
       data: { itemStatus: 'trashed' }
     });
@@ -2377,7 +2377,7 @@ app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (re
 
     // Get trash count and capacity info
     const { getTrashCapacityInfo } = await import('./utils/trash-capacity');
-    const trashCount = await prisma.InventoryItem.count({
+    const trashCount = await prisma.inventoryItem.count({
       where: { tenantId: tenantId, itemStatus: 'trashed' }
     });
     
@@ -2392,7 +2392,7 @@ app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (re
 // Restore from trash
 app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
-    const item = await prisma.InventoryItem.update({
+    const item = await prisma.inventoryItem.update({
       where: { id: req.params.id },
       data: { itemStatus: 'active' }
     });
@@ -2406,7 +2406,7 @@ app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, r
 app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     // First check if item is trashed
-    const item = await prisma.InventoryItem.findUnique({ where: { id: req.params.id } });
+    const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
     if (!item) {
       return res.status(404).json({ error: "item_not_found" });
     }
@@ -2415,7 +2415,7 @@ app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requ
     }
     
     // Permanently delete
-    await prisma.InventoryItem.delete({ where: { id: req.params.id } });
+    await prisma.inventoryItem.delete({ where: { id: req.params.id } });
     res.status(204).end();
   } catch {
     res.status(500).json({ error: "failed_to_purge_item" });
@@ -2462,7 +2462,7 @@ app.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, res) 
     if (visibility) updateData.visibility = visibility;
     if (availability) updateData.availability = availability;
     
-    const updated = await prisma.InventoryItem.update({
+    const updated = await prisma.inventoryItem.update({
       where: { id: req.params.id },
       data: updateData,
     });
@@ -2490,23 +2490,23 @@ app.post("/items/sync-availability", authenticateToken, async (req, res) => {
     }
 
     // Get all items for the tenant
-    const items = await prisma.InventoryItem.findMany({
+    const items = await prisma.inventoryItem.findMany({
       where: { tenantId },
       select: { id: true, stock: true, availability: true },
     });
 
     // Find items that are out of sync
     const outOfSync = items.filter(item => {
-      const expectedAvailability = item.stock > 0 ? 'inStock' : 'outOfStock';
+      const expectedAvailability = item.stock > 0 ? 'in_stock' : 'out_of_stock';
       return item.availability !== expectedAvailability;
     });
 
     // Update out-of-sync items
     const updates = await Promise.all(
       outOfSync.map(item =>
-        prisma.InventoryItem.update({
+        prisma.inventoryItem.update({
           where: { id: item.id },
-          data: { availability: item.stock > 0 ? 'inStock' : 'outOfStock' },
+          data: { availability: item.stock > 0 ? 'in_stock' : 'out_of_stock' },
         })
       )
     );
@@ -2737,7 +2737,7 @@ app.get("/google/auth", async (req, res) => {
     }
 
     // Validate NAP (Name, Address, Phone) is complete
-    // Check tenant_business_profile table first, fallback to metadata for backwards compatibility
+    // Check tenant_business_profiles_list table first, fallback to metadata for backwards compatibility
     const businessProfileRaw = await prisma.tenantBusinessProfile.findUnique({
       where: { tenantId }
     });
@@ -3332,7 +3332,7 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
     if (updateData.categoryPath !== undefined) prismaUpdateData.categoryPath = updateData.categoryPath;
 
     // Update the item
-    const updatedItem = await prisma.InventoryItem.update({
+    const updatedItem = await prisma.inventoryItem.update({
       where: { id: itemId },
       data: prismaUpdateData,
     });
@@ -3392,7 +3392,7 @@ app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) =>
 
     // Find products that need enrichment
     // Products created by Quick Start Wizard typically have source = 'QUICK_START_WIZARD' and are missing details
-    const products = await prisma.InventoryItem.findMany({
+    const products = await prisma.inventoryItem.findMany({
       where: {
         tenantId: { in: tenantIds },
         OR: [

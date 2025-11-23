@@ -38,7 +38,7 @@ export class CategoryDirectoryService {
       const categoriesWithCounts = await Promise.all(
         categories.map(async (category: any) => {
           // Count items in this category
-          const itemCount = await prisma.InventoryItem.count({
+          const itemCount = await prisma.inventoryItem.count({
             where: {
               tenantCategoryId: category.id,
               itemStatus: 'active',
@@ -52,7 +52,7 @@ export class CategoryDirectoryService {
           });
 
           // Count distinct tenants with items in this category
-          const tenantCount = await prisma.InventoryItem.findMany({
+          const tenantCount = await prisma.inventoryItem.findMany({
             where: {
               tenantCategoryId: category.id,
               itemStatus: 'active',
@@ -82,7 +82,22 @@ export class CategoryDirectoryService {
 
       console.log(`[CategoryService] Found ${categoriesWithCounts.length} categories`);
 
-      return categoriesWithCounts;
+      // Deduplicate by category name to prevent duplicates in UI
+      const uniqueCategories = categoriesWithCounts.reduce((acc: CategoryWithStores[], category) => {
+        const existingIndex = acc.findIndex(c => c.name === category.name);
+        if (existingIndex === -1) {
+          acc.push(category);
+        } else {
+          // Combine counts if same category name exists
+          acc[existingIndex].storeCount += category.storeCount;
+          acc[existingIndex].productCount += category.productCount;
+        }
+        return acc;
+      }, []);
+
+      console.log(`[CategoryService] After deduplication: ${uniqueCategories.length} unique categories`);
+
+      return uniqueCategories;
     } catch (error) {
       console.error('[CategoryService] Error fetching categories:', error);
       // Return empty array on error - graceful degradation
@@ -146,7 +161,7 @@ export class CategoryDirectoryService {
       // Count products for each store
       const storesWithCounts = await Promise.all(
         stores.map(async (store: any) => {
-          const productCount = await prisma.InventoryItem.count({
+          const productCount = await prisma.inventoryItem.count({
             where: {
               tenantId: store.id,
               tenantCategoryId: category.id,

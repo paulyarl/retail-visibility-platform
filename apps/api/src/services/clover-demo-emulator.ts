@@ -313,7 +313,7 @@ export function convertDemoItemToRVPFormat(demoItem: DemoItem) {
     priceCents: demoItem.price,
     currency: 'USD',
     stock: demoItem.stock,
-    availability: demoItem.stock > 0 ? AvailabilityStatus.inStock : AvailabilityStatus.outOfStock,
+    availability: demoItem.stock > 0 ? AvailabilityStatus.in_stock : AvailabilityStatus.out_of_stock,
     source: ProductSource.CLOVER_DEMO,
     metadata: {
       cloverItemId: demoItem.id,

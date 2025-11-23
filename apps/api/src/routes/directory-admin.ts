@@ -80,7 +80,7 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
           where: { tenantId: listing.tenantId },
         });
 
-        const itemCount = await prisma.InventoryItem.count({
+        const itemCount = await prisma.inventoryItem.count({
           where: { tenantId: listing.tenantId, itemStatus: 'active' },
         });
 

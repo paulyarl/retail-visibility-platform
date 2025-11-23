@@ -95,7 +95,7 @@ export class InventorySync {
       }
 
       // Get current platform inventory
-      const currentInventory = await prisma.InventoryItem.findUnique({
+      const currentInventory = await prisma.inventoryItem.findUnique({
         where: { id: mapping.inventory_item_id },
         select: { id: true, name: true, quantity: true },
       });
@@ -109,7 +109,7 @@ export class InventorySync {
       const oldQuantity = currentInventory.quantity || 0;
 
       // Update platform inventory
-      await prisma.InventoryItem.update({
+      await prisma.inventoryItem.update({
         where: { id: mapping.inventory_item_id },
         data: {
           quantity: newQuantity,
@@ -150,7 +150,7 @@ export class InventorySync {
       console.log(`[InventorySync] Exporting inventory for: ${platformProductId}`);
 
       // Get platform product
-      const platformProduct = await prisma.InventoryItem.findUnique({
+      const platformProduct = await prisma.inventoryItem.findUnique({
         where: { id: platformProductId },
         select: { id: true, name: true, quantity: true, updatedAt: true },
       });
@@ -306,7 +306,7 @@ export class InventorySync {
         return null;
       }
 
-      const platformProduct = await prisma.InventoryItem.findUnique({
+      const platformProduct = await prisma.inventoryItem.findUnique({
         where: { id: platformProductId },
         select: { updatedAt: true },
       });
@@ -351,7 +351,7 @@ export class InventorySync {
 
       for (const mapping of mappings) {
         // Get platform quantity
-        const platformProduct = await prisma.InventoryItem.findUnique({
+        const platformProduct = await prisma.inventoryItem.findUnique({
           where: { id: mapping.inventory_item_id },
           select: { id: true, name: true, quantity: true },
         });

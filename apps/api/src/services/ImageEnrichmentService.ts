@@ -119,7 +119,7 @@ export class ImageEnrichmentService {
 
       // Update item's imageUrl to primary photo (position 0)
       if (position === 0) {
-        await prisma.InventoryItem.update({
+        await prisma.inventoryItem.update({
           where: { id: item_id },
           data: { imageUrl: imageData.url },
         });
