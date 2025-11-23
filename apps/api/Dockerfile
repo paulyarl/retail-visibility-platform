@@ -20,18 +20,23 @@ COPY apps/api ./apps/api
 # Set working directory to API
 WORKDIR /app/apps/api
 
-# Emergency build: Use existing Prisma client from node_modules
-RUN echo '🚀 EMERGENCY BUILD: Using pre-generated Prisma client...' && \
-    echo '📦 Compiling all TypeScript files...' && \
-    npx tsc --skipLibCheck --target ES2020 --module commonjs --outDir dist --rootDir src src/**/*.ts && \
-    echo '✅ Checking dist folder...' && \
+# Emergency build with maximum debugging
+RUN echo '🚀 EMERGENCY BUILD: Maximum debugging...' && \
+    echo '📁 Current directory:' && pwd && \
+    echo '📁 Contents of current directory:' && ls -la && \
+    echo '📁 Contents of src directory:' && ls -la src/ && \
+    echo '📦 Using simple tsc build...' && \
+    npx tsc --version && \
+    npx tsc --skipLibCheck --outDir dist --rootDir src --target ES2020 --module commonjs src/index.ts && \
+    echo '✅ After tsc - checking dist folder:' && \
     ls -la dist/ && \
-    echo '✅ Checking for index.js...' && \
-    test -f dist/index.js && echo 'index.js exists!' || echo 'index.js missing!' && \
-    echo '✅ Emergency build complete!'
+    echo '✅ Contents of dist folder:' && \
+    find dist -type f -name "*.js" && \
+    echo '✅ Checking if index.js exists:' && \
+    test -f dist/index.js && echo 'SUCCESS: index.js found!' || (echo 'FAILED: index.js not found!' && exit 1)
 
 # Expose port (Railway uses PORT env var)
 EXPOSE ${PORT:-8080}
 
-# Start command: Emergency mode - start server directly
-CMD ["sh", "-c", "echo 'EMERGENCY MODE: Starting server...' && echo 'Files in dist:' && ls -la dist/ && node dist/index.js 2>&1 || (echo 'ERROR: Server failed to start' && exit 1)"]
+# Start command with debugging
+CMD ["sh", "-c", "echo 'STARTING SERVER...' && echo 'Current directory:' && pwd && echo 'Contents of dist:' && ls -la dist/ && echo 'Starting node...' && node dist/index.js 2>&1 || (echo 'ERROR: Server failed to start' && exit 1)"]
