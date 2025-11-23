@@ -315,6 +315,10 @@ export async function requireTenantOwner(
 
     const userId = req.user.userId || req.user.user_id;
 
+    if (!userId) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
     const userRole = await getUserTenantRole(userId, tenantId!);
 
     if (userRole !== UserTenantRole.OWNER) {

@@ -18,18 +18,18 @@ const napSchema = z.object({
 function completenessScore(bp: any) {
   // Weighted scoring: critical (10), important (5), optional (2)
   const parts: Array<{ ok: boolean; weight: number }> = [
-    { ok: !!bp.businessName, weight: 10 },
-    { ok: !!bp.addressLine1, weight: 10 },
+    { ok: !!bp.business_name, weight: 10 },
+    { ok: !!bp.address_line1, weight: 10 },
     { ok: !!bp.city, weight: 10 },
-    { ok: !!bp.postalCode, weight: 10 },
-    { ok: !!bp.countryCode, weight: 10 },
-    { ok: !!bp.phoneNumber, weight: 5 },
+    { ok: !!bp.postal_code, weight: 10 },
+    { ok: !!bp.country_code, weight: 10 },
+    { ok: !!bp.phone_number, weight: 5 },
     { ok: !!bp.email, weight: 5 },
     { ok: !!bp.website, weight: 5 },
-    { ok: !!bp.logoUrl, weight: 2 },
+    { ok: !!bp.logo_url, weight: 2 },
     { ok: bp.hours != null, weight: 2 },
-    { ok: bp.socialLinks != null, weight: 2 },
-    { ok: bp.seoTags != null, weight: 2 },
+    { ok: bp.social_links != null, weight: 2 },
+    { ok: bp.seo_tags != null, weight: 2 },
     { ok: bp.latitude != null && bp.longitude != null, weight: 5 },
   ]
   const total = parts.reduce((a, p) => a + p.weight, 0)
@@ -59,7 +59,7 @@ router.post('/tenant/:tenantId/profile/validate', async (req, res) => {
 router.get('/tenant/:tenantId/profile/completeness', async (req, res) => {
   try {
     const tenantId = req.params.tenantId
-    const bp = await prisma.tenant_business_profile.findUnique({ where: { tenantId } })
+    const bp = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } })
     if (!bp) return res.status(404).json({ success: false, error: 'profile_not_found' })
 
     const result = completenessScore(bp)
@@ -91,12 +91,12 @@ router.post('/tenant/:tenantId/profile/geocode', async (req, res) => {
 
     let completeness: { score: number; grade: string } | undefined
     if (parsed.data.save) {
-      const updated = await prisma.tenant_business_profile.upsert({
+      const updated = await prisma.tenantBusinessProfile.upsert({
         where: { tenantId },
         create: {
           tenantId,
-          business_name: '',
-          addressLine1: parsed.data.address_line1,
+          businessName: '',
+          businessLine1: parsed.data.address_line1,
           city: parsed.data.city,
           postalCode: parsed.data.postal_code,
           countryCode: parsed.data.country_code.toUpperCase(),
@@ -104,14 +104,16 @@ router.post('/tenant/:tenantId/profile/geocode', async (req, res) => {
           longitude: lng,
           displayMap: true,
           mapPrivacyMode: 'precise',
+          updatedAt: new Date(),
         },
         update: {
-          addressLine1: parsed.data.address_line1,
+          businessLine1: parsed.data.address_line1,
           city: parsed.data.city,
           postalCode: parsed.data.postal_code,
           countryCode: parsed.data.country_code.toUpperCase(),
           latitude: lat,
           longitude: lng,
+          updatedAt: new Date(),
         }
       })
       completeness = completenessScore(updated)

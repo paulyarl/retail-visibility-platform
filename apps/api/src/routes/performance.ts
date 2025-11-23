@@ -100,7 +100,7 @@ router.get('/product/:itemId', async (req, res) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysNum);
 
-    const performance = await prisma.product_performance.findMany({
+    const performance = await prisma.productPerformance.findMany({
       where: {
         itemId,
         date: {
@@ -180,10 +180,10 @@ router.post('/update', async (req, res) => {
         ? (data.clicks / data.impressions) * 100
         : undefined;
 
-    const performance = await prisma.product_performance.upsert({
+    const performance = await prisma.productPerformance.upsert({
       where: {
         itemId_date: {
-          item_id: data.item_id,
+          itemId: data.item_id,
           date,
         },
       },
@@ -200,7 +200,7 @@ router.post('/update', async (req, res) => {
         lastUpdated: new Date(),
       },
       create: {
-        item_id: data.item_id,
+        itemId: data.item_id,
         tenantId: data.tenantId,
         date,
         approvalStatus: data.approvalStatus || 'not_synced',
@@ -212,7 +212,7 @@ router.post('/update', async (req, res) => {
         revenue: data.revenue || 0,
         visibilityScore: data.visibilityScore || 0,
         searchRank: data.searchRank,
-      },
+      } as any,
     });
 
     res.json(performance);

@@ -119,7 +119,7 @@ export class SquareSyncService {
         } catch (error: any) {
           itemsFailed++;
           errors.push({
-            item_id: product.id,
+            itemId: product.id,
             itemName: product.name,
             error: error.message,
             code: error.code,
@@ -210,7 +210,7 @@ export class SquareSyncService {
         } catch (error: any) {
           itemsFailed++;
           errors.push({
-            item_id: product.id,
+            itemId: product.id,
             itemName: product.name,
             error: error.message,
             code: error.code,

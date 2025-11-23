@@ -59,6 +59,10 @@ model Tenant {
   userTenants                 UserTenant[]
   tenantBusinessProfile       TenantBusinessProfile?
   tenantFeatureOverrides     TenantFeatureOverrides[]
+  directorySettings          DirectorySettings?
+  scanResults                 ScanResults[]
+  scanSessions                ScanSessions[]
+  scanTemplates               ScanTemplates[]
 
   @@index([directoryVisible], map: "idx_tenant_directory_visible")
   @@index([googleSyncEnabled, googleLastSync], map: "idx_tenant_google_sync")
@@ -98,7 +102,7 @@ model AuditLog {
 
 model BarcodeEnrichment {
   id                 String   @id
-  barcode            String
+  barcode            String   @unique @map("barcode")
   name               String?
   brand              String?
   description        String?
@@ -194,6 +198,9 @@ model CloverDemoSnapshots {
   createdAt     DateTime @default(now()) @map("created_at")
   expiresAt     DateTime @map("expires_at")
 
+  // Relationship
+  integration    CloverIntegrations @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
   @@map("clover_demo_snapshots")
 }
 
@@ -214,6 +221,11 @@ model CloverIntegrations {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @map("updated_at")
 
+  // Relationships
+  itemMappings        CloverItemMappings[]
+  syncLogs           CloverSyncLogs[]
+  demoSnapshots      CloverDemoSnapshots[]
+
   @@map("clover_integrations")
 }
 
@@ -232,11 +244,14 @@ model CloverItemMappings {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @map("updated_at")
 
+  // Relationship
+  integration    CloverIntegrations @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
   @@map("clover_item_mappings")
 }
 
 model CloverSyncLogs {
-  id             String    @id
+  id             String    @id @default(cuid())
   integrationId  String    @map("integration_id")
   traceId        String    @map("trace_id")
   operation      String
@@ -250,11 +265,14 @@ model CloverSyncLogs {
   startedAt      DateTime  @default(now()) @map("started_at")
   completedAt    DateTime? @map("completed_at")
 
+  // Relationship
+  integration    CloverIntegrations @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
   @@map("clover_sync_logs")
 }
 
 model DirectoryFeaturedListings {
-  id                 String   @id @map("id")
+  id                 String   @id @default(cuid()) @map("id")
   tenantId          String @map("tenant_id")
   featuredFrom      DateTime @map("featured_from")
   featuredUntil     DateTime @map("featured_until")
@@ -315,6 +333,7 @@ model DirectorySettings {
   slug                 String? @unique @map("slug")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime @map("updated_at")
+  tenant              Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("directory_settings")
 }
@@ -460,14 +479,13 @@ model GoogleOauthTokens {
   createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime            @map("updated_at") @db.Timestamptz(6)
   googleOauthAccounts   GoogleOauthAccounts @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
   @@map("google_oauth_tokens")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model GoogleTaxonomy {
-  id           String @id
-  categoryId   String   @map("category_id")
+  id           String   @id
+  categoryId   String   @unique @map("category_id")
   categoryPath String   @map("category_path")
   parentId     String?  @map("parent_id")
   level        Int
@@ -480,47 +498,47 @@ model GoogleTaxonomy {
 }
 
 model InventoryItem {
-  id                   String                   @id
-  tenantId             String                   @map("tenantId")
-  sku                  String @map("sku")
-  name                 String @map("name")
-  priceCents           Int                      @map("priceCents")
-  stock                Int                      @default(0)
-  imageUrl             String?                  @map("imageUrl")
-  metadata             Json?
-  createdAt            DateTime                 @default(now()) @map("createdAt")
-  updatedAt            DateTime                 @map("updatedAt")
-  marketingDescription String?                  @map("marketingDescription")
-  imageGallery         String[]                 @default([]) @map("imageGallery")
-  customCta            Json?                    @map("customCta")
-  socialLinks          Json?                    @map("socialLinks")
-  customBranding       Json?                    @map("customBranding")
-  customSections       Json[]                   @default([]) @map("customSections")
-  landingPageTheme     String?                  @default("default") @map("landingPageTheme")
-  auditLogId           String?                  @map("auditLogId")
+  id                   String                   @id @map("id")
+  tenantId             String                   @map("tenant_id")
+  sku                  String                   @map("sku")
+  name                 String                   @map("name")
+  priceCents           Int                      @map("price_cents")
+  stock                Int                      @default(0) @map("stock")
+  imageUrl             String?                  @map("image_url")
+  metadata             Json?                     @map("metadata")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @map("updated_at")
+  marketingDescription String?                  @map("marketing_description")
+  imageGallery         String[]                 @default([]) @map("image_gallery")
+  customCta            Json?                    @map("custom_cta")
+  socialLinks          Json?                    @map("social_links")
+  customBranding       Json?                    @map("custom_branding")
+  customSections       Json[]                   @default([]) @map("custom_sections")
+  landingPageTheme     String?                  @default("default") @map("landing_page_theme")
+  auditLogId           String?                  @map("audit_log_id")
   availability         AvailabilityStatus      @default(inStock) @map("availability") 
-  brand                String
-  categoryPath         String[]                 @default([]) @map("categoryPath")
+  brand                String                   @map("brand")
+  categoryPath         String[]                 @default([]) @map("category_path")
   tenantCategoryId     String?                  @map("tenant_category_id")
   condition            ProductCondition?       @default(brand_new) @map("condition")
   currency             String                   @default("USD") @db.Char(3) @map("currency")
-  description          String?
-  eligibilityReason    String?                  @map("eligibilityReason")
-  gtin                 String?
-  itemStatus           ItemStatus?             @default(active) @map("itemStatus")
-  locationId           String?                  @map("locationId")
-  merchantName         String?                  @map("merchantName")
+  description          String?                  @map("description")
+  eligibilityReason    String?                  @map("eligibility_reason")
+  gtin                 String?                  @map("gtin")
+  itemStatus           ItemStatus?             @default(active) @map("item_status")
+  locationId           String?                  @map("location_id")
+  merchantName         String?                  @map("merchant_name")
   mpn                  String?                  @map("mpn")
-  price                Decimal                  @db.Decimal(12, 2)
+  price                Decimal                  @db.Decimal(12, 2) @map("price")
   quantity             Int?                     @map("quantity")
-  searchTsv            Unsupported("tsvector")? @map("searchTsv")
-  syncStatus           SyncStatus?             @default(pending) @map("syncStatus")
-  syncedAt             DateTime?                @map("syncedAt") @db.Timestamptz(6)
-  title                String
+  searchTsv            Unsupported("tsvector")? @map("search_tsv")
+  syncStatus           SyncStatus?             @default(pending) @map("sync_status")
+  syncedAt             DateTime?                @map("synced_at") @db.Timestamptz(6)
+  title                String                   @map("title")
   visibility           ItemVisibility?         @default(public) @map("visibility")
-  manufacturer         String?
-  source               ProductSource           @default(MANUAL)
-  enrichmentStatus     EnrichmentStatus        @default(COMPLETE) @map("enrichmentStatus")
+  manufacturer         String?                  @map("manufacturer")
+  source               ProductSource           @default(MANUAL) @map("source")
+  enrichmentStatus     EnrichmentStatus        @default(COMPLETE) @map("enrichment_status")
   enrichedAt           DateTime?                @map("enriched_at")
   enrichedBy           String?                  @map("enriched_by")
   enrichedFromBarcode  String?                  @map("enriched_from_barcode")
@@ -536,7 +554,7 @@ model InventoryItem {
   @@index([source])
   @@index([tenantId, enrichmentStatus])
   @@index([tenantId, updatedAt])
-  @@map("InventoryItem")
+  @@map("inventory_item")
 }
 
 model Invitation {
@@ -612,7 +630,7 @@ model Organization {
   maxTotalSKUs         Int       @default(2500) @map("max_total_skus")
   metadata             Json? @map("metadata")
   Tenant               Tenant[]
-  @@map("organizations")
+  @@map("organization")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -639,7 +657,7 @@ model OrganizationRequests {
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model OutreachFeedback {
-  id         String @id
+  id         String @id @default(cuid())
   tenantId  String? @map("tenant_id")
   userId    String? @map("user_id")
   feedback   Json @map("feedback")
@@ -647,7 +665,7 @@ model OutreachFeedback {
   category   String? @map("category")
   context    String? @map("context")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @map("updated_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("outreach_feedback")
 }
@@ -706,7 +724,7 @@ model PhotoAsset {
 }
 
 model PlatformFeatureFlags {
-  id                    String   @id
+  id                    String   @id @default(cuid())
   flag                  String   @unique @map("flag")
   enabled               Boolean  @default(false) @map("enabled")
   description           String? @map("description")
@@ -751,9 +769,8 @@ model ProductPerformance {
   @@map("product_performance")
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model ScanResults {
-  id           String @id
+  id           String @id @default(cuid())
   tenantId    String @map("tenant_id")
   sessionId   String @map("session_id")
   barcode      String @map("barcode")
@@ -766,12 +783,18 @@ model ScanResults {
   error        String? @map("error")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  session     ScanSessions @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([tenantId])
+  @@index([barcode])
   @@map("scan_results")
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model ScanSessions {
-  id              String @id
+  id              String @id @default(cuid())
   tenantId       String @map("tenant_id")
   userId         String? @map("user_id")
   templateId     String? @map("template_id")
@@ -786,12 +809,19 @@ model ScanSessions {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
 
+  template    ScanTemplates? @relation("ScanSessionTemplate", fields: [templateId], references: [id])
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  results     ScanResults[]
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([templateId])
+  @@index([status])
   @@map("scan_sessions")
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model ScanTemplates {
-  id                String @id
+  id                String @id @default(cuid())
   tenantId         String @map("tenant_id")
   name              String @map("name")
   defaultCategory   String? @map("default_category")
@@ -801,6 +831,11 @@ model ScanTemplates {
   enrichmentRules   Json? @map("enrichment_rules")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  sessions    ScanSessions[] @relation("ScanSessionTemplate")
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
   @@map("scan_templates")
 }
 
@@ -1243,6 +1278,7 @@ enum ProductSource {
   BULK_UPLOAD @map("BULK_UPLOAD")
   API_IMPORT @map("API_IMPORT")
   QUICK_START_WIZARD @map("QUICK_START_WIZARD")
+  CLOVER_DEMO @map("CLOVER_DEMO")
   @@map("product_source")
 }
 

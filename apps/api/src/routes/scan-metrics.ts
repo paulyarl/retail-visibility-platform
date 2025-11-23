@@ -49,7 +49,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
         committedCount: true,
         duplicateCount: true,
         startedAt: true,
-        completed_at: true,
+        completedAt: true,
       },
     });
 
@@ -63,10 +63,10 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
     const totalDuplicates = sessions.reduce((sum, s) => sum + s.duplicateCount, 0);
 
     // Calculate average session duration for completed sessions
-    const completedWithDuration = sessions.filter(s => s.completed_at && s.startedAt);
+    const completedWithDuration = sessions.filter(s => s.completedAt && s.startedAt);
     const avgDurationMs = completedWithDuration.length > 0
       ? completedWithDuration.reduce((sum, s) => {
-          const duration = s.completed_at!.getTime() - s.startedAt.getTime();
+          const duration = s.completedAt!.getTime() - s.startedAt.getTime();
           return sum + duration;
         }, 0) / completedWithDuration.length
       : 0;
@@ -142,7 +142,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
         committedCount: true,
         duplicateCount: true,
         startedAt: true,
-        completed_at: true,
+        completedAt: true,
         tenant: {
           select: {
             id: true,
@@ -221,7 +221,7 @@ router.get('/api/admin/scan-metrics/timeseries', authenticateToken, async (req: 
       },
       select: {
         startedAt: true,
-        completed_at: true,
+        completedAt: true,
         status: true,
         scannedCount: true,
         committedCount: true,

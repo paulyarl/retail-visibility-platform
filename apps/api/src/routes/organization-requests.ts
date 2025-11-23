@@ -27,25 +27,24 @@ router.get('/', authenticateToken, async (req, res) => {
       where.organizationId = organizationId as string;
     }
 
-    const requests = await prisma.organization_requests.findMany({
+    const requests = await prisma.organizationRequests.findMany({
       where,
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            subscription_tier: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
+      select: {
+        id: true,
+        tenantId: true,
+        organizationId: true,
+        requestedBy: true,
+        status: true,
+        requestType: true,
+        notes: true,
+        estimatedCost: true,
+        costCurrency: true,
+        adminNotes: true,
+        costAgreed: true,
+        processedBy: true,
+        processedAt: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -61,22 +60,24 @@ router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const organizationRequest = await prisma.organization_requests.findUnique({
+    const organizationRequest = await prisma.organizationRequests.findUnique({
       where: { id },
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            subscription_tier: true,
-          },
-        },
+      select: {
+        id: true,
+        tenantId: true,
+        organizationId: true,
+        requestedBy: true,
+        status: true,
+        requestType: true,
+        notes: true,
+        estimatedCost: true,
+        costCurrency: true,
+        adminNotes: true,
+        costAgreed: true,
+        processedBy: true,
+        processedAt: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -103,7 +104,7 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     // Check if there's already a pending request
-    const existingRequest = await prisma.organization_requests.findFirst({
+    const existingRequest = await prisma.organizationRequests.findFirst({
       where: {
         tenantId,
         organizationId,
@@ -117,7 +118,7 @@ router.post('/', authenticateToken, async (req, res) => {
       });
     }
 
-    const organizationRequest = await prisma.organization_requests.create({
+    const organizationRequest = await prisma.organizationRequests.create({
       data: {
         tenantId,
         organizationId,
@@ -127,22 +128,7 @@ router.post('/', authenticateToken, async (req, res) => {
         estimatedCost,
         costCurrency: costCurrency || 'USD',
         status: 'pending',
-      },
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            subscription_tier: true,
-          },
-        },
-      },
+      } as any,
     });
 
     res.status(201).json(organizationRequest);
@@ -183,23 +169,25 @@ router.patch('/:id', authenticateToken, async (req, res) => {
       }
     }
 
-    const organizationRequest = await prisma.organization_requests.update({
+    const organizationRequest = await prisma.organizationRequests.update({
       where: { id },
       data: updateData,
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            subscription_tier: true,
-          },
-        },
+      select: {
+        id: true,
+        tenantId: true,
+        organizationId: true,
+        requestedBy: true,
+        status: true,
+        requestType: true,
+        notes: true,
+        estimatedCost: true,
+        costCurrency: true,
+        adminNotes: true,
+        costAgreed: true,
+        processedBy: true,
+        processedAt: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -225,7 +213,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    await prisma.organization_requests.delete({
+    await prisma.organizationRequests.delete({
       where: { id },
     });
 

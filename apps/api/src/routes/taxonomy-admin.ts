@@ -34,7 +34,7 @@ async function upsertInBatches(items: any[], batchSize = 200) {
             level: it.level,
             isActive: true,
             version: '2024-09',
-          },
+          } as any,
           update: {
             categoryPath: it.categoryPath,
             parentId: it.parentId,

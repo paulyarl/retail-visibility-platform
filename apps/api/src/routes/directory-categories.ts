@@ -154,8 +154,8 @@ router.get(
       res.json({
         success: true,
         data: {
-          category: categoryPath[categoryPath.length - 1] || null,
-          categoryPath,
+          category: category_path[category_path.length - 1] || null,
+          category_path,
           stores: limitedStores,
           totalCount: stores.length,
           returnedCount: limitedStores.length,

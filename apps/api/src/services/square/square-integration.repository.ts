@@ -57,35 +57,47 @@ export class SquareIntegrationRepository {
    * Create a new Square integration
    */
   async createIntegration(data: CreateIntegrationData) {
-    return await prisma.square_integrations.upsert({
-      where: { tenantId: data.tenantId },
-      create: {
-        tenantId: data.tenantId,
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken || null,
-        merchantId: data.merchantId,
-        locationId: data.locationId || null,
-        tokenExpiresAt: data.tokenExpiresAt || null,
-        scopes: data.scopes || [],
-        mode: data.mode,
-      },
-      update: {
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken || null,
-        merchantId: data.merchantId,
-        locationId: data.locationId || null,
-        tokenExpiresAt: data.tokenExpiresAt || null,
-        scopes: data.scopes || [],
-        mode: data.mode,
-      },
+    // Check if integration exists
+    const existing = await prisma.squareIntegrations.findFirst({
+      where: { tenantId: data.tenantId }
     });
+
+    if (existing) {
+      // Update existing
+      return await prisma.squareIntegrations.update({
+        where: { id: existing.id },
+        data: {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken || null,
+          merchantId: data.merchantId,
+          locationId: data.locationId || null,
+          tokenExpiresAt: data.tokenExpiresAt || null,
+          scopes: data.scopes || [],
+          mode: data.mode,
+        }
+      });
+    } else {
+      // Create new
+      return await prisma.squareIntegrations.create({
+        data: {
+          tenantId: data.tenantId,
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken || null,
+          merchantId: data.merchantId,
+          locationId: data.locationId || null,
+          tokenExpiresAt: data.tokenExpiresAt || null,
+          scopes: data.scopes || [],
+          mode: data.mode,
+        } as any
+      });
+    }
   }
 
   /**
    * Get integration by tenant ID
    */
   async getIntegrationByTenantId(tenantId: string) {
-    return await prisma.square_integrations.findUnique({
+    return await prisma.squareIntegrations.findFirst({
       where: { tenantId },
     });
   }

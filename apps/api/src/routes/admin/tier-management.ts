@@ -240,7 +240,7 @@ router.get('/tenants', async (req, res) => {
           subscriptionTier: true,
           subscriptionStatus: true,
           trialEndsAt: true,
-          subscription_ends_at: true,
+          subscriptionEndsAt: true,
           createdAt: true,
           organizationId: true,
           organization: {
@@ -252,7 +252,8 @@ router.get('/tenants', async (req, res) => {
           },
           _count: {
             select: {
-              _count: true,
+              userTenants: true,
+              inventoryItems: true,
             },
           },
         },
@@ -305,7 +306,7 @@ router.get('/tenants/:tenantId', async (req, res) => {
         },
         _count: {
           select: {
-            _count: true,
+            tenantFeatureOverrides: true,
           },
         },
       },

@@ -324,7 +324,7 @@ export class GBPCategorySyncService {
                 name: change.newData.displayName,
                 displayName: change.newData.displayName,
                 isActive: true
-              }
+              } as any
             });
             applied++;
             break;
@@ -418,7 +418,7 @@ export class GBPCategorySyncService {
                 name: category.name,
                 displayName: category.display_name,
                 isActive: true
-              }
+              } as any
             });
             upserted++;
           } else if (existing.displayName !== category.display_name) { 

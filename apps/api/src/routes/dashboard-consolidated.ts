@@ -109,7 +109,7 @@ router.get('/dashboard/consolidated/:tenantId', authenticateToken, checkTenantAc
         name: tenant.name,
         logoUrl: (tenant.metadata as any)?.logo_url,
         bannerUrl: (tenant.metadata as any)?.banner_url,
-        location_status: tenant.locationStatus,
+        locationStatus: tenant.locationStatus,
         reopeningDate: tenant.reopeningDate,
         statusInfo,
       },

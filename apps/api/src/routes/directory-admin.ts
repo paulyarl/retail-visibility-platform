@@ -55,14 +55,14 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
 
     // Get listings
     const [listings, total] = await Promise.all([
-      prisma.directory_settings.findMany({
+      prisma.directorySettings.findMany({
         where,
         include: {
           tenant: {
             select: {
               id: true,
               name: true,
-              subscription_tier: true,
+              subscriptionTier: true,
             },
           },
         },
@@ -70,17 +70,17 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
         skip,
         take: limitNum,
       }),
-      prisma.directory_settings.count({ where }),
+      prisma.directorySettings.count({ where }),
     ]);
 
     // Add quality scores (basic calculation)
     const enrichedListings = await Promise.all(
       listings.map(async (listing) => {
-        const profile = await prisma.tenant_business_profile.findUnique({
+        const profile = await prisma.tenantBusinessProfile.findUnique({
           where: { tenantId: listing.tenantId },
         });
 
-        const itemCount = await prisma.inventory_item.count({
+        const itemCount = await prisma.inventoryItem.count({
           where: { tenantId: listing.tenantId, itemStatus: 'active' },
         });
 
@@ -88,7 +88,7 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
         let qualityScore = 0;
         if (profile) {
           if (profile.businessName) qualityScore += 15;
-          if (profile.addressLine1) qualityScore += 10;
+          if (profile.businessLine1) qualityScore += 10;
           if (profile.city && profile.state) qualityScore += 10;
           if (profile.phoneNumber) qualityScore += 10;
           if (profile.email) qualityScore += 5;
@@ -105,7 +105,7 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
           ...listing,
           qualityScore,
           itemCount,
-          business_name: profile?.businessName || listing.tenant.name,
+          business_name: profile?.businessName || listing.tenant?.name || 'Unknown Business',
         };
       })
     );
@@ -137,14 +137,14 @@ router.get('/stats', authenticateToken, requireAdmin, async (req: Request, res: 
       featuredListings,
       draftListings,
     ] = await Promise.all([
-      prisma.directory_settings.count(),
-      prisma.directory_settings.count({ where: { isPublished: true } }),
-      prisma.directory_settings.count({ where: { isFeatured: true } }),
-      prisma.directory_settings.count({ where: { isPublished: false } }),
+      prisma.directorySettings.count(),
+      prisma.directorySettings.count({ where: { isPublished: true } }),
+      prisma.directorySettings.count({ where: { isFeatured: true } }),
+      prisma.directorySettings.count({ where: { isPublished: false } }),
     ]);
 
     // Get listings by tier
-    const listingsByTier = await prisma.directory_settings.groupBy({
+    const listingsByTier = await prisma.directorySettings.groupBy({
       by: ['tenantId'],
       _count: true,
     });
@@ -153,7 +153,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req: Request, res: 
     const tenantIds = listingsByTier.map(l => l.tenantId);
     const tenants = await prisma.tenant.findMany({
       where: { id: { in: tenantIds } },
-      select: { id: true, subscription_tier: true },
+      select: { id: true, subscriptionTier: true },
     });
 
     const tierCounts: Record<string, number> = {};
@@ -181,7 +181,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req: Request, res: 
  */
 router.get('/featured', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const featured = await prisma.directory_featured_listings.findMany({
+    const featured = await prisma.directoryFeaturedListings.findMany({
       where: {
         featuredUntil: { gt: new Date() },
       },
@@ -190,7 +190,7 @@ router.get('/featured', authenticateToken, requireAdmin, async (req: Request, re
           select: {
             id: true,
             name: true,
-            subscription_tier: true,
+            subscriptionTier: true,
           },
         },
       },
@@ -226,7 +226,7 @@ router.post('/feature/:tenantId', authenticateToken, requireAdmin, async (req: R
     }
 
     // Create featured listing record
-    const featured = await prisma.directory_featured_listings.create({
+    const featured = await prisma.directoryFeaturedListings.create({
       data: {
         tenantId,
         featuredFrom: new Date(),
@@ -237,7 +237,7 @@ router.post('/feature/:tenantId', authenticateToken, requireAdmin, async (req: R
     });
 
     // Update directory settings
-    await prisma.directory_settings.update({
+    await prisma.directorySettings.update({
       where: { tenantId },
       data: {
         isFeatured: true,
@@ -262,7 +262,7 @@ router.delete('/unfeature/:tenantId', authenticateToken, requireAdmin, async (re
     const { tenantId } = req.params;
 
     // Update directory settings
-    await prisma.directory_settings.update({
+    await prisma.directorySettings.update({
       where: { tenantId },
       data: {
         isFeatured: false,
@@ -272,7 +272,7 @@ router.delete('/unfeature/:tenantId', authenticateToken, requireAdmin, async (re
     });
 
     // Expire any active featured listings
-    await prisma.directory_featured_listings.updateMany({
+    await prisma.directoryFeaturedListings.updateMany({
       where: {
         tenantId,
         featuredUntil: { gt: new Date() },

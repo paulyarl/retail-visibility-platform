@@ -19,15 +19,15 @@ router.get("/status", async (req, res) => {
       select: {
         id: true,
         name: true,
-        subscription_status: true,
-        subscription_tier: true,
+        subscriptionStatus: true,
+        subscriptionTier: true,
         trialEndsAt: true,
-        subscription_ends_at: true,
-        stripe_customer_id: true,
+        subscriptionEndsAt: true,
+        stripeCustomerId: true,
         _count: {
           select: {
-            _count: true,
-            user_tenants: true,
+            inventoryItems: true,
+            userTenants: true,
           },
         },
       },
@@ -42,7 +42,7 @@ router.get("/status", async (req, res) => {
     // Calculate days remaining (trial or subscription)
     let daysRemaining = null;
     
-    if (tenant.subscription_status === "trial" && tenant.trialEndsAt) {
+    if (tenant.subscriptionStatus === "trial" && tenant.trialEndsAt) {
       daysRemaining = Math.ceil((tenant.trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     } else if (tenant.subscriptionEndsAt) {
       daysRemaining = Math.ceil((tenant.subscriptionEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -64,23 +64,23 @@ router.get("/status", async (req, res) => {
         name: tenant.name,
       },
       subscription: {
-        status: tenant.subscription_status,
+        status: tenant.subscriptionStatus,
         tier: tenant.subscriptionTier,
         trialEndsAt: tenant.trialEndsAt,
-        subscription_ends_at: tenant.subscriptionEndsAt,
+        subscriptionEndsAt: tenant.subscriptionEndsAt,
         daysRemaining,
         hasStripeAccount: !!tenant.stripeCustomerId,
       },
       usage: {
         _count: {
-          current: tenant._count.inventory_item,
-          limit: tierLimits.items,
-          percentage: tierLimits.items === Infinity ? 0 : Math.round((tenant._count.inventory_item / tierLimits.items) * 100),
+          current: tenant._count.inventoryItems,
+          limit: tierLimits._count,
+          percentage: tierLimits._count === Infinity ? 0 : Math.round((tenant._count.inventoryItems / tierLimits._count) * 100),
         },
         user_tenants: {
-          current: tenant._count.users,
-          limit: tierLimits.users,
-          percentage: tierLimits.users === Infinity ? 0 : Math.round((tenant._count.users / tierLimits.users) * 100),
+          current: tenant._count.userTenants,
+          limit: tierLimits.user_tenants,
+          percentage: tierLimits.user_tenants === Infinity ? 0 : Math.round((tenant._count.userTenants / tierLimits.user_tenants) * 100),
         },
       },
     });
@@ -93,10 +93,10 @@ router.get("/status", async (req, res) => {
 // Update subscription status (admin only)
 const updateSchema = z.object({
   tenantId: z.string(),
-  subscription_status: z.enum(["trial", "active", "past_due", "canceled"]).optional(),
-  subscription_tier: z.enum(["starter", "pro", "enterprise"]).optional(),
+  subscriptionStatus: z.enum(["trial", "active", "past_due", "canceled"]).optional(),
+  subscriptionTier: z.enum(["starter", "pro", "enterprise"]).optional(),
   trialEndsAt: z.string().datetime().optional(),
-  subscription_ends_at: z.string().datetime().optional(),
+  subscriptionEndsAt: z.string().datetime().optional(),
   stripe_customer_id: z.string().optional(),
   stripe_subscription_id: z.string().optional(),
 });
@@ -119,7 +119,7 @@ router.patch("/update", async (req, res) => {
     if (updates.trialEndsAt) {
       data.trialEndsAt = new Date(updates.trialEndsAt);
     }
-    if (updates.subscriptionEndsAt) {
+    if (updates.subscriptionEndsAt) { 
       data.subscriptionEndsAt = new Date(updates.subscriptionEndsAt);
     }
 
@@ -129,10 +129,10 @@ router.patch("/update", async (req, res) => {
       select: {
         id: true,
         name: true,
-        subscription_status: true,
-        subscription_tier: true,
+        subscriptionStatus: true,
+        subscriptionTier: true,
         trialEndsAt: true,
-        subscription_ends_at: true,
+        subscriptionEndsAt: true,
       },
     });
 

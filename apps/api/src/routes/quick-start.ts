@@ -196,7 +196,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     console.log(`[Quick Start] Generating ${productCount} ${scenario} products for tenant ${tenantId}`);
     
     const result = await generateQuickStartProducts({
-      tenantId: tenantId,
+      tenant_id: tenantId,
       scenario: scenario as QuickStartScenario,
       productCount,
       assignCategories,
@@ -496,7 +496,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
             googleCategoryId,
             sortOrder: index,
             isActive: true,
-          },
+          } as any,
         });
       })
     );

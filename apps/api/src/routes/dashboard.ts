@@ -84,7 +84,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
           });
         }
       } catch (userError) {
-        console.error(`[Dashboard] Error fetching user tenants: ${userError.message}`);
+        console.error(`[Dashboard] Error fetching user tenants: ${(userError as Error).message}`);
         userTenants = [];
       }
     }

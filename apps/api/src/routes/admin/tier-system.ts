@@ -205,11 +205,14 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
     // Create tier with features
     const tier = await prisma.subscriptionTier.create({
       data: {
+        id: crypto.randomUUID(), // Generate unique ID
         ...tierData,
+        displayName: tierData.display_name, // Map snake_case to camelCase
         createdBy: req.user?.userId,
         updatedBy: req.user?.userId,
         features: features ? {
           create: features.map(f => ({
+            id: crypto.randomUUID(), // Generate unique ID
             featureKey: f.featureKey,
             featureName: f.featureName,
             isEnabled: true, // Default to enabled for new features
@@ -490,7 +493,7 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
         isEnabled: true, // Default to enabled for new features
         isInherited: featureData.isInherited || false,
         metadata: featureData.metadata as any,
-      },
+      } as any,
     });
 
     // Log the change

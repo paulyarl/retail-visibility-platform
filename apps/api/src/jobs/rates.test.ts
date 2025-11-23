@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import { app } from "../index";
+import app from "../index";
 
 describe("Currency Rate Job Stub (REQ-2025-905)", () => {
   const SERVICE_TOKEN = process.env.SERVICE_TOKEN || "test-token";

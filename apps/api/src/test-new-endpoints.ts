@@ -15,6 +15,7 @@ async function testFeedPushJobs() {
     console.log('1. Creating test feed push job...');
     const job = await prisma.feedPushJobs.create({
       data: {
+        id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         tenantId: 'test-tenant-id',
         sku: 'TEST-SKU-001',
         jobStatus: 'queued',
@@ -22,6 +23,7 @@ async function testFeedPushJobs() {
           feedType: 'full',
           itemCount: 100,
         },
+        updatedAt: new Date(),
       },
     });
     console.log('✅ Job created:', job.id);
@@ -51,7 +53,7 @@ async function testFeedPushJobs() {
       where: { id: job.id },
       data: {
         jobStatus: 'success',
-        completed_at: new Date(),
+        completedAt: new Date(),
         result: {
           itemsProcessed: 100,
           successCount: 98,
@@ -76,9 +78,11 @@ async function testFeedPushJobs() {
     console.log('\n6. Testing retry logic...');
     const failedJob = await prisma.feedPushJobs.create({
       data: {
+        id: `job_${Date.now()}_failed`,
         tenantId: 'test-tenant-id',
         sku: 'TEST-SKU-002',
         jobStatus: 'queued',
+        updatedAt: new Date(),
       },
     });
 
@@ -120,6 +124,7 @@ async function testOutreachFeedback() {
     console.log('1. Submitting test feedback...');
     const feedback = await prisma.outreachFeedback.create({
       data: {
+        id: `feedback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         tenantId: 'test-tenant-id',
         userId: 'test-user-id',
         feedback: {
@@ -131,6 +136,7 @@ async function testOutreachFeedback() {
         score: 5,
         category: 'usability',
         context: 'category_alignment',
+        updatedAt: new Date(),
       },
     });
     console.log('✅ Feedback submitted:', feedback.id);
@@ -140,28 +146,34 @@ async function testOutreachFeedback() {
     await prisma.outreachFeedback.createMany({
       data: [
         {
+          id: `feedback_${Date.now()}_1`,
           tenantId: 'test-tenant-id',
           userId: 'test-user-id',
           feedback: { comment: 'Good but slow' },
           score: 3,
           category: 'performance',
           context: 'feed_push',
+          updatedAt: new Date(),
         },
         {
+          id: `feedback_${Date.now()}_2`,
           tenantId: 'test-tenant-id',
           userId: 'test-user-id',
           feedback: { comment: 'Excellent support!' },
           score: 5,
           category: 'support',
           context: 'onboarding',
+          updatedAt: new Date(),
         },
         {
+          id: `feedback_${Date.now()}_3`,
           tenantId: 'test-tenant-id',
           userId: 'test-user-id',
           feedback: { comment: 'Needs more features' },
           score: 4,
           category: 'features',
           context: 'category_alignment',
+          updatedAt: new Date(),
         },
       ],
     });

@@ -362,7 +362,7 @@ export class BarcodeEnrichmentService {
     }
 
     // Check if expired
-    if (new Date() > entry.expiresAt) {
+    if (new Date() > entry.expires_at) {
       enrichmentCache.delete(barcode);
       return null;
     }
@@ -378,7 +378,7 @@ export class BarcodeEnrichmentService {
       barcode,
       data,
       cachedAt: now,
-      expiresAt,
+      expires_at: expiresAt,
     });
 
     // Cleanup old entries (simple LRU)
@@ -447,7 +447,7 @@ export class BarcodeEnrichmentService {
           source: data.source,
           lastFetchedAt: new Date(),
           fetchCount: 1,
-        },
+        } as any,
         update: {
           name: data.name || null,
           brand: data.brand || null,
@@ -515,7 +515,7 @@ export class BarcodeEnrichmentService {
           response: response || undefined,
           latencyMs: Math.round(latencyMs),
           error: error || undefined,
-        },
+        } as any,
       });
     } catch (err) {
       console.error('[Enrichment] Failed to log lookup:', err);

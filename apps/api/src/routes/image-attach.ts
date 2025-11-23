@@ -23,7 +23,7 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
     }
 
     // Verify item exists and belongs to tenant
-    const item = await prisma.inventory_item.findFirst({
+    const item = await prisma.inventoryItem.findFirst({
       where: {
         id: itemId,
         tenantId,
@@ -44,7 +44,8 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
       throw new Error('Failed to download image');
     }
 
-    const imageBuffer = await imageResponse.buffer();
+    const imageArrayBuffer = await imageResponse.arrayBuffer();
+    const imageBuffer = Buffer.from(imageArrayBuffer);
     
     // Generate unique filename
     const ext = path.extname(new URL(imageUrl).pathname) || '.jpg';
@@ -58,7 +59,7 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
     await fs.writeFile(filepath, imageBuffer);
 
     // Create photo record
-    const photo = await prisma.photo_asset.create({
+    const photo = await prisma.photoAsset.create({
       data: {
         tenantId,
         inventoryItemId: itemId,

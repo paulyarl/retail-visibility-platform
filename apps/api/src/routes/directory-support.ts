@@ -38,8 +38,8 @@ router.get('/tenant/:tenantId/status', authenticateToken, requireSupportAccess, 
       select: {
         id: true,
         name: true,
-        subscription_tier: true,
-        subscription_status: true,
+        subscriptionTier: true,
+        subscriptionStatus: true,
       },
     });
 
@@ -48,22 +48,22 @@ router.get('/tenant/:tenantId/status', authenticateToken, requireSupportAccess, 
     }
 
     // Get directory settings
-    const settings = await prisma.directory_settings.findUnique({
+    const settings = await prisma.directorySettings.findUnique({
       where: { tenantId },
     });
 
     // Get business profile
-    const profile = await prisma.tenant_business_profile.findUnique({
+    const profile = await prisma.tenantBusinessProfile.findUnique({
       where: { tenantId },
     });
 
     // Get item count
-    const itemCount = await prisma.inventory_item.count({
+    const itemCount = await prisma.inventoryItem.count({
       where: { tenantId, itemStatus: 'active' },
     });
 
     // Check if featured
-    const activeFeatured = await prisma.directory_featured_listings.findFirst({
+    const activeFeatured = await prisma.directoryFeaturedListings.findFirst({
       where: {
         tenantId,
         featuredUntil: { gt: new Date() },
@@ -97,16 +97,16 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
       return res.status(404).json({ error: 'tenant_not_found' });
     }
 
-    const profile = await prisma.tenant_business_profile.findUnique({ where: { tenantId } });
-    const settings = await prisma.directory_settings.findUnique({ where: { tenantId } });
-    const itemCount = await prisma.inventory_item.count({
+    const profile = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } });
+    const settings = await prisma.directorySettings.findUnique({ where: { tenantId } });
+    const itemCount = await prisma.inventoryItem.count({
       where: { tenantId, itemStatus: 'active' },
     });
 
     // Calculate completeness
     const checks = {
       business_name: !!profile?.businessName,
-      address: !!profile?.addressLine1,
+      address: !!profile?.businessLine1,
       cityState: !!(profile?.city && profile?.state),
       phone: !!profile?.phoneNumber,
       email: !!profile?.email,
@@ -125,7 +125,7 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
 
     // Generate recommendations
     const recommendations: string[] = [];
-    if (!checks.businessName) recommendations.push('Add business name');
+    if (!checks.business_name) recommendations.push('Add business name');
     if (!checks.address) recommendations.push('Add street address');
     if (!checks.cityState) recommendations.push('Add city and state');
     if (!checks.phone) recommendations.push('Add phone number for better local SEO');
@@ -143,7 +143,7 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
       checks,
       recommendations,
       itemCount,
-      canPublish: checks.businessName && checks.cityState && checks.category,
+      canPublish: checks.business_name && checks.cityState && checks.category,
     });
   } catch (error: any) {
     console.error('[GET /support/directory/tenant/:tenantId/quality-check] Error:', error);
@@ -159,18 +159,8 @@ router.get('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, a
   try {
     const { tenantId } = req.params;
 
-    const notes = await prisma.directory_support_notes.findMany({
+    const notes = await prisma.directorySupportNotes.findMany({
       where: { tenantId },
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -195,22 +185,12 @@ router.post('/tenant/:tenantId/add-note', authenticateToken, requireSupportAcces
     }
 
     const user = (req as any).user;
-    const note = await prisma.directory_support_notes.create({
+    const note = await prisma.directorySupportNotes.create({
       data: {
         tenantId,
         note: parsed.data.note,
         createdBy: user.userId,
-      },
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
+      } as any,
     });
 
     return res.json({ success: true, note });
@@ -246,17 +226,17 @@ router.get('/search', authenticateToken, requireSupportAccess, async (req: Reque
       select: {
         id: true,
         name: true,
-        subscription_tier: true,
-        subscription_status: true,
-        directory_settings: {
+        subscriptionTier: true,
+        subscriptionStatus: true,
+        directorySettings: {
           select: {
             isPublished: true,
             isFeatured: true,
           },
         },
-        tenant_business_profile: {
+        tenantBusinessProfile: {
           select: {
-            business_name: true,
+            businessName: true,
             city: true,
             state: true,
           },

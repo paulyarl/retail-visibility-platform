@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import { app } from './index';
+import app from './index';
 
 async function loginOrRegister(email: string, password: string) {
   // Try login first

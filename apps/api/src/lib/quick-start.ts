@@ -271,19 +271,19 @@ export async function generateQuickStartProducts(
 
   // Get final counts
   const totalProducts = await prisma.inventoryItem.count({
-    where: { tenant_id: tenant_id },
+    where: { tenantId: tenant_id },
   });
 
   const activeProducts = await prisma.inventoryItem.count({
-    where: { tenant_id: tenant_id, itemStatus: 'active' },
+    where: { tenantId: tenant_id, itemStatus: 'active' },
   });
 
   const inStockProducts = await prisma.inventoryItem.count({
-    where: { tenant_id: tenant_id, availability: 'inStock' },
+    where: { tenantId: tenant_id, availability: 'inStock' }, 
   });
 
   const categorizedProducts = await prisma.inventoryItem.count({
-    where: { tenant_id: tenant_id, categoryPath: { isEmpty: false } },
+    where: { tenantId: tenant_id, categoryPath: { isEmpty: false } },
   });
 
   return {
