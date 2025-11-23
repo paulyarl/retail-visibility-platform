@@ -73,13 +73,13 @@ router.get('/search', async (req: Request, res: Response) => {
     // Get listings and total count
     const [listings, totalItems] = await Promise.all([
       prisma.$queryRaw`
-        SELECT * FROM directory_listings
+        SELECT * FROM directory_listings_list
         WHERE ${whereClause}
         ORDER BY created_at DESC
         LIMIT ${limitNum} OFFSET ${skip}
       `,
       prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count FROM directory_listings
+        SELECT COUNT(*) as count FROM directory_listings_list
         WHERE ${whereClause}
       `,
     ]);
@@ -110,7 +110,7 @@ router.get('/categories', async (req: Request, res: Response) => {
   try {
     const categories = await prisma.$queryRaw<Array<{ primary_category: string; count: bigint }>>`
       SELECT primary_category, COUNT(*) as count
-      FROM directory_listings
+      FROM directory_listings_list
       WHERE is_published = true AND primary_category IS NOT NULL
       GROUP BY primary_category
       ORDER BY count DESC, primary_category ASC
@@ -137,7 +137,7 @@ router.get('/locations', async (req: Request, res: Response) => {
   try {
     const locations = await prisma.$queryRaw<Array<{ city: string; state: string; count: bigint }>>`
       SELECT city, state, COUNT(*) as count
-      FROM directory_listings
+      FROM directory_listings_list
       WHERE is_published = true AND city IS NOT NULL
       GROUP BY city, state
       ORDER BY count DESC, city ASC
@@ -166,7 +166,7 @@ router.get('/:slug', async (req: Request, res: Response) => {
     const { slug } = req.params;
 
     const listing = await prisma.$queryRaw<Array<any>>`
-      SELECT * FROM directory_listings
+      SELECT * FROM directory_listings_list
       WHERE slug = ${slug} AND is_published = true
       LIMIT 1
     `;

@@ -77,7 +77,7 @@ router.get('/search', async (req: Request, res: Response) => {
 
     // Get listings - use direct database query
     const listingsQuery = `
-      SELECT * FROM directory_listings
+      SELECT * FROM directory_listings_list
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -86,7 +86,7 @@ router.get('/search', async (req: Request, res: Response) => {
 
     // Get total count
     const countQuery = `
-      SELECT COUNT(*) as count FROM directory_listings
+      SELECT COUNT(*) as count FROM directory_listings_list
       WHERE ${whereClause}
     `;
     const countResult = await directPool.query(countQuery, params);
@@ -185,7 +185,7 @@ router.get('/locations', async (req: Request, res: Response) => {
   try {
     const result = await directPool.query(`
       SELECT city, state, COUNT(*) as count
-      FROM directory_listings
+      FROM directory_listings_list
       WHERE is_published = true AND city IS NOT NULL
       GROUP BY city, state
       ORDER BY count DESC, city ASC
@@ -214,7 +214,7 @@ router.get('/:slug', async (req: Request, res: Response) => {
     const { slug } = req.params;
 
     const result = await directPool.query(
-      `SELECT * FROM directory_listings
+      `SELECT * FROM directory_listings_list
        WHERE slug = $1 AND is_published = true
        LIMIT 1`,
       [slug]
@@ -272,7 +272,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
 
     // First, get the current listing
     const currentListing = await directPool.query(
-      `SELECT * FROM directory_listings WHERE slug = $1 AND is_published = true LIMIT 1`,
+      `SELECT * FROM directory_listings_list WHERE slug = $1 AND is_published = true LIMIT 1`,
       [slug]
     );
 
@@ -301,7 +301,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
             ELSE 0
           END
         ) as relevance_score
-      FROM directory_listings
+      FROM directory_listings_list
       WHERE slug != $5
         AND is_published = true
       ORDER BY relevance_score DESC, rating_avg DESC, product_count DESC

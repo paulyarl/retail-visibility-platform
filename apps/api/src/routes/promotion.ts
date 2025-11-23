@@ -24,7 +24,7 @@ router.get('/tenants/:tenantId/promotion/status', async (req, res) => {
         promotion_expires_at,
         promotion_impressions,
         promotion_clicks
-      FROM directory_listings
+      FROM directory_listings_list
       WHERE tenantId = $1
       LIMIT 1`,
       [tenantId]
@@ -77,7 +77,7 @@ router.post('/tenants/:tenantId/promotion/enable', async (req, res) => {
 
     // Update directory listing
     const result = await pool.query(
-      `UPDATE directory_listings
+      `UPDATE directory_listings_list
       SET 
         is_promoted = TRUE,
         promotion_tier = $1,
@@ -118,7 +118,7 @@ router.post('/tenants/:tenantId/promotion/disable', async (req, res) => {
     const { tenantId } = req.params;
 
     const result = await pool.query(
-      `UPDATE directory_listings
+      `UPDATE directory_listings_list
       SET 
         is_promoted = FALSE,
         promotion_tier = NULL
@@ -165,7 +165,7 @@ router.get('/tenants/:tenantId/promotion/analytics', async (req, res) => {
           THEN ROUND((promotion_clicks::numeric / promotion_impressions::numeric) * 100, 2)
           ELSE 0 
         END as click_through_rate
-      FROM directory_listings
+      FROM directory_listings_list
       WHERE tenantId = $1
       LIMIT 1`,
       [tenantId]
@@ -216,7 +216,7 @@ router.post('/tenants/:tenantId/promotion/track-impression', async (req, res) =>
     const { tenantId } = req.params;
 
     await pool.query(
-      `UPDATE directory_listings
+      `UPDATE directory_listings_list
       SET promotion_impressions = promotion_impressions + 1
       WHERE tenantId = $1 AND is_promoted = TRUE`,
       [tenantId]
@@ -238,7 +238,7 @@ router.post('/tenants/:tenantId/promotion/track-click', async (req, res) => {
     const { tenantId } = req.params;
 
     await pool.query(
-      `UPDATE directory_listings
+      `UPDATE directory_listings_list
       SET promotion_clicks = promotion_clicks + 1
       WHERE tenantId = $1 AND is_promoted = TRUE`,
       [tenantId]

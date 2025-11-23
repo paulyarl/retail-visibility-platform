@@ -16,7 +16,7 @@ class StoreTypeDirectoryService {
     radiusMiles?: number
   ) {
     try {
-      console.log('[StoreTypeService] Fetching store types from directory_listings');
+      console.log('[StoreTypeService] Fetching store types from directory_listings_list');
 
       // Get unique store types with counts
       const storeTypes = await prisma.$queryRaw<Array<{
@@ -26,7 +26,7 @@ class StoreTypeDirectoryService {
         SELECT 
           primary_category,
           COUNT(*) as store_count
-        FROM directory_listings
+        FROM directory_listings_list
         WHERE is_published = true
           AND primary_category IS NOT NULL
           AND primary_category != ''
@@ -62,7 +62,7 @@ class StoreTypeDirectoryService {
       // Convert slug back to category name (approximate)
       const typeName = this.unslugify(typeSlug);
 
-      // Get stores from directory_listings using raw SQL
+      // Get stores from directory_listings_list using raw SQL
       const stores = await prisma.$queryRaw<Array<{
         id: string;
         tenantId: string;
@@ -74,23 +74,41 @@ class StoreTypeDirectoryService {
         postal_code: string | null;
         latitude: number | null;
         longitude: number | null;
-        product_count: number;
-        primary_category: string;
+        primary_category: string | null;
+        rating_avg: number | null;
+        rating_count: number | null;
+        product_count: number | null;
+        logo_url: string | null;
+        description: string | null;
+        is_featured: boolean | null;
+        is_published: boolean | null;
+        subscription_tier: string | null;
+        created_at: Date | null;
+        updated_at: Date | null;
       }>>`
         SELECT 
           id,
           tenantId,
-          business_name,
+          businessName as business_name,
           slug,
-          address_line1,
+          address as address_line1,
           city,
           state,
-          postal_code,
+          zipCode as postal_code,
           latitude,
           longitude,
+          primary_category,
+          ratingAvg as rating_avg,
+          ratingCount as rating_count,
           product_count,
-          primary_category
-        FROM directory_listings
+          logoUrl as logo_url,
+          description,
+          isFeatured as is_featured,
+          is_published,
+          subscriptionTier as subscription_tier,
+          createdAt as created_at,
+          updatedAt as updated_at
+        FROM directory_listings_list
         WHERE is_published = true
           AND primary_category ILIKE ${`%${typeName}%`}
         ORDER BY product_count DESC
@@ -125,16 +143,9 @@ class StoreTypeDirectoryService {
     try {
       const typeName = this.unslugify(typeSlug);
       
-      const result = await prisma.$queryRaw<Array<{
-        primary_category: string;
-        store_count: bigint;
-        total_products: bigint;
-      }>>`
-        SELECT 
-          primary_category,
-          COUNT(*) as store_count,
-          SUM(product_count) as total_products
-        FROM directory_listings
+      const result = await prisma.$queryRaw<Array<{ primary_category: string }>>`
+        SELECT primary_category
+        FROM directory_listings_list
         WHERE is_published = true
           AND primary_category ILIKE ${`%${typeName}%`}
         GROUP BY primary_category

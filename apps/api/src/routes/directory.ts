@@ -126,7 +126,7 @@ router.get('/search', async (req, res) => {
     }
 
     query = Prisma.sql`${query}
-      FROM directory_listings
+      FROM directory_listings_list
       WHERE is_published = true
     `;
 
@@ -241,7 +241,7 @@ router.get('/search', async (req, res) => {
     // Get total count for pagination
     let countQuery = Prisma.sql`
       SELECT COUNT(*) as total
-      FROM directory_listings
+      FROM directory_listings_list
       WHERE is_published = true
     `;
 
@@ -337,7 +337,7 @@ router.get('/locations', async (req, res) => {
         city,
         state,
         COUNT(*) as count
-      FROM directory_listings
+      FROM directory_listings_list
       WHERE is_published = true
         AND city IS NOT NULL
         AND state IS NOT NULL
@@ -396,7 +396,7 @@ router.get('/:slug', async (req, res) => {
         use_custom_website as "useCustomWebsite",
         map_privacy_mode as "mapPrivacyMode",
         display_map as "displayMap"
-      FROM directory_listings
+      FROM directory_listings_list
       WHERE slug = ${slug}
         AND is_published = true
       LIMIT 1
