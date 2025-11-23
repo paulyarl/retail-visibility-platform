@@ -21,71 +21,68 @@ export class CategoryDirectoryService {
     try {
       console.log('[CategoryService] Fetching categories using Prisma ORM...');
       
-      // Use Prisma ORM to query TenantCategory with aggregations
-      // This avoids the materialized view and raw SQL protocol issues
-      const categories = await prisma.tenant_category.findMany({
+      // Get all active categories first
+      const categories = await prisma.tenantCategory.findMany({
         where: {
           isActive: true,
-          _count: {
-            some: {
-              itemStatus: 'active',
-              visibility: 'public',
-              tenant: {
-                googleSyncEnabled: true,
-                directoryVisible: true,
-                location_status: 'active',
-              },
-            },
-          },
         },
         select: {
           id: true,
           name: true,
           slug: true,
           googleCategoryId: true,
-          _count: {
-            select: {
-              _count: {
-                where: {
-                  itemStatus: 'active',
-                  visibility: 'public',
-                  tenant: {
-                    googleSyncEnabled: true,
-                    directoryVisible: true,
-                    location_status: 'active',
-                  },
-                },
-              },
-            },
-          },
-          _count: {
+        },
+      });
+
+      // For each category, count items and distinct tenants
+      const categoriesWithCounts = await Promise.all(
+        categories.map(async (category: any) => {
+          // Count items in this category
+          const itemCount = await prisma.inventoryItem.count({
             where: {
+              tenantCategoryId: category.id,
               itemStatus: 'active',
               visibility: 'public',
               tenant: {
                 googleSyncEnabled: true,
                 directoryVisible: true,
-                location_status: 'active',
+                locationStatus: 'active',
+              },
+            },
+          });
+
+          // Count distinct tenants with items in this category
+          const tenantCount = await prisma.inventoryItem.findMany({
+            where: {
+              tenantCategoryId: category.id,
+              itemStatus: 'active',
+              visibility: 'public',
+              tenant: {
+                googleSyncEnabled: true,
+                directoryVisible: true,
+                locationStatus: 'active',
               },
             },
             select: {
               tenantId: true,
             },
             distinct: ['tenantId'],
-          },
-        },
-      });
+          });
 
-      console.log(`[CategoryService] Found ${categories.length} categories`);
+          return {
+            id: category.id,
+            name: category.name,
+            slug: category.slug,
+            googleCategoryId: category.googleCategoryId,
+            storeCount: tenantCount.length, // Distinct tenant count
+            productCount: itemCount, // Total items count
+          };
+        })
+      );
 
-      return categories.map((cat) => ({
-        id: cat.id,
-        name: cat.name,
-        slug: cat.slug,
-        googleCategoryId: cat.googleCategoryId,
-        storeCount: cat.items.length, // Distinct tenant count
-        productCount: cat._count.inventory_item,
-      }));
+      console.log(`[CategoryService] Found ${categoriesWithCounts.length} categories`);
+
+      return categoriesWithCounts;
     } catch (error) {
       console.error('[CategoryService] Error fetching categories:', error);
       // Return empty array on error - graceful degradation
@@ -102,7 +99,7 @@ export class CategoryDirectoryService {
       console.log(`[CategoryService] Fetching stores for category: ${categorySlug}`);
       
       // 1. Find category by slug
-      const category = await prisma.tenant_category.findFirst({
+      const category = await prisma.tenantCategory.findFirst({
         where: { 
           slug: categorySlug, 
           isActive: true 
@@ -119,8 +116,8 @@ export class CategoryDirectoryService {
         where: {
           googleSyncEnabled: true,
           directoryVisible: true,
-          location_status: 'active',
-          _count: {
+          locationStatus: 'active',
+          inventory_items: {
             some: {
               tenantCategoryId: category.id,
               itemStatus: 'active',
@@ -132,10 +129,10 @@ export class CategoryDirectoryService {
           id: true,
           name: true,
           slug: true,
-          tenant_business_profile: {
+          tenantBusinessProfile: {
             select: {
-              business_name: true,
-              addressLine1: true,
+              businessName: true,
+              businessLine1: true,
               city: true,
               state: true,
               postalCode: true,
@@ -143,34 +140,39 @@ export class CategoryDirectoryService {
               longitude: true,
             },
           },
-          _count: {
-            select: {
-              _count: {
-                where: {
-                  tenantCategoryId: category.id,
-                  itemStatus: 'active',
-                  visibility: 'public',
-                },
-              },
-            },
-          },
         },
       });
 
-      console.log(`[CategoryService] Found ${stores.length} stores`);
+      // Count products for each store
+      const storesWithCounts = await Promise.all(
+        stores.map(async (store: any) => {
+          const productCount = await prisma.inventoryItem.count({
+            where: {
+              tenantId: store.id,
+              tenantCategoryId: category.id,
+              itemStatus: 'active',
+              visibility: 'public',
+            },
+          });
 
-      return stores.map((store) => ({
-        id: store.id,
-        name: store.businessProfile?.businessName || store.name,
-        slug: store.slug,
-        address: store.businessProfile?.addressLine1,
-        city: store.businessProfile?.city,
-        state: store.businessProfile?.state,
-        postalCode: store.businessProfile?.postalCode,
-        latitude: store.businessProfile?.latitude,
-        longitude: store.businessProfile?.longitude,
-        productCount: store._count.inventory_item,
-      }));
+          return {
+            id: store.id,
+            name: store.tenantBusinessProfile?.businessName || store.name,
+            slug: store.slug,
+            address: store.tenantBusinessProfile?.businessLine1,
+            city: store.tenantBusinessProfile?.city,
+            state: store.tenantBusinessProfile?.state,
+            postalCode: store.tenantBusinessProfile?.postalCode,
+            latitude: store.tenantBusinessProfile?.latitude,
+            longitude: store.tenantBusinessProfile?.longitude,
+            productCount: productCount,
+          };
+        })
+      );
+
+      console.log(`[CategoryService] Found ${storesWithCounts.length} stores`);
+
+      return storesWithCounts;
     } catch (error) {
       console.error('[CategoryService] Error fetching stores by category:', error);
       return [];
@@ -196,7 +198,7 @@ export class CategoryDirectoryService {
       
       // Walk up the parent chain
       while (currentId) {
-        const category = await prisma.tenant_category.findUnique({
+        const category: { id: string; name: string; slug: string; parentId: string | null } | null = await prisma.tenantCategory.findUnique({
           where: { id: currentId },
           select: {
             id: true,
