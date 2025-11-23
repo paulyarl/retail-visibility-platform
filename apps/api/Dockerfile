@@ -1,11 +1,5 @@
-# Use Node.js LTS with pre-installed OpenSSL
-FROM node:20-slim AS base
-
-# Install OpenSSL and clean up in one layer to reduce image size
-RUN apt-get update -y && \
-    apt-get install -y openssl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Use Node.js LTS - node:20 already includes OpenSSL
+FROM node:20 AS base
 
 # Enable corepack for pnpm
 RUN corepack enable
