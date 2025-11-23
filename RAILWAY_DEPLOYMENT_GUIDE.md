@@ -219,3 +219,31 @@ railway status
 **Last Updated:** November 23, 2025  
 **Deployment Method:** Custom Dockerfile (not Railpack)  
 **Environments:** Production + Staging both configured  
+
+What Fixed It:
+Ultra-simple Dockerfile approach:
+
+dockerfile
+FROM node:20
+WORKDIR /app
+COPY . .
+RUN npm install -g pnpm
+RUN pnpm install --no-frozen-lockfile
+WORKDIR /app/apps/api
+RUN pnpm build
+EXPOSE 8080
+CMD ["npm", "start"]
+Key Lessons Learned:
+Docker trailing slash - COPY apps/api ./apps/api/ vs ./apps/api matters
+Complexity kills - Simple approach worked when complex ones failed
+Railpack fallback - Always good to have proven alternatives
+Emergency debugging - Sometimes you need to strip everything down
+Documentation Updated:
+✅ Railway Deployment Guide - Merged to both branches
+✅ Working Dockerfile - Proven in production
+✅ Emergency procedures - Documented for future incidents
+
+End of story indeed! 🚀 Both environments are running smoothly with the emergency fix that became the permanent solution.
+
+Production API: https://api.visibleshelf.com ✅
+Staging API: https://aps.visibleshelf.store ✅

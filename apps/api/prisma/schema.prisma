@@ -554,7 +554,7 @@ model InventoryItem {
   @@index([source])
   @@index([tenantId, enrichmentStatus])
   @@index([tenantId, updatedAt])
-  @@map("inventory_item")
+  @@map("InventoryItem")
 }
 
 model Invitation {
