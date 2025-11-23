@@ -31,6 +31,7 @@ class StoreTypeDirectoryService {
           AND primary_category IS NOT NULL
           AND primary_category != ''
           AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
+          AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
         GROUP BY primary_category
         ORDER BY store_count DESC
       `;
@@ -113,6 +114,7 @@ class StoreTypeDirectoryService {
         WHERE is_published = true
           AND primary_category ILIKE ${`%${typeName}%`}
           AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
+          AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
         ORDER BY product_count DESC
         LIMIT 100
       `;
@@ -158,6 +160,7 @@ class StoreTypeDirectoryService {
         WHERE is_published = true
           AND primary_category ILIKE ${`%${typeName}%`}
           AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
+          AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
         GROUP BY primary_category
         LIMIT 1
       `;

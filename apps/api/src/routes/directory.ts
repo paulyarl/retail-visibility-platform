@@ -129,6 +129,7 @@ router.get('/search', async (req, res) => {
       FROM directory_listings_list
       WHERE is_published = true
         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
+        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
     `;
 
     // Full-text search
@@ -245,6 +246,7 @@ router.get('/search', async (req, res) => {
       FROM directory_listings_list
       WHERE is_published = true
         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
+        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
     `;
 
     // Apply same filters to count
@@ -342,6 +344,7 @@ router.get('/locations', async (req, res) => {
       FROM directory_listings_list
       WHERE is_published = true
         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
+        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
         AND city IS NOT NULL
         AND state IS NOT NULL
       GROUP BY city, state

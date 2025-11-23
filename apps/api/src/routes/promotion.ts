@@ -27,6 +27,7 @@ router.get('/tenants/:tenantId/promotion/status', async (req, res) => {
       FROM directory_listings_list
       WHERE tenantId = $1
         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
+        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
       LIMIT 1`,
       [tenantId]
     );
@@ -169,6 +170,7 @@ router.get('/tenants/:tenantId/promotion/analytics', async (req, res) => {
       FROM directory_listings_list
       WHERE tenantId = $1
         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
+        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
       LIMIT 1`,
       [tenantId]
     );
