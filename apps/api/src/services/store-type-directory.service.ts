@@ -18,29 +18,26 @@ class StoreTypeDirectoryService {
     try {
       console.log('[StoreTypeService] Fetching store types from directory_listings_list');
 
-      // Get unique store types with counts - use subquery to avoid JSON fields
+      // Get unique store types with counts using raw SQL with CTE to avoid JSON fields
       const storeTypes = await prisma.$queryRaw<Array<{
         primary_category: string;
-        store_count: bigint;
+        store_count: number;
       }>>`
-        SELECT 
-          primary_category,
-          store_count
-        FROM (
-          SELECT 
+        WITH category_counts AS (
+          SELECT
             primary_category,
             COUNT(*) as store_count
-          FROM (
-            SELECT primary_category 
-            FROM directory_listings_list
-            WHERE is_published = true
-              AND primary_category IS NOT NULL
-              AND primary_category != ''
-              AND (business_hours IS NULL OR business_hours::text != 'null')
-          ) AS clean_data
+          FROM directory_listings_list
+          WHERE is_published = true
+            AND primary_category IS NOT NULL
+            AND primary_category != ''
           GROUP BY primary_category
           ORDER BY COUNT(*) DESC
-        ) AS grouped_data
+        )
+        SELECT
+          primary_category,
+          store_count::integer
+        FROM category_counts
         ORDER BY store_count DESC
       `;
 
@@ -49,7 +46,7 @@ class StoreTypeDirectoryService {
       return storeTypes.map(type => ({
         name: type.primary_category,
         slug: this.slugify(type.primary_category),
-        storeCount: Number(type.store_count),
+        storeCount: type.store_count,
       }));
     } catch (error) {
       console.error('[StoreTypeService] Error fetching store types:', error);
@@ -72,13 +69,13 @@ class StoreTypeDirectoryService {
       // Convert slug back to category name (approximate)
       const typeName = this.unslugify(typeSlug);
 
-      // Get stores from directory_listings_list using raw SQL - avoid JSON fields
+      // Get stores from directory_listings_list using raw SQL with CTE to avoid JSON fields
       const stores = await prisma.$queryRaw<Array<{
         id: string;
         tenantId: string;
         business_name: string;
         slug: string;
-        address_line1: string | null;
+        address: string | null;
         city: string | null;
         state: string | null;
         postal_code: string | null;
@@ -91,37 +88,37 @@ class StoreTypeDirectoryService {
         logo_url: string | null;
         description: string | null;
         is_featured: boolean | null;
-        is_published: boolean | null;
         subscription_tier: string | null;
         created_at: Date | null;
         updated_at: Date | null;
       }>>`
-        SELECT 
-          id,
-          tenantId,
-          businessName as business_name,
-          slug,
-          address as address_line1,
-          city,
-          state,
-          zipCode as postal_code,
-          latitude,
-          longitude,
-          primary_category,
-          ratingAvg as rating_avg,
-          ratingCount as rating_count,
-          product_count,
-          logoUrl as logo_url,
-          description,
-          isFeatured as is_featured,
-          is_published,
-          subscriptionTier as subscription_tier,
-          createdAt as created_at,
-          updatedAt as updated_at
-        FROM directory_listings_list
-        WHERE is_published = true
-          AND primary_category ILIKE ${`%${typeName}%`}
-          AND (business_hours IS NULL OR business_hours::text != 'null')
+        WITH store_data AS (
+          SELECT
+            id,
+            tenantId,
+            businessName as business_name,
+            slug,
+            address,
+            city,
+            state,
+            zipCode as postal_code,
+            latitude,
+            longitude,
+            primary_category,
+            ratingAvg as rating_avg,
+            ratingCount as rating_count,
+            product_count,
+            logoUrl as logo_url,
+            description,
+            isFeatured as is_featured,
+            subscriptionTier as subscription_tier,
+            createdAt as created_at,
+            updatedAt as updated_at
+          FROM directory_listings_list
+          WHERE is_published = true
+            AND primary_category ILIKE ${`%${typeName}%`}
+        )
+        SELECT * FROM store_data
         ORDER BY product_count DESC
         LIMIT 100
       `;
@@ -132,14 +129,22 @@ class StoreTypeDirectoryService {
         id: store.tenantId,
         name: store.business_name,
         slug: store.slug,
-        address: store.address_line1,
+        address: store.address,
         city: store.city,
         state: store.state,
         postalCode: store.postal_code,
         latitude: store.latitude,
         longitude: store.longitude,
+        primaryCategory: store.primary_category,
+        rating: store.rating_avg,
+        ratingCount: store.rating_count,
         productCount: store.product_count,
-        storeType: store.primary_category,
+        logoUrl: store.logo_url,
+        description: store.description,
+        isFeatured: store.is_featured,
+        subscriptionTier: store.subscription_tier,
+        createdAt: store.created_at,
+        updatedAt: store.updated_at,
       }));
     } catch (error) {
       console.error('[StoreTypeService] Error fetching stores by type:', error);
@@ -154,30 +159,28 @@ class StoreTypeDirectoryService {
     try {
       const typeName = this.unslugify(typeSlug);
       
-            const result = await prisma.$queryRaw<Array<{ 
-        primary_category: string; 
-        store_count: bigint; 
-        total_products: bigint; 
+      // Get store type details using raw SQL with CTE
+      const result = await prisma.$queryRaw<Array<{
+        primary_category: string;
+        store_count: number;
+        total_products: number;
       }>>`
-        SELECT 
-          primary_category,
-          store_count,
-          total_products
-        FROM (
-          SELECT 
+        WITH type_details AS (
+          SELECT
             primary_category,
             COUNT(*) as store_count,
             SUM(product_count) as total_products
-          FROM (
-            SELECT primary_category, product_count
-            FROM directory_listings_list
-            WHERE is_published = true
-              AND primary_category ILIKE ${`%${typeName}%`}
-              AND (business_hours IS NULL OR business_hours::text != 'null')
-          ) AS clean_data
+          FROM directory_listings_list
+          WHERE is_published = true
+            AND primary_category ILIKE ${`%${typeName}%`}
           GROUP BY primary_category
           LIMIT 1
-        ) AS aggregated_data
+        )
+        SELECT
+          primary_category,
+          store_count::integer,
+          COALESCE(total_products, 0)::integer as total_products
+        FROM type_details
       `;
 
       if (result.length === 0) {
@@ -188,8 +191,8 @@ class StoreTypeDirectoryService {
       return {
         name: type.primary_category,
         slug: this.slugify(type.primary_category),
-        storeCount: Number(type.store_count),
-        productCount: Number(type.total_products),
+        storeCount: type.store_count,
+        totalProducts: type.total_products,
       };
     } catch (error) {
       console.error('[StoreTypeService] Error fetching store type details:', error);
