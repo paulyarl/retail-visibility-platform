@@ -18,20 +18,29 @@ class StoreTypeDirectoryService {
     try {
       console.log('[StoreTypeService] Fetching store types from directory_listings_list');
 
-      // Get unique store types with counts
+      // Get unique store types with counts - use subquery to avoid JSON fields
       const storeTypes = await prisma.$queryRaw<Array<{
         primary_category: string;
         store_count: bigint;
       }>>`
         SELECT 
           primary_category,
-          COUNT(*) as store_count
-        FROM directory_listings_list
-        WHERE is_published = true
-          AND primary_category IS NOT NULL
-          AND primary_category != ''
-          AND (business_hours IS NULL OR business_hours::text != 'null')
-        GROUP BY primary_category
+          store_count
+        FROM (
+          SELECT 
+            primary_category,
+            COUNT(*) as store_count
+          FROM (
+            SELECT primary_category 
+            FROM directory_listings_list
+            WHERE is_published = true
+              AND primary_category IS NOT NULL
+              AND primary_category != ''
+              AND (business_hours IS NULL OR business_hours::text != 'null')
+          ) AS clean_data
+          GROUP BY primary_category
+          ORDER BY COUNT(*) DESC
+        ) AS grouped_data
         ORDER BY store_count DESC
       `;
 
@@ -63,7 +72,7 @@ class StoreTypeDirectoryService {
       // Convert slug back to category name (approximate)
       const typeName = this.unslugify(typeSlug);
 
-      // Get stores from directory_listings_list using raw SQL
+      // Get stores from directory_listings_list using raw SQL - avoid JSON fields
       const stores = await prisma.$queryRaw<Array<{
         id: string;
         tenantId: string;
@@ -145,21 +154,30 @@ class StoreTypeDirectoryService {
     try {
       const typeName = this.unslugify(typeSlug);
       
-      const result = await prisma.$queryRaw<Array<{ 
+            const result = await prisma.$queryRaw<Array<{ 
         primary_category: string; 
         store_count: bigint; 
         total_products: bigint; 
       }>>`
         SELECT 
           primary_category,
-          COUNT(*) as store_count,
-          SUM(product_count) as total_products
-        FROM directory_listings_list
-        WHERE is_published = true
-          AND primary_category ILIKE ${`%${typeName}%`}
-          AND (business_hours IS NULL OR business_hours::text != 'null')
-        GROUP BY primary_category
-        LIMIT 1
+          store_count,
+          total_products
+        FROM (
+          SELECT 
+            primary_category,
+            COUNT(*) as store_count,
+            SUM(product_count) as total_products
+          FROM (
+            SELECT primary_category, product_count
+            FROM directory_listings_list
+            WHERE is_published = true
+              AND primary_category ILIKE ${`%${typeName}%`}
+              AND (business_hours IS NULL OR business_hours::text != 'null')
+          ) AS clean_data
+          GROUP BY primary_category
+          LIMIT 1
+        ) AS aggregated_data
       `;
 
       if (result.length === 0) {
