@@ -79,6 +79,7 @@ router.get('/search', async (req: Request, res: Response) => {
     const listingsQuery = `
       SELECT * FROM directory_listings_list
       WHERE ${whereClause}
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
@@ -88,6 +89,7 @@ router.get('/search', async (req: Request, res: Response) => {
     const countQuery = `
       SELECT COUNT(*) as count FROM directory_listings_list
       WHERE ${whereClause}
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
     `;
     const countResult = await directPool.query(countQuery, params);
 
@@ -187,6 +189,7 @@ router.get('/locations', async (req: Request, res: Response) => {
       SELECT city, state, COUNT(*) as count
       FROM directory_listings_list
       WHERE is_published = true AND city IS NOT NULL
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
       GROUP BY city, state
       ORDER BY count DESC, city ASC
       LIMIT 100
@@ -216,6 +219,7 @@ router.get('/:slug', async (req: Request, res: Response) => {
     const result = await directPool.query(
       `SELECT * FROM directory_listings_list
        WHERE slug = $1 AND is_published = true
+         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
        LIMIT 1`,
       [slug]
     );
@@ -272,7 +276,8 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
 
     // First, get the current listing
     const currentListing = await directPool.query(
-      `SELECT * FROM directory_listings_list WHERE slug = $1 AND is_published = true LIMIT 1`,
+      `SELECT * FROM directory_listings_list WHERE slug = $1 AND is_published = true
+         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL) LIMIT 1`,
       [slug]
     );
 
@@ -304,6 +309,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       FROM directory_listings_list
       WHERE slug != $5
         AND is_published = true
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
       ORDER BY relevance_score DESC, rating_avg DESC, product_count DESC
       LIMIT $6
     `;

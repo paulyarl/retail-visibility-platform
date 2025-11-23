@@ -128,6 +128,7 @@ router.get('/search', async (req, res) => {
     query = Prisma.sql`${query}
       FROM directory_listings_list
       WHERE is_published = true
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
     `;
 
     // Full-text search
@@ -243,6 +244,7 @@ router.get('/search', async (req, res) => {
       SELECT COUNT(*) as total
       FROM directory_listings_list
       WHERE is_published = true
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
     `;
 
     // Apply same filters to count
@@ -339,6 +341,7 @@ router.get('/locations', async (req, res) => {
         COUNT(*) as count
       FROM directory_listings_list
       WHERE is_published = true
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
         AND city IS NOT NULL
         AND state IS NOT NULL
       GROUP BY city, state

@@ -75,12 +75,14 @@ router.get('/search', async (req: Request, res: Response) => {
       prisma.$queryRaw`
         SELECT * FROM directory_listings_list
         WHERE ${whereClause}
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
         ORDER BY created_at DESC
         LIMIT ${limitNum} OFFSET ${skip}
       `,
       prisma.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(*) as count FROM directory_listings_list
         WHERE ${whereClause}
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
       `,
     ]);
 
@@ -112,6 +114,7 @@ router.get('/categories', async (req: Request, res: Response) => {
       SELECT primary_category, COUNT(*) as count
       FROM directory_listings_list
       WHERE is_published = true AND primary_category IS NOT NULL
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
       GROUP BY primary_category
       ORDER BY count DESC, primary_category ASC
       LIMIT 50
@@ -139,6 +142,7 @@ router.get('/locations', async (req: Request, res: Response) => {
       SELECT city, state, COUNT(*) as count
       FROM directory_listings_list
       WHERE is_published = true AND city IS NOT NULL
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
       GROUP BY city, state
       ORDER BY count DESC, city ASC
       LIMIT 100
@@ -168,6 +172,7 @@ router.get('/:slug', async (req: Request, res: Response) => {
     const listing = await prisma.$queryRaw<Array<any>>`
       SELECT * FROM directory_listings_list
       WHERE slug = ${slug} AND is_published = true
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
       LIMIT 1
     `;
 

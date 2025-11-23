@@ -26,6 +26,7 @@ router.get('/tenants/:tenantId/promotion/status', async (req, res) => {
         promotion_clicks
       FROM directory_listings_list
       WHERE tenantId = $1
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
       LIMIT 1`,
       [tenantId]
     );
@@ -167,6 +168,7 @@ router.get('/tenants/:tenantId/promotion/analytics', async (req, res) => {
         END as click_through_rate
       FROM directory_listings_list
       WHERE tenantId = $1
+        AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
       LIMIT 1`,
       [tenantId]
     );
