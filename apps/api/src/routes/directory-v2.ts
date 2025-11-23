@@ -80,7 +80,6 @@ router.get('/search', async (req: Request, res: Response) => {
       SELECT * FROM directory_listings_list
       WHERE ${whereClause}
         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
-        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
@@ -91,7 +90,6 @@ router.get('/search', async (req: Request, res: Response) => {
       SELECT COUNT(*) as count FROM directory_listings_list
       WHERE ${whereClause}
         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
-        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
     `;
     const countResult = await directPool.query(countQuery, params);
 
@@ -192,7 +190,6 @@ router.get('/locations', async (req: Request, res: Response) => {
       FROM directory_listings_list
       WHERE is_published = true AND city IS NOT NULL
         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
-        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
       GROUP BY city, state
       ORDER BY count DESC, city ASC
       LIMIT 100
@@ -223,7 +220,6 @@ router.get('/:slug', async (req: Request, res: Response) => {
       `SELECT * FROM directory_listings_list
        WHERE slug = $1 AND is_published = true
          AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
-        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
        LIMIT 1`,
       [slug]
     );
@@ -281,8 +277,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     // First, get the current listing
     const currentListing = await directPool.query(
       `SELECT * FROM directory_listings_list WHERE slug = $1 AND is_published = true
-         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
-        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array') LIMIT 1`,
+         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL) LIMIT 1`,
       [slug]
     );
 
@@ -315,7 +310,6 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       WHERE slug != $5
         AND is_published = true
         AND (business_hours IS NULL OR jsonb_typeof(business_hours) IS NOT NULL)
-        AND (secondary_categories IS NULL OR jsonb_typeof(secondary_categories) = 'array')
       ORDER BY relevance_score DESC, rating_avg DESC, product_count DESC
       LIMIT $6
     `;
