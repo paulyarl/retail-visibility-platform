@@ -21,9 +21,15 @@ COPY apps/api ./apps/api/
 # Set working directory to API
 WORKDIR /app/apps/api
 
-# Build TypeScript
+# Build TypeScript with error checking
 RUN echo '🚀 Building with fresh Prisma Client generation...' && \
-    pnpm build
+    npx prisma generate && \
+    echo '📦 Compiling TypeScript...' && \
+    npx tsc -p tsconfig.build.json --skipLibCheck && \
+    echo '✅ Checking dist folder...' && \
+    ls -la dist/ && \
+    echo '✅ Checking index.js...' && \
+    ls -la dist/index.js
 
 # Expose port (Railway uses PORT env var)
 EXPOSE ${PORT:-8080}
