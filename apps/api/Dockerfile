@@ -1,8 +1,11 @@
-# Use Node.js LTS
+# Use Node.js LTS with pre-installed OpenSSL
 FROM node:20-slim AS base
 
-# Install OpenSSL for Prisma
-RUN apt-get update -y && apt-get install -y openssl
+# Install OpenSSL and clean up in one layer to reduce image size
+RUN apt-get update -y && \
+    apt-get install -y openssl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Enable corepack for pnpm
 RUN corepack enable
@@ -13,18 +16,19 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml* ./
 COPY prisma ./prisma/
 
-# Install dependencies (includes @supabase/supabase-js in dependencies now)
-RUN corepack enable && corepack prepare pnpm@latest --activate && pnpm install --no-frozen-lockfile
+# Install dependencies with optimized settings
+RUN corepack prepare pnpm@latest --activate && \
+    pnpm install --no-frozen-lockfile --prefer-offline
 
 # Copy source code
 COPY . .
 
-# Build TypeScript (exclude test files in production) - Force rebuild v4
-RUN echo '🚀 Building with fresh Prisma Client generation...' && pnpm build
+# Build TypeScript
+RUN echo '🚀 Building with fresh Prisma Client generation...' && \
+    pnpm build
 
 # Expose port (Railway uses PORT env var)
 EXPOSE ${PORT:-8080}
 
 # Start command: run migrations then start server
-# Add explicit error handling and logging
 CMD ["sh", "-c", "echo 'Running Prisma migrations...' && npx prisma migrate deploy 2>&1 && echo 'Migrations complete!' && echo 'Starting Node server...' && node dist/index.js 2>&1 || (echo 'ERROR: Server failed to start' && exit 1)"]
