@@ -612,7 +612,7 @@ model Organization {
   maxTotalSKUs         Int       @default(2500) @map("max_total_skus")
   metadata             Json? @map("metadata")
   Tenant               Tenant[]
-  @@map("organizations")
+  @@map("organization")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
