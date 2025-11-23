@@ -222,7 +222,7 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
     }
 
     // Check for duplicates in inventory
-    const duplicateItem = await prisma.inventoryItem.findFirst({
+    const duplicateItem = await prisma.InventoryItem.findFirst({
       where: {
         tenantId: session.tenantId,
         sku: sku || barcode,
@@ -365,7 +365,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
           templateDefault: session.template?.defaultCategory 
         });
         const stock = enrichment.stock || 0;
-        const item = await prisma.inventoryItem.create({
+        const item = await prisma.InventoryItem.create({
           data: {
             id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             tenantId: session.tenantId,
@@ -820,7 +820,7 @@ router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Re
     }
 
     // Get all inventory items for this tenant that were created via scanning
-    const scannedItems = await prisma.inventoryItem.findMany({
+    const scannedItems = await prisma.InventoryItem.findMany({
       where: {
         tenantId,
         sku: { not: '' }, // Items with SKU were likely scanned
@@ -853,7 +853,7 @@ router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Re
 
     // Get scanning activity (last 30 days)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const recentScans = await prisma.inventoryItem.count({
+    const recentScans = await prisma.InventoryItem.count({
       where: {
         tenantId,
         sku: { not: '' },
@@ -862,7 +862,7 @@ router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Re
     });
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const weekScans = await prisma.inventoryItem.count({
+    const weekScans = await prisma.InventoryItem.count({
       where: {
         tenantId,
         sku: { not: '' },

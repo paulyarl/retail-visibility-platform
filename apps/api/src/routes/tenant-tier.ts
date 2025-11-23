@@ -133,12 +133,12 @@ router.get('/tenants/:id/usage', authenticateToken, checkTenantAccess, async (re
     }
 
     // Count current items
-    const itemCount = await prisma.inventoryItem.count({
+    const itemCount = await prisma.InventoryItem.count({
       where: { tenantId }
     });
 
     // Count active items
-    const activeItemCount = await prisma.inventoryItem.count({
+    const activeItemCount = await prisma.InventoryItem.count({
       where: {
         tenantId,
         availability: 'inStock'

@@ -38,7 +38,7 @@ export class CategoryDirectoryService {
       const categoriesWithCounts = await Promise.all(
         categories.map(async (category: any) => {
           // Count items in this category
-          const itemCount = await prisma.inventoryItem.count({
+          const itemCount = await prisma.InventoryItem.count({
             where: {
               tenantCategoryId: category.id,
               itemStatus: 'active',
@@ -52,7 +52,7 @@ export class CategoryDirectoryService {
           });
 
           // Count distinct tenants with items in this category
-          const tenantCount = await prisma.inventoryItem.findMany({
+          const tenantCount = await prisma.InventoryItem.findMany({
             where: {
               tenantCategoryId: category.id,
               itemStatus: 'active',
@@ -146,7 +146,7 @@ export class CategoryDirectoryService {
       // Count products for each store
       const storesWithCounts = await Promise.all(
         stores.map(async (store: any) => {
-          const productCount = await prisma.inventoryItem.count({
+          const productCount = await prisma.InventoryItem.count({
             where: {
               tenantId: store.id,
               tenantCategoryId: category.id,

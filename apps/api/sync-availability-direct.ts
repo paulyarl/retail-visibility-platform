@@ -12,7 +12,7 @@ async function syncAvailability() {
     console.log('🔄 Starting availability sync...\n');
 
     // Get all items
-    const items = await prisma.inventoryItem.findMany({
+    const items = await prisma.InventoryItem.findMany({
       select: { id: true, tenantId: true, sku: true, stock: true, availability: true },
     });
 
@@ -20,7 +20,7 @@ async function syncAvailability() {
 
     // Find items that are out of sync
     const outOfSync = items.filter(item => {
-      const expectedAvailability = item.stock > 0 ? 'in_stock' : 'out_of_stock';
+      const expectedAvailability = item.stock > 0 ? 'inStock' : 'outOfStock';
       return item.availability !== expectedAvailability;
     });
 
@@ -30,7 +30,7 @@ async function syncAvailability() {
       // Show first 10 out-of-sync items
       outOfSync.slice(0, 10).forEach(item => {
         console.log(`   - SKU: ${item.sku}`);
-        console.log(`     Stock: ${item.stock}, Current: ${item.availability}, Expected: ${item.stock > 0 ? 'in_stock' : 'out_of_stock'}`);
+        console.log(`     Stock: ${item.stock}, Current: ${item.availability}, Expected: ${item.stock > 0 ? 'inStock' : 'outOfStock'}`);
       });
       
       if (outOfSync.length > 10) {
@@ -44,9 +44,9 @@ async function syncAvailability() {
       
       const updates = await Promise.all(
         outOfSync.map(item =>
-          prisma.inventoryItem.update({
+          prisma.InventoryItem.update({
             where: { id: item.id },
-            data: { availability: item.stock > 0 ? 'in_stock' : 'out_of_stock' },
+            data: { availability: item.stock > 0 ? 'inStock' : 'outOfStock' },
           })
         )
       );
