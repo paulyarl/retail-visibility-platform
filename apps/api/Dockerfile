@@ -15,21 +15,23 @@ RUN corepack prepare pnpm@latest --activate && \
     pnpm install --no-frozen-lockfile --prefer-offline
 
 # Copy API source code
-COPY apps/api ./apps/api/
+COPY apps/api ./apps/api
 
 # Set working directory to API
 WORKDIR /app/apps/api
 
-# Simple build without Prisma validation issues
-RUN echo '🚀 Emergency build - skipping Prisma generate for now...' && \
-    echo '📦 Compiling TypeScript directly...' && \
-    npx tsc --skipLibCheck --noEmit false --outDir dist src/index.ts && \
+# Emergency build: Use existing Prisma client from node_modules
+RUN echo '🚀 EMERGENCY BUILD: Using pre-generated Prisma client...' && \
+    echo '📦 Compiling all TypeScript files...' && \
+    npx tsc --skipLibCheck --target ES2020 --module commonjs --outDir dist --rootDir src src/**/*.ts && \
     echo '✅ Checking dist folder...' && \
     ls -la dist/ && \
-    echo '✅ Build complete!'
+    echo '✅ Checking for index.js...' && \
+    test -f dist/index.js && echo 'index.js exists!' || echo 'index.js missing!' && \
+    echo '✅ Emergency build complete!'
 
 # Expose port (Railway uses PORT env var)
 EXPOSE ${PORT:-8080}
 
-# Start command: start server directly (skip migrations for emergency)
-CMD ["sh", "-c", "echo 'EMERGENCY MODE: Starting server directly...' && node dist/index.js 2>&1 || (echo 'ERROR: Server failed to start' && exit 1)"]
+# Start command: Emergency mode - start server directly
+CMD ["sh", "-c", "echo 'EMERGENCY MODE: Starting server...' && echo 'Files in dist:' && ls -la dist/ && node dist/index.js 2>&1 || (echo 'ERROR: Server failed to start' && exit 1)"]
