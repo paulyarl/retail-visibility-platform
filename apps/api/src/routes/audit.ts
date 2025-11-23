@@ -30,7 +30,7 @@ router.get('/admin/audit', requireAdmin, async (req, res) => {
       if (query.until) where.occurredAt.lte = new Date(query.until);
     }
 
-    const logs = await prisma.audit_log.findMany({
+    const logs = await prisma.auditLog.findMany({
       where,
       orderBy: { occurredAt: 'desc' },
       take: query.limit + 1,
@@ -55,7 +55,7 @@ router.get('/admin/audit', requireAdmin, async (req, res) => {
 // GET /admin/audit/:id - Get single audit log
 router.get('/admin/audit/:id', requireAdmin, async (req, res) => {
   try {
-    const log = await prisma.audit_log.findUnique({
+    const log = await prisma.auditLog.findUnique({
       where: { id: req.params.id },
     });
 
@@ -83,7 +83,7 @@ router.get('/admin/exports/audit.csv', requireAdmin, async (req, res) => {
       if (query.until) where.occurredAt.lte = new Date(query.until);
     }
 
-    const logs = await prisma.audit_log.findMany({
+    const logs = await prisma.auditLog.findMany({
       where,
       orderBy: { occurredAt: 'desc' },
       take: 10000, // Max export size

@@ -28,7 +28,7 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from '../auth/auth.service';
 import { prisma } from '../prisma';
 import jwt from 'jsonwebtoken';
-import { UserTenantRole } from '@prisma/client';
+import { UserTenantRole, UserRole } from '@prisma/client';
 import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 
 // JWT Payload interface

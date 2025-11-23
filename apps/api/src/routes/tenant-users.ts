@@ -113,6 +113,7 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     // Add user to tenant
     const userTenant = await prisma.userTenant.create({
       data: {
+        id: `ut_${tenantId}_${user.id}`,
         user: {
           connect: {
             id: user.id
@@ -124,6 +125,7 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
           }
         },
         role: parsed.data.role as UserTenantRole,
+        updatedAt: new Date(),
       },
       include: {
         user: {

@@ -98,7 +98,7 @@ router.post('/', async (req, res) => {
     }
 
     const request = await prisma.upgradeRequests.create({
-      data: parsed.data,
+      data: parsed.data as any,
     });
 
     // TODO: Send email notification to admin

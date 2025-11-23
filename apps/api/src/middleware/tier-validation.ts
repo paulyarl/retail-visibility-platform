@@ -213,7 +213,7 @@ export function requirePropagationTier(
       const effectiveTier = tenant.organization?.subscriptionTier || tenant.subscriptionTier || 'starter';
       
       // Check if user has 2+ locations
-      const locationCount = tenant.organization?._count.tenant || 1;
+      const locationCount = tenant.organization?._count.Tenant || 1;
       if (locationCount < 2) {
         return res.status(403).json({
           error: 'insufficient_locations',

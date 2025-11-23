@@ -75,7 +75,7 @@ async function createTestChain(): Promise<TestContext> {
       subscriptionStatus: 'active',
       maxLocations: 15,
       maxTotalSKUs: 25000,
-    },
+    } as any,
   });
   console.log(`✅ Organization created: ${organization.id}`);
 
@@ -91,7 +91,7 @@ async function createTestChain(): Promise<TestContext> {
         state: 'NY',
         isHeroLocation: true,
       },
-    },
+    } as any,
   });
   console.log(`✅ Hero location created: ${heroTenant.id}`);
 
@@ -108,7 +108,7 @@ async function createTestChain(): Promise<TestContext> {
           city: `City ${i}`,
           state: 'CA',
         },
-      },
+      } as any,
     });
     otherTenants.push(tenant);
     console.log(`✅ Location ${i} created: ${tenant.id}`);
@@ -144,7 +144,7 @@ async function createTestProducts(ctx: TestContext): Promise<void> {
         visibility: 'public',
         source: 'MANUAL',
         enrichmentStatus: 'COMPLETE',
-      },
+      } as any,
     });
     ctx.testItemIds.push(item.id);
     console.log(`✅ Product ${i} created: ${item.sku}`);
@@ -163,7 +163,6 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
   // Simulate the API call logic
   const sourceItem = await prisma.inventoryItem.findUnique({
     where: { id: sourceItemId },
-    include: { photos: true },
   });
   
   if (!sourceItem) {
@@ -198,7 +197,7 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
       manufacturer: sourceItem.manufacturer,
       source: sourceItem.source,
       enrichmentStatus: sourceItem.enrichmentStatus,
-    },
+    } as any,
   });
   
   console.log(`✅ Item propagated successfully: ${newItem.id}`);
@@ -231,7 +230,6 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
   // Get all items from hero location
   const heroItems = await prisma.inventoryItem.findMany({
     where: { tenantId: ctx.heroTenantId },
-    include: { photos: true },
   });
   
   console.log(`  Found ${heroItems.length} items at hero location`);
@@ -284,7 +282,7 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
             manufacturer: item.manufacturer,
             source: item.source,
             enrichmentStatus: item.enrichmentStatus,
-          },
+          } as any,
         });
         
         results.created++;

@@ -18,7 +18,7 @@ describe("Tenant global-readiness defaults (REQ-2025-901)", () => {
 
   it("should create tenant with default region, language, currency, and data_policy_accepted=false", async () => {
     const tenant = await prisma.tenant.create({
-      data: { name: "Test Tenant for Defaults" },
+      data: { name: "Test Tenant for Defaults" } as any,
     });
 
     createdTenantId = tenant.id;

@@ -117,7 +117,7 @@ export class CategoryDirectoryService {
           googleSyncEnabled: true,
           directoryVisible: true,
           locationStatus: 'active',
-          inventory_items: {
+          inventoryItems: {
             some: {
               tenantCategoryId: category.id,
               itemStatus: 'active',

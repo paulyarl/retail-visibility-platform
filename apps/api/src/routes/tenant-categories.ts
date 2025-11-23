@@ -236,7 +236,7 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
     // Get Google taxonomy info if mapped
     let googleCategory = null;
     if (category.googleCategoryId) {
-      googleCategory = await prisma.googleTaxonomy.findUnique({
+      googleCategory = await prisma.googleTaxonomy.findFirst({
         where: { categoryId: category.googleCategoryId },
       });
     }
@@ -254,7 +254,7 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
     const productCount = await prisma.inventoryItem.count({
       where: {
         tenantId,
-        category_path: {
+        categoryPath: {
           has: category.slug,
         },
       },
@@ -479,7 +479,7 @@ router.delete('/:tenantId/categories/:id', requireTenantManagement, async (req, 
     const productCount = await prisma.inventoryItem.count({
       where: {
         tenantId,
-        category_path: {
+        categoryPath: { 
           has: category.slug,
         },
       },
@@ -675,7 +675,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
       include: {
         organization: {
           include: {
-            tenant: {
+            Tenant: {
               where: {
                 id: { not: tenantId }, // Exclude the hero tenant itself
               },
@@ -728,7 +728,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
       });
     }
 
-    const locationTenants = tenant.organizationId!.tenants;
+    const locationTenants = tenant.organization?.Tenant || [];
     
     if (locationTenants.length === 0) {
       return res.status(400).json({
@@ -785,13 +785,15 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
             // Create mode - create new category
             await prisma.tenantCategory.create({
               data: {
+                id: `cat_${location.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 tenantId: location.id,
                 name: heroCategory.name,
                 slug: heroCategory.slug,
                 googleCategoryId: heroCategory.googleCategoryId,
                 sortOrder: heroCategory.sortOrder,
                 isActive: true,
-              },
+                updatedAt: new Date(),
+              } as any,
             });
             results.created++;
           }
@@ -845,7 +847,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
       include: {
         organization: {
           include: {
-            tenant: {
+            Tenant: {
               where: { id: { not: tenantId } },
               select: { id: true, name: true },
             },
@@ -879,7 +881,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
       return res.status(400).json({ success: false, error: 'No feature flags found for hero location' });
     }
 
-    const locationTenants = tenant.organizationId!.tenants;
+    const locationTenants = tenant.organization?.Tenant || [];
     if (locationTenants.length === 0) {
       return res.status(400).json({ success: false, error: 'No location tenants found in organization' });
     }
@@ -931,7 +933,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
                 enabled: heroFlag.enabled,
                 description: heroFlag.description,
                 rollout: heroFlag.rollout,
-              },
+              } as any,
             });
             results.created++;
           }
@@ -974,7 +976,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
       include: {
         organization: {
           include: {
-            tenant: {
+            Tenant: {
               where: {
                 id: { not: tenantId },
               },
@@ -1031,7 +1033,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
       });
     }
 
-    const locationTenants = tenant.organizationId!.tenants;
+    const locationTenants = tenant.organization?.Tenant || [];
 
     if (locationTenants.length === 0) {
       return res.status(400).json({
@@ -1058,7 +1060,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
             tenantId: location.id,
             timezone: heroBusinessHours.timezone,
             periods: heroBusinessHours.periods as any,
-          },
+          } as any,
           update: {
             timezone: heroBusinessHours.timezone,
             periods: heroBusinessHours.periods as any,
@@ -1096,7 +1098,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
                   open: specialHour.open,
                   close: specialHour.close,
                   note: specialHour.note,
-                },
+                } as any,
               });
               results.specialHoursCreated++;
             }
@@ -1166,7 +1168,7 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
 
     const heroUserRoles = await prisma.userTenant.findMany({
       where: { tenantId },
-      include: { users: { select: { email: true } } },
+      include: { user: { select: { email: true } } },
     });
 
     if (heroUserRoles.length === 0) {
@@ -1214,10 +1216,12 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
             }
             await prisma.userTenant.create({
               data: {
+                id: `ut_${location.id}_${heroRole.userId}`,
                 tenantId: location.id,
                 userId: heroRole.userId,
                 role: heroRole.role,
-              },
+                updatedAt: new Date(),
+              } as any,
             });
             results.created++;
           }
@@ -1252,7 +1256,7 @@ router.post('/:tenantId/brand-assets/propagate', requireTenantAdmin, requireProp
       include: {
         organization: {
           include: {
-            tenant: {
+            Tenant: {
               where: { id: { not: tenantId } },
               select: { id: true, name: true },
             },
@@ -1281,7 +1285,7 @@ router.post('/:tenantId/brand-assets/propagate', requireTenantAdmin, requireProp
       return res.status(400).json({ success: false, error: 'No brand assets found for hero location' });
     }
 
-    const locationTenants = tenant.organizationId!.tenants;
+    const locationTenants = tenant.organization?.Tenant || [];
     if (locationTenants.length === 0) {
       return res.status(400).json({ success: false, error: 'No location tenants found' });
     }
@@ -1387,7 +1391,7 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
             countryCode: tenant.tenantBusinessProfile.countryCode,
             website: tenant.tenantBusinessProfile.website,
             email: tenant.tenantBusinessProfile.email,
-          },
+          } as any,
           update: {
             businessName: tenant.tenantBusinessProfile.businessName,
             businessLine1: tenant.tenantBusinessProfile.businessLine1,

@@ -93,10 +93,10 @@ export async function syncLocationStatusToGoogle(
         googleBusinessAccessToken: true,
         googleBusinessRefreshToken: true,
         googleBusinessTokenExpiry: true,
-        google_oauth_accounts: {
+        googleOauthAccounts: { 
           include: {
             gbpLocations: true,
-            tokens: true,
+            googleOauthTokens: true,
           },
           take: 1, // Get first connected account
         },
@@ -111,7 +111,7 @@ export async function syncLocationStatusToGoogle(
     }
 
     // Check if tenant has Google Business Profile connected
-    const googleAccount = tenant.googleOAuthAccounts[0];
+    const googleAccount = tenant.googleOauthAccounts[0]; 
     const gbpLocation = googleAccount?.gbpLocations[0];
 
     if (!gbpLocation) {
@@ -134,7 +134,7 @@ export async function syncLocationStatusToGoogle(
     }
 
     // Get access token (prefer OAuth token, fallback to legacy)
-    const accessToken = googleAccount?.tokens?.accessTokenEncrypted || tenant.googleBusinessAccessToken;
+    const accessToken = googleAccount?.googleOauthTokens?.accessTokenEncrypted || tenant.googleBusinessAccessToken;
 
     if (!accessToken) {
       return {
@@ -145,7 +145,7 @@ export async function syncLocationStatusToGoogle(
 
     // Check if token is expired
     const now = new Date();
-    const tokenExpiry = googleAccount?.tokens?.expiresAt || tenant.googleBusinessTokenExpiry;
+    const tokenExpiry = googleAccount?.googleOauthTokens?.expiresAt || tenant.googleBusinessTokenExpiry;
     
     if (tokenExpiry && new Date(tokenExpiry) < now) {
       // Token expired - would need to refresh

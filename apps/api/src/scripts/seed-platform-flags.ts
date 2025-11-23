@@ -80,7 +80,7 @@ async function seedPlatformFlags() {
           rollout: flagData.rollout,
           allowTenantOverride: flagData.allowTenantOverride,
         },
-        create: flagData,
+        create: flagData as any,
       });
 
       const status = flag.enabled ? '✅' : '⏸️';

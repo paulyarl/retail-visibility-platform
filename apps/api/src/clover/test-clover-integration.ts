@@ -376,7 +376,7 @@ async function testPhase4Database() {
         accessToken: encryptToken('test-access-token'),
         refreshToken: encryptToken('test-refresh-token'),
         tokenExpiresAt: calculateTokenExpiration(3600),
-      },
+      } as any,
     });
     
     if (integration && integration.merchantId === 'test-merchant-123') {
@@ -384,7 +384,7 @@ async function testPhase4Database() {
       
       // Test 4.2: Retrieve Integration
       subsection('Test 4.2: Retrieve Integration');
-      const retrieved = await prisma.cloverIntegrations.findUnique({
+      const retrieved = await prisma.cloverIntegrations.findFirst({
         where: { tenantId: TEST_TENANT_ID },
       });
       

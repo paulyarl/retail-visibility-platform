@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { describe, it, expect } from 'vitest';
-import { app } from './index';
+import app from './index';
 
 // Health endpoint should always work without DB
 

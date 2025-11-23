@@ -82,8 +82,8 @@ router.get('/', authenticateToken, requirePlatformAdmin, async (req: Request, re
           select: {
             id: true,
             name: true,
-            subscription_tier: true,
-            subscription_status: true,
+            subscriptionTier: true, 
+            subscriptionStatus: true,
           }
         }
       },
@@ -126,8 +126,8 @@ router.get('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
           select: {
             id: true,
             name: true,
-            subscription_tier: true,
-            subscription_status: true,
+            subscriptionTier: true,
+            subscriptionStatus: true,
           }
         }
       },
@@ -214,12 +214,15 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
     // Create override
     const override = await prisma.tenantFeatureOverrides.create({
       data: {
+        id: `override_${body.tenantId}_${body.feature}_${Date.now()}`,
         tenantId: body.tenantId,
         feature: body.feature,
         granted: body.granted,
         reason: body.reason,
         expiresAt: body.expires_at ? new Date(body.expires_at) : null,
         grantedBy: userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
       include: {
         tenant: {
