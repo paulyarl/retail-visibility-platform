@@ -6,16 +6,20 @@ RUN corepack enable
 
 WORKDIR /app
 
-# Copy package files first for better layer caching
-COPY package.json pnpm-lock.yaml* ./
-COPY prisma ./prisma/
+# Copy root package files for workspace setup
+COPY package.json pnpm-lock.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/api/prisma ./apps/api/prisma/
 
-# Install dependencies with optimized settings
+# Install dependencies from root (monorepo setup)
 RUN corepack prepare pnpm@latest --activate && \
     pnpm install --no-frozen-lockfile --prefer-offline
 
-# Copy source code
-COPY . .
+# Copy API source code
+COPY apps/api ./apps/api/
+
+# Set working directory to API
+WORKDIR /app/apps/api
 
 # Build TypeScript
 RUN echo '🚀 Building with fresh Prisma Client generation...' && \
