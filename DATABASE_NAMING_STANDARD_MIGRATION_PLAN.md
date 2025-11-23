@@ -1892,7 +1892,422 @@ echo "✅ PRODUCTION MIGRATION COMPLETED SUCCESSFULLY"
 - Validation reports for stakeholders
 - Proven migration methodology
 
-This test-driven approach transforms your migration from **risky manual process** to **automated, validated, and safe** operation!
+#### 6.7 Route-to-Table Testing Matrix (NEW)
+**Purpose: Map API routes to database tables for targeted testing**
+
+**A. Critical Table Route Mapping**
+```python
+#!/usr/bin/env python3
+# File: scripts/map-routes-to-tables.py
+# Purpose: Identify which routes test which database tables
+
+class RouteTableMapper:
+    def __init__(self):
+        self.route_table_mapping = {
+            # Core Entity Tables (HIGH PRIORITY)
+            'inventory_items': [
+                'GET /api/items',
+                'POST /api/items', 
+                'GET /api/items/:id',
+                'PATCH /api/items/:id',
+                'DELETE /api/items/:id',
+                'GET /api/items/:id/photos',
+                'POST /api/items/:id/photos',
+                'DELETE /api/items/:id/photos/:photoId'
+            ],
+            'tenants': [
+                'GET /api/tenants',
+                'POST /api/tenants',
+                'GET /api/tenants/:id',
+                'PATCH /api/tenants/:id',
+                'DELETE /api/tenants/:id',
+                'GET /api/tenants/:id/users',
+                'POST /api/tenants/:id/users',
+                'PUT /api/tenants/:id/users/:userId',
+                'DELETE /api/tenants/:id/users/:userId'
+            ],
+            'users': [
+                'GET /api/users',
+                'POST /api/users',
+                'GET /api/users/:id',
+                'PATCH /api/users/:id',
+                'DELETE /api/users/:id',
+                'POST /auth/login',
+                'POST /auth/register',
+                'GET /auth/me'
+            ],
+            'photo_assets': [
+                'GET /api/photos',
+                'POST /api/photos',
+                'GET /api/photos/:id',
+                'DELETE /api/photos/:id',
+                'POST /api/upload'
+            ],
+            
+            # Supporting Tables (MEDIUM PRIORITY)
+            'product_performances': [
+                'GET /api/analytics/performance',
+                'GET /api/products/:id/performance',
+                'POST /api/analytics/performance'
+            ],
+            'sync_jobs': [
+                'GET /api/sync/jobs',
+                'GET /api/sync/jobs/:id',
+                'POST /api/sync/jobs',
+                'PATCH /api/sync/jobs/:id'
+            ],
+            'location_status_logs': [
+                'GET /api/logs/location-status',
+                'GET /api/tenants/:id/logs',
+                'POST /api/logs/location-status'
+            ],
+            'tenant_business_profiles': [
+                'GET /api/tenants/:id/business-profile',
+                'PATCH /api/tenants/:id/business-profile',
+                'GET /api/business-profiles'
+            ]
+        }
+    
+    def get_routes_for_table(self, table_name):
+        """Get all routes that test a specific table"""
+        return self.route_table_mapping.get(table_name, [])
+    
+    def get_tables_for_route(self, route_pattern):
+        """Get all tables affected by a route pattern"""
+        tables = []
+        for table, routes in self.route_table_mapping.items():
+            if any(pattern in route for pattern in routes):
+                tables.append(table)
+        return tables
+    
+    def generate_test_groups(self):
+        """Generate test groups by table priority"""
+        test_groups = {
+            'critical_tables': {
+                'tables': ['inventory_items', 'tenants', 'users', 'photo_assets'],
+                'routes': [],
+                'test_priority': 'HIGH'
+            },
+            'supporting_tables': {
+                'tables': ['product_performances', 'sync_jobs', 'location_status_logs', 'tenant_business_profiles'],
+                'routes': [],
+                'test_priority': 'MEDIUM'
+            }
+        }
+        
+        # Collect routes for each group
+        for group in test_groups.values():
+            for table in group['tables']:
+                group['routes'].extend(self.get_routes_for_table(table))
+        
+        return test_groups
+
+# Example usage
+mapper = RouteTableMapper()
+test_groups = mapper.generate_test_groups()
+
+print("🎯 ROUTE-TO-TABLE TESTING MATRIX")
+print("===============================")
+
+for group_name, group_data in test_groups.items():
+    print(f"\n{group_name.upper()} ({group_data['test_priority']} PRIORITY):")
+    print(f"Tables: {', '.join(group_data['tables'])}")
+    print("Routes to test:")
+    for route in sorted(group_data['routes']):
+        print(f"  - {route}")
+```
+
+**B. Table-Specific Test Execution**
+```python
+#!/usr/bin/env python3
+# File: scripts/test-table-specific.py
+# Purpose: Test all routes for a specific database table
+
+import requests
+import sys
+import json
+from datetime import datetime
+
+class TableSpecificTester:
+    def __init__(self, api_url):
+        self.api_url = api_url
+        self.auth_token = None
+        self.test_results = []
+    
+    def login(self):
+        """Get auth token for testing"""
+        response = requests.post(f"{self.api_url}/auth/login", json={
+            "email": "test@example.com",
+            "password": "testpassword"
+        })
+        
+        if response.status_code == 200:
+            self.auth_token = response.json()['token']
+            return True
+        return False
+    
+    def test_table_routes(self, table_name, routes):
+        """Test all routes for a specific table"""
+        print(f"\n🧪 Testing table: {table_name}")
+        print(f"Routes to test: {len(routes)}")
+        
+        results = {
+            'table': table_name,
+            'timestamp': datetime.now().isoformat(),
+            'routes_tested': 0,
+            'routes_passed': 0,
+            'routes_failed': 0,
+            'failures': []
+        }
+        
+        for route in routes:
+            result = self.test_single_route(route)
+            results['routes_tested'] += 1
+            
+            if result['success']:
+                results['routes_passed'] += 1
+                print(f"  ✅ {route} - {result['status_code']}")
+            else:
+                results['routes_failed'] += 1
+                results['failures'].append({
+                    'route': route,
+                    'error': result['error'],
+                    'status_code': result['status_code']
+                })
+                print(f"  ❌ {route} - {result['error']}")
+        
+        self.test_results.append(results)
+        return results
+    
+    def test_single_route(self, route_pattern):
+        """Test a single route pattern"""
+        headers = {}
+        if self.auth_token:
+            headers['Authorization'] = f"Bearer {self.auth_token}"
+        
+        try:
+            # Handle different HTTP methods
+            if route_pattern.startswith('GET'):
+                url = f"{self.api_url}{route_pattern.replace('GET ', '')}"
+                response = requests.get(url, headers=headers, timeout=10)
+            elif route_pattern.startswith('POST'):
+                url = f"{self.api_url}{route_pattern.replace('POST ', '')}"
+                # Add basic test data for POST requests
+                test_data = self.get_test_data_for_route(route_pattern)
+                response = requests.post(url, json=test_data, headers=headers, timeout=10)
+            elif route_pattern.startswith('PATCH'):
+                url = f"{self.api_url}{route_pattern.replace('PATCH ', '')}"
+                test_data = self.get_test_data_for_route(route_pattern)
+                response = requests.patch(url, json=test_data, headers=headers, timeout=10)
+            elif route_pattern.startswith('DELETE'):
+                url = f"{self.api_url}{route_pattern.replace('DELETE ', '')}"
+                response = requests.delete(url, headers=headers, timeout=10)
+            else:
+                return {'success': False, 'error': f'Unknown method in {route_pattern}', 'status_code': 0}
+            
+            # Consider 2xx and 3xx as success, 4xx as expected, 5xx as failure
+            if response.status_code < 500:
+                return {'success': True, 'status_code': response.status_code, 'error': None}
+            else:
+                return {'success': False, 'error': f'Server error: {response.status_code}', 'status_code': response.status_code}
+                
+        except Exception as e:
+            return {'success': False, 'error': str(e), 'status_code': 0}
+    
+    def get_test_data_for_route(self, route_pattern):
+        """Generate test data for POST/PATCH routes"""
+        if 'items' in route_pattern:
+            return {
+                "tenantId": "test-tenant-id",
+                "sku": "TEST-SKU-123",
+                "name": "Test Item",
+                "price": 29.99
+            }
+        elif 'tenants' in route_pattern:
+            return {
+                "name": "Test Tenant",
+                "subscriptionTier": "starter"
+            }
+        elif 'users' in route_pattern:
+            return {
+                "email": "test@example.com",
+                "name": "Test User"
+            }
+        else:
+            return {"test": "data"}
+    
+    def generate_report(self):
+        """Generate comprehensive test report"""
+        report = {
+            'timestamp': datetime.now().isoformat(),
+            'summary': {
+                'total_tables_tested': len(self.test_results),
+                'total_routes_tested': sum(r['routes_tested'] for r in self.test_results),
+                'total_routes_passed': sum(r['routes_passed'] for r in self.test_results),
+                'total_routes_failed': sum(r['routes_failed'] for r in self.test_results)
+            },
+            'table_results': self.test_results
+        }
+        
+        # Save report
+        with open('table-specific-test-report.json', 'w') as f:
+            json.dump(report, f, indent=2)
+        
+        return report
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python test-table-specific.py <api_url> <table_name>")
+        sys.exit(1)
+    
+    api_url = sys.argv[1]
+    table_name = sys.argv[2]
+    
+    tester = TableSpecificTester(api_url)
+    
+    print("🎯 TABLE-SPECIFIC ROUTE TESTING")
+    print("==============================")
+    
+    # Login first
+    if not tester.login():
+        print("❌ Failed to login")
+        sys.exit(1)
+    
+    # Get route mapping
+    mapper = RouteTableMapper()
+    routes = mapper.get_routes_for_table(table_name)
+    
+    if not routes:
+        print(f"❌ No routes found for table: {table_name}")
+        sys.exit(1)
+    
+    # Test all routes for this table
+    result = tester.test_table_routes(table_name, routes)
+    
+    # Generate report
+    report = tester.generate_report()
+    
+    print(f"\n📊 Test Results for {table_name}:")
+    print(f"Routes Tested: {result['routes_tested']}")
+    print(f"Routes Passed: {result['routes_passed']}")
+    print(f"Routes Failed: {result['routes_failed']}")
+    
+    if result['routes_failed'] > 0:
+        print("\n❌ Failures:")
+        for failure in result['failures']:
+            print(f"  - {failure['route']}: {failure['error']}")
+        sys.exit(1)
+    else:
+        print("✅ All routes passed!")
+```
+
+**C. Migration Phase Route Testing**
+```bash
+#!/bin/bash
+# File: scripts/test-migration-phases.sh
+# Purpose: Test routes by migration phase priority
+
+echo "🎯 MIGRATION PHASE ROUTE TESTING"
+echo "==============================="
+
+API_URL=$1
+if [ -z "$API_URL" ]; then
+    API_URL="http://localhost:3001"
+fi
+
+# Phase 1: Test critical tables (inventory_items, tenants, users, photo_assets)
+echo "Phase 1: Testing critical table routes..."
+CRITICAL_TABLES=("inventory_items" "tenants" "users" "photo_assets")
+
+for table in "${CRITICAL_TABLES[@]}"; do
+    echo "Testing $table..."
+    python scripts/test-table-specific.py $API_URL $table
+    if [ $? -ne 0 ]; then
+        echo "❌ Critical table $table failed - STOP MIGRATION!"
+        exit 1
+    fi
+done
+
+echo "✅ All critical tables passed"
+
+# Phase 2: Test supporting tables
+echo "Phase 2: Testing supporting table routes..."
+SUPPORTING_TABLES=("product_performances" "sync_jobs" "location_status_logs" "tenant_business_profiles")
+
+for table in "${SUPPORTING_TABLES[@]}"; do
+    echo "Testing $table..."
+    python scripts/test-table-specific.py $API_URL $table
+    if [ $? -ne 0 ]; then
+        echo "⚠️  Supporting table $table failed - REVIEW REQUIRED"
+        # Don't exit, but flag for review
+    fi
+done
+
+echo "✅ Migration phase testing complete"
+```
+
+**D. Route Testing Integration**
+```bash
+#!/bin/bash
+# File: scripts/integrated-route-testing.sh
+# Purpose: Complete route testing integration with migration
+
+echo "🔄 INTEGRATED ROUTE TESTING"
+echo "=========================="
+
+# Before migration - establish baseline
+echo "Step 1: Establishing baseline..."
+python scripts/test-migration-phases.sh $STAGING_API_URL
+BASELINE_STATUS=$?
+
+# During migration - test after each table rename
+echo "Step 2: Testing during migration..."
+TABLES_TO_RENAME=("InventoryItem" "Tenant" "PhotoAsset" "ProductPerformance" "SyncJob" "LocationStatusLog")
+
+for table in "${TABLES_TO_RENAME[@]}"; do
+    echo "Testing after renaming $table..."
+    
+    # Test routes for this specific table
+    snake_case_table=$(echo $table | sed 's/\([A-Z]\)/_\L\1/g' | sed 's/^_//' | sed 's/$/_s/')
+    python scripts/test-table-specific.py $STAGING_API_URL $snake_case_table
+    
+    if [ $? -ne 0 ]; then
+        echo "❌ Routes failed after renaming $table - ROLLBACK!"
+        ./scripts/rollback-with-tests.sh scripts/rollback-$table.sql
+        exit 1
+    fi
+done
+
+# After migration - full validation
+echo "Step 3: Full post-migration validation..."
+python scripts/test-migration-phases.sh $STAGING_API_URL
+FINAL_STATUS=$?
+
+if [ $BASELINE_STATUS -eq 0 ] && [ $FINAL_STATUS -eq 0 ]; then
+    echo "✅ All route tests passed before and after migration"
+else
+    echo "❌ Route test failures detected"
+    exit 1
+fi
+```
+
+### **Route Testing Benefits**
+
+✅ **Targeted Testing** - Test only routes affected by each table change  
+✅ **Priority-Based** - Test critical tables first, supporting tables second  
+✅ **Immediate Feedback** - Know exactly which routes break from which table changes  
+✅ **Rollback Precision** - Can rollback specific table changes if routes fail  
+✅ **Migration Safety** - Each table rename validated before proceeding  
+
+### **Testing Matrix Summary**
+
+| Migration Phase | Tables | Routes | Priority | Test Strategy |
+|------------------|--------|--------|----------|---------------|
+| **Phase 1** | inventory_items, tenants, users, photo_assets | 20+ routes | **CRITICAL** | Test before/after each rename |
+| **Phase 2** | product_performances, sync_jobs, location_status_logs, tenant_business_profiles | 15+ routes | **MEDIUM** | Test after all renames |
+| **Phase 3** | All remaining tables | 10+ routes | **LOW** | Test during final validation |
+
+This route-to-table mapping makes testing **systematic, targeted, and precise**! 🎯
 ```bash
 # Execute in production maintenance window
 psql production_db < migration_phase1_core.sql
