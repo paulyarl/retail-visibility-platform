@@ -32,19 +32,23 @@ async function upsertInBatches(items: any[], batchSize = 200) {
           prisma.googleTaxonomy.upsert({
             where: { categoryId: it.categoryId },
             create: {
+              id: it.categoryId, // Use categoryId as the id
               categoryId: it.categoryId,
               categoryPath: it.categoryPath,
               parentId: it.parentId,
               level: it.level,
               isActive: true,
               version: '2024-09',
-            } as any,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
             update: {
               categoryPath: it.categoryPath,
               parentId: it.parentId,
               level: it.level,
               isActive: true,
               version: '2024-09',
+              updatedAt: new Date(),
             },
           })
         )
@@ -93,7 +97,7 @@ export class TaxonomySyncService {
         latestVersion: latestTaxonomy.version,
         changes
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('[TaxonomySyncService] checkForUpdates: Failed to check for taxonomy updates:', error);
       console.error('[TaxonomySyncService] checkForUpdates: Error details:', {
         message: error?.message,
@@ -134,7 +138,7 @@ export class TaxonomySyncService {
         skipped: 0,
         needsReview: 0
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('[TaxonomySyncService] applySafeUpdates: Error populating taxonomy:', error);
       console.error('[TaxonomySyncService] applySafeUpdates: Error details:', {
         message: error?.message,
@@ -273,7 +277,7 @@ export class TaxonomySyncService {
       });
       console.log(`[TaxonomySyncService] getCurrentTaxonomy: Found ${current.length} existing taxonomy records`);
       return current;
-    } catch (error) {
+    } catch (error: any) {
       console.error('[TaxonomySyncService] getCurrentTaxonomy: Error querying database:', error);
       console.error('[TaxonomySyncService] getCurrentTaxonomy: Error details:', {
         message: error?.message,
