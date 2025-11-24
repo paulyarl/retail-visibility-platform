@@ -22,9 +22,15 @@ function collectNodes(nodes: any[]): any[] {
 async function upsertInBatches(items: any[], batchSize = 200) {
   console.log(`[TaxonomySyncService] Processing ${items.length} items in batches of ${batchSize}`);
   
+  const totalBatches = Math.ceil(items.length/batchSize);
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
-    console.log(`[TaxonomySyncService] Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(items.length/batchSize)} with ${batch.length} items`);
+    const batchNum = Math.floor(i/batchSize) + 1;
+    
+    // Only log every 5th batch to reduce log volume
+    if (batchNum % 5 === 1 || batchNum === totalBatches) {
+      console.log(`[TaxonomySyncService] Processing batch ${batchNum}/${totalBatches} with ${batch.length} items`);
+    }
     
     try {
       // Process items individually to avoid transaction issues
@@ -52,9 +58,13 @@ async function upsertInBatches(items: any[], batchSize = 200) {
           },
         });
       }
-      console.log(`[TaxonomySyncService] Batch ${Math.floor(i/batchSize) + 1} completed successfully`);
+      
+      // Only log completion for every 5th batch or final batch
+      if (batchNum % 5 === 0 || batchNum === totalBatches) {
+        console.log(`[TaxonomySyncService] Batch ${batchNum}/${totalBatches} completed`);
+      }
     } catch (error) {
-      console.error(`[TaxonomySyncService] Batch ${Math.floor(i/batchSize) + 1} failed:`, error);
+      console.error(`[TaxonomySyncService] Batch ${batchNum} failed:`, error);
       throw error;
     }
   }
