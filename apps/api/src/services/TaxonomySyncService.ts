@@ -1,4 +1,63 @@
 import { GoogleTaxonomyService } from './GoogleTaxonomyService';
+import { prisma } from '../prisma';
+import { GOOGLE_PRODUCT_TAXONOMY } from '../lib/google/taxonomy';
+
+function collectNodes(nodes: any[]): any[] {
+  const out: any[] = [];
+  for (const node of nodes) {
+    const { id, name, children } = node;
+    const parentId = node.path?.length > 1 ? node.path[node.path.length - 2] : null;
+    const level = node.path?.length || 1;
+    out.push({
+      categoryId: id,
+      categoryPath: node.path.join(' > '),
+      parentId,
+      level,
+    });
+    // Taxonomy is flat - no children property
+  }
+  return out;
+}
+
+async function upsertInBatches(items: any[], batchSize = 200) {
+  console.log(`[TaxonomySyncService] Processing ${items.length} items in batches of ${batchSize}`);
+  
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    console.log(`[TaxonomySyncService] Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(items.length/batchSize)} with ${batch.length} items`);
+    
+    try {
+      await prisma.$transaction(
+        batch.map((it) =>
+          prisma.googleTaxonomy.upsert({
+            where: { categoryId: it.categoryId },
+            create: {
+              categoryId: it.categoryId,
+              categoryPath: it.categoryPath,
+              parentId: it.parentId,
+              level: it.level,
+              isActive: true,
+              version: '2024-09',
+            } as any,
+            update: {
+              categoryPath: it.categoryPath,
+              parentId: it.parentId,
+              level: it.level,
+              isActive: true,
+              version: '2024-09',
+            },
+          })
+        )
+      );
+      console.log(`[TaxonomySyncService] Batch ${Math.floor(i/batchSize) + 1} completed successfully`);
+    } catch (error) {
+      console.error(`[TaxonomySyncService] Batch ${Math.floor(i/batchSize) + 1} failed:`, error);
+      throw error;
+    }
+  }
+  
+  console.log('[TaxonomySyncService] All batches completed');
+}
 
 export class TaxonomySyncService {
   private googleService: GoogleTaxonomyService;
@@ -40,19 +99,27 @@ export class TaxonomySyncService {
     skipped: number;
     needsReview: number;
   }> {
-    const result = { applied: 0, skipped: 0, needsReview: 0 };
-
-    for (const change of changes) {
-      if (this.isSafeChange(change)) {
-        await this.applyChange(change);
-        result.applied++;
-      } else {
-        await this.queueForReview(change);
-        result.needsReview++;
-      }
+    console.log('[TaxonomySyncService] applySafeUpdates called - populating google_taxonomy_list table');
+    
+    // Instead of processing changes, just populate the table with all taxonomy data
+    const flat = collectNodes(GOOGLE_PRODUCT_TAXONOMY);
+    console.log(`[TaxonomySyncService] Processing ${flat.length} categories from GOOGLE_PRODUCT_TAXONOMY`);
+    
+    try {
+      await upsertInBatches(flat, 200);
+      
+      const total = await prisma.googleTaxonomy.count();
+      console.log(`[TaxonomySyncService] Total records after sync: ${total}`);
+      
+      return {
+        applied: flat.length,
+        skipped: 0,
+        needsReview: 0
+      };
+    } catch (error) {
+      console.error('[TaxonomySyncService] Error populating taxonomy:', error);
+      throw error;
     }
-
-    return result;
   }
 
   /**
@@ -169,7 +236,17 @@ export class TaxonomySyncService {
 
   private async getCurrentTaxonomy(): Promise<any[]> {
     // Fetch current taxonomy from database
-    return [];
+    const current = await prisma.googleTaxonomy.findMany({
+      select: {
+        categoryId: true,
+        categoryPath: true,
+        parentId: true,
+        level: true,
+        version: true
+      }
+    });
+    console.log(`[TaxonomySyncService] Found ${current.length} existing taxonomy records`);
+    return current;
   }
 
   private async findItemsWithCategories(categoryIds: string[]): Promise<any[]> {
