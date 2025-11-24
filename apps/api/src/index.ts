@@ -73,7 +73,7 @@ import {
 // import feedJobsRoutes from './routes/feed-jobs';
 // import feedbackRoutes from './routes/feedback';
 // import tenantCategoriesRoutes from './routes/tenant-categories';
-// import taxonomyAdminRoutes from './routes/taxonomy-admin';
+   import taxonomyAdminRoutes from './routes/taxonomy-admin';
 // import feedValidationRoutes from './routes/feed-validation';
 // import businessProfileValidationRoutes from './routes/business-profile-validation';
 

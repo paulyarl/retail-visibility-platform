@@ -27,32 +27,31 @@ async function upsertInBatches(items: any[], batchSize = 200) {
     console.log(`[TaxonomySyncService] Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(items.length/batchSize)} with ${batch.length} items`);
     
     try {
-      await prisma.$transaction(
-        batch.map((it) =>
-          prisma.googleTaxonomy.upsert({
-            where: { categoryId: it.categoryId },
-            create: {
-              id: it.categoryId, // Use categoryId as the id
-              categoryId: it.categoryId,
-              categoryPath: it.categoryPath,
-              parentId: it.parentId,
-              level: it.level,
-              isActive: true,
-              version: '2024-09',
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            update: {
-              categoryPath: it.categoryPath,
-              parentId: it.parentId,
-              level: it.level,
-              isActive: true,
-              version: '2024-09',
-              updatedAt: new Date(),
-            },
-          })
-        )
-      );
+      // Process items individually to avoid transaction issues
+      for (const item of batch) {
+        await prisma.googleTaxonomy.upsert({
+          where: { categoryId: item.categoryId },
+          create: {
+            id: item.categoryId, // Use categoryId as the id
+            categoryId: item.categoryId,
+            categoryPath: item.categoryPath,
+            parentId: item.parentId,
+            level: item.level,
+            isActive: true,
+            version: '2024-09',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          update: {
+            categoryPath: item.categoryPath,
+            parentId: item.parentId,
+            level: item.level,
+            isActive: true,
+            version: '2024-09',
+            updatedAt: new Date(),
+          },
+        });
+      }
       console.log(`[TaxonomySyncService] Batch ${Math.floor(i/batchSize) + 1} completed successfully`);
     } catch (error) {
       console.error(`[TaxonomySyncService] Batch ${Math.floor(i/batchSize) + 1} failed:`, error);
