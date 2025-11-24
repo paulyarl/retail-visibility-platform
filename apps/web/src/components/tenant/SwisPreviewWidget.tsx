@@ -15,7 +15,7 @@ export interface SwisPreviewItem {
   image_url?: string;
   availability: 'in_stock' | 'out_of_stock' | 'preorder';
   updated_at: string;
-  category_path?: string[];
+  categoryPath?: string[];
   badges?: Array<'new' | 'sale' | 'low_stock'>;
 }
 

@@ -108,8 +108,8 @@ export function generateProductSchema(
   }
 
   // Add category if available
-  if (product.category_path && product.category_path.length > 0) {
-    schema.category = product.category_path.join(' > ');
+  if (product.categoryPath && product.categoryPath.length > 0) {
+    schema.category = product.categoryPath.join(' > ');
   }
 
   return schema;

@@ -15,9 +15,9 @@ function normalizeSku(v: unknown) {
   return typeof v === 'string' ? v.trim() : null
 }
 
-async function getGoogleCategoryIdForItem(tenantId: string, category_path: string[] | null) {
-  if (!Array.isArray(category_path) || category_path.length === 0) return null
-  const slug = category_path[category_path.length - 1]
+async function getGoogleCategoryIdForItem(tenantId: string, categoryPath: string[] | null) {
+  if (!Array.isArray(categoryPath) || categoryPath.length === 0) return null
+  const slug = categoryPath[categoryPath.length - 1]
   const tenantCat = await prisma.tenantCategory.findFirst({ where: { tenantId, slug, isActive: true } })
   return tenantCat?.googleCategoryId || null
 }
@@ -147,7 +147,7 @@ router.get('/:tenantId/categories/coverage', async (req, res) => {
     // Total active, public items for tenant
     const total = await prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'active', visibility: 'public' } })
 
-    // Mapped _count: join inventory_item to tenant_category by leaf slug of category_path
+    // Mapped _count: join inventory_item to tenant_category by leaf slug of categoryPath
     const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `SELECT COUNT(*) AS count
        FROM inventory_item ii

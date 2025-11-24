@@ -5,13 +5,13 @@ import { GOOGLE_PRODUCT_TAXONOMY, CategoryNode } from '../lib/google/taxonomy';
 const router = Router();
 
 function collectNodes(nodes: CategoryNode[], opts?: { parentId?: string; level?: number }) {
-  const out: Array<{ categoryId: string; category_path: string; parentId: string | null; level: number }>= [];
+  const out: Array<{ categoryId: string; categoryPath: string; parentId: string | null; level: number }>= [];
   const level = (opts?.level ?? 0);
   for (const node of nodes) {
     const parentId = opts?.parentId ?? null;
     out.push({
       categoryId: node.id,
-      category_path: node.path.join(' > '),
+      categoryPath: node.path.join(' > '),
       parentId,
       level,
     });

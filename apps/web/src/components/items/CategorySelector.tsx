@@ -50,13 +50,20 @@ export default function CategorySelector({
         // Show top-level categories
         setFilteredCategories(categories);
       } else {
-        // Show children of current path
-        const currentPathStr = browsePath.join(' > ');
-        const children = categories.filter(cat => 
-          cat.fullPath.startsWith(currentPathStr + ' > ') && 
-          cat.path.length === browsePath.length + 1
-        );
-        setFilteredCategories(children);
+        // Navigate through the hierarchy to find children at current path
+        let currentLevel = categories;
+        for (let i = 0; i < browsePath.length; i++) {
+          const segment = browsePath[i];
+          const parent = currentLevel.find(cat => cat.name === segment);
+          if (parent && parent.children) {
+            currentLevel = parent.children;
+          } else {
+            // Path not found, reset to top level
+            currentLevel = [];
+            break;
+          }
+        }
+        setFilteredCategories(currentLevel);
       }
     }
   }, [searchQuery, categories, searchMode, browsePath]);
@@ -117,17 +124,21 @@ export default function CategorySelector({
     }
   };
 
-  const handleCategoryClick = (category: CategoryOption) => {
+  const handleCategoryClick = (category: CategoryOption, event?: React.MouseEvent) => {
     if (searchMode) {
       // In search mode, directly select the category
       setSelectedCategory(category.path);
     } else {
-      // In browse mode, navigate deeper or select if it's a leaf node
-      if (category.children && category.children.length > 0) {
-        // Navigate to children
-        setBrowsePath(category.path);
+      // In browse mode, check if this is a selection or navigation
+      const isAlreadySelected = JSON.stringify(selectedCategory) === JSON.stringify(category.path);
+      
+      if (isAlreadySelected) {
+        // If already selected, clicking again navigates into children (if any)
+        if (category.children && category.children.length > 0) {
+          setBrowsePath(category.path);
+        }
       } else {
-        // Select this category
+        // First click selects the category
         setSelectedCategory(category.path);
       }
     }
@@ -148,9 +159,9 @@ export default function CategorySelector({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col h-full">
       {/* Search Toggle */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 mb-4">
         <Button
           type="button"
           variant={!searchMode ? "primary" : "secondary"}
@@ -171,7 +182,7 @@ export default function CategorySelector({
 
       {/* Browse Path Breadcrumb */}
       {!searchMode && browsePath.length > 0 && (
-        <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+        <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-4">
           <button
             type="button"
             onClick={() => setBrowsePath([])}
@@ -204,12 +215,12 @@ export default function CategorySelector({
           placeholder="Search categories (e.g., 'electronics', 'clothing')"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full"
+          className="w-full mb-4"
         />
       )}
 
       {/* Selected Category Display */}
-      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg mb-4">
         <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
           Selected Category
         </p>
@@ -227,8 +238,8 @@ export default function CategorySelector({
         </p>
       </div>
 
-      {/* Category List */}
-      <div className="max-h-64 overflow-y-auto border border-neutral-200 dark:border-neutral-700 rounded-lg">
+      {/* Category List - Flex grow to fill available space */}
+      <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-700 rounded-lg mb-4 min-h-0">
         {loading ? (
           <div className="p-4 text-center text-neutral-500">
             <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mb-2" />
@@ -236,37 +247,55 @@ export default function CategorySelector({
           </div>
         ) : filteredCategories.length > 0 ? (
           <div className="divide-y divide-neutral-200 dark:divide-neutral-700">
-            {filteredCategories.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                onClick={() => handleCategoryClick(category)}
-                className={`w-full p-3 text-left hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors ${
-                  JSON.stringify(selectedCategory) === JSON.stringify(category.path)
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
-                    : ''
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-neutral-900 dark:text-white">
-                      {category.name}
-                    </p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                      {category.fullPath}
-                    </p>
-                  </div>
-                  {category.children && category.children.length > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-neutral-400 ml-2">
-                      <span>+{category.children.length} subcategories</span>
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            {filteredCategories.map((category) => {
+              const isSelected = JSON.stringify(selectedCategory) === JSON.stringify(category.path);
+              const hasChildren = category.children && category.children.length > 0;
+              
+              return (
+                <div
+                  key={category.id}
+                  className={`flex items-stretch ${
+                    isSelected
+                      ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
+                      : ''
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleCategoryClick(category)}
+                    className="flex-1 p-3 text-left hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-neutral-900 dark:text-white">
+                          {category.name}
+                        </p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                          {category.fullPath}
+                        </p>
+                      </div>
+                      {hasChildren && (
+                        <div className="flex items-center gap-1 text-xs text-neutral-400 ml-2">
+                          <span>+{category.children?.length || 0} subcategories</span>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                  {hasChildren && (
+                    <button
+                      type="button"
+                      onClick={() => setBrowsePath(category.path)}
+                      className="px-3 border-l border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors flex items-center"
+                      title="Browse subcategories"
+                    >
+                      <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
-                    </div>
+                    </button>
                   )}
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="p-4 text-center text-neutral-500">
@@ -280,8 +309,8 @@ export default function CategorySelector({
         )}
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex gap-2 pt-2 border-t border-neutral-200 dark:border-neutral-700">
+      {/* Action Buttons - Sticky at bottom */}
+      <div className="flex gap-2 pt-4 border-t border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 sticky bottom-0">
         <Button
           type="button"
           variant="secondary"
@@ -300,6 +329,7 @@ export default function CategorySelector({
         <Button
           type="button"
           onClick={handleConfirmSelection}
+          disabled={selectedCategory.length === 0}
         >
           Confirm Selection
         </Button>

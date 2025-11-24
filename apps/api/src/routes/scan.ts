@@ -361,7 +361,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
         console.log(`[commit] Processing ${result.barcode}:`, {
           hasCategoryPath: !!enrichment.categoryPath,
           categoryPathLength: enrichment.categoryPath?.length,
-          category_path: enrichment.categoryPath,
+          categoryPath: enrichment.categoryPath,
           templateDefault: session.template?.defaultCategory 
         });
         const stock = enrichment.stock || 0;
@@ -387,7 +387,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
             updatedAt: new Date(),
           },
         });
-        console.log(`[commit] Created item ${item.id} with category_path:`, item.categoryPath);
+        console.log(`[commit] Created item ${item.id} with categoryPath:`, item.categoryPath);
         committed.push(item.id);
 
         // Process product images if available

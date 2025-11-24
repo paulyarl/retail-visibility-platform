@@ -256,13 +256,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetchUser();
   }, [fetchUser]);
 
-  // Setup token refresh interval (refresh 1 minute before expiry)
+  // Setup token refresh interval
+  // Backend tokens expire in 365 days, so refresh every 24 hours to keep session fresh
   useEffect(() => {
     if (!user) return;
 
     const interval = setInterval(() => {
       refreshToken();
-    }, 14 * 60 * 1000); // Refresh every 14 minutes (tokens expire in 15 minutes)
+    }, 24 * 60 * 60 * 1000); // Refresh every 24 hours (tokens expire in 365 days)
 
     return () => clearInterval(interval);
   }, [user, refreshToken]);

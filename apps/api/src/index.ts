@@ -115,7 +115,7 @@ import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 // import directoryStoreTypesRoutes from './routes/directory-store-types';
 // import scanRoutes from './routes/scan';
 // import scanMetricsRoutes from './routes/scan-metrics';
-// import quickStartRoutes from './routes/quick-start';
+import quickStartRoutes from './routes/quick-start';
 // import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
 // import featureOverridesRoutes from './routes/admin/feature-overrides';
@@ -2142,7 +2142,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
       const { priceCents, ...itemWithoutPriceCents } = item;
       return {
         ...itemWithoutPriceCents,
-        price: item.price ? Number(item.price) : undefined,
+        price: item.price !== null && item.price !== undefined ? Number(item.price) : null,
       };
     });
 
@@ -2184,7 +2184,7 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   const { priceCents, ...itemWithoutPriceCents } = it;
   const transformed = {
     ...itemWithoutPriceCents,
-    price: it.price ? Number(it.price) : undefined,
+    price: it.price !== null && it.price !== undefined ? Number(it.price) : null,
   };
 
   res.json(transformed);
@@ -2194,8 +2194,8 @@ const baseItemSchema = z.object({
   tenantId: z.string().min(1).optional(),
   sku: z.string().min(1),
   name: z.string().min(1),
-  priceCents: z.number().int().nonnegative().default(0),
-  stock: z.number().int().nonnegative().default(0),
+  priceCents: z.number().int().nonnegative(),
+  stock: z.number().int().nonnegative(),
   imageUrl: z.string().url().nullable().optional(),
   metadata: z.any().optional(),
   description: z.string().optional(),
@@ -2210,10 +2210,14 @@ const baseItemSchema = z.object({
   itemStatus: z.enum(['active', 'inactive', 'archived']).optional(),
   visibility: z.enum(['public', 'private']).optional(),
   // Category path for Google Shopping
-  category_path: z.array(z.string()).optional(),
+  categoryPath: z.array(z.string()).optional(),
 });
 
-const createItemSchema = baseItemSchema.transform((data) => {
+const createItemSchema = baseItemSchema.extend({
+  // Apply defaults only for creation
+  priceCents: z.number().int().nonnegative().default(0),
+  stock: z.number().int().nonnegative().default(0),
+}).transform((data) => {
   const { tenantId,  ...rest } = data;
   return {
     ...rest,
@@ -2248,11 +2252,11 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
       tenantId: parsed.data.tenantId || '', // Ensure tenantId is always a string
       // Handle both categoryPath and category_path (from transform middleware)
-      categoryPath: parsed.data.category_path || parsed.data.category_path || [],
+      categoryPath: parsed.data.categoryPath || parsed.data.categoryPath || [],
     };
     
     // Remove any conflicting fields that might be added by the middleware
-    const { category_path, ...cleanData } = data;
+    const { categoryPath, ...cleanData } = data;
     const created = await prisma.inventoryItem.create({ 
       data: {
         id: crypto.randomUUID(),
@@ -2266,7 +2270,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
     const { priceCents, ...itemWithoutPriceCents } = created;
     const transformed = {
       ...itemWithoutPriceCents,
-      price: created.price ? Number(created.price) : undefined,
+      price: created.price !== null && created.price !== undefined ? Number(created.price) : null,
     };
     
     res.status(201).json(transformed);
@@ -2307,7 +2311,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     const { priceCents, ...itemWithoutPriceCents } = updated;
     const transformed = {
       ...itemWithoutPriceCents,
-      price: updated.price ? Number(updated.price) : undefined,
+      price: updated.price !== null && updated.price !== undefined ? Number(updated.price) : null,
     };
     
     res.json(transformed);
@@ -2442,7 +2446,7 @@ app.patch("/api/v1/tenants/:tenantId/items/:itemId/category", authenticateToken,
     const { priceCents, ...itemWithoutPriceCents } = updated;
     const transformed = {
       ...itemWithoutPriceCents,
-      price: updated.price ? Number(updated.price) : undefined,
+      price: updated.price !== null && updated.price !== undefined ? Number(updated.price) : null,
     };
 
     res.json(transformed);
@@ -2471,7 +2475,7 @@ app.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, res) 
     const { priceCents, ...itemWithoutPriceCents } = updated;
     const transformed = {
       ...itemWithoutPriceCents,
-      price: updated.price ? Number(updated.price) : undefined,
+      price: updated.price !== null && updated.price !== undefined ? Number(updated.price) : null,
     };
     
     res.json(transformed);
@@ -2551,42 +2555,42 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
       finalCategories = [
         {
           categoryId: "8",
-          category_path: "Food, Beverages & Tobacco",
+          categoryPath: "Food, Beverages & Tobacco",
           level: 1,
           parentId: null,
           isActive: true
         },
         {
           categoryId: "7", 
-          category_path: "Electronics",
+          categoryPath: "Electronics", 
           level: 1,
           parentId: null,
           isActive: true
         },
         {
           categoryId: "499685",
-          category_path: "Food, Beverages & Tobacco > Food Items",
+          categoryPath: "Food, Beverages & Tobacco > Food Items",
           level: 2,
           parentId: "8",
           isActive: true
         },
         {
           categoryId: "499686",
-          category_path: "Food, Beverages & Tobacco > Beverages", 
+          categoryPath: "Food, Beverages & Tobacco > Beverages", 
           level: 2,
           parentId: "8",
           isActive: true
         },
         {
           categoryId: "499776",
-          category_path: "Food, Beverages & Tobacco > Beverages > Coffee",
+          categoryPath: "Food, Beverages & Tobacco > Beverages > Coffee",
           level: 3,
           parentId: "499686",
           isActive: true
         },
         {
           categoryId: "499777",
-          category_path: "Food, Beverages & Tobacco > Beverages > Tea & Infusions",
+          categoryPath: "Food, Beverages & Tobacco > Beverages > Tea & Infusions",
           level: 3,
           parentId: "499686", 
           isActive: true
@@ -3348,7 +3352,7 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
       description: updatedItem.description,
       visibility: updatedItem.visibility,
       status: updatedItem.itemStatus,
-      category_path: updatedItem.categoryPath,
+      categoryPath: updatedItem.categoryPath,
       createdAt: updatedItem.createdAt,
       updatedAt: updatedItem.updatedAt,
     };

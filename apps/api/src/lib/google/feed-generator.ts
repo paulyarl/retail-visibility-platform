@@ -60,7 +60,7 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
         availability: item.availability,
         image_url: item.imageUrl || undefined,
         additionalImageLinks: undefined,
-        category_path: item.categoryPath || undefined,
+        categoryPath: item.categoryPath || undefined,
       } as FeedItem;
     });
   } catch (error) {

@@ -4,7 +4,7 @@ import { Flags } from './config';
 /**
  * Create a helper view to expose local category path and resolved Google category id
  * NOTE: This view assumes the following columns exist:
- *  - inventory_item(id uuid, tenantId uuid, category_path text[])
+ *  - inventory_item(id uuid, tenantId uuid, categoryPath text[])
  *  - tenant_category(tenantId uuid, slug text, google_category_id text, is_active boolean)
  *  - google_taxonomy(category_id text)
  * If the google taxonomy table contains a path/name column, extend the SELECT accordingly.
