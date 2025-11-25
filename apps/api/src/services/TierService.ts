@@ -14,9 +14,9 @@ interface TierWithFeatures {
   id: string;
   tierKey: string;
   name: string;
-  display_name: string;
+  displayName: string;
   priceMonthly: number;
-  maxSKUs: number | null;
+  maxSkus: number | null;
   maxLocations: number | null;
   tierType: string;
   isActive: boolean;
@@ -114,7 +114,7 @@ export async function getTierSKULimit(tierKey: string): Promise<number> {
   const tier = await getTierByKey(tierKey);
   if (!tier) return 500; // Default to starter limit
   
-  return tier.maxSKUs ?? Infinity;
+  return tier.maxSkus ?? Infinity;
 }
 
 /**
@@ -132,7 +132,7 @@ export async function getTierPrice(tierKey: string): Promise<number> {
  */
 export async function getTierDisplayName(tierKey: string): Promise<string> {
   const tier = await getTierByKey(tierKey);
-  return tier?.display_name || tierKey;
+  return tier?.displayName || tierKey;
 }
 
 /**

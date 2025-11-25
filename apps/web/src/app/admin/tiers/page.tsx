@@ -30,7 +30,7 @@ interface DbTier {
   tierKey: string;
   displayName: string;
   priceMonthly: number;
-  maxSKUs: number | null;
+  maxSkus: number | null;
   maxLocations: number | null;
   tierType: string;
   isActive: boolean;
@@ -222,7 +222,7 @@ export default function AdminTiersPage() {
                         </div>
                       </div>
                       <div className="text-sm text-neutral-600">
-                        {tierOption.tier.maxSKUs ? `${tierOption.tier.maxSKUs.toLocaleString()} SKUs` : 'Unlimited SKUs'}
+                        {tierOption.tier.maxSkus ? `${tierOption.tier.maxSkus.toLocaleString()} SKUs` : 'Unlimited SKUs'}
                         {tierOption.tier.maxLocations && `, ${tierOption.tier.maxLocations} locations`}
                       </div>
                     </div>

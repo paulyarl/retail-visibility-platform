@@ -11,6 +11,8 @@ interface FeatureOverride {
   granted: boolean;
   reason?: string;
   expiresAt?: string;
+  expiresAtDate?: string;
+  expiresAtTime?: string;
   grantedBy: string;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +53,8 @@ export default function FeatureOverridesPage() {
     granted: true,
     reason: '',
     expiresAt: '',
+    expiresAtDate: '',
+    expiresAtTime: '',
   });
 
   useEffect(() => {
@@ -97,10 +101,17 @@ export default function FeatureOverridesPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Convert datetime-local to ISO 8601 format
+      // Combine date and time fields for ISO 8601 format
+      let expiresAt: string | undefined;
+      if (formData.expiresAtDate && formData.expiresAtTime) {
+        expiresAt = new Date(`${formData.expiresAtDate}T${formData.expiresAtTime}`).toISOString();
+      } else if (formData.expiresAtDate) {
+        expiresAt = new Date(`${formData.expiresAtDate}T23:59:59`).toISOString();
+      }
+
       const payload = {
         ...formData,
-        expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : undefined,
+        expiresAt,
       };
 
       const res = await fetch('/api/admin/feature-overrides', {
@@ -121,6 +132,8 @@ export default function FeatureOverridesPage() {
         granted: true,
         reason: '',
         expiresAt: '',
+        expiresAtDate: '',
+        expiresAtTime: '',
       });
       fetchOverrides();
     } catch (err: any) {
@@ -133,11 +146,20 @@ export default function FeatureOverridesPage() {
     if (!editingOverride) return;
 
     try {
-      // Convert datetime-local to ISO 8601 format
+      // Combine date and time fields for ISO 8601 format
+      let expiresAt: string | null;
+      if (formData.expiresAtDate && formData.expiresAtTime) {
+        expiresAt = new Date(`${formData.expiresAtDate}T${formData.expiresAtTime}`).toISOString();
+      } else if (formData.expiresAtDate) {
+        expiresAt = new Date(`${formData.expiresAtDate}T23:59:59`).toISOString();
+      } else {
+        expiresAt = null;
+      }
+
       const payload = {
         granted: formData.granted,
         reason: formData.reason,
-        expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
+        expiresAt,
       };
 
       const res = await fetch(`/api/admin/feature-overrides/${editingOverride.id}`, {
@@ -158,6 +180,8 @@ export default function FeatureOverridesPage() {
         granted: true,
         reason: '',
         expiresAt: '',
+        expiresAtDate: '',
+        expiresAtTime: '',
       });
       fetchOverrides();
     } catch (err: any) {
@@ -183,12 +207,23 @@ export default function FeatureOverridesPage() {
 
   const handleEdit = (override: FeatureOverride) => {
     setEditingOverride(override);
+    // Parse the expiresAt date into separate date and time fields
+    let expiresAtDate = '';
+    let expiresAtTime = '';
+    if (override.expiresAt) {
+      const date = new Date(override.expiresAt);
+      expiresAtDate = date.toISOString().slice(0, 10); // YYYY-MM-DD
+      expiresAtTime = date.toISOString().slice(11, 16); // HH:MM
+    }
+    
     setFormData({
       tenantId: override.tenantId,
       feature: override.feature,
       granted: override.granted,
       reason: override.reason || '',
       expiresAt: override.expiresAt ? new Date(override.expiresAt).toISOString().slice(0, 16) : '',
+      expiresAtDate,
+      expiresAtTime,
     });
   };
 
@@ -485,12 +520,34 @@ export default function FeatureOverridesPage() {
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                   Expires At (Optional)
                 </label>
-                <input
-                  type="datetime-local"
-                  value={formData.expiresAt}
-                  onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-                  className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.expiresAtDate}
+                      onChange={(e) => setFormData({ ...formData, expiresAtDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
+                      min={new Date().toISOString().slice(0, 10)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                      Time
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.expiresAtTime}
+                      onChange={(e) => setFormData({ ...formData, expiresAtTime: e.target.value })}
+                      className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  Set both date and time, or just date (defaults to 11:59 PM)
+                </p>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -576,12 +633,30 @@ export default function FeatureOverridesPage() {
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                   Expires At (Optional)
                 </label>
-                <input
-                  type="datetime-local"
-                  value={formData.expiresAt}
-                  onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-                  className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.expiresAtDate}
+                      onChange={(e) => setFormData({ ...formData, expiresAtDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                      Time
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.expiresAtTime}
+                      onChange={(e) => setFormData({ ...formData, expiresAtTime: e.target.value })}
+                      className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4">

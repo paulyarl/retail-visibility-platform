@@ -1,13 +1,73 @@
 import { Pool } from 'pg';
 
 // Create a direct database connection pool that bypasses Prisma's issues
-const directPool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  min: 1,
-  max: 5,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-});
+// In development, we need to handle self-signed certificates
+const getPoolConfig = () => {
+  // Modify connection string to use prefer instead of require for local development
+  let connectionString = process.env.DATABASE_URL;
+  
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is not set');
+  }
+  
+  // Always disable SSL certificate verification for local development
+  // Check for production indicators (Railway, Vercel, etc.)
+  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
+                      process.env.VERCEL_ENV === 'production' ||
+                      process.env.NODE_ENV === 'production';
+
+  if (!isProduction) {
+    console.log('[StoreType Pool] Local development detected - disabling SSL completely');
+    console.log('[StoreType Pool] Original connection string:', connectionString);
+    // Completely remove SSL for development - this will work with rejectUnauthorized: false
+    if (connectionString.includes('sslmode=')) {
+      console.log('[StoreType Pool] Removing SSL mode entirely');
+      connectionString = connectionString.replace(/sslmode=[^&]+/, 'sslmode=disable');
+    } else {
+      console.log('[StoreType Pool] Adding sslmode=disable');
+      connectionString += '&sslmode=disable';
+    }
+    console.log('[StoreType Pool] Modified connection string:', connectionString);
+  }
+
+  const config: any = {
+    connectionString,
+    min: 1,
+    max: 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  };
+
+  if (!isProduction) {
+    config.ssl = {
+      rejectUnauthorized: false
+    };
+  } else {
+    console.log('[StoreType Pool] Production environment - SSL verification enabled');
+  }
+
+  return config;
+};
+
+// Create pool on-demand to ensure SSL config is applied
+let directPool: Pool | null = null;
+
+const getDirectPool = () => {
+  // Always create a new pool in development to ensure SSL config is applied
+  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
+                      process.env.VERCEL_ENV === 'production' ||
+                      process.env.NODE_ENV === 'production';
+
+  if (!isProduction) {
+    console.log('[StoreType Pool] Creating fresh pool for development');
+    return new Pool(getPoolConfig());
+  }
+
+  if (!directPool) {
+    directPool = new Pool(getPoolConfig());
+  }
+  return directPool;
+};
 
 /**
  * Store Type Directory Service
@@ -28,7 +88,7 @@ class StoreTypeDirectoryService {
       console.log('[StoreTypeService] Fetching store types from directory_listings_list');
 
       // Get unique store types with counts using direct database connection
-      const result = await directPool.query(`
+      const result = await getDirectPool().query(`
         WITH category_counts AS (
           SELECT
             primary_category,
@@ -78,7 +138,7 @@ class StoreTypeDirectoryService {
       const typeName = this.unslugify(typeSlug);
 
       // Get stores using direct database connection
-      const result = await directPool.query(`
+      const result = await getDirectPool().query(`
         WITH store_data AS (
           SELECT
             id,
@@ -149,7 +209,7 @@ class StoreTypeDirectoryService {
       const typeName = this.unslugify(typeSlug);
       
       // Get store type details using direct database connection
-      const result = await directPool.query(`
+      const result = await getDirectPool().query(`
         WITH type_details AS (
           SELECT
             primary_category,

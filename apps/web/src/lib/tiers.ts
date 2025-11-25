@@ -11,7 +11,7 @@ export interface TierLimits {
   name: string;
   price: string;
   pricePerMonth: number;
-  maxSKUs: number;
+  maxSkus: number;
   maxLocations: number;
   description: string;
   features: string[];
@@ -23,7 +23,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     name: 'Google-Only',
     price: '$29/month',
     pricePerMonth: 29,
-    maxSKUs: 250,
+    maxSkus: 250,
     maxLocations: 1,
     description: 'Get discovered on Google',
     features: [
@@ -41,7 +41,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     name: 'Starter',
     price: '$29/month',
     pricePerMonth: 29,
-    maxSKUs: 500,
+    maxSkus: 500,
     maxLocations: 3,
     description: 'Core visibility and storefront for small retailers',
     features: [
@@ -60,7 +60,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     name: 'Professional',
     price: '$99/month',
     pricePerMonth: 99,
-    maxSKUs: 5000,
+    maxSkus: 5000,
     maxLocations: 10,
     description: 'Connected & growing retailers (POS + intelligence)',
     features: [
@@ -80,7 +80,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     name: 'Enterprise',
     price: '$499/month',
     pricePerMonth: 499,
-    maxSKUs: Infinity,
+    maxSkus: Infinity,
     maxLocations: 25,
     description: 'Full connector + AI automation (up to ~25 locations)',
     features: [
@@ -100,7 +100,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     name: 'Organization',
     price: 'Custom',
     pricePerMonth: 0,
-    maxSKUs: Infinity,
+    maxSkus: Infinity,
     maxLocations: Infinity,
     description: 'For chains & franchises with 25+ locations',
     features: [
@@ -129,15 +129,15 @@ export function getTierInfo(tier: SubscriptionTier | string | null | undefined):
  */
 export function canAddSKUs(tier: SubscriptionTier | string | null | undefined, currentCount: number, toAdd: number = 1): boolean {
   const tierInfo = getTierInfo(tier);
-  if (tierInfo.maxSKUs === Infinity) return true;
-  return (currentCount + toAdd) <= tierInfo.maxSKUs;
+  if (tierInfo.maxSkus === Infinity) return true;
+  return (currentCount + toAdd) <= tierInfo.maxSkus;
 }
 
 /**
  * Get SKU limit for a tier
  */
 export function getSKULimit(tier: SubscriptionTier | string | null | undefined): number {
-  return getTierInfo(tier).maxSKUs;
+  return getTierInfo(tier).maxSkus;
 }
 
 /**
@@ -145,8 +145,8 @@ export function getSKULimit(tier: SubscriptionTier | string | null | undefined):
  */
 export function needsUpgrade(tier: SubscriptionTier | string | null | undefined, currentCount: number): boolean {
   const tierInfo = getTierInfo(tier);
-  if (tierInfo.maxSKUs === Infinity) return false;
-  return currentCount >= tierInfo.maxSKUs;
+  if (tierInfo.maxSkus === Infinity) return false;
+  return currentCount >= tierInfo.maxSkus;
 }
 
 /**

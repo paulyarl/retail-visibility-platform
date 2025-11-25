@@ -1,7 +1,39 @@
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
 import { useFeatureFlag } from '@/lib/featureFlags';
-import CategorySelector from './CategorySelector';
+import { apiRequest } from '@/lib/api';
+import TenantCategorySelector from './TenantCategorySelector';
+
+// Helper component to display category name by ID
+function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
+  const [categoryName, setCategoryName] = useState<string>('Loading...');
+  const params = useParams();
+  const tenantId = params.tenantId as string;
+
+  useEffect(() => {
+    async function fetchCategory() {
+      try {
+        const response = await apiRequest(`api/v1/tenants/${tenantId}/categories`);
+        if (response.ok) {
+          const result = await response.json();
+          const category = result.data?.find((c: any) => c.id === categoryId);
+          if (category) {
+            setCategoryName(category.name);
+            if (category.googleCategoryId) {
+              setCategoryName(`${category.name} (${category.googleCategoryId})`);
+            }
+          }
+        }
+      } catch (error) {
+        setCategoryName('Unknown category');
+      }
+    }
+    fetchCategory();
+  }, [categoryId, tenantId]);
+
+  return <span className="font-medium">{categoryName}</span>;
+}
 
 interface Item {
   id: string;
@@ -14,6 +46,13 @@ interface Item {
   description?: string;
   status?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing';
   categoryPath?: string[];
+  tenantCategoryId?: string | null;
+  tenantCategory?: {
+    id: string;
+    name: string;
+    slug?: string;
+    googleCategoryId?: string | null;
+  };
 }
 
 interface EditItemModalProps {
@@ -34,7 +73,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [status, setStatus] = useState<'draft' | 'active' | 'archived'>('draft');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [categoryPath, setCategoryPath] = useState<string[]>([]);
+  const [tenantCategoryId, setTenantCategoryId] = useState<string>('');
   const [showCategorySelector, setShowCategorySelector] = useState(false);
 
   // Feature flag: sticky quick actions footer
@@ -69,7 +108,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       // Map 'inactive' to 'archived' since we no longer have an Inactive button
       const mappedStatus = item.status === 'inactive' ? 'archived' : item.status;
       setStatus((mappedStatus === 'draft' || mappedStatus === 'active' || mappedStatus === 'archived') ? mappedStatus : 'draft');
-      setCategoryPath(item.categoryPath || []);
+      setTenantCategoryId(item.tenantCategoryId || '');
     }
   }, [item]);
 
@@ -123,7 +162,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         description: description.trim() || undefined,
         status,
         itemStatus: status === 'draft' ? 'active' : status, // Map draft to active for API
-        categoryPath,
+        tenantCategoryId: tenantCategoryId || null,
       } as Item;
 
       await onSave(updatedItem);
@@ -328,7 +367,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         {/* Category Section */}
         <div>
           <label className="block text-sm font-medium text-neutral-700 mb-2">
-            Google Product Category
+            Product Category
           </label>
           <div className="space-y-3">
             {/* Current Category Display */}
@@ -339,12 +378,15 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
                     Current Category
                   </p>
                   <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                    {categoryPath.length > 0 ? (
+                    {item?.tenantCategory ? (
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-md border border-blue-200 dark:border-blue-800">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                         </svg>
-                        {categoryPath.join(' › ')}
+                        {item.tenantCategory.name}
+                        {item.tenantCategory.googleCategoryId && (
+                          <span className="text-xs">({item.tenantCategory.googleCategoryId})</span>
+                        )}
                       </span>
                     ) : (
                       <span className="text-neutral-500 italic">No category assigned</span>
@@ -353,6 +395,28 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
                 </div>
               </div>
             </div>
+
+            {/* Selected Category Display - Shows pending change */}
+            {tenantCategoryId && tenantCategoryId !== (item?.tenantCategoryId || '') && (
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-800 animate-pulse">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-green-800 dark:text-green-200">
+                      Selected Category (pending save)
+                    </p>
+                    <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                      <CategoryNameDisplay categoryId={tenantCategoryId} />
+                    </p>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      ✓ Click "Save Changes" to apply this category
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Category Selection */}
             <div>
@@ -371,10 +435,10 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
 
               {showCategorySelector && (
                 <div className="mt-3 p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                  <CategorySelector
-                    currentCategory={categoryPath}
-                    onCategorySelect={(newCategory) => {
-                      setCategoryPath(newCategory);
+                  <TenantCategorySelector
+                    selectedCategoryId={tenantCategoryId}
+                    onSelect={(categoryId) => {
+                      setTenantCategoryId(categoryId);
                       setShowCategorySelector(false);
                     }}
                     onCancel={() => setShowCategorySelector(false)}
@@ -384,7 +448,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             </div>
           </div>
           <p className="text-xs text-neutral-500 mt-2">
-            Required for Google Shopping sync. Choose the most specific category that fits your product.
+            Assign a category to organize your products. Categories with Google IDs will sync to Google Shopping.
           </p>
         </div>
 
@@ -407,7 +471,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
               {item.stock !== undefined && (
                 <p><span className="font-medium">Stock:</span> {item.stock}</p>
               )}
-              <p><span className="font-medium">Category:</span> {item.categoryPath && item.categoryPath.length > 0 ? item.categoryPath.join(' › ') : 'None'}</p>
+              <p><span className="font-medium">Category:</span> {item.tenantCategory ? item.tenantCategory.name : 'None'}</p>
               {item.description && (
                 <p><span className="font-medium">Description:</span> {item.description.substring(0, 100)}{item.description.length > 100 ? '...' : ''}</p>
               )}

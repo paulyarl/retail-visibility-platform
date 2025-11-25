@@ -248,10 +248,14 @@ export default function ItemsClient({
     }
   };
 
-  const handleCategoryAssign = async (itemId: string, categoryId: string, categoryPath: string[]) => {
+  const handleCategoryAssign = async (itemId: string, categoryId: string) => {
     try {
-      // Update the item with the new category path
-      await updateItem(itemId, { categoryPath });
+      console.log('[handleCategoryAssign] Called with:', { itemId, categoryId });
+      const updateData = { tenantCategoryId: categoryId };
+      console.log('[handleCategoryAssign] Update data:', updateData);
+      
+      // Update the item with the tenant category ID
+      await updateItem(itemId, updateData);
 
       closeCategoryModal();
       refresh(); // Refresh the items list

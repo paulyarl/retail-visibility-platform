@@ -7,7 +7,7 @@ export class SendGridEmailProvider implements EmailProvider {
 
   constructor() {
     this.apiKey = process.env.SENDGRID_API_KEY || '';
-    this.fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@yourplatform.com';
+    this.fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@visibleshelf.store';
     this.fromName = process.env.SENDGRID_FROM_NAME || process.env.EMAIL_FROM_NAME || 'RVP Platform';
   }
 

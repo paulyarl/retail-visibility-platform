@@ -11,6 +11,13 @@ export interface Item {
   itemStatus?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing'; // Backend field name
   visibility: 'public' | 'private';
   categoryPath?: string[];
+  tenantCategoryId?: string | null;
+  tenantCategory?: {
+    id: string;
+    name: string;
+    slug?: string;
+    googleCategoryId?: string | null;
+  };
   imageUrl?: string; // Primary photo URL from backend
   images?: string[]; // Legacy field, may be deprecated
   metadata?: any;
@@ -151,15 +158,20 @@ export class ItemsDataService {
    */
   async updateItem(itemId: string, data: Partial<Item>): Promise<Item> {
     try {
+      console.log('[updateItem] Sending data:', { itemId, data });
       const response = await api.put(`api/items/${itemId}`, data);
+      console.log('[updateItem] Response status:', response.status);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData?.error || 'Failed to update item');
       }
 
-      return await response.json();
+      const result = await response.json();
+      console.log('[updateItem] Result:', result);
+      return result;
     } catch (error) {
+      console.error('[updateItem] Error:', error);
       // Error will be caught and displayed in UI
       throw error;
     }

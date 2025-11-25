@@ -13,6 +13,9 @@ interface ItemsGridProps {
   onVisibilityToggle?: (item: Item) => void;
   onStatusToggle?: (item: Item) => void;
   tenantId?: string;
+  bulkMode?: boolean;
+  selectedItems?: Set<string>;
+  onToggleSelection?: (itemId: string) => void;
 }
 
 /**
@@ -30,6 +33,9 @@ export default function ItemsGrid({
   onVisibilityToggle,
   onStatusToggle,
   tenantId,
+  bulkMode = false,
+  selectedItems = new Set(),
+  onToggleSelection,
 }: ItemsGridProps) {
   if (items.length === 0) {
     return (
@@ -54,9 +60,15 @@ export default function ItemsGrid({
           <CardContent className="p-3 sm:p-4">
             {/* Image - Clickable */}
             <div 
-              className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg mb-3 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank')}
-              title="View item details"
+              className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg mb-3 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity relative"
+              onClick={() => {
+                if (bulkMode && onToggleSelection) {
+                  onToggleSelection(item.id);
+                } else {
+                  tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank');
+                }
+              }}
+              title={bulkMode ? "Click to select" : "View item details"}
             >
               {item.imageUrl ? (
                 <img
@@ -69,6 +81,19 @@ export default function ItemsGrid({
                   <svg className="w-12 h-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
+                </div>
+              )}
+              
+              {/* Selection Checkbox Overlay */}
+              {bulkMode && (
+                <div className="absolute top-2 right-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.has(item.id)}
+                    onChange={() => onToggleSelection?.(item.id)}
+                    className="w-5 h-5 rounded border-2 border-white shadow-lg cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
+                  />
                 </div>
               )}
             </div>
@@ -94,7 +119,7 @@ export default function ItemsGrid({
               <SyncStatusIndicator 
                 itemStatus={item.status}
                 visibility={item.visibility}
-                categoryPath={item.categoryPath}
+                tenantCategoryId={item.tenantCategoryId}
                 showDetails={false}
               />
 
@@ -111,12 +136,17 @@ export default function ItemsGrid({
                 </div>
               </div>
 
-              {item.categoryPath && item.categoryPath.length > 0 && (
+              {item.tenantCategory && (
                 <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-md border border-blue-200 dark:border-blue-800">
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                   </svg>
-                  {item.categoryPath.join(' › ')}
+                  <span>{item.tenantCategory.name}</span>
+                  {item.tenantCategory.googleCategoryId && (
+                    <span className="text-blue-600 dark:text-blue-400 font-mono" title="Google Category ID">
+                      ({item.tenantCategory.googleCategoryId})
+                    </span>
+                  )}
                 </div>
               )}
             </div>

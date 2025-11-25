@@ -26,10 +26,10 @@ export const PLATFORM_SUPPORT_LIMIT = 3;
 
 export interface TenantLimitConfig {
   limit: number;
-  display_name: string;
-  description: string;
-  upgradeMessage: string;
-  upgradeToTier?: TenantLimitTier;
+  displayName: string; // Display name for the limit
+  description: string; // Description of the limit
+  upgradeMessage: string; // Message to display when limit is reached
+  upgradeToTier?: TenantLimitTier; // Tier to upgrade to
 }
 
 /**
@@ -38,7 +38,7 @@ export interface TenantLimitConfig {
 export const TRIAL_CONFIG = {
   durationDays: 14,
   locationLimit: 1,
-  display_name: '1 Location (Trial)',
+  displayName: '1 Location (Trial)',
   description: '14-day trial with 1 location to test the platform',
   upgradeMessage: 'Convert to paid plan to unlock full location limits',
 };
@@ -49,7 +49,7 @@ export const TRIAL_CONFIG = {
 export const TENANT_LIMITS: Record<TenantLimitTier, TenantLimitConfig> = {
   google_only: {
     limit: 1,
-    display_name: '1 Location',
+    displayName: '1 Location',
     description: 'Google-only sync for one location',
     upgradeMessage: 'Upgrade to Starter for 3 locations + storefront',
     upgradeToTier: 'starter',
@@ -57,7 +57,7 @@ export const TENANT_LIMITS: Record<TenantLimitTier, TenantLimitConfig> = {
   
   starter: {
     limit: 3,
-    display_name: 'Up to 3 Locations',
+    displayName: 'Up to 3 Locations',
     description: 'Perfect for small businesses with multiple locations',
     upgradeMessage: 'Upgrade to Professional to manage up to 10 locations',
     upgradeToTier: 'professional',
@@ -65,7 +65,7 @@ export const TENANT_LIMITS: Record<TenantLimitTier, TenantLimitConfig> = {
   
   professional: {
     limit: 10,
-    display_name: 'Up to 10 Locations',
+    displayName: 'Up to 10 Locations',
     description: 'Great for growing chains',
     upgradeMessage: 'Upgrade to Organization for unlimited locations',
     upgradeToTier: 'organization',
@@ -73,7 +73,7 @@ export const TENANT_LIMITS: Record<TenantLimitTier, TenantLimitConfig> = {
   
   enterprise: {
     limit: 25,
-    display_name: 'Up to 25 Locations',
+    displayName: 'Up to 25 Locations',
     description: 'Enterprise-grade management',
     upgradeMessage: 'Contact us for unlimited locations',
     upgradeToTier: 'organization',
@@ -81,9 +81,9 @@ export const TENANT_LIMITS: Record<TenantLimitTier, TenantLimitConfig> = {
   
   organization: {
     limit: Infinity,
-    display_name: 'Unlimited Locations',
-    description: 'Unlimited locations for your chain',
-    upgradeMessage: '',
+    displayName: 'Unlimited Locations', // Display name for the limit
+    description: 'Unlimited locations for your chain', // Description of the limit
+    upgradeMessage: '', // Message to display when limit is reached
   },
 };
 
@@ -119,7 +119,7 @@ export function getTenantLimitConfig(tier: string, status?: string): TenantLimit
   if (status === 'trial') {
     return {
       limit: TRIAL_CONFIG.locationLimit,
-      display_name: TRIAL_CONFIG.display_name,
+      displayName: TRIAL_CONFIG.displayName,
       description: TRIAL_CONFIG.description,
       upgradeMessage: TRIAL_CONFIG.upgradeMessage,
       upgradeToTier: tier as TenantLimitTier, // Keep same tier, just convert to paid

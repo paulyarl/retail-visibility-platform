@@ -11,6 +11,7 @@ import featureOverridesRoutes from '../admin/feature-overrides';
 import tierManagementRoutes from '../admin/tier-management';
 import tierSystemRoutes from '../admin/tier-system';
 import taxonomyAdminRoutes from '../taxonomy-admin';
+import adminTenantsRoutes from '../admin/tenants';
 
 /**
  * Mount admin routes
@@ -29,6 +30,7 @@ export function mountAdminRoutes(app: Express) {
   app.use('/api/admin/feature-overrides', featureOverridesRoutes);
   app.use('/api/admin/tier-management', tierManagementRoutes);
   app.use('/api/admin/tier-system', tierSystemRoutes);
+  app.use('/api/admin/tenants', adminTenantsRoutes);
   app.use('/admin', authenticateToken, adminUsersRoutes);
   app.use('/api/admin', authenticateToken, adminUsersRoutes);
   app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);

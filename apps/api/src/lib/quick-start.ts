@@ -6,6 +6,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { generateItemId, generateQuickStartSku } from './id-generator';
 import { suggestCategories, getCategoryById } from './google/taxonomy';
 
 const prisma = new PrismaClient();
@@ -184,27 +185,53 @@ export async function generateQuickStartProducts(
   const scenarioData = SCENARIOS[scenario];
   const timestamp = Date.now();
 
-  // Create categories with live Google taxonomy alignment (in-memory only)
+  // Create categories with live Google taxonomy alignment and persist to database
   const categories: Array<{ id: string; name: string; slug: string; originalName: string }> = [];
-  for (const cat of scenarioData.categories) {
-    // Use live Google taxonomy to find best matching category
-    const suggestions = suggestCategories(cat.searchTerm, 1);
-    const googleCategoryId = suggestions.length > 0 ? suggestions[0].id : null;
-    
-    // Log the mapping for transparency
-    if (googleCategoryId) {
-      const googleCat = getCategoryById(googleCategoryId);
-      console.log(`[Quick Start] Mapped "${cat.name}" to Google category: ${googleCat?.path.join(' > ')} (ID: ${googleCategoryId})`);
-    } else {
-      console.warn(`[Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
+  
+  if (assignCategories) {
+    for (const cat of scenarioData.categories) {
+      // Use live Google taxonomy to find best matching category
+      const suggestions = suggestCategories(cat.searchTerm, 1);
+      const googleCategoryId = suggestions.length > 0 ? suggestions[0].id : null;
+      
+      // Log the mapping for transparency
+      if (googleCategoryId) {
+        const googleCat = getCategoryById(googleCategoryId);
+        console.log(`[Quick Start] Mapped "${cat.name}" to Google category: ${googleCat?.path.join(' > ')} (ID: ${googleCategoryId})`);
+      } else {
+        console.warn(`[Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
+      }
+      
+      const categoryId = `${tenant_id}_${cat.slug}`;
+      
+      // Persist category to database (upsert to avoid duplicates)
+      await prisma.tenantCategory.upsert({
+        where: { id: categoryId },
+        create: {
+          id: categoryId,
+          tenantId: tenant_id,
+          name: cat.name,
+          slug: cat.slug,
+          googleCategoryId,
+          sortOrder: categories.length,
+          isActive: true,
+          updatedAt: new Date(),
+        },
+        update: {
+          name: cat.name,
+          googleCategoryId,
+          isActive: true,
+          updatedAt: new Date(),
+        },
+      });
+      
+      categories.push({
+        id: categoryId,
+        name: cat.name,
+        slug: cat.slug,
+        originalName: cat.name,
+      });
     }
-    const categoryId = `${tenant_id}_${cat.slug}`;
-    categories.push({
-      id: categoryId,
-      name: cat.name,
-      slug: cat.slug,
-      originalName: cat.name,
-    });
   }
 
   // Generate products (cycle through available products)
@@ -248,9 +275,9 @@ export async function generateQuickStartProducts(
         : (Math.random() > 0.25 ? 'active' as const : 'inactive' as const);
 
       return {
-        id: `qs_${tenant_id}_${timestamp}_${(i + idx).toString().padStart(5, '0')}`,
+        id: generateItemId(),
         tenantId: tenant_id,
-        sku: `SKU-${timestamp}-${(i + idx).toString().padStart(5, '0')}`,
+        sku: generateQuickStartSku(i + idx),
         name: product.name,
         title: product.name,
         brand: product.brand || 'Generic',

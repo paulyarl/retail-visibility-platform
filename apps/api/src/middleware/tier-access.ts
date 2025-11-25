@@ -244,9 +244,13 @@ export async function checkTierAccessWithOverrides(
 export function requireTierFeature(feature: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      console.log(`[requireTierFeature] Checking feature: ${feature}`);
+      console.log(`[requireTierFeature] User:`, req.user);
+      
       // Platform admins and support bypass all tier restrictions
       const { canPerformSupportActions } = await import('../utils/platform-admin');
       if (canPerformSupportActions(req.user)) {
+        console.log(`[requireTierFeature] Platform admin/support bypass granted`);
         return next();
       }
       

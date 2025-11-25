@@ -37,16 +37,17 @@ export class CategoryDirectoryService {
       // For each category, count items and distinct tenants
       const categoriesWithCounts = await Promise.all(
         categories.map(async (category: any) => {
-          // Count items in this category
+          // Count items in this category from published directory listings
           const itemCount = await prisma.inventoryItem.count({
             where: {
               tenantCategoryId: category.id,
               itemStatus: 'active',
               visibility: 'public',
               tenant: {
-                googleSyncEnabled: true,
-                directoryVisible: true,
                 locationStatus: 'active',
+                directorySettings: {
+                  isPublished: true,
+                },
               },
             },
           });
@@ -58,9 +59,10 @@ export class CategoryDirectoryService {
               itemStatus: 'active',
               visibility: 'public',
               tenant: {
-                googleSyncEnabled: true,
-                directoryVisible: true,
                 locationStatus: 'active',
+                directorySettings: {
+                  isPublished: true,
+                },
               },
             },
             select: {

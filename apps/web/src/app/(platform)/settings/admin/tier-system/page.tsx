@@ -11,7 +11,9 @@ import {
   CreateTierModal, 
   EditTierModal, 
   DeleteTierModal, 
-  AddFeatureModal 
+  AddFeatureModal,
+  EditFeatureModal,
+  InheritTierModal
 } from '@/components/admin/TierCRUDModals';
 
 interface TierFeature {
@@ -28,7 +30,7 @@ interface Tier {
   displayName: string;
   description?: string;
   priceMonthly: number;
-  maxSKUs?: number;
+  maxSkus?: number;
   maxLocations?: number;
   tierType: 'individual' | 'organization';
   isActive: boolean;
@@ -43,10 +45,13 @@ export default function TierSystemPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [selectedTier, setSelectedTier] = useState<Tier | null>(null);
+  const [selectedFeature, setSelectedFeature] = useState<TierFeature | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAddFeatureModal, setShowAddFeatureModal] = useState(false);
+  const [showEditFeatureModal, setShowEditFeatureModal] = useState(false);
+  const [showInheritTierModal, setShowInheritTierModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [includeInactive, setIncludeInactive] = useState(false);
 
@@ -102,7 +107,7 @@ export default function TierSystemPage() {
     setError(null);
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const res = await api.patch(`${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.id}`, {
+      const res = await api.patch(`${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.tierKey}`, {
         ...data,
         priceMonthly: Math.round(data.priceMonthly * 100),
       });
@@ -129,7 +134,7 @@ export default function TierSystemPage() {
     setError(null);
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const res = await api.delete(`${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.id}`, {
+      const res = await api.delete(`${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.tierKey}`, {
         body: JSON.stringify(data),
       });
 
@@ -153,9 +158,10 @@ export default function TierSystemPage() {
     if (!selectedTier) return;
     setSubmitting(true);
     setError(null);
+    setSuccess(null);
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const res = await api.post(`${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.id}/features`, data);
+      const res = await api.post(`${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.tierKey}/features`, data);
 
       if (res.ok) {
         setSuccess('Feature added successfully');
@@ -163,10 +169,129 @@ export default function TierSystemPage() {
         await loadTiers();
       } else {
         const errorData = await res.json();
-        setError(errorData.message || errorData.error || 'Failed to add feature');
+        let userMessage = 'Failed to add feature';
+        
+        switch (errorData.error) {
+          case 'tier_not_found':
+            userMessage = 'Tier not found. Please refresh the page and try again.';
+            break;
+          case 'feature_already_exists':
+            userMessage = 'This feature already exists in the tier. Each feature can only be added once.';
+            break;
+          case 'invalid_payload':
+            userMessage = 'Invalid request. Please ensure all required fields are filled out correctly.';
+            break;
+          default:
+            userMessage = errorData.message || errorData.error || 'Failed to add feature';
+        }
+        
+        setError(userMessage);
       }
     } catch (e) {
-      setError('Failed to add feature');
+      setError('Network error occurred while adding feature. Please check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEditFeature = async (data: any) => {
+    if (!selectedTier || !selectedFeature) return;
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const res = await api.patch(`${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.tierKey}/features/${selectedFeature.id}`, data);
+
+      if (res.ok) {
+        setSuccess('Feature updated successfully');
+        setShowEditFeatureModal(false);
+        setSelectedFeature(null);
+        await loadTiers();
+      } else {
+        const errorData = await res.json();
+        let userMessage = 'Failed to update feature';
+        
+        switch (errorData.error) {
+          case 'tier_not_found':
+          case 'feature_not_found':
+            userMessage = 'Feature not found. Please refresh the page and try again.';
+            break;
+          case 'invalid_payload':
+            userMessage = 'Invalid request. Please ensure all required fields are filled out correctly.';
+            break;
+          default:
+            userMessage = errorData.message || errorData.error || 'Failed to update feature';
+        }
+        
+        setError(userMessage);
+      }
+    } catch (e) {
+      setError('Network error occurred while updating feature. Please check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleInheritTier = async (data: { sourceTierId: string; reason: string }) => {
+    if (!selectedTier) return;
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const res = await api.post(`${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.tierKey}/inherit-features`, data);
+
+      if (res.ok) {
+        const result = await res.json();
+        // Show detailed success message
+        const messages = [];
+        if (result.summary.created > 0) {
+          messages.push(`${result.summary.created} new features added`);
+        }
+        if (result.summary.updated > 0) {
+          messages.push(`${result.summary.updated} existing features marked as inherited`);
+        }
+        
+        const successMessage = messages.length > 0 
+          ? `Inheritance complete: ${messages.join(' and ')}`
+          : 'Features inherited successfully';
+          
+        setSuccess(successMessage);
+        setShowInheritTierModal(false);
+        await loadTiers();
+      } else {
+        const errorData = await res.json();
+        let userMessage = 'Failed to inherit features';
+        
+        // Handle specific error scenarios with user-friendly messages
+        switch (errorData.error) {
+          case 'no_features_to_process':
+            userMessage = 'No features available to inherit. The source tier has no features to share.';
+            break;
+          case 'target_tier_not_found':
+            userMessage = 'Target tier not found. Please refresh the page and try again.';
+            break;
+          case 'source_tier_not_found':
+            userMessage = 'Source tier not found. Please select a valid tier to inherit from.';
+            break;
+          case 'cannot_inherit_from_self':
+            userMessage = 'Cannot inherit features from the same tier. Please select a different source tier.';
+            break;
+          case 'invalid_tier_hierarchy':
+            userMessage = errorData.message || 'You can only inherit from tiers with lower sort order.';
+            break;
+          case 'invalid_payload':
+            userMessage = 'Invalid request. Please ensure all required fields are filled out.';
+            break;
+          default:
+            userMessage = errorData.message || errorData.error || 'Failed to inherit features';
+        }
+        
+        setError(userMessage);
+      }
+    } catch (e) {
+      setError('Network error occurred while inheriting features. Please check your connection and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -177,10 +302,14 @@ export default function TierSystemPage() {
     const reason = prompt('Please provide a reason for removing this feature:');
     if (!reason) return;
 
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const res = await api.delete(
-        `${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.id}/features/${featureId}`,
+        `${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.tierKey}/features/${featureId}`,
         { body: JSON.stringify({ reason }) }
       );
 
@@ -189,10 +318,26 @@ export default function TierSystemPage() {
         await loadTiers();
       } else {
         const errorData = await res.json();
-        setError(errorData.message || errorData.error || 'Failed to remove feature');
+        let userMessage = 'Failed to remove feature';
+        
+        switch (errorData.error) {
+          case 'tier_not_found':
+          case 'feature_not_found':
+            userMessage = 'Feature not found. Please refresh the page and try again.';
+            break;
+          case 'invalid_payload':
+            userMessage = 'Invalid request. Please provide a valid reason for removal.';
+            break;
+          default:
+            userMessage = errorData.message || errorData.error || 'Failed to remove feature';
+        }
+        
+        setError(userMessage);
       }
     } catch (e) {
-      setError('Failed to remove feature');
+      setError('Network error occurred while removing feature. Please check your connection and try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -268,16 +413,37 @@ export default function TierSystemPage() {
         <div className="grid grid-cols-1 gap-4">
           {tiers.map((tier, index) => (
             <motion.div
-              key={tier.id}
+              key={tier.tierKey}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
             >
-              <Card className={!tier.isActive ? 'opacity-60' : ''}>
+              <Card className={`transition-all duration-200 ${
+                    !tier.isActive 
+                      ? 'opacity-60 border-red-200 dark:border-red-800 bg-red-50/30 dark:bg-red-900/10' 
+                      : 'border-green-200 dark:border-green-800 bg-green-50/30 dark:bg-green-900/10'
+                  }`}>
                 <CardContent className="pt-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
+                        {/* Status Icon */}
+                        <div className={`flex items-center justify-center w-6 h-6 rounded-full ${
+                          tier.isActive 
+                            ? 'bg-green-100 dark:bg-green-900/30' 
+                            : 'bg-red-100 dark:bg-red-900/30'
+                        }`}>
+                          {tier.isActive ? (
+                            <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </div>
+                        
                         <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">{tier.displayName}</h3>
                         <Badge className={tier.tierType === 'organization' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}>
                           {tier.tierType}
@@ -285,7 +451,11 @@ export default function TierSystemPage() {
                         <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
                           ${(tier.priceMonthly / 100).toFixed(2)}/mo
                         </Badge>
-                        {!tier.isActive && <Badge variant="default">Inactive</Badge>}
+                        {!tier.isActive && (
+                          <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                            Inactive
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">{tier.description || 'No description'}</p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
@@ -296,7 +466,7 @@ export default function TierSystemPage() {
                         <div>
                           <span className="text-neutral-600 dark:text-neutral-400">Max SKUs:</span>
                           <span className="ml-2 font-semibold text-neutral-900 dark:text-neutral-100">
-                            {tier.maxSKUs ? tier.maxSKUs.toLocaleString() : 'Unlimited'}
+                            {tier.maxSkus ? tier.maxSkus.toLocaleString() : 'Unlimited'}
                           </span>
                         </div>
                         {tier.maxLocations && (
@@ -316,16 +486,28 @@ export default function TierSystemPage() {
                             Features ({tier.features.length})
                           </h4>
                           {isPlatformAdmin && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setSelectedTier(tier);
-                                setShowAddFeatureModal(true);
-                              }}
-                            >
-                              Add Feature
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setSelectedTier(tier);
+                                  setShowAddFeatureModal(true);
+                                }}
+                              >
+                                Add Feature
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setSelectedTier(tier);
+                                  setShowInheritTierModal(true);
+                                }}
+                              >
+                                Inherit Tier
+                              </Button>
+                            </div>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -339,16 +521,33 @@ export default function TierSystemPage() {
                                 <span className="text-neutral-500 dark:text-neutral-400" title="Inherited from lower tier">↑</span>
                               )}
                               {isPlatformAdmin && (
-                                <button
-                                  onClick={() => {
-                                    setSelectedTier(tier);
-                                    handleRemoveFeature(f.id);
-                                  }}
-                                  className="ml-1 text-red-600 dark:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Remove feature"
-                                >
-                                  ×
-                                </button>
+                                <div className="flex items-center gap-1 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedTier(tier);
+                                      setSelectedFeature(f);
+                                      setShowEditFeatureModal(true);
+                                    }}
+                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                                    title="Edit feature"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedTier(tier);
+                                      handleRemoveFeature(f.id);
+                                    }}
+                                    className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                                    title="Remove feature"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
                               )}
                             </div>
                           ))}
@@ -433,6 +632,31 @@ export default function TierSystemPage() {
             setSelectedTier(null);
           }}
           onSubmit={handleAddFeature}
+          submitting={submitting}
+        />
+
+        <EditFeatureModal
+          isOpen={showEditFeatureModal}
+          tier={selectedTier}
+          feature={selectedFeature}
+          onClose={() => {
+            setShowEditFeatureModal(false);
+            setSelectedTier(null);
+            setSelectedFeature(null);
+          }}
+          onSubmit={handleEditFeature}
+          submitting={submitting}
+        />
+
+        <InheritTierModal
+          isOpen={showInheritTierModal}
+          tier={selectedTier}
+          tiers={tiers}
+          onClose={() => {
+            setShowInheritTierModal(false);
+            setSelectedTier(null);
+          }}
+          onSubmit={handleInheritTier}
           submitting={submitting}
         />
       </div>

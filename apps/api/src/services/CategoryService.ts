@@ -28,12 +28,14 @@ export const categoryService = {
   async createTenantCategory(tenantId: string, input: Required<Pick<UpdateCategoryInput, 'name' | 'slug'>> & Partial<UpdateCategoryInput>) {
     const category = await prisma.tenantCategory.create({
       data: {
+        id: crypto.randomUUID(),
         tenantId,
         name: input.name,
         slug: input.slug,
         parentId: input.parentId ?? undefined,
         googleCategoryId: input.googleCategoryId ?? undefined,
         sortOrder: input.sortOrder ?? 0,
+        updatedAt: new Date(),
       } as any,
     })
 

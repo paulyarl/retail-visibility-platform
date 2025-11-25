@@ -69,7 +69,8 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      const response = await api.post(`/api/tenants/${tenantId}/directory/publish`);
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const response = await api.post(`${apiUrl}/api/tenants/${tenantId}/directory/publish`);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -90,7 +91,8 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      const response = await api.post(`/api/tenants/${tenantId}/directory/unpublish`);
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const response = await api.post(`${apiUrl}/api/tenants/${tenantId}/directory/unpublish`);
 
       if (!response.ok) {
         throw new Error('Failed to unpublish listing');

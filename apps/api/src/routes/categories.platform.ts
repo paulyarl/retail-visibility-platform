@@ -4,7 +4,7 @@ import { categoryService } from '../services/CategoryService';
 
 const router = Router();
 
-router.get('/api/platform/categories', authenticateToken, requireAdmin, async (_req: Request, res: Response) => {
+router.get('/categories', authenticateToken, requireAdmin, async (_req: Request, res: Response) => {
   try {
     const categories = await categoryService.getTenantCategories('platform');
     return res.json({ success: true, data: categories });
@@ -13,7 +13,7 @@ router.get('/api/platform/categories', authenticateToken, requireAdmin, async (_
   }
 });
 
-router.post('/api/platform/categories', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+router.post('/categories', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const name = String(req.body?.name || '').trim();
     const slug = String(req.body?.slug || '').trim();
@@ -25,6 +25,18 @@ router.post('/api/platform/categories', authenticateToken, requireAdmin, async (
     if (e?.message?.includes('Unique constraint failed') && e?.message?.includes('slug')) {
       return res.status(409).json({ success: false, error: 'duplicate_slug', message: `A category with slug "${req.body?.slug}" already exists` });
     }
+    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+  }
+});
+
+// Quick start endpoint for platform categories (for frontend compatibility)
+router.post('/categories/quick-start', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    // Import the quick start logic
+    const { generateQuickStartCategories } = await import('../lib/quick-start-categories');
+    const categories = await generateQuickStartCategories();
+    return res.json({ success: true, data: categories });
+  } catch (e: any) {
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
   }
 });

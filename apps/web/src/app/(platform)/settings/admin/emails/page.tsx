@@ -20,7 +20,7 @@ const EMAIL_CATEGORIES: EmailCategory[] = [
     id: 'subscription',
     name: 'Subscription Requests',
     description: 'Upgrade, downgrade, and plan change requests from tenants',
-    defaultEmail: 'subscriptions@yourplatform.com',
+    defaultEmail: 'subscriptions@visibleshelf.store',
     icon: '💳',
     color: 'bg-blue-100 text-blue-800',
     examples: [
@@ -34,7 +34,7 @@ const EMAIL_CATEGORIES: EmailCategory[] = [
     id: 'sales',
     name: 'Sales Inquiries',
     description: 'New customer inquiries and demo requests',
-    defaultEmail: 'sales@yourplatform.com',
+    defaultEmail: 'sales@visibleshelf.store',
     icon: '💼',
     color: 'bg-green-100 text-green-800',
     examples: [
@@ -48,7 +48,7 @@ const EMAIL_CATEGORIES: EmailCategory[] = [
     id: 'support',
     name: 'Customer Support',
     description: 'Technical support and customer service requests',
-    defaultEmail: 'support@yourplatform.com',
+    defaultEmail: 'support@visibleshelf.store',
     icon: '🛟',
     color: 'bg-purple-100 text-purple-800',
     examples: [
@@ -62,7 +62,7 @@ const EMAIL_CATEGORIES: EmailCategory[] = [
     id: 'managed_services',
     name: 'Managed Services',
     description: 'Data entry, catalog management, and white-glove service requests',
-    defaultEmail: 'services@yourplatform.com',
+    defaultEmail: 'services@visibleshelf.store',
     icon: '🤝',
     color: 'bg-amber-100 text-amber-800',
     examples: [
@@ -76,7 +76,7 @@ const EMAIL_CATEGORIES: EmailCategory[] = [
     id: 'partnerships',
     name: 'Partnerships & Integrations',
     description: 'Partnership proposals and integration requests',
-    defaultEmail: 'partnerships@yourplatform.com',
+    defaultEmail: 'partnerships@visibleshelf.store',
     icon: '🤝',
     color: 'bg-indigo-100 text-indigo-800',
     examples: [
@@ -90,7 +90,7 @@ const EMAIL_CATEGORIES: EmailCategory[] = [
     id: 'marketing',
     name: 'Marketing & Media',
     description: 'Press inquiries, marketing campaigns, and promotional requests',
-    defaultEmail: 'marketing@yourplatform.com',
+    defaultEmail: 'marketing@visibleshelf.store',
     icon: '📢',
     color: 'bg-pink-100 text-pink-800',
     examples: [
@@ -104,7 +104,7 @@ const EMAIL_CATEGORIES: EmailCategory[] = [
     id: 'compliance',
     name: 'Compliance & Legal',
     description: 'Legal notices, compliance issues, and data requests',
-    defaultEmail: 'legal@yourplatform.com',
+    defaultEmail: 'legal@visibleshelf.store',
     icon: '⚖️',
     color: 'bg-red-100 text-red-800',
     examples: [
@@ -118,7 +118,7 @@ const EMAIL_CATEGORIES: EmailCategory[] = [
     id: 'general',
     name: 'General Inquiries',
     description: 'Catch-all for other types of requests',
-    defaultEmail: 'info@yourplatform.com',
+    defaultEmail: 'info@visibleshelf.store',
     icon: '📧',
     color: 'bg-neutral-100 text-neutral-800',
     examples: [

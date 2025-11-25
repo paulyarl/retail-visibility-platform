@@ -399,6 +399,7 @@ router.get('/tenants', requirePlatformUser, async (req: Request, res: Response) 
         select: {
           id: true,
           name: true,
+          subscriptionTier: true,
           createdAt: true,
         },
         orderBy: {
@@ -419,6 +420,7 @@ router.get('/tenants', requirePlatformUser, async (req: Request, res: Response) 
         select: {
           id: true,
           name: true,
+          subscriptionTier: true,
           createdAt: true,
         },
         orderBy: {

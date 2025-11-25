@@ -20,7 +20,7 @@ interface Tier {
   displayName: string;
   description?: string;
   priceMonthly: number;
-  maxSKUs?: number;
+  maxSkus?: number;
   maxLocations?: number;
   tierType: string;
   isActive: boolean;

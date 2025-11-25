@@ -1279,7 +1279,15 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
         orderBy: { updatedAt: 'desc' },
         skip,
         take: limit,
-        include: {},
+        include: {
+          tenantCategory: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+        },
       }),
       prisma.inventoryItem.count({ where }),
     ]);
@@ -1323,6 +1331,29 @@ app.get("/public/tenant/:tenantId/categories", async (req, res) => {
   } catch (e: any) {
     console.error("[GET /public/tenant/:tenantId/categories] Error:", e);
     return res.status(500).json({ error: "failed_to_get_categories" });
+  }
+});
+
+// Public endpoint to lookup Google taxonomy category by ID (no auth required)
+app.get("/public/google-taxonomy/:categoryId", async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    if (!categoryId) return res.status(400).json({ error: "category_id_required" });
+    
+    // Import Google taxonomy utility
+    const { getCategoryById } = await import('./lib/google/taxonomy');
+    
+    // Get category by ID
+    const category = getCategoryById(categoryId);
+    
+    if (!category) {
+      return res.status(404).json({ error: "category_not_found" });
+    }
+    
+    res.json(category);
+  } catch (e: any) {
+    console.error("[GET /public/google-taxonomy/:categoryId] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_category" });
   }
 });
 
@@ -2131,7 +2162,16 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         orderBy,
         skip,
         take: limit,
-        include: {},
+        include: {
+          tenantCategory: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              googleCategoryId: true,
+            },
+          },
+        },
       }),
       prisma.inventoryItem.count({ where }),
     ]);
@@ -2211,6 +2251,8 @@ const baseItemSchema = z.object({
   visibility: z.enum(['public', 'private']).optional(),
   // Category path for Google Shopping
   categoryPath: z.array(z.string()).optional(),
+  // Tenant category assignment
+  tenantCategoryId: z.string().nullable().optional(),
 });
 
 const createItemSchema = baseItemSchema.extend({

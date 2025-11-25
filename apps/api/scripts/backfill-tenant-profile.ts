@@ -27,11 +27,11 @@ async function main() {
       }
 
       const createdRow = await prisma.tenantBusinessProfile.create({
-        data: {
+        data: { 
           tenantId: t.id,
           businessName: md.business_name || t.name || "",
-          addressLine1: md.address_line1 || "",
-          addressLine2: md.address_line2 ?? null,
+          businessLine1: md.address_line1 || "", 
+          businessLine2: md.address_line2 ?? null,
           city: md.city || "",
           state: md.state ?? null,
           postalCode: md.postal_code || "",
@@ -41,7 +41,7 @@ async function main() {
           website: md.website ?? null,
           contactPerson: md.contact_person ?? null,
           hours: md.hours ?? null,
-          socialLinks: md.social_links ?? null,
+          specialLinks: md.social_links ?? null, 
           seoTags: md.seo_tags ?? null,
           latitude: md.latitude ?? null,
           longitude: md.longitude ?? null,
@@ -56,15 +56,15 @@ async function main() {
       }
 
       created++;
-      console.log(`[backfill] created profile for tenant ${t.id}`, createdRow.id);
+      console.log(`[backfill] created profile for tenant ${t.id}`, createdRow.tenantId);
       continue;
     }
 
     // If profile exists, optionally fill missing fields from metadata
     const patch: any = {};
     if (!existing.businessName && (md.business_name || t.name)) patch.businessName = md.business_name || t.name;
-    if (!existing.addressLine1 && md.address_line1) patch.addressLine1 = md.address_line1;
-    if (existing.addressLine2 == null && md.address_line2 != null) patch.addressLine2 = md.address_line2;
+    if (!existing.businessLine1 && md.address_line1) patch.businessLine1 = md.address_line1;
+    if (existing.businessLine2 == null && md.address_line2 != null) patch.businessLine2 = md.address_line2;
     if (!existing.city && md.city) patch.city = md.city;
     if (existing.state == null && md.state != null) patch.state = md.state;
     if (!existing.postalCode && md.postal_code) patch.postalCode = md.postal_code;
@@ -74,7 +74,7 @@ async function main() {
     if (existing.website == null && md.website != null) patch.website = md.website;
     if (existing.contactPerson == null && md.contact_person != null) patch.contactPerson = md.contact_person;
     if (existing.hours == null && md.hours != null) patch.hours = md.hours;
-    if (existing.socialLinks == null && md.social_links != null) patch.socialLinks = md.social_links;
+    if (existing.specialLinks == null && md.social_links != null) patch.specialLinks = md.social_links;
     if (existing.seoTags == null && md.seo_tags != null) patch.seoTags = md.seo_tags;
     if (existing.latitude == null && md.latitude != null) patch.latitude = md.latitude;
     if (existing.longitude == null && md.longitude != null) patch.longitude = md.longitude;

@@ -11,7 +11,7 @@ export class SESEmailProvider implements EmailProvider {
     this.region = process.env.AWS_SES_REGION || process.env.AWS_REGION || 'us-east-1';
     this.accessKeyId = process.env.AWS_SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '';
     this.secretAccessKey = process.env.AWS_SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || '';
-    this.fromEmail = process.env.AWS_SES_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@yourplatform.com';
+    this.fromEmail = process.env.AWS_SES_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@visibleshelf.store';
     this.fromName = process.env.AWS_SES_FROM_NAME || process.env.EMAIL_FROM_NAME || 'RVP Platform';
   }
 

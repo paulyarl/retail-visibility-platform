@@ -121,9 +121,9 @@ export default function SwisProductCard({ item, index, badgesEnabled }: SwisProd
           </Badge>
 
           {/* Category (if available) */}
-          {item.category_path && item.category_path.length > 0 && (
+          {item.categoryPath && item.categoryPath.length > 0 && (
             <p className="text-xs text-neutral-400 truncate">
-              {item.category_path.join(' › ')}
+              {item.categoryPath.join(' › ')}
             </p>
           )}
         </div>

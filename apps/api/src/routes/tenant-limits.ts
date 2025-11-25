@@ -20,7 +20,9 @@ const router = Router();
  */
 router.get('/status', authenticateToken, async (req, res) => {
   try {
+    console.log('[Tenant Limits] User from request:', req.user);
     if (!req.user) {
+      console.log('[Tenant Limits] No user found in request');
       return res.status(401).json({ error: 'authentication_required' });
     }
 
@@ -133,7 +135,7 @@ router.get('/status', authenticateToken, async (req, res) => {
       remaining: remaining === Infinity ? 'unlimited' : remaining,
       tier: effectiveTier,
       status: effectiveStatus,
-      tierDisplayName: limitConfig.display_name,
+      tierDisplayName: limitConfig.displayName,
       canCreate: remaining > 0 || remaining === Infinity,
       upgradeMessage: limitConfig.upgradeMessage,
       upgradeToTier: limitConfig.upgradeToTier,
@@ -162,7 +164,7 @@ router.get('/tiers', async (_req, res) => {
     const tiers = Object.entries(TENANT_LIMITS).map(([key, config]) => ({
       tier: key,
       limit: config.limit === Infinity ? 'unlimited' : config.limit,
-      display_name: config.display_name,
+      displayName: config.displayName,
       description: config.description,
       upgradeMessage: config.upgradeMessage,
       upgradeToTier: config.upgradeToTier,

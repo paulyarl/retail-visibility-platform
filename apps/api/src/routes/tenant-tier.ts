@@ -64,10 +64,10 @@ router.get('/tenants/:id/tier', authenticateToken, checkTenantAccess, async (req
       tenantTierData = {
         tierKey: tenant.subscriptionTier,
         name: tenant.subscriptionTier,
-        display_name: tenant.subscriptionTier.charAt(0).toUpperCase() + tenant.subscriptionTier.slice(1),
+        displayName: tenant.subscriptionTier.charAt(0).toUpperCase() + tenant.subscriptionTier.slice(1),
         features: [],
         limits: {
-          maxSKUs: tenant.subscriptionTier === 'starter' ? 500 : 
+          maxSkus: tenant.subscriptionTier === 'starter' ? 500 : 
                    tenant.subscriptionTier === 'professional' ? 5000 : 
                    tenant.subscriptionTier === 'enterprise' ? null : 
                    tenant.subscriptionTier === 'organization' ? null : 250
@@ -79,10 +79,10 @@ router.get('/tenants/:id/tier', authenticateToken, checkTenantAccess, async (req
       orgTierData = {
         tierKey: tenant.organization.subscriptionTier,
         name: tenant.organization.subscriptionTier,
-        display_name: tenant.organization.subscriptionTier.charAt(0).toUpperCase() + tenant.organization.subscriptionTier.slice(1),
+        displayName: tenant.organization.subscriptionTier.charAt(0).toUpperCase() + tenant.organization.subscriptionTier.slice(1),
         features: [],
         limits: {
-          maxSKUs: tenant.organization.subscriptionTier === 'starter' ? 500 : 
+          maxSkus: tenant.organization.subscriptionTier === 'starter' ? 500 : 
                    tenant.organization.subscriptionTier === 'professional' ? 5000 : 
                    tenant.organization.subscriptionTier === 'enterprise' ? null : 
                    tenant.organization.subscriptionTier === 'organization' ? null : 250

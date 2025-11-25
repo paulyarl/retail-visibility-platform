@@ -49,6 +49,7 @@ type Item = {
   visibility?: 'public' | 'private';
   availability?: 'in_stock' | 'out_of_stock' | 'preorder';
   categoryPath?: string[];
+  tenantCategoryId?: string | null;
 };
 
 export default function ItemsClient({
@@ -1081,7 +1082,7 @@ export default function ItemsClient({
                         <SyncStatusIndicator 
                           itemStatus={i.itemStatus}
                           visibility={i.visibility}
-                          categoryPath={i.categoryPath}
+                          tenantCategoryId={i.tenantCategoryId}
                           showDetails={true}
                         />
                       </div>

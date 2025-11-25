@@ -1,38 +1,29 @@
 import { useState } from 'react';
 import { Item } from '@/services/itemsDataService';
-import CategorySelector from './CategorySelector';
+import TenantCategorySelector from './TenantCategorySelector';
 
 interface CategoryAssignmentModalProps {
   item: Item;
-  onSave: (itemId: string, categoryId: string, categoryPath: string[]) => Promise<void>;
+  onSave: (itemId: string, categoryId: string) => Promise<void>;
   onClose: () => void;
 }
 
 /**
- * Modal for assigning categories to items
- * Uses CategorySelector for consistent category selection experience
+ * Modal for assigning tenant categories to items
+ * Shows the tenant's custom categories, not Google taxonomy
  */
 export default function CategoryAssignmentModal({
   item,
   onSave,
   onClose,
 }: CategoryAssignmentModalProps) {
-  const [selectedCategoryPath, setSelectedCategoryPath] = useState<string[]>([]);
-
-  const handleCategorySelect = (categoryPath: string[]) => {
-    setSelectedCategoryPath(categoryPath);
-  };
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(item.tenantCategoryId || '');
 
   const handleSave = async () => {
-    if (selectedCategoryPath.length === 0) return;
+    if (!selectedCategoryId) return;
 
     try {
-      // Find the selected category details to get the ID
-      // For now, we'll use a placeholder ID since the CategorySelector
-      // doesn't provide the category ID directly
-      const categoryId = selectedCategoryPath[selectedCategoryPath.length - 1] || 'unknown';
-
-      await onSave(item.id, categoryId, selectedCategoryPath);
+      await onSave(item.id, selectedCategoryId);
       onClose();
     } catch (error) {
       console.error('Failed to save category:', error);
@@ -46,7 +37,7 @@ export default function CategoryAssignmentModal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
           <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
-            Assign Google Category
+            Assign Category
           </h3>
           <button
             onClick={onClose}
@@ -69,10 +60,9 @@ export default function CategoryAssignmentModal({
             </div>
           </div>
 
-          <CategorySelector
-            currentCategory={item.categoryPath || []}
-            onCategorySelect={handleCategorySelect}
-            onCancel={onClose}
+          <TenantCategorySelector
+            selectedCategoryId={selectedCategoryId}
+            onSelect={setSelectedCategoryId}
           />
         </div>
 
@@ -86,7 +76,7 @@ export default function CategoryAssignmentModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={selectedCategoryPath.length === 0}
+            disabled={!selectedCategoryId}
             className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Assign Category

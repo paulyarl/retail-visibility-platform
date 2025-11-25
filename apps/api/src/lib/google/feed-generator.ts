@@ -17,7 +17,8 @@ export interface FeedItem {
   availability: string;
   imageUrl?: string;
   additionalImageLinks?: string[];
-  categoryPath?: string[];
+  googleProductCategory?: string; // Google category ID from tenant category
+  productType?: string; // Tenant category name for product_type field
 }
 
 /**
@@ -43,11 +44,20 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
         currency: true,
         availability: true,
         imageUrl: true,
-        categoryPath: true,
+        tenantCategory: {
+          select: {
+            name: true,
+            googleCategoryId: true,
+          },
+        },
       },
     });
 
     return items.map(item => {
+      // Use tenant category's Google ID if available
+      const googleProductCategory = item.tenantCategory?.googleCategoryId || undefined;
+      const productType = item.tenantCategory?.name || undefined;
+
       return {
         id: item.id,
         sku: item.sku,
@@ -60,7 +70,8 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
         availability: item.availability,
         image_url: item.imageUrl || undefined,
         additionalImageLinks: undefined,
-        categoryPath: item.categoryPath || undefined,
+        googleProductCategory, // Google category ID from tenant category
+        productType, // Tenant category name
       } as FeedItem;
     });
   } catch (error) {

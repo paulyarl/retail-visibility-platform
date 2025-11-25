@@ -6,15 +6,15 @@
  */
 
 interface TierLimits {
-  maxSKUs: number;
+  maxSkus: number;
 }
 
 const TIER_LIMITS: Record<string, TierLimits> = {
-  google_only: { maxSKUs: 250 },
-  starter: { maxSKUs: 500 },
-  professional: { maxSKUs: 5000 },
-  enterprise: { maxSKUs: Infinity },
-  organization: { maxSKUs: Infinity },
+  google_only: { maxSkus: 250 },
+  starter: { maxSkus: 500 },
+  professional: { maxSkus: 5000 },
+  enterprise: { maxSkus: Infinity },
+  organization: { maxSkus: Infinity },
 };
 
 const TRASH_CAPACITY_PERCENT = 0.05; // 5% of SKU limit
@@ -33,12 +33,12 @@ export function getTrashCapacity(tier: string): number {
   }
   
   // For unlimited tiers, use a reasonable default
-  if (tierConfig.maxSKUs === Infinity) {
+  if (tierConfig.maxSkus === Infinity) {
     return 250; // 5% of 5000 (professional limit)
   }
   
   // Calculate 5% of SKU limit, minimum 10
-  const capacity = Math.max(10, Math.ceil(tierConfig.maxSKUs * TRASH_CAPACITY_PERCENT));
+  const capacity = Math.max(10, Math.ceil(tierConfig.maxSkus * TRASH_CAPACITY_PERCENT));
   return capacity;
 }
 

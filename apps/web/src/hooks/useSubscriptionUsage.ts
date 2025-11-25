@@ -113,7 +113,7 @@ export function useSubscriptionUsage(tenantIdProp?: string) {
         // Get tier info
         const tier = (tenantData.subscriptionTier || 'starter') as SubscriptionTier;
         const tierInfo = TIER_LIMITS[tier];
-        const skuLimit = tierInfo.maxSKUs;
+        const skuLimit = tierInfo.maxSkus;
         const skuIsUnlimited = skuLimit === Infinity;
         
         // Calculate SKU usage percentage

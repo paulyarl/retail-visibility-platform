@@ -73,14 +73,16 @@ export async function getCategoryCounts(
       return acc;
     }, {} as Record<string, number>);
 
-    // Transform to CategoryCount format
-    return categories.map(cat => ({
-      id: cat.id,
-      name: cat.name,
-      slug: cat.slug,
-      googleCategoryId: cat.googleCategoryId,
-      count: countMap[cat.id] || 0,
-    }));
+    // Transform to CategoryCount format and filter out categories with no products
+    return categories
+      .map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        googleCategoryId: cat.googleCategoryId,
+        count: countMap[cat.id] || 0,
+      }))
+      .filter(cat => cat.count > 0); // Only show categories with products
   } catch (error) {
     console.error('[Category Counts] Error:', error);
     throw new Error('Failed to get category counts');

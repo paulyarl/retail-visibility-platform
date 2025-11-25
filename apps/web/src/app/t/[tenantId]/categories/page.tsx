@@ -27,6 +27,93 @@ interface AlignmentStatus {
   status: string
 }
 
+// Component to display Google category ID with lookup utility
+function GoogleCategoryPath({ googleCategoryId }: { googleCategoryId: string }) {
+  const [showLookup, setShowLookup] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(googleCategoryId)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <div className="flex items-center gap-1.5 text-gray-600">
+        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+        </svg>
+        <span className="font-medium text-green-700">Google ID:</span>
+        <button
+          onClick={handleCopy}
+          className="font-mono text-gray-700 hover:text-green-700 hover:underline transition-colors"
+          title="Click to copy ID"
+        >
+          {googleCategoryId}
+        </button>
+        {copied && (
+          <span className="text-green-600 font-medium">✓ Copied</span>
+        )}
+      </div>
+      <button
+        onClick={() => setShowLookup(!showLookup)}
+        className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
+        title="Lookup category path"
+      >
+        {showLookup ? 'Hide path' : 'Show path'}
+      </button>
+      {showLookup && (
+        <GoogleCategoryLookup googleCategoryId={googleCategoryId} />
+      )}
+    </div>
+  )
+}
+
+// Separate component for the lookup that fetches from public endpoint
+function GoogleCategoryLookup({ googleCategoryId }: { googleCategoryId: string }) {
+  const [path, setPath] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchPath() {
+      try {
+        // Use the public Google taxonomy endpoint (no auth required)
+        const res = await fetch(`${API_BASE_URL}/public/google-taxonomy/${googleCategoryId}`)
+        if (res.ok) {
+          const data = await res.json()
+          // data.path is an array like ["Food", "Bakery", "Bread"]
+          if (data.path) {
+            const pathString = Array.isArray(data.path) ? data.path.join(' > ') : data.path
+            setPath(pathString)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch Google category path:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchPath()
+  }, [googleCategoryId])
+
+  if (loading) {
+    return (
+      <span className="text-gray-500 italic">Loading...</span>
+    )
+  }
+
+  if (!path) {
+    return (
+      <span className="text-orange-600">Path not found</span>
+    )
+  }
+
+  return (
+    <span className="text-gray-700 italic">→ {path}</span>
+  )
+}
+
 export default function CategoriesPage() {
   const params = useParams()
   const tenantId = params.tenantId as string
@@ -389,25 +476,43 @@ export default function CategoriesPage() {
           </svg>
           <div className="flex-1">
             <h4 className="text-sm font-semibold text-blue-900 mb-2">📚 Product Categories Guide</h4>
-            <div className="space-y-2 text-sm text-blue-800">
+            <div className="space-y-3 text-sm text-blue-800">
               <div>
                 <strong>💡 Why create categories?</strong>
                 <p>Organize your products and improve visibility in Google Business Profile and Google Merchant Center. Well-categorized products perform better in search results and shopping ads.</p>
               </div>
+              
+              <div className="bg-blue-100 rounded p-3">
+                <strong className="text-blue-900">🎯 Single Source of Truth</strong>
+                <p className="mt-1">Categories created here appear <strong>consistently everywhere</strong>:</p>
+                <ul className="list-disc list-inside ml-2 mt-1 space-y-0.5">
+                  <li><strong>Storefront sidebar</strong> - Customers browse by category</li>
+                  <li><strong>Product cards</strong> - Category badges on each item</li>
+                  <li><strong>Directory listing</strong> - Category filters for discovery</li>
+                  <li><strong>Items page</strong> - Assign products to your categories</li>
+                </ul>
+              </div>
+
               <div>
-                <strong>🎯 How to use:</strong>
+                <strong>🔄 How it works:</strong>
                 <ol className="list-decimal list-inside ml-2 space-y-1">
-                  <li>Create categories here (e.g., "Hot Coffee", "Pastries", "Sandwiches")</li>
-                  <li>Align each category to Google's Product Taxonomy for better matching</li>
-                  <li>Assign categories to your products on the{' '}
+                  <li><strong>Create categories here</strong> (e.g., "Hot Coffee", "Pastries", "Sandwiches")</li>
+                  <li><strong>Optionally map to Google</strong> taxonomy for SEO & sync</li>
+                  <li><strong>Assign to products</strong> on the{' '}
                     <a href={`/t/${tenantId}/items`} className="underline font-medium hover:text-blue-900">
                       Items page
                     </a>
                   </li>
-                  <li>If you're part of a chain, propagate to other locations</li>
+                  <li><strong>Categories appear</strong> automatically on all public pages</li>
                 </ol>
               </div>
-              <div className="bg-blue-100 rounded p-2 mt-2">
+
+              <div className="bg-purple-50 border border-purple-200 rounded p-2">
+                <strong className="text-purple-900">ℹ️ Important:</strong>
+                <p className="mt-1">Products can <strong>only use categories you create here</strong>. They don't have direct access to Google's 6000+ categories. You control your category structure and optionally map to Google for sync purposes.</p>
+              </div>
+
+              <div className="bg-blue-100 rounded p-2">
                 <strong>🔍 Note:</strong> These are <strong>product categories</strong> (unlimited). Your <strong>business category</strong> (e.g., "Coffee Shop") is managed separately at{' '}
                 <a href={`/t/${tenantId}/settings/gbp-category`} className="underline font-medium hover:text-blue-900">
                   Business Category Settings
@@ -554,14 +659,14 @@ export default function CategoriesPage() {
               <div key={cat.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 mb-1">
                       <h3 className="font-medium text-gray-900">{cat.name}</h3>
                       {cat.googleCategoryId ? (
                         <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-1 rounded">
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
-                          Mapped
+                          Mapped to Google
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs text-orange-700 bg-orange-50 px-2 py-1 rounded">
@@ -572,6 +677,9 @@ export default function CategoriesPage() {
                         </span>
                       )}
                     </div>
+                    {cat.googleCategoryId && (
+                      <GoogleCategoryPath googleCategoryId={cat.googleCategoryId} />
+                    )}
                   </div>
                   <button
                     onClick={() => openEdit(cat)}
@@ -811,32 +919,60 @@ export default function CategoriesPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Google Category</label>
-                <div className="relative">
-                  <input
-                    placeholder="Search taxonomy by name (e.g. Electronics)"
-                    value={taxQuery}
-                    onChange={(e) => { setTaxQuery(e.target.value); setShowTaxResults(true) }}
-                    onFocus={() => setShowTaxResults(true)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {showTaxResults && (taxResults.length > 0 || taxLoading) && (
-                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-auto">
-                      {taxLoading && <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>}
-                      {taxResults.map((r) => (
-                        <button
-                          key={r.id}
-                          type="button"
-                          onClick={() => { setFormGoogleId(r.id); setTaxQuery(r.path.join(' > ')); setShowTaxResults(false) }}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-50"
-                        >
-                          <div className="text-sm font-medium text-gray-900">{r.name}</div>
-                          <div className="text-xs text-gray-600">{r.path.join(' > ')}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                <div className="space-y-3">
+                  {/* Search by name */}
+                  <div className="relative">
+                    <input
+                      placeholder="Search taxonomy by name (e.g. Electronics)"
+                      value={taxQuery}
+                      onChange={(e) => { setTaxQuery(e.target.value); setShowTaxResults(true) }}
+                      onFocus={() => setShowTaxResults(true)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {showTaxResults && (taxResults.length > 0 || taxLoading) && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-auto">
+                        {taxLoading && <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>}
+                        {taxResults.map((r) => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => { setFormGoogleId(r.id); setTaxQuery(r.path.join(' > ')); setShowTaxResults(false) }}
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                          >
+                            <div className="text-sm font-medium text-gray-900">{r.name}</div>
+                            <div className="text-xs text-gray-600">{r.path.join(' > ')}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* OR divider */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 border-t border-gray-300"></div>
+                    <span className="text-xs text-gray-500 font-medium">OR</span>
+                    <div className="flex-1 border-t border-gray-300"></div>
+                  </div>
+
+                  {/* Direct ID input */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Enter Google Category ID directly</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 543543, 5904, 499989"
+                      value={formGoogleId}
+                      onChange={(e) => setFormGoogleId(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formGoogleId ? (
+                        <>Selected ID: <span className="font-mono font-medium">{formGoogleId}</span></>
+                      ) : (
+                        'Paste a known Google category ID if you have one'
+                      )}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Selected ID: {formGoogleId || 'none'}</p>
               </div>
             </div>
             <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-2">

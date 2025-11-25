@@ -78,15 +78,17 @@ router.get('/scenarios', async (req, res) => {
  */
 const quickStartSchema = z.object({
   scenario: z.enum(['grocery', 'fashion', 'electronics', 'general']),
-  productCount: z.number().int().min(1).max(100),
+  productCount: z.number().int().min(1).max(100).default(50),
   assignCategories: z.boolean().optional().default(true),
   createAsDrafts: z.boolean().optional().default(true),
 });
 
 router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quick_start_wizard'), validateSKULimits, async (req, res) => {
   try {
+    console.log('[Quick Start] POST request received');
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId;
+    console.log('[Quick Start] Tenant ID:', tenantId, 'User ID:', userId);
 
     // Verify user is authenticated
     if (!userId) {
@@ -157,9 +159,22 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     // If tenant has no organization, allow any authenticated user (for backwards compatibility)
     // TODO: In production, all tenants should belong to an organization
 
-    // Validate request body
-    const parsed = quickStartSchema.safeParse(req.body);
+    // Validate request body - handle both camelCase and snake_case due to universal transform middleware
+    console.log('[Quick Start] Request body:', req.body);
+    
+    // Normalize the request body to handle both naming conventions
+    const normalizedBody = {
+      scenario: req.body.scenario,
+      productCount: req.body.productCount || req.body.product_count,
+      assignCategories: req.body.assignCategories || req.body.assign_categories,
+      createAsDrafts: req.body.createAsDrafts || req.body.create_as_drafts,
+    };
+    
+    console.log('[Quick Start] Normalized body:', normalizedBody);
+    
+    const parsed = quickStartSchema.safeParse(normalizedBody);
     if (!parsed.success) {
+      console.log('[Quick Start] Validation errors:', parsed.error.issues);
       return res.status(400).json({
         error: 'Invalid request',
         details: parsed.error.issues,
@@ -490,12 +505,14 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
 
         return prisma.tenantCategory.create({
           data: {
+            id: crypto.randomUUID(),
             tenantId,
             name: cat.name,
             slug: cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
             googleCategoryId,
             sortOrder: index,
             isActive: true,
+          updatedAt: new Date(),
           } as any,
         });
       })

@@ -33,6 +33,13 @@ interface Item {
   status: 'active' | 'inactive' | 'syncing';
   visibility: 'public' | 'private';
   categoryPath?: string[];
+  tenantCategoryId?: string | null;
+  tenantCategory?: {
+    id: string;
+    name: string;
+    slug?: string;
+    googleCategoryId?: string | null;
+  };
   imageUrl?: string;
   brand?: string;
   manufacturer?: string;
@@ -258,7 +265,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 <SyncStatusIndicator
                   itemStatus={item.status}
                   visibility={item.visibility}
-                  categoryPath={item.categoryPath}
+                  tenantCategoryId={item.tenantCategoryId}
                   showDetails={true}
                 />
               </CardContent>

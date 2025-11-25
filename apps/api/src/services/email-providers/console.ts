@@ -7,7 +7,7 @@ export class ConsoleEmailProvider implements EmailProvider {
       console.log('📧 EMAIL SENT (Console Provider)');
       console.log('='.repeat(80));
       console.log(`To: ${params.to}`);
-      console.log(`From: ${params.from || 'noreply@yourplatform.com'}`);
+      console.log(`From: ${params.from || 'noreply@visibleshelf.store'}`);
       console.log(`Subject: ${params.subject}`);
       console.log('-'.repeat(80));
       

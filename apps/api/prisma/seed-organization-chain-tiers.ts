@@ -34,12 +34,13 @@ async function main() {
     // Create organization tier
     const newOrgTier = await prisma.subscriptionTier.create({
       data: {
+        id: crypto.randomUUID(),
         tierKey: 'organization',
         name: 'Organization',
         displayName: 'Organization',
         description: 'For multi-location businesses managed as an organization',
         priceMonthly: 0, // Custom pricing
-        maxSKUs: null, // Unlimited
+        maxSkus: null, // Unlimited
         maxLocations: null, // Unlimited
         tierType: 'organization',
         isActive: true,
@@ -51,12 +52,13 @@ async function main() {
     // Create chain tiers (mirror individual tiers)
     const newChainStarter = await prisma.subscriptionTier.create({
       data: {
+        id: crypto.randomUUID(),
         tierKey: 'chain_starter',
         name: 'Chain Starter',
         displayName: 'Chain Starter',
         description: 'Starter tier for retail chains',
         priceMonthly: 19900, // $199/mo
-        maxSKUs: 500,
+        maxSkus: 500,
         maxLocations: null,
         tierType: 'organization',
         isActive: true,
@@ -67,12 +69,13 @@ async function main() {
 
     const newChainProfessional = await prisma.subscriptionTier.create({
       data: {
+        id: crypto.randomUUID(),
         tierKey: 'chain_professional',
         name: 'Chain Professional',
         displayName: 'Chain Professional',
         description: 'Professional tier for retail chains',
         priceMonthly: 199900, // $1,999/mo
-        maxSKUs: 5000,
+        maxSkus: 5000,
         maxLocations: null,
         tierType: 'organization',
         isActive: true,
@@ -83,12 +86,13 @@ async function main() {
 
     const newChainEnterprise = await prisma.subscriptionTier.create({
       data: {
+        id: crypto.randomUUID(),
         tierKey: 'chain_enterprise',
         name: 'Chain Enterprise',
         displayName: 'Chain Enterprise',
         description: 'Enterprise tier for retail chains',
         priceMonthly: 499900, // $4,999/mo
-        maxSKUs: null,
+        maxSkus: null,
         maxLocations: null,
         tierType: 'organization',
         isActive: true,
@@ -150,8 +154,9 @@ async function main() {
       ];
 
       for (const feature of orgFeatures) {
-        await prisma.tierFeature.create({
+        await prisma.tierFeatures.create({
           data: {
+            id: crypto.randomUUID(),
             tierId: organizationTier.id,
             ...feature,
             isEnabled: true,
@@ -195,8 +200,9 @@ async function main() {
     ];
 
     for (const feature of chainStarterFeatures) {
-      await prisma.tierFeature.create({
+      await prisma.tierFeatures.create({
         data: {
+          id: crypto.randomUUID(),
           tierId: chainStarterFinal.id,
           ...feature,
           isEnabled: true,
@@ -237,8 +243,9 @@ async function main() {
     ];
 
     for (const feature of chainProfessionalFeatures) {
-      await prisma.tierFeature.create({
+      await prisma.tierFeatures.create({
         data: {
+          id: crypto.randomUUID(),
           tierId: chainProfessionalFinal.id,
           ...feature,
           isEnabled: true,
@@ -274,8 +281,9 @@ async function main() {
     ];
 
     for (const feature of chainEnterpriseFeatures) {
-      await prisma.tierFeature.create({
+      await prisma.tierFeatures.create({
         data: {
+          id: crypto.randomUUID(),
           tierId: chainEnterpriseFinal.id,
           ...feature,
           isEnabled: true,

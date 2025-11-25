@@ -233,7 +233,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                         <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
                           <span className="font-semibold text-orange-900">SKUs:</span>{' '}
                           <span className="text-orange-700 font-medium">
-                            {info.maxSKUs === Infinity ? 'Unlimited' : info.maxSKUs.toLocaleString()}
+                            {info.maxSkus === Infinity ? 'Unlimited' : info.maxSkus.toLocaleString()}
                           </span>
                         </div>
                       </div>
@@ -324,7 +324,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   const skuUsage = capacityData?.skuUsage || 0;
   const skuLimit = capacityData?.skuLimit || (isChainTier 
     ? (tierInfo as any).maxTotalSKUs 
-    : (tierInfo as any).maxSKUs);
+    : (tierInfo as any).maxSkus);
   const usagePercent = capacityData?.skuPercent || 0;
 
   const handleRequestChange = (newTier: SubscriptionTier | ChainTier) => {
@@ -859,7 +859,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
                         <span className="font-semibold text-orange-900">SKUs:</span>{' '}
                         <span className="text-orange-700 font-medium">
-                          {info.maxSKUs === Infinity ? 'Unlimited' : info.maxSKUs.toLocaleString()}
+                          {info.maxSkus === Infinity ? 'Unlimited' : info.maxSkus.toLocaleString()}
                         </span>
                       </div>
                     </div>

@@ -13,6 +13,29 @@ export interface CSVItem {
   sku: string;
   availability: string;
   imageUrl?: string;
+  category?: string; // Tenant category name
+  status?: 'active' | 'inactive' | 'archived' | 'draft';
+  visibility?: 'public' | 'private';
+}
+
+export interface CategorySuggestion {
+  name: string;
+  itemCount: number;
+  exists: boolean;
+  existingCategoryId?: string;
+}
+
+export interface CSVImportPreview {
+  items: CSVItem[];
+  categorySuggestions: CategorySuggestion[];
+  summary: {
+    totalItems: number;
+    newCategories: number;
+    statusBreakdown: Record<string, number>;
+    visibilityBreakdown: Record<string, number>;
+  };
+  errors: string[];
+  warnings: string[];
 }
 
 export const CSV_TEMPLATE_HEADERS = [
@@ -25,7 +48,10 @@ export const CSV_TEMPLATE_HEADERS = [
   'currency',
   'sku',
   'availability',
-  'imageUrl'
+  'imageUrl',
+  'category',
+  'status',
+  'visibility'
 ];
 
 export const CSV_EXAMPLE_DATA = [
@@ -39,7 +65,10 @@ export const CSV_EXAMPLE_DATA = [
     currency: 'USD',
     sku: 'SHOE-RED-10',
     availability: 'in_stock',
-    imageUrl: 'https://example.com/shoe.jpg'
+    imageUrl: 'https://example.com/shoe.jpg',
+    category: 'Athletic Footwear',
+    status: 'active',
+    visibility: 'public'
   },
   {
     name: 'Blue T-Shirt',
@@ -51,14 +80,44 @@ export const CSV_EXAMPLE_DATA = [
     currency: 'USD',
     sku: 'SHIRT-BLUE-M',
     availability: 'in_stock',
-    imageUrl: ''
+    imageUrl: '',
+    category: 'Apparel',
+    status: 'active',
+    visibility: 'public'
+  },
+  {
+    name: 'Yoga Mat',
+    title: 'Premium Yoga Mat',
+    brand: 'Generic',
+    manufacturer: 'Generic Co.',
+    description: 'Non-slip yoga mat',
+    price: 34.99,
+    currency: 'USD',
+    sku: 'YOGA-MAT-01',
+    availability: 'in_stock',
+    imageUrl: '',
+    category: 'Fitness Equipment',
+    status: 'inactive',
+    visibility: 'private'
   }
 ];
 
 /**
- * Generate CSV template file
+ * Generate CSV template file with helpful comments
  */
 export function generateCSVTemplate(): string {
+  const comments = [
+    '# RVP Bulk Import Template',
+    '# Required fields: name, sku, price',
+    '# Optional fields: title, brand, manufacturer, description, currency, availability, imageUrl, category, status, visibility',
+    '#',
+    '# Category: Use your tenant category names (will be created if new)',
+    '# Status: active, inactive, archived, draft (default: active)',
+    '# Visibility: public, private (default: public)',
+    '# Availability: in_stock, out_of_stock, preorder, discontinued',
+    ''
+  ].join('\n');
+  
   const headers = CSV_TEMPLATE_HEADERS.join(',');
   const examples = CSV_EXAMPLE_DATA.map(row => 
     CSV_TEMPLATE_HEADERS.map(header => {
@@ -72,7 +131,7 @@ export function generateCSVTemplate(): string {
     }).join(',')
   ).join('\n');
   
-  return `${headers}\n${examples}`;
+  return `${comments}${headers}\n${examples}`;
 }
 
 /**
@@ -127,7 +186,10 @@ export function parseCSV(csvText: string): CSVItem[] {
         currency: item.currency || 'USD',
         sku: item.sku || '',
         availability: item.availability || 'in_stock',
-        imageUrl: item.imageUrl || undefined
+        imageUrl: item.imageUrl || undefined,
+        category: item.category || undefined,
+        status: (item.status as any) || 'active',
+        visibility: (item.visibility as any) || 'public'
       };
 
       // Basic validation
@@ -211,14 +273,88 @@ export function validateCSVItems(items: CSVItem[]): { valid: boolean; errors: st
     }
 
     // Validate availability
-    const validAvailability = ['in_stock', 'out_of_stock', 'preorder', 'backorder'];
+    const validAvailability = ['in_stock', 'out_of_stock', 'preorder', 'backorder', 'discontinued'];
     if (!validAvailability.includes(item.availability)) {
       errors.push(`Invalid availability at row ${index + 2}: ${item.availability}`);
+    }
+
+    // Validate status
+    if (item.status) {
+      const validStatus = ['active', 'inactive', 'archived', 'draft'];
+      if (!validStatus.includes(item.status)) {
+        errors.push(`Invalid status at row ${index + 2}: ${item.status}. Must be one of: ${validStatus.join(', ')}`);
+      }
+    }
+
+    // Validate visibility
+    if (item.visibility) {
+      const validVisibility = ['public', 'private'];
+      if (!validVisibility.includes(item.visibility)) {
+        errors.push(`Invalid visibility at row ${index + 2}: ${item.visibility}. Must be one of: ${validVisibility.join(', ')}`);
+      }
     }
   });
 
   return {
     valid: errors.length === 0,
     errors
+  };
+}
+
+/**
+ * Analyze CSV items and generate import preview
+ */
+export async function analyzeCSVImport(
+  items: CSVItem[],
+  existingCategories: Array<{ id: string; name: string }>
+): Promise<CSVImportPreview> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  
+  // Analyze categories
+  const categoryMap = new Map<string, number>();
+  items.forEach(item => {
+    if (item.category) {
+      categoryMap.set(item.category, (categoryMap.get(item.category) || 0) + 1);
+    } else {
+      warnings.push(`Item "${item.name}" (SKU: ${item.sku}) has no category assigned`);
+    }
+  });
+  
+  const categorySuggestions: CategorySuggestion[] = Array.from(categoryMap.entries()).map(([name, count]) => {
+    const existing = existingCategories.find(c => c.name.toLowerCase() === name.toLowerCase());
+    return {
+      name,
+      itemCount: count,
+      exists: !!existing,
+      existingCategoryId: existing?.id
+    };
+  });
+  
+  // Status breakdown
+  const statusBreakdown: Record<string, number> = {};
+  items.forEach(item => {
+    const status = item.status || 'active';
+    statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+  });
+  
+  // Visibility breakdown
+  const visibilityBreakdown: Record<string, number> = {};
+  items.forEach(item => {
+    const visibility = item.visibility || 'public';
+    visibilityBreakdown[visibility] = (visibilityBreakdown[visibility] || 0) + 1;
+  });
+  
+  return {
+    items,
+    categorySuggestions,
+    summary: {
+      totalItems: items.length,
+      newCategories: categorySuggestions.filter(c => !c.exists).length,
+      statusBreakdown,
+      visibilityBreakdown
+    },
+    errors,
+    warnings
   };
 }

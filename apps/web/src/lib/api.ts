@@ -126,12 +126,16 @@ export const api = {
       body: data ? JSON.stringify(data) : undefined,
     }),
 
-  put: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
-    apiRequest(endpoint, {
+  put: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) => {
+    console.log('[api.put] Endpoint:', endpoint, 'Data:', data);
+    const body = data ? JSON.stringify(data) : undefined;
+    console.log('[api.put] Body:', body);
+    return apiRequest(endpoint, {
       ...options,
       method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined,
-    }),
+      body,
+    });
+  },
 
   patch: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
     apiRequest(endpoint, {

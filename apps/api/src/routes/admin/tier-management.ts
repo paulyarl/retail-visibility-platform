@@ -18,182 +18,51 @@ router.use(requireAdmin);
 
 /**
  * GET /api/admin/tiers
- * List all available subscription tiers with their configurations
+ * List all available subscription tiers with their configurations from database
  */
 router.get('/tiers', async (req, res) => {
   try {
-    // Return tier definitions from the system
-    const tiers = {
-      individual: [
-        {
-          id: 'google_only',
-          name: 'Google-Only',
-          display_name: 'Google-Only',
-          price: 29,
-          maxSKUs: 250,
-          description: 'Get discovered on Google',
-          type: 'individual',
-          features: [
-            'google_shopping',
-            'google_merchant_center',
-            'basic_product_pages',
-            'qr_codes_512',
-            'performance_analytics',
-            'quick_start_wizard', // Limited
-          ],
+    // Fetch tiers from database
+    const tiers = await prisma.subscriptionTier.findMany({
+      where: { isActive: true },
+      include: {
+        features: {
+          where: { isEnabled: true },
+          select: {
+            featureKey: true,
+            featureName: true,
+          },
         },
-        {
-          id: 'starter',
-          name: 'Starter',
-          display_name: 'Starter',
-          price: 49,
-          maxSKUs: 500,
-          description: 'Get started with the basics',
-          type: 'individual',
-          features: [
-            'storefront',
-            'product_search',
-            'mobile_responsive',
-            'enhanced_seo',
-            'basic_categories',
-          ],
-        },
-        {
-          id: 'professional',
-          name: 'Professional',
-          display_name: 'Professional',
-          price: 499,
-          maxSKUs: 5000,
-          description: 'For established retail businesses',
-          type: 'individual',
-          features: [
-            'quick_start_wizard',
-            'product_scanning',
-            'gbp_integration',
-            'custom_branding',
-            'business_logo',
-            'qr_codes_1024',
-            'image_gallery_5',
-            'interactive_maps',
-            'privacy_mode',
-            'custom_marketing_copy',
-            'priority_support',
-          ],
-        },
-        {
-          id: 'enterprise',
-          name: 'Enterprise',
-          display_name: 'Enterprise',
-          price: 999,
-          maxSKUs: Infinity,
-          description: 'For large single-location operations',
-          type: 'individual',
-          features: [
-            'unlimited_skus',
-            'white_label',
-            'custom_domain',
-            'qr_codes_2048',
-            'image_gallery_10',
-            'api_access',
-            'advanced_analytics',
-            'dedicated_account_manager',
-            'sla_guarantee',
-            'custom_integrations',
-          ],
-        },
-      ],
-      organization: [
-        {
-          id: 'organization',
-          name: 'Organization',
-          display_name: 'Organization',
-          price: 999,
-          maxSKUs: 10000,
-          description: 'For franchise chains & multi-location businesses',
-          type: 'organization',
-          features: [
-            'propagation_products',
-            'propagation_categories',
-            'propagation_gbp_sync',
-            'propagation_hours',
-            'propagation_profile',
-            'propagation_flags',
-            'propagation_roles',
-            'propagation_brand',
-            'organization_dashboard',
-            'hero_location',
-            'strategic_testing',
-            'unlimited_locations',
-            'shared_sku_pool',
-            'centralized_control',
-            'api_access',
-          ],
-        },
-        {
-          id: 'chain_starter',
-          name: 'Chain Starter',
-          display_name: 'Chain Starter',
-          price: 199,
-          maxLocations: 5,
-          maxSKUs: 2500,
-          description: 'For small chains (2-5 locations)',
-          type: 'chain',
-          features: [
-            'storefront',
-            'product_search',
-            'mobile_responsive',
-            'enhanced_seo',
-            'multi_location_5',
-          ],
-        },
-        {
-          id: 'chain_professional',
-          name: 'Chain Professional',
-          display_name: 'Chain Professional',
-          price: 1999,
-          maxLocations: 25,
-          maxSKUs: 25000,
-          description: 'For medium chains (6-25 locations)',
-          type: 'chain',
-          features: [
-            'quick_start_wizard',
-            'product_scanning',
-            'gbp_integration',
-            'custom_branding',
-            'qr_codes_1024',
-            'image_gallery_5',
-            'multi_location_25',
-            'basic_propagation',
-          ],
-        },
-        {
-          id: 'chain_enterprise',
-          name: 'Chain Enterprise',
-          display_name: 'Chain Enterprise',
-          price: 4999,
-          maxLocations: Infinity,
-          maxSKUs: Infinity,
-          description: 'For large chains (26+ locations)',
-          type: 'chain',
-          features: [
-            'unlimited_skus',
-            'white_label',
-            'custom_domain',
-            'qr_codes_2048',
-            'image_gallery_10',
-            'api_access',
-            'unlimited_locations',
-            'advanced_propagation',
-            'dedicated_account_manager',
-          ],
-        },
-      ],
-    };
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
 
-    res.json(tiers);
+    // Group tiers by type
+    const groupedTiers = tiers.reduce((acc, tier) => {
+      const tierData = {
+        id: tier.tierKey,
+        name: tier.name,
+        displayName: tier.displayName,
+        price: tier.priceMonthly / 100, // Convert from cents to dollars
+        maxSkus: tier.maxSkus,
+        maxLocations: tier.maxLocations,
+        description: tier.description || '',
+        type: tier.tierType,
+        features: tier.features.map(f => f.featureKey),
+        sortOrder: tier.sortOrder,
+      };
+
+      if (!acc[tier.tierType]) {
+        acc[tier.tierType] = [];
+      }
+      acc[tier.tierType].push(tierData);
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    res.json(groupedTiers);
   } catch (error) {
-    console.error('[GET /api/admin/tiers] Error:', error);
-    res.status(500).json({ error: 'failed_to_list_tiers' });
+    console.error('[GET /api/admin/tier-management/tiers] Error:', error);
+    res.status(500).json({ error: 'failed_to_fetch_tiers' });
   }
 });
 
@@ -435,14 +304,14 @@ router.patch('/tenants/:tenantId', async (req, res) => {
         before: {
           subscriptionTier: currentTenant.subscriptionTier,
           subscriptionStatus: currentTenant.subscriptionStatus,
-          trialEndsAt: currentTenant.trialEndsAt,
-          subscriptionEndsAt: currentTenant.subscriptionEndsAt,
+          trialEndsAt: currentTenant.trialEndsAt?.toISOString(),
+          subscriptionEndsAt: currentTenant.subscriptionEndsAt?.toISOString(),
         },
         after: {
           subscriptionTier: updatedTenant.subscriptionTier,
           subscriptionStatus: updatedTenant.subscriptionStatus,
-          trialEndsAt: updatedTenant.trialEndsAt,
-          subscriptionEndsAt: updatedTenant.subscriptionEndsAt,
+          trialEndsAt: updatedTenant.trialEndsAt?.toISOString(),
+          subscriptionEndsAt: updatedTenant.subscriptionEndsAt?.toISOString(),
         },
         adminUserId: req.user?.userId,
         adminEmail: req.user?.email,

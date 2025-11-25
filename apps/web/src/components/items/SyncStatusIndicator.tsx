@@ -3,14 +3,14 @@
 interface SyncStatusIndicatorProps {
   itemStatus?: 'active' | 'inactive' | 'syncing' | 'archived' | 'draft';
   visibility?: 'public' | 'private';
-  categoryPath?: string[];
+  tenantCategoryId?: string | null;
   showDetails?: boolean;
 }
 
 export default function SyncStatusIndicator({ 
   itemStatus, 
   visibility, 
-  categoryPath,
+  tenantCategoryId,
   showDetails = false 
 }: SyncStatusIndicatorProps) {
   const isActive = itemStatus === 'active';
@@ -18,7 +18,7 @@ export default function SyncStatusIndicator({
   const isInactive = itemStatus === 'inactive';
   const isDraft = itemStatus === 'draft';
   const isPublic = visibility === 'public';
-  const hasCategory = categoryPath && categoryPath.length > 0;
+  const hasCategory = !!tenantCategoryId; // Has tenant category assigned
   
   const willSync = isActive && isPublic && hasCategory;
   

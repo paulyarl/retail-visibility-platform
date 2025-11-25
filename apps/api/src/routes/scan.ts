@@ -6,9 +6,12 @@ import { prisma } from '../prisma';
 import { audit } from '../audit';
 import { z } from 'zod';
 import { UserRole, Prisma } from '@prisma/client';
-// import { barcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
+import { BarcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
 // import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
+
+// Initialize enrichment service
+const barcodeEnrichmentService = new BarcodeEnrichmentService();
 // import {
 //   scanSessionStarted,
 //   scanSessionCompleted,
@@ -230,10 +233,17 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
       select: { id: true, name: true, sku: true },
     });
 
-    // Perform barcode lookup/enrichment using the service
-    // const enrichment = Flags.SCAN_ENRICHMENT
-    //   ? await barcodeEnrichmentService.enrich(barcode, session.tenantId)
-    //   : null;
+    // Perform barcode lookup/enrichment using the service with category suggestions
+    let enrichment = null;
+    let categorySuggestion = null;
+    
+    try {
+      enrichment = await barcodeEnrichmentService.enrichWithCategorySuggestion(barcode, session.tenantId);
+      categorySuggestion = enrichment.categorySuggestion;
+    } catch (error) {
+      console.warn('[scan/lookup] Enrichment failed:', error);
+      // Continue without enrichment
+    }
 
     // Create scan result
     const result = await prisma.scanResults.create({
@@ -243,7 +253,7 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
         barcode,
         sku: sku || barcode,
         status: duplicateItem ? 'duplicate' : 'new',
-        enrichment: {} as any, // enrichment as any || {},
+        enrichment: enrichment as any || {},
         duplicateOf: duplicateItem?.id,
         rawPayload: { barcode, sku, timestamp: new Date().toISOString() },
       },
@@ -267,6 +277,8 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
     return res.status(201).json({
       success: true,
       result,
+      enrichment,
+      categorySuggestion, // Include category suggestion for frontend modal
       duplicate: duplicateItem ? { item: duplicateItem, warning: 'Item already exists in inventory' } : null,
     });
   } catch (error: any) {

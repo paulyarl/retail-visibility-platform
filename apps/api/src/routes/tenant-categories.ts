@@ -98,10 +98,10 @@ async function requireTenantManagement(req: Request, res: Response, next: NextFu
 
 // Validation schemas
 const createCategorySchema = z.object({
-  tenantId: z.string().cuid(),
+  tenantId: z.string().min(1), // Accept any string ID (CUID, UUID, or short ID)
   name: z.string().min(1).max(100),
   slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/),
-  parentId: z.string().cuid().optional(),
+  parentId: z.string().min(1).optional(), // Accept any string ID
   googleCategoryId: z.string().optional(),
   sortOrder: z.number().int().min(0).optional(),
 });
@@ -109,7 +109,7 @@ const createCategorySchema = z.object({
 const updateCategorySchema = z.object({
   name: z.string().min(1).max(100).optional(),
   slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/).optional(),
-  parentId: z.string().cuid().optional().nullable(),
+  parentId: z.string().min(1).optional().nullable(), // Accept any string ID
   googleCategoryId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
@@ -342,6 +342,107 @@ router.post('/:tenantId/categories', requireTenantManagement, async (req, res) =
     }
 
     console.error('Error creating category:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create category',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/tenants/:tenantId/categories/from-enrichment
+ * Create a category from enrichment suggestion and optionally assign to item
+ * Permission: Platform support OR tenant owner/admin
+ * Body: { name, googleCategoryId?, itemId? }
+ */
+router.post('/:tenantId/categories/from-enrichment', requireTenantManagement, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const enrichmentCategorySchema = z.object({
+      name: z.string().min(1, 'Category name is required'),
+      googleCategoryId: z.string().optional(),
+      itemId: z.string().optional(), // Optional: assign to item immediately
+    });
+
+    const body = enrichmentCategorySchema.parse(req.body);
+
+    // Generate slug from name
+    const slug = body.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    // Check for duplicate slug
+    const existing = await prisma.tenantCategory.findFirst({
+      where: {
+        tenantId,
+        slug,
+      },
+    });
+
+    if (existing) {
+      // If category exists, just assign to item if requested
+      if (body.itemId) {
+        await prisma.inventoryItem.update({
+          where: { id: body.itemId },
+          data: { tenantCategoryId: existing.id },
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: existing,
+        message: 'Category already exists, assigned to item',
+      });
+    }
+
+    // Create new category
+    const category = await categoryService.createTenantCategory(tenantId, {
+      name: body.name,
+      slug,
+      parentId: null,
+      googleCategoryId: body.googleCategoryId ?? null,
+      sortOrder: 0,
+    });
+
+    // Assign to item if requested
+    if (body.itemId) {
+      await prisma.inventoryItem.update({
+        where: { id: body.itemId },
+        data: { tenantCategoryId: category.id },
+      });
+    }
+
+    // Audit log
+    await audit({
+      action: 'tenant_category.created_from_enrichment',
+      actor: (req as any).user?.id || 'system',
+      tenantId,
+      payload: {
+        resourceType: 'tenant_category',
+        resourceId: category.id,
+        categoryName: category.name,
+        googleCategoryId: body.googleCategoryId,
+        itemId: body.itemId,
+        source: 'enrichment',
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: category,
+      message: 'Category created from enrichment',
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation error',
+        details: error.issues,
+      });
+    }
+
+    console.error('Error creating category from enrichment:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create category',
@@ -785,7 +886,8 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
             // Create mode - create new category
             await prisma.tenantCategory.create({
               data: {
-                id: `cat_${location.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                /** id: `cat_${location.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, */
+                id: crypto.randomUUID(),
                 tenantId: location.id,
                 name: heroCategory.name,
                 slug: heroCategory.slug,

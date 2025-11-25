@@ -4,9 +4,31 @@ import { Pool } from 'pg';
 const router = Router();
 
 // Create a connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+// In development, we need to handle self-signed certificates
+const getPoolConfig = () => {
+  const config: any = {
+    connectionString: process.env.DATABASE_URL,
+  };
+
+  // Always disable SSL certificate verification for local development
+  // Check for production indicators (Railway, Vercel, etc.)
+  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
+                      process.env.VERCEL_ENV === 'production' ||
+                      process.env.NODE_ENV === 'production';
+
+  if (!isProduction) {
+    console.log('[Promotion Pool] Local development detected - disabling SSL verification');
+    config.ssl = {
+      rejectUnauthorized: false
+    };
+  } else {
+    console.log('[Promotion Pool] Production environment - SSL verification enabled');
+  }
+
+  return config;
+};
+
+const pool = new Pool(getPoolConfig());
 
 /**
  * GET /api/tenants/:tenantId/promotion/status

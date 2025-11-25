@@ -43,10 +43,12 @@ interface TierDefinition {
   name: string;
   displayName: string;
   price: number;
-  maxSKUs: number;
+  maxSkus?: number;
+  maxLocations?: number;
   description: string;
   type: string;
   features: string[];
+  sortOrder?: number;
 }
 
 export default function TierManagementPage() {
@@ -118,6 +120,16 @@ export default function TierManagementPage() {
   }, [hasAccess]);
 
   const getTierDisplayName = (tier: string) => {
+    // Find tier in loaded tiers data
+    if (tiers) {
+      const allTiers = [...(tiers.individual || []), ...(tiers.organization || [])];
+      const foundTier = allTiers.find(t => t.id === tier);
+      if (foundTier) {
+        return foundTier.displayName;
+      }
+    }
+    
+    // Fallback to hardcoded names for backwards compatibility
     const tierNames: Record<string, string> = {
       google_only: 'Google-Only',
       starter: 'Starter',
@@ -356,14 +368,20 @@ export default function TierManagementPage() {
                 className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
               >
                 <option value="all">All Tiers</option>
-                <option value="google_only">Google-Only</option>
-                <option value="starter">Starter</option>
-                <option value="professional">Professional</option>
-                <option value="enterprise">Enterprise</option>
-                <option value="organization">Organization</option>
-                <option value="chain_starter">Chain Starter</option>
-                <option value="chain_professional">Chain Professional</option>
-                <option value="chain_enterprise">Chain Enterprise</option>
+                {tiers && (
+                  <>
+                    {(tiers.individual || []).map((tier) => (
+                      <option key={tier.id} value={tier.id}>
+                        {tier.displayName}
+                      </option>
+                    ))}
+                    {(tiers.organization || []).map((tier) => (
+                      <option key={tier.id} value={tier.id}>
+                        {tier.displayName}
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
 
               {/* Status Filter */}
@@ -497,14 +515,31 @@ export default function TierManagementPage() {
                     onChange={(e) => setUpdateForm({ ...updateForm, subscriptionTier: e.target.value })}
                     className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
                   >
-                    <option value="google_only">Google-Only ($29/mo)</option>
-                    <option value="starter">Starter ($49/mo)</option>
-                    <option value="professional">Professional ($499/mo)</option>
-                    <option value="enterprise">Enterprise ($999/mo)</option>
-                    <option value="organization">Organization ($999/mo)</option>
-                    <option value="chain_starter">Chain Starter ($199/mo)</option>
-                    <option value="chain_professional">Chain Professional ($1,999/mo)</option>
-                    <option value="chain_enterprise">Chain Enterprise ($4,999/mo)</option>
+                    <option value="">Select a tier...</option>
+                    {tiers && (
+                      <>
+                        {/* Individual Tiers */}
+                        <optgroup label="Individual Plans">
+                          {(tiers.individual || []).map((tier) => (
+                            <option key={tier.id} value={tier.id}>
+                              {tier.displayName} (${tier.price}/mo)
+                              {tier.maxSkus && ` • ${tier.maxSkus.toLocaleString()} SKUs`}
+                              {tier.maxLocations && ` • ${tier.maxLocations} locations`}
+                            </option>
+                          ))}
+                        </optgroup>
+                        {/* Organization Tiers */}
+                        <optgroup label="Organization Plans">
+                          {(tiers.organization || []).map((tier) => (
+                            <option key={tier.id} value={tier.id}>
+                              {tier.displayName} (${tier.price}/mo)
+                              {tier.maxSkus && ` • ${tier.maxSkus.toLocaleString()} SKUs`}
+                              {tier.maxLocations && ` • ${tier.maxLocations} locations`}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </>
+                    )}
                   </select>
                 </div>
 

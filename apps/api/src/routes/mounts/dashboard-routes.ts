@@ -54,7 +54,7 @@ export function mountDashboardRoutes(app: Express) {
   app.use('/api', feedValidationRoutes);
 
   // Category scaffolds (M3 start)
-  app.use(categoriesPlatformRoutes);
+  app.use('/api/platform', categoriesPlatformRoutes);
   app.use(categoriesTenantRoutes);
   app.use(categoriesMirrorRoutes);
   app.use(mirrorAdminRoutes);

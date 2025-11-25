@@ -548,6 +548,7 @@ model InventoryItem {
   missingSpecs         Boolean                  @default(false) @map("missing_specs")
   missingBrand         Boolean                  @default(false) @map("missing_brand")
   tenant               Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantCategory       TenantCategory?          @relation(fields: [tenantCategoryId], references: [id], onDelete: SetNull)
   photoAsset           PhotoAsset[]            @relation("InventoryItemPhotos")
   productPerformance   ProductPerformance[]    @relation("InventoryItemPerformance")
 
@@ -1030,6 +1031,7 @@ model TenantCategory {
   sortOrder         Int      @default(0) @map("sort_order")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @map("updated_at")
+  inventoryItems    InventoryItem[]
   @@map("tenant_categories_list")
 }
 

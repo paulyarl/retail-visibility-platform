@@ -10,30 +10,30 @@
 export type SubscriptionTier = 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
 
 export interface TierLimits {
-  maxSKUs: number;
+  maxSkus: number;
   name: string;
 }
 
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   google_only: {
     name: 'Google-Only',
-    maxSKUs: 250,
+    maxSkus: 250,
   },
   starter: {
     name: 'Starter',
-    maxSKUs: 500,
+    maxSkus: 500,
   },
   professional: {
     name: 'Professional',
-    maxSKUs: 5000, // Updated from 2000 to 5000
+    maxSkus: 5000, // Updated from 2000 to 5000
   },
   enterprise: {
     name: 'Enterprise',
-    maxSKUs: Infinity, // Unlimited SKUs
+    maxSkus: Infinity, // Unlimited SKUs
   },
   organization: {
     name: 'Organization',
-    maxSKUs: 10000, // Shared pool across all locations
+    maxSkus: 10000, // Shared pool across all locations
   },
 };
 
@@ -42,7 +42,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
  */
 export function getSKULimit(tier: string | null | undefined): number {
   const normalizedTier = (tier?.toLowerCase() || 'starter') as SubscriptionTier;
-  return TIER_LIMITS[normalizedTier]?.maxSKUs || TIER_LIMITS.starter.maxSKUs;
+  return TIER_LIMITS[normalizedTier]?.maxSkus || TIER_LIMITS.starter.maxSkus;
 }
 
 /**

@@ -16,16 +16,16 @@ export type EmailCategory =
   | 'general';
 
 export const DEFAULT_ADMIN_EMAILS: Record<EmailCategory, string> = {
-  subscription: 'subscriptions@yourplatform.com',
-  upgrade_requests: 'upgrades@yourplatform.com',
-  organization_requests: 'organizations@yourplatform.com',
-  sales: 'sales@yourplatform.com',
-  support: 'support@yourplatform.com',
-  managed_services: 'services@yourplatform.com',
-  partnerships: 'partnerships@yourplatform.com',
-  marketing: 'marketing@yourplatform.com',
-  compliance: 'compliance@yourplatform.com',
-  general: 'info@yourplatform.com',
+  subscription: 'subscriptions@visibleshelf.store',
+  upgrade_requests: 'upgrades@visibleshelf.store',
+  organization_requests: 'organizations@visibleshelf.store',
+  sales: 'sales@visibleshelf.store',
+  support: 'support@visibleshelf.store',
+  managed_services: 'services@visibleshelf.store',
+  partnerships: 'partnerships@visibleshelf.store',
+  marketing: 'marketing@visibleshelf.store',
+  compliance: 'compliance@visibleshelf.store',
+  general: 'info@visibleshelf.store',
 };
 
 // Cache for email configurations

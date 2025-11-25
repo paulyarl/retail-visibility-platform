@@ -11,11 +11,23 @@ import {
 // Rate limiting state (in-memory, consider Redis for production)
 const rateLimitState = new Map<string, { count: number; resetAt: number }>();
 
-interface EnrichmentResult {
+export interface CategorySuggestion {
+  suggestedName: string; // Suggested category name from enrichment
+  googleCategoryId?: string; // Google category ID if available
+  categoryPath: string[]; // Full path for display
+  existingTenantCategory?: {
+    id: string;
+    name: string;
+    googleCategoryId?: string | null;
+  };
+}
+
+export interface EnrichmentResult {
   name?: string;
   description?: string;
   brand?: string;
-  categoryPath?: string[];
+  categoryPath?: string[]; // Legacy - for display only
+  categorySuggestion?: CategorySuggestion; // New - for merchant approval
   priceCents?: number;
   imageUrl?: string;
   imageThumbnailUrl?: string;
@@ -39,6 +51,79 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const RATE_LIMIT_MAX_REQUESTS = 500; // 500 requests per hour per provider
 
 export class BarcodeEnrichmentService {
+  /**
+   * Check if tenant has a category matching the enrichment data
+   */
+  private async findMatchingTenantCategory(
+    tenantId: string,
+    categoryPath: string[],
+    googleCategoryId?: string
+  ) {
+    if (!categoryPath || categoryPath.length === 0) return null;
+
+    // Try to match by Google category ID first (most accurate)
+    if (googleCategoryId) {
+      const byGoogleId = await prisma.tenantCategory.findFirst({
+        where: {
+          tenantId,
+          googleCategoryId,
+        },
+        select: {
+          id: true,
+          name: true,
+          googleCategoryId: true,
+        },
+      });
+      if (byGoogleId) return byGoogleId;
+    }
+
+    // Try to match by name similarity
+    const categoryName = categoryPath[categoryPath.length - 1]; // Use most specific category
+    const byName = await prisma.tenantCategory.findFirst({
+      where: {
+        tenantId,
+        name: {
+          contains: categoryName,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        googleCategoryId: true,
+      },
+    });
+    
+    return byName;
+  }
+
+  /**
+   * Enrich with category suggestion for merchant approval
+   * This wraps the main enrich method and adds category matching
+   */
+  async enrichWithCategorySuggestion(barcode: string, tenantId: string): Promise<EnrichmentResult> {
+    // Get base enrichment data
+    const enrichmentResult = await this.enrich(barcode, tenantId);
+    
+    // If enrichment has category data, check for tenant category match
+    if (enrichmentResult.categoryPath && enrichmentResult.categoryPath.length > 0) {
+      const existingCategory = await this.findMatchingTenantCategory(
+        tenantId,
+        enrichmentResult.categoryPath
+      );
+      
+      // Build category suggestion
+      const suggestedName = enrichmentResult.categoryPath[enrichmentResult.categoryPath.length - 1];
+      enrichmentResult.categorySuggestion = {
+        suggestedName,
+        categoryPath: enrichmentResult.categoryPath,
+        existingTenantCategory: existingCategory || undefined,
+      };
+    }
+    
+    return enrichmentResult;
+  }
+
   /**
    * Main enrichment method with fallback chain
    */

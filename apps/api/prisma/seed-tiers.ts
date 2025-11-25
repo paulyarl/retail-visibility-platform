@@ -26,7 +26,7 @@ async function main() {
       displayName: 'Google-Only',
       description: 'Get discovered on Google',
       priceMonthly: 2900,
-      maxSKUs: 250,
+      maxSkus: 250,
       tierType: 'individual',
       sortOrder: 1,
       features: [
@@ -45,7 +45,7 @@ async function main() {
       displayName: 'Starter',
       description: 'Get started with the basics',
       priceMonthly: 4900,
-      maxSKUs: 500,
+      maxSkus: 500,
       tierType: 'individual',
       sortOrder: 2,
       features: [
@@ -68,7 +68,7 @@ async function main() {
       displayName: 'Professional',
       description: 'For established retail businesses',
       priceMonthly: 49900,
-      maxSKUs: 5000,
+      maxSkus: 5000,
       tierType: 'individual',
       sortOrder: 3,
       features: [
@@ -102,7 +102,7 @@ async function main() {
       displayName: 'Enterprise',
       description: 'For large single-location operations',
       priceMonthly: 99900,
-      maxSKUs: null,
+      maxSkus: null,
       tierType: 'individual',
       sortOrder: 4,
       features: [
@@ -126,14 +126,23 @@ async function main() {
 
   for (const tierData of tiers) {
     const { features, ...tier } = tierData;
-    await prisma.subscriptionTier.create({
-      data: {
-        ...tier,
-        features: {
-          create: features,
-        },
-      },
+
+    // Create the tier first
+    const createdTier = await prisma.subscriptionTier.create({
+      data: tier,
     });
+
+    // Then create features for this tier
+    if (features && features.length > 0) {
+      await prisma.tierFeatures.createMany({
+        data: features.map((feature, index) => ({
+          id: `${createdTier.id}_${feature.featureKey}_${index}`, // Generate unique ID
+          tierId: createdTier.id,
+          ...feature,
+        })),
+      });
+    }
+
     console.log(`✓ Created tier: ${tier.displayName}`);
   }
 
