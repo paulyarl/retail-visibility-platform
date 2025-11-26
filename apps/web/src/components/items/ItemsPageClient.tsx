@@ -93,7 +93,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   // Bulk selection state
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkMode, setBulkMode] = useState(false);
-  const [bulkActionsExpanded, setBulkActionsExpanded] = useState(true);
+  const [bulkActionsExpanded, setBulkActionsExpanded] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [visibilityDropdownOpen, setVisibilityDropdownOpen] = useState(false);
   
