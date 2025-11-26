@@ -518,9 +518,24 @@ app.patch("/api/tenants/:id", authenticateToken, requireAdmin, validateTierAssig
 
 app.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireTenantOwner, async (req, res) => {
   try {
-    await prisma.tenant.delete({ where: { id: req.params.id } });
+    const tenantId = req.params.id;
+    
+    // Explicitly delete directory-related data to prevent orphaned listings
+    await prisma.directoryFeaturedListings.deleteMany({
+      where: { tenantId },
+    });
+    
+    await prisma.directorySettings.deleteMany({
+      where: { tenantId },
+    });
+    
+    // Delete the tenant (cascade will handle other relations)
+    await prisma.tenant.delete({ where: { id: tenantId } });
+    
+    console.log(`[Audit] Tenant deleted: ${tenantId} (including directory listings)`);
     res.status(204).end();
-  } catch {
+  } catch (error: any) {
+    console.error('[DELETE /tenants/:id] Error:', error);
     res.status(500).json({ error: "failed_to_delete_tenant" });
   }
 });

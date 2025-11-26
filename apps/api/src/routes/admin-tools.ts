@@ -175,18 +175,29 @@ router.delete('/tenants/:tenantId', async (req, res) => {
       where: { tenantId },
     });
 
+    // Delete directory-related data
+    const deletedFeaturedListings = await prisma.directoryFeaturedListings.deleteMany({
+      where: { tenantId },
+    });
+
+    const deletedDirectorySettings = await prisma.directorySettings.deleteMany({
+      where: { tenantId },
+    });
+
     // Delete the tenant
     const deletedTenant = await prisma.tenant.delete({
       where: { id: tenantId },
     });
 
-    console.log(`[Audit] Admin deleted test tenant: ${tenantId} (${deletedProducts.count} products, ${deletedCategories.count} categories)`);
+    console.log(`[Audit] Admin deleted test tenant: ${tenantId} (${deletedProducts.count} products, ${deletedCategories.count} categories, ${deletedDirectorySettings.count} directory listings)`);
 
     res.json({
       success: true,
       tenantId,
       deletedProducts: deletedProducts.count,
       deletedCategories: deletedCategories.count,
+      deletedDirectoryListings: deletedDirectorySettings.count,
+      deletedFeaturedListings: deletedFeaturedListings.count,
       message: 'Test tenant deleted successfully',
     });
   } catch (error: any) {

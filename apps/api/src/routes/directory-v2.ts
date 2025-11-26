@@ -137,9 +137,10 @@ router.get('/search', async (req: Request, res: Response) => {
     // Get listings - use direct database query
     // console.log('[Directory Search] Query:', whereClause, params);
     const listingsQuery = `
-      SELECT * FROM directory_listings_list
+      SELECT dl.* FROM directory_listings_list dl
+      INNER JOIN "Tenant" t ON dl.tenant_id = t.id
       WHERE ${whereClause}
-        AND (business_hours IS NULL OR business_hours::text != 'null')
+        AND (dl.business_hours IS NULL OR dl.business_hours::text != 'null')
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
@@ -149,9 +150,10 @@ router.get('/search', async (req: Request, res: Response) => {
 
     // Get total count
     const countQuery = `
-      SELECT COUNT(*) as count FROM directory_listings_list
+      SELECT COUNT(*) as count FROM directory_listings_list dl
+      INNER JOIN "Tenant" t ON dl.tenant_id = t.id
       WHERE ${whereClause}
-        AND (business_hours IS NULL OR business_hours::text != 'null')
+        AND (dl.business_hours IS NULL OR dl.business_hours::text != 'null')
     `;
     const countResult = await getDirectPool().query(countQuery, params);
 
