@@ -26,6 +26,17 @@ export function generateUserId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `user-${nanoid()}`;
 }
+
+/**
+ * Generates short user tenant IDs
+ * Format: tenant-abc123 (13 chars vs 36 for UUID)
+ * URL-safe, readable, unique
+ */
+export function generateUserTenantId(userId: string = 'user',tenantId: string = 'tenant'): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
+  return `ut-${userId}-${tenantId}-${nanoid()}`;
+}
+// id: `ut_${tenantId}_${user.id}`,
 /**
  * Generates short item/SKU IDs
  * Format: item-xyz789 (12 chars)

@@ -12,7 +12,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
-import { generateFeatureId } from '../../lib/id-generator';
+import { generateFeatureId, generateTierId } from '../../lib/id-generator';
 
 const router = Router();
 
@@ -232,7 +232,7 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
     // Create tier with features
     const tier = await prisma.subscriptionTier.create({
       data: {
-        id: crypto.randomUUID(), // Generate unique ID
+        id: generateTierId(), // Generate unique ID
         ...tierData,
         displayName: tierData.displayName, // Map snake_case to camelCase
         createdBy: req.user?.userId,

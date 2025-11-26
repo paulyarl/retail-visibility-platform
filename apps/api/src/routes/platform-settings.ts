@@ -4,6 +4,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
+import { generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -53,9 +54,9 @@ router.get('/platform-settings', async (_req, res) => {
     if (!settings) {
       settings = await prisma.platformSettings.create({
         data: {
-          id: 1,
+          id: 1, 
           platformName: 'Visible Shelf',
-          platformDescription: 'Manage your retail operations with ease',
+          platformDescription: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
           updatedAt: new Date(),
         },
       });

@@ -7,6 +7,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { generateQuickStartProducts } from './quick-start';
+import { generateQuickStart, generateUserTenantId } from './id-generator';
 
 const prisma = new PrismaClient();
 
@@ -203,7 +204,7 @@ export async function createTestTenant(options: {
   if (ownerId) {
     await prisma.userTenant.create({
       data: {
-        id: `ut_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: generateUserTenantId(ownerId, tenant.id),
         userId: ownerId,
         tenantId: tenant.id,
         role: 'OWNER',

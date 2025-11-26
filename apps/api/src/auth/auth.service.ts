@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../prisma';
 import { JWTPayload } from '../middleware/auth';
+import { generateSessionId, generateUserId } from '../lib/id-generator';
 
 // JWT configuration
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'your-super-secret-access-key-change-in-production';
@@ -92,7 +93,7 @@ export class AuthService {
     // Create user using snake_case Prisma fields, then map to camelCase DTO
     const user = await prisma.user.create({
       data: {
-        id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: generateUserId(),
         email: data.email.toLowerCase(),
         passwordHash: passwordHash,
         firstName: data.firstName,
@@ -164,7 +165,7 @@ export class AuthService {
     // Create session
     await prisma.userSession.create({
       data: {
-        id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: generateSessionId(),
         userId: user.id,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },

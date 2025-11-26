@@ -431,7 +431,7 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
 
     const userTenant = await prisma.userTenant.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateUserTenantId(ownerId, tenant.id),
         userId: ownerId,
         tenantId: tenant.id,
         role: 'OWNER' as const,
@@ -1844,7 +1844,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 
       const created = await prisma.photoAsset.create({
         data: {
-          id: crypto.randomUUID(),
+          id: generatePhotoId(),
           tenantId: item.tenantId,
           inventoryItemId: item.id,
           url,
@@ -1895,7 +1895,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 
       const created = await prisma.photoAsset.create({
         data: {
-          id: crypto.randomUUID(),
+          id: generatePhotoId(),
           tenantId: item.tenantId,
           inventoryItemId: item.id,
           url: publicUrl!,
@@ -1960,7 +1960,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 
       const created = await prisma.photoAsset.create({
         data: {
-          id: crypto.randomUUID(),
+          id: generatePhotoId(),
           tenantId: item.tenantId,
           inventoryItemId: item.id,
           url: publicUrl,
@@ -2301,7 +2301,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
     const { categoryPath, ...cleanData } = data;
     const created = await prisma.inventoryItem.create({ 
       data: {
-        id: crypto.randomUUID(),
+        id: generateItemId(),
         ...cleanData,
         updatedAt: new Date(),
       }
@@ -3246,7 +3246,7 @@ app.put("/admin/email-config", async (req, res) => {
 /* ------------------------------ ROUTE MOUNTING ------------------------------ */
 // Use modular route mounting for better isolation and debugging
 import { mountMinimalRoutes, mountAllRoutes } from './routes';
-import { generateTenantId } from './lib/id-generator';
+import { generateItemId, generatePhotoId, generateQuickStart, generateTenantId, generateUserTenantId } from './lib/id-generator';
 
 // For debugging: mount only minimal routes
 // mountMinimalRoutes(app);

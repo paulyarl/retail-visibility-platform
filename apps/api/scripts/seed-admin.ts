@@ -6,6 +6,7 @@
 import { PrismaClient, UserRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { generateTenantId } from '../src/lib/id-generator';
 
 const prisma = new PrismaClient();
 
@@ -43,7 +44,7 @@ async function seedAdmin() {
     // Create admin user
     const admin = await prisma.user.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateTenantId(),
         email: adminData.email,
         passwordHash,
         firstName: adminData.firstName,

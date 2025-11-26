@@ -8,7 +8,7 @@ import { getCategoryById } from '../lib/google/taxonomy';
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
-import { generateQsCatId, generateQuickStart } from '../lib/id-generator';
+import { generateQsCatId, generateQuickStart, generateUserTenantId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -1319,7 +1319,7 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
             }
             await prisma.userTenant.create({
               data: {
-                id: generateQuickStart("ut"),
+                 id: generateUserTenantId(heroRole.userId, location.id),
                 tenantId: location.id,
                 userId: heroRole.userId,
                 role: heroRole.role,

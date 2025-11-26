@@ -67,7 +67,7 @@ async function logAudit(req: Request, res: Response, requestId: string) {
     // Create audit log entry
     await prisma.auditLog.create({
       data: {
-        id: generateQuickStart("al"),
+        id: generateQuickStart("audit"),
         tenantId: (user as any)?.tenantId || 'system',
         actorId: (user as any)?.id || 'anonymous',
         actorType: user ? 'user' : 'system',

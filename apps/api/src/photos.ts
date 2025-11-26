@@ -3,6 +3,7 @@ import multer from "multer";
 import { prisma } from "./prisma";
 import { createClient } from "@supabase/supabase-js";
 import { StorageBuckets } from "./storage-config";
+import { generateQuickStart } from "./lib/id-generator";
 
 const prismaClient = prisma;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -134,7 +135,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
 
     const created = await prisma.photoAsset.create({
       data: {
-        id: `photo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: generateQuickStart("photo"),
         tenantId: item.tenantId,
         inventoryItemId: item.id,
         url,

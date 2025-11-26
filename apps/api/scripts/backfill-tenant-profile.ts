@@ -47,6 +47,7 @@ async function main() {
           longitude: md.longitude ?? null,
           displayMap: md.display_map ?? false,
           mapPrivacyMode: md.map_privacy_mode ?? "precise",
+          updatedAt: new Date(),
         }
       });
 
