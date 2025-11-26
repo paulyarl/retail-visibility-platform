@@ -143,12 +143,12 @@ export default function ItemsGuide() {
               </section>
 
               {/* Understanding Sync Status */}
-              <section>
+              <section className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                 <h4 className="text-md font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 text-sm font-bold">1</span>
                   Understanding Sync Status
                 </h4>
-                <div className="ml-8 space-y-3">
+                <div className="ml-8 space-y-3 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                   <div className="flex items-start gap-3">
                     <div className="flex items-center gap-1.5 text-green-600 dark:text-green-500 mt-0.5">
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -186,7 +186,7 @@ export default function ItemsGuide() {
               </section>
 
               {/* Understanding Categories */}
-              <section>
+              <section className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                 <h4 className="text-md font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 text-sm font-bold">2</span>
                   Understanding Categories
@@ -196,7 +196,7 @@ export default function ItemsGuide() {
                     Categories organize your products and appear consistently across your <strong>storefront</strong>, <strong>product pages</strong>, and <strong>directory listing</strong>.
                   </p>
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                       <div className="w-8 h-8 rounded bg-blue-600 flex items-center justify-center flex-shrink-0">
                         <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -256,7 +256,7 @@ export default function ItemsGuide() {
                     Bulk Category Assignment
                   </h4>
                   
-                  <div className="ml-10 space-y-4">
+                  <div className="ml-10 space-y-4 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                     <p className="text-sm font-medium text-neutral-900 dark:text-white">
                       Save <strong className="text-primary-600 dark:text-primary-400">97% of your time</strong> by assigning categories to multiple items at once!
                     </p>
@@ -351,7 +351,7 @@ export default function ItemsGuide() {
                     CSV Bulk Import
                   </h4>
                   
-                  <div className="ml-10 space-y-4">
+                  <div className="ml-10 space-y-4 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                     <p className="text-sm font-medium text-neutral-900 dark:text-white">
                       Import hundreds of products at once with categories, status, and visibility pre-configured!
                     </p>
@@ -459,7 +459,7 @@ export default function ItemsGuide() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                         <div className="text-sm text-amber-900 dark:text-amber-100">
-                          <p className="font-semibold mb-1">⚠️ Important CSV Formatting Rule:</p>
+                          <h2 className="font-semibold mb-1">⚠️ Important CSV Formatting Rule:</h2>
                           <p className="mb-2">Optional fields can be <strong>empty</strong>, but you must <strong>keep the commas</strong>!</p>
                           <div className="bg-white dark:bg-neutral-800 rounded p-2 font-mono text-xs space-y-1">
                             <div className="text-green-600 dark:text-green-400">✓ Correct: Red Shoes,SHOE-01,89.99,,active,public</div>
@@ -471,7 +471,7 @@ export default function ItemsGuide() {
                     </div>
                     
                     <div className="bg-neutral-100 dark:bg-neutral-800 rounded-lg p-3 font-mono text-xs overflow-x-auto">
-                      <p className="text-neutral-500 dark:text-neutral-400 mb-2"># Example CSV:</p>
+                      <h2 className="text-neutral-500 dark:text-neutral-400 mb-2"># Example CSV:</h2>
                       <div className="text-neutral-900 dark:text-neutral-100 space-y-1">
                         <div>name,sku,price,category,status,visibility</div>
                         <div className="text-green-600 dark:text-green-400">Red Shoes,SHOE-01,89.99,Athletic Footwear,active,public</div>
@@ -487,7 +487,7 @@ export default function ItemsGuide() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <div className="text-sm text-green-900 dark:text-green-100">
-                        <p className="font-semibold mb-1">Download Template</p>
+                        <h2 className="font-semibold mb-1">Download Template</h2>
                         <p>Click "Bulk Upload" → "Download Template" to get a pre-formatted CSV with examples and instructions!</p>
                       </div>
                     </div>
@@ -496,12 +496,12 @@ export default function ItemsGuide() {
               </section>
 
               {/* Quick Actions */}
-              <section>
+              <section className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                 <h4 className="text-md font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 text-sm font-bold">5</span>
                   Quick Actions
                 </h4>
-                <div className="ml-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="ml-8 grid grid-cols-1 md:grid-cols-2 gap-4 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 rounded bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0">
                       <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -551,12 +551,12 @@ export default function ItemsGuide() {
               </section>
 
               {/* Getting Items to Sync */}
-              <section>
+              <section className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                 <h4 className="text-md font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 text-sm font-bold">4</span>
+                  <span className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 text-sm font-bold">6</span>
                   Getting Items to Sync
                 </h4>
-                <div className="ml-8 space-y-2">
+                <div className="ml-8 space-y-2 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                   <p className="text-sm text-neutral-600 dark:text-neutral-400">
                     For an item to sync to Google Merchant Center, it must meet all three requirements:
                   </p>
@@ -590,12 +590,12 @@ export default function ItemsGuide() {
               </section>
 
               {/* Tips & Best Practices */}
-              <section>
+              <section className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                 <h4 className="text-md font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 text-sm font-bold">💡</span>
                   Tips & Best Practices
                 </h4>
-                <div className="ml-8 space-y-2">
+                <div className="ml-8 space-y-2 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
                   <div className="flex items-start gap-2">
                     <svg className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />

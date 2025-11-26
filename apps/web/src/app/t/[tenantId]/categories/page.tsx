@@ -796,7 +796,7 @@ export default function CategoriesPage() {
         
         {isQuickStartExpanded && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 mt-4 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
           <div>
             <h4 className="font-medium text-purple-800 dark:text-purple-200 mb-2">Food & Grocery</h4>
             <ul className="space-y-1 text-sm text-purple-700 dark:text-purple-300">
@@ -850,7 +850,7 @@ export default function CategoriesPage() {
             </ul>
           </div>
 
-          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-700">
+          <div className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
             <h4 className="font-medium text-red-900 dark:text-red-100 mb-2 flex items-center gap-2">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />

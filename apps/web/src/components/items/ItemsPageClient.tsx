@@ -458,10 +458,10 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                   </svg>
                 </div>
                 <div className="text-left">
-                  <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                  <h2 className="text-sm font-semibold bg-white/80 dark:bg-neutral-100/80 backdrop-blur-sm rounded-lg p-4 ">
                     Bulk Actions
-                  </h3>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  </h2>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-200">
                     {bulkMode ? `${selectedItems.size} item${selectedItems.size !== 1 ? 's' : ''} selected` : 'Click to select multiple items to edit category, status, visibility or propagation'}
                   </p>
                 </div>

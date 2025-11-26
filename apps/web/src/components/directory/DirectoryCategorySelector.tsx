@@ -49,7 +49,7 @@ export default function DirectoryCategorySelector({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
       {/* Primary Category */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
