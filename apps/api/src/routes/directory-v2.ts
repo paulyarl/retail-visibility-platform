@@ -67,7 +67,7 @@ const getDirectPool = () => {
                       process.env.NODE_ENV === 'production';
 
   if (!isProduction) {
-    console.log('[Directory Pool] Creating fresh pool for development');
+    // console.log('[Directory Pool] Creating fresh pool for development');
     return new Pool(getPoolConfig());
   }
 
@@ -135,7 +135,7 @@ router.get('/search', async (req: Request, res: Response) => {
     }
 
     // Get listings - use direct database query
-    console.log('[Directory Search] Query:', whereClause, params);
+    // console.log('[Directory Search] Query:', whereClause, params);
     const listingsQuery = `
       SELECT * FROM directory_listings_list
       WHERE ${whereClause}
@@ -143,9 +143,9 @@ router.get('/search', async (req: Request, res: Response) => {
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
-    console.log('[Directory Search] Full SQL:', listingsQuery);
+    // console.log('[Directory Search] Full SQL:', listingsQuery);
     const listingsResult = await getDirectPool().query(listingsQuery, [...params, limitNum, skip]);
-    console.log('[Directory Search] Query result rows:', listingsResult.rows.length);
+    // console.log('[Directory Search] Query result rows:', listingsResult.rows.length);
 
     // Get total count
     const countQuery = `
