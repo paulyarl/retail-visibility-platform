@@ -34,7 +34,7 @@ async function main() {
     // Create organization tier
     const newOrgTier = await prisma.subscriptionTier.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateTierId(),
         tierKey: 'organization',
         name: 'Organization',
         displayName: 'Organization',
@@ -52,7 +52,7 @@ async function main() {
     // Create chain tiers (mirror individual tiers)
     const newChainStarter = await prisma.subscriptionTier.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateTierId(),
         tierKey: 'chain_starter',
         name: 'Chain Starter',
         displayName: 'Chain Starter',
@@ -69,7 +69,7 @@ async function main() {
 
     const newChainProfessional = await prisma.subscriptionTier.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateTierId(),
         tierKey: 'chain_professional',
         name: 'Chain Professional',
         displayName: 'Chain Professional',
@@ -86,7 +86,7 @@ async function main() {
 
     const newChainEnterprise = await prisma.subscriptionTier.create({
       data: {
-        id: crypto.randomUUID(),
+        id:generateTierId(),
         tierKey: 'chain_enterprise',
         name: 'Chain Enterprise',
         displayName: 'Chain Enterprise',
@@ -156,7 +156,7 @@ async function main() {
       for (const feature of orgFeatures) {
         await prisma.tierFeatures.create({
           data: {
-            id: crypto.randomUUID(),
+            id: generateFeatureId(),
             tierId: organizationTier.id,
             ...feature,
             isEnabled: true,
@@ -202,7 +202,7 @@ async function main() {
     for (const feature of chainStarterFeatures) {
       await prisma.tierFeatures.create({
         data: {
-          id: crypto.randomUUID(),
+          id: generateFeatureId(),
           tierId: chainStarterFinal.id,
           ...feature,
           isEnabled: true,
@@ -245,7 +245,7 @@ async function main() {
     for (const feature of chainProfessionalFeatures) {
       await prisma.tierFeatures.create({
         data: {
-          id: crypto.randomUUID(),
+          id: generateFeatureId(),
           tierId: chainProfessionalFinal.id,
           ...feature,
           isEnabled: true,
@@ -283,7 +283,7 @@ async function main() {
     for (const feature of chainEnterpriseFeatures) {
       await prisma.tierFeatures.create({
         data: {
-          id: crypto.randomUUID(),
+          id: generateFeatureId(),
           tierId: chainEnterpriseFinal.id,
           ...feature,
           isEnabled: true,
@@ -304,3 +304,11 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+function generateTierId(): any {
+  throw new Error('Function not implemented.');
+}
+
+function generateFeatureId(): any {
+  throw new Error('Function not implemented.');
+}
+

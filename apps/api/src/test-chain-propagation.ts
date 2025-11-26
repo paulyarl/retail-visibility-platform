@@ -11,6 +11,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { generateTenantId } from './lib/id-generator';
 
 const prisma = new PrismaClient();
 
@@ -82,6 +83,7 @@ async function createTestChain(): Promise<TestContext> {
   // Create hero location
   const heroTenant = await prisma.tenant.create({
     data: {
+      id:generateTenantId(),
       name: HERO_LOCATION_NAME,
       organizationId: organization.id,
       subscriptionTier: 'professional',
@@ -100,6 +102,7 @@ async function createTestChain(): Promise<TestContext> {
   for (let i = 1; i <= NUM_LOCATIONS; i++) {
     const tenant = await prisma.tenant.create({
       data: {
+        id:generateTenantId(),
         name: `Location ${i}`,
         organizationId: organization.id,
         subscriptionTier: 'professional',

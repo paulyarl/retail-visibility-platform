@@ -14,6 +14,7 @@ import { isPlatformAdmin, isPlatformUser, canViewAllTenants, canPerformSupportAc
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
 import { requireTierFeature, requireWritableSubscription } from '../middleware/tier-access';
+import { generateQsCatId, generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -505,7 +506,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
 
         return prisma.tenantCategory.create({
           data: {
-            id: crypto.randomUUID(),
+            id: generateQsCatId(),
             tenantId,
             name: cat.name,
             slug: cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),

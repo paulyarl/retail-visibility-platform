@@ -18,6 +18,15 @@ export function generateTenantId(): string {
 }
 
 /**
+ * Generates short user IDs
+ * Format: tenant-abc123 (13 chars vs 36 for UUID)
+ * URL-safe, readable, unique
+ */
+export function generateUserId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `user-${nanoid()}`;
+}
+/**
  * Generates short item/SKU IDs
  * Format: item-xyz789 (12 chars)
  * URL-safe, readable, unique
@@ -65,6 +74,41 @@ export function generateSessionId(): string {
   return `s-${nanoid()}`;
 }
 
+/**
+ * Generates short tier IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateTierId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
+  return `tier-${nanoid()}`;
+}
+
+/**
+ * Generates short tier feature IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateFeatureId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
+  return `feat-${nanoid()}`;
+}
+
+/**
+ * Generates short quick start category IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateQsCatId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `qscat-${nanoid()}`;
+}
+
+/**
+ * Generates short quick start with optional prefix
+ * Format: SKU-abc123 or CUSTOM-abc123
+ */
+export function generateQuickStart(prefix: string = 'QS'): string {
+  const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 8);
+  return `${prefix}-${nanoid()}`;
+}
 /**
  * Example outputs:
  * 

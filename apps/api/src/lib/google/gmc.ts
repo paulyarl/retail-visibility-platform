@@ -8,6 +8,7 @@
 
 import { decryptToken, refreshAccessToken, encryptToken } from './oauth';
 import { prisma } from '../../prisma';
+import { generateQuickStart } from '../id-generator';
 
 // Merchant API v1beta (replaces deprecated Content API v2.1)
 const GMC_API_BASE = 'https://merchantapi.googleapis.com';
@@ -252,7 +253,7 @@ export async function syncMerchantAccount(
     } else {
       await prisma.googleMerchantLinks.create({
         data: {
-          id: `gmc_link_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          id: generateQuickStart("gmc_link"),
           accountId: account_id,
           merchantId: merchantId,
           merchantName: merchantName,

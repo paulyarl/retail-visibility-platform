@@ -407,7 +407,7 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
 
     const tenant = await prisma.tenant.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateTenantId(),
         name: parsed.data.name,
         subscriptionTier: 'starter',
         subscriptionStatus: 'trial',
@@ -3246,6 +3246,7 @@ app.put("/admin/email-config", async (req, res) => {
 /* ------------------------------ ROUTE MOUNTING ------------------------------ */
 // Use modular route mounting for better isolation and debugging
 import { mountMinimalRoutes, mountAllRoutes } from './routes';
+import { generateTenantId } from './lib/id-generator';
 
 // For debugging: mount only minimal routes
 // mountMinimalRoutes(app);

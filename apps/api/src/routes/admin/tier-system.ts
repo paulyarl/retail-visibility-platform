@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
+import { generateFeatureId } from '../../lib/id-generator';
 
 const router = Router();
 
@@ -538,7 +539,7 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
     // Add feature
     const feature = await prisma.tierFeatures.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateFeatureId(),
         tierId,
         featureKey: featureData.featureKey,
         featureName: featureData.featureName,
@@ -749,7 +750,7 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
       for (const feature of featuresToCreate) {
         const newFeature = await tx.tierFeatures.create({
           data: {
-            id: crypto.randomUUID(),
+            id: generateFeatureId(),
             tierId,
             featureKey: feature.featureKey,
             featureName: feature.featureName,

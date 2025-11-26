@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { randomUUID } from 'crypto';
+import { generateQuickStart } from '../lib/id-generator';
 
 /**
  * Middleware to log all write operations to audit_log table
@@ -66,7 +67,7 @@ async function logAudit(req: Request, res: Response, requestId: string) {
     // Create audit log entry
     await prisma.auditLog.create({
       data: {
-        id: randomUUID(),
+        id: generateQuickStart("al"),
         tenantId: (user as any)?.tenantId || 'system',
         actorId: (user as any)?.id || 'anonymous',
         actorType: user ? 'user' : 'system',

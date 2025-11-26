@@ -9,6 +9,7 @@ import { UserRole, Prisma } from '@prisma/client';
 import { BarcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
 // import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
+import { generateItemId } from '../lib/id-generator';
 
 // Initialize enrichment service
 const barcodeEnrichmentService = new BarcodeEnrichmentService();
@@ -379,7 +380,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
         const stock = enrichment.stock || 0;
         const item = await prisma.inventoryItem.create({
           data: {
-            id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: generateItemId(),
             tenantId: session.tenantId,
             name: enrichment.name || `Product ${result.barcode}`,
             title: enrichment.name || `Product ${result.barcode}`,

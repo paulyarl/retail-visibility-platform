@@ -7,6 +7,7 @@ import { validateOrganizationTier, validateOrganizationLimits, validateOrganizat
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
+import { generateItemId, generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -152,7 +153,7 @@ router.post('/', requirePlatformAdmin, validateOrganizationTier, validateOrganiz
 
     const organization = await prisma.organization.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateQuickStart("org"),
         name: parsed.data.name,
         ownerId,
         subscriptionTier: parsed.data.subscriptionTier,
@@ -441,7 +442,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
         // Create mode - create new item
         const newItem = await prisma.inventoryItem.create({
           data: {
-            id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: generateItemId(),
             updatedAt: new Date(),
             tenantId,
             sku: sourceItem.sku,
@@ -873,7 +874,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
           // Create the item for this tenant
           const newItem = await prisma.inventoryItem.create({
             data: {
-              id: crypto.randomUUID(),
+              id: generateItemId(),
               tenantId: targetTenant.id,
               sku: sourceItem.sku,
               name: sourceItem.name,

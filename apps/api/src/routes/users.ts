@@ -5,6 +5,7 @@ import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
 import { getUserTenantRole } from '../middleware/permissions';
+import { generateUserId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -393,7 +394,7 @@ router.post('/:id/tenants', requireAdmin, async (req, res) => {
     // Create user-tenant relationship
     const userTenant = await prisma.userTenant.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateUserId(),
         userId: req.params.id,
         tenantId: parsed.data.tenantId,
         role: parsed.data.role,
@@ -480,3 +481,4 @@ router.get('/stats/summary', requireAdmin, async (req, res) => {
 });
 
 export default router;
+
