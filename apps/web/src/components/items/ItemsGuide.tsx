@@ -19,13 +19,13 @@ export default function ItemsGuide() {
             onClick={() => setIsExpanded(!isExpanded)}
             className="w-full flex items-center justify-between text-left"
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3" >
               <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                 <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <div>
+              <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg animate-pulse">
                 <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
                   Quick Start Guide
                 </h3>

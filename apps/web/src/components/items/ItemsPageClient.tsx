@@ -439,7 +439,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
             <div className={`absolute inset-0 transition-opacity duration-300 ${
               bulkMode 
                 ? 'opacity-100 bg-gradient-to-r from-primary-50 via-blue-50 to-purple-50 dark:from-primary-900/20 dark:via-blue-900/20 dark:to-purple-900/20' 
-                : 'opacity-0'
+                : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg animate-pulse'
             }`} />
             
             {/* Header - Always Visible */}
@@ -462,7 +462,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                     Bulk Actions
                   </h3>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    {bulkMode ? `${selectedItems.size} item${selectedItems.size !== 1 ? 's' : ''} selected` : 'Select multiple items to edit'}
+                    {bulkMode ? `${selectedItems.size} item${selectedItems.size !== 1 ? 's' : ''} selected` : 'Click to select multiple items to edit category, status, visibility or propagation'}
                   </p>
                 </div>
               </div>

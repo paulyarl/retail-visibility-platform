@@ -158,6 +158,10 @@ export default function CategoriesPage() {
   const [selectedHeroId, setSelectedHeroId] = useState<string>('')
   const [propagateMode, setPropagateMode] = useState<'create_only' | 'update_only' | 'create_or_update'>('create_or_update')
 
+  // Guide collapse state
+  const [isGuideExpanded, setIsGuideExpanded] = useState(false)
+  const [isQuickStartExpanded, setIsQuickStartExpanded] = useState(false)
+
   // Toasts
   const [toast, setToast] = useState<{ type: 'success'|'error'|'info'; message: string } | null>(null)
   const showToast = (type: 'success'|'error'|'info', message: string) => {
@@ -468,14 +472,63 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Store Guide */}
+      {/* Alignment Status Card */}
+      {alignmentStatus && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Alignment Status</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Total Categories</p>
+              <p className="text-2xl font-bold text-gray-900">{alignmentStatus.total}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Mapped</p>
+              <p className="text-2xl font-bold text-green-600">{alignmentStatus.mapped}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Unmapped</p>
+              <p className="text-2xl font-bold text-orange-600">{alignmentStatus.unmapped}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Coverage</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-2xl font-bold text-gray-900">{alignmentStatus.mappingCoverage}%</p>
+                {alignmentStatus.isCompliant ? (
+                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Compliant</span>
+                ) : (
+                  <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">Needs Work</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product Categories Guide */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div className="flex items-start gap-3">
-          <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+        <button
+          onClick={() => setIsGuideExpanded(!isGuideExpanded)}
+          className="w-full flex items-start gap-3 text-left hover:bg-blue-100/50 rounded-lg p-2 -m-2 transition-colors"
+        >
+          <svg className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1 a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
           </svg>
           <div className="flex-1">
-            <h4 className="text-sm font-semibold text-blue-900 mb-2">📚 Product Categories Guide</h4>
+            <h4 className="text-sm font-semibold text-blue-900">📚 Product Categories Guide</h4>
+            <p className="text-xs text-blue-700 mt-0.5">Click to {isGuideExpanded ? 'hide' : 'show'} detailed guide</p>
+          </div>
+          <svg 
+            className={`w-5 h-5 text-blue-600 shrink-0 transition-transform ${isGuideExpanded ? 'rotate-180' : ''}`}
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        {isGuideExpanded && (
+          <div className="mt-4 pl-8">
             <div className="space-y-3 text-sm text-blue-800">
               <div>
                 <strong>💡 Why create categories?</strong>
@@ -520,40 +573,8 @@ export default function CategoriesPage() {
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
-
-      {/* Alignment Status Card */}
-      {alignmentStatus && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Alignment Status</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Total Categories</p>
-              <p className="text-2xl font-bold text-gray-900">{alignmentStatus.total}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Mapped</p>
-              <p className="text-2xl font-bold text-green-600">{alignmentStatus.mapped}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Unmapped</p>
-              <p className="text-2xl font-bold text-orange-600">{alignmentStatus.unmapped}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Coverage</p>
-              <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-bold text-gray-900">{alignmentStatus.mappingCoverage}%</p>
-                {alignmentStatus.isCompliant ? (
-                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Compliant</span>
-                ) : (
-                  <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">Needs Work</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Categories List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -743,11 +764,27 @@ export default function CategoriesPage() {
       )}
 
       {/* Quick Start Guide */}
-      <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6 mb-6">
+      <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6 mt-6 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100">
-            🚀 Quick Start: Common Product Categories
-          </h3>
+          <button
+            onClick={() => setIsQuickStartExpanded(!isQuickStartExpanded)}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
+            <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100">
+              🚀 Quick Start: Common Product Categories
+            </h3>
+            <p className="text-xs text-purple-700 dark:text-purple-300">
+              Click to {isQuickStartExpanded ? 'hide' : 'show'} examples
+            </p>
+            <svg 
+              className={`w-5 h-5 text-purple-600 dark:text-purple-400 shrink-0 transition-transform ${isQuickStartExpanded ? 'rotate-180' : ''}`}
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
           {categories.length > 0 && (
             <Link href={`/t/${tenantId}/categories/quick-start`}>
               <button className="text-sm bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg transition-all">
@@ -757,7 +794,9 @@ export default function CategoriesPage() {
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {isQuickStartExpanded && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 mt-4">
           <div>
             <h4 className="font-medium text-purple-800 dark:text-purple-200 mb-2">Food & Grocery</h4>
             <ul className="space-y-1 text-sm text-purple-700 dark:text-purple-300">
@@ -836,6 +875,8 @@ export default function CategoriesPage() {
             </p>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Quick Actions */}
