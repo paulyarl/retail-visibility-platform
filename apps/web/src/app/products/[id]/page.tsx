@@ -110,6 +110,12 @@ interface Tenant {
     website?: string;
     address?: string;
     logo_url?: string;
+    social_links?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      linkedin?: string;
+    };
   };
 }
 
@@ -129,46 +135,35 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
 
     const product: Product = await productRes.json();
 
-    // Fetch tenant info
-    const tenantRes = await fetch(`${apiBaseUrl}/tenants/${product.tenantId}`, {
+    // Fetch tenant info and business profile using public endpoint
+    const profileRes = await fetch(`${apiBaseUrl}/public/tenant/${product.tenantId}/profile`, {
       cache: 'no-store',
     });
 
-    const tenant: Tenant = tenantRes.ok ? await tenantRes.json() : { id: product.tenantId, name: 'Store' };
-
-    // Fetch business profile using public endpoint (no auth required)
-    // Business hours are included in the profile response
+    const tenant: Tenant = { id: product.tenantId, name: 'Store', metadata: {} };
+    
     let storeStatus = null;
-    try {
-      const profileRes = await fetch(`${apiBaseUrl}/public/tenant/${product.tenantId}/profile`, {
-        cache: 'no-store',
-      });
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
-        // Merge business profile data into tenant metadata
-        tenant.metadata = {
-          ...tenant.metadata,
-          businessName: profile.business_name,
-          phone: profile.phone_number,
-          email: profile.email,
-          website: profile.website,
-          address: profile.address_line1 
-            ? `${profile.address_line1}${profile.address_line2 ? ', ' + profile.address_line2 : ''}, ${profile.city}, ${profile.state} ${profile.postal_code}`
-            : undefined,
-          logo_url: profile.logo_url,
-        };
-        
-        // Extract business hours from profile (same as storefront)
-        const businessHours = (profile as any)?.hours;
-        if (businessHours) {
-          storeStatus = computeStoreStatus(businessHours);
-        }
-      }
-    } catch (e) {
-      // Profile fetch failed, continue without it
-      console.error('Failed to fetch business profile:', e);
+    if (profileRes.ok) {
+      const profile = await profileRes.json();
+      // Extract business name from profile
+      tenant.name = profile.business_name || 'Store';
+      // Merge business profile data into tenant metadata
+      tenant.metadata = {
+        businessName: profile.business_name,
+        phone: profile.phone_number,
+        email: profile.email,
+        website: profile.website,
+        address: profile.address_line1 
+          ? `${profile.address_line1}${profile.address_line2 ? ', ' + profile.address_line2 : ''}, ${profile.city}, ${profile.state} ${profile.postal_code}`
+          : undefined,
+        logo_url: profile.logo_url,
+        social_links: profile.social_links,
+      };
+      
+      // Extract store hours for status calculation
+      storeStatus = computeStoreStatus(profile.hours);
     }
-
+        
     return { product, tenant, storeStatus };
   } catch (error) {
     console.error('Error fetching product:', error);
@@ -295,7 +290,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         {!isPubliclyAccessible && (
           <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-4 rounded-r-lg">
             <div className="flex items-start gap-3">
-              <svg className="w-6 h-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <div className="flex-1">

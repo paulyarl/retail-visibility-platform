@@ -272,6 +272,8 @@ export default function EditBusinessProfileModal({
         business_description: formData.business_description ? formData.business_description : undefined,
         phone_number: formData.phone_number ? formData.phone_number : undefined,
         email: formData.email ? formData.email : undefined,
+        // Include social links if they exist
+        social_links: formData.social_links && Object.keys(formData.social_links).length > 0 ? formData.social_links : undefined,
         // Explicitly include coordinates if they exist
         latitude: formData.latitude !== undefined && formData.latitude !== null ? formData.latitude : undefined,
         longitude: formData.longitude !== undefined && formData.longitude !== null ? formData.longitude : undefined,
@@ -509,6 +511,84 @@ export default function EditBusinessProfileModal({
             error={errors.contact_person}
             helperText="Optional - Primary contact for this location"
           />
+
+          {/* Social Links (Optional) */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Social Links
+            </label>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3">
+              Optional - Connect your social media profiles for better SEO and customer engagement
+            </p>
+
+            {/* Facebook */}
+            <Input
+              label="Facebook"
+              placeholder="https://facebook.com/yourpage"
+              value={(formData.social_links as any)?.facebook || ''}
+              onChange={(e) => {
+                const currentLinks = formData.social_links || {};
+                handleChange('social_links', {
+                  ...currentLinks,
+                  facebook: e.target.value
+                });
+              }}
+              onBlur={() => handleBlur('social_links')}
+              error={errors.social_links}
+              helperText="Your Facebook page URL"
+            />
+
+            {/* Instagram */}
+            <Input
+              label="Instagram"
+              placeholder="https://instagram.com/yourhandle"
+              value={(formData.social_links as any)?.instagram || ''}
+              onChange={(e) => {
+                const currentLinks = formData.social_links || {};
+                handleChange('social_links', {
+                  ...currentLinks,
+                  instagram: e.target.value
+                });
+              }}
+              onBlur={() => handleBlur('social_links')}
+              error={errors.social_links}
+              helperText="Your Instagram profile URL"
+            />
+
+            {/* Twitter/X */}
+            <Input
+              label="Twitter/X"
+              placeholder="https://twitter.com/yourhandle"
+              value={(formData.social_links as any)?.twitter || ''}
+              onChange={(e) => {
+                const currentLinks = formData.social_links || {};
+                handleChange('social_links', {
+                  ...currentLinks,
+                  twitter: e.target.value
+                });
+              }}
+              onBlur={() => handleBlur('social_links')}
+              error={errors.social_links}
+              helperText="Your Twitter/X profile URL"
+            />
+
+            {/* LinkedIn */}
+            <Input
+              label="LinkedIn"
+              placeholder="https://linkedin.com/company/yourcompany"
+              value={(formData.social_links as any)?.linkedin || ''}
+              onChange={(e) => {
+                const currentLinks = formData.social_links || {};
+                handleChange('social_links', {
+                  ...currentLinks,
+                  linkedin: e.target.value
+                });
+              }}
+              onBlur={() => handleBlur('social_links')}
+              error={errors.social_links}
+              helperText="Your LinkedIn company page URL"
+            />
+          </div>
 
           {/* Logo URL (Professional+ Tier) - with upload option */}
           <div>

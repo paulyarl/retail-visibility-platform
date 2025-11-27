@@ -32,7 +32,7 @@ export default function TenantBusinessProfilePage() {
   const loadProfile = async () => {
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.get(`${apiBaseUrl}/tenant/${encodeURIComponent(tenantId)}/profile`);
+      const response = await api.get(`${apiBaseUrl}/tenant/profile?tenantId=${encodeURIComponent(tenantId)}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -59,8 +59,29 @@ export default function TenantBusinessProfilePage() {
     }
   };
 
-  const handleUpdate = (updatedProfile: BusinessProfile) => {
-    setProfile(updatedProfile);
+  const handleUpdate = async (updatedProfile: BusinessProfile) => {
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const response = await api.post(`${apiBaseUrl}/tenant/profile`, {
+        ...updatedProfile,
+        tenantId,
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(data);
+        // Reload the profile data to ensure we have the latest from server
+        loadProfile();
+      } else {
+        console.error('Failed to update profile:', response.statusText);
+        // Still update local state for UI feedback, but it will be overwritten when loadProfile() completes
+        setProfile(updatedProfile);
+      }
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      // Update local state for UI feedback even if API call fails
+      setProfile(updatedProfile);
+    }
   };
 
   // Access control checks

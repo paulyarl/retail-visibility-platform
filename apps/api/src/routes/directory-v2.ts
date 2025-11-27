@@ -101,7 +101,7 @@ router.get('/search', async (req: Request, res: Response) => {
     }
 
     if (category && typeof category === 'string') {
-      conditions.push(`LOWER(primary_category) LIKE LOWER($${paramIndex})`);
+      conditions.push(`(LOWER(primary_category) LIKE LOWER($${paramIndex}) OR LOWER(secondary_categories::text) LIKE LOWER($${paramIndex}))`);
       params.push(`%${category}%`);
       paramIndex++;
     }
@@ -273,20 +273,38 @@ router.get('/locations', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/directory/:slug
- * Get single listing by slug
+ * GET /api/directory/:identifier
+ * Get single listing by slug or tenant ID
  */
-router.get('/:slug', async (req: Request, res: Response) => {
+router.get('/:identifier', async (req: Request, res: Response) => {
   try {
-    const { slug } = req.params;
+    const { identifier } = req.params;
 
-    const result = await getDirectPool().query(
-      `SELECT * FROM directory_listings_list
-       WHERE slug = $1 AND is_published = true
-         AND (business_hours IS NULL OR business_hours::text != 'null')
-       LIMIT 1`,
-      [slug]
-    );
+    // Check if identifier is a tenant ID (starts with 't-')
+    const isTenantId = identifier.startsWith('t-');
+
+    let query, params;
+    if (isTenantId) {
+      // Query by tenant_id
+      query = `
+        SELECT * FROM directory_listings_list
+         WHERE tenant_id = $1 AND is_published = true
+           AND (business_hours IS NULL OR business_hours::text != 'null')
+         LIMIT 1
+      `;
+      params = [identifier];
+    } else {
+      // Query by slug
+      query = `
+        SELECT * FROM directory_listings_list
+         WHERE slug = $1 AND is_published = true
+           AND (business_hours IS NULL OR business_hours::text != 'null')
+         LIMIT 1
+      `;
+      params = [identifier];
+    }
+
+    const result = await getDirectPool().query(query, params);
 
     if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ error: 'listing_not_found' });
@@ -296,7 +314,7 @@ router.get('/:slug', async (req: Request, res: Response) => {
     const listing = {
       id: row.id,
       tenantId: row.tenantId,
-      business_name: row.businessName,
+      business_name: row.business_name,
       slug: row.slug,
       address: row.address,
       city: row.city,
@@ -352,12 +370,14 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     const current = currentListing.rows[0];
 
     // Find related stores using a scoring algorithm
-    // Priority: Same category > Same city > Similar rating
+    // Priority: Same category (primary/secondary) > Same city > Similar rating
     const relatedQuery = `
       SELECT *,
         (
           CASE
             WHEN primary_category = $1 THEN 3
+            WHEN $1 = ANY(secondary_categories) THEN 2
+            WHEN primary_category = ANY($7) THEN 2
             ELSE 0
           END +
           CASE
@@ -385,12 +405,13 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       current.rating_avg || 0,
       slug,
       limit,
+      current.secondary_categories || [], // Add secondary categories for cross-matching
     ]);
 
     const relatedListings = related.rows.map((row: any) => ({
       id: row.id,
       tenantId: row.tenantId,
-      business_name: row.businessName,
+      business_name: row.business_name,
       slug: row.slug,
       address: row.address,
       city: row.city,

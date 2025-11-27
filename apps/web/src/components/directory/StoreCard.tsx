@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface StoreCardProps {
   listing: {
@@ -30,6 +31,8 @@ interface StoreCardProps {
 }
 
 export default function StoreCard({ listing, index }: StoreCardProps) {
+  const router = useRouter();
+
   // Determine destination URL based on tier and settings
   const canUseCustomUrl = ['professional', 'enterprise', 'organization'].includes(
     listing.subscriptionTier
@@ -45,6 +48,13 @@ export default function StoreCard({ listing, index }: StoreCardProps) {
   // Format rating
   const formatRating = (rating: number) => {
     return rating > 0 ? rating.toFixed(1) : 'New';
+  };
+
+  // Handle directory page navigation
+  const handleDirectoryPageClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/directory/${listing.slug}`);
   };
 
   return (
@@ -160,9 +170,18 @@ export default function StoreCard({ listing, index }: StoreCardProps) {
               <span>{listing.productCount} {listing.productCount === 1 ? 'product' : 'products'}</span>
             </div>
 
-            {/* CTA Button */}
-            <div className="pt-2">
-              <div className="w-full text-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">
+            {/* CTA Buttons */}
+            <div className="pt-2 space-y-2">
+              {/* Directory Page Button */}
+              <button
+                onClick={handleDirectoryPageClick}
+                className="block w-full text-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                View Directory Page
+              </button>
+
+              {/* Main CTA Button */}
+              <div className="w-full text-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors cursor-pointer">
                 {isExternalLink ? 'Visit Website' : 'View Storefront'} →
               </div>
             </div>

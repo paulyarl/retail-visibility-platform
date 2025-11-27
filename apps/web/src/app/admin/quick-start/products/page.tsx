@@ -172,7 +172,7 @@ export default function AdminProductQuickStartPage() {
   if (success && result) {
     const selectedTenantName = tenants.find(t => t.id === selectedTenant)?.name || 'tenant';
     return (
-      <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-full flex items-center justify-center p-4">
+      <div className="bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 min-h-full flex items-center justify-center p-4">
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -185,7 +185,7 @@ export default function AdminProductQuickStartPage() {
               </div>
             </div>
 
-            <h1 className="text-3xl font-bold text-center mb-4 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+            <h1 className="text-3xl font-bold text-center mb-4 bg-linear-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
               🎉 {result.productsCreated} Products Created!
             </h1>
 
@@ -216,7 +216,7 @@ export default function AdminProductQuickStartPage() {
   }
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-full">
+    <div className="bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 min-h-full">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <motion.div
@@ -224,13 +224,13 @@ export default function AdminProductQuickStartPage() {
           animate={{ y: 0, opacity: 1 }}
           className="text-center mb-12"
         >
-          <Badge className="mb-4 bg-gradient-to-r from-red-500 to-orange-600 text-white">
+          <Badge className="mb-4 bg-linear-to-r from-red-500 to-orange-600 text-white">
             Admin Tool
           </Badge>
           <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 mb-4">
             Product Quick Start
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+            <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-purple-600">
               Admin Panel
             </span>
           </h1>

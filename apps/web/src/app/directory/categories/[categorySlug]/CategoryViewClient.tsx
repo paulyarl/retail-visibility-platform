@@ -95,14 +95,15 @@ export default function CategoryViewClient({
           setCategory(currentCat || null);
         }
 
-        // 2. Fetch stores in this category
+        // 2. Fetch stores in this category using main directory search
         const params = new URLSearchParams();
         if (searchParams.lat) params.set('lat', searchParams.lat);
         if (searchParams.lng) params.set('lng', searchParams.lng);
         if (searchParams.radius) params.set('radius', searchParams.radius);
+        params.set('category', categorySlug); // Use category slug as filter
 
         const storesRes = await fetch(
-          `${apiBaseUrl}/api/directory/categories/${categorySlug}/stores?${params}`
+          `${apiBaseUrl}/api/directory/search?${params}`
         );
 
         if (!storesRes.ok) {

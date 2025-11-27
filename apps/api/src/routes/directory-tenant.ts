@@ -257,7 +257,7 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
         t.id,
         t.id as tenant_id,
         COALESCE(bp.business_name, t.name) as business_name,
-        t.slug,
+        COALESCE(ds.slug, t.slug) as slug,
         bp.address_line1 as address,
         bp.city,
         bp.state,

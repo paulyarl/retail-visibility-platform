@@ -113,10 +113,15 @@ import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 // import directorySupportRoutes from './routes/directory-support';
 // import directoryCategoriesRoutes from './routes/directory-categories';
 // import directoryStoreTypesRoutes from './routes/directory-store-types';
+import directoryRoutes from './routes/directory-v2';
+import directoryTenantRoutes from './routes/directory-tenant';
+import directoryCategoriesRoutes from './routes/directory-categories';
+import directoryStoreTypesRoutes from './routes/directory-store-types';
 import scanRoutes from './routes/scan';
 import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
 import tenantsRoutes from './routes/tenants';
+import productLikesRoutes from './routes/product-likes';
 // import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
 import adminEnrichmentRoutes from './routes/admin-enrichment';
@@ -947,13 +952,7 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
         display_map: (profileData as any).display_map,
         map_privacy_mode: (profileData as any).map_privacy_mode,
       };
-
-      Object.entries(optionalMappings).forEach(([field, value]) => {
-        if (value !== undefined) {
-          insertFields.push(field);
-          insertValues.push(value === '' ? null : (value as any));
-        }
-      });
+      console.log('[POST /tenant/profile] Optional mappings social_links:', optionalMappings.social_links);
 
       // Always add updated_at field with current timestamp
       insertFields.push('updated_at');
@@ -1229,21 +1228,22 @@ app.get("/public/tenant/:tenantId/profile", async (req, res) => {
     
     // Return public business information only
     const profile = {
-      business_name: bp?.businessName || md.businessName || tenant.name || null,
-      address_line1: bp?.addressLine1 || md.address_line1 || null,
-      address_line2: bp?.addressLine2 || md.address_line2 || null,
+      business_name: bp?.business_name || md.businessName || tenant.name || null,
+      address_line1: bp?.address_line1 || md.address_line1 || null,
+      address_line2: bp?.address_line2 || md.address_line2 || null,
       city: bp?.city || md.city || null,
       state: bp?.state || md.state || null,
-      postal_code: bp?.postalCode || md.postal_code || null,
-      country_code: bp?.countryCode || md.country_code || null,
-      phone_number: bp?.phoneNumber || md.phone_number || null,
+      postal_code: bp?.postal_code || md.postal_code || null,
+      country_code: bp?.country_code || md.country_code || null,
+      phone_number: bp?.phone_number || md.phone_number || null,
       email: bp?.email || md.email || null,
       website: bp?.website || md.website || null,
-      contact_person: bp?.contactPerson || md.contact_person || null,
-      logo_url: bp?.logoUrl ?? md.logo_url ?? null,
+      contact_person: bp?.contact_person || md.contact_person || null,
+      logo_url: bp?.logo_url ?? md.logo_url ?? null,
       banner_url: bp?.banner_url ?? md.banner_url ?? null,
       business_description: bp?.business_description || md.business_description || null,
       hours: hoursData || bp?.hours || md.hours || null,
+      social_links: bp?.social_links || md.social_links || null,
     };
     return res.json(profile);
   } catch (e: any) {
@@ -3662,9 +3662,29 @@ console.log('✅ Admin enrichment routes mounted at /api/admin/enrichment');
 app.use('/api/admin/scan-metrics', scanMetricsRoutes);
 console.log('✅ Admin scan metrics routes mounted at /api/admin/scan-metrics');
 
+/* ------------------------------ directory ------------------------------ */
+app.use('/api/directory', directoryRoutes);
+console.log('✅ Directory listings routes mounted (directory_listings table)');
+
+/* ------------------------------ directory tenant ------------------------------ */
+app.use('/api/directory/tenant', directoryTenantRoutes);
+console.log('✅ Directory tenant routes mounted');
+
+/* ------------------------------ directory categories ------------------------------ */
+app.use('/api/directory/categories', directoryCategoriesRoutes);
+console.log('✅ Directory categories routes mounted (category-based discovery)');
+
+/* ------------------------------ directory store types ------------------------------ */
+app.use('/api/directory/store-types', directoryStoreTypesRoutes);
+console.log('✅ Directory store types routes mounted (store type discovery)');
+
 /* ------------------------------ tenants ------------------------------ */
 app.use('/api/tenants', tenantsRoutes);
 console.log('✅ Tenants routes mounted at /api/tenants');
+
+/* ------------------------------ product likes ------------------------------ */
+app.use('/api/products', productLikesRoutes);
+console.log('✅ Product likes routes mounted at /api/products');
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
