@@ -35,7 +35,7 @@ export function mountIntegrationRoutes(app: Express) {
   app.use('/api/google-business', googleBusinessOAuthRoutes);
 
   // Scanning and barcode processing
-  app.use('/api', scanRoutes);
+  app.use('/api/scan', scanRoutes);
   console.log('✅ Scan routes mounted at /api/scan');
   app.use(scanMetricsRoutes);
 

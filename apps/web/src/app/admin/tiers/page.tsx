@@ -162,7 +162,7 @@ export default function AdminTiersPage() {
     return (
       <div className="min-h-screen bg-neutral-50">
         <PageHeader
-          title="Subscription Tier Management"
+          title="Location Subscription Management"
           description="Manage location subscription tiers and billing status"
           icon={Icons.Settings}
         />
@@ -178,8 +178,8 @@ export default function AdminTiersPage() {
   return (
     <div className="min-h-screen bg-neutral-50">
       <PageHeader
-        title="Subscription Tier Management"
-        description="Manage tenant subscription tiers and billing status"
+        title="Location Subscription Management"
+        description="Manage location subscription tiers and billing status"
         icon={Icons.Settings}
       />
 

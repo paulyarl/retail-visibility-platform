@@ -77,7 +77,7 @@ export default function AdminProductQuickStartPage() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/tenants`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/tenants`, {
         headers,
         credentials: 'include',
       });
@@ -444,7 +444,7 @@ export default function AdminProductQuickStartPage() {
         {/* Back Link */}
         <div className="text-center mt-6">
           <button
-            onClick={() => router.push('/admin')}
+            onClick={() => router.push('/settings/admin')}
             className="text-sm text-neutral-600 hover:text-neutral-900"
           >
             ← Back to Admin

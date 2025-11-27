@@ -127,11 +127,11 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
     return (
       <div className="min-h-screen bg-neutral-50">
         <PageHeader
-          title="Subscription Tiers"
-          description="Platform user view - Available subscription tiers"
+          title="Subscription Management"
+          description="Location subscription management - Available subscription tiers"
           icon={Icons.Settings}
           backLink={{
-            href: '/settings',
+            href: '/settings/admin',
             label: 'Back to Settings'
           }}
         />

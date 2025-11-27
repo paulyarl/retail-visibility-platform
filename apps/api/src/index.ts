@@ -113,11 +113,13 @@ import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 // import directorySupportRoutes from './routes/directory-support';
 // import directoryCategoriesRoutes from './routes/directory-categories';
 // import directoryStoreTypesRoutes from './routes/directory-store-types';
-// import scanRoutes from './routes/scan';
-// import scanMetricsRoutes from './routes/scan-metrics';
+import scanRoutes from './routes/scan';
+import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
+import tenantsRoutes from './routes/tenants';
 // import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
+import adminEnrichmentRoutes from './routes/admin-enrichment';
 // import featureOverridesRoutes from './routes/admin/feature-overrides';
 // import tierManagementRoutes from './routes/admin/tier-management';
 // import tierSystemRoutes from './routes/admin/tier-system';
@@ -163,7 +165,6 @@ const getSquareRoutes = async () => {
 // import categoriesMirrorRoutes from './routes/categories.mirror';
 // import mirrorAdminRoutes from './routes/mirror.admin';
 // import syncLogsRoutes from './routes/sync-logs';
-// import scanRoutes from './routes/scan';
 // import scanMetricsRoutes from './routes/scan-metrics';
 // import testGbpSyncRoutes from './routes/test-gbp-sync';
 
@@ -3341,7 +3342,7 @@ app.post('/api/admin/taxonomy/sync', requireAdmin, async (req, res) => {
 // app.use(mirrorAdminRoutes);
 // app.use(syncLogsRoutes);
 // M4: SKU Scanning routes
-// app.use('/api', scanRoutes);
+// app.use('/api/scan', scanRoutes);
 // console.log('✅ Scan routes mounted at /api/scan');
 // app.use(scanMetricsRoutes);
 
@@ -3652,6 +3653,18 @@ app.get("/api/gbp/categories", async (req, res) => {
 /* ------------------------------ admin users ------------------------------ */
 app.use('/api/admin', adminUsersRoutes);
 console.log('✅ Admin users routes mounted at /api/admin');
+
+/* ------------------------------ admin enrichment ------------------------------ */
+app.use('/api/admin/enrichment', adminEnrichmentRoutes);
+console.log('✅ Admin enrichment routes mounted at /api/admin/enrichment');
+
+/* ------------------------------ admin scan metrics ------------------------------ */
+app.use('/api/admin/scan-metrics', scanMetricsRoutes);
+console.log('✅ Admin scan metrics routes mounted at /api/admin/scan-metrics');
+
+/* ------------------------------ tenants ------------------------------ */
+app.use('/api/tenants', tenantsRoutes);
+console.log('✅ Tenants routes mounted at /api/tenants');
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);

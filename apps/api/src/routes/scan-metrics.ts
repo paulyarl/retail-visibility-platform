@@ -6,8 +6,8 @@ import { canViewAllTenants } from '../utils/platform-admin';
 
 const router = Router();
 
-// GET /api/admin/scan-metrics - Get scan activity metrics
-router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, res: Response) => {
+// GET / - Get scan activity metrics
+router.get('/', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -156,7 +156,7 @@ router.get('/api/admin/scan-metrics', authenticateToken, async (req: Request, re
       success: true,
       timeRange,
       stats: {
-        scanSessions: {
+        sessions: {
           total: totalSessions,
           active: activeSessions,
           completed: completedSessions,

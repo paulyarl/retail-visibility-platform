@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiRequest } from '@/lib/api';
 import { 
   BarChart3, 
   Database, 
@@ -17,9 +18,17 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 
+interface PopularProduct {
+  barcode: string;
+  name: string;
+  brand: string;
+  fetchCount: number;
+  source: string;
+}
+
 interface Analytics {
-  totalCached: number;
-  popularProducts: any[];
+  totalProducts: number;
+  popularProducts: PopularProduct[];
   dataQuality: {
     withNutrition: number;
     withImages: number;
@@ -56,9 +65,7 @@ export default function EnrichmentDashboardPage() {
 
   const loadAnalytics = async () => {
     try {
-      const response = await fetch('/api/admin/enrichment/analytics', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      });
+      const response = await apiRequest('api/admin/enrichment/analytics');
       const data = await response.json();
       if (data.success) {
         setAnalytics(data.analytics);
@@ -80,9 +87,7 @@ export default function EnrichmentDashboardPage() {
         ...(sourceFilter && { source: sourceFilter }),
       });
 
-      const response = await fetch(`/api/admin/enrichment/search?${params}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      });
+      const response = await apiRequest(`api/admin/enrichment/search?${params}`);
       const data = await response.json();
       if (data.success) {
         setProducts(data.products);
@@ -102,9 +107,7 @@ export default function EnrichmentDashboardPage() {
 
   const viewProductDetails = async (barcode: string) => {
     try {
-      const response = await fetch(`/api/admin/enrichment/${barcode}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      });
+      const response = await apiRequest(`api/admin/enrichment/${barcode}`);
       const data = await response.json();
       if (data.success) {
         setSelectedProduct(data.product);
@@ -144,15 +147,15 @@ export default function EnrichmentDashboardPage() {
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Total Cached */}
+          {/* Total Products */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <Database className="w-8 h-8 text-blue-600" />
               <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                {analytics?.totalCached.toLocaleString()}
+                {analytics?.totalProducts.toLocaleString()}
               </span>
             </div>
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Cached Products</h3>
+            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Products</h3>
             <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
               {analytics?.recentAdditions} added in last 24h
             </p>
@@ -271,7 +274,7 @@ export default function EnrichmentDashboardPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 mb-8">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Most Popular Products</h2>
           <div className="space-y-3">
-            {analytics?.popularProducts.map((product, idx) => (
+            {analytics?.popularProducts.map((product: PopularProduct, idx: number) => (
               <div key={product.barcode} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
@@ -344,7 +347,7 @@ export default function EnrichmentDashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {products.map((product) => (
+                    {products.map((product: any) => (
                       <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -385,7 +388,7 @@ export default function EnrichmentDashboardPage() {
               {/* Pagination */}
               <div className="flex items-center justify-between mt-4">
                 <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  onClick={() => setPage((p: number) => Math.max(1, p - 1))}
                   disabled={page === 1}
                   className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
@@ -395,7 +398,7 @@ export default function EnrichmentDashboardPage() {
                   Page {page} of {totalPages}
                 </span>
                 <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
                   className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
                 >

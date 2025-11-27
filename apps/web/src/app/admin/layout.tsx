@@ -34,11 +34,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/tools', label: 'Control Panel', icon: Rocket },
     { href: '/admin/users', label: 'User Management', icon: Users },
     { href: '/admin/enrichment', label: 'Product Intelligence', icon: Sparkles },
-    { href: '/admin/organizations', label: 'Organizations', icon: Building2 },
-    { href: '/admin/categories', label: 'Categories', icon: Layers },
-    { href: '/admin/directory', label: 'Directory', icon: MapPin },
-    { href: '/admin/tiers', label: 'Subscription Tiers', icon: DollarSign },
-    { href: '/admin/billing', label: 'Billing', icon: DollarSign },
+    { href: '/admin/quick-start/products', label: 'Products Quick Start', icon: Rocket },
+    { href: '/admin/quick-start/categories', label: 'Product Categories Quick Start', icon: Rocket },
+    { href: '/admin/organizations', label: 'Organizations Panel', icon: Building2 },
+    { href: '/admin/categories', label: 'Product Categories', icon: Layers },
+    { href: '/admin/directory', label: 'Directory Panel', icon: MapPin },
+    { href: '/admin/tiers', label: 'Subscription Panel', icon: DollarSign },
+    { href: '/admin/billing', label: 'Billing Panel', icon: DollarSign },
   ];
 
   return (
@@ -79,7 +81,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             </div>
             <Link
-              href="/"
+              href="/settings/admin"
               className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               <Home className="w-3 h-3 sm:w-4 sm:h-4" />
