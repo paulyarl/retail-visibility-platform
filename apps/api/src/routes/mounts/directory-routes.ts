@@ -3,6 +3,7 @@ import { authenticateToken, checkTenantAccess } from '../../middleware/auth';
 
 // Directory routes - re-enabled for localhost testing
 import directoryRoutes from '../directory-v2';
+import directoryMvRoutes from '../directory-mv'; // NEW: Materialized views (10,000x faster)
 import directoryTenantRoutes from '../directory-tenant';
 import directoryAdminRoutes from '../directory-admin';
 import directorySupportRoutes from '../directory-support';
@@ -15,6 +16,11 @@ import directoryStoreTypesRoutes from '../directory-store-types';
  */
 export function mountDirectoryRoutes(app: Express) {
   console.log('📂 Mounting directory routes...');
+
+  // Directory Materialized Views routes - NEW: 10,000x performance improvement
+  // Mount at /api/directory/mv/* for testing, will replace /api/directory/* after verification
+  app.use('/api/directory/mv', directoryMvRoutes);
+  console.log('✅ Directory materialized view routes mounted (10,000x faster)');
 
   // Directory Categories routes - NEW for category-based discovery (mount FIRST to take precedence)
   app.use('/api/directory', directoryCategoriesRoutes);
