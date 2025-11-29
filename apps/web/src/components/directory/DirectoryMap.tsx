@@ -15,6 +15,8 @@ interface DirectoryListing {
   address?: string;
   city?: string;
   state?: string;
+  zipCode?: string;
+  country?: string;
   latitude?: number;
   longitude?: number;
   logoUrl?: string;
@@ -46,26 +48,72 @@ export default function DirectoryMap({
   const listingsWithoutCoords = listings.filter(l => !l.latitude || !l.longitude);
 
   // Auto-geocode stores without coordinates
-  const handleAutoGeocode = async () => {
-    if (listingsWithoutCoords.length === 0) return;
-    
-    setAutoGeocoding(true);
-    try {
-      // For now, just geocode the first store without coordinates
-      const store = listingsWithoutCoords[0];
-      
-      // Try to extract address components from the listing data
-      // Note: This would require the listing to have address fields
-      console.log('[DirectoryMap] Attempting auto-geocode for:', store.businessName);
-      
-      // For now, just log that we attempted it
-      // In a full implementation, you'd call an API to update the store coordinates
-    } catch (error) {
-      console.error('[DirectoryMap] Auto-geocode failed:', error);
-    } finally {
-      setAutoGeocoding(false);
+  const handleAutoGeocode = async (store: DirectoryListing) => {
+    if (!store.address || !store.city || !store.zipCode || !store.country) {
+      console.log('[DirectoryMap] Store missing required address fields for geocoding:', store.businessName);
+      return null;
     }
+    
+    try {
+      console.log('[DirectoryMap] Auto-geocoding store:', store.businessName);
+      
+      const coordinates = await geocodeAddress({
+        address_line1: store.address,
+        city: store.city,
+        state: store.state,
+        postal_code: store.zipCode,
+        country_code: store.country,
+      });
+
+      if (coordinates) {
+        console.log('[DirectoryMap] Got coordinates for', store.businessName, ':', coordinates);
+        
+        // Update the store coordinates via API
+        const response = await fetch(`/api/tenants/${store.id}/coordinates`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(coordinates),
+        });
+
+        if (response.ok) {
+          console.log('[DirectoryMap] Successfully updated coordinates for', store.businessName);
+          return coordinates;
+        } else {
+          console.error('[DirectoryMap] Failed to update coordinates for', store.businessName);
+        }
+      } else {
+        console.log('[DirectoryMap] Geocoding failed for', store.businessName);
+      }
+    } catch (error) {
+      console.error('[DirectoryMap] Auto-geocode error for', store.businessName, ':', error);
+    }
+    
+    return null;
   };
+
+  // Auto-geocode stores when component mounts
+  useEffect(() => {
+    const autoGeocodeStores = async () => {
+      if (listingsWithoutCoords.length === 0) return;
+      
+      // Find stores that have complete address info but no coordinates
+      const storesWithCompleteAddress = listingsWithoutCoords.filter(store => 
+        store.address && store.city && store.zipCode && store.country
+      );
+
+      if (storesWithCompleteAddress.length === 0) return;
+
+      console.log(`[DirectoryMap] Found ${storesWithCompleteAddress.length} stores with addresses but no coordinates`);
+      
+      // Auto-geocode the first store (to avoid overwhelming the geocoding API)
+      const store = storesWithCompleteAddress[0];
+      await handleAutoGeocode(store);
+    };
+
+    // Run auto-geocoding with a slight delay to avoid blocking the UI
+    const timer = setTimeout(autoGeocodeStores, 1000);
+    return () => clearTimeout(timer);
+  }, [listingsWithoutCoords]);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -193,7 +241,7 @@ export default function DirectoryMap({
       {listingsWithoutCoords.length > 0 && validListings.length === 0 && (
         <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
           <div className="flex items-start gap-3">
-            <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center shrink-0 mt-0.5">
               <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -211,16 +259,10 @@ export default function DirectoryMap({
               <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
                 Stores are displayed in Grid and List views with their addresses.
               </div>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={handleAutoGeocode}
-                  disabled={autoGeocoding}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-xs font-medium rounded transition-colors"
-                >
-                  {autoGeocoding ? 'Getting Coordinates...' : 'Get Coordinates'}
-                </button>
-                <span className="text-xs text-amber-600 dark:text-amber-400 self-center">
-                  Updates store with map coordinates
+              <div className="mt-3 flex items-center gap-2">
+                <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-amber-600 dark:text-amber-400">
+                  Automatically getting coordinates...
                 </span>
               </div>
             </div>

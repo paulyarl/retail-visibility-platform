@@ -525,6 +525,46 @@ app.patch("/api/tenants/:id", authenticateToken, requireAdmin, validateTierAssig
   }
 });
 
+// PATCH /api/tenants/:id/coordinates - Update tenant coordinates (for auto-geocoding)
+const coordinatesSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+
+app.patch("/api/tenants/:id/coordinates", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const parsed = coordinatesSchema.safeParse(req.body);
+    
+    if (!parsed.success) {
+      return res.status(400).json({ error: "invalid_coordinates", details: parsed.error.flatten() });
+    }
+
+    // Update tenant coordinates
+    const tenant = await prisma.tenant.update({
+      where: { id },
+      data: {
+        latitude: parsed.data.latitude,
+        longitude: parsed.data.longitude,
+      },
+    });
+
+    console.log(`[PATCH /api/tenants/${id}/coordinates] Updated coordinates for ${tenant.name}:`, parsed.data);
+
+    res.json({
+      success: true,
+      coordinates: parsed.data,
+      tenantId: id,
+    });
+  } catch (error: any) {
+    console.error('[PATCH /api/tenants/:id/coordinates] Error:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: "tenant_not_found" });
+    }
+    res.status(500).json({ error: "failed_to_update_coordinates" });
+  }
+});
+
 app.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireTenantOwner, async (req, res) => {
   try {
     const tenantId = req.params.id;
