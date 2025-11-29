@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { Flags } from "./config";
 import { Prisma } from '@prisma/client';
+import { generateQuickStart } from "./lib/id-generator";
 
 export type AuditPayload = Record<string, any> | null | undefined;
 
@@ -12,11 +13,34 @@ export async function audit(opts: {
 }) {
   if (!Flags.AUDIT_LOG) return; // feature-guarded noop
   try {
-    const payloadJson = opts.payload ? JSON.stringify(opts.payload) : null;
-    await prisma.$executeRaw(Prisma.sql`
-      INSERT INTO audit_log (tenantId, actor, action, payload)
-      VALUES (${opts.tenantId}, ${opts.actor ?? null}, ${opts.action}, ${payloadJson}::jsonb)
-    `);
+    // Map action strings to enum values
+    let mappedAction: 'create' | 'update' | 'delete' | 'sync' | 'policyApply' | 'oauthConnect' | 'oauthRefresh';
+    if (opts.action.includes('create')) {
+      mappedAction = 'create';
+    } else if (opts.action.includes('update')) {
+      mappedAction = 'update';
+    } else if (opts.action.includes('delete')) {
+      mappedAction = 'delete';
+    } else if (opts.action.includes('sync')) {
+      mappedAction = 'sync';
+    } else {
+      mappedAction = 'update'; // default fallback
+    }
+
+    const auditData: any = {
+      id: generateQuickStart("audit"),
+      tenantId: opts.tenantId,
+      action: mappedAction, // Use mapped enum value instead of string
+      actorId: opts.actor || 'system', // Prisma model expects this
+      actorType: 'system', // Prisma model expects this
+      entityId: opts.payload?.id || 'unknown', // Prisma model expects this
+      entityType: 'other', // Valid EntityType enum value for categories
+      diff: opts.payload || {}, // Required field
+    };
+
+    await prisma.auditLog.create({
+      data: auditData,
+    });
   } catch (e) {
     // swallow errors to avoid impacting hot paths
     // optionally add sampling/logging later under observability work

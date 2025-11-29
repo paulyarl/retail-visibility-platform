@@ -27,6 +27,7 @@ interface DirectoryListing {
   phone?: string;
   logoUrl?: string;
   primaryCategory?: string;
+  gbpPrimaryCategoryName?: string;
   ratingAvg: number;
   ratingCount: number;
   productCount: number;

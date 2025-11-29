@@ -92,15 +92,9 @@ export default function StoreTypeViewClient({
           setStoreType(typeData.data?.storeType || null);
         }
 
-        // 2. Fetch stores of this type using MV search
-        const params = new URLSearchParams();
-        params.set('category', storeTypeSlug); // Use category filter
-        if (searchParams.lat) params.set('lat', searchParams.lat);
-        if (searchParams.lng) params.set('lng', searchParams.lng);
-        if (searchParams.radius) params.set('radius', searchParams.radius);
-
+        // 2. Fetch stores of this type using store-types endpoint
         const storesRes = await fetch(
-          `${apiBaseUrl}/api/directory/mv/search?${params}`
+          `${apiBaseUrl}/api/directory/store-types/${storeTypeSlug}/stores`
         );
 
         if (!storesRes.ok) {
@@ -110,34 +104,34 @@ export default function StoreTypeViewClient({
         const storesData = await storesRes.json();
 
         // 3. Transform to DirectoryResponse format
-        const stores = storesData.listings || [];
+        const stores = storesData.data?.stores || [];
         setData({
           listings: stores.map((store: any) => ({
             id: store.id,
-            tenantId: store.tenant_id || store.tenantId,
-            businessName: store.business_name || store.businessName,
+            tenantId: store.id,
+            businessName: store.name,
             slug: store.slug,
             address: store.address,
             city: store.city,
             state: store.state,
-            zipCode: store.zip_code || store.zipCode,
+            zipCode: store.postalCode,
             latitude: store.latitude,
             longitude: store.longitude,
-            productCount: store.product_count || store.productCount || 0,
-            primaryCategory: store.primary_category || store.primaryCategory,
-            logoUrl: store.logo_url || store.logoUrl,
+            productCount: store.productCount || 0,
+            primaryCategory: store.primaryCategory,
+            gbpPrimaryCategoryName: store.gbpCategoryName,
+            logoUrl: store.logoUrl,
             description: store.description,
-            // Rating fields
-            ratingAvg: store.rating_avg || store.ratingAvg || 0,
-            ratingCount: store.rating_count || store.ratingCount || 0,
-            isFeatured: false,
-            subscriptionTier: 'trial',
-            useCustomWebsite: false,
+            ratingAvg: store.ratingAvg || 0,
+            ratingCount: store.ratingCount || 0,
+            isFeatured: store.isFeatured || false,
+            subscriptionTier: store.subscriptionTier || 'trial',
+            useCustomWebsite: store.useCustomWebsite || false,
           })),
           pagination: {
             page: 1,
             limit: stores.length,
-            totalItems: stores.length,
+            totalItems: storesData.data?.totalCount || stores.length,
             totalPages: 1,
           },
         });

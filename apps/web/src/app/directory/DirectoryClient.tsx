@@ -132,13 +132,34 @@ export default function DirectoryClient() {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const params = new URLSearchParams(searchParams.toString());
         
-        const response = await fetch(`${apiBaseUrl}/api/directory/search?${params.toString()}`);
+        // Use materialized view endpoint for faster queries
+        const response = await fetch(`${apiBaseUrl}/api/directory/mv/search?${params.toString()}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch directory listings');
         }
 
         const result = await response.json();
+        
+        // Deduplicate listings by tenant_id (MV returns one row per category)
+        // Keep the first occurrence of each store
+        if (result.listings) {
+          const seenIds = new Set();
+          result.listings = result.listings.filter((listing: any) => {
+            const id = listing.tenantId || listing.tenant_id || listing.id;
+            if (seenIds.has(id)) {
+              return false;
+            }
+            seenIds.add(id);
+            return true;
+          });
+          // Update pagination count to reflect deduplicated results
+          if (result.pagination) {
+            result.pagination.totalItems = result.listings.length;
+            result.pagination.returnedCount = result.listings.length;
+          }
+        }
+        
         setData(result);
       } catch (err: any) {
         console.error('Error fetching directory:', err);
@@ -205,7 +226,8 @@ export default function DirectoryClient() {
 
       {/* Filters */}
       <DirectoryFilters 
-        categories={categories.map(cat => ({ name: cat.name, count: cat.storeCount }))} 
+        categories={categories.map(cat => ({ name: cat.name, slug: cat.slug, count: cat.storeCount }))}
+        storeTypes={storeTypes}
         locations={locations} 
       />
 

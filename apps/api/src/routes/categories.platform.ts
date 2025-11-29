@@ -29,6 +29,28 @@ router.post('/categories', authenticateToken, requireAdmin, async (req: Request,
   }
 });
 
+router.patch('/categories/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const name = String(req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ success: false, error: 'invalid_payload' });
+    const updated = await categoryService.updateTenantCategory('platform', id, { name });
+    return res.json({ success: true, data: updated });
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+  }
+});
+
+router.delete('/categories/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await categoryService.softDeleteTenantCategory('platform', id);
+    return res.status(204).send();
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+  }
+});
+
 // Quick start endpoint for platform categories (for frontend compatibility)
 router.post('/categories/quick-start', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {

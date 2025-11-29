@@ -112,13 +112,14 @@ export default function GBPCategoryPage() {
       <div className="mt-6 space-y-6">
         <GBPCategoryCard
           tenantId={tenantId}
-          initialCategory={
+          initialPrimary={
             profile?.gbpCategoryId && profile?.gbpCategoryName
               ? { id: profile.gbpCategoryId, name: profile.gbpCategoryName }
               : null
           }
+          initialSecondary={profile?.gbpSecondaryCategories || []}
           syncStatus={profile?.gbpCategorySyncStatus}
-          lastMirrored={profile?.gbpCategoryLastMirrored}
+          lastSynced={profile?.gbpCategoryLastMirrored}
         />
 
         {/* Quick Start Guide */}

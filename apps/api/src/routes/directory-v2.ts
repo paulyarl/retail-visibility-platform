@@ -82,31 +82,31 @@ router.get('/search', async (req: Request, res: Response) => {
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Build WHERE clause
-    const conditions: string[] = ['is_published = true'];
+    // Build WHERE clause with dl. prefix for joined query
+    const conditions: string[] = ['dl.is_published = true'];
     const params: any[] = [];
     let paramIndex = 1;
 
     if (q && typeof q === 'string') {
-      conditions.push(`(LOWER(business_name) LIKE LOWER($${paramIndex}) OR LOWER(city) LIKE LOWER($${paramIndex}) OR LOWER(primary_category) LIKE LOWER($${paramIndex}))`);
+      conditions.push(`(LOWER(dl.business_name) LIKE LOWER($${paramIndex}) OR LOWER(dl.city) LIKE LOWER($${paramIndex}) OR LOWER(dl.primary_category) LIKE LOWER($${paramIndex}))`);
       params.push(`%${q}%`);
       paramIndex++;
     }
 
     if (category && typeof category === 'string') {
-      conditions.push(`(LOWER(primary_category) LIKE LOWER($${paramIndex}) OR LOWER(secondary_categories::text) LIKE LOWER($${paramIndex}))`);
+      conditions.push(`(LOWER(dl.primary_category) LIKE LOWER($${paramIndex}) OR LOWER(dl.secondary_categories::text) LIKE LOWER($${paramIndex}))`);
       params.push(`%${category}%`);
       paramIndex++;
     }
 
     if (city && typeof city === 'string') {
-      conditions.push(`LOWER(city) = LOWER($${paramIndex})`);
+      conditions.push(`LOWER(dl.city) = LOWER($${paramIndex})`);
       params.push(city);
       paramIndex++;
     }
 
     if (state && typeof state === 'string') {
-      conditions.push(`LOWER(state) = LOWER($${paramIndex})`);
+      conditions.push(`LOWER(dl.state) = LOWER($${paramIndex})`);
       params.push(state);
       paramIndex++;
     }
@@ -127,14 +127,18 @@ router.get('/search', async (req: Request, res: Response) => {
       orderByClause = 'rating_avg DESC NULLS LAST, product_count DESC NULLS LAST, created_at DESC';
     }
 
-    // Get listings - use direct database query
+    // Get listings - use direct database query with GBP category from tenants.metadata
     // console.log('[Directory Search] Query:', whereClause, params);
     const listingsQuery = `
-      SELECT * FROM directory_listings_list
+      SELECT 
+        dl.*,
+        t.metadata->'gbp_categories'->'primary'->>'name' as gbp_primary_category_name
+      FROM directory_listings_list dl
+      LEFT JOIN tenants t ON t.id = dl.tenant_id
       WHERE ${whereClause}
-        AND (business_hours IS NULL OR business_hours::text != 'null')
-        AND tenant_id IN (SELECT id FROM tenants WHERE id IS NOT NULL)
-      ORDER BY ${orderByClause}
+        AND (dl.business_hours IS NULL OR dl.business_hours::text != 'null')
+        AND dl.tenant_id IN (SELECT id FROM tenants WHERE id IS NOT NULL)
+      ORDER BY ${orderByClause.replace('is_featured', 'dl.is_featured').replace('created_at', 'dl.created_at')}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     // console.log('[Directory Search] Full SQL:', listingsQuery);
@@ -143,10 +147,10 @@ router.get('/search', async (req: Request, res: Response) => {
 
     // Get total count
     const countQuery = `
-      SELECT COUNT(*) as count FROM directory_listings_list
+      SELECT COUNT(*) as count FROM directory_listings_list dl
       WHERE ${whereClause}
-        AND (business_hours IS NULL OR business_hours::text != 'null')
-        AND tenant_id IN (SELECT id FROM tenants WHERE id IS NOT NULL)
+        AND (dl.business_hours IS NULL OR dl.business_hours::text != 'null')
+        AND dl.tenant_id IN (SELECT id FROM tenants WHERE id IS NOT NULL)
     `;
     const countResult = await getDirectPool().query(countQuery, params);
 
@@ -158,6 +162,7 @@ router.get('/search', async (req: Request, res: Response) => {
       id: row.id,
       tenantId: row.tenant_id,
       business_name: row.business_name,
+      businessName: row.business_name,
       slug: row.slug,
       address: row.address,
       city: row.city,
@@ -170,17 +175,19 @@ router.get('/search', async (req: Request, res: Response) => {
       longitude: row.longitude,
       primaryCategory: row.primary_category,
       secondaryCategories: row.secondary_categories,
+      gbpPrimaryCategoryName: row.gbp_primary_category_name,
       logoUrl: row.logo_url,
       description: row.description,
       ratingAvg: row.rating_avg || 0,
       ratingCount: row.rating_count || 0,
       productCount: row.product_count || 0,
       isFeatured: row.is_featured || false,
-      subscription_tier: row.subscriptionTier || 'trial',
+      subscriptionTier: row.subscription_tier || 'trial',
+      subscription_tier: row.subscription_tier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
       createdAt: row.created_at,
-      updatedAt: row.updatedAt,
+      updatedAt: row.updated_at,
     }));
 
     return res.json({
@@ -305,7 +312,7 @@ router.get('/:identifier', async (req: Request, res: Response) => {
 
     const row = result.rows[0];
     
-    // Fetch categories from normalized structure
+    // Fetch product categories from normalized structure
     const categoriesQuery = `
       SELECT 
         pc.id,
@@ -330,9 +337,50 @@ router.get('/:identifier', async (req: Request, res: Response) => {
       isPrimary: cat.is_primary,
     }));
     
+    // Fetch GBP store type categories from tenants.metadata and gbp_listing_categories
+    const gbpCategoriesQuery = `
+      SELECT 
+        glc.gbp_category_id,
+        glc.is_primary,
+        t.metadata->'gbp_categories'->'primary'->>'name' as primary_name,
+        t.metadata->'gbp_categories'->'secondary' as secondary_categories
+      FROM gbp_listing_categories glc
+      INNER JOIN tenants t ON t.id = glc.tenant_id
+      WHERE glc.tenant_id = $1
+      ORDER BY glc.is_primary DESC
+    `;
+    const gbpCategoriesResult = await getDirectPool().query(gbpCategoriesQuery, [row.tenant_id]);
+    
+    const gbpCategories = gbpCategoriesResult.rows.map((cat: any) => {
+      // Extract category name from metadata
+      let categoryName = '';
+      if (cat.is_primary && cat.primary_name) {
+        categoryName = cat.primary_name;
+      } else if (!cat.is_primary && cat.secondary_categories) {
+        // Find the matching secondary category
+        const secondaryArray = cat.secondary_categories;
+        const matchingSecondary = secondaryArray?.find((sec: any) => 
+          sec.id === cat.gbp_category_id
+        );
+        categoryName = matchingSecondary?.name || '';
+      }
+      
+      // Convert category name to slug (e.g., "Grocery store" -> "grocery-store")
+      const slug = categoryName.toLowerCase().replace(/\s+/g, '-');
+      
+      return {
+        id: cat.gbp_category_id,
+        name: categoryName,
+        slug: slug,
+        isPrimary: cat.is_primary,
+        type: 'store_type',
+      };
+    }).filter((cat: any) => cat.name); // Filter out empty names
+    
     const listing = {
       id: row.id,
       tenantId: row.tenant_id,
+      tenant_id: row.tenant_id,
       business_name: row.business_name,
       slug: row.slug,
       address: row.address,
@@ -344,16 +392,19 @@ router.get('/:identifier', async (req: Request, res: Response) => {
       website: row.website,
       latitude: row.latitude,
       longitude: row.longitude,
-      categories: categories, // New normalized categories array
+      categories: categories, // Product categories
+      gbpCategories: gbpCategories, // Store type categories
       logoUrl: row.logo_url,
       description: row.description,
       ratingAvg: row.rating_avg || 0,
       ratingCount: row.rating_count || 0,
       productCount: row.product_count || 0,
+      product_count: row.product_count || 0,
       isFeatured: row.is_featured || false,
       subscription_tier: row.subscription_tier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
+      business_hours: row.business_hours,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

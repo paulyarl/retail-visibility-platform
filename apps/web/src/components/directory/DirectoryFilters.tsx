@@ -5,16 +5,18 @@ import { Filter, SlidersHorizontal, X, MapPin, Navigation } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface DirectoryFiltersProps {
-  categories: Array<{ name: string; count: number }>;
+  categories: Array<{ name: string; slug: string; count: number }>;
+  storeTypes?: Array<{ name: string; slug: string; storeCount: number }>;
   locations: Array<{ city: string; state: string; count: number }>;
 }
 
-export default function DirectoryFilters({ categories, locations }: DirectoryFiltersProps) {
+export default function DirectoryFilters({ categories, storeTypes = [], locations }: DirectoryFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
+  const [selectedStoreType, setSelectedStoreType] = useState(searchParams.get('storeType') || '');
   const [selectedLocation, setSelectedLocation] = useState(searchParams.get('city') || '');
   const [zipCode, setZipCode] = useState(searchParams.get('zip') || '');
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'relevance');
@@ -24,6 +26,7 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
   // Count active filters
   const activeFilters = [
     selectedCategory,
+    selectedStoreType,
     selectedLocation,
     zipCode,
     searchQuery,
@@ -65,6 +68,7 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
     
     if (searchQuery) params.set('q', searchQuery);
     if (selectedCategory) params.set('category', selectedCategory);
+    if (selectedStoreType) params.set('storeType', selectedStoreType);
     if (zipCode) {
       params.set('zip', zipCode);
       // Auto-sort by distance when ZIP is provided
@@ -87,6 +91,7 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
   // Clear all filters
   const clearFilters = () => {
     setSelectedCategory('');
+    setSelectedStoreType('');
     setSelectedLocation('');
     setZipCode('');
     setSortBy('relevance');
@@ -144,8 +149,29 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
                 >
                   <option value="">All Categories</option>
                   {categories.map((cat) => (
-                    <option key={cat.name} value={cat.name}>
+                    <option key={cat.slug} value={cat.slug}>
                       {cat.name} ({cat.count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Store Type Filter - Only show if store types are provided */}
+            {storeTypes.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Store Type
+                </label>
+                <select
+                  value={selectedStoreType}
+                  onChange={(e) => setSelectedStoreType(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Store Types</option>
+                  {storeTypes.map((type) => (
+                    <option key={type.slug} value={type.slug}>
+                      {type.name} ({type.storeCount})
                     </option>
                   ))}
                 </select>

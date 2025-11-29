@@ -85,36 +85,60 @@ class StoreTypeDirectoryService {
     radiusMiles?: number
   ) {
     try {
-      console.log('[StoreTypeService] Fetching store types from directory_listings_list');
+      console.log('[StoreTypeService] Fetching GBP store types from directory_gbp_stats');
 
-      // Get unique store types with counts using direct database connection
+      // Query stats materialized view for fast aggregated data
       const result = await getDirectPool().query(`
-        WITH category_counts AS (
-          SELECT
-            primary_category,
-            COUNT(*) as store_count
-          FROM directory_listings_list
-          WHERE is_published = true
-            AND primary_category IS NOT NULL
-            AND primary_category != ''
-          GROUP BY primary_category
-          ORDER BY COUNT(*) DESC
-        )
-        SELECT
-          primary_category,
-          store_count::integer
-        FROM category_counts
+        SELECT 
+          gbp_category_id,
+          gbp_category_name,
+          gbp_category_display_name,
+          store_count,
+          primary_store_count,
+          secondary_store_count,
+          total_products,
+          avg_rating,
+          unique_locations,
+          cities,
+          states,
+          featured_store_count,
+          synced_store_count,
+          first_store_added,
+          last_store_updated
+        FROM directory_gbp_stats
+        WHERE store_count > 0
         ORDER BY store_count DESC
       `);
 
-      const storeTypes = result.rows;
+      console.log(`[StoreTypeService] Found ${result.rows.length} GBP store types`);
 
-      console.log(`[StoreTypeService] Found ${storeTypes.length} store types`);
-
-      return storeTypes.map(type => ({
-        name: type.primary_category,
-        slug: this.slugify(type.primary_category),
-        storeCount: type.store_count,
+      return result.rows.map(row => ({
+        id: row.gbp_category_id,
+        name: row.gbp_category_name,
+        displayName: row.gbp_category_display_name,
+        slug: this.slugify(row.gbp_category_name),
+        storeCount: parseInt(row.store_count),
+        store_count: parseInt(row.store_count), // Compatibility
+        primaryStoreCount: parseInt(row.primary_store_count || '0'),
+        primary_store_count: parseInt(row.primary_store_count || '0'), // Compatibility
+        secondaryStoreCount: parseInt(row.secondary_store_count || '0'),
+        secondary_store_count: parseInt(row.secondary_store_count || '0'), // Compatibility
+        totalProducts: parseInt(row.total_products || '0'),
+        total_products: parseInt(row.total_products || '0'), // Compatibility
+        avgRating: parseFloat(row.avg_rating || '0'),
+        avg_rating: parseFloat(row.avg_rating || '0'), // Compatibility
+        uniqueLocations: parseInt(row.unique_locations || '0'),
+        unique_locations: parseInt(row.unique_locations || '0'), // Compatibility
+        cities: row.cities || [],
+        states: row.states || [],
+        featuredStoreCount: parseInt(row.featured_store_count || '0'),
+        featured_store_count: parseInt(row.featured_store_count || '0'), // Compatibility
+        syncedStoreCount: parseInt(row.synced_store_count || '0'),
+        synced_store_count: parseInt(row.synced_store_count || '0'), // Compatibility
+        firstStoreAdded: row.first_store_added,
+        first_store_added: row.first_store_added, // Compatibility
+        lastStoreUpdated: row.last_store_updated,
+        last_store_updated: row.last_store_updated, // Compatibility
       }));
     } catch (error) {
       console.error('[StoreTypeService] Error fetching store types:', error);
@@ -123,8 +147,8 @@ class StoreTypeDirectoryService {
   }
 
   /**
-   * Get stores by store type
-   * Similar to getStoresByCategory but uses primary_category
+   * Get stores by store type (GBP category)
+   * Uses directory_gbp_listings materialized view
    */
   async getStoresByType(
     typeSlug: string,
@@ -132,51 +156,57 @@ class StoreTypeDirectoryService {
     radius?: number
   ) {
     try {
-      console.log(`[StoreTypeService] Fetching stores for type: ${typeSlug}`);
+      console.log(`[StoreTypeService] Fetching stores for GBP type: ${typeSlug}`);
       
-      // Convert slug back to category name (approximate)
-      const typeName = this.unslugify(typeSlug);
-
-      // Get stores using direct database connection
+      // Convert slug to GBP category ID format (e.g., "electronics-store" -> "gcid:electronics_store")
+      const categoryId = `gcid:${typeSlug.replace(/-/g, '_')}`;
+      
+      console.log(`[StoreTypeService] Looking for GBP category ID: ${categoryId}`);
+      
+      // Query from directory_gbp_listings materialized view
       const result = await getDirectPool().query(`
-        WITH store_data AS (
-          SELECT
-            id,
-            tenantId,
-            businessName as business_name,
-            slug,
-            address,
-            city,
-            state,
-            zipCode as postal_code,
-            latitude,
-            longitude,
-            primary_category,
-            ratingAvg as rating_avg,
-            ratingCount as rating_count,
-            product_count,
-            logoUrl as logo_url,
-            description,
-            isFeatured as is_featured,
-            subscriptionTier as subscription_tier,
-            createdAt as created_at,
-            updatedAt as updated_at
-          FROM directory_listings_list
-          WHERE is_published = true
-            AND primary_category ILIKE $1
-        )
-        SELECT * FROM store_data
-        ORDER BY product_count DESC
+        SELECT
+          id,
+          tenant_id,
+          business_name,
+          slug,
+          address,
+          city,
+          state,
+          zip_code as postal_code,
+          latitude,
+          longitude,
+          gbp_category_id,
+          gbp_category_name,
+          is_primary,
+          rating_avg,
+          rating_count,
+          product_count,
+          logo_url,
+          description,
+          is_featured,
+          subscription_tier,
+          created_at,
+          updated_at
+        FROM directory_gbp_listings
+        WHERE gbp_category_id = $1
+        ORDER BY 
+          is_primary DESC,
+          rating_avg DESC NULLS LAST,
+          product_count DESC NULLS LAST,
+          created_at DESC
         LIMIT 100
-      `, [`%${typeName}%`]);
+      `, [categoryId]);
 
       const stores = result.rows;
 
       console.log(`[StoreTypeService] Found ${stores.length} stores`);
 
       return stores.map((store) => ({
-        id: store.tenantId,
+        id: store.tenant_id || store.id,
+        tenantId: store.tenant_id,
         name: store.business_name,
+        businessName: store.business_name,
         slug: store.slug,
         address: store.address,
         city: store.city,
@@ -185,6 +215,10 @@ class StoreTypeDirectoryService {
         latitude: store.latitude,
         longitude: store.longitude,
         primaryCategory: store.primary_category,
+        gbpCategoryName: store.gbp_category_name,
+        gbpPrimaryCategoryName: store.gbp_category_name,
+        isPrimary: store.is_primary,
+        ratingAvg: store.rating_avg,
         rating: store.rating_avg,
         ratingCount: store.rating_count,
         productCount: store.product_count,
@@ -202,31 +236,35 @@ class StoreTypeDirectoryService {
   }
 
   /**
-   * Get store type details
+   * Get store type details from GBP stats materialized view
    */
   async getStoreTypeDetails(typeSlug: string) {
     try {
-      const typeName = this.unslugify(typeSlug);
+      console.log(`[StoreTypeService] Fetching GBP type details for: ${typeSlug}`);
       
-      // Get store type details using direct database connection
+      // Convert slug to GBP category ID format (e.g., "electronics-store" -> "gcid:electronics_store")
+      const categoryId = `gcid:${typeSlug.replace(/-/g, '_')}`;
+      
+      console.log(`[StoreTypeService] Looking for GBP category ID: ${categoryId}`);
+      
+      // Query from directory_gbp_stats materialized view
       const result = await getDirectPool().query(`
-        WITH type_details AS (
-          SELECT
-            primary_category,
-            COUNT(*) as store_count,
-            SUM(product_count) as total_products
-          FROM directory_listings_list
-          WHERE is_published = true
-            AND primary_category ILIKE $1
-          GROUP BY primary_category
-          LIMIT 1
-        )
         SELECT
-          primary_category,
-          store_count::integer,
-          COALESCE(total_products, 0)::integer as total_products
-        FROM type_details
-      `, [`%${typeName}%`]);
+          gbp_category_id,
+          gbp_category_name,
+          gbp_category_display_name,
+          store_count,
+          primary_store_count,
+          secondary_store_count,
+          total_products,
+          avg_rating,
+          unique_locations,
+          cities,
+          states
+        FROM directory_gbp_stats
+        WHERE gbp_category_id = $1
+        LIMIT 1
+      `, [categoryId]);
 
       if (result.rows.length === 0) {
         return null;
@@ -234,10 +272,18 @@ class StoreTypeDirectoryService {
 
       const type = result.rows[0];
       return {
-        name: type.primary_category,
-        slug: this.slugify(type.primary_category),
-        storeCount: type.store_count,
-        totalProducts: type.total_products,
+        id: type.gbp_category_id,
+        name: type.gbp_category_name,
+        displayName: type.gbp_category_display_name,
+        slug: typeSlug,
+        storeCount: parseInt(type.store_count),
+        primaryStoreCount: parseInt(type.primary_store_count || '0'),
+        secondaryStoreCount: parseInt(type.secondary_store_count || '0'),
+        totalProducts: parseInt(type.total_products || '0'),
+        avgRating: parseFloat(type.avg_rating || '0'),
+        uniqueLocations: parseInt(type.unique_locations || '0'),
+        cities: type.cities || [],
+        states: type.states || [],
       };
     } catch (error) {
       console.error('[StoreTypeService] Error fetching store type details:', error);

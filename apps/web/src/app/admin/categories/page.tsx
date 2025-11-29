@@ -80,7 +80,9 @@ export default function AdminCategoriesPage() {
 
   const loadCategories = async () => {
     try {
-      const res = await fetch('/api/platform/categories');
+      const res = await fetch('/api/platform/categories', {
+        credentials: 'include',
+      });
       const data = await res.json();
       console.log('[Load Categories] Response:', data);
       // API returns {success: true, data: [...]}
@@ -143,6 +145,7 @@ export default function AdminCategoriesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: categoryName, slug }),
+        credentials: 'include',
       });
       
       if (res.ok) {
@@ -167,10 +170,11 @@ export default function AdminCategoriesPage() {
     if (!selectedCategory || !categoryName.trim()) return;
     
     try {
-      const res = await fetch(`/api/categories/${selectedCategory.id}`, {
-        method: 'PUT',
+      const res = await fetch(`/api/platform/categories/${selectedCategory.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: categoryName }),
+        credentials: 'include',
       });
       
       if (res.ok) {
@@ -188,8 +192,9 @@ export default function AdminCategoriesPage() {
     if (!selectedCategory) return;
     
     try {
-      const res = await fetch(`/api/categories/${selectedCategory.id}`, {
+      const res = await fetch(`/api/platform/categories/${selectedCategory.id}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
       
       if (res.ok || res.status === 204) {
@@ -266,7 +271,8 @@ export default function AdminCategoriesPage() {
       const res = await fetch(`/api/categories/search?q=${encodeURIComponent(query)}&limit=50`);
       if (res.ok) {
         const data = await res.json();
-        setTaxonomyResults(data.categories || []);
+        console.log('[Search Taxonomy] Response:', data);
+        setTaxonomyResults(data.results || data.categories || []);
       }
     } catch (error) {
       console.error('Failed to search taxonomy:', error);

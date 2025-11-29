@@ -7,6 +7,8 @@ interface StoreType {
   name: string;
   slug: string;
   storeCount: number;
+  primaryStoreCount?: number;
+  secondaryStoreCount?: number;
 }
 
 interface DirectoryStoreTypeBrowserProps {
@@ -76,6 +78,13 @@ export default function DirectoryStoreTypeBrowser({
               </h3>
               <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                 {type.storeCount} {type.storeCount === 1 ? 'store' : 'stores'}
+                {type.primaryStoreCount !== undefined && type.secondaryStoreCount !== undefined && (
+                  <span className="ml-1 text-neutral-500">
+                    ({type.primaryStoreCount > 0 && `${type.primaryStoreCount} primary`}
+                    {type.primaryStoreCount > 0 && type.secondaryStoreCount > 0 && ', '}
+                    {type.secondaryStoreCount > 0 && `${type.secondaryStoreCount} also`})
+                  </span>
+                )}
               </p>
             </div>
           </button>

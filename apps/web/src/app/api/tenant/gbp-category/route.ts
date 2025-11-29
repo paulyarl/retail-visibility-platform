@@ -39,41 +39,26 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Prepare GBP categories structure
-    const gbpCategories = {
-      primary: {
-        id: primary.id,
-        name: primary.name,
-        selected_at: new Date().toISOString(),
-      },
-      secondary: secondary.map((cat: any) => ({
-        id: cat.id,
-        name: cat.name,
-        selected_at: new Date().toISOString(),
-      })),
-      sync_status: 'pending',
-      last_synced_at: null,
-    };
-
-    // Update tenant metadata with GBP categories
+    // Update business profile with GBP categories
+    // This will trigger the database trigger to sync to tenants.metadata and refresh the materialized view
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       'Authorization': authHeader,
     };
     if (cookieHeader) headers['Cookie'] = cookieHeader;
     
-    const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}`, {
-      method: 'PATCH',
+    const response = await fetch(`${API_BASE_URL}/api/tenant/gbp-category`, {
+      method: 'PUT',
       headers,
       body: JSON.stringify({
-        metadata: {
-          gbp_categories: gbpCategories,
-        },
+        tenantId,
+        primary,
+        secondary,
       }),
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to update tenant' }));
+      const error = await response.json().catch(() => ({ error: 'Failed to update GBP category' }));
       return NextResponse.json(
         { error: error.error || 'Failed to set GBP categories' },
         { status: response.status }
@@ -82,36 +67,10 @@ export async function PUT(request: NextRequest) {
 
     const result = await response.json();
 
-    // Trigger sync to directory
-    try {
-      const syncResponse = await fetch(`${API_BASE_URL}/api/gbp/sync-to-directory`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          tenantId,
-          gbpCategories: {
-            primary: gbpCategories.primary,
-            secondary: gbpCategories.secondary,
-          },
-        }),
-      });
-
-      if (!syncResponse.ok) {
-        console.error('[GBP Category API] Sync to directory failed');
-        // Don't fail the request, just log the error
-      }
-    } catch (syncError) {
-      console.error('[GBP Category API] Sync to directory error:', syncError);
-      // Don't fail the request, just log the error
-    }
-
     return NextResponse.json({
       success: true,
+      message: 'GBP categories updated and synced to directory',
       data: result,
-      gbpCategories: {
-        primary: gbpCategories.primary,
-        secondary: gbpCategories.secondary,
-      },
     });
   } catch (error) {
     console.error('[GBP Category API] Error:', error);

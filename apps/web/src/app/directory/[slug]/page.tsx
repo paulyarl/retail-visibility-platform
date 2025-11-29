@@ -234,9 +234,92 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Main Info */}
-            <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left Sidebar - Categories */}
+            <div className="lg:col-span-3 space-y-6">
+              {/* Store Type Categories */}
+              {listing.gbpCategories && listing.gbpCategories.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    Store Type
+                  </h2>
+                  <div className="space-y-2">
+                    {listing.gbpCategories.filter((c: any) => c.isPrimary).map((category: any) => (
+                      <Link
+                        key={category.id}
+                        href={`/directory/stores/${category.slug}`}
+                        className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors group"
+                      >
+                        <span className="text-sm text-blue-900 font-semibold">
+                          {category.name}
+                        </span>
+                        <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                          Primary
+                        </span>
+                      </Link>
+                    ))}
+                    {listing.gbpCategories.filter((c: any) => !c.isPrimary).map((category: any) => (
+                      <Link
+                        key={category.id}
+                        href={`/directory/stores/${category.slug}`}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                      >
+                        <span className="text-sm text-gray-700 group-hover:text-blue-600">
+                          {category.name}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Product Categories */}
+              {storefrontCategories.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    Product Categories
+                  </h2>
+                  <div className="space-y-2">
+                    {storefrontCategories.map((category: any) => (
+                      <Link
+                        key={category.id}
+                        href={`/tenant/${listing.tenant_id}?category=${category.slug}`}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                      >
+                        <span className="text-sm text-gray-700 group-hover:text-blue-600 font-medium">
+                          {category.name}
+                        </span>
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                          {category.count}
+                        </span>
+                      </Link>
+                    ))}
+                    {uncategorizedCount > 0 && (
+                      <Link
+                        href={`/tenant/${listing.tenant_id}`}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                      >
+                        <span className="text-sm text-gray-500 group-hover:text-blue-600">
+                          Other Products
+                        </span>
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                          {uncategorizedCount}
+                        </span>
+                      </Link>
+                    )}
+                    <Link
+                      href={`/tenant/${listing.tenant_id}`}
+                      className="block text-sm text-blue-600 hover:text-blue-700 mt-4 font-medium"
+                    >
+                      View All Products →
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Middle Column - Main Info */}
+            <div className="lg:col-span-6 space-y-6">
               {/* Store Header */}
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-start gap-6">
@@ -310,7 +393,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
           </div>
 
           {/* Right Column - Contact & Hours */}
-          <div className="space-y-6">
+          <div className="lg:col-span-3 space-y-6">
             {/* Contact Information */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -464,55 +547,6 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                       </span>
                     </div>
                   ))}
-                </div>
-              </div>
-            )}
-
-            {/* Product Categories (from Materialized View!) */}
-            {storefrontCategories.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Product Categories
-                </h2>
-                <div className="space-y-2">
-                  {storefrontCategories.map((category: any) => (
-                    <Link
-                      key={category.id}
-                      href={`/tenant/${listing.tenant_id}?category=${category.slug}`}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
-                    >
-                      <span className="text-sm text-gray-700 group-hover:text-blue-600 font-medium">
-                        {category.name}
-                      </span>
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                        {category.count}
-                      </span>
-                    </Link>
-                  ))}
-                  {uncategorizedCount > 0 && (
-                    <Link
-                      href={`/tenant/${listing.tenant_id}`}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
-                    >
-                      <span className="text-sm text-gray-500 group-hover:text-blue-600">
-                        Other Products
-                      </span>
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                        {uncategorizedCount}
-                      </span>
-                    </Link>
-                  )}
-                </div>
-                <div className="mt-4 pt-4 border-t">
-                  <Link
-                    href={`/tenant/${listing.tenant_id}`}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center justify-between group"
-                  >
-                    <span>View All Products</span>
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full group-hover:bg-blue-200">
-                      {totalProducts}
-                    </span>
-                  </Link>
                 </div>
               </div>
             )}

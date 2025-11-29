@@ -16,7 +16,8 @@ interface StoreCardProps {
     state?: string;
     phone?: string;
     logoUrl?: string;
-    primaryCategory?: string;
+    primaryCategory?: string; // Product category
+    gbpPrimaryCategoryName?: string; // GBP store type
     ratingAvg: number;
     ratingCount: number;
     productCount: number;
@@ -26,11 +27,17 @@ interface StoreCardProps {
     website?: string;
     distance?: number;
     isOpen?: boolean;
+    category?: {
+      name: string;
+      slug: string;
+      isPrimary?: boolean;
+    };
   };
   index: number;
+  contextCategory?: string; // Override category display (e.g., for product category pages)
 }
 
-export default function StoreCard({ listing, index }: StoreCardProps) {
+export default function StoreCard({ listing, index, contextCategory }: StoreCardProps) {
   const router = useRouter();
 
   // Determine destination URL based on tier and settings
@@ -132,10 +139,10 @@ export default function StoreCard({ listing, index }: StoreCardProps) {
               )}
             </div>
 
-            {/* Category */}
-            {listing.primaryCategory && (
+            {/* Category - Context-aware display */}
+            {(contextCategory || listing.category?.name || listing.gbpPrimaryCategoryName) && (
               <p className="text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
-                {listing.primaryCategory.replace(/_/g, ' ')}
+                {contextCategory || listing.category?.name || listing.gbpPrimaryCategoryName}
               </p>
             )}
 

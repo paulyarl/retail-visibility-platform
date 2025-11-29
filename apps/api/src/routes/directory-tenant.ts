@@ -8,54 +8,9 @@ import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { z } from 'zod';
-import { Pool } from 'pg';
+import { getDirectPool } from '../utils/db-pool';
 
 const router = Router();
-
-// Create pool on-demand to ensure SSL config is applied
-let directPool: Pool | null = null;
-
-const getDirectPool = () => {
-  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
-                      process.env.VERCEL_ENV === 'production' ||
-                      process.env.NODE_ENV === 'production';
-
-  if (!directPool || !isProduction) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL is not set');
-    }
-
-    console.log('[Directory Pool] Creating new pool');
-    console.log('[Directory Pool] Environment:', process.env.NODE_ENV);
-    console.log('[Directory Pool] Is Production:', isProduction);
-
-    // Check if DATABASE_URL contains SSL parameters or is a cloud database
-    const needsSSL = connectionString.includes('supabase.co') || 
-                     connectionString.includes('railway.app') ||
-                     connectionString.includes('sslmode=require') ||
-                     isProduction;
-
-    // Parse connection string to remove sslmode parameter if present
-    const cleanConnectionString = connectionString.split('?')[0];
-
-    directPool = new Pool({
-      connectionString: cleanConnectionString,
-      ssl: needsSSL ? {
-        rejectUnauthorized: false,
-        // Disable all SSL verification for development with cloud databases
-        checkServerIdentity: () => undefined
-      } : false,
-      max: 5,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    });
-
-    console.log('[Directory Pool] Pool created with SSL:', needsSSL ? 'enabled (no verification)' : 'disabled');
-  }
-
-  return directPool;
-};
 
 // Validation schemas
 const updateListingSchema = z.object({
@@ -163,7 +118,16 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
   });
   try {
     const { id: tenantId } = req.params;
-    const parsed = updateListingSchema.safeParse(req.body);
+    
+    // Extract only the snake_case fields we need (ignore camelCase duplicates)
+    const cleanBody = {
+      seo_description: req.body.seo_description,
+      seo_keywords: req.body.seo_keywords,
+      primary_category: req.body.primary_category,
+      secondary_categories: req.body.secondary_categories,
+    };
+    
+    const parsed = updateListingSchema.safeParse(cleanBody);
 
     if (!parsed.success) {
       console.error('[PATCH /tenants/:id/directory/listing] Validation failed:', parsed.error.flatten());
@@ -194,6 +158,49 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
     });
 
     console.log('[PATCH /tenants/:id/directory/listing] Upsert completed successfully. Updated record:', JSON.stringify(updated, null, 2));
+    
+    // Sync categories to directory_listing_categories table for materialized view
+    if (parsed.data.primary_category || parsed.data.secondary_categories) {
+      const pool = getDirectPool();
+      
+      // Delete existing category associations
+      await pool.query(
+        'DELETE FROM directory_listing_categories WHERE listing_id = $1',
+        [tenantId]
+      );
+      
+      // Find platform category IDs by slug/name
+      const categories = [
+        ...(parsed.data.primary_category ? [{ name: parsed.data.primary_category, isPrimary: true }] : []),
+        ...(parsed.data.secondary_categories || []).map(name => ({ name, isPrimary: false }))
+      ];
+      
+      for (const cat of categories) {
+        // Find category by slug or name
+        const categoryResult = await pool.query(
+          `SELECT id FROM platform_categories 
+           WHERE slug = $1 OR name = $1 
+           LIMIT 1`,
+          [cat.name]
+        );
+        
+        if (categoryResult.rows.length > 0) {
+          const categoryId = categoryResult.rows[0].id;
+          
+          // Insert into directory_listing_categories
+          await pool.query(
+            `INSERT INTO directory_listing_categories (listing_id, category_id, is_primary)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (listing_id, category_id) DO UPDATE
+             SET is_primary = EXCLUDED.is_primary`,
+            [tenantId, categoryId, cat.isPrimary]
+          );
+        }
+      }
+      
+      console.log('[PATCH /tenants/:id/directory/listing] Synced categories to directory_listing_categories');
+    }
+    
     return res.json(updated);
   } catch (error: any) {
     console.error('[PATCH /tenants/:id/directory/listing] ===== ERROR =====');
@@ -309,6 +316,40 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
   } catch (error: any) {
     console.error('[POST /tenants/:id/directory/publish] Error:', error);
     return res.status(500).json({ error: 'failed_to_publish' });
+  }
+});
+
+/**
+ * POST /api/tenants/:id/directory/refresh
+ * Manually refresh materialized views for this tenant
+ */
+router.post('/:id/directory/refresh', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { id: tenantId } = req.params;
+    
+    console.log('[POST /tenants/:id/directory/refresh] Manually refreshing materialized views...');
+    
+    // Force refresh of materialized views (bypasses debounce)
+    const pool = getDirectPool();
+    
+    // Product category views
+    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_listings');
+    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_stats');
+    
+    // GBP category views
+    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_gbp_listings');
+    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_gbp_stats');
+    
+    console.log('[POST /tenants/:id/directory/refresh] All materialized views refreshed successfully');
+    
+    return res.json({ 
+      success: true, 
+      message: 'Directory materialized views refreshed',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('[POST /tenants/:id/directory/refresh] Error:', error);
+    return res.status(500).json({ error: 'failed_to_refresh_views', message: error.message });
   }
 });
 

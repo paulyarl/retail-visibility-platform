@@ -133,41 +133,43 @@ router.get('/search', async (req: Request, res: Response) => {
       orderByClause = 'is_featured DESC, rating_avg DESC NULLS LAST';
     }
 
-    // Query materialized view (FAST!) - Now with normalized categories
+    // Query materialized view (FAST!) - Now with normalized categories and GBP category
     const listingsQuery = `
       SELECT 
-        id,
-        tenant_id,
-        business_name,
-        slug,
-        address,
-        city,
-        state,
-        zip_code,
-        phone,
-        email,
-        website,
-        latitude,
-        longitude,
-        category_id,
-        category_name,
-        category_slug,
-        google_category_id,
-        category_icon,
-        is_primary,
-        logo_url,
-        description,
-        rating_avg,
-        rating_count,
-        product_count,
-        is_featured,
-        subscription_tier,
-        use_custom_website,
-        created_at,
-        updated_at
-      FROM directory_category_listings
+        dcl.id,
+        dcl.tenant_id,
+        dcl.business_name,
+        dcl.slug,
+        dcl.address,
+        dcl.city,
+        dcl.state,
+        dcl.zip_code,
+        dcl.phone,
+        dcl.email,
+        dcl.website,
+        dcl.latitude,
+        dcl.longitude,
+        dcl.category_id,
+        dcl.category_name,
+        dcl.category_slug,
+        dcl.google_category_id,
+        dcl.category_icon,
+        dcl.is_primary,
+        dcl.logo_url,
+        dcl.description,
+        dcl.rating_avg,
+        dcl.rating_count,
+        dcl.product_count,
+        dcl.is_featured,
+        dcl.subscription_tier,
+        dcl.use_custom_website,
+        dcl.created_at,
+        dcl.updated_at,
+        t.metadata->'gbp_categories'->'primary'->>'name' as gbp_primary_category_name
+      FROM directory_category_listings dcl
+      LEFT JOIN tenants t ON t.id = dcl.tenant_id
       WHERE ${whereClause}
-      ORDER BY ${orderByClause}
+      ORDER BY ${orderByClause.replace(/^/, 'dcl.')}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
@@ -184,7 +186,7 @@ router.get('/search', async (req: Request, res: Response) => {
     const total = parseInt(countResult.rows[0]?.count || '0');
     const totalPages = Math.ceil(total / limitNum);
 
-    // Transform to camelCase for frontend - Now with normalized category data
+    // Transform to camelCase for frontend - Now with normalized category data and GBP category
     const listings = listingsResult.rows.map((row: any) => ({
       id: row.id,
       tenantId: row.tenant_id,
@@ -207,6 +209,7 @@ router.get('/search', async (req: Request, res: Response) => {
         icon: row.category_icon,
         isPrimary: row.is_primary,
       },
+      gbpPrimaryCategoryName: row.gbp_primary_category_name,
       logoUrl: row.logo_url,
       description: row.description,
       ratingAvg: row.rating_avg || 0,

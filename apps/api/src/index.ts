@@ -11,6 +11,7 @@ if (process.env.NODE_ENV === 'production') {
 import { Pool } from 'pg';
 import { prisma, basePrisma } from "./prisma";
 import { z } from "zod";
+import { getDirectPool } from "./utils/db-pool";
 import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
 
 // Migration fix applied: ProductCondition enum renamed 'new' to 'brand_new'
@@ -1060,11 +1061,132 @@ app.get("/tenant/profile", authenticateToken, async (req, res) => {
       longitude: bp?.longitude ? Number(bp.longitude) : (md.longitude || null),
       display_map: bp?.display_map ?? md.display_map ?? false,
       map_privacy_mode: bp?.map_privacy_mode || md.map_privacy_mode || 'precise',
+      // GBP category fields from business profile and metadata
+      gbpCategoryId: bp?.gbp_category_id || null,
+      gbpCategoryName: bp?.gbp_category_name || null,
+      gbpCategoryLastMirrored: bp?.gbp_category_last_mirrored || null,
+      gbpCategorySyncStatus: bp?.gbp_category_sync_status || null,
+      // Secondary categories from metadata
+      gbpSecondaryCategories: md?.gbp_categories?.secondary || [],
     };
     return res.json(profile);
   } catch (e: any) {
     console.error("[GET /tenant/profile] Error:", e);
     return res.status(500).json({ error: "failed_to_get_profile" });
+  }
+});
+
+// PUT /api/tenant/gbp-category - update GBP categories
+app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
+  try {
+    const { tenantId, primary, secondary } = req.body;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenant_required" });
+    }
+    
+    if (!primary || !primary.id || !primary.name) {
+      return res.status(400).json({ error: "primary_category_required" });
+    }
+    
+    console.log('[PUT /api/tenant/gbp-category] Updating GBP categories for tenant:', tenantId);
+    console.log('[PUT /api/tenant/gbp-category] Primary:', primary);
+    console.log('[PUT /api/tenant/gbp-category] Secondary:', secondary);
+    
+    // Update business profile with GBP categories using raw SQL
+    // (Prisma client needs regeneration to recognize these fields)
+    const pool = getDirectPool();
+    
+    // First, ensure the GBP category exists in gbp_categories_list
+    // Insert if not exists (upsert)
+    await pool.query(
+      `INSERT INTO gbp_categories_list (id, name, display_name, created_at, updated_at)
+       VALUES ($1, $2, $2, NOW(), NOW())
+       ON CONFLICT (id) DO UPDATE
+       SET name = EXCLUDED.name,
+           display_name = EXCLUDED.display_name,
+           updated_at = NOW()`,
+      [primary.id, primary.name]
+    );
+    
+    console.log('[PUT /api/tenant/gbp-category] GBP category ensured in gbp_categories_list');
+    
+    // Now update the business profile
+    await pool.query(
+      `UPDATE tenant_business_profiles_list
+       SET gbp_category_id = $1,
+           gbp_category_name = $2,
+           gbp_category_sync_status = 'synced',
+           gbp_category_last_mirrored = NOW(),
+           updated_at = NOW()
+       WHERE tenant_id = $3`,
+      [primary.id, primary.name, tenantId]
+    );
+    
+    console.log('[PUT /api/tenant/gbp-category] Business profile updated successfully');
+    
+    // Also update tenants.metadata with both primary and secondary categories
+    // This is needed for the frontend to display secondary categories
+    const gbpMetadata = {
+      primary: {
+        id: primary.id,
+        name: primary.name
+      },
+      secondary: secondary || [],
+      sync_status: 'synced',
+      last_synced_at: new Date().toISOString()
+    };
+    
+    await pool.query(
+      `UPDATE tenants
+       SET metadata = COALESCE(metadata, '{}'::jsonb) || 
+         jsonb_build_object('gbp_categories', $1::jsonb)
+       WHERE id = $2`,
+      [JSON.stringify(gbpMetadata), tenantId]
+    );
+    
+    console.log('[PUT /api/tenant/gbp-category] Metadata updated with primary and secondary categories');
+    
+    // Sync GBP categories to gbp_listing_categories junction table
+    // Delete existing associations
+    await pool.query(
+      'DELETE FROM gbp_listing_categories WHERE listing_id = $1',
+      [tenantId]
+    );
+    
+    // Insert primary category
+    await pool.query(
+      `INSERT INTO gbp_listing_categories (listing_id, gbp_category_id, is_primary)
+       VALUES ($1, $2, true)
+       ON CONFLICT (listing_id, gbp_category_id) DO UPDATE
+       SET is_primary = EXCLUDED.is_primary`,
+      [tenantId, primary.id]
+    );
+    
+    // Insert secondary categories
+    if (secondary && secondary.length > 0) {
+      for (const cat of secondary) {
+        await pool.query(
+          `INSERT INTO gbp_listing_categories (listing_id, gbp_category_id, is_primary)
+           VALUES ($1, $2, false)
+           ON CONFLICT (listing_id, gbp_category_id) DO UPDATE
+           SET is_primary = EXCLUDED.is_primary`,
+          [tenantId, cat.id]
+        );
+      }
+    }
+    
+    console.log('[PUT /api/tenant/gbp-category] Synced GBP categories to gbp_listing_categories');
+    
+    // The trigger will automatically refresh the materialized view (with debounce)
+    
+    return res.json({ 
+      success: true,
+      message: 'GBP categories updated and synced to directory'
+    });
+  } catch (e: any) {
+    console.error("[PUT /api/tenant/gbp-category] Error:", e);
+    return res.status(500).json({ error: "failed_to_update_gbp_category", message: e.message });
   }
 });
 
@@ -3344,9 +3466,8 @@ app.post('/api/admin/taxonomy/sync', requireAdmin, async (req, res) => {
 // app.use(mirrorAdminRoutes);
 // app.use(syncLogsRoutes);
 // M4: SKU Scanning routes
-// app.use('/api/scan', scanRoutes);
-// console.log('✅ Scan routes mounted at /api/scan');
-// app.use(scanMetricsRoutes);
+app.use('/api', scanRoutes);
+console.log('✅ Scan routes mounted at /api');
 
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenantId/items/:itemId/category

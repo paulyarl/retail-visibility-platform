@@ -6,10 +6,11 @@ import { Store, ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 
 interface StoreType {
-  slug: string;
   name: string;
-  icon: string;
+  slug: string;
   storeCount: number;
+  primaryStoreCount?: number;
+  secondaryStoreCount?: number;
   description?: string;
 }
 
@@ -159,6 +160,13 @@ export default function AllStoreTypesClient() {
                         </h3>
                         <p className="text-sm text-neutral-600 dark:text-neutral-400">
                           {type.storeCount} {type.storeCount === 1 ? 'store' : 'stores'}
+                          {type.primaryStoreCount !== undefined && type.secondaryStoreCount !== undefined && (
+                            <span className="ml-1 text-xs text-neutral-500">
+                              ({type.primaryStoreCount > 0 && `${type.primaryStoreCount} primary`}
+                              {type.primaryStoreCount > 0 && type.secondaryStoreCount > 0 && ', '}
+                              {type.secondaryStoreCount > 0 && `${type.secondaryStoreCount} also`})
+                            </span>
+                          )}
                         </p>
                         {type.description && (
                           <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-2 line-clamp-2">

@@ -160,7 +160,7 @@ export class CategoryDirectoryService {
         },
       });
 
-      // Count products for each store
+      // Count products for each store and get GBP category
       const storesWithCounts = await Promise.all(
         stores.map(async (store: any) => {
           const productCount = await prisma.inventoryItem.count({
@@ -172,9 +172,19 @@ export class CategoryDirectoryService {
             },
           });
 
+          // Get tenant with metadata for GBP category
+          const tenantWithMetadata = await prisma.tenant.findUnique({
+            where: { id: store.id },
+            select: { metadata: true },
+          });
+
+          const gbpPrimaryCategoryName = 
+            (tenantWithMetadata?.metadata as any)?.gbp_categories?.primary?.name || null;
+
           return {
             id: store.id,
             name: store.tenantBusinessProfile?.businessName || store.name,
+            businessName: store.tenantBusinessProfile?.businessName || store.name,
             slug: store.slug,
             address: store.tenantBusinessProfile?.businessLine1,
             city: store.tenantBusinessProfile?.city,
@@ -183,6 +193,7 @@ export class CategoryDirectoryService {
             latitude: store.tenantBusinessProfile?.latitude,
             longitude: store.tenantBusinessProfile?.longitude,
             productCount: productCount,
+            gbpPrimaryCategoryName: gbpPrimaryCategoryName,
           };
         })
       );
