@@ -540,13 +540,18 @@ app.patch("/api/tenants/:id/coordinates", async (req, res) => {
       return res.status(400).json({ error: "invalid_coordinates", details: parsed.error.flatten() });
     }
 
-    // Update tenant coordinates
-    const tenant = await prisma.tenant.update({
+    // Update tenant coordinates in business profile
+    const { basePrisma } = await import('./prisma');
+    await basePrisma.$executeRaw`
+      UPDATE "tenant_business_profiles_list" 
+      SET latitude = ${parsed.data.latitude}, 
+          longitude = ${parsed.data.longitude},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tenant_id = ${id}
+    `;
+
+    const tenant = await prisma.tenant.findUnique({
       where: { id },
-      data: {
-        latitude: parsed.data.latitude,
-        longitude: parsed.data.longitude,
-      },
     });
 
     console.log(`[PATCH /api/tenants/${id}/coordinates] Updated coordinates for ${tenant.name}:`, parsed.data);
