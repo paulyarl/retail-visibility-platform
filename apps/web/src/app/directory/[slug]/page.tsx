@@ -5,6 +5,7 @@ import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft } from 'lucide-rea
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
 import DirectoryActions from '@/components/directory/DirectoryActions';
+import MapWrapper from '@/components/directory/MapWrapper';
 
 interface StoreDetailPageProps {
   params: {
@@ -434,13 +435,14 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                 )}
 
                 {listing.email && (
-                  <div className="flex items-start gap-3">
+                  <div key="email-contact" className="flex items-start gap-3">
                     <Mail className="w-5 h-5 text-gray-400 mt-0.5 shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-gray-900">Email</p>
                       <a
                         href={`mailto:${listing.email}`}
                         className="text-sm text-blue-600 hover:text-blue-700"
+                        suppressHydrationWarning={true}
                       >
                         {listing.email}
                       </a>
@@ -675,6 +677,37 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
           </Link>
+        </div>
+      </div>
+
+      {/* Map Section */}
+      <div className="bg-gray-50 border-t">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Visit Our Location</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Find us at {fullAddress || listing.city + ', ' + listing.state}. We're conveniently located and ready to serve you.
+            </p>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <MapWrapper 
+              listings={[{
+                id: listing.tenant_id,
+                businessName: listing.business_name,
+                slug: listing.slug,
+                address: listing.address,
+                city: listing.city,
+                state: listing.state,
+                zipCode: listing.zip_code,
+                country: listing.country,
+                latitude: listing.latitude,
+                longitude: listing.longitude,
+                logoUrl: listing.logo_url,
+                ratingAvg: listing.rating_avg,
+                productCount: listing.product_count,
+              }]}
+            />
+          </div>
         </div>
       </div>
 

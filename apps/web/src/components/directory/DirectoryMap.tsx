@@ -1,11 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import 'leaflet.markercluster';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
 
 interface DirectoryListing {
@@ -38,9 +33,9 @@ export default function DirectoryMap({
   center = [39.8283, -98.5795], // Center of USA
   zoom = 4 
 }: DirectoryMapProps) {
-  const mapRef = useRef<L.Map | null>(null);
+  const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<L.MarkerClusterGroup | null>(null);
+  const markersRef = useRef<any>(null);
   const [autoGeocoding, setAutoGeocoding] = useState(false);
 
   // Calculate listings with and without coordinates
@@ -116,112 +111,123 @@ export default function DirectoryMap({
   }, [listingsWithoutCoords]);
 
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    // Import Leaflet only on client side
+    const initializeMap = async () => {
+      if (!mapContainerRef.current) return;
 
-    // Initialize map only once
-    if (!mapRef.current) {
-      mapRef.current = L.map(mapContainerRef.current).setView(center, zoom);
+      const L = (await import('leaflet')).default;
+      await import('leaflet/dist/leaflet.css');
+      await import('leaflet.markercluster/dist/MarkerCluster.css');
+      await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
+      await import('leaflet.markercluster');
 
-      // Add OpenStreetMap tiles
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      }).addTo(mapRef.current);
+      // Initialize map only once
+      if (!mapRef.current) {
+        mapRef.current = L.map(mapContainerRef.current).setView(center, zoom);
 
-      // Initialize marker cluster group
-      markersRef.current = L.markerClusterGroup({
-        chunkedLoading: true,
-        spiderfyOnMaxZoom: true,
-        showCoverageOnHover: false,
-        zoomToBoundsOnClick: true,
-      });
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+        }).addTo(mapRef.current);
 
-      mapRef.current.addLayer(markersRef.current);
-    }
-
-    // Clear existing markers
-    if (markersRef.current) {
-      markersRef.current.clearLayers();
-    }
-
-    // Add markers for listings with coordinates
-    if (validListings.length > 0 && markersRef.current) {
-      const bounds = L.latLngBounds([]);
-
-      validListings.forEach((listing) => {
-        if (!listing.latitude || !listing.longitude) return;
-
-        // Determine marker style based on promotion status
-        const isPromoted = listing.isPromoted && listing.promotionTier;
-        const markerColor = isPromoted ? '#f59e0b' : '#2563eb'; // Gold for promoted, blue for regular
-        const markerSize: [number, number] = isPromoted ? [48, 48] : [40, 40]; // Larger for promoted
-        const iconAnchor: [number, number] = isPromoted ? [24, 48] : [20, 40];
-
-        const marker = L.marker([listing.latitude, listing.longitude], {
-          icon: L.divIcon({
-            className: isPromoted ? 'custom-marker promoted-marker' : 'custom-marker',
-            html: `
-              <div class="marker-pin ${isPromoted ? 'promoted' : ''}">
-                ${isPromoted ? '<div class="promoted-badge">⭐</div>' : ''}
-                <div class="marker-icon" style="background: ${markerColor};">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                    <circle cx="12" cy="10" r="3"></circle>
-                  </svg>
-                </div>
-              </div>
-            `,
-            iconSize: markerSize,
-            iconAnchor: iconAnchor,
-            popupAnchor: [0, isPromoted ? -48 : -40],
-          }),
-          // Promoted markers have higher z-index
-          zIndexOffset: isPromoted ? 1000 : 0,
+        // Initialize marker cluster group
+        markersRef.current = L.markerClusterGroup({
+          chunkedLoading: true,
+          spiderfyOnMaxZoom: true,
+          showCoverageOnHover: false,
+          zoomToBoundsOnClick: true,
         });
 
-        // Create popup content
-        const popupContent = `
-          <div class="map-popup ${isPromoted ? 'promoted' : ''}">
-            ${isPromoted ? '<div class="popup-promoted-badge">⭐ Promoted</div>' : ''}
-            ${listing.logoUrl ? `<img src="${listing.logoUrl}" alt="${listing.businessName}" class="popup-logo" />` : ''}
-            <h3 class="popup-title">${listing.businessName}</h3>
-            ${listing.primaryCategory ? `<p class="popup-category">${listing.primaryCategory}</p>` : ''}
-            ${listing.address ? `<p class="popup-address">${listing.address}</p>` : ''}
-            ${listing.city && listing.state ? `<p class="popup-location">${listing.city}, ${listing.state}</p>` : ''}
-            <div class="popup-stats">
-              ${listing.ratingAvg > 0 ? `<span>⭐ ${listing.ratingAvg.toFixed(1)}</span>` : ''}
-              ${listing.productCount > 0 ? `<span>📦 ${listing.productCount} products</span>` : ''}
-            </div>
-            <a href="/directory/${listing.slug}" class="popup-link">View Store →</a>
-          </div>
-        `;
-
-        marker.bindPopup(popupContent, {
-          maxWidth: 300,
-          className: 'custom-popup',
-        });
-
-        markersRef.current?.addLayer(marker);
-        bounds.extend([listing.latitude, listing.longitude]);
-      });
-
-      // Fit map to show all markers
-      if (bounds.isValid() && mapRef.current) {
-        mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+        mapRef.current.addLayer(markersRef.current);
       }
-    }
 
-    // Show message for stores without coordinates
-    if (listingsWithoutCoords.length > 0 && validListings.length === 0 && mapRef.current) {
-      // Center on a reasonable location (e.g., center of USA)
-      mapRef.current.setView([39.8283, -98.5795], 4);
-    }
+      // Clear existing markers
+      if (markersRef.current) {
+        markersRef.current.clearLayers();
+      }
+
+      // Add markers for listings with coordinates
+      if (validListings.length > 0 && markersRef.current) {
+        const bounds = L.latLngBounds([]);
+
+        validListings.forEach((listing) => {
+          if (!listing.latitude || !listing.longitude) return;
+
+          // Determine marker style based on promotion status
+          const isPromoted = listing.isPromoted && listing.promotionTier;
+          const markerColor = isPromoted ? '#f59e0b' : '#2563eb'; // Gold for promoted, blue for regular
+          const markerSize: [number, number] = isPromoted ? [48, 48] : [40, 40]; // Larger for promoted
+          const iconAnchor: [number, number] = isPromoted ? [24, 48] : [20, 40];
+
+          const marker = L.marker([listing.latitude, listing.longitude], {
+            icon: L.divIcon({
+              className: isPromoted ? 'custom-marker promoted-marker' : 'custom-marker',
+              html: `
+                <div class="marker-pin ${isPromoted ? 'promoted' : ''}">
+                  ${isPromoted ? '<div class="promoted-badge">⭐</div>' : ''}
+                  <div class="marker-icon" style="background: ${markerColor};">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                      <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                  </div>
+                </div>
+              `,
+              iconSize: markerSize,
+              iconAnchor: iconAnchor,
+              popupAnchor: [0, isPromoted ? -48 : -40],
+            }),
+            // Promoted markers have higher z-index
+            zIndexOffset: isPromoted ? 1000 : 0,
+          });
+
+          // Create popup content
+          const popupContent = `
+            <div class="map-popup ${isPromoted ? 'promoted' : ''}">
+              ${isPromoted ? '<div class="popup-promoted-badge">⭐ Promoted</div>' : ''}
+              ${listing.logoUrl ? `<img src="${listing.logoUrl}" alt="${listing.businessName}" class="popup-logo" />` : ''}
+              <h3 class="popup-title">${listing.businessName}</h3>
+              ${listing.primaryCategory ? `<p class="popup-category">${listing.primaryCategory}</p>` : ''}
+              ${listing.address ? `<p class="popup-address">${listing.address}</p>` : ''}
+              ${listing.city && listing.state ? `<p class="popup-location">${listing.city}, ${listing.state}</p>` : ''}
+              <div class="popup-stats">
+                ${listing.ratingAvg > 0 ? `<span>⭐ ${listing.ratingAvg.toFixed(1)}</span>` : ''}
+                ${listing.productCount > 0 ? `<span>📦 ${listing.productCount} products</span>` : ''}
+              </div>
+              <a href="/directory/${listing.slug}" class="popup-link">View Store →</a>
+            </div>
+          `;
+
+          marker.bindPopup(popupContent, {
+            maxWidth: 300,
+            className: 'custom-popup',
+          });
+
+          markersRef.current?.addLayer(marker);
+          bounds.extend([listing.latitude, listing.longitude]);
+        });
+
+        // Fit map to show all markers
+        if (bounds.isValid() && mapRef.current) {
+          mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+        }
+      }
+
+      // Show message for stores without coordinates
+      if (listingsWithoutCoords.length > 0 && validListings.length === 0 && mapRef.current) {
+        // Center on a reasonable location (e.g., center of USA)
+        mapRef.current.setView([39.8283, -98.5795], 4);
+      }
+    };
+
+    initializeMap();
 
     // Cleanup function
     return () => {
       // Don't destroy the map on every render, only on unmount
     };
-  }, [listings]);
+  }, [listings, validListings, listingsWithoutCoords, center, zoom]);
 
   // Cleanup on unmount
   useEffect(() => {
