@@ -42,11 +42,6 @@ export default function DirectoryMap({
   const validListings = listings.filter(l => l.latitude && l.longitude);
   const listingsWithoutCoords = listings.filter(l => !l.latitude || !l.longitude);
 
-  console.log('[DirectoryMap] Total listings:', listings.length);
-  console.log('[DirectoryMap] Valid listings (with coords):', validListings.length);
-  console.log('[DirectoryMap] Listings without coords:', listingsWithoutCoords.length);
-  console.log('[DirectoryMap] Valid listings data:', validListings);
-
   // Auto-geocode stores without coordinates
   const handleAutoGeocode = async (store: DirectoryListing) => {
     if (!store.address || !store.city || !store.zipCode || !store.country) {
@@ -118,11 +113,7 @@ export default function DirectoryMap({
   useEffect(() => {
     // Import Leaflet only on client side
     const initializeMap = async () => {
-      console.log('[DirectoryMap] Initializing map...');
-      if (!mapContainerRef.current) {
-        console.log('[DirectoryMap] No map container ref');
-        return;
-      }
+      if (!mapContainerRef.current) return;
 
       try {
         const L = (await import('leaflet')).default;
@@ -131,11 +122,8 @@ export default function DirectoryMap({
         await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
         await import('leaflet.markercluster');
 
-        console.log('[DirectoryMap] Leaflet imported successfully');
-
         // Initialize map only once
         if (!mapRef.current) {
-          console.log('[DirectoryMap] Creating new map instance');
           mapRef.current = L.map(mapContainerRef.current).setView(center, zoom);
 
           // Add OpenStreetMap tiles
@@ -153,26 +141,19 @@ export default function DirectoryMap({
           });
 
           mapRef.current.addLayer(markersRef.current);
-          console.log('[DirectoryMap] Map initialized successfully');
-        } else {
-          console.log('[DirectoryMap] Map already exists');
         }
 
         // Clear existing markers
         if (markersRef.current) {
           markersRef.current.clearLayers();
-          console.log('[DirectoryMap] Cleared existing markers');
         }
 
         // Add markers for listings with coordinates
         if (validListings.length > 0 && markersRef.current) {
-          console.log('[DirectoryMap] Adding markers for', validListings.length, 'listings');
           const bounds = L.latLngBounds([]);
 
           validListings.forEach((listing) => {
             if (!listing.latitude || !listing.longitude) return;
-
-            console.log('[DirectoryMap] Adding marker for:', listing.businessName, 'at', listing.latitude, listing.longitude);
 
             // Determine marker style based on promotion status
             const isPromoted = listing.isPromoted && listing.promotionTier;
@@ -231,17 +212,13 @@ export default function DirectoryMap({
           // Fit map to show all markers
           if (bounds.isValid() && mapRef.current) {
             mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-            console.log('[DirectoryMap] Map fitted to bounds');
           }
-        } else {
-          console.log('[DirectoryMap] No valid listings to display');
         }
 
         // Show message for stores without coordinates
         if (listingsWithoutCoords.length > 0 && validListings.length === 0 && mapRef.current) {
           // Center on a reasonable location (e.g., center of USA)
           mapRef.current.setView([39.8283, -98.5795], 4);
-          console.log('[DirectoryMap] Centered on default location (no valid coordinates)');
         }
       } catch (error) {
         console.error('[DirectoryMap] Error initializing map:', error);
@@ -254,7 +231,7 @@ export default function DirectoryMap({
     return () => {
       // Don't destroy the map on every render, only on unmount
     };
-  }, [listings, validListings, listingsWithoutCoords, center, zoom]);
+  }, [listings]);
 
   // Cleanup on unmount
   useEffect(() => {
