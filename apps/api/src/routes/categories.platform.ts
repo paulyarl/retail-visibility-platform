@@ -32,11 +32,57 @@ router.post('/categories', authenticateToken, requireAdmin, async (req: Request,
 // Quick start endpoint for platform categories (for frontend compatibility)
 router.post('/categories/quick-start', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
+    const { categoryCount = 12 } = req.body;
+    
     // Import the quick start logic
     const { generateQuickStartCategories } = await import('../lib/quick-start-categories');
-    const categories = await generateQuickStartCategories();
-    return res.json({ success: true, data: categories });
+    const { prisma } = await import('../prisma');
+    const { generateQsCatId } = await import('../lib/id-generator');
+    
+    // Get all available categories
+    const allCategories = await generateQuickStartCategories();
+    
+    // Limit to requested count
+    const categoriesToCreate = allCategories.slice(0, Math.min(categoryCount, allCategories.length));
+    
+    // Create categories for the "platform" tenant
+    const createdCategories = [];
+    for (const category of categoriesToCreate) {
+      try {
+        // Check if category already exists
+        const existing = await prisma.tenantCategory.findFirst({
+          where: {
+            tenantId: 'platform',
+            slug: category.slug,
+          },
+        });
+        
+        if (existing) {
+          console.log(`[Quick Start] Skipping duplicate category: ${category.name}`);
+          continue;
+        }
+        
+        const created = await prisma.tenantCategory.create({
+          data: {
+            id: generateQsCatId(),
+            tenantId: 'platform',
+            name: category.name,
+            slug: category.slug,
+            updatedAt: new Date(),
+          },
+        });
+        createdCategories.push(created);
+      } catch (error: any) {
+        console.error(`Failed to create category ${category.name}:`, error);
+      }
+    }
+    
+    // Fetch all platform categories to return
+    const categories = await categoryService.getTenantCategories('platform');
+    
+    return res.json({ success: true, data: categories, categoriesCreated: createdCategories.length });
   } catch (e: any) {
+    console.error('[Quick Start Categories] Error:', e);
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
   }
 });

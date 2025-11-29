@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useDirectoryListing } from '@/hooks/directory/useDirectoryListing';
-import DirectoryCategorySelector from './DirectoryCategorySelector';
+import DirectoryCategorySelectorMulti from './DirectoryCategorySelectorMulti';
 import DirectoryListingPreview from './DirectoryListingPreview';
 import DirectoryStatusBadge from './DirectoryStatusBadge';
 
@@ -161,11 +161,11 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Categories
             </h3>
-            <DirectoryCategorySelector
-              primaryCategory={primaryCategory}
-              secondaryCategories={secondaryCategories}
-              onPrimaryCategoryChange={setPrimaryCategory}
-              onSecondaryCategoriesChange={setSecondaryCategories}
+            <DirectoryCategorySelectorMulti
+              primary={primaryCategory}
+              secondary={secondaryCategories}
+              onPrimaryChange={setPrimaryCategory}
+              onSecondaryChange={setSecondaryCategories}
             />
           </div>
 

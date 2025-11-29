@@ -301,7 +301,7 @@ export default function AdminDashboardPage() {
       description: 'Manage product categories and data organization',
       sections: [
         {
-          title: 'Categories',
+          title: 'Product Categories',
           description: 'Manage product categories and hierarchies',
           href: '/admin/categories',
           icon: (
@@ -312,6 +312,19 @@ export default function AdminDashboardPage() {
           color: 'bg-purple-500',
           stats: 'Product organization',
           badge: 'NEW',
+        },
+        {
+          title: 'Platform Categories',
+          description: 'Manage directory categories for all stores',
+          href: '/settings/admin/platform-categories',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+          ),
+          color: 'bg-indigo-500',
+          stats: '57 categories',
+          badge: 'P4',
         },
       ],
     },

@@ -248,13 +248,32 @@ export async function generateQuickStartProducts(
     });
   }
 
+  // Get existing product names to avoid duplicates
+  const existingProducts = await prisma.inventoryItem.findMany({
+    where: { tenantId: tenant_id },
+    select: { name: true },
+  });
+  const existingNames = new Set(existingProducts.map(p => p.name));
+  
   // Create products in batches
   const batchSize = 100;
   let createdCount = 0;
+  let skippedCount = 0;
 
   for (let i = 0; i < allProducts.length; i += batchSize) {
     const batch = allProducts.slice(i, i + batchSize);
-    const items = batch.map((product, idx) => {
+    const items = [];
+    
+    for (let idx = 0; idx < batch.length; idx++) {
+      const product = batch[idx];
+      
+      // Skip if product name already exists
+      if (existingNames.has(product.name)) {
+        console.log(`[Quick Start] Skipping duplicate product: ${product.name}`);
+        skippedCount++;
+        continue;
+      }
+      
       const availability = Math.random() > 0.25 ? 'in_stock' as const : 'out_of_stock' as const;
       const stock = availability === 'in_stock' ? Math.floor(Math.random() * 96) + 5 : 0;
 
@@ -274,7 +293,7 @@ export async function generateQuickStartProducts(
         ? 'inactive' as const
         : (Math.random() > 0.25 ? 'active' as const : 'inactive' as const);
 
-      return {
+      items.push({
         id: generateItemId(),
         tenantId: tenant_id,
         sku: generateQuickStartSku(i + idx),
@@ -289,11 +308,20 @@ export async function generateQuickStartProducts(
         itemStatus: itemStatus,
         updatedAt: new Date(),
         ...categoryAssignment,
-      };
-    });
+      });
+      
+      // Add to existing names set to prevent duplicates within this batch
+      existingNames.add(product.name);
+    }
 
-    await prisma.inventoryItem.createMany({ data: items });
-    createdCount += items.length;
+    if (items.length > 0) {
+      await prisma.inventoryItem.createMany({ data: items });
+      createdCount += items.length;
+    }
+  }
+  
+  if (skippedCount > 0) {
+    console.log(`[Quick Start] Skipped ${skippedCount} duplicate products`);
   }
 
   // Get final counts

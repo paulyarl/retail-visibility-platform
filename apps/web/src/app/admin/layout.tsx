@@ -15,7 +15,8 @@ import {
   Users,
   Menu,
   X,
-  MapPin
+  MapPin,
+  FolderTree
 } from 'lucide-react';
 import SettingsFooter from '@/components/SettingsFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
@@ -38,6 +39,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/quick-start/categories', label: 'Product Categories Quick Start', icon: Rocket },
     { href: '/admin/organizations', label: 'Organizations Panel', icon: Building2 },
     { href: '/admin/categories', label: 'Product Categories', icon: Layers },
+    { href: '/settings/admin/platform-categories', label: 'Platform Categories', icon: FolderTree },
     { href: '/admin/directory', label: 'Directory Panel', icon: MapPin },
     { href: '/admin/tiers', label: 'Subscription Panel', icon: DollarSign },
     { href: '/admin/billing', label: 'Billing Panel', icon: DollarSign },

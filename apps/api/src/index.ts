@@ -117,6 +117,8 @@ import directoryRoutes from './routes/directory-v2';
 import directoryTenantRoutes from './routes/directory-tenant';
 import directoryCategoriesRoutes from './routes/directory-categories';
 import directoryStoreTypesRoutes from './routes/directory-store-types';
+import storefrontRoutes from './routes/storefront';
+import gbpRoutes from './routes/gbp';
 import scanRoutes from './routes/scan';
 import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
@@ -3677,6 +3679,14 @@ console.log('✅ Directory categories routes mounted (category-based discovery)'
 /* ------------------------------ directory store types ------------------------------ */
 app.use('/api/directory/store-types', directoryStoreTypesRoutes);
 console.log('✅ Directory store types routes mounted (store type discovery)');
+
+/* ------------------------------ storefront (materialized view) ------------------------------ */
+app.use('/api/storefront', storefrontRoutes);
+console.log('✅ Storefront routes mounted (materialized view for instant category filtering)');
+
+/* ------------------------------ GBP categories ------------------------------ */
+app.use('/api/gbp', gbpRoutes);
+console.log('✅ GBP routes mounted (Google Business Profile category search)');
 
 /* ------------------------------ tenants ------------------------------ */
 app.use('/api/tenants', tenantsRoutes);

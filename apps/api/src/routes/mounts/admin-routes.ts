@@ -12,6 +12,7 @@ import tierManagementRoutes from '../admin/tier-management';
 import tierSystemRoutes from '../admin/tier-system';
 import taxonomyAdminRoutes from '../taxonomy-admin';
 import adminTenantsRoutes from '../admin/tenants';
+import platformCategoriesRoutes from '../admin/platform-categories';
 
 /**
  * Mount admin routes
@@ -20,17 +21,19 @@ import adminTenantsRoutes from '../admin/tenants';
 export function mountAdminRoutes(app: Express) {
   console.log('👑 Mounting admin routes...');
 
+  // Specific admin routes - MUST be mounted BEFORE generic routes to prevent conflicts
+  app.use('/api/admin/platform-categories', authenticateToken, requireAdmin, platformCategoriesRoutes);
+  app.use('/api/admin/feature-overrides', featureOverridesRoutes);
+  app.use('/api/admin/tier-management', tierManagementRoutes);
+  app.use('/api/admin/tier-system', tierSystemRoutes);
+  app.use('/api/admin/tenants', adminTenantsRoutes);
+  
   // Tenant flags: accessible by platform admins OR store owners of that specific tenant
-  // MUST be mounted BEFORE the generic /api/admin route below to prevent route matching conflicts
   app.use('/admin', authenticateToken, tenantFlagsRoutes);
   app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
   
   // Admin tools and users - these are more generic and should come after specific routes
   app.use('/api/admin', authenticateToken, requireAdmin, adminToolsRoutes);
-  app.use('/api/admin/feature-overrides', featureOverridesRoutes);
-  app.use('/api/admin/tier-management', tierManagementRoutes);
-  app.use('/api/admin/tier-system', tierSystemRoutes);
-  app.use('/api/admin/tenants', adminTenantsRoutes);
   app.use('/admin', authenticateToken, adminUsersRoutes);
   app.use('/api/admin', authenticateToken, adminUsersRoutes);
   app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);

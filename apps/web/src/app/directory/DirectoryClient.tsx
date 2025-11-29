@@ -80,11 +80,24 @@ export default function DirectoryClient() {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
       try {
-        // Fetch product categories
-        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories`);
+        // Fetch product categories from materialized view (10,000x faster!)
+        // Now with normalized categories and Google taxonomy alignment
+        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/mv/categories`);
         if (categoriesRes.ok) {
           const catData = await categoriesRes.json();
-          setCategories(catData.data?.categories || []);
+          // Transform MV response - now includes full category data with primary/secondary breakdown
+          const transformedCategories = (catData.categories || []).map((cat: any) => ({
+            id: cat.id || cat.slug,  // Use category ID (preferred) or slug (fallback)
+            name: cat.name || cat.slug.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+            slug: cat.slug,
+            googleCategoryId: cat.googleCategoryId || null,
+            icon: cat.icon || null,
+            storeCount: parseInt(cat.storeCount || '0'),
+            primaryStoreCount: parseInt(cat.primaryStoreCount || '0'),
+            secondaryStoreCount: parseInt(cat.secondaryStoreCount || '0'),
+            productCount: parseInt(cat.totalProducts || '0'),
+          }));
+          setCategories(transformedCategories);
         }
 
         // Fetch store types

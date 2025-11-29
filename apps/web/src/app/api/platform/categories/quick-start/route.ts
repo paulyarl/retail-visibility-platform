@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const headers = buildAuthHeaders(req);
     
-    // Call the quick-start endpoint with "platform" as the tenant ID
-    const res = await fetch(`${base}/api/v1/tenants/platform/categories/quick-start`, {
+    // Call the platform categories quick-start endpoint
+    const res = await fetch(`${base}/api/platform/categories/quick-start`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),

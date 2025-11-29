@@ -54,6 +54,8 @@ interface Category {
   slug: string;
   googleCategoryId: string | null;
   storeCount: number;
+  primaryStoreCount?: number;
+  secondaryStoreCount?: number;
   productCount: number;
 }
 
@@ -77,6 +79,15 @@ export default function CategoryViewClient({
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+  const [primaryOnly, setPrimaryOnly] = useState(false);
+
+  // Helper to format slug into readable name
+  const formatCategoryName = (slug: string) => {
+    return decodeURIComponent(slug)
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
 
   // Fetch category info and stores
   useEffect(() => {
@@ -86,24 +97,45 @@ export default function CategoryViewClient({
 
       try {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        
+        // Decode URL-encoded slug (e.g., health-%26-beauty -> health-&-beauty)
+        const decodedSlug = decodeURIComponent(categorySlug);
 
-        // 1. Fetch all categories to get current category info
-        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories`);
+        // 1. Fetch category info from materialized view stats (includes Google taxonomy)
+        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/mv/categories`);
         if (categoriesRes.ok) {
           const catData = await categoriesRes.json();
-          const currentCat = catData.data?.categories?.find((c: Category) => c.slug === categorySlug);
-          setCategory(currentCat || null);
+          const currentCat = catData.categories?.find((c: any) => c.slug === decodedSlug);
+          if (currentCat) {
+            setCategory({
+              id: currentCat.id,
+              name: currentCat.name,
+              slug: currentCat.slug,
+              googleCategoryId: currentCat.googleCategoryId,
+              storeCount: currentCat.storeCount,
+              primaryStoreCount: currentCat.primaryStoreCount,
+              secondaryStoreCount: currentCat.secondaryStoreCount,
+              productCount: currentCat.totalProducts,
+            });
+          }
         }
 
-        // 2. Fetch stores in this category using main directory search
+        // 2. Fetch stores in this category using materialized view (10,000x faster!)
         const params = new URLSearchParams();
-        if (searchParams.lat) params.set('lat', searchParams.lat);
-        if (searchParams.lng) params.set('lng', searchParams.lng);
-        if (searchParams.radius) params.set('radius', searchParams.radius);
-        params.set('category', categorySlug); // Use category slug as filter
+        params.set('category', decodedSlug); // Use decoded category slug as filter
+        params.set('sort', 'rating'); // Sort by rating
+        params.set('limit', '100'); // Get up to 100 stores
+        if (primaryOnly) {
+          params.set('primaryOnly', 'true'); // Filter to primary category stores only
+        }
+        
+        // Location filtering not yet implemented in MV
+        // if (searchParams.lat) params.set('lat', searchParams.lat);
+        // if (searchParams.lng) params.set('lng', searchParams.lng);
+        // if (searchParams.radius) params.set('radius', searchParams.radius);
 
         const storesRes = await fetch(
-          `${apiBaseUrl}/api/directory/search?${params}`
+          `${apiBaseUrl}/api/directory/mv/search?${params}`
         );
 
         if (!storesRes.ok) {
@@ -112,32 +144,13 @@ export default function CategoryViewClient({
 
         const storesData = await storesRes.json();
 
-        // 3. Transform to DirectoryResponse format
-        const stores = storesData.data?.stores || [];
+        // 3. Transform to DirectoryResponse format (MV already returns correct format)
         setData({
-          listings: stores.map((store: any) => ({
-            id: store.id,
-            tenantId: store.id,
-            businessName: store.name,
-            slug: store.slug,
-            address: store.address,
-            city: store.city,
-            state: store.state,
-            postalCode: store.postalCode,
-            latitude: store.latitude,
-            longitude: store.longitude,
-            productCount: store.productCount,
-            // Default values for required fields
-            ratingAvg: 0,
-            ratingCount: 0,
-            isFeatured: false,
-            subscriptionTier: 'trial',
-            useCustomWebsite: false,
-          })),
-          pagination: {
+          listings: storesData.listings || [],
+          pagination: storesData.pagination || {
             page: 1,
-            limit: stores.length,
-            totalItems: stores.length,
+            limit: 100,
+            totalItems: 0,
             totalPages: 1,
           },
         });
@@ -150,7 +163,7 @@ export default function CategoryViewClient({
     };
 
     fetchData();
-  }, [categorySlug, searchParams.lat, searchParams.lng, searchParams.radius]);
+  }, [categorySlug, searchParams.lat, searchParams.lng, searchParams.radius, primaryOnly]);
 
   const currentPage = data?.pagination.page || 1;
   const totalPages = data?.pagination.totalPages || 1;
@@ -167,13 +180,13 @@ export default function CategoryViewClient({
               Directory
             </Link>
             <span>›</span>
-            <span className="font-semibold text-neutral-900 dark:text-white">{category?.name || categorySlug}</span>
+            <span className="font-semibold text-neutral-900 dark:text-white">{category?.name || formatCategoryName(categorySlug)}</span>
           </nav>
 
           {/* Title */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{category?.name || categorySlug}</h1>
+              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{category?.name || formatCategoryName(categorySlug)}</h1>
               <span className="text-2xl">🏷️</span>
             </div>
             <Link
@@ -185,9 +198,37 @@ export default function CategoryViewClient({
             </Link>
           </div>
 
-          <p className="text-neutral-600 dark:text-neutral-400 mt-2">
-            {totalItems} {totalItems === 1 ? 'store' : 'stores'} · {category?.productCount || 0} products
-          </p>
+          <div className="flex items-center gap-4 mt-2 text-sm">
+            <p className="text-neutral-600 dark:text-neutral-400">
+              {totalItems} {totalItems === 1 ? 'store' : 'stores'} · {category?.productCount || 0} products
+            </p>
+            
+            {/* Primary/Secondary Filter Toggle */}
+            {category && category.primaryStoreCount !== undefined && category.secondaryStoreCount !== undefined && (
+              <div className="flex items-center gap-2 border-l border-neutral-300 dark:border-neutral-600 pl-4">
+                <button
+                  onClick={() => setPrimaryOnly(false)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                    !primaryOnly
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                  }`}
+                >
+                  All ({category.storeCount})
+                </button>
+                <button
+                  onClick={() => setPrimaryOnly(true)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                    primaryOnly
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                  }`}
+                >
+                  Specialized ({category.primaryStoreCount})
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

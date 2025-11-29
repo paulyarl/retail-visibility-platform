@@ -29,6 +29,7 @@ export default function GBPCategorySelector({
   const [popularCategories, setPopularCategories] = useState<GBPCategory[]>([]);
   const [loadingPopular, setLoadingPopular] = useState(true);
   const [showPopular, setShowPopular] = useState(true);
+  const [useDropdown, setUseDropdown] = useState(false);
 
   // Load popular categories on mount
   useEffect(() => {
@@ -125,38 +126,86 @@ export default function GBPCategorySelector({
 
   return (
     <div className="relative">
-      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-        Google Business Profile Category
-      </label>
-      
-      <div className="relative">
-        <input
-          type="text"
-          value={value ? value.name : query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setShowResults(true);
-            if (!e.target.value) onChange(null);
-          }}
-          onFocus={() => setShowResults(true)}
-          placeholder="Search for your business category..."
-          disabled={disabled}
-          className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        />
-        
-        {value && !disabled && (
-          <button
-            type="button"
-            onClick={handleClear}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
-          >
-            ✕
-          </button>
-        )}
+      <div className="flex items-center justify-between mb-2">
+        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+          Google Business Profile Category
+        </label>
+        <button
+          type="button"
+          onClick={() => setUseDropdown(!useDropdown)}
+          className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
+        >
+          {useDropdown ? '🔍 Switch to Search' : '📋 Switch to Dropdown'}
+        </button>
       </div>
+      
+      {useDropdown ? (
+        /* Dropdown Mode */
+        <div className="relative">
+          <select
+            value={value?.id || ''}
+            onChange={(e) => {
+              const selected = popularCategories.find(cat => cat.id === e.target.value);
+              if (selected) {
+                handleSelect(selected);
+              } else {
+                onChange(null);
+              }
+            }}
+            disabled={disabled || loadingPopular}
+            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">Select a category...</option>
+            {Object.entries(groupedCategories).map(([groupName, categories]) => {
+              if (categories.length === 0) return null;
+              return (
+                <optgroup key={groupName} label={groupName}>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
+          </select>
+          {loadingPopular && (
+            <div className="absolute right-10 top-1/2 -translate-y-1/2">
+              <div className="animate-spin h-4 w-4 border-2 border-primary-500 border-t-transparent rounded-full"></div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Search Mode */
+        <div className="relative">
+          <input
+            type="text"
+            value={value ? value.name : query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setShowResults(true);
+              if (!e.target.value) onChange(null);
+            }}
+            onFocus={() => setShowResults(true)}
+            placeholder="Search for your business category..."
+            disabled={disabled}
+            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+          
+          {value && !disabled && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
 
-      {/* Search results dropdown */}
-      {showResults && (results.length > 0 || loading) && (
+      {/* Search results dropdown - only show in search mode */}
+      {!useDropdown && showResults && (results.length > 0 || loading) && (
         <div className="absolute z-10 mt-1 w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg max-h-64 overflow-auto">
           {loading && (
             <div className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">

@@ -615,32 +615,82 @@ time curl -s "http://localhost:4000/api/directory/categories" > /dev/null
 ## Phase 5: Production Deployment
 
 **Timeline:** Week 2, Days 3-4  
-**Status:** ⬜ Not Started  
+**Status:** ⬜ Ready for Production  
 
 ### Pre-Deployment Checklist
-- [ ] All phases completed in development
-- [ ] Performance improvements verified
-- [ ] Triggers tested thoroughly
-- [ ] Rollback plan documented
+- [x] All phases completed in development
+- [x] Performance improvements verified (10,000x faster)
+- [x] Triggers tested thoroughly (30s debouncing working)
+- [x] Rollback plan documented
+- [x] Code committed and pushed to staging
 - [ ] Team notified of deployment
 
 ### Deployment Steps
 
-#### Step 1: Staging Deployment
-1. [ ] Run Phase 1 scripts in staging
-2. [ ] Run Phase 2 SQL in staging
-3. [ ] Run Phase 3 SQL in staging
-4. [ ] Deploy API changes to staging
-5. [ ] Test staging thoroughly
+#### Step 1: Staging Deployment ✅ COMPLETE
+1. [x] Run Phase 1 scripts in staging
+2. [x] Run Phase 2 SQL in staging
+3. [x] Run Phase 3 SQL in staging
+4. [x] Deploy API changes to staging (auto-deployed via Railway)
+5. [x] Test staging thoroughly (all 4 endpoints working)
 6. [ ] Monitor for 24 hours
 
+**Note:** Staging and local share the same database, so migrations are already live.
+
 #### Step 2: Production Deployment
-1. [ ] Schedule maintenance window (optional)
-2. [ ] Run Phase 2 SQL in production
-3. [ ] Run Phase 3 SQL in production
-4. [ ] Deploy API changes to production
-5. [ ] Monitor performance metrics
-6. [ ] Verify category pages load fast
+1. [ ] Merge staging → main branch
+2. [ ] Railway auto-deploys to production
+3. [ ] Execute SQL migrations in **Production Supabase** (in order):
+   - `00_migration_tracking.sql`
+   - `01_create_directory_materialized_views.sql`
+   - `01a_add_unique_index.sql`
+   - `02_create_directory_triggers.sql`
+4. [ ] Verify views created: `SELECT * FROM pg_matviews WHERE matviewname LIKE 'directory_%';`
+5. [ ] Test health endpoint: `GET /api/directory/mv/health`
+6. [ ] Monitor refresh logs: `SELECT * FROM directory_mv_refresh_log ORDER BY refresh_started_at DESC LIMIT 10;`
+7. [ ] Verify performance: Test category queries (<50ms expected)
+
+### Post-Deployment Verification
+
+**Health Check:**
+```bash
+curl https://api.visibleshelf.com/api/directory/mv/health
+```
+
+**Expected Response:**
+- Both views populated
+- Recent refresh activity
+- No failed refreshes
+- Status: "healthy"
+
+**Performance Test:**
+```bash
+time curl "https://api.visibleshelf.com/api/directory/mv/search?category=frozen-foods"
+```
+
+**Expected:** <50ms response time
+
+### Rollback Plan (if needed)
+
+**If issues arise:**
+1. Revert API code: `git revert <commit-hash>`
+2. Keep views running (they don't break existing functionality)
+3. Investigate and fix issues
+4. Re-deploy when ready
+
+**To completely rollback:**
+```sql
+-- Drop triggers (keeps views)
+DROP TRIGGER IF EXISTS trigger_directory_listings_refresh ON directory_listings_list;
+DROP TRIGGER IF EXISTS trigger_tenant_directory_refresh ON tenants;
+DROP TRIGGER IF EXISTS trigger_business_profile_directory_refresh ON tenant_business_profiles_list;
+DROP TRIGGER IF EXISTS trigger_inventory_directory_refresh ON inventory_items;
+DROP TRIGGER IF EXISTS trigger_category_directory_refresh ON tenant_categories_list;
+
+-- Drop views (if necessary)
+DROP MATERIALIZED VIEW IF EXISTS directory_category_stats CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS directory_category_listings CASCADE;
+```
 
 ---
 
@@ -1086,6 +1136,7 @@ WHERE migration_name LIKE '0%_directory%';
 - ✅ **Phase 1 COMPLETE** (Foundation & Testing) - Baseline captured
 - ✅ **Phase 2 COMPLETE** (Materialized Views Creation) - 2 views, 11 indexes, 10,000x faster
 - ✅ **Phase 3 COMPLETE** (Trigger Implementation) - Automatic refresh working, 30s debouncing verified
-- ⬜ Phase 4 pending (API Integration & Code Retrofit)
-- ⬜ Phase 5 pending (Production Deployment)
+- ✅ **Phase 4 COMPLETE** (API Integration) - 4 new endpoints, all working in staging
+- ✅ **Staging Deployment COMPLETE** - Code pushed, database migrated, API live
+- ⬜ Phase 5 pending (Production Deployment) - Ready to deploy
 - ⬜ Phase 6 pending (High-Priority Feature Rollout)

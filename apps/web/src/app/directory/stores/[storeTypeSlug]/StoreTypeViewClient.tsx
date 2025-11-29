@@ -92,14 +92,15 @@ export default function StoreTypeViewClient({
           setStoreType(typeData.data?.storeType || null);
         }
 
-        // 2. Fetch stores of this type
+        // 2. Fetch stores of this type using MV search
         const params = new URLSearchParams();
+        params.set('category', storeTypeSlug); // Use category filter
         if (searchParams.lat) params.set('lat', searchParams.lat);
         if (searchParams.lng) params.set('lng', searchParams.lng);
         if (searchParams.radius) params.set('radius', searchParams.radius);
 
         const storesRes = await fetch(
-          `${apiBaseUrl}/api/directory/store-types/${storeTypeSlug}/stores?${params}`
+          `${apiBaseUrl}/api/directory/mv/search?${params}`
         );
 
         if (!storesRes.ok) {
@@ -109,24 +110,26 @@ export default function StoreTypeViewClient({
         const storesData = await storesRes.json();
 
         // 3. Transform to DirectoryResponse format
-        const stores = storesData.data?.stores || [];
+        const stores = storesData.listings || [];
         setData({
           listings: stores.map((store: any) => ({
             id: store.id,
-            tenantId: store.id,
-            businessName: store.name,
+            tenantId: store.tenant_id || store.tenantId,
+            businessName: store.business_name || store.businessName,
             slug: store.slug,
             address: store.address,
             city: store.city,
             state: store.state,
-            postalCode: store.postalCode,
+            zipCode: store.zip_code || store.zipCode,
             latitude: store.latitude,
             longitude: store.longitude,
-            productCount: store.productCount,
-            primaryCategory: store.storeType,
-            // Default values for required fields
-            ratingAvg: 0,
-            ratingCount: 0,
+            productCount: store.product_count || store.productCount || 0,
+            primaryCategory: store.primary_category || store.primaryCategory,
+            logoUrl: store.logo_url || store.logoUrl,
+            description: store.description,
+            // Rating fields
+            ratingAvg: store.rating_avg || store.ratingAvg || 0,
+            ratingCount: store.rating_count || store.ratingCount || 0,
             isFeatured: false,
             subscriptionTier: 'trial',
             useCustomWebsite: false,

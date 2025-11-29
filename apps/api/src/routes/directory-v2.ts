@@ -25,17 +25,12 @@ const getPoolConfig = () => {
                       process.env.NODE_ENV === 'production';
 
   if (!isProduction) {
-    console.log('[Directory Pool] Local development detected - disabling SSL completely');
-    console.log('[Directory Pool] Original connection string:', connectionString);
-    // Completely remove SSL for development - this will work with rejectUnauthorized: false
+    // Disable SSL for local development
     if (connectionString.includes('sslmode=')) {
-      console.log('[Directory Pool] Removing SSL mode entirely');
       connectionString = connectionString.replace(/sslmode=[^&]+/, 'sslmode=disable');
     } else {
-      console.log('[Directory Pool] Adding sslmode=disable');
       connectionString += '&sslmode=disable';
     }
-    console.log('[Directory Pool] Modified connection string:', connectionString);
   }
 
   const config: any = {
@@ -50,8 +45,6 @@ const getPoolConfig = () => {
     config.ssl = {
       rejectUnauthorized: false
     };
-  } else {
-    console.log('[Directory Pool] Production environment - SSL verification enabled');
   }
 
   return config;
@@ -311,9 +304,35 @@ router.get('/:identifier', async (req: Request, res: Response) => {
     }
 
     const row = result.rows[0];
+    
+    // Fetch categories from normalized structure
+    const categoriesQuery = `
+      SELECT 
+        pc.id,
+        pc.name,
+        pc.slug,
+        pc.google_category_id,
+        pc.icon_emoji,
+        dlc.is_primary
+      FROM directory_listing_categories dlc
+      INNER JOIN platform_categories pc ON pc.id = dlc.category_id
+      WHERE dlc.listing_id = $1
+      ORDER BY dlc.is_primary DESC, pc.name ASC
+    `;
+    const categoriesResult = await getDirectPool().query(categoriesQuery, [row.id]);
+    
+    const categories = categoriesResult.rows.map((cat: any) => ({
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      googleCategoryId: cat.google_category_id,
+      icon: cat.icon_emoji,
+      isPrimary: cat.is_primary,
+    }));
+    
     const listing = {
       id: row.id,
-      tenantId: row.tenantId,
+      tenantId: row.tenant_id,
       business_name: row.business_name,
       slug: row.slug,
       address: row.address,
@@ -325,19 +344,18 @@ router.get('/:identifier', async (req: Request, res: Response) => {
       website: row.website,
       latitude: row.latitude,
       longitude: row.longitude,
-      primaryCategory: row.primary_category,
-      secondaryCategories: row.secondary_categories,
+      categories: categories, // New normalized categories array
       logoUrl: row.logo_url,
       description: row.description,
       ratingAvg: row.rating_avg || 0,
       ratingCount: row.rating_count || 0,
       productCount: row.product_count || 0,
       isFeatured: row.is_featured || false,
-      subscription_tier: row.subscriptionTier || 'trial',
+      subscription_tier: row.subscription_tier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
       createdAt: row.created_at,
-      updatedAt: row.updatedAt,
+      updatedAt: row.updated_at,
     };
 
     return res.json({ listing });
@@ -369,32 +387,33 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
 
     const current = currentListing.rows[0];
 
-    // Find related stores using a scoring algorithm
+    // Find related stores using a scoring algorithm with materialized view
     // Priority: Same category (primary/secondary) > Same city > Similar rating
+    // Using directory_category_listings MV for faster queries
+    // Note: MV is already filtered by is_published = true at creation time
     const relatedQuery = `
-      SELECT *,
+      SELECT DISTINCT ON (dcl.id)
+        dcl.*,
         (
           CASE
-            WHEN primary_category = $1 THEN 3
-            WHEN $1 = ANY(secondary_categories) THEN 2
-            WHEN primary_category = ANY($7) THEN 2
+            WHEN dcl.is_primary = true AND dcl.category_name = $1 THEN 3
+            WHEN dcl.is_primary = false AND dcl.category_name = $1 THEN 2
+            WHEN dcl.category_name = ANY($7) THEN 2
             ELSE 0
           END +
           CASE
-            WHEN city = $2 AND state = $3 THEN 2
-            WHEN state = $3 THEN 1
+            WHEN dcl.city = $2 AND dcl.state = $3 THEN 2
+            WHEN dcl.state = $3 THEN 1
             ELSE 0
           END +
           CASE
-            WHEN ABS(rating_avg - $4) < 0.5 THEN 1
+            WHEN ABS(dcl.rating_avg - $4) < 0.5 THEN 1
             ELSE 0
           END
         ) as relevance_score
-      FROM directory_listings_list
-      WHERE slug != $5
-        AND is_published = true
-        AND (business_hours IS NULL OR business_hours::text != 'null')
-      ORDER BY relevance_score DESC, rating_avg DESC, product_count DESC
+      FROM directory_category_listings dcl
+      WHERE dcl.slug != $5
+      ORDER BY dcl.id, relevance_score DESC, dcl.rating_avg DESC, dcl.product_count DESC
       LIMIT $6
     `;
 
@@ -410,7 +429,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
 
     const relatedListings = related.rows.map((row: any) => ({
       id: row.id,
-      tenantId: row.tenantId,
+      tenantId: row.tenant_id,
       business_name: row.business_name,
       slug: row.slug,
       address: row.address,
@@ -422,19 +441,19 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       website: row.website,
       latitude: row.latitude,
       longitude: row.longitude,
-      primaryCategory: row.primary_category,
-      secondaryCategories: row.secondary_categories,
+      primaryCategory: row.category_name, // From MV
+      secondaryCategories: [], // MV has one category per row
       logoUrl: row.logo_url,
       description: row.description,
       ratingAvg: row.rating_avg || 0,
       ratingCount: row.rating_count || 0,
       productCount: row.product_count || 0,
       isFeatured: row.is_featured || false,
-      subscription_tier: row.subscriptionTier || 'trial',
+      subscription_tier: row.subscription_tier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
       createdAt: row.created_at,
-      updatedAt: row.updatedAt,
+      updatedAt: row.updated_at,
     }));
 
     return res.json({

@@ -82,8 +82,10 @@ export default function AdminCategoriesPage() {
     try {
       const res = await fetch('/api/platform/categories');
       const data = await res.json();
+      console.log('[Load Categories] Response:', data);
       // API returns {success: true, data: [...]}
       const categories = data.success ? data.data : (Array.isArray(data) ? data : []);
+      console.log('[Load Categories] Parsed categories:', categories);
       setCategories(categories);
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -344,14 +346,18 @@ export default function AdminCategoriesPage() {
       
       if (res.ok) {
         const data = await res.json();
+        console.log('[Quick Start] Response:', data);
         await loadCategories();
         setShowQuickStartModal(false);
-        alert(`Successfully generated ${data.categoriesCreated} Google-aligned categories!`);
+        const createdCount = data.categoriesCreated || 0;
+        const totalCount = data.data?.length || 0;
+        alert(`Successfully created ${createdCount} new categories! (${totalCount} total platform categories)`);
       } else {
         const data = await res.json();
         alert(`Failed to generate categories: ${data.message || data.error || 'Unknown error'}`);
       }
     } catch (error) {
+      console.error('[Quick Start] Error:', error);
       alert('Failed to generate categories. Please try again.');
     } finally {
       setQuickStartLoading(false);

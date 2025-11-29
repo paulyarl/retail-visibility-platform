@@ -5,26 +5,27 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BAS
 
 /**
  * PUT /api/tenant/gbp-category
- * Set GBP business category for a tenant
- * Feature-gated by FF_TENANT_GBP_CATEGORY_SYNC
+ * Set GBP business categories for a tenant (primary + secondary)
+ * Automatically syncs to directory listings
  */
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { tenantId, gbpCategoryId, gbpCategoryName } = body;
+    const { tenantId, primary, secondary = [] } = body;
 
-    if (!tenantId || !gbpCategoryId || !gbpCategoryName) {
+    // Validate input
+    if (!tenantId || !primary?.id || !primary?.name) {
       return NextResponse.json(
-        { error: 'Missing required fields: tenantId, gbpCategoryId, gbpCategoryName' },
+        { error: 'Missing required fields: tenantId, primary.id, primary.name' },
         { status: 400 }
       );
     }
 
-    // Feature gate
-    if (!isFeatureEnabled('FF_TENANT_GBP_CATEGORY_SYNC', tenantId)) {
+    // Validate secondary categories (max 9)
+    if (secondary.length > 9) {
       return NextResponse.json(
-        { error: 'GBP category sync not enabled for this tenant' },
-        { status: 403 }
+        { error: 'Maximum 9 secondary categories allowed' },
+        { status: 400 }
       );
     }
 
@@ -38,46 +39,79 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Update tenant business profile with GBP category
+    // Prepare GBP categories structure
+    const gbpCategories = {
+      primary: {
+        id: primary.id,
+        name: primary.name,
+        selected_at: new Date().toISOString(),
+      },
+      secondary: secondary.map((cat: any) => ({
+        id: cat.id,
+        name: cat.name,
+        selected_at: new Date().toISOString(),
+      })),
+      sync_status: 'pending',
+      last_synced_at: null,
+    };
+
+    // Update tenant metadata with GBP categories
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       'Authorization': authHeader,
     };
     if (cookieHeader) headers['Cookie'] = cookieHeader;
     
-    const response = await fetch(`${API_BASE_URL}/api/tenant/profile`, {
+    const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify({
-        tenant_id: tenantId,
-        gbpCategoryId,
-        gbpCategoryName,
-        gbpCategorySyncStatus: 'pending', // Will be updated by worker
+        metadata: {
+          gbp_categories: gbpCategories,
+        },
       }),
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to update profile' }));
+      const error = await response.json().catch(() => ({ error: 'Failed to update tenant' }));
       return NextResponse.json(
-        { error: error.error || 'Failed to set GBP category' },
+        { error: error.error || 'Failed to set GBP categories' },
         { status: response.status }
       );
     }
 
     const result = await response.json();
 
-    // Queue mirror job if FF_CATEGORY_MIRRORING is enabled
-    const mirroringEnabled = isFeatureEnabled('FF_CATEGORY_MIRRORING', tenantId);
-    if (mirroringEnabled) {
-      // TODO: Queue GBP mirror job
-      // For now, just log that it would be queued
-      console.log('[GBP Category API] Would queue mirror job for tenant:', tenantId);
+    // Trigger sync to directory
+    try {
+      const syncResponse = await fetch(`${API_BASE_URL}/api/gbp/sync-to-directory`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          tenantId,
+          gbpCategories: {
+            primary: gbpCategories.primary,
+            secondary: gbpCategories.secondary,
+          },
+        }),
+      });
+
+      if (!syncResponse.ok) {
+        console.error('[GBP Category API] Sync to directory failed');
+        // Don't fail the request, just log the error
+      }
+    } catch (syncError) {
+      console.error('[GBP Category API] Sync to directory error:', syncError);
+      // Don't fail the request, just log the error
     }
 
     return NextResponse.json({
       success: true,
       data: result,
-      status: mirroringEnabled ? 'queued' : 'ok',
+      gbpCategories: {
+        primary: gbpCategories.primary,
+        secondary: gbpCategories.secondary,
+      },
     });
   } catch (error) {
     console.error('[GBP Category API] Error:', error);
@@ -101,14 +135,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing tenantId parameter' },
         { status: 400 }
-      );
-    }
-
-    // Feature gate
-    if (!isFeatureEnabled('FF_TENANT_GBP_CATEGORY_SYNC', tenantId)) {
-      return NextResponse.json(
-        { error: 'GBP category sync not enabled for this tenant' },
-        { status: 403 }
       );
     }
 

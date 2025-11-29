@@ -87,11 +87,22 @@ router.get('/search', async (req: Request, res: Response) => {
     const params: any[] = [];
     let paramIndex = 1;
 
-    // Category filter (uses flattened category_slug)
+    // Category filter (supports both ID and slug for backward compatibility)
     if (category && typeof category === 'string') {
-      conditions.push(`category_slug = $${paramIndex}`);
+      // Check if it's a category ID (starts with 'cat_') or slug
+      if (category.startsWith('cat_')) {
+        conditions.push(`category_id = $${paramIndex}`);
+      } else {
+        conditions.push(`category_slug = $${paramIndex}`);
+      }
       params.push(category);
       paramIndex++;
+    }
+
+    // Primary category filter (optional)
+    const { primaryOnly } = req.query;
+    if (primaryOnly === 'true') {
+      conditions.push('is_primary = true');
     }
 
     // Location filters
@@ -122,7 +133,7 @@ router.get('/search', async (req: Request, res: Response) => {
       orderByClause = 'is_featured DESC, rating_avg DESC NULLS LAST';
     }
 
-    // Query materialized view (FAST!)
+    // Query materialized view (FAST!) - Now with normalized categories
     const listingsQuery = `
       SELECT 
         id,
@@ -138,7 +149,12 @@ router.get('/search', async (req: Request, res: Response) => {
         website,
         latitude,
         longitude,
+        category_id,
+        category_name,
         category_slug,
+        google_category_id,
+        category_icon,
+        is_primary,
         logo_url,
         description,
         rating_avg,
@@ -168,11 +184,11 @@ router.get('/search', async (req: Request, res: Response) => {
     const total = parseInt(countResult.rows[0]?.count || '0');
     const totalPages = Math.ceil(total / limitNum);
 
-    // Transform to camelCase for frontend
+    // Transform to camelCase for frontend - Now with normalized category data
     const listings = listingsResult.rows.map((row: any) => ({
       id: row.id,
       tenantId: row.tenant_id,
-      business_name: row.business_name,
+      businessName: row.business_name,
       slug: row.slug,
       address: row.address,
       city: row.city,
@@ -183,14 +199,21 @@ router.get('/search', async (req: Request, res: Response) => {
       website: row.website,
       latitude: row.latitude,
       longitude: row.longitude,
-      category: row.category_slug,
+      category: {
+        id: row.category_id,
+        name: row.category_name,
+        slug: row.category_slug,
+        googleCategoryId: row.google_category_id,
+        icon: row.category_icon,
+        isPrimary: row.is_primary,
+      },
       logoUrl: row.logo_url,
       description: row.description,
       ratingAvg: row.rating_avg || 0,
       ratingCount: row.rating_count || 0,
       productCount: row.product_count || 0,
       isFeatured: row.is_featured || false,
-      subscription_tier: row.subscription_tier || 'trial',
+      subscriptionTier: row.subscription_tier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -221,11 +244,17 @@ router.get('/categories', async (req: Request, res: Response) => {
     const { minStores = '1' } = req.query;
     const minStoresNum = Math.max(0, Number(minStores));
 
-    // Query stats materialized view
+    // Query stats materialized view - Now with normalized categories and primary/secondary breakdown
     const statsQuery = `
       SELECT 
+        category_id,
+        category_name,
         category_slug,
+        google_category_id,
+        category_icon,
         store_count,
+        primary_store_count,
+        secondary_store_count,
         total_products,
         avg_rating,
         unique_locations,
@@ -234,7 +263,7 @@ router.get('/categories', async (req: Request, res: Response) => {
         featured_store_count,
         synced_store_count,
         first_store_added,
-        last_store_added
+        last_store_updated
       FROM directory_category_stats
       WHERE store_count >= $1
       ORDER BY store_count DESC
@@ -243,8 +272,14 @@ router.get('/categories', async (req: Request, res: Response) => {
     const result = await getDirectPool().query(statsQuery, [minStoresNum]);
 
     const categories = result.rows.map((row: any) => ({
+      id: row.category_id,
+      name: row.category_name,
       slug: row.category_slug,
+      googleCategoryId: row.google_category_id,
+      icon: row.category_icon,
       storeCount: row.store_count,
+      primaryStoreCount: row.primary_store_count,
+      secondaryStoreCount: row.secondary_store_count,
       totalProducts: row.total_products,
       avgRating: row.avg_rating || 0,
       uniqueLocations: row.unique_locations,
@@ -253,7 +288,7 @@ router.get('/categories', async (req: Request, res: Response) => {
       featuredStoreCount: row.featured_store_count,
       syncedStoreCount: row.synced_store_count,
       firstStoreAdded: row.first_store_added,
-      lastStoreAdded: row.last_store_added,
+      lastStoreAdded: row.last_store_updated,
     }));
 
     return res.json({
@@ -267,32 +302,42 @@ router.get('/categories', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/directory/mv/categories/:slug/stats
- * Get detailed stats for a specific category
+ * GET /api/directory/mv/categories/:idOrSlug/stats
+ * Get detailed stats for a specific category (by ID or slug)
  * Performance: <5ms
  */
-router.get('/categories/:slug/stats', async (req: Request, res: Response) => {
+router.get('/categories/:idOrSlug/stats', async (req: Request, res: Response) => {
   try {
-    const { slug } = req.params;
+    const { idOrSlug } = req.params;
 
+    // Support both category ID and slug
     const statsQuery = `
       SELECT 
+        category_id,
+        category_name,
         category_slug,
+        google_category_id,
+        category_icon,
         store_count,
+        primary_store_count,
+        secondary_store_count,
         total_products,
+        avg_products_per_store,
         avg_rating,
+        total_ratings,
         unique_locations,
         cities,
         states,
         featured_store_count,
         synced_store_count,
         first_store_added,
-        last_store_added
+        last_store_updated,
+        stats_generated_at
       FROM directory_category_stats
-      WHERE category_slug = $1
+      WHERE category_id = $1 OR category_slug = $1
     `;
     
-    const result = await getDirectPool().query(statsQuery, [slug]);
+    const result = await getDirectPool().query(statsQuery, [idOrSlug]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'category_not_found' });
@@ -300,17 +345,26 @@ router.get('/categories/:slug/stats', async (req: Request, res: Response) => {
 
     const row = result.rows[0];
     const stats = {
+      id: row.category_id,
+      name: row.category_name,
       slug: row.category_slug,
+      googleCategoryId: row.google_category_id,
+      icon: row.category_icon,
       storeCount: row.store_count,
+      primaryStoreCount: row.primary_store_count,
+      secondaryStoreCount: row.secondary_store_count,
       totalProducts: row.total_products,
+      avgProductsPerStore: row.avg_products_per_store,
       avgRating: row.avg_rating || 0,
+      totalRatings: row.total_ratings,
       uniqueLocations: row.unique_locations,
       cities: row.cities || [],
       states: row.states || [],
       featuredStoreCount: row.featured_store_count,
       syncedStoreCount: row.synced_store_count,
       firstStoreAdded: row.first_store_added,
-      lastStoreAdded: row.last_store_added,
+      lastStoreUpdated: row.last_store_updated,
+      statsGeneratedAt: row.stats_generated_at,
     };
 
     return res.json({ stats });
