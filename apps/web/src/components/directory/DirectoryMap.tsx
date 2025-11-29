@@ -42,6 +42,11 @@ export default function DirectoryMap({
   const validListings = listings.filter(l => l.latitude && l.longitude);
   const listingsWithoutCoords = listings.filter(l => !l.latitude || !l.longitude);
 
+  console.log('[DirectoryMap] Total listings:', listings.length);
+  console.log('[DirectoryMap] Valid listings (with coords):', validListings.length);
+  console.log('[DirectoryMap] Listings without coords:', listingsWithoutCoords.length);
+  console.log('[DirectoryMap] Valid listings data:', validListings);
+
   // Auto-geocode stores without coordinates
   const handleAutoGeocode = async (store: DirectoryListing) => {
     if (!store.address || !store.city || !store.zipCode || !store.country) {
@@ -113,111 +118,133 @@ export default function DirectoryMap({
   useEffect(() => {
     // Import Leaflet only on client side
     const initializeMap = async () => {
-      if (!mapContainerRef.current) return;
-
-      const L = (await import('leaflet')).default;
-      await import('leaflet/dist/leaflet.css');
-      await import('leaflet.markercluster/dist/MarkerCluster.css');
-      await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
-      await import('leaflet.markercluster');
-
-      // Initialize map only once
-      if (!mapRef.current) {
-        mapRef.current = L.map(mapContainerRef.current).setView(center, zoom);
-
-        // Add OpenStreetMap tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          maxZoom: 19,
-        }).addTo(mapRef.current);
-
-        // Initialize marker cluster group
-        markersRef.current = L.markerClusterGroup({
-          chunkedLoading: true,
-          spiderfyOnMaxZoom: true,
-          showCoverageOnHover: false,
-          zoomToBoundsOnClick: true,
-        });
-
-        mapRef.current.addLayer(markersRef.current);
+      console.log('[DirectoryMap] Initializing map...');
+      if (!mapContainerRef.current) {
+        console.log('[DirectoryMap] No map container ref');
+        return;
       }
 
-      // Clear existing markers
-      if (markersRef.current) {
-        markersRef.current.clearLayers();
-      }
+      try {
+        const L = (await import('leaflet')).default;
+        await import('leaflet/dist/leaflet.css');
+        await import('leaflet.markercluster/dist/MarkerCluster.css');
+        await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
+        await import('leaflet.markercluster');
 
-      // Add markers for listings with coordinates
-      if (validListings.length > 0 && markersRef.current) {
-        const bounds = L.latLngBounds([]);
+        console.log('[DirectoryMap] Leaflet imported successfully');
 
-        validListings.forEach((listing) => {
-          if (!listing.latitude || !listing.longitude) return;
+        // Initialize map only once
+        if (!mapRef.current) {
+          console.log('[DirectoryMap] Creating new map instance');
+          mapRef.current = L.map(mapContainerRef.current).setView(center, zoom);
 
-          // Determine marker style based on promotion status
-          const isPromoted = listing.isPromoted && listing.promotionTier;
-          const markerColor = isPromoted ? '#f59e0b' : '#2563eb'; // Gold for promoted, blue for regular
-          const markerSize: [number, number] = isPromoted ? [48, 48] : [40, 40]; // Larger for promoted
-          const iconAnchor: [number, number] = isPromoted ? [24, 48] : [20, 40];
+          // Add OpenStreetMap tiles
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19,
+          }).addTo(mapRef.current);
 
-          const marker = L.marker([listing.latitude, listing.longitude], {
-            icon: L.divIcon({
-              className: isPromoted ? 'custom-marker promoted-marker' : 'custom-marker',
-              html: `
-                <div class="marker-pin ${isPromoted ? 'promoted' : ''}">
-                  ${isPromoted ? '<div class="promoted-badge">⭐</div>' : ''}
-                  <div class="marker-icon" style="background: ${markerColor};">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                      <circle cx="12" cy="10" r="3"></circle>
-                    </svg>
-                  </div>
-                </div>
-              `,
-              iconSize: markerSize,
-              iconAnchor: iconAnchor,
-              popupAnchor: [0, isPromoted ? -48 : -40],
-            }),
-            // Promoted markers have higher z-index
-            zIndexOffset: isPromoted ? 1000 : 0,
+          // Initialize marker cluster group
+          markersRef.current = L.markerClusterGroup({
+            chunkedLoading: true,
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            zoomToBoundsOnClick: true,
           });
 
-          // Create popup content
-          const popupContent = `
-            <div class="map-popup ${isPromoted ? 'promoted' : ''}">
-              ${isPromoted ? '<div class="popup-promoted-badge">⭐ Promoted</div>' : ''}
-              ${listing.logoUrl ? `<img src="${listing.logoUrl}" alt="${listing.businessName}" class="popup-logo" />` : ''}
-              <h3 class="popup-title">${listing.businessName}</h3>
-              ${listing.primaryCategory ? `<p class="popup-category">${listing.primaryCategory}</p>` : ''}
-              ${listing.address ? `<p class="popup-address">${listing.address}</p>` : ''}
-              ${listing.city && listing.state ? `<p class="popup-location">${listing.city}, ${listing.state}</p>` : ''}
-              <div class="popup-stats">
-                ${listing.ratingAvg > 0 ? `<span>⭐ ${listing.ratingAvg.toFixed(1)}</span>` : ''}
-                ${listing.productCount > 0 ? `<span>📦 ${listing.productCount} products</span>` : ''}
-              </div>
-              <a href="/directory/${listing.slug}" class="popup-link">View Store →</a>
-            </div>
-          `;
-
-          marker.bindPopup(popupContent, {
-            maxWidth: 300,
-            className: 'custom-popup',
-          });
-
-          markersRef.current?.addLayer(marker);
-          bounds.extend([listing.latitude, listing.longitude]);
-        });
-
-        // Fit map to show all markers
-        if (bounds.isValid() && mapRef.current) {
-          mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+          mapRef.current.addLayer(markersRef.current);
+          console.log('[DirectoryMap] Map initialized successfully');
+        } else {
+          console.log('[DirectoryMap] Map already exists');
         }
-      }
 
-      // Show message for stores without coordinates
-      if (listingsWithoutCoords.length > 0 && validListings.length === 0 && mapRef.current) {
-        // Center on a reasonable location (e.g., center of USA)
-        mapRef.current.setView([39.8283, -98.5795], 4);
+        // Clear existing markers
+        if (markersRef.current) {
+          markersRef.current.clearLayers();
+          console.log('[DirectoryMap] Cleared existing markers');
+        }
+
+        // Add markers for listings with coordinates
+        if (validListings.length > 0 && markersRef.current) {
+          console.log('[DirectoryMap] Adding markers for', validListings.length, 'listings');
+          const bounds = L.latLngBounds([]);
+
+          validListings.forEach((listing) => {
+            if (!listing.latitude || !listing.longitude) return;
+
+            console.log('[DirectoryMap] Adding marker for:', listing.businessName, 'at', listing.latitude, listing.longitude);
+
+            // Determine marker style based on promotion status
+            const isPromoted = listing.isPromoted && listing.promotionTier;
+            const markerColor = isPromoted ? '#f59e0b' : '#2563eb'; // Gold for promoted, blue for regular
+            const markerSize: [number, number] = isPromoted ? [48, 48] : [40, 40]; // Larger for promoted
+            const iconAnchor: [number, number] = isPromoted ? [24, 48] : [20, 40];
+
+            const marker = L.marker([listing.latitude, listing.longitude], {
+              icon: L.divIcon({
+                className: isPromoted ? 'custom-marker promoted-marker' : 'custom-marker',
+                html: `
+                  <div class="marker-pin ${isPromoted ? 'promoted' : ''}">
+                    ${isPromoted ? '<div class="promoted-badge">⭐</div>' : ''}
+                    <div class="marker-icon" style="background: ${markerColor};">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                      </svg>
+                    </div>
+                  </div>
+                `,
+                iconSize: markerSize,
+                iconAnchor: iconAnchor,
+                popupAnchor: [0, isPromoted ? -48 : -40],
+              }),
+              // Promoted markers have higher z-index
+              zIndexOffset: isPromoted ? 1000 : 0,
+            });
+
+            // Create popup content
+            const popupContent = `
+              <div class="map-popup ${isPromoted ? 'promoted' : ''}">
+                ${isPromoted ? '<div class="popup-promoted-badge">⭐ Promoted</div>' : ''}
+                ${listing.logoUrl ? `<img src="${listing.logoUrl}" alt="${listing.businessName}" class="popup-logo" />` : ''}
+                <h3 class="popup-title">${listing.businessName}</h3>
+                ${listing.primaryCategory ? `<p class="popup-category">${listing.primaryCategory}</p>` : ''}
+                ${listing.address ? `<p class="popup-address">${listing.address}</p>` : ''}
+                ${listing.city && listing.state ? `<p class="popup-location">${listing.city}, ${listing.state}</p>` : ''}
+                <div class="popup-stats">
+                  ${listing.ratingAvg > 0 ? `<span>⭐ ${listing.ratingAvg.toFixed(1)}</span>` : ''}
+                  ${listing.productCount > 0 ? `<span>📦 ${listing.productCount} products</span>` : ''}
+                </div>
+                <a href="/directory/${listing.slug}" class="popup-link">View Store →</a>
+              </div>
+            `;
+
+            marker.bindPopup(popupContent, {
+              maxWidth: 300,
+              className: 'custom-popup',
+            });
+
+            markersRef.current?.addLayer(marker);
+            bounds.extend([listing.latitude, listing.longitude]);
+          });
+
+          // Fit map to show all markers
+          if (bounds.isValid() && mapRef.current) {
+            mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+            console.log('[DirectoryMap] Map fitted to bounds');
+          }
+        } else {
+          console.log('[DirectoryMap] No valid listings to display');
+        }
+
+        // Show message for stores without coordinates
+        if (listingsWithoutCoords.length > 0 && validListings.length === 0 && mapRef.current) {
+          // Center on a reasonable location (e.g., center of USA)
+          mapRef.current.setView([39.8283, -98.5795], 4);
+          console.log('[DirectoryMap] Centered on default location (no valid coordinates)');
+        }
+      } catch (error) {
+        console.error('[DirectoryMap] Error initializing map:', error);
       }
     };
 

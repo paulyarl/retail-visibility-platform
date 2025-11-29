@@ -21,5 +21,6 @@ interface MapWrapperProps {
 }
 
 export default function MapWrapper({ listings }: MapWrapperProps) {
+  console.log('[MapWrapper] Listings passed to map:', listings);
   return <DirectoryMap listings={listings} />;
 }
