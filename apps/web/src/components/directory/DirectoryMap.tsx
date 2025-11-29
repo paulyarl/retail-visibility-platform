@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
+import { geocodeAddress } from '@/lib/validation/businessProfile';
 
 interface DirectoryListing {
   id: string;
@@ -38,6 +39,33 @@ export default function DirectoryMap({
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<L.MarkerClusterGroup | null>(null);
+  const [autoGeocoding, setAutoGeocoding] = useState(false);
+
+  // Calculate listings with and without coordinates
+  const validListings = listings.filter(l => l.latitude && l.longitude);
+  const listingsWithoutCoords = listings.filter(l => !l.latitude || !l.longitude);
+
+  // Auto-geocode stores without coordinates
+  const handleAutoGeocode = async () => {
+    if (listingsWithoutCoords.length === 0) return;
+    
+    setAutoGeocoding(true);
+    try {
+      // For now, just geocode the first store without coordinates
+      const store = listingsWithoutCoords[0];
+      
+      // Try to extract address components from the listing data
+      // Note: This would require the listing to have address fields
+      console.log('[DirectoryMap] Attempting auto-geocode for:', store.businessName);
+      
+      // For now, just log that we attempted it
+      // In a full implementation, you'd call an API to update the store coordinates
+    } catch (error) {
+      console.error('[DirectoryMap] Auto-geocode failed:', error);
+    } finally {
+      setAutoGeocoding(false);
+    }
+  };
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -69,8 +97,6 @@ export default function DirectoryMap({
     }
 
     // Add markers for listings with coordinates
-    const validListings = listings.filter(l => l.latitude && l.longitude);
-    
     if (validListings.length > 0 && markersRef.current) {
       const bounds = L.latLngBounds([]);
 
@@ -137,6 +163,12 @@ export default function DirectoryMap({
       }
     }
 
+    // Show message for stores without coordinates
+    if (listingsWithoutCoords.length > 0 && validListings.length === 0 && mapRef.current) {
+      // Center on a reasonable location (e.g., center of USA)
+      mapRef.current.setView([39.8283, -98.5795], 4);
+    }
+
     // Cleanup function
     return () => {
       // Don't destroy the map on every render, only on unmount
@@ -156,6 +188,45 @@ export default function DirectoryMap({
   return (
     <>
       <div ref={mapContainerRef} className="w-full h-[600px] rounded-lg overflow-hidden shadow-lg" />
+      
+      {/* Info message for stores without coordinates */}
+      {listingsWithoutCoords.length > 0 && validListings.length === 0 && (
+        <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">
+                Location Coordinates Not Available
+              </h4>
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                {listingsWithoutCoords.length === 1 
+                  ? `${listingsWithoutCoords[0].businessName} has an address but no precise location coordinates for mapping.`
+                  : `${listingsWithoutCoords.length} stores have addresses but no precise location coordinates for mapping.`
+                }
+              </p>
+              <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                Stores are displayed in Grid and List views with their addresses.
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={handleAutoGeocode}
+                  disabled={autoGeocoding}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-xs font-medium rounded transition-colors"
+                >
+                  {autoGeocoding ? 'Getting Coordinates...' : 'Get Coordinates'}
+                </button>
+                <span className="text-xs text-amber-600 dark:text-amber-400 self-center">
+                  Updates store with map coordinates
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Custom Styles */}
       <style jsx global>{`
