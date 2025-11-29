@@ -25,6 +25,12 @@ interface DirectoryListing {
   website?: string;
   distance?: number;
   isOpen?: boolean;
+  category?: {
+    name: string;
+    slug: string;
+    isPrimary?: boolean;
+  };
+  gbpPrimaryCategoryName?: string;
 }
 
 interface DirectoryListProps {
@@ -136,9 +142,10 @@ export default function DirectoryList({ listings, loading }: DirectoryListProps)
                         <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {listing.businessName}
                         </h3>
-                        {listing.primaryCategory && (
+                        {/* Category - Context-aware display */}
+                        {(listing.category?.name || listing.gbpPrimaryCategoryName || listing.primaryCategory) && (
                           <p className="text-sm text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
-                            {listing.primaryCategory.replace(/_/g, ' ')}
+                            {listing.category?.name || listing.gbpPrimaryCategoryName || listing.primaryCategory?.replace(/_/g, ' ')}
                           </p>
                         )}
                       </div>
