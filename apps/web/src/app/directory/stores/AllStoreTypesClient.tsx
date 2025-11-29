@@ -12,6 +12,7 @@ interface StoreType {
   primaryStoreCount?: number;
   secondaryStoreCount?: number;
   description?: string;
+  icon?: string;
 }
 
 export default function AllStoreTypesClient() {
@@ -152,7 +153,7 @@ export default function AllStoreTypesClient() {
                   <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6 hover:shadow-lg hover:border-green-500 dark:hover:border-green-500 transition-all">
                     <div className="flex items-start gap-3">
                       <div className="shrink-0 w-12 h-12 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                        {type.icon}
+                        {type.icon || <Store className="w-6 h-6 text-green-600 dark:text-green-400" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-neutral-900 dark:text-white text-base mb-1 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">

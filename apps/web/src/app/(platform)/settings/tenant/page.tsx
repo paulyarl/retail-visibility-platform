@@ -367,13 +367,12 @@ export default function TenantSettingsPage() {
             {isFeatureEnabled('FF_TENANT_GBP_CATEGORY_SYNC', tenant.id, tenant.region) && profile && (
               <GBPCategoryCard
                 tenantId={tenant.id}
-                initialCategory={
-                  (profile as any).gbpCategoryId && (profile as any).gbpCategoryName
-                    ? { id: (profile as any).gbpCategoryId, name: (profile as any).gbpCategoryName }
+                initialPrimary={
+                  (profile as any).gbpPrimaryCategory
+                    ? { id: (profile as any).gbpPrimaryCategory.id, name: (profile as any).gbpPrimaryCategory.name }
                     : null
                 }
-                syncStatus={(profile as any).gbpCategorySyncStatus}
-                lastMirrored={(profile as any).gbpCategoryLastMirrored}
+                initialSecondary={(profile as any).gbpSecondaryCategories || []}
               />
             )}
 
