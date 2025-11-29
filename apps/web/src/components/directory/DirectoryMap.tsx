@@ -118,13 +118,13 @@ export default function DirectoryMap({
       try {
         const L = (await import('leaflet')).default;
         
-        // Import CSS files using dynamic imports with any type to avoid TypeScript errors
-        await Promise.all([
-          import('leaflet/dist/leaflet.css') as any,
-          import('leaflet.markercluster/dist/MarkerCluster.css') as any,
-          import('leaflet.markercluster/dist/MarkerCluster.Default.css') as any,
-          import('leaflet.markercluster') as any
-        ]);
+        // Import CSS files using require() to bypass TypeScript module checking
+        if (typeof window !== 'undefined') {
+          require('leaflet/dist/leaflet.css');
+          require('leaflet.markercluster/dist/MarkerCluster.css');
+          require('leaflet.markercluster/dist/MarkerCluster.Default.css');
+          await import('leaflet.markercluster');
+        }
 
         // Initialize map only once
         if (!mapRef.current) {
