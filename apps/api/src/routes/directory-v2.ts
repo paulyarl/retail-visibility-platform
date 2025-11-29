@@ -345,8 +345,8 @@ router.get('/:identifier', async (req: Request, res: Response) => {
         t.metadata->'gbp_categories'->'primary'->>'name' as primary_name,
         t.metadata->'gbp_categories'->'secondary' as secondary_categories
       FROM gbp_listing_categories glc
-      INNER JOIN tenants t ON t.id = glc.tenant_id
-      WHERE glc.tenant_id = $1
+      INNER JOIN tenants t ON t.id = $1
+      WHERE glc.listing_id = $1
       ORDER BY glc.is_primary DESC
     `;
     const gbpCategoriesResult = await getDirectPool().query(gbpCategoriesQuery, [row.tenant_id]);
