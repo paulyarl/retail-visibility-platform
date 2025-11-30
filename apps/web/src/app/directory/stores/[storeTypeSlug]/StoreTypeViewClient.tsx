@@ -9,6 +9,7 @@ import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 // Dynamically import map to avoid SSR issues
 const DirectoryMap = dynamic(() => import('@/components/directory/DirectoryMap'), {
@@ -75,6 +76,64 @@ export default function StoreTypeViewClient({
   const [error, setError] = useState<string | null>(null);
   const [storeType, setStoreType] = useState<StoreType | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+
+  // Track store type page view
+  useEffect(() => {
+    // Track store type browsing when component mounts
+    const formatStoreTypeName = (slug: string) => {
+      return slug
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    };
+
+    trackBehaviorClient({
+      entityType: 'category', // Use category for store types (they're similar)
+      entityId: storeTypeSlug,
+      entityName: formatStoreTypeName(storeTypeSlug),
+      context: {
+        store_type_slug: storeTypeSlug,
+        store_type_name: formatStoreTypeName(storeTypeSlug),
+        search_params: searchParams,
+        view_mode: viewMode
+      },
+      pageType: 'directory_home'
+    });
+  }, [storeTypeSlug]); // Only track once when store type changes
+
+  // Track view mode changes
+  useEffect(() => {
+    if (data) { // Only track after data is loaded
+      trackBehaviorClient({
+        entityType: 'category',
+        entityId: storeTypeSlug,
+        context: {
+          store_type_slug: storeTypeSlug,
+          action: 'view_mode_change',
+          view_mode: viewMode,
+          stores_count: data.pagination.totalItems
+        },
+        pageType: 'directory_home'
+      });
+    }
+  }, [viewMode, storeTypeSlug, data]);
+
+  // Track store interactions (clicks, etc.)
+  const handleStoreClick = (store: DirectoryListing) => {
+    trackBehaviorClient({
+      entityType: 'store',
+      entityId: store.tenantId,
+      entityName: store.businessName,
+      context: {
+        store_type_slug: storeTypeSlug,
+        source: 'store_type_page',
+        store_rating: store.ratingAvg,
+        store_product_count: store.productCount,
+        distance: store.distance
+      },
+      pageType: 'directory_home'
+    });
+  };
 
   // Fetch store type info and stores
   useEffect(() => {
@@ -266,6 +325,8 @@ export default function StoreTypeViewClient({
             listings={data?.listings || []}
             loading={loading}
             pagination={data?.pagination}
+            categorySlug={storeTypeSlug}
+            onStoreClick={handleStoreClick}
           />
         )}
 
@@ -273,14 +334,83 @@ export default function StoreTypeViewClient({
           <DirectoryList
             listings={data?.listings || []}
             loading={loading}
+            categorySlug={storeTypeSlug}
+            onStoreClick={handleStoreClick}
           />
         )}
 
         {viewMode === 'map' && (
           <DirectoryMap
             listings={data?.listings || []}
+            onStoreClick={handleStoreClick}
           />
         )}
+
+        {/* Store Type Recommendations */}
+        <StoreTypeRecommendations storeTypeSlug={storeTypeSlug} />
+      </div>
+    </div>
+  );
+}
+
+// Store Type Recommendations Component
+function StoreTypeRecommendations({ storeTypeSlug }: { storeTypeSlug: string }) {
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const response = await fetch(`${apiUrl}/api/recommendations/for-directory?storeType=${storeTypeSlug}`);
+        const data = await response.json();
+        setRecommendations(data.recommendations || []);
+      } catch (error) {
+        console.error('Error fetching store type recommendations:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecommendations();
+  }, [storeTypeSlug]);
+
+  if (loading || recommendations.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
+      <h2 className="text-xl font-semibold text-neutral-900 dark:text-white mb-6">
+        Recommended For You
+      </h2>
+      <div className="grid gap-4">
+        {recommendations.map((rec, index) => (
+          <Link
+            key={rec.tenantId}
+            href={`/directory/${rec.slug}`}
+            className="flex items-center justify-between p-4 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-green-500 dark:hover:border-green-400 transition-colors"
+          >
+            <div className="flex-1">
+              <h3 className="font-medium text-neutral-900 dark:text-white">
+                {rec.businessName}
+              </h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                {rec.address}
+              </p>
+              <p className="text-sm text-neutral-500">
+                {rec.city}, {rec.state}
+                {rec.distance && ` • ${rec.distance} mi`}
+              </p>
+              <p className="text-xs text-green-600 mt-2 font-medium">
+                {rec.reason}
+              </p>
+            </div>
+            <div className="ml-3 shrink-0">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   );

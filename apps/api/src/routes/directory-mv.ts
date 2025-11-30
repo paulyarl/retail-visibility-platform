@@ -11,6 +11,41 @@ import { Pool } from 'pg';
 
 const router = Router();
 
+// NEW: Activity score calculation utility
+function calculateActivityScore(lastUpdated: string, firstAdded: string): number {
+  if (!lastUpdated || !firstAdded) return 0;
+  
+  const now = new Date();
+  const lastUpdate = new Date(lastUpdated);
+  const firstAdd = new Date(firstAdded);
+  
+  const daysSinceLastUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24);
+  const daysSinceFirstAdd = (now.getTime() - firstAdd.getTime()) / (1000 * 60 * 60 * 24);
+  
+  // Higher score for recent activity and consistent updates
+  let activityScore = 0;
+  
+  // Recent activity bonus (higher for more recent updates)
+  if (daysSinceLastUpdate <= 7) {
+    activityScore += 50; // Very recent
+  } else if (daysSinceLastUpdate <= 30) {
+    activityScore += 30; // Recent
+  } else if (daysSinceLastUpdate <= 90) {
+    activityScore += 15; // Somewhat recent
+  } else if (daysSinceLastUpdate <= 365) {
+    activityScore += 5; // Not too old
+  }
+  
+  // Consistency bonus (categories that have been around longer)
+  if (daysSinceFirstAdd >= 365) {
+    activityScore += 10; // Established category
+  } else if (daysSinceFirstAdd >= 180) {
+    activityScore += 5; // Mature category
+  }
+  
+  return Math.min(100, activityScore); // Cap at 100
+}
+
 // Reuse the pool configuration from directory-v2
 const getPoolConfig = () => {
   let connectionString = process.env.DATABASE_URL;
@@ -241,11 +276,42 @@ router.get('/search', async (req: Request, res: Response) => {
  * GET /api/directory/mv/categories
  * Get all categories with stats from materialized view
  * Performance: <20ms
+ * NEW: Supports location parameters for proximity-based scoring
  */
 router.get('/categories', async (req: Request, res: Response) => {
   try {
-    const { minStores = '1' } = req.query;
+    const { minStores = '1', lat, lng, city, state } = req.query;
     const minStoresNum = Math.max(0, Number(minStores));
+    
+    // NEW: Calculate proximity metrics if location provided
+    let proximityCalculation = '';
+    let proximityJoin = '';
+    if (lat && lng) {
+      proximityJoin = `
+        LEFT JOIN LATERAL (
+          SELECT 
+            COUNT(*) as nearby_stores,
+            AVG(
+              3959 * ACOS(
+                COS(RADIANS($2)) * COS(RADIANS(dcl.latitude)) * 
+                COS(RADIANS(dcl.longitude) - RADIANS($3)) + 
+                SIN(RADIANS($2)) * SIN(RADIANS(dcl.latitude))
+              )
+            ) as avg_distance
+          FROM directory_listings_list dcl
+          WHERE dcl.category_id = dcs.category_id
+            AND dcl.tenant_exists = true
+            AND dcl.is_active_location = true
+            AND dcl.is_directory_visible = true
+            AND dcl.latitude IS NOT NULL 
+            AND dcl.longitude IS NOT NULL
+        ) proximity ON true
+      `;
+      proximityCalculation = `
+        proximity.nearby_stores,
+        proximity.avg_distance,
+      `;
+    }
 
     // Query stats materialized view - Now with normalized categories and primary/secondary breakdown
     const statsQuery = `
@@ -267,12 +333,15 @@ router.get('/categories', async (req: Request, res: Response) => {
         synced_store_count,
         first_store_added,
         last_store_updated
-      FROM directory_category_stats
+        ${proximityCalculation}
+      FROM directory_category_stats dcs
+      ${proximityJoin}
       WHERE store_count >= $1
       ORDER BY store_count DESC
     `;
     
-    const result = await getDirectPool().query(statsQuery, [minStoresNum]);
+    const params = lat && lng ? [minStoresNum, Number(lat), Number(lng)] : [minStoresNum];
+    const result = await getDirectPool().query(statsQuery, params);
 
     const categories = result.rows.map((row: any) => ({
       id: row.category_id,
@@ -283,7 +352,7 @@ router.get('/categories', async (req: Request, res: Response) => {
       storeCount: row.store_count,
       primaryStoreCount: row.primary_store_count,
       secondaryStoreCount: row.secondary_store_count,
-      totalProducts: row.total_products,
+      productCount: row.total_products,
       avgRating: row.avg_rating || 0,
       uniqueLocations: row.unique_locations,
       cities: row.cities || [],
@@ -291,7 +360,12 @@ router.get('/categories', async (req: Request, res: Response) => {
       featuredStoreCount: row.featured_store_count,
       syncedStoreCount: row.synced_store_count,
       firstStoreAdded: row.first_store_added,
-      lastStoreAdded: row.last_store_updated,
+      lastStoreUpdated: row.last_store_updated,
+      // NEW: Proximity metrics (if location provided)
+      nearbyStoreCount: row.nearby_stores || 0,
+      avgDistance: row.avg_distance || 0,
+      // NEW: Activity score based on recent updates
+      recentActivityScore: calculateActivityScore(row.last_store_updated, row.first_store_added),
     }));
 
     return res.json({

@@ -3,12 +3,14 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import { Pagination } from '@/components/ui';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
 import TenantMapSection from '@/components/tenant/TenantMapSection';
 import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductDisplay from '@/components/storefront/ProductDisplay';
-import CategorySidebar from '@/components/storefront/CategorySidebar';
+import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
+import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 import LocationClosedBanner from '@/components/storefront/LocationClosedBanner';
@@ -64,6 +66,8 @@ interface Category {
   slug: string;
   count: number;
   googleCategoryId: string | null;
+  category_type?: string;
+  is_primary?: boolean;
 }
 
 interface PageProps {
@@ -126,20 +130,65 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch map location using utility
     const mapLocation = await getTenantMapLocation(tenantId);
 
-    // Fetch categories with counts
+    // Fetch categories with counts - using new separate endpoints
     let categories: Category[] = [];
+    let productCategories: Category[] = [];
+    let storeCategories: Category[] = [];
     let uncategorizedCount = 0;
     try {
-      const categoriesRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/categories`, {
+      // Fetch product-level categories
+      const productCategoriesRes = await fetch(`${apiBaseUrl}/api/categories/product-level/${tenantId}`, {
         cache: 'no-store',
       });
-      if (categoriesRes.ok) {
-        const categoriesData = await categoriesRes.json();
-        categories = categoriesData.categories || [];
-        uncategorizedCount = categoriesData.uncategorizedCount || 0;
+      if (productCategoriesRes.ok) {
+        const productCategoriesData = await productCategoriesRes.json();
+        let rawProductCategories = productCategoriesData.data?.categories || [];
+        
+        // Deduplicate by keeping tenant categories over platform categories for same name
+        const deduplicatedProductCategories = rawProductCategories.reduce((acc: Category[], cat: Category) => {
+          const existing = acc.find(existing => existing.name.toLowerCase() === cat.name.toLowerCase());
+          if (!existing) {
+            acc.push(cat);
+          } else {
+            // Keep tenant categories over platform categories
+            if (cat.category_type === 'tenant' && existing.category_type === 'platform') {
+              const index = acc.indexOf(existing);
+              acc[index] = cat;
+            }
+          }
+          return acc;
+        }, []);
+        
+        productCategories = deduplicatedProductCategories;
       }
+
+      // Fetch store-level categories
+      const storeCategoriesRes = await fetch(`${apiBaseUrl}/api/categories/store-level/${tenantId}`, {
+        cache: 'no-store',
+      });
+      if (storeCategoriesRes.ok) {
+        const storeCategoriesData = await storeCategoriesRes.json();
+        storeCategories = storeCategoriesData.data?.categories || [];
+      }
+
+      // For backward compatibility, combine all categories
+      categories = [...productCategories, ...storeCategories];
+      uncategorizedCount = 0; // No uncategorized in new structure
     } catch (e) {
       console.error('Failed to fetch categories:', e);
+      // Fallback to old endpoint
+      try {
+        const categoriesRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/categories`, {
+          cache: 'no-store',
+        });
+        if (categoriesRes.ok) {
+          const categoriesData = await categoriesRes.json();
+          categories = categoriesData.categories || [];
+          uncategorizedCount = categoriesData.uncategorizedCount || 0;
+        }
+      } catch (fallbackError) {
+        console.error('Failed to fetch categories (fallback):', fallbackError);
+      }
     }
 
     // Fetch products for this tenant with optional search and category filter
@@ -184,9 +233,9 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     const storeStatus = computeStoreStatus(businessHours);
     
     // Find current category name if filtering
-    const currentCategory = category ? categories.find(c => c.slug === category) : null;
+    const currentCategory = category ? categories.find((c: Category) => c.slug === category) : null;
     
-    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, uncategorizedCount, currentCategory };
+    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -229,12 +278,17 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     notFound();
   }
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, uncategorizedCount, currentCategory } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
   const totalPages = Math.ceil(total / limit);
   
-  // Calculate total products across all categories (for sidebar "All Products" count)
-  const totalAllProducts = categories.reduce((sum: number, cat: any) => sum + (cat.count || 0), 0) + (uncategorizedCount || 0);
+  // Find primary store category for header badge
+  const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary);
+  
+  // Calculate total products - use store categories count (all products) or fallback to total from API
+  const totalAllProducts = storeCategories.length > 0 
+    ? storeCategories[0].count || 0  // Store categories all have same count (all products)
+    : total || 0;  // Fallback to API total
   
   // Get tier features for footer
   const tier = tenant.subscriptionTier || 'trial';
@@ -335,11 +389,56 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
               </div>
             )}
             <div>
-              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">
-                {businessName}
-              </h1>
+              <div className="flex items-center gap-3 mb-3">
+                <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">
+                  {businessName}
+                </h1>
+              </div>
+              
+              {/* Store Type Categories Pane */}
+              {storeCategories && storeCategories.length > 0 && (
+                <div className="inline-flex flex-wrap gap-2 p-3 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-700/50">
+                  {storeCategories
+                    .sort((a: Category, b: Category) => {
+                      if (a.is_primary && !b.is_primary) return -1;
+                      if (!a.is_primary && b.is_primary) return 1;
+                      return a.name.localeCompare(b.name);
+                    })
+                    .map((category: Category) => (
+                      <div
+                        key={category.id}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          category.is_primary
+                            ? 'bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600'
+                            : 'bg-white/60 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600'
+                        }`}
+                      >
+                        <span className="text-base">
+                          {category.name === 'Grocery store' && '🏪'}
+                          {category.name === 'Electronics store' && '🛍️'}
+                          {category.name === 'Shoe store' && '👟'}
+                          {category.name === 'Supermarket' && '🛒'}
+                          {category.name === 'Clothing store' && '👕'}
+                          {category.name === 'Hardware store' && '🔧'}
+                          {category.name === 'Restaurant' && '🍽️'}
+                          {category.name === 'Pharmacy' && '💊'}
+                          {category.name === 'Bookstore' && '📚'}
+                          {category.name === 'Pet store' && '🐕'}
+                          {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(category.name) && '🏢'}
+                        </span>
+                        <span>{category.name}</span>
+                        {category.is_primary && (
+                          <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-full">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+              
               {storeStatus && (
-                <p className="text-neutral-600 dark:text-neutral-400 mt-2 flex items-center gap-2">
+                <p className="text-neutral-600 dark:text-neutral-400 mt-3 flex items-center gap-2">
                   <span className={`inline-block w-2 h-2 rounded-full ${storeStatus.isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
                   {storeStatus.label}
                 </p>
@@ -380,24 +479,32 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
       {/* Products Section with Sidebar */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Category Sidebar - Desktop */}
-          {categories.length > 0 && (
-            <aside className="hidden lg:block lg:col-span-1">
-              <CategorySidebar 
+          {/* Product Categories Sidebar - Desktop */}
+          {productCategories.length > 0 && (
+            <aside className="hidden lg:block lg:col-span-1 space-y-6">
+              <ProductCategorySidebar 
                 tenantId={id} 
-                categories={categories} 
+                categories={productCategories} 
                 totalProducts={totalAllProducts} 
               />
+              
+              {/* GBP Categories Navigation */}
+              {storeCategories.length > 0 && (
+                <GBPCategoriesNav 
+                  tenantId={id} 
+                  categories={storeCategories} 
+                />
+              )}
             </aside>
           )}
 
           {/* Main Content */}
-          <div className={categories.length > 0 ? "lg:col-span-3" : "lg:col-span-4"}>
+          <div className={productCategories.length > 0 ? "lg:col-span-3" : "lg:col-span-4"}>
             {/* Mobile Category Dropdown */}
-            {categories.length > 0 && (
+            {productCategories.length > 0 && (
               <CategoryMobileDropdown 
                 tenantId={id} 
-                categories={categories} 
+                categories={productCategories} 
                 totalProducts={totalAllProducts} 
               />
             )}
@@ -481,6 +588,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           <>
             {/* Product Display with Grid/List Toggle */}
             <ProductDisplay products={products} tenantId={id} />
+
+            {/* Storefront Recommendations */}
+            <StorefrontRecommendations tenantId={id} />
 
             {/* Pagination */}
             {totalPages > 1 && (
@@ -786,7 +896,11 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
                   {/* Email */}
                   {tenant.metadata?.email && (
-                    <a href={`mailto:${tenant.metadata?.email}`} className="flex items-center gap-2 hover:text-primary-600 dark:hover:text-primary-400">
+                    <a 
+                      href={`mailto:${tenant.metadata?.email}`} 
+                      className="flex items-center gap-2 hover:text-primary-600 dark:hover:text-primary-400"
+                      suppressHydrationWarning={true}
+                    >
                       <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
@@ -892,6 +1006,71 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           )}
         </div>
       </footer>
+    </div>
+  );
+}
+
+// Storefront Recommendations Component
+function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const response = await fetch(`${apiUrl}/api/recommendations/for-storefront/${tenantId}`);
+        const data = await response.json();
+        setRecommendations(data.recommendations || []);
+      } catch (error) {
+        console.error('Error fetching storefront recommendations:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecommendations();
+  }, [tenantId]);
+
+  if (loading || recommendations.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
+      <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white mb-6">
+        You Might Also Like
+      </h2>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {recommendations.map((rec, index) => (
+          <Link
+            key={rec.tenantId}
+            href={`/directory/${rec.slug}`}
+            className="block p-6 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-green-500 dark:hover:border-green-400 transition-all hover:shadow-lg"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="font-semibold text-neutral-900 dark:text-white text-lg">
+                  {rec.businessName}
+                </h3>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  {rec.address}
+                </p>
+                <p className="text-sm text-neutral-500">
+                  {rec.city}, {rec.state}
+                  {rec.distance && ` • ${rec.distance} mi`}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-green-600 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">
+                {rec.reason}
+              </p>
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

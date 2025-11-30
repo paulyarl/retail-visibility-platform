@@ -9,6 +9,7 @@ import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 // Dynamically import map to avoid SSR issues
 const DirectoryMap = dynamic(() => import('@/components/directory/DirectoryMap'), {
@@ -88,6 +89,58 @@ export default function CategoryViewClient({
       .split('-')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
+  };
+
+  // Track category page view
+  useEffect(() => {
+    // Track category browsing when component mounts
+    trackBehaviorClient({
+      entityType: 'category',
+      entityId: categorySlug, // Use slug as ID for now
+      entityName: formatCategoryName(categorySlug),
+      context: {
+        category_slug: categorySlug,
+        category_name: formatCategoryName(categorySlug),
+        search_params: searchParams,
+        view_mode: viewMode
+      },
+      pageType: 'directory_home'
+    });
+  }, [categorySlug]); // Only track once when category changes
+
+  // Track view mode changes
+  useEffect(() => {
+    if (data) { // Only track after data is loaded
+      trackBehaviorClient({
+        entityType: 'category',
+        entityId: categorySlug,
+        context: {
+          category_slug: categorySlug,
+          action: 'view_mode_change',
+          view_mode: viewMode,
+          stores_count: data.pagination.totalItems,
+          primary_only: primaryOnly
+        },
+        pageType: 'directory_home'
+      });
+    }
+  }, [viewMode, primaryOnly, categorySlug, data]);
+
+  // Track store interactions (clicks, etc.)
+  const handleStoreClick = (store: DirectoryListing) => {
+    trackBehaviorClient({
+      entityType: 'store',
+      entityId: store.tenantId,
+      entityName: store.businessName,
+      context: {
+        category_slug: categorySlug,
+        source: 'category_page',
+        store_rating: store.ratingAvg,
+        store_product_count: store.productCount,
+        distance: store.distance
+      },
+      pageType: 'directory_home'
+    });
   };
 
   // Fetch category info and stores
@@ -307,6 +360,8 @@ export default function CategoryViewClient({
             listings={data?.listings || []}
             loading={loading}
             pagination={data?.pagination}
+            categorySlug={categorySlug}
+            onStoreClick={handleStoreClick}
           />
         )}
 
@@ -314,12 +369,15 @@ export default function CategoryViewClient({
           <DirectoryList
             listings={data?.listings || []}
             loading={loading}
+            categorySlug={categorySlug}
+            onStoreClick={handleStoreClick}
           />
         )}
 
         {viewMode === 'map' && (
           <DirectoryMap
             listings={data?.listings || []}
+            onStoreClick={handleStoreClick}
           />
         )}
       </div>

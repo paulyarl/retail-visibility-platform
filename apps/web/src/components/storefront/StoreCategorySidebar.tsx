@@ -12,22 +12,40 @@ interface Category {
   is_primary?: boolean;
 }
 
-interface CategorySidebarProps {
+interface StoreCategorySidebarProps {
   tenantId: string;
   categories: Category[];
   totalProducts: number;
 }
 
-export default function CategorySidebar({ tenantId, categories, totalProducts }: CategorySidebarProps) {
+export default function StoreCategorySidebar({ tenantId, categories, totalProducts }: StoreCategorySidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentCategory = searchParams.get('category');
 
+  // Sort categories: primary first, then secondary alphabetically
+  const sortedCategories = [...categories].sort((a, b) => {
+    if (a.is_primary && !b.is_primary) return -1; // a comes first
+    if (!a.is_primary && b.is_primary) return 1;  // b comes first
+    return a.name.localeCompare(b.name); // both secondary, sort alphabetically
+  });
+
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-      <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-        Categories
-      </h2>
+      <div className="flex items-center gap-2 mb-4">
+        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
+          Browse by Store Type
+        </h2>
+        <span className="px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">
+          Store Categories
+        </span>
+      </div>
+      
+      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+        <p className="text-sm text-blue-700 dark:text-blue-300">
+          <strong>Note:</strong> Store categories include all {totalProducts} products in this store.
+        </p>
+      </div>
       
       <nav className="space-y-1">
         {/* All Products */}
@@ -49,8 +67,8 @@ export default function CategorySidebar({ tenantId, categories, totalProducts }:
           </span>
         </Link>
 
-        {/* Category List */}
-        {categories.map((category) => (
+        {/* Store Category List */}
+        {sortedCategories.map((category) => (
           <Link
             key={category.id}
             href={`/tenant/${tenantId}?category=${category.slug}`}
@@ -82,7 +100,7 @@ export default function CategorySidebar({ tenantId, categories, totalProducts }:
       {/* Empty State */}
       {categories.length === 0 && (
         <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center py-4">
-          No categories yet
+          No store categories yet
         </p>
       )}
     </div>

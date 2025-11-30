@@ -3,6 +3,7 @@ import { authenticateToken, checkTenantAccess } from '../../middleware/auth';
 
 // Directory routes - re-enabled for localhost testing
 import directoryRoutes from '../directory-v2';
+import enhancedDirectoryRoutes from '../ENHANCED_DIRECTORY_ROUTES'; // NEW: Enhanced routes with 3-category support
 import directoryMvRoutes from '../directory-mv'; // NEW: Materialized views (10,000x faster)
 import directoryTenantRoutes from '../directory-tenant';
 import directoryAdminRoutes from '../directory-admin';
@@ -34,6 +35,7 @@ export function mountDirectoryRoutes(app: Express) {
   // Category routes handle: /api/directory/categories/*
   // These routes handle: /api/directory/search, /api/directory/locations, etc.
   app.use('/api/directory', directoryRoutes); // Public directory endpoint - no auth required
+  app.use('/api/directory/enhanced', enhancedDirectoryRoutes); // Enhanced routes with 3-category support
   app.use('/api/admin/directory', directoryAdminRoutes); // Admin directory management (auth in routes)
   app.use('/api/support/directory', directorySupportRoutes); // Support directory tools (auth in routes)
   
@@ -41,5 +43,5 @@ export function mountDirectoryRoutes(app: Express) {
   app.use('/api/tenants', directoryTenantRoutes); // Tenant directory management (auth in routes)
   console.log('✅ Directory listings routes mounted (directory_listings table)');
 
-  console.log('✅ Directory routes mounted');
+  console.log('✅ Directory routes mounted (enhanced with 3-category support)');
 }

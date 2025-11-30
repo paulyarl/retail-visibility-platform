@@ -12,22 +12,27 @@ interface Category {
   is_primary?: boolean;
 }
 
-interface CategorySidebarProps {
+interface ProductCategorySidebarProps {
   tenantId: string;
   categories: Category[];
   totalProducts: number;
 }
 
-export default function CategorySidebar({ tenantId, categories, totalProducts }: CategorySidebarProps) {
+export default function ProductCategorySidebar({ tenantId, categories, totalProducts }: ProductCategorySidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentCategory = searchParams.get('category');
 
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-      <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-        Categories
-      </h2>
+      <div className="flex items-center gap-2 mb-4">
+        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
+          Browse by Product Type
+        </h2>
+        <span className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+          Product Categories
+        </span>
+      </div>
       
       <nav className="space-y-1">
         {/* All Products */}
@@ -49,7 +54,7 @@ export default function CategorySidebar({ tenantId, categories, totalProducts }:
           </span>
         </Link>
 
-        {/* Category List */}
+        {/* Product Category List */}
         {categories.map((category) => (
           <Link
             key={category.id}
@@ -60,14 +65,7 @@ export default function CategorySidebar({ tenantId, categories, totalProducts }:
                 : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <span>{category.name}</span>
-              {category.is_primary && (
-                <span className="px-2 py-1 text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full">
-                  Primary
-                </span>
-              )}
-            </div>
+            <span>{category.name}</span>
             <span className={`text-sm ${
               currentCategory === category.slug
                 ? 'text-primary-600 dark:text-primary-400'
@@ -82,7 +80,7 @@ export default function CategorySidebar({ tenantId, categories, totalProducts }:
       {/* Empty State */}
       {categories.length === 0 && (
         <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center py-4">
-          No categories yet
+          No product categories yet
         </p>
       )}
     </div>

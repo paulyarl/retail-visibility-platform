@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Store, ChevronRight } from 'lucide-react';
+import { calculatePopularityScore, SCORING_PRESETS, type CategoryMetrics, useSortedCategories } from '@/utils/popularityScoring';
 
 interface StoreType {
   name: string;
@@ -24,10 +25,23 @@ export default function DirectoryStoreTypeBrowser({
 }: DirectoryStoreTypeBrowserProps) {
   const router = useRouter();
 
-  // Show top store types (most stores)
-  const topTypes = [...storeTypes]
-    .sort((a, b) => b.storeCount - a.storeCount)
-    .slice(0, 12);
+  // Convert store types to CategoryMetrics format for scoring
+  const convertedStoreTypes = storeTypes.map(type => ({
+    id: type.slug,
+    slug: type.slug,
+    name: type.name,
+    icon: '🏪', // Default icon for store types
+    storeCount: type.storeCount,
+    productCount: 0, // Store types don't have product counts
+  } as CategoryMetrics));
+
+  // Use memoized hook for performance optimization
+  // NEW: Use LOCATION_AWARE preset for proximity-based scoring
+  const topStoreTypes = useSortedCategories(
+    convertedStoreTypes, 
+    12, 
+    SCORING_PRESETS.LOCATION_AWARE
+  );
 
   const handleTypeClick = (slug: string) => {
     router.push(`/directory/stores/${slug}`);
@@ -56,7 +70,7 @@ export default function DirectoryStoreTypeBrowser({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {topTypes.map((type) => (
+        {topStoreTypes.map((type: any) => (
           <button
             key={type.slug}
             onClick={() => handleTypeClick(type.slug)}
@@ -69,7 +83,7 @@ export default function DirectoryStoreTypeBrowser({
               }
             `}
           >
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+            <div className="shrink-0 w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-2xl">
               <Store className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
             <div className="flex-1 text-left min-w-0">

@@ -32,6 +32,77 @@ async function getStoreListing(identifier: string) {
   }
 }
 
+async function getStoreTypeCounts() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  
+  try {
+    const res = await fetch(`${apiUrl}/api/directory/store-type-counts`, {
+      next: { revalidate: 300 }, // Revalidate every 5 minutes
+    });
+
+    if (!res.ok) {
+      console.error('Store type counts API failed:', res.status, res.statusText);
+      return {};
+    }
+
+    const data = await res.json();
+    console.log('Store type counts response:', data);
+    return data.data?.storeTypeCounts || data.data?.store_type_counts || {};
+  } catch (error) {
+    console.error('Error fetching store type counts:', error);
+    return {};
+  }
+}
+
+async function getGbpCategoryCounts() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  
+  try {
+    const res = await fetch(`${apiUrl}/api/directory/categories-optimized/gbp-counts`, {
+      next: { revalidate: 300 }, // Revalidate every 5 minutes
+    });
+
+    if (!res.ok) {
+      console.error('GBP category counts API failed:', res.status, res.statusText);
+      return {};
+    }
+
+    const data = await res.json();
+    console.log('GBP category counts response:', data);
+    
+    // Convert categories array to slug->count mapping for easy lookup
+    const categoryCounts: Record<string, number> = {};
+    if (data.categories && Array.isArray(data.categories)) {
+      data.categories.forEach((category: any) => {
+        // Use categorySlug first, fallback to category_slug
+        const slug = category.categorySlug || category.category_slug;
+        const stores = category.totalStores || category.total_stores;
+        categoryCounts[slug] = parseInt(stores) || 0;
+        
+        // Also map category name to slug for common categories
+        const categoryName = category.categoryName || category.category_name;
+        const nameSlug = categoryName
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+          .replace(/\s+/g, '-') // Replace spaces with hyphens
+          .replace(/-+/g, '-') // Remove duplicate hyphens
+          .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+        
+        categoryCounts[nameSlug] = parseInt(stores) || 0;
+      });
+    }
+    
+    // Add fallback for common categories that might not exist
+    categoryCounts['international'] = categoryCounts['international'] || 0;
+    categoryCounts['international-foods'] = categoryCounts['international-foods'] || 0;
+    
+    return categoryCounts;
+  } catch (error) {
+    console.error('Error fetching GBP category counts:', error);
+    return {};
+  }
+}
+
 async function getStorefrontCategories(tenantId: string) {
   const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   
@@ -140,6 +211,120 @@ async function getRelatedProducts(categorySlug: string, excludeTenantId: string,
   }
 }
 
+// NEW: Track store view for recommendations
+async function trackStoreView(tenantId: string, categories: any[] = []) {
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  
+  try {
+    // Get user location (reuse existing logic)
+    const location = await getUserLocation();
+    
+    // Get primary category for context
+    const primaryCategory = categories.find((c: any) => c.isPrimary) || categories[0];
+    
+    await fetch(`${apiUrl}/api/recommendations/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entityType: 'store',
+        entityId: tenantId,
+        entityName: '', // Will be populated by API
+        context: {
+          category_id: primaryCategory?.id,
+          category_slug: primaryCategory?.slug,
+          categories: categories.map((c: any) => ({ id: c.id, slug: c.slug }))
+        },
+        locationLat: location?.latitude,
+        locationLng: location?.longitude,
+        referrer: typeof document !== 'undefined' ? document.referrer : '',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        pageType: 'directory_detail'
+      })
+    });
+  } catch (error) {
+    console.error('Error tracking store view:', error);
+    // Don't throw - tracking failures shouldn't break the page
+  }
+}
+
+// NEW: Get store recommendations
+async function getStoreRecommendations(tenantId: string, categorySlug?: string) {
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  
+  try {
+    // Get user location
+    const location = await getUserLocation();
+    
+    const params = new URLSearchParams();
+    if (categorySlug) params.append('categorySlug', categorySlug);
+    if (location) {
+      params.append('lat', location.latitude.toString());
+      params.append('lng', location.longitude.toString());
+    }
+    
+    const response = await fetch(`${apiUrl}/api/recommendations/for-store/${tenantId}?${params}`);
+    
+    if (!response.ok) return { recommendations: [] };
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting recommendations:', error);
+    return { recommendations: [] };
+  }
+}
+
+// NEW: Get user location (reuse from DirectoryClient)
+async function getUserLocation(): Promise<{
+  latitude: number;
+  longitude: number;
+  city: string;
+  state: string;
+} | null> {
+  try {
+    // Try browser geolocation first
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 10000,
+          enableHighAccuracy: true
+        });
+      });
+      
+      const { latitude, longitude } = position.coords;
+      
+      // Reverse geocoding to get city/state
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
+      );
+      const data = await response.json();
+      
+      const address = data.address || {};
+      const city = address.city || address.town || address.village || 'Unknown';
+      const state = address.state || 'Unknown';
+      
+      return { latitude, longitude, city, state };
+    }
+  } catch (error) {
+    console.warn('Geolocation failed, falling back to IP-based location');
+  }
+  
+  // Fallback to IP-based location
+  try {
+    const response = await fetch('https://ipapi.co/json/');
+    const data = await response.json();
+    
+    return {
+      latitude: data.latitude || 0,
+      longitude: data.longitude || 0,
+      city: data.city || 'Unknown',
+      state: data.region || 'Unknown'
+    };
+  } catch (error) {
+    console.warn('IP location failed, using default');
+    return null;
+  }
+}
+
 export async function generateMetadata({ params }: StoreDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
   const listing = await getStoreListing(slug);
@@ -185,11 +370,20 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   const { categories: storefrontCategories, uncategorizedCount } = await getStorefrontCategories(listing.tenant_id);
   const totalProducts = storefrontCategories.reduce((sum: number, cat: any) => sum + (cat.count || 0), 0) + uncategorizedCount;
 
+  // Fetch store type counts for sidebar
+  const storeTypeCounts = await getStoreTypeCounts();
+
+  // Fetch GBP category counts for sidebar
+  const gbpCategoryCounts = await getGbpCategoryCounts();
+
   // Fetch business profile for social links
   const businessProfile = await getBusinessProfile(listing.tenant_id);
 
   // Fetch products (all powered by materialized view!)
   const featuredProducts = await getFeaturedProducts(listing.tenant_id, 6);
+  
+  // NEW: Track user behavior for recommendations
+  await trackStoreView(listing.tenant_id, listing.categories);
   
   const fullAddress = [
     listing.address,
@@ -207,6 +401,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   // Get primary category for related stores and products
   const primaryCategory = listing.categories?.find((c: any) => c.isPrimary) || listing.categories?.[0];
   const relatedProducts = primaryCategory ? await getRelatedProducts(primaryCategory.slug, listing.tenant_id, 6) : [];
+  
+  // NEW: Get recommendations for this store
+  const recommendations = await getStoreRecommendations(listing.tenant_id, primaryCategory?.slug);
 
   return (
     <>
@@ -243,32 +440,58 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
                     Store Type
                   </h2>
-                  <div className="space-y-2">
-                    {listing.gbpCategories.filter((c: any) => c.isPrimary).map((category: any) => (
-                      <Link
-                        key={category.id}
-                        href={`/directory/stores/${category.slug}`}
-                        className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors group"
-                      >
-                        <span className="text-sm text-blue-900 font-semibold">
-                          {category.name}
-                        </span>
-                        <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                          Primary
-                        </span>
-                      </Link>
-                    ))}
-                    {listing.gbpCategories.filter((c: any) => !c.isPrimary).map((category: any) => (
-                      <Link
-                        key={category.id}
-                        href={`/directory/stores/${category.slug}`}
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
-                      >
-                        <span className="text-sm text-gray-700 group-hover:text-blue-600">
-                          {category.name}
-                        </span>
-                      </Link>
-                    ))}
+                  
+                  {/* Store Type Categories Pane */}
+                  <div className="inline-flex flex-wrap gap-2 p-3 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-700/50 mb-4">
+                    {listing.gbpCategories
+                      .sort((a: any, b: any) => {
+                        if (a.isPrimary && !b.isPrimary) return -1;
+                        if (!a.isPrimary && b.isPrimary) return 1;
+                        return a.name.localeCompare(b.name);
+                      })
+                      .map((category: any) => (
+                        <Link
+                          key={category.id}
+                          href={`/directory/stores/${category.slug}`}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80 ${
+                            category.isPrimary
+                              ? 'bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600'
+                              : 'bg-white/60 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600'
+                          }`}
+                        >
+                          <span className="text-base">
+                            {category.name === 'Grocery store' && '🏪'}
+                            {category.name === 'Electronics store' && '🛍️'}
+                            {category.name === 'Shoe store' && '👟'}
+                            {category.name === 'Supermarket' && '🛒'}
+                            {category.name === 'Clothing store' && '👕'}
+                            {category.name === 'Hardware store' && '🔧'}
+                            {category.name === 'Restaurant' && '🍽️'}
+                            {category.name === 'Pharmacy' && '💊'}
+                            {category.name === 'Bookstore' && '📚'}
+                            {category.name === 'Pet store' && '🐕'}
+                            {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(category.name) && '🏢'}
+                          </span>
+                          <span>{category.name}</span>
+                          <span className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded-full">
+                            {storeTypeCounts[category.slug] || 0} stores
+                          </span>
+                          {category.isPrimary && (
+                            <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-full">
+                              Primary
+                            </span>
+                          )}
+                        </Link>
+                      ))}
+                  </div>
+                  
+                  <div className="mt-3 text-right">
+                    <Link
+                      href="/directory/stores"
+                      className="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium"
+                    >
+                      Browse all store types →
+                    </Link>
                   </div>
                 </div>
               )}
@@ -331,50 +554,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                     />
                   )}
                   <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
                       {listing.business_name}
                     </h1>
-                    {/* Display categories with primary/secondary separation */}
-                    {listing.categories && listing.categories.length > 0 && (
-                      <div className="mb-2 space-y-2">
-                        {/* Primary Category - Prominent Display */}
-                        {listing.categories.filter((c: any) => c.isPrimary).map((category: any) => (
-                          <div key={category.id} className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                              Primary:
-                            </span>
-                            <Link
-                              href={`/directory/categories/${category.slug}`}
-                              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-full font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm"
-                            >
-                              {category.icon && <span className="text-base">{category.icon}</span>}
-                              <span>{category.name}</span>
-                            </Link>
-                          </div>
-                        ))}
-                        
-                        {/* Secondary Categories - Subtle Display */}
-                        {listing.categories.filter((c: any) => !c.isPrimary).length > 0 && (
-                          <div className="flex items-start gap-2">
-                            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide mt-1">
-                              Also:
-                            </span>
-                            <div className="flex flex-wrap gap-1.5">
-                              {listing.categories.filter((c: any) => !c.isPrimary).map((category: any, index: number) => (
-                                <Link
-                                  key={category.id || index}
-                                  href={`/directory/categories/${category.slug}`}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-                                >
-                                  {category.icon && <span className="text-sm">{category.icon}</span>}
-                                  <span>{category.name}</span>
-                                </Link>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   {listing.product_count > 0 && (
                     <p className="text-gray-600 mt-2">
                       {listing.product_count} products available
@@ -394,6 +576,74 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
           {/* Right Column - Contact & Hours */}
           <div className="lg:col-span-3 space-y-6">
+            {/* GBP Categories */}
+            {listing.categories && listing.categories.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                  Business Categories
+                </h2>
+                
+                {/* GBP Categories Pane */}
+                <div className="inline-flex flex-wrap gap-2 p-3 bg-linear-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl border border-purple-200 dark:border-purple-700/50 mb-4">
+                  {listing.categories
+                    .sort((a: any, b: any) => {
+                      if (a.isPrimary && !b.isPrimary) return -1;
+                      if (!a.isPrimary && b.isPrimary) return 1;
+                      return a.name.localeCompare(b.name);
+                    })
+                    .map((category: any) => (
+                      <Link
+                        key={category.id}
+                        href={`/directory/categories/${category.slug}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80 ${
+                          category.isPrimary
+                            ? 'bg-white dark:bg-neutral-800 text-purple-700 dark:text-purple-300 shadow-sm border border-purple-300 dark:border-purple-600'
+                            : 'bg-white/60 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600'
+                        }`}
+                      >
+                        <span className="text-base">
+                          {category.icon && category.icon}
+                          {!category.icon && (
+                            <>
+                              {category.name === 'International Foods' && '🌍'}
+                              {category.name === 'Electronics store' && '🛍️'}
+                              {category.name === 'Shoe store' && '👟'}
+                              {category.name === 'Grocery store' && '🏪'}
+                              {category.name === 'Supermarket' && '🛒'}
+                              {category.name === 'Clothing store' && '👕'}
+                              {category.name === 'Hardware store' && '🔧'}
+                              {category.name === 'Restaurant' && '🍽️'}
+                              {category.name === 'Pharmacy' && '💊'}
+                              {category.name === 'Bookstore' && '📚'}
+                              {category.name === 'Pet store' && '🐕'}
+                              {!['International Foods', 'Electronics store', 'Shoe store', 'Grocery store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(category.name) && '🏢'}
+                            </>
+                          )}
+                        </span>
+                        <span>{category.name}</span>
+                        <span className="text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300 px-1.5 py-0.5 rounded-full">
+                          {gbpCategoryCounts[category.slug] || 0} stores
+                        </span>
+                        {category.isPrimary && (
+                          <span className="px-1.5 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300 rounded-full">
+                            Primary
+                          </span>
+                        )}
+                      </Link>
+                    ))}
+                </div>
+                
+                <div className="mt-3 text-right">
+                  <Link
+                    href="/directory/categories"
+                    className="text-purple-600 dark:text-purple-400 hover:underline text-sm font-medium"
+                  >
+                    Browse all business categories →
+                  </Link>
+                </div>
+              </div>
+            )}
+
             {/* Contact Information */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -652,6 +902,62 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                     </div>
                   </div>
                 </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Store Recommendations */}
+      {recommendations.recommendations && recommendations.recommendations.length > 0 && (
+        <div className="bg-white border-t">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Discover More Stores</h2>
+            <div className="space-y-8">
+              {recommendations.recommendations.map((recGroup: any) => (
+                <div key={recGroup.type}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">{recGroup.title}</h3>
+                    {recGroup.type === 'popular_in_category' && (
+                      <Link
+                        href={`/directory/categories/${primaryCategory?.slug}`}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        View All →
+                      </Link>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {recGroup.recommendations.map((rec: any) => (
+                      <Link
+                        key={rec.tenantId}
+                        href={`/directory/${rec.slug}`}
+                        className="group block p-4 bg-white border border-gray-200 rounded-lg hover:border-green-300 hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 group-hover:text-blue-600 line-clamp-1">
+                              {rec.businessName}
+                            </h4>
+                            <p className="text-sm text-gray-600 mt-1 line-clamp-1">
+                              {rec.address}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {rec.city}, {rec.state}
+                              {rec.distance && ` • ${rec.distance} mi`}
+                            </p>
+                            <p className="text-xs text-green-600 mt-2 font-medium">
+                              {rec.reason}
+                            </p>
+                          </div>
+                          <div className="ml-3 shrink-0">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

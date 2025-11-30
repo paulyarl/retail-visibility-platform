@@ -90,9 +90,20 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     
     // Category filter
     if (category && typeof category === 'string') {
-      conditions.push(`category_slug = $${paramIndex}`);
-      params.push(category);
-      paramIndex++;
+      // Check if this is a store-level category (GBP/Platform) or product-level category
+      // Product categories have slugs like "books-media", store categories have names like "Electronics store"
+      const isProductLevelCategory = category.includes('-') && !category.includes(' ');
+      
+      if (isProductLevelCategory) {
+        // Product-level category: filter by category_slug
+        conditions.push(`category_slug = $${paramIndex}`);
+        params.push(category);
+        paramIndex++;
+      } else {
+        // Store-level category (GBP/Platform): return all products (no category filter)
+        // These categories inherit all store products, so no filtering needed
+        console.log(`[Storefront] Store-level category detected: ${category} - returning all products`);
+      }
     }
     
     // Search filter (name or SKU)

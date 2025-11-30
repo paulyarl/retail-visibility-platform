@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Package, ChevronRight } from 'lucide-react';
+import { calculatePopularityScore, SCORING_PRESETS, type CategoryMetrics, useSortedCategories } from '@/utils/popularityScoring';
 
 interface Category {
   id: string;
@@ -28,10 +29,13 @@ export default function DirectoryCategoryBrowser({
 }: DirectoryCategoryBrowserProps) {
   const router = useRouter();
 
-  // Show top categories (most stores)
-  const topCategories = [...categories]
-    .sort((a, b) => b.storeCount - a.storeCount)
-    .slice(0, 12);
+  // Use memoized hook for performance optimization
+  // NEW: Use LOCATION_AWARE preset for proximity-based scoring
+  const topCategories = useSortedCategories(
+    categories as CategoryMetrics[], 
+    12, 
+    SCORING_PRESETS.LOCATION_AWARE
+  );
 
   const handleCategoryClick = (slug: string) => {
     router.push(`/directory/categories/${slug}`);
@@ -73,7 +77,7 @@ export default function DirectoryCategoryBrowser({
               }
             `}
           >
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-2xl">
+            <div className="shrink-0 w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-2xl">
               {category.icon || <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
             </div>
             <div className="flex-1 text-left min-w-0">

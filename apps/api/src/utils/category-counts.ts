@@ -5,15 +5,20 @@ export interface CategoryCount {
   name: string;
   slug: string;
   count: number;
-  googleCategoryId: string | null;
-  sortOrder?: number;
+  google_category_id: string | null;
+  sort_order?: number;
   // Additional fields from materialized view
-  productsWithImages?: number;
-  productsWithDescriptions?: number;
-  avgPriceCents?: number;
-  minPriceCents?: number;
-  maxPriceCents?: number;
-  lastProductUpdated?: Date;
+  products_with_images?: number;
+  products_with_descriptions?: number;
+  avg_price_cents?: number;
+  min_price_cents?: number;
+  max_price_cents?: number;
+  last_product_updated?: Date;
+  // NEW: 3-category system fields
+  category_type?: 'tenant' | 'gbp_primary' | 'gbp_secondary' | 'platform';
+  is_primary?: boolean;
+  tenant_id?: string;
+  tenant_name?: string;
 }
 
 /**
@@ -26,33 +31,70 @@ export interface CategoryCount {
  */
 export async function getCategoryCounts(
   tenantId: string,
-  includeAll: boolean = false
+  includeAll: boolean = false,
+  categoryType?: 'tenant' | 'gbp_primary' | 'gbp_secondary' | 'platform'
 ): Promise<CategoryCount[]> {
   try {
-    // Use materialized view for instant performance (10-30x faster than groupBy)
-    // Note: includeAll parameter is ignored since MV only contains active/public items
-    const categories = await prisma.$queryRaw<CategoryCount[]>`
+    // Use direct SQL query instead of Prisma $queryRaw to avoid transformation issues
+    const { getDirectPool } = await import('./db-pool');
+    const pool = getDirectPool();
+    
+    // Build WHERE clause with optional category type filtering
+    let whereClause = 'WHERE tenant_id = $1 AND product_count > 0';
+    let params: any[] = [tenantId];
+    
+    if (categoryType) {
+      whereClause += ' AND category_type = $2';
+      params.push(categoryType);
+    }
+    
+    const query = `
       SELECT 
-        category_id as "id",
-        category_name as "name", 
-        category_slug as "slug",
-        google_category_id as "googleCategoryId",
-        category_sort_order as "sortOrder",
-        product_count as "count",
-        products_with_images as "productsWithImages",
-        products_with_descriptions as "productsWithDescriptions",
-        avg_price_cents as "avgPriceCents",
-        min_price_cents as "minPriceCents", 
-        max_price_cents as "maxPriceCents",
-        last_product_updated as "lastProductUpdated"
+        category_id,
+        category_name, 
+        category_slug,
+        google_category_id,
+        category_sort_order,
+        product_count,
+        products_with_images,
+        products_with_descriptions,
+        avg_price_cents,
+        min_price_cents, 
+        max_price_cents,
+        last_product_updated,
+        category_type,
+        is_primary,
+        tenant_id,
+        tenant_name
       FROM storefront_category_counts
-      WHERE tenant_id = ${tenantId}
-      AND product_count > 0
+      ${whereClause}
       ORDER BY category_sort_order ASC NULLS LAST, category_name ASC
     `;
-
-    console.log(`[Category Counts] Retrieved ${categories.length} categories from materialized view for tenant ${tenantId}`);
-    return categories;
+    
+    const result = await pool.query(query, params);
+    
+    // Transform to snake_case only (what frontend expects)
+    const transformedRows = result.rows.map(row => ({
+      id: row.category_id,
+      name: row.category_name,
+      slug: row.category_slug,
+      google_category_id: row.google_category_id,
+      sort_order: row.category_sort_order,
+      count: row.product_count,
+      products_with_images: row.products_with_images,
+      products_with_descriptions: row.products_with_descriptions,
+      avg_price_cents: row.avg_price_cents,
+      min_price_cents: row.min_price_cents,
+      max_price_cents: row.max_price_cents,
+      last_product_updated: row.last_product_updated,
+      category_type: row.category_type,
+      is_primary: row.is_primary,
+      tenant_id: row.tenant_id,
+      tenant_name: row.tenant_name
+    }));
+    
+    console.log(`[Category Counts] Retrieved ${result.rows.length} categories from materialized view for tenant ${tenantId}${categoryType ? ` (type: ${categoryType})` : ''}`);
+    return transformedRows;
   } catch (error) {
     console.error('[Category Counts] Error reading from materialized view:', error);
     
@@ -129,8 +171,8 @@ async function getCategoryCountsLegacy(
         id: cat.id,
         name: cat.name,
         slug: cat.slug,
-        googleCategoryId: cat.googleCategoryId,
-        sortOrder: cat.sortOrder,
+        google_category_id: cat.googleCategoryId,
+        sort_order: cat.sortOrder,
         count: countMap[cat.id] || 0,
       }))
       .filter(cat => cat.count > 0); // Only show categories with products

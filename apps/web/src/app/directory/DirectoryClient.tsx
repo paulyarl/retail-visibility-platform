@@ -10,9 +10,62 @@ import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBrowser';
 import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
+import GBPCategoryBrowser from '@/components/directory/GBPCategoryBrowser';
 import { Pagination } from '@/components/ui';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
+
+// NEW: Location detection utility
+async function getUserLocation(): Promise<{
+  latitude: number;
+  longitude: number;
+  city: string;
+  state: string;
+} | null> {
+  try {
+    // Try browser geolocation first
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 10000,
+          enableHighAccuracy: true
+        });
+      });
+      
+      const { latitude, longitude } = position.coords;
+      
+      // Reverse geocoding to get city/state
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
+      );
+      const data = await response.json();
+      
+      const address = data.address || {};
+      const city = address.city || address.town || address.village || 'Unknown';
+      const state = address.state || 'Unknown';
+      
+      return { latitude, longitude, city, state };
+    }
+  } catch (error) {
+    console.warn('Geolocation failed, falling back to IP-based location');
+  }
+  
+  // Fallback to IP-based location
+  try {
+    const response = await fetch('https://ipapi.co/json/');
+    const data = await response.json();
+    
+    return {
+      latitude: data.latitude || 0,
+      longitude: data.longitude || 0,
+      city: data.city || 'Unknown',
+      state: data.region || 'Unknown'
+    };
+  } catch (error) {
+    console.warn('IP location failed, using default');
+    return null;
+  }
+}
 
 // Dynamically import map to avoid SSR issues
 const DirectoryMap = dynamic(() => import('@/components/directory/DirectoryMap'), {
@@ -71,8 +124,24 @@ export default function DirectoryClient() {
     slug: string;
     storeCount: number;
   }>>([]);
+  const [gbpCategories, setGbpCategories] = useState<Array<{
+    categorySlug: string;
+    categoryName: string;
+    categoryIcon: string;
+    totalStores: string;
+    totalProducts: string;
+    isPrimary: number;
+  }>>([]);
   const [locations, setLocations] = useState<Array<{ city: string; state: string; count: number }>>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+  
+  // NEW: User location for proximity-based scoring
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+    city: string;
+    state: string;
+  } | null>(null);
 
   // Fetch categories (locations endpoint disabled for now)
   useEffect(() => {
@@ -80,31 +149,28 @@ export default function DirectoryClient() {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
       try {
+        // NEW: Get user location for proximity scoring
+        const location = await getUserLocation();
+        setUserLocation(location);
+        
         // Fetch product categories from materialized view (10,000x faster!)
         // Now with normalized categories and Google taxonomy alignment
-        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/mv/categories`);
-        if (categoriesRes.ok) {
-          const catData = await categoriesRes.json();
-          // Transform MV response - now includes full category data with primary/secondary breakdown
-          const transformedCategories = (catData.categories || []).map((cat: any) => ({
-            id: cat.id || cat.slug,  // Use category ID (preferred) or slug (fallback)
-            name: cat.name || cat.slug.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-            slug: cat.slug,
-            googleCategoryId: cat.googleCategoryId || null,
-            icon: cat.icon || null,
-            storeCount: parseInt(cat.storeCount || '0'),
-            primaryStoreCount: parseInt(cat.primaryStoreCount || '0'),
-            secondaryStoreCount: parseInt(cat.secondaryStoreCount || '0'),
-            productCount: parseInt(cat.totalProducts || '0'),
-          }));
-          setCategories(transformedCategories);
-        }
+        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/mv/categories${location ? `?lat=${location.latitude}&lng=${location.longitude}&city=${encodeURIComponent(location.city)}&state=${location.state}` : ''}`);
+        const categoriesData = await categoriesRes.json();
+        setCategories(categoriesData.categories || []);
 
         // Fetch store types
         const storeTypesRes = await fetch(`${apiBaseUrl}/api/directory/store-types`);
         if (storeTypesRes.ok) {
           const typesData = await storeTypesRes.json();
           setStoreTypes(typesData.data?.storeTypes || []);
+        }
+
+        // Fetch GBP categories
+        const gbpCategoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories-optimized/gbp-counts`);
+        if (gbpCategoriesRes.ok) {
+          const gbpData = await gbpCategoriesRes.json();
+          setGbpCategories(gbpData.categories || []);
         }
 
         // Locations endpoint is disabled (old directory system)
@@ -249,6 +315,14 @@ export default function DirectoryClient() {
           />
         )}
 
+        {/* GBP Category Browser - Show when no search is active */}
+        {!searchParams.get('q') && !searchParams.get('category') && gbpCategories.length > 0 && (
+          <GBPCategoryBrowser 
+            gbpCategories={gbpCategories}
+            className="mb-8"
+          />
+        )}
+
         {/* Error State */}
         {error && (
           <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -340,6 +414,9 @@ export default function DirectoryClient() {
           </div>
         )}
 
+        {/* Directory Home Recommendations */}
+        <DirectoryHomeRecommendations />
+
         {/* Help Section - Two Column */}
         {!loading && (
           <div className="mt-16 grid md:grid-cols-2 gap-6">
@@ -385,6 +462,71 @@ export default function DirectoryClient() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Directory Home Recommendations Component
+function DirectoryHomeRecommendations() {
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const response = await fetch(`${apiUrl}/api/recommendations/for-directory`);
+        const data = await response.json();
+        setRecommendations(data.recommendations || []);
+      } catch (error) {
+        console.error('Error fetching directory recommendations:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecommendations();
+  }, []);
+
+  if (loading || recommendations.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
+      <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white mb-6">
+        Trending Nearby
+      </h2>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {recommendations.map((rec, index) => (
+          <Link
+            key={rec.tenantId}
+            href={`/directory/${rec.slug}`}
+            className="block p-6 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-green-500 dark:hover:border-green-400 transition-all hover:shadow-lg"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="font-semibold text-neutral-900 dark:text-white text-lg">
+                  {rec.businessName}
+                </h3>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  {rec.address}
+                </p>
+                <p className="text-sm text-neutral-500">
+                  {rec.city}, {rec.state}
+                  {rec.distance && ` • ${rec.distance} mi`}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-green-600 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">
+                {rec.reason}
+              </p>
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   );

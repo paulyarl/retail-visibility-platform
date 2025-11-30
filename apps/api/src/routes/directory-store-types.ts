@@ -52,6 +52,38 @@ router.get('/store-types', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/directory/store-type-counts
+ * 
+ * Get store type counts for all store types
+ * Returns a mapping of store type slug to store count
+ */
+router.get('/store-type-counts', async (req: Request, res: Response) => {
+  try {
+    // Get store types with counts
+    const storeTypes = await storeTypeDirectoryService.getStoreTypes();
+
+    // Convert to simple mapping of slug -> count
+    const storeTypeCounts: Record<string, number> = {};
+    storeTypes.forEach(storeType => {
+      storeTypeCounts[storeType.slug] = storeType.storeCount;
+    });
+
+    res.json({
+      success: true,
+      data: {
+        storeTypeCounts,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching store type counts:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch store type counts',
+    });
+  }
+});
+
+/**
  * GET /api/directory/store-types/:typeSlug
  * 
  * Get details for a specific store type
