@@ -5,7 +5,6 @@ import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft } from 'lucide-rea
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
 import DirectoryActions from '@/components/directory/DirectoryActions';
-import MapWrapper from '@/components/directory/MapWrapper';
 
 interface StoreDetailPageProps {
   params: {
@@ -686,28 +685,50 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Visit Our Location</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Find us at {fullAddress || listing.city + ', ' + listing.state}. We're conveniently located and ready to serve you.
+              Find us at {fullAddress || listing.city + ', ' + listing.state}. We're conveniently located
             </p>
           </div>
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <MapWrapper 
-              listings={[{
-                id: listing.tenant_id,
-                businessName: listing.business_name,
-                slug: listing.slug,
-                address: listing.address,
-                city: listing.city,
-                state: listing.state,
-                zipCode: listing.zip_code,
-                country: listing.country,
-                latitude: listing.latitude,
-                longitude: listing.longitude,
-                logoUrl: listing.logo_url,
-                ratingAvg: listing.rating_avg,
-                productCount: listing.product_count,
-              }]}
-            />
-          </div>
+          {listing.address && (
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-neutral-900 dark:text-white mb-4">Store Location</h2>
+              <div className="w-full h-64 sm:h-80 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700">
+                <iframe
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}&q=${encodeURIComponent(listing.address)}`}
+                  title="Store Location"
+                />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(listing.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  Get Directions
+                </a>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(listing.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  View on Google Maps
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
