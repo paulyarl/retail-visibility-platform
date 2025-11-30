@@ -11,6 +11,23 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "15mb" },
   },
 
+  // Add CSP headers to allow API calls in development
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: process.env.NODE_ENV === 'development' 
+              ? "" // Disable CSP entirely in development
+              : "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' https: ws: wss:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';"
+          },
+        ],
+      },
+    ];
+  },
+
   images: {
     remotePatterns: [
       {

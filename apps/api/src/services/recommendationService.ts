@@ -45,7 +45,7 @@ export async function getStoresViewedBySameUsers(
         WHERE ub.entity_id = $1 
           AND ub.entity_type = 'store'
           AND ub.timestamp >= NOW() - INTERVAL '30 days'
-          ${userId ? 'AND ub.user_id = $2' : ''}
+          ${userId ? 'AND ub.user_id::text = $2::text' : ''}
       ),
       other_stores_viewed AS (
         SELECT 
@@ -53,7 +53,7 @@ export async function getStoresViewedBySameUsers(
           COUNT(*) as view_count,
           MAX(ub.timestamp) as last_viewed
         FROM user_behavior_simple ub
-        JOIN same_user_views suv ON ub.user_id = suv.user_id
+        JOIN same_user_views suv ON ub.user_id::text = suv.user_id::text
         WHERE ub.entity_id != $1 
           AND ub.entity_type = 'store'
           AND ub.timestamp >= NOW() - INTERVAL '30 days'
@@ -304,16 +304,24 @@ export async function trackUserBehavior({
         user_id, session_id, entity_type, entity_id, entity_name, context,
         location_lat, location_lng, referrer, user_agent, ip_address, 
         duration_seconds, page_type
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ) VALUES ($1, $2, $3, 
+        CASE 
+          WHEN $3 = 'store'::text THEN $4::uuid
+          ELSE '00000000-0000-0000-0000-000000000000'::uuid
+        END, 
+        $5, $6, $7, $8, $9, $10, $11, $12, $13)
       ON CONFLICT DO NOTHING
     `;
+    
+    // For non-store entities, store the actual entity ID in entity_name
+    const actualEntityName = entityType === 'store' ? entityName : entityId;
     
     await pool.query(query, [
       userId || null,
       sessionId || null,
       entityType,
-      entityId,
-      entityName || null,
+      entityId, // For stores: UUID, for others: will be replaced with placeholder
+      actualEntityName || null,
       context ? JSON.stringify(context) : null,
       locationLat || null,
       locationLng || null,

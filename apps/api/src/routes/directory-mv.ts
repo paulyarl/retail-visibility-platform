@@ -113,7 +113,7 @@ router.get('/search', async (req: Request, res: Response) => {
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Build WHERE clause for materialized view
+    // Build WHERE clause for directory_category_listings
     const conditions: string[] = [
       'tenant_exists = true',
       'is_active_location = true',
@@ -122,13 +122,23 @@ router.get('/search', async (req: Request, res: Response) => {
     const params: any[] = [];
     let paramIndex = 1;
 
+    // Build WHERE clause for directory_gbp_listings (same base conditions)
+    const gbpConditions: string[] = [
+      'tenant_exists = true',
+      'is_active_location = true',
+      'is_directory_visible = true'
+    ];
+
     // Category filter (supports both ID and slug for backward compatibility)
     if (category && typeof category === 'string') {
       // Check if it's a category ID (starts with 'cat_') or slug
       if (category.startsWith('cat_')) {
         conditions.push(`category_id = $${paramIndex}`);
+        gbpConditions.push(`gbp_category_id = $${paramIndex}`);
       } else {
-        conditions.push(`category_slug = $${paramIndex}`);
+        // Support both proper slugs and raw category names
+        conditions.push(`(category_slug = $${paramIndex} OR category_name = $${paramIndex})`);
+        gbpConditions.push(`(gbp_category_display_name = $${paramIndex} OR gbp_category_name = $${paramIndex})`);
       }
       params.push(category);
       paramIndex++;
@@ -138,22 +148,26 @@ router.get('/search', async (req: Request, res: Response) => {
     const { primaryOnly } = req.query;
     if (primaryOnly === 'true') {
       conditions.push('is_primary = true');
+      gbpConditions.push('is_primary = true');
     }
 
     // Location filters
     if (city && typeof city === 'string') {
       conditions.push(`LOWER(city) = LOWER($${paramIndex})`);
+      gbpConditions.push(`LOWER(city) = LOWER($${paramIndex})`);
       params.push(city);
       paramIndex++;
     }
 
     if (state && typeof state === 'string') {
       conditions.push(`LOWER(state) = LOWER($${paramIndex})`);
+      gbpConditions.push(`LOWER(state) = LOWER($${paramIndex})`);
       params.push(state);
       paramIndex++;
     }
 
     const whereClause = conditions.join(' AND ');
+    const gbpWhereClause = gbpConditions.join(' AND ');
 
     // Determine ORDER BY clause (uses indexed columns)
     let orderByClause = 'rating_avg DESC NULLS LAST, rating_count DESC';
@@ -168,53 +182,96 @@ router.get('/search', async (req: Request, res: Response) => {
       orderByClause = 'is_featured DESC, rating_avg DESC NULLS LAST';
     }
 
-    // Query materialized view (FAST!) - Now with normalized categories and GBP category
+    // Query both materialized views for comprehensive search
     const listingsQuery = `
-      SELECT 
-        dcl.id,
-        dcl.tenant_id,
-        dcl.business_name,
-        dcl.slug,
-        dcl.address,
-        dcl.city,
-        dcl.state,
-        dcl.zip_code,
-        dcl.phone,
-        dcl.email,
-        dcl.website,
-        dcl.latitude,
-        dcl.longitude,
-        dcl.category_id,
-        dcl.category_name,
-        dcl.category_slug,
-        dcl.google_category_id,
-        dcl.category_icon,
-        dcl.is_primary,
-        dcl.logo_url,
-        dcl.description,
-        dcl.rating_avg,
-        dcl.rating_count,
-        dcl.product_count,
-        dcl.is_featured,
-        dcl.subscription_tier,
-        dcl.use_custom_website,
-        dcl.created_at,
-        dcl.updated_at,
-        t.metadata->'gbp_categories'->'primary'->>'name' as gbp_primary_category_name
-      FROM directory_category_listings dcl
-      LEFT JOIN tenants t ON t.id = dcl.tenant_id
-      WHERE ${whereClause}
-      ORDER BY ${orderByClause.replace(/^/, 'dcl.')}
+      (
+        -- Search directory_category_listings (tenant categories)
+        SELECT 
+          dcl.id,
+          dcl.tenant_id,
+          dcl.business_name,
+          dcl.slug,
+          dcl.address,
+          dcl.city,
+          dcl.state,
+          dcl.zip_code,
+          dcl.phone,
+          dcl.email,
+          dcl.website,
+          dcl.latitude,
+          dcl.longitude,
+          dcl.category_id,
+          dcl.category_name,
+          dcl.category_slug,
+          dcl.google_category_id,
+          dcl.category_icon,
+          dcl.is_primary,
+          dcl.logo_url,
+          dcl.description,
+          dcl.rating_avg,
+          dcl.rating_count,
+          dcl.product_count,
+          dcl.is_featured,
+          dcl.subscription_tier,
+          dcl.use_custom_website,
+          dcl.created_at,
+          dcl.updated_at,
+          t.metadata->'gbp_categories'->'primary'->>'name' as gbp_primary_category_name
+        FROM directory_category_listings dcl
+        LEFT JOIN tenants t ON t.id = dcl.tenant_id
+        WHERE ${whereClause}
+      )
+      UNION ALL
+      (
+        -- Search directory_gbp_listings (GBP categories)
+        SELECT 
+          dgl.id,
+          dgl.tenant_id,
+          dgl.business_name,
+          dgl.slug,
+          dgl.address,
+          dgl.city,
+          dgl.state,
+          dgl.zip_code,
+          dgl.phone,
+          dgl.email,
+          dgl.website,
+          dgl.latitude,
+          dgl.longitude,
+          dgl.gbp_category_id as category_id,
+          dgl.gbp_category_name as category_name,
+          dgl.gbp_category_display_name as category_slug,
+          dgl.gbp_category_id as google_category_id,
+          null as category_icon,
+          dgl.is_primary,
+          dgl.logo_url,
+          dgl.description,
+          dgl.rating_avg,
+          dgl.rating_count,
+          dgl.product_count,
+          dgl.is_featured,
+          dgl.subscription_tier,
+          dgl.use_custom_website,
+          dgl.created_at,
+          dgl.updated_at,
+          null as gbp_primary_category_name
+        FROM directory_gbp_listings dgl
+        WHERE ${gbpWhereClause}
+      )
+      ORDER BY ${orderByClause.replace(/^/, '')}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
     const listingsResult = await getDirectPool().query(listingsQuery, [...params, limitNum, skip]);
 
-    // Get total count (also fast from materialized view)
+    // Get total count (from both materialized views)
     const countQuery = `
       SELECT COUNT(*) as count 
-      FROM directory_category_listings
-      WHERE ${whereClause}
+      FROM (
+        SELECT 1 FROM directory_category_listings WHERE ${whereClause}
+        UNION ALL
+        SELECT 1 FROM directory_gbp_listings WHERE ${gbpWhereClause}
+      ) combined_search
     `;
     const countResult = await getDirectPool().query(countQuery, params);
 
@@ -298,8 +355,8 @@ router.get('/categories', async (req: Request, res: Response) => {
                 SIN(RADIANS($2)) * SIN(RADIANS(dcl.latitude))
               )
             ) as avg_distance
-          FROM directory_listings_list dcl
-          WHERE dcl.category_id = dcs.category_id
+          FROM directory_category_listings dcl
+          WHERE dcl.category_name = dcs.category_name
             AND dcl.tenant_exists = true
             AND dcl.is_active_location = true
             AND dcl.is_directory_visible = true
@@ -309,7 +366,7 @@ router.get('/categories', async (req: Request, res: Response) => {
       `;
       proximityCalculation = `
         proximity.nearby_stores,
-        proximity.avg_distance,
+        proximity.avg_distance
       `;
     }
 
@@ -333,7 +390,7 @@ router.get('/categories', async (req: Request, res: Response) => {
         synced_store_count,
         first_store_added,
         last_store_updated
-        ${proximityCalculation}
+        ${proximityCalculation ? ', ' + proximityCalculation : ''}
       FROM directory_category_stats dcs
       ${proximityJoin}
       WHERE store_count >= $1

@@ -51,7 +51,7 @@ export default function DirectoryCategoryBrowser({
         <div className="flex items-center gap-2">
           <span className="text-xl">🏷️</span>
           <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
-            Browse by Product Category
+            Browse by Business Categories
           </h2>
         </div>
         <button

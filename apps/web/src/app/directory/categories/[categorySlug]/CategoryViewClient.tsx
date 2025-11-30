@@ -177,7 +177,7 @@ export default function CategoryViewClient({
         // if (searchParams.lng) params.set('lng', searchParams.lng);
         
         const storesRes = await fetch(
-          `${apiBaseUrl}/api/directory/search?${params}`
+          `${apiBaseUrl}/api/directory/mv/search?${params}`
         );
 
         if (!storesRes.ok) {

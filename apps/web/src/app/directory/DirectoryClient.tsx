@@ -10,7 +10,6 @@ import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBrowser';
 import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
-import GBPCategoryBrowser from '@/components/directory/GBPCategoryBrowser';
 import { Pagination } from '@/components/ui';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
@@ -124,14 +123,6 @@ export default function DirectoryClient() {
     slug: string;
     storeCount: number;
   }>>([]);
-  const [gbpCategories, setGbpCategories] = useState<Array<{
-    categorySlug: string;
-    categoryName: string;
-    categoryIcon: string;
-    totalStores: string;
-    totalProducts: string;
-    isPrimary: number;
-  }>>([]);
   const [locations, setLocations] = useState<Array<{ city: string; state: string; count: number }>>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
   
@@ -164,13 +155,6 @@ export default function DirectoryClient() {
         if (storeTypesRes.ok) {
           const typesData = await storeTypesRes.json();
           setStoreTypes(typesData.data?.storeTypes || []);
-        }
-
-        // Fetch GBP categories
-        const gbpCategoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories-optimized/gbp-counts`);
-        if (gbpCategoriesRes.ok) {
-          const gbpData = await gbpCategoriesRes.json();
-          setGbpCategories(gbpData.categories || []);
         }
 
         // Locations endpoint is disabled (old directory system)
@@ -311,14 +295,6 @@ export default function DirectoryClient() {
         {!searchParams.get('q') && !searchParams.get('category') && storeTypes.length > 0 && (
           <DirectoryStoreTypeBrowser 
             storeTypes={storeTypes}
-            className="mb-8"
-          />
-        )}
-
-        {/* GBP Category Browser - Show when no search is active */}
-        {!searchParams.get('q') && !searchParams.get('category') && gbpCategories.length > 0 && (
-          <GBPCategoryBrowser 
-            gbpCategories={gbpCategories}
             className="mb-8"
           />
         )}
