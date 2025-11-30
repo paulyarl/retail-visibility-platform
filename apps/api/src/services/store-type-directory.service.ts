@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { slugify } from '../utils/slug';
 
 // Create a direct database connection pool that bypasses Prisma's issues
 // In development, we need to handle self-signed certificates
@@ -116,7 +117,7 @@ class StoreTypeDirectoryService {
         id: row.gbp_category_id,
         name: row.gbp_category_name,
         displayName: row.gbp_category_display_name,
-        slug: this.slugify(row.gbp_category_name),
+        slug: slugify(row.gbp_category_name),
         storeCount: parseInt(row.store_count),
         store_count: parseInt(row.store_count), // Compatibility
         primaryStoreCount: parseInt(row.primary_store_count || '0'),
@@ -289,26 +290,6 @@ class StoreTypeDirectoryService {
       console.error('[StoreTypeService] Error fetching store type details:', error);
       return null;
     }
-  }
-
-  /**
-   * Helper: Convert category name to slug
-   */
-  private slugify(text: string): string {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
-
-  /**
-   * Helper: Convert slug back to approximate category name
-   */
-  private unslugify(slug: string): string {
-    return slug
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
   }
 }
 

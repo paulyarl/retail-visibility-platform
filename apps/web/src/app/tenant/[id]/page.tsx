@@ -15,6 +15,7 @@ import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 import LocationClosedBanner from '@/components/storefront/LocationClosedBanner';
 import StorefrontActions from '@/components/products/StorefrontActions';
 import { StorefrontRecommendations } from './StorefrontClient';
+import { getCategoryUrl } from '@/utils/slug';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -281,7 +282,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
   const totalPages = Math.ceil(total / limit);
-  
+
   // Find primary store category for header badge
   const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary);
   
@@ -407,7 +408,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                     .map((category: Category) => (
                       <Link
                         key={category.id}
-                        href={`/directory/categories/${category.slug}`}
+                        href={getCategoryUrl(category)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:shadow-md hover:scale-105 ${
                           category.is_primary
                             ? 'bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600 hover:border-blue-400 dark:hover:border-blue-500'

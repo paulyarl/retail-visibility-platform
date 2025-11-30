@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react';
 import { Map, Grid3x3, List, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import DirectorySearch from '@/components/directory/DirectorySearch';
-import DirectoryGrid from '@/components/directory/DirectoryGrid';
-import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
+import { DirectoryGrid } from '@/components/directory/DirectoryGrid';
+import { DirectoryList } from '@/components/directory/DirectoryList';
+import { Pagination } from '@/components/ui';
+import { useSearchParams } from 'next/navigation';
+import { slugsMatch } from '@/utils/slug';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
@@ -138,26 +141,29 @@ export default function CategoryViewClient({
         // Decode URL-encoded slug (e.g., health-%26-beauty -> health-&-beauty)
         const decodedSlug = decodeURIComponent(categorySlug);
 
-        // 1. Fetch category info from materialized view stats (includes Google taxonomy)
-        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/mv/categories`);
+        // 1. Fetch category info from directory categories API
+        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories`);
         if (categoriesRes.ok) {
           const catData = await categoriesRes.json();
-          const currentCat = catData.categories?.find((c: any) => c.slug === decodedSlug);
+          // Use centralized slug matching for robust comparison
+          const currentCat = catData.categories?.find((c: any) => 
+            slugsMatch(c.slug, decodedSlug)
+          );
           if (currentCat) {
             setCategory({
               id: currentCat.id,
               name: currentCat.name,
               slug: currentCat.slug,
-              googleCategoryId: currentCat.googleCategoryId,
-              storeCount: currentCat.storeCount,
-              primaryStoreCount: currentCat.primaryStoreCount,
-              secondaryStoreCount: currentCat.secondaryStoreCount,
-              productCount: currentCat.totalProducts,
+              googleCategoryId: currentCat.google_category_id,
+              storeCount: currentCat.store_count,
+              primaryStoreCount: currentCat.primary_store_count || 0,
+              secondaryStoreCount: currentCat.secondary_store_count || 0,
+              productCount: currentCat.total_products,
             });
           }
         }
 
-        // 2. Fetch stores in this category using materialized view (10,000x faster!)
+        // 2. Fetch stores in this category using directory search API
         const params = new URLSearchParams();
         params.set('category', decodedSlug); // Use decoded category slug as filter
         params.set('sort', 'rating'); // Sort by rating
@@ -169,10 +175,9 @@ export default function CategoryViewClient({
         // Location filtering not yet implemented in MV
         // if (searchParams.lat) params.set('lat', searchParams.lat);
         // if (searchParams.lng) params.set('lng', searchParams.lng);
-        // if (searchParams.radius) params.set('radius', searchParams.radius);
-
+        
         const storesRes = await fetch(
-          `${apiBaseUrl}/api/directory/mv/search?${params}`
+          `${apiBaseUrl}/api/directory/search?${params}`
         );
 
         if (!storesRes.ok) {

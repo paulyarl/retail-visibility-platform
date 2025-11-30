@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { Store, ChevronRight } from 'lucide-react';
 import { calculatePopularityScore, SCORING_PRESETS, type CategoryMetrics, useSortedCategories } from '@/utils/popularityScoring';
+import { getStoreTypeUrl } from '@/utils/slug';
 
 interface StoreType {
   name: string;
@@ -44,7 +45,7 @@ export default function DirectoryStoreTypeBrowser({
   );
 
   const handleTypeClick = (slug: string) => {
-    router.push(`/directory/stores/${slug}`);
+    router.push(getStoreTypeUrl(slug));
   };
 
   if (storeTypes.length === 0) {
