@@ -405,13 +405,15 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                       return a.name.localeCompare(b.name);
                     })
                     .map((category: Category) => (
-                      <div
+                      <Link
                         key={category.id}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        href={`/directory/categories/${category.slug}`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:shadow-md hover:scale-105 ${
                           category.is_primary
-                            ? 'bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600'
-                            : 'bg-white/60 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600'
+                            ? 'bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600 hover:border-blue-400 dark:hover:border-blue-500'
+                            : 'bg-white/60 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600 hover:border-neutral-300 dark:hover:border-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
                         }`}
+                        title={`View all ${category.name} stores in the directory`}
                       >
                         <span className="text-base">
                           {category.name === 'Grocery store' && '🏪'}
@@ -432,7 +434,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                             Primary
                           </span>
                         )}
-                      </div>
+                      </Link>
                     ))}
                 </div>
               )}
