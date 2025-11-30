@@ -31,8 +31,7 @@ export async function trackBehavior(trackingData: TrackingData): Promise<void> {
     const session = await getServerSession(authOptions);
     
     // Extract user ID safely - handle different session structures
-    const userId = session?.user?.id || 
-                   (session as any)?.user?.id || 
+    const userId = (session as any)?.user?.id || 
                    (session as any)?.userId || 
                    undefined;
     

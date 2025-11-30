@@ -126,23 +126,6 @@ export default function CategoryViewClient({
     }
   }, [viewMode, primaryOnly, categorySlug, data]);
 
-  // Track store interactions (clicks, etc.)
-  const handleStoreClick = (store: DirectoryListing) => {
-    trackBehaviorClient({
-      entityType: 'store',
-      entityId: store.tenantId,
-      entityName: store.businessName,
-      context: {
-        category_slug: categorySlug,
-        source: 'category_page',
-        store_rating: store.ratingAvg,
-        store_product_count: store.productCount,
-        distance: store.distance
-      },
-      pageType: 'directory_home'
-    });
-  };
-
   // Fetch category info and stores
   useEffect(() => {
     const fetchData = async () => {
@@ -361,7 +344,6 @@ export default function CategoryViewClient({
             loading={loading}
             pagination={data?.pagination}
             categorySlug={categorySlug}
-            onStoreClick={handleStoreClick}
           />
         )}
 
@@ -369,15 +351,12 @@ export default function CategoryViewClient({
           <DirectoryList
             listings={data?.listings || []}
             loading={loading}
-            categorySlug={categorySlug}
-            onStoreClick={handleStoreClick}
           />
         )}
 
         {viewMode === 'map' && (
           <DirectoryMap
             listings={data?.listings || []}
-            onStoreClick={handleStoreClick}
           />
         )}
       </div>
