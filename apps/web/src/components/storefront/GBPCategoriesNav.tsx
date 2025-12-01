@@ -14,9 +14,10 @@ interface Category {
 interface GBPCategoriesNavProps {
   tenantId: string;
   categories: Category[];
+  title?: string;
 }
 
-export default function GBPCategoriesNav({ tenantId, categories }: GBPCategoriesNavProps) {
+export default function GBPCategoriesNav({ tenantId, categories, title = "Browse Store Types" }: GBPCategoriesNavProps) {
   // Sort categories: primary first, then secondary alphabetically
   const sortedCategories = [...categories].sort((a, b) => {
     if (a.is_primary && !b.is_primary) return -1; // a comes first
@@ -26,11 +27,11 @@ export default function GBPCategoriesNav({ tenantId, categories }: GBPCategories
 
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
-          Browse Store Types
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">
+          {title}
         </h2>
-        <span className="px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">
+        <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">
           Store Categories
         </span>
       </div>
@@ -48,17 +49,17 @@ export default function GBPCategoriesNav({ tenantId, categories }: GBPCategories
             href={`/directory/stores/${category.slug}`}
             className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-primary-600 dark:hover:text-primary-400`}
           >
-            <div className="flex items-center gap-2">
-              <span>{category.name}</span>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="truncate">{category.name}</span>
               {category.is_primary && (
-                <span className="px-2 py-1 text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full">
+                <span className="px-2 py-1 text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full whitespace-nowrap">
                   Primary
                 </span>
               )}
             </div>
-            <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
+            <span className="text-sm text-neutral-500 dark:text-neutral-400 ml-2">
+              {category.count}
+            </span>
           </Link>
         ))}
       </nav>

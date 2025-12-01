@@ -24,6 +24,10 @@ interface DirectoryMapGoogleProps {
   zoom?: number;
 }
 
+// Global flag to track if script is loading or loaded
+let isScriptLoading = false;
+let isScriptLoaded = false;
+
 export default function DirectoryMapGoogle({ 
   listings, 
   center = { lat: 39.8283, lng: -98.5795 }, // Center of USA
@@ -42,7 +46,31 @@ export default function DirectoryMapGoogle({
   useEffect(() => {
     // Check if Google Maps is already loaded
     if ((window as any).google && (window as any).google.maps) {
+      isScriptLoaded = true;
       setIsLoaded(true);
+      return;
+    }
+
+    // If script is already loading, wait for it
+    if (isScriptLoading) {
+      const checkInterval = setInterval(() => {
+        if ((window as any).google && (window as any).google.maps) {
+          isScriptLoaded = true;
+          setIsLoaded(true);
+          clearInterval(checkInterval);
+        }
+      }, 100);
+      return () => clearInterval(checkInterval);
+    }
+
+    // Check if script already exists in DOM
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+    if (existingScript) {
+      isScriptLoading = true;
+      existingScript.addEventListener('load', () => {
+        isScriptLoaded = true;
+        setIsLoaded(true);
+      });
       return;
     }
 
@@ -54,20 +82,21 @@ export default function DirectoryMapGoogle({
       return;
     }
 
+    isScriptLoading = true;
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=marker`;
     script.async = true;
     script.defer = true;
-    script.onload = () => setIsLoaded(true);
-    script.onerror = () => setError('Failed to load Google Maps');
-    document.head.appendChild(script);
-
-    return () => {
-      // Cleanup script on unmount
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
+    script.onload = () => {
+      isScriptLoaded = true;
+      isScriptLoading = false;
+      setIsLoaded(true);
     };
+    script.onerror = () => {
+      isScriptLoading = false;
+      setError('Failed to load Google Maps');
+    };
+    document.head.appendChild(script);
   }, []);
 
   useEffect(() => {

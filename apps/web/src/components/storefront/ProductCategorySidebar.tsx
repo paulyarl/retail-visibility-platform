@@ -25,12 +25,12 @@ export default function ProductCategorySidebar({ tenantId, categories, totalProd
 
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
-          Browse by Product Type
-        </h2>
-        <span className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">
           Product Categories
+        </h2>
+        <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">
+          Store Product Categories
         </span>
       </div>
       

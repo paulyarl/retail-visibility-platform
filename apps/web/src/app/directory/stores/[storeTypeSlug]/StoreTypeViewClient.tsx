@@ -78,7 +78,23 @@ export default function StoreTypeViewClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [storeType, setStoreType] = useState<StoreType | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+  
+  // Persist view mode in localStorage
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('directory-view-mode');
+      return (saved as 'grid' | 'list' | 'map') || 'grid';
+    }
+    return 'grid';
+  });
+
+  // Save view mode to localStorage when it changes
+  const handleViewModeChange = (mode: 'grid' | 'list' | 'map') => {
+    setViewMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('directory-view-mode', mode);
+    }
+  };
 
   // Track store type page view
   useEffect(() => {
@@ -270,7 +286,7 @@ export default function StoreTypeViewClient({
           {/* View Toggle */}
           <div className="flex gap-2">
             <button
-              onClick={() => setViewMode('grid')}
+              onClick={() => handleViewModeChange('grid')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                 viewMode === 'grid'
                   ? 'bg-green-600 text-white'
@@ -281,7 +297,7 @@ export default function StoreTypeViewClient({
               <span className="hidden sm:inline">Grid</span>
             </button>
             <button
-              onClick={() => setViewMode('list')}
+              onClick={() => handleViewModeChange('list')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                 viewMode === 'list'
                   ? 'bg-green-600 text-white'
@@ -292,7 +308,7 @@ export default function StoreTypeViewClient({
               <span className="hidden sm:inline">List</span>
             </button>
             <button
-              onClick={() => setViewMode('map')}
+              onClick={() => handleViewModeChange('map')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                 viewMode === 'map'
                   ? 'bg-green-600 text-white'

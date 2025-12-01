@@ -146,7 +146,6 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         landing_page_theme,
         dcl.id as category_id,
         dcl.name as category_name,
-        dcl.slug as category_slug,
         dcl.google_category_id,
         CASE WHEN ii.image_url IS NOT NULL THEN true ELSE false END as has_image,
         CASE WHEN (ii.stock > 0 OR ii.quantity > 0) THEN true ELSE false END as in_stock,

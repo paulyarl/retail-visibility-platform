@@ -127,7 +127,23 @@ export default function DirectoryClient() {
     storeCount: number;
   }>>([]);
   const [locations, setLocations] = useState<Array<{ city: string; state: string; count: number }>>([]);
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+  
+  // Persist view mode in localStorage
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('directory-view-mode');
+      return (saved as 'grid' | 'list' | 'map') || 'grid';
+    }
+    return 'grid';
+  });
+
+  // Save view mode to localStorage when it changes
+  const handleViewModeChange = (mode: 'grid' | 'list' | 'map') => {
+    setViewMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('directory-view-mode', mode);
+    }
+  };
   
   // NEW: User location for proximity-based scoring
   const [userLocation, setUserLocation] = useState<{
@@ -319,7 +335,7 @@ export default function DirectoryClient() {
             {/* View Toggle */}
             <div className="flex items-center gap-2 bg-white dark:bg-neutral-800 rounded-lg p-1 border border-neutral-200 dark:border-neutral-700">
               <button
-                onClick={() => setViewMode('grid')}
+                onClick={() => handleViewModeChange('grid')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
                   viewMode === 'grid'
                     ? 'bg-blue-600 text-white'
@@ -330,7 +346,7 @@ export default function DirectoryClient() {
                 <span className="hidden sm:inline">Grid</span>
               </button>
               <button
-                onClick={() => setViewMode('list')}
+                onClick={() => handleViewModeChange('list')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
                   viewMode === 'list'
                     ? 'bg-blue-600 text-white'
@@ -341,7 +357,7 @@ export default function DirectoryClient() {
                 <span className="hidden sm:inline">List</span>
               </button>
               <button
-                onClick={() => setViewMode('map')}
+                onClick={() => handleViewModeChange('map')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
                   viewMode === 'map'
                     ? 'bg-blue-600 text-white'

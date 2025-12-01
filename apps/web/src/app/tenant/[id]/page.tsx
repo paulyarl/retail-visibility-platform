@@ -17,6 +17,7 @@ import StorefrontActions from '@/components/products/StorefrontActions';
 import { StorefrontRecommendations } from './StorefrontClient';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 import { getCategoryUrl } from '@/utils/slug';
+import StorefrontMap from '@/components/storefront/StorefrontMap';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -482,6 +483,20 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                       </span>
                     </div>
                   )}
+                  
+                  {/* View in Directory Badge */}
+                  {directoryPublished && tenantSlug && (
+                    <Link
+                      href={`/directory/${tenantSlug}`}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:shadow-md hover:scale-105 bg-green-600 hover:bg-green-700 text-white border border-green-700"
+                      title="View this store in the directory"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span>View in Directory</span>
+                    </Link>
+                  )}
                 </div>
               ) : null}
               
@@ -505,13 +520,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
             tenantSlug={tenantSlug}
             directoryPublished={directoryPublished}
           />
-        </div>
-      </div>
-
-      {/* Store Ratings and Reviews */}
-      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <StoreRatingDisplay tenantId={id} showWriteReview={true} />
         </div>
       </div>
 
@@ -543,14 +551,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                 categories={productCategories} 
                 totalProducts={totalAllProducts} 
               />
-              
-              {/* GBP Categories Navigation */}
-              {storeCategories.length > 0 && (
-                <GBPCategoriesNav 
-                  tenantId={id} 
-                  categories={storeCategories} 
-                />
-              )}
             </aside>
           )}
 
@@ -702,6 +702,13 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           </div>
         </div>
       </main>
+
+      {/* Store Ratings and Reviews - After Products */}
+      <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <StoreRatingDisplay tenantId={id} showWriteReview={true} />
+        </div>
+      </div>
 
       {/* Map Section - How to Get There */}
       {tenant.metadata?.address && (
@@ -933,56 +940,18 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                 Quick Links
               </h3>
               <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700 mb-4">
-                <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
-                  <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Contact Information
-                </h4>
-                <div className="space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
-                  {/* Phone */}
-                  {(tenant.metadata?.phone || tenant.metadata?.phone_number) && (
-                    <a href={`tel:${tenant.metadata?.phone || tenant.metadata?.phone_number || ''}`} className="flex items-center gap-2 hover:text-primary-600 dark:hover:text-primary-400">
-                      <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                      {tenant.metadata?.phone || tenant.metadata?.phone_number}
-                    </a>
-                  )}
-
-                  {/* Email */}
-                  {tenant.metadata?.email && (
-                    <a 
-                      href={`mailto:${tenant.metadata?.email}`} 
-                      className="flex items-center gap-2 hover:text-primary-600 dark:hover:text-primary-400"
-                      suppressHydrationWarning={true}
+                <div className="space-y-3 text-sm">
+                  {/* Directory Entry Link */}
+                  {directoryPublished && tenantSlug && (
+                    <Link
+                      href={`/directory/${tenantSlug}`}
+                      className="flex items-center gap-2 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium"
                     >
-                      <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
-                      {tenant.metadata?.email}
-                    </a>
-                  )}
-
-                  {/* Website */}
-                  {tenant.metadata?.website && (
-                    <a href={tenant.metadata.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-primary-600 dark:hover:text-primary-400">
-                      <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                      </svg>
-                      {tenant.metadata.website}
-                    </a>
-                  )}
-
-                  {/* Address */}
-                  {tenant.metadata?.address && (
-                    <div className="flex items-start gap-2">
-                      <svg className="h-4 w-4 text-neutral-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span>{tenant.metadata?.address}</span>
-                    </div>
+                      View Store in Directory
+                    </Link>
                   )}
 
                   {/* Social Links */}
@@ -1052,6 +1021,18 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
               </div>
               
             </div>
+
+            {/* Store Location Map */}
+            <StorefrontMap
+              tenant={{
+                id: tenant.id,
+                businessName: businessName,
+                slug: tenantSlug,
+                metadata: tenant.metadata
+              }}
+              primaryCategory={primaryStoreCategory?.name}
+              productCount={total}
+            />
           </div>
 
           {/* Platform Branding (unless Enterprise with removal) */}

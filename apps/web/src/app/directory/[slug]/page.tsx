@@ -482,9 +482,14 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               {/* Product Categories */}
               {storefrontCategories.length > 0 && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                    Product Categories
-                  </h2>
+                  <div className="mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                      Product Categories
+                    </h2>
+                    <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">
+                      Store Product Categories
+                    </span>
+                  </div>
                   <div className="space-y-2">
                     {storefrontCategories.map((category: any) => (
                       <Link
@@ -567,9 +572,14 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             {/* GBP Categories */}
             {listing.categories && listing.categories.length > 0 && (
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Business Categories
-                </h2>
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                    Business Categories
+                  </h2>
+                  <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">
+                    Store Business Categories
+                  </span>
+                </div>
                 
                 {/* GBP Categories Pane */}
                 <div className="inline-flex flex-wrap gap-2 p-3 bg-linear-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl border border-purple-200 dark:border-purple-700/50 mb-4">
