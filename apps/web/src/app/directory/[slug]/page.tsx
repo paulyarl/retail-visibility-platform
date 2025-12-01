@@ -5,6 +5,8 @@ import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft } from 'lucide-rea
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
 import DirectoryActions from '@/components/directory/DirectoryActions';
+import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
+import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
 
 interface StoreDetailPageProps {
   params: {
@@ -46,11 +48,42 @@ async function getStoreTypeCounts() {
     }
 
     const data = await res.json();
-    console.log('Store type counts response:', data);
     return data.data?.storeTypeCounts || data.data?.store_type_counts || {};
   } catch (error) {
     console.error('Error fetching store type counts:', error);
     return {};
+  }
+}
+
+async function getAllStoreCategories() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  
+  try {
+    // Fetch all GBP store types from directory API
+    const res = await fetch(`${apiUrl}/api/directory/store-types`, {
+      next: { revalidate: 300 },
+    });
+
+    if (!res.ok) {
+      console.error('Store types API failed:', res.status, res.statusText);
+      return [];
+    }
+
+    const data = await res.json();
+    
+    // Transform to format expected by GBPCategoriesNav component
+    const storeTypes = data.data?.storeTypes || [];
+    return storeTypes.map((type: any) => ({
+      id: type.gbpCategoryId || type.slug,
+      name: type.name || type.displayName,
+      slug: type.slug,
+      count: type.storeCount || 0,
+      category_type: 'gbp_primary', // All are store types
+      is_primary: false // Not specific to this store
+    }));
+  } catch (error) {
+    console.error('Error fetching store types:', error);
+    return [];
   }
 }
 
@@ -68,7 +101,6 @@ async function getGbpCategoryCounts() {
     }
 
     const data = await res.json();
-    console.log('GBP category counts response:', data);
     
     // Convert categories array to slug->count mapping for easy lookup
     const categoryCounts: Record<string, number> = {};
@@ -262,7 +294,7 @@ async function getStoreRecommendations(tenantId: string, categorySlug?: string) 
       params.append('lng', location.longitude.toString());
     }
     
-    const response = await fetch(`${apiUrl}/api/recommendations/for-store/${tenantId}?${params}`);
+    const response = await fetch(`${apiUrl}/api/recommendations/for-storefront/${tenantId}?${params}`);
     
     if (!response.ok) return { recommendations: [] };
     
@@ -366,24 +398,36 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     notFound();
   }
 
-  // Fetch storefront categories with product counts (from materialized view!)
-  const { categories: storefrontCategories, uncategorizedCount } = await getStorefrontCategories(listing.tenant_id);
+  // Get primary category early for parallel fetching
+  const primaryCategory = listing.categories?.find((c: any) => c.isPrimary) || listing.categories?.[0];
+
+  // Fetch all independent data in parallel for better performance
+  const [
+    { categories: storefrontCategories, uncategorizedCount },
+    storeTypeCounts,
+    gbpCategoryCounts,
+    businessProfile,
+    featuredProducts,
+    allStoreCategories,
+    relatedProducts,
+    recommendations
+  ] = await Promise.all([
+    getStorefrontCategories(listing.tenant_id),
+    getStoreTypeCounts(),
+    getGbpCategoryCounts(),
+    getBusinessProfile(listing.tenant_id),
+    getFeaturedProducts(listing.tenant_id, 6),
+    getAllStoreCategories(),
+    primaryCategory ? getRelatedProducts(primaryCategory.slug, listing.tenant_id, 6) : Promise.resolve([]),
+    getStoreRecommendations(listing.tenant_id, primaryCategory?.slug)
+  ]);
+
   const totalProducts = storefrontCategories.reduce((sum: number, cat: any) => sum + (cat.count || 0), 0) + uncategorizedCount;
-
-  // Fetch store type counts for sidebar
-  const storeTypeCounts = await getStoreTypeCounts();
-
-  // Fetch GBP category counts for sidebar
-  const gbpCategoryCounts = await getGbpCategoryCounts();
-
-  // Fetch business profile for social links
-  const businessProfile = await getBusinessProfile(listing.tenant_id);
-
-  // Fetch products (all powered by materialized view!)
-  const featuredProducts = await getFeaturedProducts(listing.tenant_id, 6);
   
-  // NEW: Track user behavior for recommendations
-  await trackStoreView(listing.tenant_id, listing.categories);
+  // Track user behavior for recommendations (fire and forget, don't await)
+  trackStoreView(listing.tenant_id, listing.categories).catch(err => 
+    console.error('Failed to track store view:', err)
+  );
   
   const fullAddress = [
     listing.address,
@@ -397,13 +441,6 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
   // For RelatedStores, we need the slug (not tenant ID)
   const slugForRelated = identifier.startsWith('t-') ? listing.slug : identifier;
-
-  // Get primary category for related stores and products
-  const primaryCategory = listing.categories?.find((c: any) => c.isPrimary) || listing.categories?.[0];
-  const relatedProducts = primaryCategory ? await getRelatedProducts(primaryCategory.slug, listing.tenant_id, 6) : [];
-  
-  // NEW: Get recommendations for this store
-  const recommendations = await getStoreRecommendations(listing.tenant_id, primaryCategory?.slug);
 
   return (
     <>
@@ -434,66 +471,12 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Left Sidebar - Categories */}
             <div className="lg:col-span-3 space-y-6">
-              {/* Store Type Categories */}
-              {listing.gbpCategories && listing.gbpCategories.length > 0 && (
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                    Store Type
-                  </h2>
-                  
-                  {/* Store Type Categories Pane */}
-                  <div className="inline-flex flex-wrap gap-2 p-3 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-700/50 mb-4">
-                    {listing.gbpCategories
-                      .sort((a: any, b: any) => {
-                        if (a.isPrimary && !b.isPrimary) return -1;
-                        if (!a.isPrimary && b.isPrimary) return 1;
-                        return a.name.localeCompare(b.name);
-                      })
-                      .map((category: any) => (
-                        <Link
-                          key={category.id}
-                          href={`/directory/stores/${category.slug}`}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80 ${
-                            category.isPrimary
-                              ? 'bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600'
-                              : 'bg-white/60 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600'
-                          }`}
-                        >
-                          <span className="text-base">
-                            {category.name === 'Grocery store' && '🏪'}
-                            {category.name === 'Electronics store' && '🛍️'}
-                            {category.name === 'Shoe store' && '👟'}
-                            {category.name === 'Supermarket' && '🛒'}
-                            {category.name === 'Clothing store' && '👕'}
-                            {category.name === 'Hardware store' && '🔧'}
-                            {category.name === 'Restaurant' && '🍽️'}
-                            {category.name === 'Pharmacy' && '💊'}
-                            {category.name === 'Bookstore' && '📚'}
-                            {category.name === 'Pet store' && '🐕'}
-                            {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(category.name) && '🏢'}
-                          </span>
-                          <span>{category.name}</span>
-                          <span className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded-full">
-                            {storeTypeCounts[category.slug] || 0} stores
-                          </span>
-                          {category.isPrimary && (
-                            <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-full">
-                              Primary
-                            </span>
-                          )}
-                        </Link>
-                      ))}
-                  </div>
-                  
-                  <div className="mt-3 text-right">
-                    <Link
-                      href="/directory/stores"
-                      className="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium"
-                    >
-                      Browse all store types →
-                    </Link>
-                  </div>
-                </div>
+              {/* Browse by Store Type - Using working component from storefront */}
+              {allStoreCategories.length > 0 && (
+                <GBPCategoriesNav 
+                  tenantId={listing.tenant_id}
+                  categories={allStoreCategories}
+                />
               )}
 
               {/* Product Categories */}
@@ -564,6 +547,11 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   )}
                 </div>
                 <DirectoryActions listing={listing} currentUrl={currentUrl} />
+              </div>
+
+              {/* Store Ratings and Reviews */}
+              <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+                <StoreRatingDisplay tenantId={listing.tenant_id} showWriteReview={true} />
               </div>
 
               {listing.description && (
@@ -843,7 +831,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                         {product.name || product.title}
                       </h3>
                       <p className="text-sm font-semibold text-gray-900 mt-1">
-                        ${product.price}
+                        ${Number(product.price).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -897,7 +885,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                         {product.storeName}
                       </p>
                       <p className="text-sm font-semibold text-gray-900 mt-1">
-                        ${product.price}
+                        ${Number(product.price).toFixed(2)}
                       </p>
                     </div>
                   </div>

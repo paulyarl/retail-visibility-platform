@@ -179,7 +179,7 @@ type Cat = { id?: string | null; slug?: string | null; name: string };
 async function fetchPlatformCategories(tenantId: string | null): Promise<Cat[]> {
   if (!tenantId) return [];
   try {
-    const rows = await prisma.tenantCategory.findMany({
+    const rows = await prisma.directoryCategory.findMany({
       where: { tenantId, isActive: true },
       select: { slug: true, name: true },
       orderBy: { sortOrder: 'asc' },

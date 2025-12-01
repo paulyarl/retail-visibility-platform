@@ -26,6 +26,7 @@ interface AuthContextType {
   register: (email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
+  getAccessToken: () => string | null;
   currentTenantId: string | null;
   switchTenant: (tenantId: string) => void;
 }
@@ -276,6 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     refreshToken,
+    getAccessToken,
     currentTenantId,
     switchTenant,
   };

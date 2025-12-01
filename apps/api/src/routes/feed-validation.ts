@@ -18,7 +18,7 @@ function normalizeSku(v: unknown) {
 async function getGoogleCategoryIdForItem(tenantId: string, categoryPath: string[] | null) {
   if (!Array.isArray(categoryPath) || categoryPath.length === 0) return null
   const slug = categoryPath[categoryPath.length - 1]
-  const tenantCat = await prisma.tenantCategory.findFirst({ where: { tenantId, slug, isActive: true } })
+  const tenantCat = await prisma.directoryCategory.findFirst({ where: { tenantId, slug, isActive: true } })
   return tenantCat?.googleCategoryId || null
 }
 

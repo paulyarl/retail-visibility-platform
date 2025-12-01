@@ -84,7 +84,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const skip = (pageNum - 1) * limitNum;
     
     // Build WHERE clause
-    const conditions: string[] = ['tenant_id = $1'];
+    const conditions: string[] = ['ii.tenant_id = $1'];
     const params: any[] = [tenantId];
     let paramIndex = 2;
     
@@ -115,18 +115,18 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     
     const whereClause = conditions.join(' AND ');
     
-    // Query materialized view (FAST! No JOINs!)
+    // Query base tables for individual products (MV is aggregated)
     const query = `
       SELECT 
-        id,
-        tenant_id,
-        sku,
-        name,
-        title,
-        description,
-        marketing_description,
-        price,
-        price_cents,
+        ii.id,
+        ii.tenant_id,
+        ii.sku,
+        ii.name,
+        ii.name as title,
+        ii.description,
+        ii.marketing_description,
+        ii.price_cents / 100.0 as price,
+        ii.price_cents,
         currency,
         stock,
         quantity,
@@ -144,24 +144,26 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         custom_branding,
         custom_sections,
         landing_page_theme,
-        category_id,
-        category_name,
-        category_slug,
-        google_category_id,
-        has_image,
-        in_stock,
-        has_gallery,
-        created_at,
-        updated_at
-      FROM public.storefront_products
+        dcl.id as category_id,
+        dcl.name as category_name,
+        dcl.slug as category_slug,
+        dcl.google_category_id,
+        CASE WHEN ii.image_url IS NOT NULL THEN true ELSE false END as has_image,
+        CASE WHEN (ii.stock > 0 OR ii.quantity > 0) THEN true ELSE false END as in_stock,
+        CASE WHEN array_length(ii.image_gallery, 1) > 0 THEN true ELSE false END as has_gallery,
+        ii.created_at,
+        ii.updated_at
+      FROM inventory_items ii
+      LEFT JOIN directory_categories_list dcl ON dcl.id = ii.directory_category_id
       WHERE ${whereClause}
-      ORDER BY updated_at DESC
+      ORDER BY ii.updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
     const countQuery = `
       SELECT COUNT(*) as count
-      FROM public.storefront_products
+      FROM inventory_items ii
+      LEFT JOIN directory_categories_list dcl ON dcl.id = ii.directory_category_id
       WHERE ${whereClause}
     `;
     
@@ -232,7 +234,8 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
 
 /**
  * GET /api/storefront/:tenantId/categories
- * Get category list with product counts for storefront sidebar
+ * Get product category list with counts for storefront sidebar
+ * Uses storefront_category_counts materialized view
  * Performance: <5ms
  */
 router.get('/:tenantId/categories', async (req: Request, res: Response) => {
@@ -243,27 +246,32 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'tenant_required' });
     }
     
-    // Query category counts from materialized view
+    // Query product category counts from storefront_category_counts MV
     const query = `
       SELECT 
         category_id,
         category_name,
         category_slug,
-        google_category_id,
-        COUNT(*) as count
-      FROM public.storefront_products
+        product_count as count,
+        products_with_images,
+        products_with_descriptions,
+        avg_price_cents,
+        min_price_cents,
+        max_price_cents
+      FROM storefront_category_counts
       WHERE tenant_id = $1
-        AND category_slug IS NOT NULL
-      GROUP BY category_id, category_name, category_slug, google_category_id
-      ORDER BY category_name ASC
+        AND product_count > 0
+      ORDER BY category_level ASC, category_name ASC
     `;
     
     // Get uncategorized count
     const uncategorizedQuery = `
       SELECT COUNT(*) as count
-      FROM public.storefront_products
-      WHERE tenant_id = $1
-        AND category_slug IS NULL
+      FROM inventory_items ii
+      WHERE ii.tenant_id = $1
+        AND ii.item_status = 'active'
+        AND ii.visibility = 'public'
+        AND ii.directory_category_id IS NULL
     `;
     
     const [categoriesResult, uncategorizedResult] = await Promise.all([
@@ -275,8 +283,12 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       id: row.category_id,
       name: row.category_name,
       slug: row.category_slug,
-      googleCategoryId: row.google_category_id,
       count: parseInt(row.count),
+      productsWithImages: row.products_with_images,
+      productsWithDescriptions: row.products_with_descriptions,
+      avgPriceCents: row.avg_price_cents,
+      minPriceCents: row.min_price_cents,
+      maxPriceCents: row.max_price_cents,
     }));
     
     const uncategorizedCount = parseInt(uncategorizedResult.rows[0]?.count || '0');

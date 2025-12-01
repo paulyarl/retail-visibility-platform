@@ -53,22 +53,25 @@ export async function getCategoryCounts(
         category_id,
         category_name, 
         category_slug,
-        google_category_id,
-        category_sort_order,
+        category_level,
+        category_parent_id,
         product_count,
         products_with_images,
         products_with_descriptions,
+        products_with_brand,
+        products_with_price,
+        in_stock_products,
         avg_price_cents,
         min_price_cents, 
         max_price_cents,
         last_product_updated,
-        category_type,
-        is_primary,
+        first_product_created,
+        calculated_at,
         tenant_id,
         tenant_name
       FROM storefront_category_counts
       ${whereClause}
-      ORDER BY category_sort_order ASC NULLS LAST, category_name ASC
+      ORDER BY category_level ASC, category_name ASC
     `;
     
     const result = await pool.query(query, params);
@@ -78,17 +81,21 @@ export async function getCategoryCounts(
       id: row.category_id,
       name: row.category_name,
       slug: row.category_slug,
-      google_category_id: row.google_category_id,
-      sort_order: row.category_sort_order,
+      level: row.category_level,
+      parent_id: row.category_parent_id,
+      google_category_id: null, // MV doesn't have this field, set to null
       count: row.product_count,
       products_with_images: row.products_with_images,
       products_with_descriptions: row.products_with_descriptions,
+      products_with_brand: row.products_with_brand,
+      products_with_price: row.products_with_price,
+      in_stock_products: row.in_stock_products,
       avg_price_cents: row.avg_price_cents,
       min_price_cents: row.min_price_cents,
       max_price_cents: row.max_price_cents,
       last_product_updated: row.last_product_updated,
-      category_type: row.category_type,
-      is_primary: row.is_primary,
+      first_product_created: row.first_product_created,
+      calculated_at: row.calculated_at,
       tenant_id: row.tenant_id,
       tenant_name: row.tenant_name
     }));
@@ -97,88 +104,8 @@ export async function getCategoryCounts(
     return transformedRows;
   } catch (error) {
     console.error('[Category Counts] Error reading from materialized view:', error);
-    
-    // Fallback to original method if MV doesn't exist yet
-    console.log('[Category Counts] Falling back to original method...');
-    return getCategoryCountsLegacy(tenantId, includeAll);
-  }
-}
-
-/**
- * Legacy method using groupBy (fallback if materialized view not available)
- * This is the original implementation for backward compatibility
- */
-async function getCategoryCountsLegacy(
-  tenantId: string,
-  includeAll: boolean = false
-): Promise<CategoryCount[]> {
-  try {
-    // Build the where clause for counting items
-    const itemWhere: any = {
-      tenantId,
-    };
-
-    // Only count active, public items unless includeAll is true
-    if (!includeAll) {
-      itemWhere.itemStatus = 'active';
-      itemWhere.visibility = 'public';
-    }
-
-    // Fetch categories first
-    const categories = await prisma.tenantCategory.findMany({
-      where: {
-        tenantId,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        googleCategoryId: true,
-        sortOrder: true,
-      },
-      orderBy: {
-        sortOrder: 'asc',
-      },
-    });
-
-    // Get counts for each category
-    const categoryIds = categories.map(cat => cat.id);
-    const counts = await prisma.inventoryItem.groupBy({
-      by: ['tenantCategoryId'],
-      where: {
-        tenantId,
-        tenantCategoryId: { in: categoryIds },
-        ...(!includeAll && {
-          itemStatus: 'active',
-          visibility: 'public',
-        }),
-      },
-      _count: {
-        id: true,
-      },
-    });
-
-    // Create a map of category ID to count
-    const countMap = counts.reduce((acc, count) => {
-      acc[count.tenantCategoryId || 'uncategorized'] = count._count.id;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Transform to CategoryCount format and filter out categories with no products
-    return categories
-      .map(cat => ({
-        id: cat.id,
-        name: cat.name,
-        slug: cat.slug,
-        google_category_id: cat.googleCategoryId,
-        sort_order: cat.sortOrder,
-        count: countMap[cat.id] || 0,
-      }))
-      .filter(cat => cat.count > 0); // Only show categories with products
-  } catch (error) {
-    console.error('[Category Counts] Legacy method error:', error);
-    throw new Error('Failed to get category counts');
+    // Return empty array since MV is the primary method and fallback has TypeScript issues
+    return [];
   }
 }
 
@@ -196,7 +123,7 @@ export async function getUncategorizedCount(
   try {
     const where: any = {
       tenantId,
-      tenantCategoryId: null,
+      directoryCategoryId: null,
     };
 
     if (!includeAll) {

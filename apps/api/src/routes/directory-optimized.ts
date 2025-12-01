@@ -36,7 +36,7 @@ router.get('/categories/:categoryId/stores', async (req: Request, res: Response)
     const offset = (pageNum - 1) * limitNum;
     
     // Build WHERE clause
-    let whereClause = 'category_id = $1 AND is_published = true AND directory_visible = true';
+    let whereClause = 'category_id = $1 AND is_published = true';
     let params: any[] = [categoryId];
     let paramIndex = 2;
     
@@ -94,7 +94,6 @@ router.get('/categories/:categoryId/stores', async (req: Request, res: Response)
         rating_avg,
         rating_count,
         is_featured,
-        is_primary,
         store_tier,
         avg_price_dollars,
         min_price_cents,
@@ -182,7 +181,6 @@ router.get('/categories/:categoryId/summary', async (req: Request, res: Response
         SUM(actual_product_count) as total_products,
         AVG(quality_score) as avg_quality_score,
         COUNT(*) FILTER (WHERE is_featured = true) as featured_stores,
-        COUNT(*) FILTER (WHERE is_primary = true) as primary_stores,
         COUNT(DISTINCT state) as states_represented,
         COUNT(DISTINCT city) as cities_represented,
         AVG(avg_price_dollars) as avg_price_dollars,
@@ -196,7 +194,6 @@ router.get('/categories/:categoryId/summary', async (req: Request, res: Response
       FROM directory_category_products
       WHERE category_id = $1
         AND is_published = true
-        AND directory_visible = true
     `;
     
     const result = await getDirectPool().query(query, [categoryId]);
@@ -248,7 +245,7 @@ router.get('/categories/featured', async (req: Request, res: Response) => {
     const { limit = '10', state } = req.query;
     const limitNum = parseInt(limit as string);
     
-    let whereClause = 'is_published = true AND directory_visible = true AND actual_product_count > 0';
+    let whereClause = 'is_published = true AND actual_product_count > 0';
     let params: any[] = [];
     let paramIndex = 1;
     
@@ -311,7 +308,7 @@ router.get('/stores/featured', async (req: Request, res: Response) => {
     const { limit = '20', category, state } = req.query;
     const limitNum = parseInt(limit as string);
     
-    let whereClause = 'is_published = true AND directory_visible = true AND actual_product_count > 0';
+    let whereClause = 'is_published = true AND actual_product_count > 0';
     let params: any[] = [];
     let paramIndex = 1;
     
@@ -408,7 +405,7 @@ router.get('/search', async (req: Request, res: Response) => {
     const offset = (pageNum - 1) * limitNum;
     
     // Build WHERE clause for search
-    let whereClause = 'is_published = true AND directory_visible = true AND actual_product_count > 0';
+    let whereClause = 'is_published = true AND actual_product_count > 0';
     let params: any[] = [];
     let paramIndex = 1;
     

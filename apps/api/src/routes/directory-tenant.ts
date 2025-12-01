@@ -274,8 +274,21 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
         bp.website,
         bp.latitude,
         bp.longitude,
-        ds.primary_category,
-        ds.secondary_categories,
+        -- Use Platform Directory Categories instead of GBP categories
+        COALESCE(
+          (SELECT dc.name FROM directory_categories_list dc 
+           WHERE dc.tenant_id = t.id AND dc.is_active = true 
+           ORDER BY dc.sort_order ASC LIMIT 1), 
+          'Uncategorized'
+        ) as primary_category,
+        COALESCE(
+          ARRAY(
+            SELECT dc.name FROM directory_categories_list dc 
+            WHERE dc.tenant_id = t.id AND dc.is_active = true 
+            ORDER BY dc.sort_order ASC OFFSET 1
+          ),
+          ARRAY[]::text[]
+        ) as secondary_categories,
         bp.logo_url,
         ds.seo_description as description,
         true as is_published,

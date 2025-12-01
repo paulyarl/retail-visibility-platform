@@ -1,0 +1,209 @@
+"use client";
+
+import { useEffect, useRef, useState } from 'react';
+
+interface DirectoryListing {
+  id: string;
+  businessName: string;
+  slug: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  latitude?: number;
+  longitude?: number;
+  logoUrl?: string;
+  primaryCategory?: string;
+  ratingAvg: number;
+  productCount: number;
+}
+
+interface DirectoryMapGoogleProps {
+  listings: DirectoryListing[];
+  center?: { lat: number; lng: number };
+  zoom?: number;
+}
+
+export default function DirectoryMapGoogle({ 
+  listings, 
+  center = { lat: 39.8283, lng: -98.5795 }, // Center of USA
+  zoom = 4 
+}: DirectoryMapGoogleProps) {
+  const mapRef = useRef<any>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const markersRef = useRef<any[]>([]);
+  const infoWindowRef = useRef<any>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filter listings with valid coordinates
+  const validListings = listings.filter(l => l.latitude && l.longitude);
+
+  useEffect(() => {
+    // Check if Google Maps is already loaded
+    if ((window as any).google && (window as any).google.maps) {
+      setIsLoaded(true);
+      return;
+    }
+
+    // Load Google Maps script
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      setError('Google Maps API key not configured');
+      console.error('[DirectoryMapGoogle] NEXT_PUBLIC_GOOGLE_MAPS_API_KEY not set');
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=marker`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setIsLoaded(true);
+    script.onerror = () => setError('Failed to load Google Maps');
+    document.head.appendChild(script);
+
+    return () => {
+      // Cleanup script on unmount
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded || !mapContainerRef.current || !(window as any).google) return;
+
+    const google = (window as any).google;
+
+    // Initialize map
+    if (!mapRef.current) {
+      mapRef.current = new google.maps.Map(mapContainerRef.current, {
+        center,
+        zoom,
+        mapTypeControl: true,
+        streetViewControl: true,
+        fullscreenControl: true,
+        zoomControl: true,
+      });
+
+      // Create single info window for all markers
+      infoWindowRef.current = new google.maps.InfoWindow();
+    }
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = [];
+
+    // Add markers for each listing
+    validListings.forEach((listing) => {
+      if (!listing.latitude || !listing.longitude || !mapRef.current) return;
+
+      const marker = new google.maps.Marker({
+        position: { lat: listing.latitude, lng: listing.longitude },
+        map: mapRef.current,
+        title: listing.businessName,
+        animation: google.maps.Animation.DROP,
+      });
+
+      // Create info window content
+      const infoContent = `
+        <div style="padding: 12px; max-width: 250px;">
+          <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #111;">
+            ${listing.businessName}
+          </h3>
+          ${listing.address ? `
+            <p style="margin: 4px 0; font-size: 14px; color: #666;">
+              ${listing.address}
+            </p>
+          ` : ''}
+          ${listing.city || listing.state ? `
+            <p style="margin: 4px 0; font-size: 14px; color: #666;">
+              ${[listing.city, listing.state].filter(Boolean).join(', ')}
+            </p>
+          ` : ''}
+          ${listing.ratingAvg > 0 ? `
+            <p style="margin: 8px 0 4px 0; font-size: 14px; color: #666;">
+              ⭐ ${listing.ratingAvg.toFixed(1)} rating
+            </p>
+          ` : ''}
+          ${listing.productCount > 0 ? `
+            <p style="margin: 4px 0; font-size: 14px; color: #666;">
+              ${listing.productCount} products
+            </p>
+          ` : ''}
+          <a 
+            href="/directory/${listing.slug}" 
+            style="display: inline-block; margin-top: 8px; padding: 6px 12px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;"
+          >
+            View Store
+          </a>
+        </div>
+      `;
+
+      // Add click listener to show info window
+      marker.addListener('click', () => {
+        if (infoWindowRef.current && mapRef.current) {
+          infoWindowRef.current.setContent(infoContent);
+          infoWindowRef.current.open(mapRef.current, marker);
+        }
+      });
+
+      markersRef.current.push(marker);
+    });
+
+    // Fit bounds to show all markers
+    if (validListings.length > 0 && mapRef.current) {
+      const bounds = new google.maps.LatLngBounds();
+      validListings.forEach(listing => {
+        if (listing.latitude && listing.longitude) {
+          bounds.extend({ lat: listing.latitude, lng: listing.longitude });
+        }
+      });
+      mapRef.current.fitBounds(bounds);
+      
+      // Prevent too much zoom for single marker
+      const listener = google.maps.event.addListener(mapRef.current, 'idle', () => {
+        if (mapRef.current && mapRef.current.getZoom()! > 15) {
+          mapRef.current.setZoom(15);
+        }
+        google.maps.event.removeListener(listener);
+      });
+    }
+  }, [isLoaded, validListings, center, zoom]);
+
+  if (error) {
+    return (
+      <div className="w-full h-[600px] bg-gray-100 rounded-lg flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 font-medium mb-2">Map Error</p>
+          <p className="text-gray-600 text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="w-full h-[600px] bg-gray-100 rounded-lg flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-[600px] rounded-lg overflow-hidden shadow-lg">
+      <div ref={mapContainerRef} className="w-full h-full" />
+      {validListings.length === 0 && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-white rounded-lg p-6 text-center">
+            <p className="text-gray-900 font-medium">No stores with locations to display</p>
+            <p className="text-gray-600 text-sm mt-2">Stores need coordinates to appear on the map</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

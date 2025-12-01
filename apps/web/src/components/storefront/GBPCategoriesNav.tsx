@@ -45,7 +45,7 @@ export default function GBPCategoriesNav({ tenantId, categories }: GBPCategories
         {sortedCategories.map((category) => (
           <Link
             key={category.id}
-            href={`/directory?store_type=${encodeURIComponent(category.slug)}`}
+            href={`/directory/stores/${category.slug}`}
             className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-primary-600 dark:hover:text-primary-400`}
           >
             <div className="flex items-center gap-2">

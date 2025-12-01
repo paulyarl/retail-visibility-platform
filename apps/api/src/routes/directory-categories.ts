@@ -68,7 +68,7 @@ router.get('/categories', async (req: Request, res: Response) => {
     const { lat, lng, radius } = req.query;
 
     // Query platform_categories directly to get ALL available categories
-    // This ensures categories are available even for new stores
+    // Use directory_category_products for store/product counts since stats view is empty
     const result = await getDirectPool().query(`
       SELECT 
         pc.id,
@@ -77,10 +77,18 @@ router.get('/categories', async (req: Request, res: Response) => {
         pc.google_category_id,
         pc.icon_emoji,
         pc.sort_order,
-        COALESCE(dcs.store_count, 0) as store_count,
-        COALESCE(dcs.total_products, 0) as total_products
+        COALESCE(dcp.store_count, 0) as store_count,
+        COALESCE(dcp.product_count, 0) as total_products
       FROM platform_categories pc
-      LEFT JOIN directory_category_stats dcs ON dcs.category_slug = pc.slug
+      LEFT JOIN (
+        SELECT 
+          category_slug,
+          COUNT(DISTINCT tenant_id) as store_count,
+          SUM(CAST(actual_product_count AS INTEGER)) as product_count
+        FROM directory_category_products 
+        WHERE is_published = true
+        GROUP BY category_slug
+      ) dcp ON dcp.category_slug = pc.slug
       WHERE pc.is_active = true
       ORDER BY pc.sort_order ASC, pc.name ASC
     `);

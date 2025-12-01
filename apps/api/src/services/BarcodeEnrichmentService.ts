@@ -63,7 +63,7 @@ export class BarcodeEnrichmentService {
 
     // Try to match by Google category ID first (most accurate)
     if (googleCategoryId) {
-      const byGoogleId = await prisma.tenantCategory.findFirst({
+      const byGoogleId = await prisma.directoryCategory.findFirst({
         where: {
           tenantId,
           googleCategoryId,
@@ -79,7 +79,7 @@ export class BarcodeEnrichmentService {
 
     // Try to match by name similarity
     const categoryName = categoryPath[categoryPath.length - 1]; // Use most specific category
-    const byName = await prisma.tenantCategory.findFirst({
+    const byName = await prisma.directoryCategory.findFirst({
       where: {
         tenantId,
         name: {

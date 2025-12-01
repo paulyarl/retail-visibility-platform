@@ -11,8 +11,8 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
-// Dynamically import map to avoid SSR issues
-const DirectoryMap = dynamic(() => import('@/components/directory/DirectoryMap'), {
+// Dynamically import Google Maps to avoid SSR issues
+const DirectoryMapGoogle = dynamic(() => import('@/components/directory/DirectoryMapGoogle'), {
   ssr: false,
   loading: () => <div className="w-full h-[600px] bg-gray-100 rounded-lg flex items-center justify-center">Loading map...</div>
 });
@@ -25,7 +25,10 @@ interface DirectoryListing {
   address?: string;
   city?: string;
   state?: string;
+  zipCode?: string;
   phone?: string;
+  latitude?: number;
+  longitude?: number;
   logoUrl?: string;
   primaryCategory?: string;
   ratingAvg: number;
@@ -320,7 +323,7 @@ export default function StoreTypeViewClient({
         )}
 
         {viewMode === 'map' && (
-          <DirectoryMap
+          <DirectoryMapGoogle
             listings={data?.listings || []}
           />
         )}

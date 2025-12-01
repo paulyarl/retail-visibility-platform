@@ -31,7 +31,7 @@ export async function getDirectoryCategoryCounts(options?: {
   try {
     const { minProducts = 1, featuredOnly = false } = options || {};
     
-    let whereClause = 'is_published = true AND directory_visible = true AND actual_product_count >= $1';
+    let whereClause = 'is_published = true AND actual_product_count >= $1';
     let params: any[] = [];
     let paramIndex = 2;
     
@@ -44,25 +44,25 @@ export async function getDirectoryCategoryCounts(options?: {
     
     const minProductsParam = 1;
     
-    // Use a simple, clean query without template literals
+    // Use a simple, clean query that matches the actual MV structure
     const query = `
       SELECT 
         category_id as "categoryId",
         category_name as "categoryName",
         category_slug as "categorySlug",
         category_icon as "categoryIcon",
-        category_level as "categoryLevel",
+        1 as "categoryLevel",
         COUNT(DISTINCT tenant_id) as "totalStores",
         SUM(actual_product_count) as "totalProducts",
         AVG(quality_score) as "avgQualityScore",
         COUNT(*) FILTER (WHERE is_featured = true) as "featuredStores",
         AVG(avg_price_dollars) as "avgPriceDollars",
-        COUNT(DISTINCT 'state') as "statesRepresented",
+        COUNT(DISTINCT state) as "statesRepresented",
         SUM(recently_updated_products) as "recentlyUpdatedProducts",
         COUNT(*) FILTER (WHERE product_volume_level = 'high') as "highVolumeStores"
       FROM directory_category_products
       WHERE ${whereClause}
-      GROUP BY category_id, category_name, category_slug, category_icon, category_level
+      GROUP BY category_id, category_name, category_slug, category_icon
       HAVING SUM(actual_product_count) >= $1
       ORDER BY SUM(actual_product_count) DESC, COUNT(DISTINCT tenant_id) DESC, AVG(quality_score) DESC NULLS LAST
     `;
@@ -98,21 +98,21 @@ export async function getFeaturedCategories(limit: number = 10): Promise<Directo
  */
 export async function getPlatformDirectoryCategoryCounts(): Promise<DirectoryCategoryCount[]> {
   try {
-    // Query platform categories and count stores assigned to each category
+    // Query using directory_category_products since directory_category_stats is empty
+    // Note: directory_visible is already filtered in the materialized view
     const query = `
       SELECT 
         category_slug as "categorySlug",
         category_name as "categoryName",
         category_icon as "categoryIcon",
-        store_count as "totalStores",
-        COALESCE(total_products, '0') as "totalProducts",
-        CASE 
-          WHEN primary_store_count > 0 THEN 1 
-          ELSE 0 
-        END as "isPrimary"
-      FROM directory_category_stats
-      WHERE store_count > 0
-      ORDER BY store_count DESC, category_name ASC
+        COUNT(DISTINCT tenant_id) as "totalStores",
+        SUM(CAST(actual_product_count AS INTEGER)) as "totalProducts",
+        0 as "isPrimary"
+      FROM directory_category_products
+      WHERE is_published = true
+      GROUP BY category_slug, category_name, category_icon
+      HAVING COUNT(DISTINCT tenant_id) > 0
+      ORDER BY COUNT(DISTINCT tenant_id) DESC, category_name ASC
     `;
     
     const result = await getDirectPool().query(query);
@@ -150,8 +150,7 @@ export async function getCategorySummary(categoryId: string): Promise<DirectoryC
         STRING_AGG(DISTINCT state, ', ') as statesList
       FROM directory_category_products
       WHERE category_id = $1
-        AND is_published = true 
-        AND directory_visible = true
+        AND is_published = true
       GROUP BY category_id, category_name, category_slug, category_icon, category_level
     `;
     
@@ -188,7 +187,7 @@ export async function getDirectoryStats(): Promise<{
         COUNT(DISTINCT state) as "statesRepresented",
         SUM(recently_updated_products) as "recentlyUpdatedProducts"
       FROM directory_category_products
-      WHERE is_published = true AND directory_visible = true
+      WHERE is_published = true
     `;
     
     const result = await getDirectPool().query(query);

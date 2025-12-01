@@ -7,12 +7,10 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const query = url.searchParams.toString();
   const upstreamUrl = `${base}/api/tenants${query ? `?${query}` : ''}`;
-
-  console.log('[API Proxy] Fetching tenants from:', upstreamUrl);
   
   // Forward Authorization header from client to backend
   const authHeader = req.headers.get('authorization');
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
   
@@ -21,8 +19,6 @@ export async function GET(req: Request) {
   }
   
   const res = await fetch(upstreamUrl, { headers });
-  
-  console.log('[API Proxy] Response status:', res.status);
   
   if (!res.ok) {
     const text = await res.text();

@@ -81,7 +81,7 @@ export async function createQuickStartCategoriesForTenant(tenantId: string): Pro
   
   for (const category of categories) {
     try {
-      await prisma.tenantCategory.create({
+      await prisma.directoryCategory.create({
         data: {
           /**id: `cat_${tenantId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, */
           id: generateQsCatId(),

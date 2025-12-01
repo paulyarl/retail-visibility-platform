@@ -34,7 +34,7 @@ router.patch('/categories/:id', authenticateToken, requireAdmin, async (req: Req
     const { id } = req.params;
     const name = String(req.body?.name || '').trim();
     if (!name) return res.status(400).json({ success: false, error: 'invalid_payload' });
-    const updated = await categoryService.updateTenantCategory('platform', id, { name });
+    const updated = await categoryService.updateDirectoryCategory('platform', id, { name });
     return res.json({ success: true, data: updated });
   } catch (e: any) {
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
@@ -44,7 +44,7 @@ router.patch('/categories/:id', authenticateToken, requireAdmin, async (req: Req
 router.delete('/categories/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await categoryService.softDeleteTenantCategory('platform', id);
+    await categoryService.softDeleteDirectoryCategory('platform', id);
     return res.status(204).send();
   } catch (e: any) {
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
@@ -72,7 +72,7 @@ router.post('/categories/quick-start', authenticateToken, requireAdmin, async (r
     for (const category of categoriesToCreate) {
       try {
         // Check if category already exists
-        const existing = await prisma.tenantCategory.findFirst({
+        const existing = await prisma.directoryCategory.findFirst({
           where: {
             tenantId: 'platform',
             slug: category.slug,
@@ -84,7 +84,7 @@ router.post('/categories/quick-start', authenticateToken, requireAdmin, async (r
           continue;
         }
         
-        const created = await prisma.tenantCategory.create({
+        const created = await prisma.directoryCategory.create({
           data: {
             id: generateQsCatId(),
             tenantId: 'platform',

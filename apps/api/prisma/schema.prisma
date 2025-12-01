@@ -50,6 +50,7 @@ model Tenant {
   businessHours               BusinessHours?
   businessHoursSpecial        BusinessHoursSpecial[]
   categoryMirrorRuns          CategoryMirrorRuns[]
+  directoryCategories         DirectoryCategory[]           @relation("DirectoryCategories")
   googleOauthAccounts         GoogleOauthAccounts[]
   inventoryItems              InventoryItem[]
   invitations                 Invitation[]
@@ -63,6 +64,8 @@ model Tenant {
   scanResults                 ScanResults[]
   scanSessions                ScanSessions[]
   scanTemplates               ScanTemplates[]
+  storeReviews                StoreReview[]
+  ratingSummary               StoreRatingSummary?
 
   @@index([directoryVisible], map: "idx_tenant_directory_visible")
   @@index([googleSyncEnabled, googleLastSync], map: "idx_tenant_google_sync")
@@ -520,7 +523,7 @@ model InventoryItem {
   availability         AvailabilityStatus      @default(in_stock) @map("availability") 
   brand                String                   @map("brand")
   categoryPath         String[]                 @default([]) @map("category_path")
-  tenantCategoryId     String?                  @map("tenant_category_id")
+  directoryCategoryId  String?                  @map("directory_category_id")
   condition            ProductCondition?       @default(brand_new) @map("condition")
   currency             String                   @default("USD") @db.Char(3) @map("currency")
   description          String?                  @map("description")
@@ -548,7 +551,7 @@ model InventoryItem {
   missingSpecs         Boolean                  @default(false) @map("missing_specs")
   missingBrand         Boolean                  @default(false) @map("missing_brand")
   tenant               Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  tenantCategory       TenantCategory?          @relation(fields: [tenantCategoryId], references: [id], onDelete: SetNull)
+  directoryCategory    DirectoryCategory?       @relation(fields: [directoryCategoryId], references: [id], onDelete: SetNull)
   photoAsset           PhotoAsset[]            @relation("InventoryItemPhotos")
   productPerformance   ProductPerformance[]    @relation("InventoryItemPerformance")
 
@@ -1020,7 +1023,7 @@ model TenantBusinessProfile {
   @@map("tenant_business_profiles_list")
 }
 
-model TenantCategory {
+model DirectoryCategory {
   id                 String @id @map("id")
   tenantId          String @map("tenant_id")
   name               String @map("name")
@@ -1031,8 +1034,12 @@ model TenantCategory {
   sortOrder         Int      @default(0) @map("sort_order")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @map("updated_at")
+  
+  // Relations
+  tenant            Tenant @relation("DirectoryCategories", fields: [tenantId], references: [id], onDelete: Cascade)
   inventoryItems    InventoryItem[]
-  @@map("tenant_categories_list")
+  
+  @@map("directory_categories_list")
 }
 
 model TenantFeatureFlags {
@@ -1163,8 +1170,9 @@ model User {
   invitations               Invitation[]
   userSessions              UserSession[] 
   userTenants               UserTenant[]
+  storeReviews              StoreReview[]
+  helpfulVotes              ReviewHelpfulVote[]
 }
-
 
 enum LocationStatus {
   pending  
@@ -1311,4 +1319,64 @@ enum UserTenantRole {
   MEMBER @map("MEMBER")
   VIEWER @map("VIEWER")
   @@map("user_tenant_role")
+}
+
+// Store Reviews System Models
+model StoreReview {
+  id                   String    @id @default(cuid()) @map("id")
+  tenantId             String    @map("tenant_id")
+  userId               String    @map("user_id")
+  rating               Int       @map("rating")
+  reviewText           String?   @map("review_text")
+  helpfulCount         Int       @default(0) @map("helpful_count")
+  verifiedPurchase     Boolean   @default(false) @map("verified_purchase")
+  locationLat          Decimal?  @map("location_lat")
+  locationLng          Decimal?  @map("location_lng")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  helpfulVotes         ReviewHelpfulVote[]
+  
+  // Constraints
+  @@unique([tenantId, userId])
+  @@map("store_reviews")
+}
+
+model StoreRatingSummary {
+  tenantId                String    @id @map("tenant_id")
+  ratingAvg               Decimal   @default(0.00) @map("rating_avg")
+  ratingCount             Int       @default(0) @map("rating_count")
+  rating1Count            Int       @default(0) @map("rating_1_count")
+  rating2Count            Int       @default(0) @map("rating_2_count")
+  rating3Count            Int       @default(0) @map("rating_3_count")
+  rating4Count            Int       @default(0) @map("rating_4_count")
+  rating5Count            Int       @default(0) @map("rating_5_count")
+  helpfulCountTotal       Int       @default(0) @map("helpful_count_total")
+  verifiedPurchaseCount   Int       @default(0) @map("verified_purchase_count")
+  lastReviewAt            DateTime? @map("last_review_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  tenant                  Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  @@map("store_rating_summary")
+}
+
+model ReviewHelpfulVote {
+  id         String   @id @default(cuid()) @map("id")
+  reviewId   String   @map("review_id")
+  userId     String   @map("user_id")
+  isHelpful  Boolean  @map("is_helpful")
+  createdAt  DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  review     StoreReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Constraints
+  @@unique([reviewId, userId])
+  @@map("review_helpful_votes")
 }

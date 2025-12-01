@@ -20,9 +20,7 @@ const router = Router();
  */
 router.get('/status', authenticateToken, async (req, res) => {
   try {
-    console.log('[Tenant Limits] User from request:', req.user);
     if (!req.user) {
-      console.log('[Tenant Limits] No user found in request');
       return res.status(401).json({ error: 'authentication_required' });
     }
 

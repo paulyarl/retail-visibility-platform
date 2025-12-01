@@ -97,10 +97,28 @@ router.get('/store-types/:typeSlug', async (req: Request, res: Response) => {
 
     const storeType = await storeTypeDirectoryService.getStoreTypeDetails(typeSlug);
 
+    // If store type not found, return empty result instead of 404
+    // This allows the frontend to handle zero-store categories gracefully
     if (!storeType) {
-      return res.status(404).json({
-        success: false,
-        error: 'Store type not found',
+      return res.json({
+        success: true,
+        data: { 
+          storeType: {
+            id: typeSlug,
+            name: typeSlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+            slug: typeSlug,
+            storeCount: 0,
+            totalProducts: 0,
+            avgRating: 0,
+            uniqueLocations: 0,
+            cities: [],
+            states: [],
+            featuredStoreCount: 0,
+            syncedStoreCount: 0,
+            firstStoreAdded: null,
+            lastStoreUpdated: null,
+          }
+        },
       });
     }
 

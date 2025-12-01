@@ -107,17 +107,12 @@ const makeBothConventionsAvailable = (obj: any): any => {
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers['authorization'];
-    console.log('[Auth Middleware] Authorization header:', authHeader ? 'PRESENT' : 'MISSING');
-    
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-    console.log('[Auth Middleware] Token extracted:', token ? 'PRESENT' : 'MISSING');
 
     if (!token) {
-      console.log('[Auth Middleware] No token found, returning 401');
       return res.status(401).json({ error: 'authentication_required', message: 'No token provided' });
     }
 
-    console.log('[Auth Middleware] Verifying token...');
     const payload = authService.verifyAccessToken(token);
     
     // Apply universal transform to JWT payload to ensure both naming conventions

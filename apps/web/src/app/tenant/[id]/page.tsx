@@ -15,6 +15,7 @@ import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 import LocationClosedBanner from '@/components/storefront/LocationClosedBanner';
 import StorefrontActions from '@/components/products/StorefrontActions';
 import { StorefrontRecommendations } from './StorefrontClient';
+import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 import { getCategoryUrl } from '@/utils/slug';
 
 export const dynamic = 'force-dynamic';
@@ -283,12 +284,31 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const businessName = tenant.metadata?.businessName || tenant.name;
   const totalPages = Math.ceil(total / limit);
 
+  // Fetch directory publish status
+  let directoryPublished = false;
+  const tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
+  try {
+    const directoryRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/directory/${tenantSlug}`, {
+      cache: 'no-store',
+    });
+    if (directoryRes.ok) {
+      // If the directory page exists, the store is published
+      directoryPublished = true;
+    }
+  } catch (e) {
+    // Directory page doesn't exist or error - store is not published
+    directoryPublished = false;
+  }
+
   // Find primary store category for header badge
   const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary);
   
-  // Calculate total products - use store categories count (all products) or fallback to total from API
-  const totalAllProducts = storeCategories.length > 0 
-    ? storeCategories[0].count || 0  // Store categories all have same count (all products)
+  // Get primary GBP category from tenant metadata (always available regardless of directory publish status)
+  const primaryGBPCategory = tenant.metadata?.gbp_categories?.primary || tenant.metadata?.gbpCategories?.primary;
+  
+  // Calculate total products - sum of all product category counts
+  const totalAllProducts = productCategories.length > 0
+    ? productCategories.reduce((sum: number, cat: any) => sum + (Number(cat.count) || 0), 0)  // Sum all product category counts (convert to number)
     : total || 0;  // Fallback to API total
   
   // Get tier features for footer
@@ -397,48 +417,73 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
               </div>
               
               {/* Store Type Categories Pane */}
-              {storeCategories && storeCategories.length > 0 && (
+              {(storeCategories && storeCategories.length > 0) || primaryGBPCategory ? (
                 <div className="inline-flex flex-wrap gap-2 p-3 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-700/50">
-                  {storeCategories
-                    .sort((a: Category, b: Category) => {
-                      if (a.is_primary && !b.is_primary) return -1;
-                      if (!a.is_primary && b.is_primary) return 1;
-                      return a.name.localeCompare(b.name);
-                    })
-                    .map((category: Category) => (
-                      <Link
-                        key={category.id}
-                        href={getCategoryUrl(category)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:shadow-md hover:scale-105 ${
-                          category.is_primary
-                            ? 'bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600 hover:border-blue-400 dark:hover:border-blue-500'
-                            : 'bg-white/60 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600 hover:border-neutral-300 dark:hover:border-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
-                        }`}
-                        title={`View all ${category.name} stores in the directory`}
-                      >
-                        <span className="text-base">
-                          {category.name === 'Grocery store' && '🏪'}
-                          {category.name === 'Electronics store' && '🛍️'}
-                          {category.name === 'Shoe store' && '👟'}
-                          {category.name === 'Supermarket' && '🛒'}
-                          {category.name === 'Clothing store' && '👕'}
-                          {category.name === 'Hardware store' && '🔧'}
-                          {category.name === 'Restaurant' && '🍽️'}
-                          {category.name === 'Pharmacy' && '💊'}
-                          {category.name === 'Bookstore' && '📚'}
-                          {category.name === 'Pet store' && '🐕'}
-                          {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(category.name) && '🏢'}
-                        </span>
-                        <span>{category.name}</span>
-                        {category.is_primary && (
-                          <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-full">
-                            Primary
+                  {/* Show store categories if available */}
+                  {storeCategories && storeCategories.length > 0 &&
+                    storeCategories
+                      .sort((a: Category, b: Category) => {
+                        if (a.is_primary && !b.is_primary) return -1;
+                        if (!a.is_primary && b.is_primary) return 1;
+                        return a.name.localeCompare(b.name);
+                      })
+                      .map((category: Category) => (
+                        <Link
+                          key={category.id}
+                          href={getCategoryUrl(category)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:shadow-md hover:scale-105 ${
+                            category.is_primary
+                              ? 'bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600 hover:border-blue-400 dark:hover:border-blue-500'
+                              : 'bg-white/60 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600 hover:border-neutral-300 dark:hover:border-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+                          }`}
+                          title={`View all ${category.name} stores in the directory`}
+                        >
+                          <span className="text-base">
+                            {category.name === 'Grocery store' && '🏪'}
+                            {category.name === 'Electronics store' && '🛍️'}
+                            {category.name === 'Shoe store' && '👟'}
+                            {category.name === 'Supermarket' && '🛒'}
+                            {category.name === 'Clothing store' && '👕'}
+                            {category.name === 'Hardware store' && '🔧'}
+                            {category.name === 'Restaurant' && '🍽️'}
+                            {category.name === 'Pharmacy' && '💊'}
+                            {category.name === 'Bookstore' && '📚'}
+                            {category.name === 'Pet store' && '🐕'}
+                            {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(category.name) && '🏢'}
                           </span>
-                        )}
-                      </Link>
-                    ))}
+                          <span>{category.name}</span>
+                          {category.is_primary && (
+                            <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-full">
+                              Primary
+                            </span>
+                          )}
+                        </Link>
+                      ))}
+                  
+                  {/* Show GBP category as fallback when no store categories */}
+                  {!storeCategories?.length && primaryGBPCategory && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600">
+                      <span className="text-base">
+                        {primaryGBPCategory.name === 'Grocery store' && '🏪'}
+                        {primaryGBPCategory.name === 'Electronics store' && '🛍️'}
+                        {primaryGBPCategory.name === 'Shoe store' && '👟'}
+                        {primaryGBPCategory.name === 'Supermarket' && '🛒'}
+                        {primaryGBPCategory.name === 'Clothing store' && '👕'}
+                        {primaryGBPCategory.name === 'Hardware store' && '🔧'}
+                        {primaryGBPCategory.name === 'Restaurant' && '🍽️'}
+                        {primaryGBPCategory.name === 'Pharmacy' && '💊'}
+                        {primaryGBPCategory.name === 'Bookstore' && '📚'}
+                        {primaryGBPCategory.name === 'Pet store' && '🐕'}
+                        {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(primaryGBPCategory.name) && '🏢'}
+                      </span>
+                      <span>{primaryGBPCategory.name}</span>
+                      <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-full">
+                        Primary
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
+              ) : null}
               
               {storeStatus && (
                 <p className="text-neutral-600 dark:text-neutral-400 mt-3 flex items-center gap-2">
@@ -457,8 +502,16 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           <StorefrontActions
             tenantId={id}
             businessName={businessName}
-            tenantSlug={tenant.slug}
+            tenantSlug={tenantSlug}
+            directoryPublished={directoryPublished}
           />
+        </div>
+      </div>
+
+      {/* Store Ratings and Reviews */}
+      <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <StoreRatingDisplay tenantId={id} showWriteReview={true} />
         </div>
       </div>
 

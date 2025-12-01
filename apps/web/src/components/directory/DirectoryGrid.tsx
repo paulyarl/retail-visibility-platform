@@ -23,6 +23,7 @@ interface DirectoryListing {
   website?: string;
   distance?: number;
   isOpen?: boolean;
+  directoryPublished?: boolean; // Add directory publish status
 }
 
 interface Pagination {

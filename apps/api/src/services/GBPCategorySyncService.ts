@@ -7,6 +7,7 @@
 import { google } from 'googleapis';
 import { prisma } from '../prisma';
 import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
+import { getDirectPool } from '../utils/db-pool';
 
 interface GBPCategory {
   categoryId: string;
@@ -24,6 +25,21 @@ interface GBPCategoryChange {
 
 export class GBPCategorySyncService {
   private readonly API_BASE = 'https://mybusiness.googleapis.com/v4';
+  
+  /**
+   * Refresh directory_category_products materialized view after GBP category changes
+   * Ensures MV stays in sync with GBP category updates
+   */
+  private async refreshDirectoryMV(): Promise<void> {
+    try {
+      const pool = getDirectPool();
+      await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_products');
+      console.log('[GBPCategorySync] Refreshed directory_category_products MV after GBP category changes');
+    } catch (error) {
+      console.error('[GBPCategorySync] Failed to refresh MV:', error);
+      // Don't throw error - this is non-critical
+    }
+  }
   
   /**
    * Get any valid Google OAuth access token with business.manage scope.
@@ -438,6 +454,12 @@ export class GBPCategorySyncService {
       });
 
       console.log(`[GBPCategorySync] Successfully seeded/updated ${result} GBP categories`);
+      
+      // Refresh MV to sync with GBP category changes
+      if (result > 0) {
+        await this.refreshDirectoryMV();
+      }
+      
       return result;
 
     } catch (error) {
@@ -471,6 +493,12 @@ export class GBPCategorySyncService {
       }
 
       console.log(`[GBPCategorySync] Fallback seeding completed: ${seeded}/${hardcodedCategories.length} categories`);
+      
+      // Refresh MV to sync with GBP category changes
+      if (seeded > 0) {
+        await this.refreshDirectoryMV();
+      }
+      
       return seeded;
     }
   }

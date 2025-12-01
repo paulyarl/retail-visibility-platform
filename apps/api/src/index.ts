@@ -1158,6 +1158,24 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
     
     console.log('[PUT /api/tenant/gbp-category] GBP category ensured in gbp_categories_list');
     
+    // Also ensure secondary categories exist in gbp_categories_list
+    if (secondary && Array.isArray(secondary)) {
+      for (const secCategory of secondary) {
+        if (secCategory.id && secCategory.name) {
+          await pool.query(
+            `INSERT INTO gbp_categories_list (id, name, display_name, created_at, updated_at)
+             VALUES ($1, $2, $2, NOW(), NOW())
+             ON CONFLICT (id) DO UPDATE
+             SET name = EXCLUDED.name,
+                 display_name = EXCLUDED.display_name,
+                 updated_at = NOW()`,
+            [secCategory.id, secCategory.name]
+          );
+        }
+      }
+      console.log(`[PUT /api/tenant/gbp-category] ${secondary.length} secondary categories ensured in gbp_categories_list`);
+    }
+    
     // Now update the business profile
     await pool.query(
       `UPDATE tenant_business_profiles_list
@@ -1173,7 +1191,7 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
     console.log('[PUT /api/tenant/gbp-category] Business profile updated successfully');
     
     // Also update tenants.metadata with both primary and secondary categories
-    // This is needed for the frontend to display secondary categories
+    // This is needed for backward compatibility during transition
     const gbpMetadata = {
       primary: {
         id: primary.id,
@@ -1193,6 +1211,35 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
     );
     
     console.log('[PUT /api/tenant/gbp-category] Metadata updated with primary and secondary categories');
+    
+    // NEW: Update junction table with clean relational design
+    // Delete existing categories for this tenant
+    await pool.query('DELETE FROM tenant_gbp_categories WHERE tenant_id = $1', [tenantId]);
+    
+    // Insert primary category
+    await pool.query(
+      `INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type)
+       VALUES ($1, $2, 'primary')
+       ON CONFLICT (tenant_id, category_type) DO UPDATE SET
+         gbp_category_id = EXCLUDED.gbp_category_id,
+         updated_at = NOW()`,
+      [tenantId, primary.id]
+    );
+    
+    console.log('[PUT /api/tenant/gbp-category] Primary category added to junction table');
+    
+    // Insert secondary categories
+    if (secondary && secondary.length > 0) {
+      for (const secCategory of secondary) {
+        await pool.query(
+          `INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type)
+           VALUES ($1, $2, 'secondary')
+           ON CONFLICT (tenant_id, gbp_category_id, category_type) DO NOTHING`,
+          [tenantId, secCategory.id]
+        );
+      }
+      console.log(`[PUT /api/tenant/gbp-category] ${secondary.length} secondary categories added to junction table`);
+    }
     
     // Sync GBP categories to gbp_listing_categories junction table
     // Delete existing associations
@@ -1445,7 +1492,7 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
     
     // Apply category filter
     if (categorySlug) {
-      where.tenantCategory = {
+      where.directoryCategory = {
         slug: categorySlug,
       };
     }
@@ -1467,7 +1514,7 @@ app.get("/public/tenant/:tenantId/items", async (req, res) => {
         skip,
         take: limit,
         include: {
-          tenantCategory: {
+          directoryCategory: {
             select: {
               id: true,
               name: true,
@@ -1538,11 +1585,12 @@ app.get("/api/categories/product-level/:tenantId", async (req, res) => {
     // Import category count utility
     const { getCategoryCounts } = await import('./utils/category-counts');
     
-    // Get only product-level categories (tenant and platform)
-    const allCategories = await getCategoryCounts(tenantId, false);
-    const productCategories = allCategories.filter(cat => 
-      cat.category_type === 'tenant' || cat.category_type === 'platform'
-    );
+    // Get all categories from materialized view (these are product-level categories from directory_categories_list)
+    const productCategories = await getCategoryCounts(tenantId, false);
+    
+    // Get actual total product count (distinct count, not sum of categories)
+    const { getTotalProductCount } = await import('./utils/category-counts');
+    const totalProducts = await getTotalProductCount(tenantId, false);
     
     // Clean response to avoid field duplication
     const cleanResponse = {
@@ -1552,7 +1600,7 @@ app.get("/api/categories/product-level/:tenantId", async (req, res) => {
         categories: productCategories,
         summary: {
           total_categories: productCategories.length,
-          total_products: productCategories.reduce((sum: number, cat: any) => sum + (Number(cat.count) || 0), 0),
+          total_products: totalProducts,
           category_type: 'product-level'
         }
       }
@@ -1569,19 +1617,47 @@ app.get("/api/categories/product-level/:tenantId", async (req, res) => {
 });
 
 // Store-level categories endpoint (for store sidebar)
+// Returns GBP primary and secondary categories for a tenant
 app.get("/api/categories/store-level/:tenantId", async (req, res) => {
   try {
     const { tenantId } = req.params;
     if (!tenantId) return res.status(400).json({ error: "tenant_required" });
     
-    // Import category count utility
-    const { getCategoryCounts } = await import('./utils/category-counts');
+    // Query tenant_google_categories for GBP primary and secondary categories
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
     
-    // Get only store-level categories (GBP primary and secondary)
-    const allCategories = await getCategoryCounts(tenantId, false);
-    const storeCategories = allCategories.filter(cat => 
-      cat.category_type === 'gbp_primary' || cat.category_type === 'gbp_secondary'
-    );
+    const query = `
+      SELECT 
+        gc.id,
+        gc.name,
+        gc.display_name,
+        tgc.category_type,
+        tgc.gbp_category_id,
+        CASE WHEN tgc.category_type = 'primary' THEN true ELSE false END as is_primary,
+        (SELECT COUNT(*) FROM inventory_items WHERE tenant_id = $1 AND item_status = 'active' AND visibility = 'public') as count
+      FROM tenant_gbp_categories tgc
+      INNER JOIN gbp_categories_list gc ON gc.id = tgc.gbp_category_id
+      WHERE tgc.tenant_id = $1
+        AND tgc.category_type IN ('primary', 'secondary')
+        AND gc.is_active = true
+      ORDER BY 
+        CASE WHEN tgc.category_type = 'primary' THEN 0 ELSE 1 END,
+        gc.display_name ASC
+    `;
+    
+    const result = await pool.query(query, [tenantId]);
+    
+    // Transform to expected format
+    const storeCategories = result.rows.map((row: any) => ({
+      id: row.id,
+      name: row.display_name || row.name,
+      slug: row.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      category_type: row.category_type === 'primary' ? 'gbp_primary' : 'gbp_secondary',
+      is_primary: row.is_primary,
+      gbp_category_id: row.gbp_category_id,
+      count: parseInt(row.count) || 0
+    }));
     
     // Clean response to avoid field duplication
     const cleanResponse = {
@@ -1591,7 +1667,7 @@ app.get("/api/categories/store-level/:tenantId", async (req, res) => {
         categories: storeCategories,
         summary: {
           total_categories: storeCategories.length,
-          total_products: storeCategories.length > 0 ? storeCategories[0].count : 0, // All store categories have same count
+          total_products: storeCategories.length > 0 ? storeCategories[0].count : 0,
           category_type: 'store-level'
         }
       }
@@ -2472,7 +2548,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     
     // Apply category filter
     if (parsed.data.category) {
-      where.tenantCategory = {
+      where.directoryCategory = {
         slug: parsed.data.category,
       };
     }
@@ -2524,7 +2600,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         skip,
         take: limit,
         include: {
-          tenantCategory: {
+          directoryCategory: {
             select: {
               id: true,
               name: true,
@@ -2613,7 +2689,7 @@ const baseItemSchema = z.object({
   // Category path for Google Shopping
   categoryPath: z.array(z.string()).optional(),
   // Tenant category assignment
-  tenantCategoryId: z.string().nullable().optional(),
+  directoryCategoryId: z.string().nullable().optional(),
 });
 
 const createItemSchema = baseItemSchema.extend({
@@ -2846,6 +2922,10 @@ app.patch("/api/v1/tenants/:tenantId/items/:itemId/category", authenticateToken,
     });
 
     // Convert Decimal price to number and hide priceCents for frontend compatibility
+    if (!updated) {
+      return res.status(404).json({ error: 'item_not_found' });
+    }
+    
     const { priceCents, ...itemWithoutPriceCents } = updated;
     const transformed = {
       ...itemWithoutPriceCents,
@@ -3692,13 +3772,13 @@ console.log('✅ Scan routes mounted at /api');
 
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenantId/items/:itemId/category
-// Body: { tenantCategoryId?: string, categorySlug?: string }
+// Body: { directoryCategoryId?: string, categorySlug?: string }
 app.patch('/api/v1/tenants/:tenantId/items/:itemId/category', async (req, res) => {
   try {
     const { tenantId, itemId } = req.params as { tenantId: string; itemId: string };
-    const { tenantCategoryId, categorySlug } = (req.body || {}) as { tenantCategoryId?: string; categorySlug?: string };
+    const { directoryCategoryId, categorySlug } = (req.body || {}) as { directoryCategoryId?: string; categorySlug?: string };
 
-    const updated = await categoryService.assignItemCategory(tenantId, itemId, { tenantCategoryId, categorySlug });
+    const updated = await categoryService.assignItemCategory(tenantId, itemId, { directoryCategoryId, categorySlug });
     // ISR revalidation (best-effort) already triggered inside service
     return res.json({ success: true, data: updated });
   } catch (e: any) {
@@ -4007,6 +4087,15 @@ app.use('/api/admin/scan-metrics', scanMetricsRoutes);
 console.log('✅ Admin scan metrics routes mounted at /api/admin/scan-metrics');
 
 /* ------------------------------ directory ------------------------------ */
+/* ------------------------------ directory optimized ------------------------------ */
+app.use('/api/directory-optimized', directoryOptimizedRoutes);
+console.log('✅ Directory optimized routes mounted (materialized view - 6.7x faster)');
+
+/* ------------------------------ directory categories optimized ------------------------------ */
+app.use('/api/directory/categories-optimized', directoryCategoriesOptimizedRoutes);
+console.log('✅ Directory categories optimized routes mounted (category statistics - 10x faster)');
+
+/* ------------------------------ directory main ------------------------------ */
 app.use('/api/directory', directoryRoutes);
 console.log('✅ Directory listings routes mounted (directory_listings table)');
 
@@ -4017,14 +4106,6 @@ console.log('✅ Directory tenant routes mounted');
 /* ------------------------------ directory categories ------------------------------ */
 app.use('/api/directory/categories', directoryCategoriesRoutes);
 console.log('✅ Directory categories routes mounted (category-based discovery)');
-
-/* ------------------------------ directory optimized ------------------------------ */
-app.use('/api/directory', directoryOptimizedRoutes);
-console.log('✅ Directory optimized routes mounted (materialized view - 6.7x faster)');
-
-/* ------------------------------ directory categories optimized ------------------------------ */
-app.use('/api/directory/categories-optimized', directoryCategoriesOptimizedRoutes);
-console.log('✅ Directory categories optimized routes mounted (category statistics - 10x faster)');
 
 /* ------------------------------ directory store types ------------------------------ */
 app.use('/api/directory/store-types', directoryStoreTypesRoutes);
@@ -4050,6 +4131,11 @@ console.log('✅ Tenants routes mounted at /api/tenants');
 /* ------------------------------ product likes ------------------------------ */
 app.use('/api/products', productLikesRoutes);
 console.log('✅ Product likes routes mounted at /api/products');
+
+/* ------------------------------ store reviews ------------------------------ */
+import storeReviewsRoutes from './routes/store-reviews';
+app.use('/api', storeReviewsRoutes);
+console.log('✅ Store reviews routes mounted at /api');
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);

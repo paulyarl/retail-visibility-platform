@@ -44,7 +44,7 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
         currency: true,
         availability: true,
         imageUrl: true,
-        tenantCategory: {
+        directoryCategory: {
           select: {
             name: true,
             googleCategoryId: true,
@@ -55,8 +55,8 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
 
     return items.map(item => {
       // Use tenant category's Google ID if available
-      const googleProductCategory = item.tenantCategory?.googleCategoryId || undefined;
-      const productType = item.tenantCategory?.name || undefined;
+      const googleProductCategory = item.directoryCategory?.googleCategoryId || undefined;
+      const productType = item.directoryCategory?.name || undefined;
 
       return {
         id: item.id,

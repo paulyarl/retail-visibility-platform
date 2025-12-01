@@ -400,7 +400,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     const { businessType, categoryCount } = parsed.data;
 
     // Check if tenant already has categories (optional warning, not blocking)
-    const existingCategoryCount = await prisma.tenantCategory.count({
+    const existingCategoryCount = await prisma.directoryCategory.count({
       where: { tenantId },
     });
 
@@ -504,7 +504,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
           console.warn(`[Category Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
         }
 
-        return prisma.tenantCategory.create({
+        return prisma.directoryCategory.create({
           data: {
             id: generateQsCatId(),
             tenantId,

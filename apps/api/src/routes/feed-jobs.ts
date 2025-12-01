@@ -102,7 +102,7 @@ router.post('/', async (req, res) => {
       const slugList = Array.from(slugs);
       const catMap: Record<string, string | null> = {};
       if (slugList.length > 0) {
-        const cats = await prisma.tenantCategory.findMany({
+        const cats = await prisma.directoryCategory.findMany({
           where: { tenantId, slug: { in: slugList }, isActive: true },
           select: { slug: true, googleCategoryId: true },
         });

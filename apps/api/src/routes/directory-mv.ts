@@ -8,6 +8,7 @@
 
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
+import { slugify } from '../utils/slug';
 
 const router = Router();
 
@@ -115,52 +116,39 @@ router.get('/search', async (req: Request, res: Response) => {
 
     // Build WHERE clause for directory_category_listings
     const conditions: string[] = [
-      'tenant_exists = true',
-      'is_active_location = true',
-      'is_directory_visible = true'
+      'dcp.is_published = true'
     ];
     const params: any[] = [];
     let paramIndex = 1;
 
     // Build WHERE clause for directory_gbp_listings (same base conditions)
     const gbpConditions: string[] = [
-      'tenant_exists = true',
-      'is_active_location = true',
-      'is_directory_visible = true'
+      'is_published = true'
     ];
 
-    // Category filter (supports both ID and slug for backward compatibility)
+    // Category filter - match by slug for both product categories and GBP store types
     if (category && typeof category === 'string') {
-      // Check if it's a category ID (starts with 'cat_') or slug
-      if (category.startsWith('cat_')) {
-        conditions.push(`category_id = $${paramIndex}`);
-        gbpConditions.push(`gbp_category_id = $${paramIndex}`);
-      } else {
-        // Support both proper slugs and raw category names
-        conditions.push(`(category_slug = $${paramIndex} OR category_name = $${paramIndex})`);
-        gbpConditions.push(`(gbp_category_display_name = $${paramIndex} OR gbp_category_name = $${paramIndex})`);
-      }
+      // Use slug directly for matching (e.g., "supermarket", "books-media", "grocery-store")
+      conditions.push(`dcp.category_slug = $${paramIndex}`);
+      gbpConditions.push(`gbp_category_slug = $${paramIndex}`); // GBP uses different column name
       params.push(category);
       paramIndex++;
     }
 
     // Primary category filter (optional)
     const { primaryOnly } = req.query;
-    if (primaryOnly === 'true') {
-      conditions.push('is_primary = true');
-      gbpConditions.push('is_primary = true');
-    }
+    // REMOVED: is_primary filter since column doesn't exist in materialized view
 
     // Location filters
     if (city && typeof city === 'string') {
-      conditions.push(`LOWER(city) = LOWER($${paramIndex})`);
+      conditions.push(`LOWER(dcp.city) = LOWER($${paramIndex})`);
       gbpConditions.push(`LOWER(city) = LOWER($${paramIndex})`);
       params.push(city);
       paramIndex++;
     }
 
     if (state && typeof state === 'string') {
-      conditions.push(`LOWER(state) = LOWER($${paramIndex})`);
+      conditions.push(`LOWER(dcp.state) = LOWER($${paramIndex})`);
       gbpConditions.push(`LOWER(state) = LOWER($${paramIndex})`);
       params.push(state);
       paramIndex++;
@@ -182,81 +170,67 @@ router.get('/search', async (req: Request, res: Response) => {
       orderByClause = 'is_featured DESC, rating_avg DESC NULLS LAST';
     }
 
-    // Query both materialized views for comprehensive search
+    // Query using directory_category_products for consistency with categories API
     const listingsQuery = `
       (
-        -- Search directory_category_listings (tenant categories)
-        SELECT 
-          dcl.id,
-          dcl.tenant_id,
-          dcl.business_name,
-          dcl.slug,
-          dcl.address,
-          dcl.city,
-          dcl.state,
-          dcl.zip_code,
-          dcl.phone,
-          dcl.email,
-          dcl.website,
-          dcl.latitude,
-          dcl.longitude,
-          dcl.category_id,
-          dcl.category_name,
-          dcl.category_slug,
-          dcl.google_category_id,
-          dcl.category_icon,
-          dcl.is_primary,
-          dcl.logo_url,
-          dcl.description,
-          dcl.rating_avg,
-          dcl.rating_count,
-          dcl.product_count,
-          dcl.is_featured,
-          dcl.subscription_tier,
-          dcl.use_custom_website,
-          dcl.created_at,
-          dcl.updated_at,
-          t.metadata->'gbp_categories'->'primary'->>'name' as gbp_primary_category_name
-        FROM directory_category_listings dcl
-        LEFT JOIN tenants t ON t.id = dcl.tenant_id
-        WHERE ${whereClause}
-      )
-      UNION ALL
-      (
-        -- Search directory_gbp_listings (GBP categories)
-        SELECT 
-          dgl.id,
-          dgl.tenant_id,
-          dgl.business_name,
-          dgl.slug,
-          dgl.address,
-          dgl.city,
-          dgl.state,
-          dgl.zip_code,
-          dgl.phone,
-          dgl.email,
-          dgl.website,
-          dgl.latitude,
-          dgl.longitude,
-          dgl.gbp_category_id as category_id,
-          dgl.gbp_category_name as category_name,
-          dgl.gbp_category_display_name as category_slug,
-          dgl.gbp_category_id as google_category_id,
-          null as category_icon,
-          dgl.is_primary,
-          dgl.logo_url,
-          dgl.description,
-          dgl.rating_avg,
-          dgl.rating_count,
-          dgl.product_count,
-          dgl.is_featured,
-          dgl.subscription_tier,
-          dgl.use_custom_website,
-          dgl.created_at,
-          dgl.updated_at,
-          null as gbp_primary_category_name
-        FROM directory_gbp_listings dgl
-        WHERE ${gbpWhereClause}
+        -- Search directory_category_products but calculate real product counts and check directory publish status
+        SELECT DISTINCT
+          dcp.tenant_id as id,
+          dcp.tenant_id,
+          dcp.tenant_name as business_name,
+          dcp.tenant_name as business_name,
+          dcp.tenant_slug as slug,
+          dcp.address,
+          dcp.city as city,
+          dcp.state as state,
+          dcp.zip_code,
+          null as phone,
+          null as email,
+          null as website,
+          dcp.latitude,
+          dcp.longitude,
+          dcp.category_name,
+          dcp.category_name as category_slug,
+          dcp.google_category_id,
+          dcp.google_category_id as googleCategoryId,
+          dcp.category_icon as icon,
+          false as is_primary,  -- DEFAULT: no primary flag since column doesn't exist
+          dcp.rating_avg as rating_avg,
+          dcp.rating_avg as rating_avg,
+          dcp.rating_count,
+          dcp.rating_count as rating_count,
+          -- Calculate real product count from inventory_items
+          COALESCE(real_counts.product_count, 0) as product_count,
+          dcp.is_featured,
+          dcp.is_featured as is_featured,
+          dcp.subscription_tier,
+          dcp.subscription_tier as subscription_tier,
+          null as use_custom_website,
+          dcp.listing_created_at as created_at,
+          dcp.listing_created_at as created_at,
+          dcp.listing_updated_at as updated_at,
+          dcp.listing_updated_at as updated_at,
+          null as gbp_primary_category_name,
+          -- Get logo URL from tenants metadata
+          (t.metadata->>'logo_url') as logo_url,
+          -- Check if store has published directory listing
+          COALESCE(dll.is_published, false) as directory_published
+        FROM directory_category_products dcp
+        LEFT JOIN tenants t ON dcp.tenant_id = t.id
+        LEFT JOIN (
+          SELECT 
+            tenant_id,
+            COUNT(*) as product_count
+          FROM inventory_items
+          WHERE item_status = 'active' AND visibility = 'public'
+          GROUP BY tenant_id
+        ) real_counts ON dcp.tenant_id = real_counts.tenant_id
+        LEFT JOIN (
+          SELECT tenant_id, is_published
+          FROM directory_listings_list
+          WHERE is_published = true
+        ) dll ON dcp.tenant_id = dll.tenant_id
+          WHERE ${whereClause}
       )
       ORDER BY ${orderByClause.replace(/^/, '')}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -264,26 +238,23 @@ router.get('/search', async (req: Request, res: Response) => {
     
     const listingsResult = await getDirectPool().query(listingsQuery, [...params, limitNum, skip]);
 
-    // Get total count (from both materialized views)
+    // Get total count (using same source as search)
     const countQuery = `
       SELECT COUNT(*) as count 
-      FROM (
-        SELECT 1 FROM directory_category_listings WHERE ${whereClause}
-        UNION ALL
-        SELECT 1 FROM directory_gbp_listings WHERE ${gbpWhereClause}
-      ) combined_search
+      FROM directory_category_products dcp
+      WHERE ${whereClause}
     `;
     const countResult = await getDirectPool().query(countQuery, params);
 
     const total = parseInt(countResult.rows[0]?.count || '0');
     const totalPages = Math.ceil(total / limitNum);
 
-    // Transform to camelCase for frontend - Now with normalized category data and GBP category
+    // Transform to camelCase for frontend - simplified since we only have primary_category
     const listings = listingsResult.rows.map((row: any) => ({
       id: row.id,
       tenantId: row.tenant_id,
       businessName: row.business_name,
-      slug: row.slug,
+      slug: row.slug || slugify(row.business_name), // Generate slug if null
       address: row.address,
       city: row.city,
       state: row.state,
@@ -294,14 +265,12 @@ router.get('/search', async (req: Request, res: Response) => {
       latitude: row.latitude,
       longitude: row.longitude,
       category: {
-        id: row.category_id,
         name: row.category_name,
         slug: row.category_slug,
-        googleCategoryId: row.google_category_id,
+        google_category_id: row.google_category_id,
         icon: row.category_icon,
         isPrimary: row.is_primary,
       },
-      gbpPrimaryCategoryName: row.gbp_primary_category_name,
       logoUrl: row.logo_url,
       description: row.description,
       ratingAvg: row.rating_avg || 0,
@@ -310,6 +279,7 @@ router.get('/search', async (req: Request, res: Response) => {
       isFeatured: row.is_featured || false,
       subscriptionTier: row.subscription_tier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
+      directoryPublished: row.directory_published || false, // Add directory publish status
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
@@ -356,10 +326,8 @@ router.get('/categories', async (req: Request, res: Response) => {
               )
             ) as avg_distance
           FROM directory_category_listings dcl
-          WHERE dcl.category_name = dcs.category_name
-            AND dcl.tenant_exists = true
-            AND dcl.is_active_location = true
-            AND dcl.is_directory_visible = true
+          WHERE dcl.primary_category = dcs.category_name
+            AND dcl.is_published = true
             AND dcl.latitude IS NOT NULL 
             AND dcl.longitude IS NOT NULL
         ) proximity ON true
@@ -370,41 +338,46 @@ router.get('/categories', async (req: Request, res: Response) => {
       `;
     }
 
-    // Query stats materialized view - Now with normalized categories and primary/secondary breakdown
+    // Query using directory_category_products view for complete category data
     const statsQuery = `
       SELECT 
-        category_id,
-        category_name,
-        category_slug,
-        google_category_id,
-        category_icon,
-        store_count,
-        primary_store_count,
-        secondary_store_count,
-        total_products,
-        avg_rating,
-        unique_locations,
-        cities,
-        states,
-        featured_store_count,
-        synced_store_count,
-        first_store_added,
-        last_store_updated
-        ${proximityCalculation ? ', ' + proximityCalculation : ''}
-      FROM directory_category_stats dcs
-      ${proximityJoin}
-      WHERE store_count >= $1
-      ORDER BY store_count DESC
+        pc.id as category_id,
+        pc.name as category_name,
+        pc.slug as category_slug,
+        pc.google_category_id,
+        pc.icon_emoji as category_icon,
+        COALESCE(dcp.store_count, 0) as store_count,
+        COALESCE(dcp.store_count, 0) as primary_store_count,
+        0 as secondary_store_count,
+        COALESCE(dcp.product_count, 0) as total_products,
+        0 as avg_rating,
+        0 as unique_locations,
+        ARRAY[]::text[] as cities,
+        ARRAY[]::text[] as states,
+        0 as featured_store_count
+      FROM platform_categories pc
+      LEFT JOIN (
+        SELECT 
+          category_slug,
+          COUNT(DISTINCT tenant_id) as store_count,
+          SUM(CAST(actual_product_count AS INTEGER)) as product_count
+        FROM directory_category_products 
+        WHERE is_published = true
+        GROUP BY category_slug
+      ) dcp ON dcp.category_slug = pc.slug
+      WHERE pc.is_active = true
+        AND COALESCE(dcp.store_count, 0) >= $1
+      ORDER BY store_count DESC, pc.sort_order ASC
     `;
     
-    const params = lat && lng ? [minStoresNum, Number(lat), Number(lng)] : [minStoresNum];
+    const params = [minStoresNum];
     const result = await getDirectPool().query(statsQuery, params);
 
     const categories = result.rows.map((row: any) => ({
       id: row.category_id,
       name: row.category_name,
       slug: row.category_slug,
-      googleCategoryId: row.google_category_id,
+      google_category_id: row.google_category_id,
       icon: row.category_icon,
       storeCount: row.store_count,
       primaryStoreCount: row.primary_store_count,
@@ -432,6 +405,195 @@ router.get('/categories', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Categories MV error:', error);
     return res.status(500).json({ error: 'categories_failed' });
+  }
+});
+
+/**
+ * GET /api/directory/mv/categories/:idOrSlug
+ * Get individual category details with stores
+ * Performance: <50ms
+ */
+router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
+  try {
+    const { idOrSlug } = req.params;
+    const { page = '1', limit = '12', sort = 'rating' } = req.query;
+
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(100, Math.max(1, Number(limit)));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Support both category ID and slug
+    const categoryQuery = `
+      SELECT 
+        pc.id as category_id,
+        pc.name as category_name,
+        pc.slug as category_slug,
+        pc.google_category_id,
+        pc.icon_emoji as category_icon,
+        COALESCE(dcp.store_count, 0) as store_count,
+        COALESCE(dcp.product_count, 0) as product_count
+      FROM platform_categories pc
+      LEFT JOIN (
+        SELECT 
+          category_slug,
+          COUNT(DISTINCT tenant_id) as store_count,
+          SUM(CAST(actual_product_count AS INTEGER)) as product_count
+        FROM directory_category_products 
+        WHERE is_published = true
+        GROUP BY category_slug
+      ) dcp ON dcp.category_slug = pc.slug
+      WHERE pc.is_active = true 
+        AND (pc.id = $1 OR pc.slug = $1)
+      LIMIT 1
+    `;
+    
+    const categoryResult = await getDirectPool().query(categoryQuery, [idOrSlug]);
+
+    if (categoryResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    const category = categoryResult.rows[0];
+
+    // Get stores in this category
+    const storesQuery = `
+      -- Search directory_category_products but calculate real product counts and check directory publish status
+      SELECT 
+        dcp.tenant_id as id,
+        dcp.tenant_id,
+        dcp.tenant_name as business_name,
+        dcp.tenant_name as business_name,
+        dcp.tenant_slug as slug,
+        dcp.address,
+        dcp.tenant_city as city,
+        dcp.tenant_state as state,
+        dcp.zip_code,
+        null as phone,
+        null as email,
+        null as website,
+        dcp.latitude,
+        dcp.longitude,
+        dcp.category_name,
+        dcp.category_name as category_slug,
+        dcp.google_category_id,
+        dcp.google_category_id as googleCategoryId,
+        dcp.category_icon as icon,
+        dcp.is_primary,
+        dcp.is_primary as is_primary,
+        dcp.rating_avg,
+        dcp.rating_avg as rating_avg,
+        dcp.rating_count,
+        dcp.rating_count as rating_count,
+        -- Calculate real product count from inventory_items
+        COALESCE(real_counts.product_count, 0) as product_count,
+        dcp.is_featured,
+        dcp.is_featured as is_featured,
+        dcp.subscription_tier,
+        dcp.subscription_tier as subscription_tier,
+        null as use_custom_website,
+        dcp.listing_created_at as created_at,
+        dcp.listing_created_at as created_at,
+        dcp.listing_updated_at as updated_at,
+        dcp.listing_updated_at as updated_at,
+        null as gbp_primary_category_name,
+        -- Get logo URL from tenants metadata
+        (t.metadata->>'logo_url') as logo_url,
+        -- Check if store has published directory listing
+        COALESCE(dll.is_published, false) as directory_published
+      FROM directory_category_products dcp
+      LEFT JOIN tenants t ON dcp.tenant_id = t.id
+      LEFT JOIN (
+        SELECT 
+          tenant_id,
+          COUNT(*) as product_count
+        FROM inventory_items
+        WHERE item_status = 'active' AND visibility = 'public'
+        GROUP BY tenant_id
+      ) real_counts ON dcp.tenant_id = real_counts.tenant_id
+      LEFT JOIN (
+        SELECT tenant_id, is_published
+        FROM directory_listings_list
+        WHERE is_published = true
+      ) dll ON dcp.tenant_id = dll.tenant_id
+      WHERE dcp.category_name = $1
+        AND dcp.is_published = true
+      ORDER BY 
+        dcp.rating_avg DESC NULLS LAST,
+        real_counts.product_count DESC NULLS LAST,
+        dcp.listing_created_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+    
+    const storesResult = await getDirectPool().query(storesQuery, [category.category_name, limitNum, skip]);
+
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as count 
+      FROM directory_category_products dcp
+      WHERE dcp.category_name = $1
+        AND dcp.is_published = true
+    `;
+    const countResult = await getDirectPool().query(countQuery, [category.category_name]);
+
+    const total = parseInt(countResult.rows[0]?.count || '0');
+    const totalPages = Math.ceil(total / limitNum);
+
+    // Transform stores to camelCase
+    const stores = storesResult.rows.map((row: any) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      businessName: row.business_name,
+      slug: row.slug || slugify(row.business_name),
+      address: row.address,
+      city: row.city,
+      state: row.state,
+      zipCode: row.zip_code,
+      phone: row.phone,
+      email: row.email,
+      website: row.website,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      category: {
+        name: row.category_name,
+        slug: row.category_slug,
+        google_category_id: row.google_category_id,
+        icon: row.category_icon,
+        isPrimary: row.is_primary,
+      },
+      logoUrl: row.logo_url,
+      description: row.description,
+      ratingAvg: row.rating_avg || 0,
+      ratingCount: row.rating_count || 0,
+      productCount: row.product_count || 0,
+      isFeatured: row.is_featured || false,
+      subscriptionTier: row.subscription_tier || 'trial',
+      useCustomWebsite: row.use_custom_website || false,
+      directoryPublished: row.directory_published || false, // Add directory publish status
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+
+    return res.json({
+      category: {
+        id: category.category_id,
+        name: category.category_name,
+        slug: category.category_slug,
+        google_category_id: category.google_category_id,
+        icon: category.category_icon,
+        storeCount: parseInt(category.store_count),
+        productCount: parseInt(category.product_count),
+      },
+      stores,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalItems: total,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    console.error('Category MV error:', error);
+    return res.status(500).json({ error: 'category_failed' });
   }
 });
 
@@ -482,7 +644,7 @@ router.get('/categories/:idOrSlug/stats', async (req: Request, res: Response) =>
       id: row.category_id,
       name: row.category_name,
       slug: row.category_slug,
-      googleCategoryId: row.google_category_id,
+      google_category_id: row.google_category_id,
       icon: row.category_icon,
       storeCount: row.store_count,
       primaryStoreCount: row.primary_store_count,

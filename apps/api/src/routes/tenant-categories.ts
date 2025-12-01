@@ -9,8 +9,25 @@ import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-adm
 import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
 import { generateQsCatId, generateQuickStart, generateUserTenantId } from '../lib/id-generator';
+import { getDirectPool } from '../utils/db-pool';
 
 const router = Router();
+
+/**
+ * Refresh directory_category_products materialized view after category changes
+ * Ensures MV stays in sync with tenant configuration
+ */
+async function refreshDirectoryMV(tenantId?: string) {
+  try {
+    const pool = getDirectPool();
+    // Use CONCURRENTLY to avoid blocking reads
+    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_products');
+    console.log(`[MV Refresh] Refreshed directory_category_products${tenantId ? ` for tenant ${tenantId}` : ''}`);
+  } catch (error) {
+    console.error('[MV Refresh] Failed to refresh materialized view:', error);
+    // Don't throw error - this is non-critical
+  }
+}
 
 /**
  * Middleware to check if user can perform support actions (admin/support)
@@ -180,7 +197,7 @@ router.get('/:tenantId/categories', async (req, res) => {
       findArgs.skip = 1; // skip the cursor item itself
     }
 
-    const result = await prisma.tenantCategory.findMany(findArgs);
+    const result = await prisma.directoryCategory.findMany(findArgs);
     const hasMore = result.length > take;
     const categories = hasMore ? result.slice(0, take) : result;
     const nextCursor = hasMore ? categories[categories.length - 1]?.id : undefined;
@@ -220,7 +237,7 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
   try {
     const { tenantId, id } = req.params;
 
-    const category = await prisma.tenantCategory.findFirst({
+    const category = await prisma.directoryCategory.findFirst({
       where: {
         id,
         tenantId,
@@ -243,7 +260,7 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
     }
 
     // Get child categories count
-    const childCount = await prisma.tenantCategory.count({
+    const childCount = await prisma.directoryCategory.count({
       where: {
         tenantId,
         parentId: id,
@@ -290,7 +307,7 @@ router.post('/:tenantId/categories', requireTenantManagement, async (req, res) =
     const body = createCategorySchema.parse({ ...req.body, tenantId });
 
     // Check for duplicate slug
-    const existing = await prisma.tenantCategory.findFirst({
+    const existing = await prisma.directoryCategory.findFirst({
       where: {
         tenantId,
         slug: body.slug,
@@ -306,7 +323,7 @@ router.post('/:tenantId/categories', requireTenantManagement, async (req, res) =
 
     // Validate parent exists if provided
     if (body.parentId) {
-      const parent = await prisma.tenantCategory.findFirst({
+      const parent = await prisma.directoryCategory.findFirst({
         where: {
           id: body.parentId,
           tenantId,
@@ -328,6 +345,9 @@ router.post('/:tenantId/categories', requireTenantManagement, async (req, res) =
       googleCategoryId: body.googleCategoryId ?? null,
       sortOrder: body.sortOrder || 0,
     });
+
+    // Refresh MV to sync with new category
+    await refreshDirectoryMV(tenantId);
 
     res.status(201).json({
       success: true,
@@ -374,7 +394,7 @@ router.post('/:tenantId/categories/from-enrichment', requireTenantManagement, as
       .replace(/^-|-$/g, '');
 
     // Check for duplicate slug
-    const existing = await prisma.tenantCategory.findFirst({
+    const existing = await prisma.directoryCategory.findFirst({
       where: {
         tenantId,
         slug,
@@ -386,7 +406,7 @@ router.post('/:tenantId/categories/from-enrichment', requireTenantManagement, as
       if (body.itemId) {
         await prisma.inventoryItem.update({
           where: { id: body.itemId },
-          data: { tenantCategoryId: existing.id },
+          data: { directoryCategoryId: existing.id },
         });
       }
 
@@ -410,7 +430,7 @@ router.post('/:tenantId/categories/from-enrichment', requireTenantManagement, as
     if (body.itemId) {
       await prisma.inventoryItem.update({
         where: { id: body.itemId },
-        data: { tenantCategoryId: category.id },
+        data: { directoryCategoryId: category.id },
       });
     }
 
@@ -462,7 +482,7 @@ router.put('/:tenantId/categories/:id', requireTenantManagement, async (req, res
     const body = updateCategorySchema.parse(req.body);
 
     // Check category exists
-    const existing = await prisma.tenantCategory.findFirst({
+    const existing = await prisma.directoryCategory.findFirst({
       where: { id, tenantId },
     });
 
@@ -475,7 +495,7 @@ router.put('/:tenantId/categories/:id', requireTenantManagement, async (req, res
 
     // Check for duplicate slug if changing
     if (body.slug && body.slug !== existing.slug) {
-      const duplicate = await prisma.tenantCategory.findFirst({
+      const duplicate = await prisma.directoryCategory.findFirst({
         where: {
           tenantId,
           slug: body.slug,
@@ -493,7 +513,7 @@ router.put('/:tenantId/categories/:id', requireTenantManagement, async (req, res
 
     // Validate parent exists if provided
     if (body.parentId) {
-      const parent = await prisma.tenantCategory.findFirst({
+      const parent = await prisma.directoryCategory.findFirst({
         where: {
           id: body.parentId,
           tenantId,
@@ -516,7 +536,10 @@ router.put('/:tenantId/categories/:id', requireTenantManagement, async (req, res
       }
     }
 
-    const category = await categoryService.updateTenantCategory(tenantId, id, body);
+    const category = await categoryService.updateDirectoryCategory(tenantId, id, body);
+
+    // Refresh MV to sync with category changes
+    await refreshDirectoryMV(tenantId);
 
     res.json({
       success: true,
@@ -549,7 +572,7 @@ router.delete('/:tenantId/categories/:id', requireTenantManagement, async (req, 
     const { tenantId, id } = req.params;
 
     // Check category exists
-    const category = await prisma.tenantCategory.findFirst({
+    const category = await prisma.directoryCategory.findFirst({
       where: { id, tenantId },
     });
 
@@ -561,7 +584,7 @@ router.delete('/:tenantId/categories/:id', requireTenantManagement, async (req, 
     }
 
     // Check for child categories
-    const childCount = await prisma.tenantCategory.count({
+    const childCount = await prisma.directoryCategory.count({
       where: {
         tenantId,
         parentId: id,
@@ -595,7 +618,10 @@ router.delete('/:tenantId/categories/:id', requireTenantManagement, async (req, 
       });
     }
 
-    await categoryService.softDeleteTenantCategory(tenantId, id);
+    await categoryService.softDeleteDirectoryCategory(tenantId, id);
+
+    // Refresh MV to sync with category deletion
+    await refreshDirectoryMV(tenantId);
 
     res.json({
       success: true,
@@ -621,7 +647,7 @@ router.post('/:tenantId/categories/:id/align', requireTenantManagement, async (r
     const body = alignCategorySchema.parse(req.body);
 
     // Check category exists
-    const category = await prisma.tenantCategory.findFirst({
+    const category = await prisma.directoryCategory.findFirst({
       where: { id, tenantId },
     });
 
@@ -681,7 +707,7 @@ router.get('/:tenantId/categories-unmapped', async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    const unmapped = await prisma.tenantCategory.findMany({
+    const unmapped = await prisma.directoryCategory.findMany({
       where: {
         tenantId,
         isActive: true,
@@ -713,17 +739,17 @@ router.get('/:tenantId/categories-alignment-status', async (req, res) => {
     const { tenantId } = req.params;
 
     const [total, mapped, unmapped] = await Promise.all([
-      prisma.tenantCategory.count({
+      prisma.directoryCategory.count({
         where: { tenantId, isActive: true },
       }),
-      prisma.tenantCategory.count({
+      prisma.directoryCategory.count({
         where: {
           tenantId,
           isActive: true,
           googleCategoryId: { not: null },
         },
       }),
-      prisma.tenantCategory.count({
+      prisma.directoryCategory.count({
         where: {
           tenantId,
           isActive: true,
@@ -815,7 +841,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
     }
 
     // Get all active categories from the hero tenant
-    const heroCategories = await prisma.tenantCategory.findMany({
+    const heroCategories = await prisma.directoryCategory.findMany({
       where: {
         tenantId,
         isActive: true,
@@ -853,7 +879,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
       try {
         for (const heroCategory of heroCategories) {
           // Check if category with same slug already exists
-          const existing = await prisma.tenantCategory.findFirst({
+          const existing = await prisma.directoryCategory.findFirst({
             where: {
               tenantId: location.id,
               slug: heroCategory.slug,
@@ -868,7 +894,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
             }
             
             // Update mode - update existing category
-            await prisma.tenantCategory.update({
+            await prisma.directoryCategory.update({
               where: { id: existing.id },
               data: {
                 name: heroCategory.name,
@@ -885,7 +911,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
             }
             
             // Create mode - create new category
-            await prisma.tenantCategory.create({
+            await prisma.directoryCategory.create({
               data: {
                 /** id: `cat_${location.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, */
                 id: generateQsCatId(),
@@ -913,6 +939,9 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
         });
       }
     }
+
+    // Refresh MV to sync with all propagated category changes
+    await refreshDirectoryMV();
 
     res.json({
       success: true,

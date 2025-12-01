@@ -316,16 +316,9 @@ export class GBPCategorySyncService {
       UPDATE gbp_category_mappings
       SET 
         tenant_count = (
-          SELECT COUNT(DISTINCT t.id)
-          FROM tenants t
-          WHERE t.metadata->'gbp_categories'->'primary'->>'id' = gbp_category_mappings.gbp_category_id
-            OR EXISTS (
-              SELECT 1 
-              FROM jsonb_array_elements(
-                COALESCE(t.metadata->'gbp_categories'->'secondary', '[]'::jsonb)
-              ) AS sec
-              WHERE sec->>'id' = gbp_category_mappings.gbp_category_id
-            )
+          SELECT COUNT(DISTINCT tgc.tenant_id)
+          FROM tenant_gbp_categories tgc
+          WHERE tgc.gbp_category_id = gbp_category_mappings.gbp_category_id
         ),
         last_used_at = NOW(),
         updated_at = NOW()

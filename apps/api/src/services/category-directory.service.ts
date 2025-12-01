@@ -22,7 +22,7 @@ export class CategoryDirectoryService {
       console.log('[CategoryService] Fetching categories using Prisma ORM...');
       
       // Get all active categories first
-      const categories = await prisma.tenantCategory.findMany({
+      const categories = await prisma.directoryCategory.findMany({
         where: {
           isActive: true,
         },
@@ -40,7 +40,7 @@ export class CategoryDirectoryService {
           // Count items in this category from published directory listings
           const itemCount = await prisma.inventoryItem.count({
             where: {
-              tenantCategoryId: category.id,
+              directoryCategoryId: category.id,
               itemStatus: 'active',
               visibility: 'public',
               tenant: {
@@ -55,7 +55,7 @@ export class CategoryDirectoryService {
           // Count distinct tenants with items in this category
           const tenantCount = await prisma.inventoryItem.findMany({
             where: {
-              tenantCategoryId: category.id,
+              directoryCategoryId: category.id,
               itemStatus: 'active',
               visibility: 'public',
               tenant: {
@@ -116,7 +116,7 @@ export class CategoryDirectoryService {
       console.log(`[CategoryService] Fetching stores for category: ${categorySlug}`);
       
       // 1. Find category by slug
-      const category = await prisma.tenantCategory.findFirst({
+      const category = await prisma.directoryCategory.findFirst({
         where: { 
           slug: categorySlug, 
           isActive: true 
@@ -136,7 +136,7 @@ export class CategoryDirectoryService {
           locationStatus: 'active',
           inventoryItems: {
             some: {
-              tenantCategoryId: category.id,
+              directoryCategoryId: category.id,
               itemStatus: 'active',
               visibility: 'public',
             },
@@ -166,7 +166,7 @@ export class CategoryDirectoryService {
           const productCount = await prisma.inventoryItem.count({
             where: {
               tenantId: store.id,
-              tenantCategoryId: category.id,
+              directoryCategoryId: category.id,
               itemStatus: 'active',
               visibility: 'public',
             },
@@ -226,7 +226,7 @@ export class CategoryDirectoryService {
       
       // Walk up the parent chain
       while (currentId) {
-        const category: { id: string; name: string; slug: string; parentId: string | null } | null = await prisma.tenantCategory.findUnique({
+        const category: { id: string; name: string; slug: string; parentId: string | null } | null = await prisma.directoryCategory.findUnique({
           where: { id: currentId },
           select: {
             id: true,

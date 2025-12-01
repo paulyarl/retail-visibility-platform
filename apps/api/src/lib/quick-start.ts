@@ -205,7 +205,7 @@ export async function generateQuickStartProducts(
       const categoryId = `${tenant_id}_${cat.slug}`;
       
       // Persist category to database (upsert to avoid duplicates)
-      await prisma.tenantCategory.upsert({
+      await prisma.directoryCategory.upsert({
         where: { id: categoryId },
         create: {
           id: categoryId,
@@ -278,12 +278,12 @@ export async function generateQuickStartProducts(
       const stock = availability === 'in_stock' ? Math.floor(Math.random() * 96) + 5 : 0;
 
       // Assign category if enabled
-      let categoryAssignment: { tenantCategoryId?: string; categoryPath?: string[] } = {};
+      let categoryAssignment: { directoryCategoryId?: string; categoryPath?: string[] } = {};
       if (assignCategories && categories.length > 0) {
         const matchingCat = categories.find((c) => c.originalName === product.category);
         const selectedCat = matchingCat || categories[Math.floor(Math.random() * categories.length)];
         categoryAssignment = {
-          tenantCategoryId: selectedCat.id,
+          directoryCategoryId: selectedCat.id,
           categoryPath: [selectedCat.slug],
         };
       }

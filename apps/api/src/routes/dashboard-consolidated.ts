@@ -59,7 +59,7 @@ router.get('/dashboard/consolidated/:tenantId', authenticateToken, checkTenantAc
             tenantId,
             itemStatus: 'active',
             OR: [
-              { tenantCategoryId: null },
+              { directoryCategoryId: null },
               { visibility: 'private' },
             ],
           },

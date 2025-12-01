@@ -44,7 +44,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // @ts-expect-error - duplex is a new fetch feature
       duplex: 'half',
     });
-    console.log('proxy response status:', res.status, 'content-type:', res.headers.get('content-type'));
     
     // Handle non-JSON responses
     const contentType = res.headers.get('content-type');

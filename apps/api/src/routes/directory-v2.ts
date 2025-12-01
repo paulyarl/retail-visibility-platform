@@ -71,6 +71,68 @@ const getDirectPool = () => {
 };
 
 /**
+ * GET /api/directory/stores
+ * Get all directory listings (using materialized view for performance)
+ */
+router.get('/stores', async (req: Request, res: Response) => {
+  try {
+    const { page = '1', limit = '12', sort = 'activity' } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Get all stores using directory_listings_list materialized view
+    const query = `
+      SELECT * FROM directory_listings_list
+       WHERE is_published = true
+         AND (business_hours IS NULL OR business_hours::text != 'null')
+       ORDER BY 
+         CASE 
+           WHEN $3 = 'activity' THEN activity_score
+           WHEN $3 = 'name' THEN business_name
+           WHEN $3 = 'city' THEN city
+           ELSE activity_score
+         END DESC,
+         business_name ASC
+       LIMIT $1 OFFSET $2
+    `;
+    
+    const result = await getDirectPool().query(query, [limitNum, offset, sort]);
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total FROM directory_listings_list
+       WHERE is_published = true
+         AND (business_hours IS NULL OR business_hours::text != 'null')
+    `;
+    const countResult = await getDirectPool().query(countQuery);
+    const total = parseInt(countResult.rows[0].total);
+
+    res.json({
+      success: true,
+      listings: result.rows,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
+      },
+      performance: {
+        source: 'directory_listings_list (materialized view)',
+        optimized: true
+      }
+    });
+
+  } catch (error) {
+    console.error('[GET /api/directory/stores] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch directory stores'
+    });
+  }
+});
+
+/**
  * GET /api/directory/search
  * Search directory listings with filters
  */
@@ -311,108 +373,46 @@ router.get('/:identifier', async (req: Request, res: Response) => {
     }
 
     const row = result.rows[0];
-    
-    // Fetch product categories from normalized structure
+
+    // Get Product Categories with counts from storefront_category_counts MV
     const categoriesQuery = `
       SELECT 
-        pc.id,
-        pc.name,
-        pc.slug,
-        pc.google_category_id,
-        pc.icon_emoji,
-        dlc.is_primary
-      FROM directory_listing_categories dlc
-      INNER JOIN platform_categories pc ON pc.id = dlc.category_id
-      WHERE dlc.listing_id = $1
-      ORDER BY dlc.is_primary DESC, pc.name ASC
+        category_id as id,
+        category_name as name,
+        category_slug as slug,
+        product_count as count,
+        products_with_images,
+        products_with_descriptions,
+        avg_price_cents,
+        min_price_cents,
+        max_price_cents
+      FROM storefront_category_counts
+      WHERE tenant_id = $1
+        AND product_count > 0
+      ORDER BY category_level ASC, category_name ASC
     `;
-    const categoriesResult = await getDirectPool().query(categoriesQuery, [row.id]);
-    
+    const categoriesResult = await getDirectPool().query(categoriesQuery, [row.tenant_id]);
     const categories = categoriesResult.rows.map((cat: any) => ({
       id: cat.id,
       name: cat.name,
       slug: cat.slug,
-      googleCategoryId: cat.google_category_id,
-      icon: cat.icon_emoji,
-      isPrimary: cat.is_primary,
+      count: cat.count,
+      productsWithImages: cat.products_with_images,
+      productsWithDescriptions: cat.products_with_descriptions,
+      avgPriceCents: cat.avg_price_cents,
+      minPriceCents: cat.min_price_cents,
+      maxPriceCents: cat.max_price_cents,
     }));
-    
-    // Fetch GBP store type categories from tenants.metadata and gbp_listing_categories
-    const gbpCategoriesQuery = `
-      SELECT 
-        glc.gbp_category_id,
-        glc.is_primary,
-        t.metadata->'gbp_categories'->'primary'->>'name' as primary_name,
-        t.metadata->'gbp_categories'->'secondary' as secondary_categories
-      FROM gbp_listing_categories glc
-      INNER JOIN tenants t ON t.id = $1
-      WHERE glc.listing_id = $1
-      ORDER BY glc.is_primary DESC
-    `;
-    const gbpCategoriesResult = await getDirectPool().query(gbpCategoriesQuery, [row.tenant_id]);
-    
-    const gbpCategories = gbpCategoriesResult.rows.map((cat: any) => {
-      // Extract category name from metadata
-      let categoryName = '';
-      if (cat.is_primary && cat.primary_name) {
-        categoryName = cat.primary_name;
-      } else if (!cat.is_primary && cat.secondary_categories) {
-        // Find the matching secondary category
-        const secondaryArray = cat.secondary_categories;
-        const matchingSecondary = secondaryArray?.find((sec: any) => 
-          sec.id === cat.gbp_category_id
-        );
-        categoryName = matchingSecondary?.name || '';
-      }
-      
-      // Convert category name to slug (e.g., "Grocery store" -> "grocery-store")
-      const slug = categoryName.toLowerCase().replace(/\s+/g, '-');
-      
-      return {
-        id: cat.gbp_category_id,
-        name: categoryName,
-        slug: slug,
-        isPrimary: cat.is_primary,
-        type: 'store_type',
-      };
-    }).filter((cat: any) => cat.name); // Filter out empty names
-    
-    const listing = {
-      id: row.id,
-      tenantId: row.tenant_id,
-      tenant_id: row.tenant_id,
-      business_name: row.business_name,
-      slug: row.slug,
-      address: row.address,
-      city: row.city,
-      state: row.state,
-      zipCode: row.zip_code,
-      phone: row.phone,
-      email: row.email,
-      website: row.website,
-      latitude: row.latitude,
-      longitude: row.longitude,
-      categories: categories, // Product categories
-      gbpCategories: gbpCategories, // Store type categories
-      logoUrl: row.logo_url,
-      description: row.description,
-      ratingAvg: row.rating_avg || 0,
-      ratingCount: row.rating_count || 0,
-      productCount: row.product_count || 0,
-      product_count: row.product_count || 0,
-      isFeatured: row.is_featured || false,
-      subscription_tier: row.subscription_tier || 'trial',
-      useCustomWebsite: row.use_custom_website || false,
-      isPublished: row.is_published || true,
-      business_hours: row.business_hours,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    };
 
-    return res.json({ listing });
+    return res.json({
+      listing: {
+        ...row,
+        categories, // Platform Directory Categories from MV
+      }
+    });
   } catch (error) {
-    console.error('Get listing error:', error);
-    return res.status(500).json({ error: 'get_listing_failed' });
+    console.error('[GET /api/directory/:identifier] Error:', error);
+    return res.status(500).json({ error: 'Failed to fetch directory listing' });
   }
 });
 
@@ -438,44 +438,38 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
 
     const current = currentListing.rows[0];
 
-    // Find related stores using a scoring algorithm with materialized view
-    // Priority: Same category (primary/secondary) > Same city > Similar rating
-    // Using directory_category_listings MV for faster queries
-    // Note: MV is already filtered by is_published = true at creation time
+    // Find related stores using MV categories
+    // Get the current store's MV categories
+    const currentCategoriesQuery = `
+      SELECT DISTINCT category_slug as slug
+      FROM directory_category_products
+      WHERE tenant_id = $1
+        AND is_published = true
+    `;
+    const currentCategoriesResult = await getDirectPool().query(currentCategoriesQuery, [current.tenant_id]);
+    const currentCategorySlugs = currentCategoriesResult.rows.map((row: any) => row.slug);
+
+    // Find related stores using MV categories
     const relatedQuery = `
-      SELECT DISTINCT ON (dcl.id)
+      SELECT DISTINCT ON (dcl.tenant_id)
         dcl.*,
-        (
-          CASE
-            WHEN dcl.is_primary = true AND dcl.category_name = $1 THEN 3
-            WHEN dcl.is_primary = false AND dcl.category_name = $1 THEN 2
-            WHEN dcl.category_name = ANY($7) THEN 2
-            ELSE 0
-          END +
-          CASE
-            WHEN dcl.city = $2 AND dcl.state = $3 THEN 2
-            WHEN dcl.state = $3 THEN 1
-            ELSE 0
-          END +
-          CASE
-            WHEN ABS(dcl.rating_avg - $4) < 0.5 THEN 1
-            ELSE 0
-          END
-        ) as relevance_score
-      FROM directory_category_listings dcl
-      WHERE dcl.slug != $5
-      ORDER BY dcl.id, relevance_score DESC, dcl.rating_avg DESC, dcl.product_count DESC
-      LIMIT $6
+        COUNT(dcp.category_slug) FILTER (WHERE dcp.category_slug = ANY($1)) as category_matches
+      FROM directory_listings_list dcl
+      INNER JOIN directory_category_products dcp ON dcp.tenant_id = dcl.tenant_id
+      WHERE dcl.slug != $2
+        AND dcl.is_published = true
+        AND (dcl.business_hours IS NULL OR dcl.business_hours::text != 'null')
+        AND dcp.is_published = true
+        AND dcp.category_slug = ANY($1)
+      GROUP BY dcl.tenant_id, dcl.id, dcl.business_name, dcl.slug, dcl.address, dcl.city, dcl.state, dcl.zip_code, dcl.phone, dcl.email, dcl.website, dcl.latitude, dcl.longitude, dcl.primary_category, dcl.secondary_categories, dcl.logo_url, dcl.description, dcl.rating_avg, dcl.rating_count, dcl.product_count, dcl.is_featured, dcl.subscription_tier, dcl.use_custom_website, dcl.is_published, dcl.business_hours, dcl.created_at, dcl.updated_at
+      ORDER BY dcl.tenant_id, category_matches DESC, dcl.rating_avg DESC, dcl.product_count DESC
+      LIMIT $3
     `;
 
     const related = await getDirectPool().query(relatedQuery, [
-      current.primary_category,
-      current.city,
-      current.state,
-      current.rating_avg || 0,
+      currentCategorySlugs,
       slug,
       limit,
-      current.secondary_categories || [], // Add secondary categories for cross-matching
     ]);
 
     const relatedListings = related.rows.map((row: any) => ({
@@ -492,8 +486,8 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       website: row.website,
       latitude: row.latitude,
       longitude: row.longitude,
-      primaryCategory: row.category_name, // From MV
-      secondaryCategories: [], // MV has one category per row
+      primaryCategory: row.primary_category,
+      secondaryCategories: row.secondary_categories || [],
       logoUrl: row.logo_url,
       description: row.description,
       ratingAvg: row.rating_avg || 0,

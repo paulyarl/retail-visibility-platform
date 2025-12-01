@@ -38,14 +38,23 @@ export async function getStoresViewedBySameUsers(
   const pool = getDirectPool();
   
   try {
-    const query = `
+    let query = `
       WITH same_user_views AS (
         SELECT DISTINCT ub.user_id
         FROM user_behavior_simple ub
-        WHERE ub.entity_id = $1 
+        WHERE ub.entity_id::text = $1::text 
           AND ub.entity_type = 'store'
           AND ub.timestamp >= NOW() - INTERVAL '30 days'
-          ${userId ? 'AND ub.user_id::text = $2::text' : ''}
+    `;
+    
+    let params: any[] = [storeId];
+    
+    if (userId) {
+      query += ` AND ub.user_id::text = $2::text`;
+      params.push(userId);
+    }
+    
+    query += `
       ),
       other_stores_viewed AS (
         SELECT 
@@ -54,12 +63,12 @@ export async function getStoresViewedBySameUsers(
           MAX(ub.timestamp) as last_viewed
         FROM user_behavior_simple ub
         JOIN same_user_views suv ON ub.user_id::text = suv.user_id::text
-        WHERE ub.entity_id != $1 
+        WHERE ub.entity_id::text != $1::text
           AND ub.entity_type = 'store'
           AND ub.timestamp >= NOW() - INTERVAL '30 days'
         GROUP BY ub.entity_id
         ORDER BY view_count DESC, last_viewed DESC
-        LIMIT $3
+        LIMIT $${params.length + 1}
       )
       SELECT 
         dcl.tenant_id,
@@ -70,12 +79,11 @@ export async function getStoresViewedBySameUsers(
         dcl.state,
         osv.view_count as score
       FROM other_stores_viewed osv
-      JOIN directory_listings_list dcl ON osv.entity_id = dcl.tenant_id
-      WHERE dcl.tenant_exists = true
-        AND dcl.is_directory_visible = true
+      JOIN directory_listings_list dcl ON osv.entity_id::text = dcl.tenant_id::text
+      WHERE dcl.is_published = true
     `;
     
-    const params = userId ? [storeId, userId, limit] : [storeId, limit];
+    params.push(limit);
     const result = await pool.query(query, params);
     
     const recommendations: Recommendation[] = result.rows.map((row: any) => ({
@@ -154,17 +162,39 @@ export async function getPopularStoresInCategory(
     params.push(limit);
     const result = await pool.query(query, params);
     
-    const recommendations: Recommendation[] = result.rows.map((row: any) => ({
-      tenantId: row.tenant_id,
-      businessName: row.business_name,
-      slug: row.slug,
-      score: (row.store_count * 0.7) + ((row.avg_rating || 0) * 5 * 0.3), // Weighted score
-      reason: `Popular ${categorySlug.replace('-', ' ')} with ${row.store_count} locations`,
-      address: row.address,
-      city: row.city,
-      state: row.state,
-      distance: row.distance ? Math.round(row.distance * 10) / 10 : undefined
-    }));
+    const recommendations: Recommendation[] = result.rows.map((row: any) => {
+      // Calculate location-weighted rating if user location is available
+      let locationWeightedRating = row.avg_rating || 0;
+      if (userLat && userLng && row.distance !== null) {
+        // Apply location bonus: closer stores get rating boost
+        const distanceMiles = row.distance;
+        const locationBonus = Math.max(0, 1 - (distanceMiles / 50)) * 0.5; // 0 to 0.5 bonus
+        locationWeightedRating = Math.min(5, (row.avg_rating || 0) + locationBonus);
+      }
+      
+      // Enhanced scoring with location-weighted ratings
+      const baseScore = (row.store_count * 0.6) + (locationWeightedRating * 5 * 0.4);
+      
+      // Apply proximity bonus if user location is available
+      let proximityBonus = 0;
+      if (userLat && userLng && row.distance !== null) {
+        proximityBonus = Math.max(0, 1 - (row.distance / 25)) * 10; // 0 to 10 bonus
+      }
+      
+      const finalScore = baseScore + proximityBonus;
+      
+      return {
+        tenantId: row.tenant_id,
+        businessName: row.business_name,
+        slug: row.slug,
+        score: finalScore,
+        reason: `Popular ${categorySlug.replace('-', ' ')} with ${row.store_count} locations${row.avg_rating ? ` and ${row.avg_rating.toFixed(1)}⭐` : ''}`,
+        address: row.address,
+        city: row.city,
+        state: row.state,
+        distance: row.distance ? Math.round(row.distance * 10) / 10 : undefined
+      };
+    });
 
     return {
       recommendations,
@@ -221,6 +251,7 @@ export async function getTrendingNearby(
         dcl.address,
         dcl.city,
         dcl.state,
+        dcl.rating_avg,
         ts.view_count,
         ts.unique_viewers,
         3959 * ACOS(
@@ -229,9 +260,8 @@ export async function getTrendingNearby(
           SIN(RADIANS($1)) * SIN(RADIANS(dcl.latitude))
         ) as distance
       FROM trending_stores ts
-      JOIN directory_listings_list dcl ON ts.entity_id = dcl.tenant_id
-      WHERE dcl.tenant_exists = true
-        AND dcl.is_directory_visible = true
+      JOIN directory_listings_list dcl ON ts.entity_id::text = dcl.tenant_id
+      WHERE dcl.is_published = true
         AND dcl.latitude IS NOT NULL 
         AND dcl.longitude IS NOT NULL
       ORDER BY ts.view_count DESC
@@ -239,17 +269,39 @@ export async function getTrendingNearby(
     
     const result = await pool.query(query, [userLat, userLng, radiusMiles, limit]);
     
-    const recommendations: Recommendation[] = result.rows.map((row: any) => ({
-      tenantId: row.tenant_id,
-      businessName: row.business_name,
-      slug: row.slug,
-      score: row.view_count + (row.unique_viewers * 0.5), // Weight unique viewers
-      reason: `Trending nearby - ${row.view_count} views by ${row.unique_viewers} people`,
-      address: row.address,
-      city: row.city,
-      state: row.state,
-      distance: Math.round(row.distance * 10) / 10
-    }));
+    const recommendations: Recommendation[] = result.rows.map((row: any) => {
+      // Calculate location-weighted rating if user location is available
+      let locationWeightedRating = row.rating_avg || 0;
+      if (userLat && userLng && row.distance !== null) {
+        // Apply location bonus: closer stores get rating boost
+        const distanceMiles = row.distance;
+        const locationBonus = Math.max(0, 1 - (distanceMiles / 50)) * 0.5; // 0 to 0.5 bonus
+        locationWeightedRating = Math.min(5, (row.rating_avg || 0) + locationBonus);
+      }
+      
+      // Enhanced scoring with location-weighted ratings
+      const baseScore = (row.view_count + (row.unique_viewers * 0.5)) + (locationWeightedRating * 2);
+      
+      // Apply proximity bonus if user location is available
+      let proximityBonus = 0;
+      if (userLat && userLng && row.distance !== null) {
+        proximityBonus = Math.max(0, 1 - (row.distance / 25)) * 5; // 0 to 5 bonus
+      }
+      
+      const finalScore = baseScore + proximityBonus;
+      
+      return {
+        tenantId: row.tenant_id,
+        businessName: row.business_name,
+        slug: row.slug,
+        score: finalScore,
+        reason: `Trending nearby - ${row.view_count} views by ${row.unique_viewers} people${row.rating_avg ? ` (${row.rating_avg.toFixed(1)}⭐)` : ''}`,
+        address: row.address,
+        city: row.city,
+        state: row.state,
+        distance: Math.round(row.distance * 10) / 10
+      };
+    });
 
     return {
       recommendations,
@@ -299,38 +351,37 @@ export async function trackUserBehavior({
   const pool = getDirectPool();
   
   try {
+    // Use placeholder UUID for all entity types to avoid UUID validation issues
     const query = `
       INSERT INTO user_behavior_simple (
         user_id, session_id, entity_type, entity_id, entity_name, context,
         location_lat, location_lng, referrer, user_agent, ip_address, 
         duration_seconds, page_type
-      ) VALUES ($1, $2, $3, 
-        CASE 
-          WHEN $3 = 'store'::text THEN $4::uuid
-          ELSE '00000000-0000-0000-0000-000000000000'::uuid
-        END, 
-        $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ) VALUES ($1, $2, $3::text, 
+        '00000000-0000-0000-0000-000000000000'::uuid, 
+        $4, $5, $6, $7, $8, $9, $10, $11, $12)
       ON CONFLICT DO NOTHING
     `;
     
-    // For non-store entities, store the actual entity ID in entity_name
+    // Store the actual entity ID in entity_name for all entity types
     const actualEntityName = entityType === 'store' ? entityName : entityId;
     
-    await pool.query(query, [
+    const queryParams = [
       userId || null,
       sessionId || null,
       entityType,
-      entityId, // For stores: UUID, for others: will be replaced with placeholder
       actualEntityName || null,
       context ? JSON.stringify(context) : null,
-      locationLat || null,
-      locationLng || null,
+      locationLat ? locationLat.toString() : null,
+      locationLng ? locationLng.toString() : null,
       referrer || null,
       userAgent || null,
       ipAddress || null,
-      durationSeconds || null,
-      pageType || null
-    ]);
+      durationSeconds ? durationSeconds.toString() : null,
+      pageType ? pageType.toString() : null
+    ];
+    
+    await pool.query(query, queryParams);
 
   } catch (error) {
     console.error('Error tracking user behavior:', error);
@@ -518,21 +569,43 @@ export async function getStoresInUserFavoriteCategories(
     
     const result = await pool.query(query, params);
     
-    const recommendations: Recommendation[] = result.rows.map((row: any) => ({
-      tenantId: row.tenant_id,
-      businessName: row.business_name,
-      slug: row.slug,
-      score: (row.store_count * 0.5) + 
-             ((row.avg_rating || 0) * 5 * 0.3) + 
-             (row.category_browse_count * 0.1) + 
-             ((row.category_avg_duration || 0) * 0.1) * 
-             (row.store_type_boost || 1.0),
-      reason: `Based on your interest in ${row.category_slug}${row.store_type_slug ? ` and ${row.store_type_slug} stores` : ''}`,
-      address: row.address,
-      city: row.city,
-      state: row.state,
-      distance: row.distance ? Math.round(row.distance * 10) / 10 : undefined
-    }));
+    const recommendations: Recommendation[] = result.rows.map((row: any) => {
+      // Calculate location-weighted rating if user location is available
+      let locationWeightedRating = row.avg_rating || 0;
+      if (userLat && userLng && row.distance !== null) {
+        // Apply location bonus: closer stores get rating boost
+        const distanceMiles = row.distance;
+        const locationBonus = Math.max(0, 1 - (distanceMiles / 50)) * 0.5; // 0 to 0.5 bonus
+        locationWeightedRating = Math.min(5, (row.avg_rating || 0) + locationBonus);
+      }
+      
+      // Enhanced scoring with location-weighted ratings
+      const baseScore = (row.store_count * 0.4) + 
+                       (locationWeightedRating * 5 * 0.3) + 
+                       (row.category_browse_count * 0.15) + 
+                       ((row.category_avg_duration || 0) * 0.05) * 
+                       (row.store_type_boost || 1.0);
+      
+      // Apply proximity bonus if user location is available
+      let proximityBonus = 0;
+      if (userLat && userLng && row.distance !== null) {
+        proximityBonus = Math.max(0, 1 - (row.distance / 25)) * 10; // 0 to 10 bonus
+      }
+      
+      const finalScore = baseScore + proximityBonus;
+      
+      return {
+        tenantId: row.tenant_id,
+        businessName: row.business_name,
+        slug: row.slug,
+        score: finalScore,
+        reason: `Based on your interest in ${row.category_slug}${row.store_type_slug ? ` and ${row.store_type_slug} stores` : ''}${row.avg_rating ? ` (${row.avg_rating.toFixed(1)}⭐)` : ''}`,
+        address: row.address,
+        city: row.city,
+        state: row.state,
+        distance: row.distance ? Math.round(row.distance * 10) / 10 : undefined
+      };
+    });
 
     return {
       recommendations,

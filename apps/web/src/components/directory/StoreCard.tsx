@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from 'framer-motion';
-import { Badge } from '@/components/ui';
+import { Badge, Button, Tooltip } from '@/components/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -27,6 +27,7 @@ interface StoreCardProps {
     website?: string;
     distance?: number;
     isOpen?: boolean;
+    directoryPublished?: boolean; // Add directory publish status
     category?: {
       name: string;
       slug: string;
@@ -64,6 +65,14 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
     router.push(`/directory/${listing.slug}`);
   };
 
+  // Handle publish to directory action (placeholder for future implementation)
+  const handlePublishToDirectory = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // TODO: Navigate to settings or show publish dialog
+    console.log('Publish to directory clicked for:', listing.tenantId);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -77,7 +86,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
         rel={isExternalLink ? 'noopener noreferrer' : undefined}
         className="block"
       >
-        <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow duration-200">
+        <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:shadow-lg transition-shadow duration-200">
           {/* Logo/Image */}
           <div className="relative aspect-video bg-white dark:bg-neutral-800 overflow-hidden flex items-center justify-center p-4">
             {listing.logoUrl ? (
@@ -179,13 +188,28 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
 
             {/* CTA Buttons */}
             <div className="pt-2 space-y-2">
-              {/* Directory Page Button */}
-              <button
-                onClick={handleDirectoryPageClick}
-                className="block w-full text-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                View Directory Page
-              </button>
+              {/* Directory Page Button - Dynamic based on publish status */}
+              {listing.directoryPublished ? (
+                <Button
+                  onClick={handleDirectoryPageClick}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-medium"
+                >
+                  View Directory Page
+                </Button>
+              ) : (
+                <Tooltip content="This store hasn't been published to the public directory yet. Click to discover other stores in the directory.">
+                  <Button
+                    variant="secondary"
+                    className="w-full border-neutral-300 text-neutral-400 text-sm font-medium hover:bg-neutral-50 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent navigating to storefront
+                      window.location.href = '/directory';
+                    }}
+                  >
+                    Directory Not Published →
+                  </Button>
+                </Tooltip>
+              )}
 
               {/* Main CTA Button */}
               <div className="w-full text-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors cursor-pointer">

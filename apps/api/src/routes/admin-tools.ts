@@ -171,7 +171,7 @@ router.delete('/tenants/:tenantId', async (req, res) => {
     });
 
     // Delete all categories for this tenant
-    const deletedCategories = await prisma.tenantCategory.deleteMany({
+    const deletedCategories = await prisma.directoryCategory.deleteMany({
       where: { tenantId },
     });
 
