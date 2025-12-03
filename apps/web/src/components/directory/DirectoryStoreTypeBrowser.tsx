@@ -26,8 +26,11 @@ export default function DirectoryStoreTypeBrowser({
 }: DirectoryStoreTypeBrowserProps) {
   const router = useRouter();
 
+  // Filter out store types with zero stores
+  const nonEmptyStoreTypes = storeTypes.filter(type => type.storeCount > 0);
+
   // Convert store types to CategoryMetrics format for scoring
-  const convertedStoreTypes = storeTypes.map(type => ({
+  const convertedStoreTypes = nonEmptyStoreTypes.map(type => ({
     id: type.slug,
     slug: type.slug,
     name: type.name,
@@ -48,7 +51,7 @@ export default function DirectoryStoreTypeBrowser({
     router.push(getStoreTypeUrl(slug));
   };
 
-  if (storeTypes.length === 0) {
+  if (nonEmptyStoreTypes.length === 0) {
     return null;
   }
 
@@ -106,13 +109,13 @@ export default function DirectoryStoreTypeBrowser({
         ))}
       </div>
 
-      {storeTypes.length > 12 && (
+      {nonEmptyStoreTypes.length > 12 && (
         <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
           <button
             onClick={() => router.push('/directory/stores')}
             className="w-full py-2 text-sm text-green-600 dark:text-green-400 hover:underline font-medium"
           >
-            Browse all {storeTypes.length} store types →
+            Browse all {nonEmptyStoreTypes.length} store types →
           </button>
         </div>
       )}

@@ -50,9 +50,9 @@ export default function AllStoreTypesClient() {
     fetchStoreTypes();
   }, []);
 
-  const filteredStoreTypes = storeTypes.filter((type) =>
-    type.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredStoreTypes = storeTypes
+    .filter((type) => type.storeCount > 0) // Filter out empty store types
+    .filter((type) => type.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   if (loading) {
     return (
