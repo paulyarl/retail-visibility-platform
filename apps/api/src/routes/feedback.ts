@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -22,14 +23,16 @@ router.post('/', async (req, res) => {
   try {
     const body = submitFeedbackSchema.parse(req.body);
 
-    const feedback = await prisma.outreachFeedback.create({
+    const feedback = await prisma.outreach_feedback_list.create({
       data: {
-        tenantId: body.tenantId || null,
-        userId: body.userId || null,
+        id: generateQuickStart("feedback"),
+        tenant_id: body.tenantId || null,
+        user_id: body.userId || null,
         feedback: body.feedback as any,
         score: body.score,
         category: body.category || null,
         context: body.context || null,
+        updated_at: new Date(),
       },
     });
 
@@ -97,13 +100,13 @@ router.get('/', async (req, res) => {
     }
 
     const [feedbacks, total] = await Promise.all([
-      prisma.outreachFeedback.findMany({
+      prisma.outreach_feedback_list.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
         take: parseInt(limit as string),
         skip: parseInt(offset as string),
       }),
-      prisma.outreachFeedback.count({ where }),
+      prisma.outreach_feedback_list.count({ where }),
     ]);
 
     res.json({
@@ -132,7 +135,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const feedback = await prisma.outreachFeedback.findUnique({
+    const feedback = await prisma.outreach_feedback_list.findUnique({
       where: { id },
     });
 
@@ -174,7 +177,7 @@ router.get('/analytics/summary', async (req, res) => {
       where.tenantId = tenantId as string;
     }
 
-    const feedbacks = await prisma.outreachFeedback.findMany({
+    const feedbacks = await prisma.outreach_feedback_list.findMany({
       where,
       select: {
         score: true,
@@ -265,11 +268,11 @@ router.get('/pilot/kpis', async (req, res) => {
       where.tenantId = tenantId as string;
     }
 
-    const feedbacks = await prisma.outreachFeedback.findMany({
+    const feedbacks = await prisma.outreach_feedback_list.findMany({
       where,
       select: {
         score: true,
-        tenantId: true,
+        tenant_id: true,
       },
     });
 
@@ -295,9 +298,9 @@ router.get('/pilot/kpis', async (req, res) => {
     }
 
     const [totalJobs, successJobs] = await Promise.all([
-      prisma.feedPushJobs.count({ where: feedJobsWhere }),
-      prisma.feedPushJobs.count({
-        where: { ...feedJobsWhere, jobStatus: 'success' },
+      prisma.feed_push_jobs_list.count({ where: feedJobsWhere }),
+      prisma.feed_push_jobs_list.count({
+        where: { ...feedJobsWhere, job_status: 'success' },
       }),
     ]);
 
@@ -358,7 +361,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    await prisma.outreachFeedback.delete({
+    await prisma.outreach_feedback_list.delete({
       where: { id },
     });
 

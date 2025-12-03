@@ -23,39 +23,39 @@ router.use(requireAdmin);
 router.get('/tiers', async (req, res) => {
   try {
     // Fetch tiers from database
-    const tiers = await prisma.subscriptionTier.findMany({
-      where: { isActive: true },
+    const tiers = await prisma.subscription_tiers_list.findMany({
+      where: { is_active: true },
       include: {
-        features: {
-          where: { isEnabled: true },
+        tier_features_list: {
+          where: { is_enabled: true },
           select: {
-            featureKey: true,
-            featureName: true,
+            feature_key: true,
+            feature_name: true,
           },
         },
       },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { sort_order: 'asc' },
     });
 
     // Group tiers by type
     const groupedTiers = tiers.reduce((acc, tier) => {
       const tierData = {
-        id: tier.tierKey,
+        id: tier.tier_key,
         name: tier.name,
-        displayName: tier.displayName,
-        price: tier.priceMonthly / 100, // Convert from cents to dollars
-        maxSkus: tier.maxSkus,
-        maxLocations: tier.maxLocations,
+        displayName: tier.display_name,
+        price: tier.price_monthly / 100, // Convert from cents to dollars
+        maxSkus: tier.max_skus,
+        maxLocations: tier.max_locations,
         description: tier.description || '',
-        type: tier.tierType,
-        features: tier.features.map(f => f.featureKey),
-        sortOrder: tier.sortOrder,
+        type: tier.tier_type,
+        features: tier.tier_features_list.map((f: { feature_key: string }) => f.feature_key),
+        sortOrder: tier.sort_order,
       };
 
-      if (!acc[tier.tierType]) {
-        acc[tier.tierType] = [];
+      if (!acc[tier.tier_type]) {
+        acc[tier.tier_type] = [];
       }
-      acc[tier.tierType].push(tierData);
+      acc[tier.tier_type].push(tierData);
       return acc;
     }, {} as Record<string, any[]>);
 
@@ -82,11 +82,11 @@ router.get('/tenants', async (req, res) => {
     const where: any = {};
 
     if (tier) {
-      where.subscriptionTier = tier;
+      where.subscription_tier = tier;
     }
 
     if (status) {
-      where.subscriptionStatus = status;
+      where.subscription_status = status;
     }
 
     if (search) {
@@ -98,36 +98,36 @@ router.get('/tenants', async (req, res) => {
 
     // Fetch tenants with pagination
     const [tenants, totalCount] = await Promise.all([
-      prisma.tenant.findMany({
+      prisma.tenants.findMany({
         where,
         skip,
         take: limitNum,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
         select: {
           id: true,
           name: true,
-          subscriptionTier: true,
-          subscriptionStatus: true,
-          trialEndsAt: true,
-          subscriptionEndsAt: true,
-          createdAt: true,
-          organizationId: true,
-          organization: {
+          subscription_tier: true,
+          subscription_status: true,
+          trial_ends_at: true,
+          subscription_ends_at: true,
+          created_at: true,
+          organization_id: true,
+          organizations_list: {
             select: {
               id: true,
               name: true,
-              subscriptionTier: true,
+              subscription_tier: true,
             },
           },
           _count: {
             select: {
-              userTenants: true,
-              inventoryItems: true,
+              user_tenants: true,
+              inventory_items: true,
             },
           },
         },
       }),
-      prisma.tenant.count({ where }),
+      prisma.tenants.count({ where }),
     ]);
 
     res.json({
@@ -154,28 +154,28 @@ router.get('/tenants/:tenantId', async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       include: {
-        organization: {
+        organizations_list: {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true, 
-            subscriptionStatus: true,
+            subscription_tier: true,
+            subscription_status: true,
           },
         },
-        tenantFeatureOverrides: {
+        tenant_feature_overrides_list: {
           where: {
             OR: [
-              { expiresAt: null }, 
-              { expiresAt: { gt: new Date() } }, 
+              { expires_at: null },
+              { expires_at: { gt: new Date() } },
             ],
           },
         },
         _count: {
           select: {
-            tenantFeatureOverrides: true,
+            tenant_feature_overrides_list: true,
           },
         },
       },
@@ -234,18 +234,18 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     const { reason, ...updateData } = parsed.data;
 
     // Get current tenant state for audit
-    const currentTenant = await prisma.tenant.findUnique({
+    const currentTenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
         _count: {
           select: {
-            inventoryItems: true,
+            inventory_items: true,
           },
         },
       },
@@ -256,7 +256,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     }
 
     // Check SKU limits if changing tier
-    if (updateData.subscriptionTier && updateData.subscriptionTier !== currentTenant.subscriptionTier) {
+    if (updateData.subscriptionTier && updateData.subscriptionTier !== currentTenant.subscription_tier) {
       const tierLimits: Record<string, number> = {
         google_only: 250,
         starter: 500,
@@ -269,7 +269,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       };
 
       const newLimit = tierLimits[updateData.subscriptionTier];
-      const currentSKUs = currentTenant._count.inventoryItems;
+      const currentSKUs = currentTenant._count.inventory_items;
 
       if (newLimit !== Infinity && currentSKUs > newLimit) {
         return res.status(400).json({
@@ -283,13 +283,13 @@ router.patch('/tenants/:tenantId', async (req, res) => {
 
     // Convert date strings to Date objects
     const updatePayload: any = {};
-    if (updateData.subscriptionTier) updatePayload.subscriptionTier = updateData.subscriptionTier;
-    if (updateData.subscription_status) updatePayload.subscriptionStatus = updateData.subscription_status;
-    if (updateData.trialEndsAt) updatePayload.trialEndsAt = new Date(updateData.trialEndsAt);
-    if (updateData.subscription_ends_at) updatePayload.subscriptionEndsAt = new Date(updateData.subscription_ends_at);
+    if (updateData.subscriptionTier) updatePayload.subscription_tier = updateData.subscriptionTier;
+    if (updateData.subscription_status) updatePayload.subscription_status = updateData.subscription_status;
+    if (updateData.trialEndsAt) updatePayload.trial_ends_at = new Date(updateData.trialEndsAt);
+    if (updateData.subscription_ends_at) updatePayload.subscription_ends_at = new Date(updateData.subscription_ends_at);
 
     // Update tenant
-    const updatedTenant = await prisma.tenant.update({
+    const updatedTenant = await prisma.tenants.update({
       where: { id: tenantId },
       data: updatePayload,
     });
@@ -302,16 +302,16 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       payload: {
         reason,
         before: {
-          subscriptionTier: currentTenant.subscriptionTier,
-          subscriptionStatus: currentTenant.subscriptionStatus,
-          trialEndsAt: currentTenant.trialEndsAt?.toISOString(),
-          subscriptionEndsAt: currentTenant.subscriptionEndsAt?.toISOString(),
+          subscriptionTier: currentTenant.subscription_tier,
+          subscriptionStatus: currentTenant.subscription_status,
+          trialEndsAt: currentTenant.trial_ends_at?.toISOString(),
+          subscriptionEndsAt: currentTenant.subscription_ends_at?.toISOString(),
         },
         after: {
-          subscriptionTier: updatedTenant.subscriptionTier,
-          subscriptionStatus: updatedTenant.subscriptionStatus,
-          trialEndsAt: updatedTenant.trialEndsAt?.toISOString(),
-          subscriptionEndsAt: updatedTenant.subscriptionEndsAt?.toISOString(),
+          subscriptionTier: updatedTenant.subscription_tier,
+          subscriptionStatus: updatedTenant.subscription_status,
+          trialEndsAt: updatedTenant.trial_ends_at?.toISOString(),
+          subscriptionEndsAt: updatedTenant.subscription_ends_at?.toISOString(),
         },
         adminUserId: req.user?.userId,
         adminEmail: req.user?.email,
@@ -319,8 +319,8 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     });
 
     console.log(`[Tier Management] Tenant ${tenantId} tier updated by ${req.user?.email}:`, {
-      from: currentTenant.subscriptionTier,
-      to: updatedTenant.subscriptionTier,
+      from: currentTenant.subscription_tier,
+      to: updatedTenant.subscription_tier,
       reason,
     });
 
@@ -329,12 +329,12 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       tenant: updatedTenant,
       changes: {
         before: {
-          subscriptionTier: currentTenant.subscriptionTier,
-          subscriptionStatus: currentTenant.subscriptionStatus,
+          subscriptionTier: currentTenant.subscription_tier,
+          subscriptionStatus: currentTenant.subscription_status,
         },
         after: {
-          subscriptionTier: updatedTenant.subscriptionTier,
-          subscriptionStatus: updatedTenant.subscriptionStatus,
+          subscriptionTier: updatedTenant.subscription_tier,
+          subscriptionStatus: updatedTenant.subscription_status,
         },
       },
     });
@@ -351,27 +351,27 @@ router.patch('/tenants/:tenantId', async (req, res) => {
 router.get('/stats', async (req, res) => {
   try {
     // Get tier distribution
-    const tierDistribution = await prisma.tenant.groupBy({
-      by: ['subscriptionTier'],
+    const tierDistribution = await prisma.tenants.groupBy({
+      by: ['subscription_tier'],
       _count: {
         id: true,
       },
     });
 
     // Get status distribution
-    const statusDistribution = await prisma.tenant.groupBy({
-      by: ['subscriptionStatus'],
+    const statusDistribution = await prisma.tenants.groupBy({
+      by: ['subscription_status'],
       _count: {
         id: true,
       },
-    });
+    }) as any;
 
     // Get total counts
     const [totalTenants, totalOrganizations, totalTrialTenants, totalActiveTenants] = await Promise.all([
-      prisma.tenant.count(),
-      prisma.organization.count(),
-      prisma.tenant.count({ where: { subscriptionStatus: 'trial' } }),
-      prisma.tenant.count({ where: { subscriptionStatus: 'active' } }),
+      prisma.tenants.count(),
+      prisma.organizations_list.count(),
+      prisma.tenants.count({ where: { subscription_status: { equals: 'trial' } } }),
+      prisma.tenants.count({ where: { subscription_status: { equals: 'active' } } }),
     ]);
 
     // Calculate MRR (Monthly Recurring Revenue) estimate
@@ -386,13 +386,13 @@ router.get('/stats', async (req, res) => {
       chain_enterprise: 4999,
     };
 
-    const activeTenants = await prisma.tenant.findMany({
-      where: { subscriptionStatus: 'active' },
-      select: { subscriptionTier: true },
+    const activeTenants = await prisma.tenants.findMany({
+      where: { subscription_status: 'active' },
+      select: { subscription_tier: true },
     });
 
     const estimatedMRR = activeTenants.reduce((sum, tenant) => {
-      const tier = tenant.subscriptionTier || 'starter';
+      const tier = tenant.subscription_tier || 'starter';
       return sum + (tierPricing[tier] || 0);
     }, 0);
 
@@ -402,13 +402,13 @@ router.get('/stats', async (req, res) => {
       totalTrialTenants,
       totalActiveTenants,
       estimatedMRR,
-      tierDistribution: tierDistribution.map(t => ({
-        tier: t.subscriptionTier,
-        count: t._count.id,
+      tierDistribution: tierDistribution.map((t: any) => ({
+        tier: t.subscription_tier,
+        count: (t as any)._count?.id ?? 0,
       })),
-      statusDistribution: statusDistribution.map(s => ({
-        status: s.subscriptionStatus,
-        count: s._count.id,
+      statusDistribution: statusDistribution.map((s: any) => ({
+        status: s.subscription_status,
+        count: (s as any)._count?.id ?? 0,
       })),
     });
   } catch (error) {
@@ -457,13 +457,13 @@ router.post('/bulk-update', async (req, res) => {
     const { tenantIds, reason, ...updateData } = parsed.data;
 
     // Validate all tenants exist
-    const tenants = await prisma.tenant.findMany({
+    const tenants = await prisma.tenants.findMany({
       where: { id: { in: tenantIds } },
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
+        subscription_tier: true,
+        subscription_status: true,
       },
     });
 
@@ -477,10 +477,10 @@ router.post('/bulk-update', async (req, res) => {
 
     // Update all tenants
     const updatePayload: any = {};
-    if (updateData.subscriptionTier) updatePayload.subscriptionTier = updateData.subscriptionTier;
-    if (updateData.subscriptionStatus) updatePayload.subscriptionStatus = updateData.subscriptionStatus;
+    if (updateData.subscriptionTier) updatePayload.subscription_tier = updateData.subscriptionTier;
+    if (updateData.subscriptionStatus) updatePayload.subscription_status = updateData.subscriptionStatus;
 
-    await prisma.tenant.updateMany({
+    await prisma.tenants.updateMany({
       where: { id: { in: tenantIds } },
       data: updatePayload,
     });
@@ -494,8 +494,8 @@ router.post('/bulk-update', async (req, res) => {
         payload: {
           reason,
           before: {
-            subscriptionTier: tenant.subscriptionTier,
-            subscriptionStatus: tenant.subscriptionStatus,
+            subscriptionTier: tenant.subscription_tier,
+            subscriptionStatus: tenant.subscription_status,
           },
           after: updateData,
           adminUserId: req.user?.userId,

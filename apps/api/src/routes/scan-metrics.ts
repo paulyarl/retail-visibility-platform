@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../prisma';
-import { UserRole } from '@prisma/client';
+import { user_role } from '@prisma/client';
 import { canViewAllTenants } from '../utils/platform-admin';
 
 const router = Router();
@@ -37,19 +37,19 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
     }
 
     // Get session stats
-    const sessions = await prisma.scanSessions.findMany({
+    const sessions = await prisma.scan_sessions_list.findMany({
       where: {
-        startedAt: { gte: startDate },
+        started_at: { gte: startDate },
       },
       select: {
         id: true,
         status: true,
-        deviceType: true,
-        scannedCount: true,
-        committedCount: true,
-        duplicateCount: true,
-        startedAt: true,
-        completedAt: true,
+        device_type: true,
+        scanned_count: true,
+        committed_count: true,
+        duplicate_count: true,
+        started_at: true,
+        completed_at: true,
       },
     });
 
@@ -58,40 +58,40 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
     const completedSessions = sessions.filter(s => s.status === 'completed').length;
     const cancelledSessions = sessions.filter(s => s.status === 'cancelled').length;
     
-    const totalScanned = sessions.reduce((sum, s) => sum + s.scannedCount, 0);
-    const totalCommitted = sessions.reduce((sum, s) => sum + s.committedCount, 0);
-    const totalDuplicates = sessions.reduce((sum, s) => sum + s.duplicateCount, 0);
+    const totalScanned = sessions.reduce((sum, s) => sum + s.scanned_count, 0);
+    const totalCommitted = sessions.reduce((sum, s) => sum + s.committed_count, 0);
+    const totalDuplicates = sessions.reduce((sum, s) => sum + s.duplicate_count, 0);
 
     // Calculate average session duration for completed sessions
-    const completedWithDuration = sessions.filter(s => s.completedAt && s.startedAt);
+    const completedWithDuration = sessions.filter(s => s.completed_at && s.started_at);
     const avgDurationMs = completedWithDuration.length > 0
       ? completedWithDuration.reduce((sum, s) => {
-          const duration = s.completedAt!.getTime() - s.startedAt.getTime();
+          const duration = s.completed_at!.getTime() - s.started_at.getTime();
           return sum + duration;
         }, 0) / completedWithDuration.length
       : 0;
 
     // Device type breakdown
     const deviceBreakdown = sessions.reduce((acc, s) => {
-      const device = s.deviceType || 'unknown';
+      const device = s.device_type || 'unknown';
       acc[device] = (acc[device] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
     // Get enrichment stats
-    const enrichmentLogs = await prisma.barcodeLookupLog.findMany({
+    const enrichmentLogs = await prisma.barcode_lookup_log.findMany({
       where: {
-        createdAt: { gte: startDate },
+        created_at: { gte: startDate },
       },
       select: {
         provider: true,
         status: true,
-        latencyMs: true,
+        latency_ms: true,
       },
     });
 
     const enrichmentTotal = enrichmentLogs.length;
-    const enrichmentByProvider = enrichmentLogs.reduce((acc, log) => {
+    const enrichmentByProvider = enrichmentLogs.reduce((acc: Record<string, any>, log: any) => {
       const provider = log.provider || 'unknown';
       if (!acc[provider]) {
         acc[provider] = { total: 0, success: 0, fail: 0, avgLatency: 0 };
@@ -107,10 +107,10 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
 
     // Calculate average latency per provider
     Object.keys(enrichmentByProvider).forEach(provider => {
-      const logs = enrichmentLogs.filter(l => l.provider === provider && l.latencyMs);
+      const logs = enrichmentLogs.filter((l: any) => l.provider === provider && l.latency_ms);
       if (logs.length > 0) {
         enrichmentByProvider[provider].avgLatency = 
-          logs.reduce((sum, l) => sum + (l.latencyMs || 0), 0) / logs.length;
+          logs.reduce((sum: number, l: any) => sum + (l.latency_ms || 0), 0) / logs.length;
       }
     });
 
@@ -128,22 +128,22 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       : '0';
 
     // Recent activity (last 10 sessions)
-    const recentSessions = await prisma.scanSessions.findMany({
+    const recentSessions = await prisma.scan_sessions_list.findMany({
       where: {
-        startedAt: { gte: startDate },
+        started_at: { gte: startDate },
       },
-      orderBy: { startedAt: 'desc' },
+      orderBy: { started_at: 'desc' },
       take: 10,
       select: {
         id: true,
         status: true,
-        deviceType: true,
-        scannedCount: true,
-        committedCount: true,
-        duplicateCount: true,
-        startedAt: true,
-        completedAt: true,
-        tenant: {
+        device_type: true,
+        scanned_count: true,
+        committed_count: true,
+        duplicate_count: true,
+        started_at: true,
+        completed_at: true,
+        tenants: {
           select: {
             id: true,
             name: true,
@@ -215,16 +215,16 @@ router.get('/api/admin/scan-metrics/timeseries', authenticateToken, async (req: 
     }
 
     // Get all sessions in range
-    const sessions = await prisma.scanSessions.findMany({
+    const sessions = await prisma.scan_sessions_list.findMany({
       where: {
-        startedAt: { gte: startDate },
+        started_at: { gte: startDate },
       },
       select: {
-        startedAt: true,
-        completedAt: true,
+        started_at: true,
+        completed_at: true,
         status: true,
-        scannedCount: true,
-        committedCount: true,
+        scanned_count: true,
+        committed_count: true,
       },
     });
 
@@ -245,17 +245,17 @@ router.get('/api/admin/scan-metrics/timeseries', authenticateToken, async (req: 
     }
 
     // Fill buckets with data
-    sessions.forEach(session => {
-      const bucketTime = Math.floor(session.startedAt.getTime() / bucketSize) * bucketSize;
+    sessions.forEach((session: any) => {
+      const bucketTime = Math.floor(session.started_at.getTime() / bucketSize) * bucketSize;
       const bucketKey = new Date(bucketTime).toISOString();
       
       if (buckets[bucketKey]) {
         buckets[bucketKey].sessionsStarted++;
-        buckets[bucketKey].itemsScanned += session.scannedCount;
+        buckets[bucketKey].itemsScanned += session.scanned_count;
         
         if (session.status === 'completed') {
           buckets[bucketKey].sessionsCompleted++;
-          buckets[bucketKey].itemsCommitted += session.committedCount;
+          buckets[bucketKey].itemsCommitted += session.committed_count;
         }
       }
     });

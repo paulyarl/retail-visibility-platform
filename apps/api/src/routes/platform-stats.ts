@@ -18,22 +18,22 @@ router.get('/', async (req, res) => {
       tenantsWithItems,
     ] = await Promise.all([
       // Total number of tenants (retailers)
-      prisma.tenant.count(),
+      prisma.tenants.count(),
       
       // Total number of items (products)
-      prisma.inventoryItem.count(),
+      prisma.inventory_items.count(),
       
       // Active items (synced to Google)
-      prisma.inventoryItem.count({
+      prisma.inventory_items.count({
         where: {
-          itemStatus: 'active',
+          item_status: 'active',
         },
       }),
       
       // Tenants with at least one item (active storefronts)
-      prisma.tenant.count({
+      prisma.tenants.count({
         where: {
-          inventoryItems: {
+          inventory_items: {
             some: {},
           },
         },

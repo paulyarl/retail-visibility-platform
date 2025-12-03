@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../prisma";
 import { StorageBuckets } from "../storage-config";
+import { generatePhotoId } from "../lib/id-generator";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -101,16 +102,17 @@ export class ImageEnrichmentService {
     alt?: string
   ): Promise<void> {
     try {
-      await prisma.photoAsset.create({
+      await prisma.photo_assets.create({
         data: {
-          tenantId,
-          inventoryItemId: item_id,
+          id:generatePhotoId(),
+          tenant_id:tenantId,
+          inventory_item_id: item_id,
           url: imageData.url,
           width: imageData.width ?? null,
           height: imageData.height ?? null,
-          contentType: imageData.contentType ?? null,
+          content_type: imageData.contentType ?? null,
           bytes: imageData.bytes ?? null,
-          exifRemoved: true,
+          exif_removed: true,
           position,
           alt: alt ?? null,
           caption: null,
@@ -119,9 +121,9 @@ export class ImageEnrichmentService {
 
       // Update item's imageUrl to primary photo (position 0)
       if (position === 0) {
-        await prisma.inventoryItem.update({
+        await prisma.inventory_items.update({
           where: { id: item_id },
-          data: { imageUrl: imageData.url },
+          data: { image_url: imageData.url },
         });
       }
     } catch (error: any) {

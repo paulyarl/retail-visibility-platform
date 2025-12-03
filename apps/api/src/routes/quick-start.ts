@@ -9,7 +9,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
-import { UserRole } from '@prisma/client';
+import { user_role } from '@prisma/client';
 import { isPlatformAdmin, isPlatformUser, canViewAllTenants, canPerformSupportActions } from '../utils/platform-admin';
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
@@ -105,11 +105,11 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     const userCanPerformSupport = canPerformSupportActions(user);
 
     // Verify tenant exists and user has access
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: { 
         id: true,
-        organizationId: true,
+        organization_id: true,
       },
     });
 
@@ -126,11 +126,11 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     // Check tenant-level permissions (owner or admin)
     else {
       const { prisma: prismaClient } = await import('../prisma');
-      const userTenant = await prismaClient.userTenant.findUnique({
+      const userTenant = await prismaClient.user_tenants.findUnique({
         where: {
-          userId_tenantId: {
-            userId,
-            tenantId,
+          user_id_tenant_id: {
+            user_id:userId,
+            tenant_id:tenantId,
           },
         },
       });
@@ -138,13 +138,13 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       const isTenantOwnerOrAdmin = userTenant && (userTenant.role === 'OWNER' || userTenant.role === 'ADMIN');
 
       // If not tenant owner/admin, check org ownership (legacy)
-      if (!isTenantOwnerOrAdmin && tenant.organizationId) {
-        const organization = await prismaClient.organization.findUnique({
-          where: { id: tenant.organizationId },
-          select: { ownerId: true },
+      if (!isTenantOwnerOrAdmin && tenant.organization_id) {
+        const organization = await prismaClient.organizations_list.findUnique({
+          where: { id: tenant.organization_id },
+          select: { owner_id: true },
         });
 
-        if (!organization || organization.ownerId !== userId) {
+        if (!organization || organization.owner_id !== userId) {
           return res.status(403).json({
             error: 'Forbidden',
             message: 'You do not have permission to use Quick Start. Only platform support, tenant owners, or tenant admins can use this feature.',
@@ -199,8 +199,8 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     }
 
     // Check if tenant already has products (warn if > 10)
-    const existingProductCount = await prisma.inventoryItem.count({
-      where: { tenantId },
+    const existingProductCount = await prisma.inventory_items.count({
+      where: { tenant_id:tenantId },
     });
 
     if (existingProductCount > 10) {
@@ -263,15 +263,15 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
     const user = (req as any).user;
     const userIsPlatformAdmin = isPlatformAdmin(user);
     const userCanPerformSupport = canPerformSupportActions(user);
-    const userIsPlatformViewer = user.role === UserRole.PLATFORM_VIEWER;
+    const userIsPlatformViewer = user.role === user_role.PLATFORM_VIEWER;
     const userCanView = canViewAllTenants(user);
 
     // Check rate limit (admin/support bypass this - they're helping customers)
     const rateLimit = userCanPerformSupport ? { allowed: true } : checkRateLimit(tenantId);
     
     // Check existing product count
-    const productCount = await prisma.inventoryItem.count({
-      where: { tenantId },
+    const productCount = await prisma.inventory_items.count({
+      where: { tenant_id:tenantId },
     });
 
     // Configurable product limit (default: 500, allows testing multiple scenarios)
@@ -335,11 +335,11 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     const userCanPerformSupport = canPerformSupportActions(user);
 
     // Verify tenant exists and user has access
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: { 
         id: true,
-        organizationId: true,
+        organization_id: true,
       },
     });
 
@@ -356,11 +356,11 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     // Check tenant-level permissions (owner or admin)
     else {
       const { prisma: prismaClient } = await import('../prisma');
-      const userTenant = await prismaClient.userTenant.findUnique({
+      const userTenant = await prismaClient.user_tenants.findUnique({
         where: {
-          userId_tenantId: {
-            userId,
-            tenantId,
+          user_id_tenant_id: {
+            user_id:userId,
+            tenant_id:tenantId,
           },
         },
       });
@@ -368,13 +368,13 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
       const isTenantOwnerOrAdmin = userTenant && (userTenant.role === 'OWNER' || userTenant.role === 'ADMIN');
 
       // If not tenant owner/admin, check org ownership (legacy)
-      if (!isTenantOwnerOrAdmin && tenant.organizationId) {
-        const organization = await prismaClient.organization.findUnique({
-          where: { id: tenant.organizationId },
-          select: { ownerId: true },
+      if (!isTenantOwnerOrAdmin && tenant.organization_id) {
+        const organization = await prismaClient.organizations_list.findUnique({
+          where: { id: tenant.organization_id },
+          select: { owner_id: true },
         });
 
-        if (!organization || organization.ownerId !== userId) {
+        if (!organization || organization.owner_id !== userId) {
           return res.status(403).json({
             error: 'Forbidden',
             message: 'You do not have permission to use Category Quick Start. Only platform support, tenant owners, or tenant admins can use this feature.',
@@ -400,8 +400,8 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     const { businessType, categoryCount } = parsed.data;
 
     // Check if tenant already has categories (optional warning, not blocking)
-    const existingCategoryCount = await prisma.directoryCategory.count({
-      where: { tenantId },
+    const existingCategoryCount = await prisma.directory_category.count({
+      where: { tenantId: tenantId },
     });
 
     // Platform admin/support bypass category limit (viewer cannot create)
@@ -504,7 +504,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
           console.warn(`[Category Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
         }
 
-        return prisma.directoryCategory.create({
+        return prisma.directory_category.create({
           data: {
             id: generateQsCatId(),
             tenantId,

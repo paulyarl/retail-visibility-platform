@@ -1,6 +1,7 @@
 import { Badge, Button, Card, CardContent } from '@/components/ui';
 import { Item } from '@/services/itemsDataService';
 import SyncStatusIndicator from './SyncStatusIndicator';
+import InlineStockEditor from './InlineStockEditor';
 
 interface ItemsListProps {
   items: Item[];
@@ -9,9 +10,11 @@ interface ItemsListProps {
   onQRCode: (item: Item) => void;
   onPhotos: (item: Item) => void;
   onCategory: (item: Item) => void;
+  onClone?: (item: Item) => void;
   onPropagate?: (item: Item) => void;
   onVisibilityToggle?: (item: Item) => void;
   onStatusToggle?: (item: Item) => void;
+  onStockUpdate?: (itemId: string, newStock: number) => Promise<void>;
   tenantId?: string;
   bulkMode?: boolean;
   selectedItems?: Set<string>;
@@ -29,9 +32,11 @@ export default function ItemsList({
   onQRCode,
   onPhotos,
   onCategory,
+  onClone,
   onPropagate,
   onVisibilityToggle,
   onStatusToggle,
+  onStockUpdate,
   tenantId,
   bulkMode = false,
   selectedItems = new Set(),
@@ -163,10 +168,25 @@ export default function ItemsList({
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-neutral-500">Stock</p>
-                    <p className={`text-lg font-semibold ${item.stock < 10 ? 'text-warning' : 'text-success'}`}>
-                      {item.stock}
-                    </p>
+                    {onStockUpdate ? (
+                      <div className="flex flex-col gap-1">
+                        <p className="text-xs text-neutral-500">Stock</p>
+                        <InlineStockEditor
+                          itemId={item.id}
+                          itemName={item.name}
+                          currentStock={item.stock}
+                          onUpdate={onStockUpdate}
+                          className="text-lg font-semibold"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-neutral-500">Stock</p>
+                        <p className={`text-lg font-semibold ${item.stock < 10 ? 'text-warning' : 'text-success'}`}>
+                          {item.stock}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -186,6 +206,20 @@ export default function ItemsList({
                 </svg>
                 Edit
               </Button>
+              {onClone && (
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={() => onClone(item)}
+                  title="Clone this product to create a variant (keeps all data, generates new SKU)"
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white border-0"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Clone
+                </Button>
+              )}
               <Button 
                 size="sm" 
                 variant="ghost" 

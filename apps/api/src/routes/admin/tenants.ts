@@ -20,27 +20,27 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     console.log('[ADMIN TENANTS] Request received from platform admin');
 
-    const tenants = await prisma.tenant.findMany({
+    const tenants = await prisma.tenants.findMany({
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        createdAt: true,
+        subscription_tier: true,
+        subscription_status: true,
+        created_at: true,
         _count: {
           select: {
-            inventoryItems: true,
-            userTenants: true,
+            inventory_items: true,
+            user_tenants: true,
           },
         },
-        organization: {
+        organizations_list: {
           select: {
             id: true,
             name: true,
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
     });
 
     console.log(`[ADMIN TENANTS] Found ${tenants.length} tenants`);
@@ -49,13 +49,13 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
     const transformedTenants = tenants.map(tenant => ({
       id: tenant.id,
       name: tenant.name,
-      subscriptionTier: tenant.subscriptionTier,
-      subscriptionStatus: tenant.subscriptionStatus,
-      createdAt: tenant.createdAt,
-      organization: tenant.organization,
+      subscriptionTier: tenant.subscription_tier,
+      subscriptionStatus: tenant.subscription_status,
+      createdAt: tenant.created_at,
+      organization: tenant.organizations_list,
       stats: {
-        productCount: tenant._count.inventoryItems,
-        userCount: tenant._count.userTenants,
+        productCount: tenant._count.inventory_items,
+        userCount: tenant._count.user_tenants,
       },
     }));
 

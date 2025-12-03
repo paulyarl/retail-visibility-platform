@@ -131,7 +131,7 @@ export async function getUncategorizedCount(
       where.visibility = 'public';
     }
 
-    return await prisma.inventoryItem.count({ where });
+    return await prisma.inventory_items.count({ where });
   } catch (error) {
     console.error('[Uncategorized Count] Error:', error);
     return 0;
@@ -159,7 +159,7 @@ export async function getTotalProductCount(
       where.visibility = 'public';
     }
 
-    return await prisma.inventoryItem.count({ where });
+    return await prisma.inventory_items.count({ where });
   } catch (error) {
     console.error('[Total Product Count] Error:', error);
     return 0;

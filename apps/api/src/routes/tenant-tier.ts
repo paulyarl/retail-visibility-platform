@@ -13,23 +13,23 @@ router.get('/tenants/:id/tier', authenticateToken, checkTenantAccess, async (req
   try {
     const { id: tenantId } = req.params;
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
-        organizationId: true,
-        organization: {
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        organization_id: true,
+        organizations_list: {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
+            subscription_tier: true,
             _count: {
-              select: { Tenant: true }
+              select: { tenants: true }
             }
           }
         }
@@ -41,51 +41,51 @@ router.get('/tenants/:id/tier', authenticateToken, checkTenantAccess, async (req
     }
 
     // Determine effective tier (org tier can override tenant tier for chains)
-    const effectiveTier = tenant.organization?.subscriptionTier || tenant.subscriptionTier || 'starter';
-    const isChain = tenant.organization ? tenant.organization._count.Tenant > 1 : false;
+    const effectiveTier = tenant.organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
+    const isChain = tenant.organizations_list ? tenant.organizations_list._count.tenants > 1 : false;
 
     // Fetch tier details from database (with features) - with fallback
     let tenantTierData = null;
     let orgTierData = null;
     
     try {
-      if (tenant.subscriptionTier) {
-        tenantTierData = await TierService.getTierByKey(tenant.subscriptionTier);
+      if (tenant.subscription_tier) {
+        tenantTierData = await TierService.getTierByKey(tenant.subscription_tier);
       }
-      if (tenant.organization?.subscriptionTier) {
-        orgTierData = await TierService.getTierByKey(tenant.organization.subscriptionTier);
+      if (tenant.organizations_list?.subscription_tier) {
+        orgTierData = await TierService.getTierByKey(tenant.organizations_list.subscription_tier);
       }
     } catch (error) {
       console.warn('[Tier API] TierService failed, using fallback data:', error);
     }
     
     // Fallback tier data if TierService fails
-    if (!tenantTierData && tenant.subscriptionTier) {
+    if (!tenantTierData && tenant.subscription_tier) {
       tenantTierData = {
-        tierKey: tenant.subscriptionTier,
-        name: tenant.subscriptionTier,
-        displayName: tenant.subscriptionTier.charAt(0).toUpperCase() + tenant.subscriptionTier.slice(1),
+        tierKey: tenant.subscription_tier,
+        name: tenant.subscription_tier,
+        displayName: tenant.subscription_tier.charAt(0).toUpperCase() + tenant.subscription_tier.slice(1),
         features: [],
         limits: {
-          maxSkus: tenant.subscriptionTier === 'starter' ? 500 : 
-                   tenant.subscriptionTier === 'professional' ? 5000 : 
-                   tenant.subscriptionTier === 'enterprise' ? null : 
-                   tenant.subscriptionTier === 'organization' ? null : 250
+          maxSkus: tenant.subscription_tier === 'starter' ? 500 : 
+                   tenant.subscription_tier === 'professional' ? 5000 : 
+                   tenant.subscription_tier === 'enterprise' ? null : 
+                   tenant.subscription_tier === 'organization' ? null : 250
         }
       };
     }
     
-    if (!orgTierData && tenant.organization?.subscriptionTier) {
+    if (!orgTierData && tenant.organizations_list?.subscription_tier) {
       orgTierData = {
-        tierKey: tenant.organization.subscriptionTier,
-        name: tenant.organization.subscriptionTier,
-        displayName: tenant.organization.subscriptionTier.charAt(0).toUpperCase() + tenant.organization.subscriptionTier.slice(1),
+        tierKey: tenant.organizations_list.subscription_tier,
+        name: tenant.organizations_list.subscription_tier,
+        displayName: tenant.organizations_list.subscription_tier.charAt(0).toUpperCase() + tenant.organizations_list.subscription_tier.slice(1),
         features: [],
         limits: {
-          maxSkus: tenant.organization.subscriptionTier === 'starter' ? 500 : 
-                   tenant.organization.subscriptionTier === 'professional' ? 5000 : 
-                   tenant.organization.subscriptionTier === 'enterprise' ? null : 
-                   tenant.organization.subscriptionTier === 'organization' ? null : 250
+          maxSkus: tenant.organizations_list.subscription_tier === 'chain_starter' ? 500 : 
+                   tenant.organizations_list.subscription_tier === 'chain_professional' ? 5000 : 
+                   tenant.organizations_list.subscription_tier === 'chain_enterprise' ? null : 
+                   tenant.organizations_list.subscription_tier === 'chain_organization' ? null : 250
         }
       };
     }
@@ -94,12 +94,12 @@ router.get('/tenants/:id/tier', authenticateToken, checkTenantAccess, async (req
       tenantId: tenant.id,
       tenantName: tenant.name,
       tier: effectiveTier,
-      subscriptionStatus: tenant.subscriptionStatus,
-      trialEndsAt: tenant.trialEndsAt,
-      subscriptionEndsAt: tenant.subscriptionEndsAt,
+      subscriptionStatus: tenant.subscription_status,
+      trialEndsAt: tenant.trial_ends_at,
+      subscriptionEndsAt: tenant.subscription_ends_at,
       isChain,
-      organizationId: tenant.organizationId,
-      organizationName: tenant.organization?.name,
+      organizationId: tenant.organizations_list?.id,
+      organizationName: tenant.organizations_list?.name,
       organizationTier: orgTierData, // Frontend expects this property name
       tenantTier: tenantTierData,    // Frontend expects this property name
       // Legacy compatibility
@@ -119,12 +119,12 @@ router.get('/tenants/:id/usage', authenticateToken, checkTenantAccess, async (re
   try {
     const { id: tenantId } = req.params;
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
-        monthlySkuQuota: true,
-        skusAddedThisMonth: true,
+        monthly_sku_quota: true,
+        skus_added_this_month: true,
       }
     });
 
@@ -133,14 +133,14 @@ router.get('/tenants/:id/usage', authenticateToken, checkTenantAccess, async (re
     }
 
     // Count current items
-    const itemCount = await prisma.inventoryItem.count({
-      where: { tenantId }
+    const itemCount = await prisma.inventory_items.count({
+      where: { tenant_id:tenantId }
     });
 
     // Count active items
-    const activeItemCount = await prisma.inventoryItem.count({
+    const activeItemCount = await prisma.inventory_items.count({
       where: {
-        tenantId,
+        tenant_id:tenantId,
         availability: 'in_stock',
       }
     });
@@ -149,9 +149,9 @@ router.get('/tenants/:id/usage', authenticateToken, checkTenantAccess, async (re
       tenantId: tenant.id,
       currentItems: itemCount,
       activeItems: activeItemCount,
-      monthlySkuQuota: tenant.monthlySkuQuota,
-      skusAddedThisMonth: tenant.skusAddedThisMonth || 0,
-      quotaRemaining: tenant.monthlySkuQuota ? tenant.monthlySkuQuota - (tenant.skusAddedThisMonth || 0) : null,
+      monthlySkuQuota: tenant.monthly_sku_quota ,
+      skusAddedThisMonth: tenant.skus_added_this_month || 0,
+      quotaRemaining: tenant.monthly_sku_quota ? tenant.monthly_sku_quota - (tenant.skus_added_this_month || 0) : null,
     });
   } catch (error) {
     console.error('[GET /tenants/:id/usage] Error:', error);

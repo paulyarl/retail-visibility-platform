@@ -144,17 +144,17 @@ export async function validateOrganizationTierChange(
     }
 
     // Get organization's current state
-    const org = await prisma.organization.findUnique({
+    const org = await prisma.organizations_list.findUnique({
       where: { id: organizationId },
       select: {
-        subscriptionTier: true,
-        maxLocations: true,
-        maxTotalSKUs: true,
-        Tenant: {
+        subscription_tier: true,
+        max_locations: true,
+        max_total_skus: true,
+        tenants: {
           select: {
             id: true,
             _count: {
-              select: { inventoryItems: true },
+              select: { inventory_items: true },
             },
           },
         },
@@ -190,7 +190,7 @@ export async function validateOrganizationTierChange(
     }
 
     // Check current location count
-    const currentLocationCount = org.Tenant.length;
+    const currentLocationCount = org.tenants.length;
     if (newLimits.maxLocations !== Infinity && currentLocationCount > newLimits.maxLocations) {
       return res.status(403).json({
         error: 'tier_change_blocked',
@@ -202,7 +202,7 @@ export async function validateOrganizationTierChange(
     }
 
     // Check total SKU count
-    const totalSKUs = org.Tenant.reduce((sum: number, tenant) => sum + tenant._count.inventoryItems, 0);
+    const totalSKUs = org.tenants.reduce((sum: number, tenants) => sum + tenants._count.inventory_items, 0);
     if (newLimits.maxTotalSKUs !== Infinity && totalSKUs > newLimits.maxTotalSKUs) {
       return res.status(403).json({
         error: 'tier_change_blocked',

@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from "@prisma/client";
+import { PrismaClient, user_role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const db = new PrismaClient();
@@ -8,31 +8,31 @@ async function main() {
   const trialEndsAt = new Date();
   trialEndsAt.setDate(trialEndsAt.getDate() + 30);
 
-  const t = await db.tenant.upsert({
+  const t = await db.tenants.upsert({
     where: { id: "demo-tenant" },
     update: {
-      subscriptionTier: "starter",
-      subscriptionStatus: "trial",
+      subscription_tier: "starter", 
+      subscription_status: "trial", 
       trialEndsAt: trialEndsAt,
     },
     create: {
       id: "demo-tenant",
       name: "Demo Tenant",
-      subscriptionTier: "starter",
-      subscriptionStatus: "trial",
+      subscription_tier: "starter",
+      subscription_status: "trial",
       trialEndsAt: trialEndsAt,
     },
   });
 
   const hashedPassword = await bcrypt.hash("password123", 10);
 
-  const user = await db.user.upsert({
+  const user = await db.users.upsert({
     where: { email: "owner@demo.local" },
     update: {},
     create: {
       email: "owner@demo.local",
       passwordHash: hashedPassword,
-      role: UserRole.ADMIN,
+      role: user_role.ADMIN,
       firstName: "Demo",
       lastName: "Owner",
       emailVerified: true,
@@ -40,7 +40,7 @@ async function main() {
   });
 
   // Link user to tenant
-  await db.userTenant.upsert({
+  await db.user_tenants.upsert({
     where: {
       userId_tenantId: {
         userId: user.id,
@@ -51,14 +51,14 @@ async function main() {
     create: {
       userId: user.id,
       tenantId: t.id,
-      role: UserRole.OWNER,
+      role: user_role.OWNER,
     },
   });
 
   // SQLite does not support createMany({ skipDuplicates }) in this Prisma version.
   // Use idempotent upserts keyed by the unique [tenantId, sku] constraint.
   await Promise.all([
-    db.inventoryItem.upsert({
+    db.inventory_items.upsert({
       where: { uq_tenant_sku: { tenantId: t.id, sku: "SKU-001" } },
       update: { name: "Organic Apples", priceCents: 299, stock: 50 },
       create: {
@@ -74,7 +74,7 @@ async function main() {
         availability: "in_stock",
       },
     }),
-    db.inventoryItem.upsert({
+    db.inventory_items.upsert({
       where: { uq_tenant_sku: { tenantId: t.id, sku: "SKU-002" } },
       update: { name: "Whole Milk 1L", priceCents: 349, stock: 40 },
       create: {

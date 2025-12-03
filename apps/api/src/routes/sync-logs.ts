@@ -20,28 +20,28 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
     
     try {
       [logs, total] = await Promise.all([
-        prisma.categoryMirrorRuns.findMany({
+        prisma.category_mirror_runs.findMany({
           where,
-          orderBy: { startedAt: 'desc' },
+          orderBy: { started_at: 'desc' },
           take: limit,
           skip: offset,
           select: {
             id: true,
-            tenantId: true,
+            tenant_id: true,
             strategy: true,
-            dryRun: true,
+            dry_run: true,
             created: true,
             updated: true,
             deleted: true,
             skipped: true,
             reason: true,
             error: true,
-            jobId: true,
-            startedAt: true,
-            completedAt: true,
+            job_id: true,
+            started_at: true,
+            completed_at: true,
           },
         }),
-        prisma.categoryMirrorRuns.count({ where }),
+        prisma.category_mirror_runs.count({ where }),
       ]);
     } catch (tableError: any) {
       // Handle case where table doesn't exist yet
@@ -79,19 +79,19 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
     
     try {
       // Get recent runs
-      recentRuns = await prisma.categoryMirrorRuns.findMany({
+      recentRuns = await prisma.category_mirror_runs.findMany({
         where: {
-          startedAt: { gte: last24h },
+          started_at: { gte: last24h },
         },
         select: {
           id: true,
-          tenantId: true,
+          tenant_id: true,
           error: true,
           skipped: true,
           created: true,
           updated: true,
           deleted: true,
-          completedAt: true,
+          completed_at: true,
         },
       });
     } catch (tableError: any) {
@@ -105,7 +105,7 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
     }
 
     const totalRuns = recentRuns.length;
-    const successfulRuns = recentRuns.filter((r: any) => !r.error && r.completedAt).length;
+    const successfulRuns = recentRuns.filter((r: any) => !r.error && r.completed_at).length;
     const failedRuns = recentRuns.filter((r: any) => r.error).length;
     const outOfSyncCount = recentRuns.filter(
       (r: any) => !r.skipped && (r.created > 0 || r.updated > 0 || r.deleted > 0)
@@ -114,18 +114,18 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
     const successRate = totalRuns > 0 ? (successfulRuns / totalRuns) * 100 : 0;
 
     // Get recent errors
-    const recentErrors = await prisma.categoryMirrorRuns.findMany({
+    const recentErrors = await prisma.category_mirror_runs.findMany({
       where: {
         error: { not: null },
-        startedAt: { gte: last24h },
+        started_at: { gte: last24h },
       },
-      orderBy: { startedAt: 'desc' },
+      orderBy: { started_at: 'desc' },
       take: 5,
       select: {
         id: true,
-        tenantId: true,
+        tenant_id: true,
         error: true,
-        startedAt: true,
+        started_at: true,
       },
     });
 

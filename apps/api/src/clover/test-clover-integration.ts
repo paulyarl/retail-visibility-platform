@@ -115,7 +115,7 @@ async function testPhase1Infrastructure() {
     
     // Try to query the table
     try {
-      await prisma.cloverIntegrations.findFirst();
+      await prisma.clover_integrations_list.findFirst();
       success('Table clover_integrations exists');
       passed++;
     } catch (err: any) {
@@ -369,23 +369,23 @@ async function testPhase4Database() {
   try {
     info('Creating test integration...');
     
-    const integration = await prisma.cloverIntegrations.create({
+    const integration = await prisma.clover_integrations_list.create({
       data: {
-        tenantId: TEST_TENANT_ID, 
-        merchantId: 'test-merchant-123',
-        accessToken: encryptToken('test-access-token'),
-        refreshToken: encryptToken('test-refresh-token'),
-        tokenExpiresAt: calculateTokenExpiration(3600),
+        tenant_id: TEST_TENANT_ID, 
+        merchant_id: 'test-merchant-123',
+        access_token: encryptToken('test-access-token'),
+        refresh_token: encryptToken('test-refresh-token'),
+        token_expires_at: calculateTokenExpiration(3600),
       } as any,
     });
     
-    if (integration && integration.merchantId === 'test-merchant-123') {
+    if (integration && integration.merchant_id === 'test-merchant-123') {
       success('Integration created successfully');
       
       // Test 4.2: Retrieve Integration
       subsection('Test 4.2: Retrieve Integration');
-      const retrieved = await prisma.cloverIntegrations.findFirst({
-        where: { tenantId: TEST_TENANT_ID },
+      const retrieved = await prisma.clover_integrations_list.findFirst({
+        where: { tenant_id: TEST_TENANT_ID },
       });
       
       if (retrieved && retrieved.id === integration.id) {
@@ -398,7 +398,7 @@ async function testPhase4Database() {
       }
       
       // Cleanup
-      await prisma.cloverIntegrations.delete({
+      await prisma.clover_integrations_list.delete({
         where: { id: integration.id },
       });
       success('Test data cleaned up');

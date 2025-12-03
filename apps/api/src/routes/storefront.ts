@@ -83,8 +83,12 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const skip = (pageNum - 1) * limitNum;
     
-    // Build WHERE clause
-    const conditions: string[] = ['ii.tenant_id = $1'];
+    // Build WHERE clause - match the filters used in storefront_category_counts MV
+    const conditions: string[] = [
+      'ii.tenant_id = $1',
+      "ii.item_status = 'active'",
+      "ii.visibility = 'public'"
+    ];
     const params: any[] = [tenantId];
     let paramIndex = 2;
     
@@ -95,8 +99,8 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       const isProductLevelCategory = category.includes('-') && !category.includes(' ');
       
       if (isProductLevelCategory) {
-        // Product-level category: filter by category_slug
-        conditions.push(`category_slug = $${paramIndex}`);
+        // Product-level category: filter by directory_categories_list slug
+        conditions.push(`dcl.slug = $${paramIndex}`);
         params.push(category);
         paramIndex++;
       } else {
@@ -146,6 +150,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         landing_page_theme,
         dcl.id as category_id,
         dcl.name as category_name,
+        dcl.slug as category_slug,
         dcl.google_category_id,
         CASE WHEN ii.image_url IS NOT NULL THEN true ELSE false END as has_image,
         CASE WHEN (ii.stock > 0 OR ii.quantity > 0) THEN true ELSE false END as in_stock,

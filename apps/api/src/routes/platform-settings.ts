@@ -4,7 +4,6 @@ import { z } from 'zod';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
-import { generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -22,7 +21,7 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
 
-const platformSettingsSchema = z.object({
+const platform_settings_listSchema = z.object({
   platformName: z.string().optional(),
   platformDescription: z.string().optional(),
 });
@@ -31,12 +30,12 @@ const platformSettingsSchema = z.object({
 router.get('/platform-settings', async (_req, res) => {
   try {
     // Check if Prisma client is properly initialized
-    if (!prisma || !prisma.platformSettings) {
+    if (!prisma || !prisma.platform_settings_list) {
       console.warn('[Platform Settings] Prisma client not properly initialized, using defaults');
       return res.json({
         id: 1,
-        platformName: 'RVP Platform',
-        platformDescription: 'Retail Visibility Platform',
+        platformName: 'Visible Shelf',
+        platformDescription: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
         logoUrl: null,
         faviconUrl: null,
         primaryColor: '#3b82f6',
@@ -46,18 +45,18 @@ router.get('/platform-settings', async (_req, res) => {
       });
     }
 
-    let settings = await prisma.platformSettings.findUnique({
+    let settings = await prisma.platform_settings_list.findUnique({
       where: { id: 1 },
     });
 
     // Create default settings if they don't exist
     if (!settings) {
-      settings = await prisma.platformSettings.create({
+      settings = await prisma.platform_settings_list.create({
         data: {
           id: 1, 
-          platformName: 'Visible Shelf',
-          platformDescription: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
-          updatedAt: new Date(),
+          platform_name: 'Visible Shelf',
+          platform_description: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
+          updated_at: new Date(),
         },
       });
     }
@@ -78,7 +77,7 @@ router.post(
   ]),
   async (req: any, res) => {
     try {
-      const parsed = platformSettingsSchema.safeParse(req.body);
+      const parsed = platform_settings_listSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
       }
@@ -136,16 +135,16 @@ router.post(
       }
 
       // Update or create settings
-      const settings = await prisma.platformSettings.upsert({
+      const settings = await prisma.platform_settings_list.upsert({
         where: { id: 1 },
         update: updateData,
         create: {
           id: 1,
-          platformName: updateData.platformName || 'Visible Shelf',
-          platformDescription: updateData.platformDescription || 'Manage your retail operations with ease',
-          logoUrl: updateData.logoUrl,
-          faviconUrl: updateData.faviconUrl,
-          updatedAt: new Date(),
+          platform_name: updateData.platformName || 'Visible Shelf',
+          platform_description: updateData.platformDescription || 'Manage your retail operations with ease',
+          logo_url: updateData.logoUrl,
+          favicon_url: updateData.faviconUrl,
+          updated_at: new Date(),
         },
       });
 

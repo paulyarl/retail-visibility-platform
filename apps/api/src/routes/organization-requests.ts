@@ -27,24 +27,24 @@ router.get('/', authenticateToken, async (req, res) => {
       where.organizationId = organizationId as string;
     }
 
-    const requests = await prisma.organizationRequests.findMany({
+    const requests = await prisma.organization_requests_list.findMany({
       where,
       select: {
         id: true,
-        tenantId: true,
-        organizationId: true,
-        requestedBy: true,
+        tenant_id: true,
+        organization_id: true,
+        requested_by: true,
         status: true,
-        requestType: true,
+        request_type: true,
         notes: true,
-        estimatedCost: true,
-        costCurrency: true,
-        adminNotes: true,
-        costAgreed: true,
-        processedBy: true,
-        processedAt: true,
-        createdAt: true,
-        updatedAt: true,
+        estimated_cost: true,
+        cost_currency: true,
+        admin_notes: true,
+        cost_agreed: true,
+        processed_by: true,
+        processed_at: true,
+        created_at: true,
+        updated_at: true,
       },
     });
 
@@ -60,24 +60,24 @@ router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const organizationRequest = await prisma.organizationRequests.findUnique({
+    const organizationRequest = await prisma.organization_requests_list.findUnique({
       where: { id },
       select: {
         id: true,
-        tenantId: true,
-        organizationId: true,
-        requestedBy: true,
+        tenant_id: true,
+        organization_id: true,
+        requested_by: true,
         status: true,
-        requestType: true,
+        request_type: true,
         notes: true,
-        estimatedCost: true,
-        costCurrency: true,
-        adminNotes: true,
-        costAgreed: true,
-        processedBy: true,
-        processedAt: true,
-        createdAt: true,
-        updatedAt: true,
+        estimated_cost: true,
+        cost_currency: true,
+        admin_notes: true,
+        cost_agreed: true,
+        processed_by: true,
+        processed_at: true,
+        created_at: true,
+        updated_at: true,
       },
     });
 
@@ -104,10 +104,10 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     // Check if there's already a pending request
-    const existingRequest = await prisma.organizationRequests.findFirst({
+    const existingRequest = await prisma.organization_requests_list.findFirst({
       where: {
-        tenantId,
-        organizationId,
+        tenant_id: tenantId,
+        organization_id: organizationId,
         status: 'pending',
       },
     });
@@ -118,15 +118,15 @@ router.post('/', authenticateToken, async (req, res) => {
       });
     }
 
-    const organizationRequest = await prisma.organizationRequests.create({
+    const organizationRequest = await prisma.organization_requests_list.create({
       data: {
-        tenantId,
-        organizationId,
-        requestedBy,
-        requestType: requestType || 'join',
+        tenant_id: tenantId,
+        organization_id: organizationId,
+        requested_by: requestedBy,
+        request_type: requestType || 'join',
         notes,
-        estimatedCost,
-        costCurrency: costCurrency || 'USD',
+        estimated_cost: estimatedCost,
+        cost_currency: costCurrency || 'USD',
         status: 'pending',
       } as any,
     });
@@ -148,55 +148,55 @@ router.patch('/:id', authenticateToken, async (req, res) => {
 
     if (status) {
       updateData.status = status;
-      updateData.processedAt = new Date();
+      updateData.processed_at = new Date();
       if (processedBy) {
-        updateData.processedBy = processedBy;
+        updateData.processed_by = processedBy;
       }
     }
 
     if (adminNotes !== undefined) {
-      updateData.adminNotes = adminNotes;
+      updateData.admin_notes = adminNotes;
     }
 
     if (estimatedCost !== undefined) {
-      updateData.estimatedCost = estimatedCost;
+      updateData.estimated_cost = estimatedCost;
     }
 
     if (costAgreed !== undefined) {
-      updateData.costAgreed = costAgreed;
+      updateData.cost_agreed = costAgreed;
       if (costAgreed) {
-        updateData.costAgreedAt = new Date();
+        updateData.cost_agreed_at = new Date();
       }
     }
 
-    const organizationRequest = await prisma.organizationRequests.update({
+    const organizationRequest = await prisma.organization_requests_list.update({
       where: { id },
       data: updateData,
       select: {
         id: true,
-        tenantId: true,
-        organizationId: true,
-        requestedBy: true,
+        tenant_id: true,
+        organization_id: true,
+        requested_by: true,
         status: true,
-        requestType: true,
+        request_type: true,
         notes: true,
-        estimatedCost: true,
-        costCurrency: true,
-        adminNotes: true,
-        costAgreed: true,
-        processedBy: true,
-        processedAt: true,
-        createdAt: true,
-        updatedAt: true,
+        estimated_cost: true,
+        cost_currency: true,
+        admin_notes: true,
+        cost_agreed: true,
+        processed_by: true,
+        processed_at: true,
+        created_at: true,
+        updated_at: true,
       },
     });
 
     // If approved and cost agreed, assign tenant to organization
-    if (status === 'approved' && organizationRequest.costAgreed) {
-      await prisma.tenant.update({
-        where: { id: organizationRequest.tenantId },
+    if (status === 'approved' && organizationRequest.cost_agreed) {
+      await prisma.tenants.update({
+        where: { id: organizationRequest.tenant_id },
         data: {
-          organizationId: organizationRequest.organizationId,
+          organization_id: organizationRequest.organization_id,
         },
       });
     }
@@ -213,7 +213,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    await prisma.organizationRequests.delete({
+    await prisma.organization_requests_list.delete({
       where: { id },
     });
 

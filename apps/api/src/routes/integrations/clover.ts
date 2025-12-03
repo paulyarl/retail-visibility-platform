@@ -16,6 +16,7 @@ import {
   calculateTokenExpiration,
   formatScopesForDisplay
 } from '../../services/clover-oauth';
+import { generateQuickStart } from '../../lib/id-generator';
 
 const router = Router();
 
@@ -29,9 +30,9 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
     const user = (req as any).user;
 
     // Verify tenant exists and user has access
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
-      include: { userTenants: true }
+      include: { user_tenants: true }
     });
 
     if (!tenant) {
@@ -39,23 +40,23 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.userTenants.some((ut: any) => ut.userId === user.id);
+    const hasAccess = tenant.user_tenants.some((ut: any) => ut.user_id === user.id);
     if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
       return res.status(403).json({ error: 'access_denied' });
     }
 
     // Check if integration already exists
-    let integration = await prisma.cloverIntegrations.findFirst({
-      where: { tenantId }
+    let integration = await prisma.clover_integrations_list.findFirst({
+      where: { tenant_id: tenantId }
     });
 
     if (integration) {
       // If already in demo mode, just refresh the timestamp
       if (integration.mode === 'demo') {
-        integration = await prisma.cloverIntegrations.update({
+        integration = await prisma.clover_integrations_list.update({
           where: { id: integration.id },
           data: {
-            demoLastActiveAt: new Date(),
+            demo_last_active_at: new Date(),
             status: 'active'
           }
         });
@@ -73,13 +74,13 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
     }
 
     // Create new integration in demo mode
-    integration = await prisma.cloverIntegrations.create({
+    integration = await prisma.clover_integrations_list.create({
       data: {
-        tenantId,
+        tenant_id: tenantId,
         mode: 'demo',
         status: 'active',
-        demoEnabledAt: new Date(),
-        demoLastActiveAt: new Date()
+        demo_enabled_at: new Date(),
+        demo_last_active_at: new Date()
       } as any
     });
 
@@ -92,9 +93,9 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
       
       try {
         // Check if item with this SKU already exists
-        const existingItem = await prisma.inventoryItem.findFirst({
+        const existingItem = await prisma.inventory_items.findFirst({
           where: {
-            tenantId,
+            tenant_id: tenantId,
             sku: rvpItem.sku
           }
         });
@@ -105,22 +106,22 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
         }
 
         // Create inventory item
-        const createdItem = await prisma.inventoryItem.create({
+        const createdItem = await prisma.inventory_items.create({
           data: {
-            tenantId,
+            tenant_id: tenantId,
             ...rvpItem
           } as any,
         });
 
         // Create mapping
-        await prisma.cloverItemMappings.create({
+        await prisma.clover_item_mappings_list.create({
           data: {
-            integrationId: integration.id,
-            cloverItemId: demoItem.id,
-            cloverItemName: demoItem.name,
-            cloverSku: demoItem.sku,
-            rvpItemId: createdItem.id,
-            rvpSku: rvpItem.sku,
+            integration_id: integration.id,
+            clover_item_id: demoItem.id,
+            clover_item_name: demoItem.name,
+            clover_sku: demoItem.sku,
+            rvp_item_id: createdItem.id,
+            rvp_sku: rvpItem.sku,
             mappingStatus: 'mapped',
             lastSyncedAt: new Date(),
             lastSyncStatus: 'success'
@@ -135,17 +136,18 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
     }
 
     // Create sync log
-    await prisma.cloverSyncLogs.create({
+    await prisma.clover_sync_logs_list.create({
       data: {
-        integrationId: integration.id,
-        traceId: `demo_import_${Date.now()}`,
+        id: crypto.randomUUID(),
+        integration_id: integration.id,
+        trace_id: `demo_import_${Date.now()}`,
         operation: 'import',
         status: 'success',
-        itemsProcessed: demoItems.length,
-        itemsSucceeded: importedItems.length,
-        itemsFailed: demoItems.length - importedItems.length,
-        durationMs: 0, // Calculated later if needed
-        completedAt: new Date()
+        items_processed: demoItems.length,
+        items_succeeded: importedItems.length,
+        items_failed: demoItems.length - importedItems.length,
+        duration_ms: 0, // Calculated later if needed
+        completed_at: new Date()
       }
     });
 
@@ -176,9 +178,9 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, async (req: Req
     const user = (req as any).user;
 
     // Verify tenant exists and user has access
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
-      include: { userTenants: true }
+      include: { user_tenants: true }
     });
 
     if (!tenant) {
@@ -186,14 +188,14 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, async (req: Req
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.userTenants.some((ut: any) => ut.userId === user.id);
+    const hasAccess = tenant.user_tenants.some((ut: any) => ut.userId === user.id);
     if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
       return res.status(403).json({ error: 'access_denied' });
     }
 
     // Find integration
-    const integration = await prisma.cloverIntegrations.findFirst({
-      where: { tenantId }
+    const integration = await prisma.clover_integrations_list.findFirst({
+      where: { tenant_id: tenantId }
     });
 
     if (!integration) {
@@ -217,7 +219,7 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, async (req: Req
     }
 
     // Delete integration (cascades to mappings, logs, snapshots)
-    await prisma.cloverIntegrations.delete({
+    await prisma.clover_integrations_list.delete({
       where: { id: integration.id }
     });
 
@@ -245,9 +247,9 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
     const user = (req as any).user;
 
     // Verify tenant exists and user has access
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
-      include: { userTenants: true }
+      include: { user_tenants: true }
     });
 
     if (!tenant) {
@@ -255,14 +257,14 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.userTenants.some((ut: any) => ut.userId === user.id);
+    const hasAccess = tenant.user_tenants.some((ut: any) => ut.userId === user.id);
     if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
       return res.status(403).json({ error: 'access_denied' });
     }
 
     // Find integration
-    const integration = await prisma.cloverIntegrations.findFirst({
-      where: { tenantId }
+    const integration = await prisma.clover_integrations_list.findFirst({
+      where: { tenant_id: tenantId }
     });
 
     if (!integration) {
@@ -274,21 +276,21 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
     }
 
     // Calculate stats
-    const totalMappings = await prisma.cloverItemMappings.count({
-      where: { integrationId: integration.id }
+    const totalMappings = await prisma.clover_item_mappings_list.count({
+      where: { integration_id: integration.id }
     });
 
-    const mappedCount = await prisma.cloverItemMappings.count({
+    const mappedCount = await prisma.clover_item_mappings_list.count({
       where: {
-        integrationId: integration.id,
-        mappingStatus: 'mapped'
+        integration_id: integration.id,
+        mapping_status: 'mapped'
       }
     });
 
-    const conflictCount = await prisma.cloverItemMappings.count({
+    const conflictCount = await prisma.clover_item_mappings_list.count({
       where: {
-        integrationId: integration.id,
-        mappingStatus: 'conflict'
+        integration_id: integration.id,
+        mapping_status: 'conflict'
       }
     });
 
@@ -296,12 +298,12 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
       enabled: true,
       mode: integration.mode,
       status: integration.status,
-      merchantId: integration.merchantId,
-      demoEnabledAt: integration.demoEnabledAt,
-      demoLastActiveAt: integration.demoLastActiveAt,
-      productionEnabledAt: integration.productionEnabledAt,
-      lastSyncAt: integration.lastSyncAt,
-      lastSyncStatus: integration.lastSyncStatus,
+      merchantId: integration.merchant_id,
+      demoEnabledAt: integration.demo_enabled_at,
+      demoLastActiveAt: integration.demo_last_active_at,
+      productionEnabledAt: integration.production_enabled_at,
+      lastSyncAt: integration.last_sync_at,
+      lastSyncStatus: integration.last_sync_status,
       stats: {
         totalItems: totalMappings,
         mappedItems: mappedCount,
@@ -330,9 +332,9 @@ router.get('/:tenantId/clover/oauth/authorize', authenticateToken, async (req: R
     const user = (req as any).user;
 
     // Verify tenant exists and user has access
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
-      include: { userTenants: true }
+      include: { user_tenants: true }
     });
 
     if (!tenant) {
@@ -340,14 +342,14 @@ router.get('/:tenantId/clover/oauth/authorize', authenticateToken, async (req: R
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.userTenants.some((ut: any) => ut.userId === user.id);
+    const hasAccess = tenant.user_tenants.some((ut: any) => ut.user_id === user.id);
     if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
       return res.status(403).json({ error: 'access_denied' });
     }
 
     // Check if already in production mode
-    const integration = await prisma.cloverIntegrations.findFirst({
-      where: { tenantId }
+    const integration = await prisma.clover_integrations_list.findFirst({
+      where: { tenant_id: tenantId }
     });
 
     if (integration && integration.mode === 'production') {
@@ -423,50 +425,50 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
       : null;
 
     // Find or create integration
-    let integration = await prisma.cloverIntegrations.findFirst({
-      where: { tenantId }
+    let integration = await prisma.clover_integrations_list.findFirst({
+      where: { tenant_id: tenantId }
     });
 
     if (integration) {
       // Update existing integration to production mode
-      integration = await prisma.cloverIntegrations.update({
+      integration = await prisma.clover_integrations_list.update({
         where: { id: integration.id },
         data: {
           mode: 'production',
           status: 'active',
-          accessToken: encryptedAccessToken,
-          refreshToken: encryptedRefreshToken,
-          tokenExpiresAt,
-          merchantId: tokenData.merchant_id,
-          productionEnabledAt: new Date()
+          access_token: encryptedAccessToken,
+          refresh_token: encryptedRefreshToken,
+          token_expires_at: tokenExpiresAt,
+          merchant_id: tokenData.merchant_id,
+          production_enabled_at: new Date()
         }
       });
     } else {
       // Create new integration in production mode
-      integration = await prisma.cloverIntegrations.create({
+      integration = await prisma.clover_integrations_list.create({
         data: {
-          tenantId,
+          tenant_id: tenantId,
           mode: 'production',
           status: 'active',
-          accessToken: encryptedAccessToken,
-          refreshToken: encryptedRefreshToken,
-          tokenExpiresAt,
-          merchantId: tokenData.merchant_id,
-          productionEnabledAt: new Date()
+          access_token: encryptedAccessToken,
+          refresh_token: encryptedRefreshToken,
+          token_expires_at: tokenExpiresAt,
+          merchant_id: tokenData.merchant_id,
+          production_enabled_at: new Date()
         } as any
       });
     }
 
     // Create sync log for OAuth connection
-    await prisma.cloverSyncLogs.create({
+    await prisma.tier_change_logs_list.create({
       data: {
-        integrationId: integration.id,
-        traceId: `oauth_connect_${Date.now()}`,
-        operation: 'import',
-        status: 'started',
-        itemsProcessed: 0,
-        itemsSucceeded: 0,
-        itemsFailed: 0
+        id: generateQuickStart("clover"),
+        entity_type: 'clover_integration',
+        entity_id: integration.id,
+        action: 'oauth_connect',
+        change_type: 'create',
+        changed_by: req.user?.userId || 'system',
+        reason: 'OAuth connection established for Clover POS'
       }
     });
 

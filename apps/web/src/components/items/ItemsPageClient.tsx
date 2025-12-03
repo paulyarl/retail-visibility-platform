@@ -329,6 +329,57 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     openBulkUpload();
   };
 
+  const handleClone = async (item: Item) => {
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      
+      const response = await fetch(`${apiBaseUrl}/api/clone/product`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          productId: item.id,
+          tenantId: tenantId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to clone product');
+      }
+
+      const result = await response.json();
+      
+      // Show success message with the new product name
+      alert(`✅ Product cloned successfully!\n\nNew product: ${result.product.name}\nSKU: ${result.product.sku}\n\nThe cloned product has been created as a draft. You can edit it to customize the variant.`);
+      
+      // Refresh the list to show the new product
+      refresh();
+    } catch (error) {
+      console.error('[ItemsPageClient] Clone failed:', error);
+      alert(error instanceof Error ? error.message : 'Failed to clone product');
+    }
+  };
+
+  const handleStockUpdate = async (itemId: string, newStock: number) => {
+    console.log('[handleStockUpdate] CALLED with:', { itemId, newStock, type: typeof newStock });
+    console.log('[handleStockUpdate] updateItem function:', typeof updateItem);
+    try {
+      // Ensure stock is a number, not a string
+      const stockNumber = typeof newStock === 'string' ? parseInt(newStock) : newStock;
+      console.log(`[ItemsPageClient] Updating stock for item ${itemId} to ${stockNumber} (type: ${typeof stockNumber})`);
+      const result = await updateItem(itemId, { stock: stockNumber });
+      console.log(`[ItemsPageClient] Stock updated successfully:`, result);
+      console.log(`[ItemsPageClient] Refreshing list...`);
+      // Refresh is called automatically by updateItem's onSuccess callback
+    } catch (error) {
+      console.error('[ItemsPageClient] Stock update failed:', error);
+      throw error; // Re-throw so the inline editor can handle it
+    }
+  };
+
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       {/* Header */}
@@ -744,9 +795,11 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 onQRCode={openQRModal}
                 onPhotos={openPhotoGallery}
                 onCategory={openCategoryModal}
+                onClone={handleClone}
                 onPropagate={undefined}
                 onVisibilityToggle={handleVisibilityToggle}
                 onStatusToggle={handleStatusToggle}
+                onStockUpdate={handleStockUpdate}
                 tenantId={tenantId}
                 bulkMode={bulkMode}
                 selectedItems={selectedItems}
@@ -760,9 +813,11 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 onQRCode={openQRModal}
                 onPhotos={openPhotoGallery}
                 onCategory={openCategoryModal}
+                onClone={handleClone}
                 onPropagate={undefined}
                 onVisibilityToggle={handleVisibilityToggle}
                 onStatusToggle={handleStatusToggle}
+                onStockUpdate={handleStockUpdate}
                 tenantId={tenantId}
                 bulkMode={bulkMode}
                 selectedItems={selectedItems}

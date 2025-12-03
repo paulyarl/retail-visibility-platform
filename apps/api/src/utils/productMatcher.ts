@@ -5,7 +5,7 @@
  * to enable scan-to-enrich workflow.
  */
 
-import { PrismaClient, InventoryItem } from '@prisma/client';
+import { PrismaClient, inventory_items } from '@prisma/client';
 
 export interface ScannedProductData {
   barcode: string;
@@ -23,7 +23,7 @@ export interface ScannedProductData {
 }
 
 export interface ProductMatch {
-  existingProduct: InventoryItem;
+  existingProduct: inventory_items;
   scannedData: ScannedProductData;
   matchScore: number; // 0-100
   matchReasons: string[];
@@ -51,17 +51,17 @@ export async function findMatchingProducts(
   const matches: ProductMatch[] = [];
 
   // Get products that need enrichment
-  const candidateProducts = await prisma.inventoryItem.findMany({
+  const candidateProducts = await prisma.inventory_items.findMany({
     where: {
-      tenantId,
+      tenant_id: tenantId,
       OR: [
         { source: 'QUICK_START_WIZARD' },
-        { enrichmentStatus: 'NEEDS_ENRICHMENT' }, 
-        { enrichmentStatus: 'PARTIALLY_ENRICHED' }
+        { enrichment_status: 'NEEDS_ENRICHMENT' }, 
+        { enrichment_status: 'PARTIALLY_ENRICHED' }
       ]
     },
     include: {
-      photoAsset: true
+      photo_assets: true
     }
   });
 
@@ -90,7 +90,7 @@ export async function findMatchingProducts(
  * Calculate match score between existing product and scanned data
  */
 function calculateMatchScore(
-  product: InventoryItem,
+  product: inventory_items,
   scanned: ScannedProductData
 ): number {
   let score = 0;
@@ -132,9 +132,9 @@ function calculateMatchScore(
   }
 
   // Category match
-  if (product.categoryPath && product.categoryPath.length > 0 && scanned.category) {
+  if (product.category_path && product.category_path.length > 0 && scanned.category) {
     totalWeight += 10;
-    const productCategory = product.categoryPath[product.categoryPath.length - 1];
+    const productCategory = product.category_path[product.category_path.length - 1];
     if (normalizeString(productCategory).includes(normalizeString(scanned.category)) ||
         normalizeString(scanned.category).includes(normalizeString(productCategory))) {
       score += 10;
@@ -171,7 +171,7 @@ function calculateMatchScore(
  * Get human-readable match reasons
  */
 function getMatchReasons(
-  product: InventoryItem,
+  product: inventory_items,
   scanned: ScannedProductData,
   score: number
 ): string[] {
@@ -207,8 +207,8 @@ function getMatchReasons(
   }
 
   // Category match
-  if (product.categoryPath && product.categoryPath.length > 0 && scanned.category) {
-    const productCategory = product.categoryPath[product.categoryPath.length - 1];
+  if (product.category_path && product.category_path.length > 0 && scanned.category) {
+    const productCategory = product.category_path[product.category_path.length - 1];
     if (normalizeString(productCategory).includes(normalizeString(scanned.category))) {
       reasons.push('Same category');
     }
@@ -235,7 +235,7 @@ function getMatchReasons(
     reasons.push('Created by Quick Start Wizard');
   }
 
-  if (product.enrichmentStatus === 'NEEDS_ENRICHMENT') {
+  if (product.enrichment_status === 'NEEDS_ENRICHMENT') {
     reasons.push('Needs enrichment');
   }
 
@@ -303,17 +303,17 @@ function normalizeString(str: string): string {
 /**
  * Determine what fields are missing from a product
  */
-export function getMissingFields(product: InventoryItem): {
+export function getMissingFields(product: inventory_items): {
   missingImages: boolean;
   missingDescription: boolean;
   missingSpecs: boolean;
   missingBrand: boolean;
 } {
   return {
-    missingImages: Boolean(product.missingImages),
-    missingDescription: Boolean(product.missingDescription) || (!product.description || product.description.length < 20),
-    missingSpecs: Boolean(product.missingSpecs) || !product.metadata || Object.keys(product.metadata as any).length === 0,
-    missingBrand: Boolean(product.missingBrand) || !product.brand
+    missingImages: Boolean(product.missing_images),
+    missingDescription: Boolean(product.missing_description) || (!product.description || product.description.length < 20),
+    missingSpecs: Boolean(product.missing_specs) || !product.metadata || Object.keys(product.metadata as any).length === 0,
+    missingBrand: Boolean(product.missing_brand) || !product.brand
   };
 }
 
@@ -321,7 +321,7 @@ export function getMissingFields(product: InventoryItem): {
  * Determine what fields can be enriched from scanned data
  */
 export function getEnrichableFields(
-  product: InventoryItem,
+  product: inventory_items,
   scannedData: ScannedProductData
 ): EnrichmentOptions {
   const missing = getMissingFields(product);
@@ -341,7 +341,7 @@ export function getEnrichableFields(
  * Calculate potential enrichment value (how much would be improved)
  */
 export function calculateEnrichmentValue(
-  product: InventoryItem,
+  product: inventory_items,
   scannedData: ScannedProductData
 ): {
   score: number; // 0-100

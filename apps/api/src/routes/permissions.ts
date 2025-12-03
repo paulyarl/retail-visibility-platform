@@ -15,7 +15,7 @@ router.use(authenticateToken, requireAdmin);
  */
 router.get('/', async (req, res) => {
   try {
-    const permissions = await prisma.permissionMatrix.findMany({
+    const permissions = await prisma.permission_matrix_list.findMany({
       orderBy: [{ role: 'asc' }, { action: 'asc' }],
     });
 
@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/:role', async (req, res) => {
   try {
-    const permissions = await prisma.permissionMatrix.findMany({
+    const permissions = await prisma.permission_matrix_list.findMany({
       where: { role: req.params.role },
       orderBy: { action: 'asc' },
     });
@@ -75,7 +75,7 @@ router.put('/:id', async (req, res) => {
     }
 
     // Get current permission
-    const current = await prisma.permissionMatrix.findUnique({
+    const current = await prisma.permission_matrix_list.findUnique({
       where: { id: req.params.id },
     });
 
@@ -84,13 +84,13 @@ router.put('/:id', async (req, res) => {
     }
 
     // Update permission
-    const updated = await prisma.permissionMatrix.update({
+    const updated = await prisma.permission_matrix_list.update({
       where: { id: req.params.id },
       data: { allowed: parsed.data.allowed },
     });
 
     // Log the change
-    await prisma.permissionAuditLog.create({
+    await prisma.permission_audit_logs_list.create({
       data: {
         id: generateQuickStart("audit"),
         tenantId: (req.user as any)?.tenantId || 'system',
@@ -138,14 +138,14 @@ router.post('/bulk-update', async (req, res) => {
 
     for (const update of parsed.data.updates) {
       // Get current permission
-      const current = await prisma.permissionMatrix.findUnique({
+      const current = await prisma.permission_matrix_list.findUnique({
         where: { id: update.id },
       });
 
       if (!current) continue;
 
       // Update permission
-      const updated = await prisma.permissionMatrix.update({
+      const updated = await prisma.permission_matrix_list.update({
         where: { id: update.id },
         data: { allowed: update.allowed },
       });
@@ -166,7 +166,7 @@ router.post('/bulk-update', async (req, res) => {
     }
 
     // Create audit logs
-    await prisma.permissionAuditLog.createMany({
+    await prisma.permission_audit_logs_list.createMany({
       data: auditLogs as any,
     });
 
@@ -189,12 +189,12 @@ router.get('/audit/history', async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
 
     const [logs, total] = await Promise.all([
-      prisma.permissionAuditLog.findMany({
+      prisma.permission_audit_logs_list.findMany({
         take: limit,
         skip: offset,
-        orderBy: { changedAt: 'desc' },
+        orderBy: { changed_at: 'desc' },
       }),
-      prisma.permissionAuditLog.count(),
+      prisma.permission_audit_logs_list.count(),
     ]);
 
     res.json({
@@ -227,7 +227,7 @@ router.post('/check', async (req, res) => {
       });
     }
 
-    const permission = await prisma.permissionMatrix.findFirst({
+    const permission = await prisma.permission_matrix_list.findFirst({
       where: {
         role: parsed.data.role,
         action: parsed.data.action as any,

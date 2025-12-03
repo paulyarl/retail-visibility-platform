@@ -69,21 +69,21 @@ async function logTierChange(params: {
   userAgent?: string;
 }) {
   try {
-    await prisma.tierChangeLogs.create({
+    await prisma.tier_change_logs_list.create({
       data: {
-        id: crypto.randomUUID(), // Generate unique ID for the log entry
-        entityType: params.entityType,
-        entityId: params.entityId,
+        id: crypto.randomUUID(),
+        entity_type: params.entityType,
+        entity_id: params.entityId,
         action: params.action,
-        changeType: params.changeType,
-        beforeState: params.beforeState as any,
-        afterState: params.afterState as any,
-        changedBy: params.changedBy,
-        changedByEmail: params.changedByEmail || null,
+        change_type: params.changeType,
+        before_state: params.beforeState as any,
+        after_state: params.afterState as any,
+        changed_by: params.changedBy,
+        changed_by_email: params.changedByEmail || null,
         reason: params.reason || null,
-        ipAddress: params.ipAddress || null,
-        userAgent: params.userAgent || null,
-      } as any,
+        ip_address: params.ipAddress || null,
+        user_agent: params.userAgent || null,
+      },
     });
   } catch (error) {
     console.error('[Tier Change Log] Failed to log change:', error);
@@ -101,19 +101,19 @@ router.get('/tiers', requirePlatformStaff, async (req, res) => {
 
     const where: any = {};
     if (includeInactive !== 'true') {
-      where.isActive = true;
+      where.is_active = true;
     }
 
-    const tiers = await prisma.subscriptionTier.findMany({
+    const tiers = await prisma.subscription_tiers_list.findMany({
       where,
       orderBy: [
-        { sortOrder: 'asc' },
-        { createdAt: 'asc' },
+        { sort_order: 'asc' },
+        { created_at: 'asc' },
       ],
       include: {
-        features: {
-          where: { isEnabled: true },
-          orderBy: { featureKey: 'asc' },
+        tier_features_list: {
+          where: { is_enabled: true },
+          orderBy: { feature_key: 'asc' },
         },
       },
     });
@@ -133,17 +133,22 @@ router.get('/tiers', requirePlatformStaff, async (req, res) => {
 router.get('/features', requirePlatformStaff, async (req, res) => {
   try {
     // Get all unique features from all tiers
-    const features = await prisma.tierFeatures.findMany({
-      where: { isEnabled: true },
+    const features = await prisma.tier_features_list.findMany({
+      where: { is_enabled: true },
       select: {
-        featureKey: true,
-        featureName: true,
+        feature_key: true,
+        feature_name: true,
       },
-      distinct: ['featureKey'],
-      orderBy: { featureKey: 'asc' },
+      distinct: ['feature_key'],
+      orderBy: { feature_key: 'asc' },
     });
 
-    res.json({ features });
+    res.json({
+      features: features.map(f => ({
+        featureKey: f.feature_key,
+        featureName: f.feature_name,
+      })),
+    });
   } catch (error) {
     console.error('[GET /api/admin/tier-system/features] Error:', error);
     res.status(500).json({ error: 'failed_to_fetch_features' });
@@ -159,11 +164,11 @@ router.get('/tiers/:tierId', requirePlatformStaff, async (req, res) => {
   try {
     const { tierId } = req.params;
 
-    const tier = await prisma.subscriptionTier.findUnique({
-      where: { tierKey: tierId },
+    const tier = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: tierId },
       include: {
-        features: {
-          orderBy: { featureKey: 'asc' },
+        tier_features_list: {
+          orderBy: { feature_key: 'asc' },
         },
       },
     });
@@ -218,8 +223,8 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
     const { reason, features, ...tierData } = parsed.data;
 
     // Check if tier key already exists
-    const existing = await prisma.subscriptionTier.findUnique({
-      where: { tierKey: tierData.tierKey },
+    const existing = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: tierData.tierKey },
     });
 
     if (existing) {
@@ -230,26 +235,40 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
     }
 
     // Create tier with features
-    const tier = await prisma.subscriptionTier.create({
+    const dbTierData: any = {
+      tier_key: tierData.tierKey,
+      name: tierData.name,
+      display_name: tierData.displayName,
+      description: tierData.description,
+      price_monthly: tierData.priceMonthly,
+      max_skus: tierData.maxSkus ?? null,
+      max_locations: tierData.maxLocations ?? null,
+      tier_type: tierData.tierType,
+      sort_order: tierData.sortOrder,
+      metadata: tierData.metadata as any,
+      created_by: req.user?.userId,
+      updated_by: req.user?.userId,
+    };
+
+    const tier = await prisma.subscription_tiers_list.create({
       data: {
-        id: generateTierId(), // Generate unique ID
-        ...tierData,
-        displayName: tierData.displayName, // Map snake_case to camelCase
-        createdBy: req.user?.userId,
-        updatedBy: req.user?.userId,
-        features: features ? {
-          create: features.map(f => ({
-            id: crypto.randomUUID(), // Generate unique ID
-            featureKey: f.featureKey,
-            featureName: f.featureName,
-            isEnabled: true, // Default to enabled for new features
-            isInherited: f.isInherited || false,
-            metadata: f.metadata as any,
-          })),
-        } : undefined,
+        id: generateTierId(),
+        ...dbTierData,
+        tier_features_list: features
+          ? {
+              create: features.map(f => ({
+                id: crypto.randomUUID(),
+                feature_key: f.featureKey,
+                feature_name: f.featureName,
+                is_enabled: true,
+                is_inherited: f.isInherited || false,
+                metadata: f.metadata as any,
+              })),
+            }
+          : undefined,
       },
       include: {
-        features: true,
+        tier_features_list: true,
       },
     });
 
@@ -267,7 +286,7 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] Tier created by ${req.user?.email}:`, tier.tierKey);
+    console.log(`[Tier System] Tier created by ${req.user?.email}:`, tier.tier_key);
 
     res.status(201).json({ tier });
   } catch (error) {
@@ -310,9 +329,9 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     const { reason, ...updateData } = parsed.data;
 
     // Get current state
-    const currentTier = await prisma.subscriptionTier.findUnique({
-      where: { tierKey: tierId },
-      include: { features: true },
+    const currentTier = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: tierId },
+      include: { tier_features_list: true },
     });
 
     if (!currentTier) {
@@ -320,14 +339,24 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     }
 
     // Update tier
-    const updatedTier = await prisma.subscriptionTier.update({
-      where: { tierKey: tierId },
-      data: {
-        ...updateData,
-        updatedBy: req.user?.userId,
-      },
+    const dbUpdateData: any = {};
+    if (updateData.name !== undefined) dbUpdateData.name = updateData.name;
+    if (updateData.displayName !== undefined) dbUpdateData.display_display_name = updateData.displayName;
+    if (updateData.description !== undefined) dbUpdateData.description = updateData.description;
+    if (updateData.priceMonthly !== undefined) dbUpdateData.price_monthly = updateData.priceMonthly;
+    if (updateData.maxSkus !== undefined) dbUpdateData.max_skus = updateData.maxSkus;
+    if (updateData.maxLocations !== undefined) dbUpdateData.max_locations = updateData.maxLocations;
+    if (updateData.tierType !== undefined) dbUpdateData.tier_type = updateData.tierType;
+    if (updateData.isActive !== undefined) dbUpdateData.is_active = updateData.isActive;
+    if (updateData.sortOrder !== undefined) dbUpdateData.sort_order = updateData.sortOrder;
+    if (updateData.metadata !== undefined) dbUpdateData.metadata = updateData.metadata as any;
+    dbUpdateData.updated_by = req.user?.userId;
+
+    const updatedTier = await prisma.subscription_tiers_list.update({
+      where: { tier_key: tierId },
+      data: dbUpdateData,
       include: {
-        features: true,
+        tier_features_list: true,
       },
     });
 
@@ -346,7 +375,7 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] Tier updated by ${req.user?.email}:`, updatedTier.tierKey);
+    console.log(`[Tier System] Tier updated by ${req.user?.email}:`, updatedTier.tier_key);
 
     res.json({ tier: updatedTier });
   } catch (error) {
@@ -380,9 +409,9 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     const { reason, hardDelete } = parsed.data;
 
     // Get current state
-    const currentTier = await prisma.subscriptionTier.findUnique({
-      where: { tierKey: tierId },
-      include: { features: true },
+    const currentTier = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: tierId },
+      include: { tier_features_list: true },
     });
 
     if (!currentTier) {
@@ -390,8 +419,8 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     }
 
     // Check if any tenants are using this tier
-    const tenantCount = await prisma.tenant.count({
-      where: { subscriptionTier: currentTier.tierKey },
+    const tenantCount = await prisma.tenants.count({
+      where: { subscription_tier: currentTier.tier_key },
     });
 
     if (tenantCount > 0 && hardDelete) {
@@ -404,8 +433,8 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
 
     if (hardDelete) {
       // Hard delete
-      await prisma.subscriptionTier.delete({
-        where: { tierKey: tierId },
+      await prisma.subscription_tiers_list.delete({
+        where: { tier_key: tierId },
       });
 
       await logTierChange({
@@ -421,16 +450,16 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
         userAgent: req.get('user-agent'),
       });
 
-      console.log(`[Tier System] Tier hard deleted by ${req.user?.email}:`, currentTier.tierKey);
+      console.log(`[Tier System] Tier hard deleted by ${req.user?.email}:`, currentTier.tier_key);
 
       res.json({ success: true, deleted: true });
     } else {
       // Soft delete
-      const updatedTier = await prisma.subscriptionTier.update({
-        where: { tierKey: tierId },
+      const updatedTier = await prisma.subscription_tiers_list.update({
+        where: { tier_key: tierId },
         data: {
-          isActive: false,
-          updatedBy: req.user?.userId,
+          is_active: false,
+          updated_by: req.user?.userId,
         },
       });
 
@@ -448,7 +477,7 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
         userAgent: req.get('user-agent'),
       });
 
-      console.log(`[Tier System] Tier soft deleted by ${req.user?.email}:`, currentTier.tierKey);
+      console.log(`[Tier System] Tier soft deleted by ${req.user?.email}:`, currentTier.tier_key);
 
       res.json({ success: true, deactivated: true, tier: updatedTier });
     }
@@ -466,15 +495,17 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
 router.get('/features', requirePlatformStaff, async (req, res) => {
   try {
     // Get all unique features from all tiers
-    const features = await prisma.tierFeatures.groupBy({
-      by: ['featureKey', 'featureName'],
+    const features = await prisma.tier_features_list.groupBy({
+      by: ['feature_key', 'feature_name'],
       where: {
-        isEnabled: true,
+        is_enabled: true,
       },
     });
 
     // Sort by feature name for better UX
-    const sortedFeatures = features.sort((a, b) => a.featureName.localeCompare(b.featureName));
+    const sortedFeatures = features.sort((a: any, b: any) =>
+      a.feature_name.localeCompare(b.feature_name),
+    );
 
     res.json(sortedFeatures);
   } catch (error) {
@@ -511,8 +542,8 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
     const { reason, ...featureData } = parsed.data;
 
     // Check if tier exists
-    const tier = await prisma.subscriptionTier.findUnique({
-      where: { tierKey: tierId },
+    const tier = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: tierId },
     });
 
     if (!tier) {
@@ -520,11 +551,11 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
     }
 
     // Check if feature already exists
-    const existing = await prisma.tierFeatures.findUnique({
+    const existing = await prisma.tier_features_list.findUnique({
       where: {
-        tierId_featureKey: {
-          tierId,
-          featureKey: featureData.featureKey,
+        tier_id_feature_key: {
+          tier_id: tierId,
+          feature_key: featureData.featureKey,
         },
       },
     });
@@ -537,7 +568,7 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
     }
 
     // Add feature
-    const feature = await prisma.tierFeatures.create({
+    const feature = await prisma.tier_features_list.create({
       data: {
         id: generateFeatureId(),
         tierId,
@@ -563,7 +594,7 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] Feature added by ${req.user?.email}:`, feature.featureKey, 'to', tier.tierKey);
+    console.log(`[Tier System] Feature added by ${req.user?.email}:`, feature.feature_key, 'to', tier.tier_key);
 
     res.status(201).json({ feature });
   } catch (error) {
@@ -600,8 +631,8 @@ router.patch('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async (
     const { reason, ...updateData } = parsed.data;
 
     // Check if tier exists
-    const tier = await prisma.subscriptionTier.findUnique({
-      where: { tierKey: tierId },
+    const tier = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: tierId },
     });
 
     if (!tier) {
@@ -609,24 +640,24 @@ router.patch('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async (
     }
 
     // Get current feature state
-    const currentFeature = await prisma.tierFeatures.findUnique({
+    const currentFeature = await prisma.tier_features_list.findUnique({
       where: { id: featureId },
-      include: { tier: true },
+      include: { subscription_tiers_list: true },
     });
 
-    if (!currentFeature || currentFeature.tierId !== tierId) {
+    if (!currentFeature || currentFeature.tier_id !== tierId) {
       return res.status(404).json({ error: 'feature_not_found' });
     }
 
     // Update feature
-    const updatedFeature = await prisma.tierFeatures.update({
+    const updatedFeature = await prisma.tier_features_list.update({
       where: { id: featureId },
       data: {
         ...updateData,
-        updatedAt: new Date(),
+        updated_at: new Date(),
       },
       include: {
-        tier: true,
+        subscription_tiers_list: true,
       },
     });
 
@@ -645,7 +676,7 @@ router.patch('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async (
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] Feature updated by ${req.user?.email}:`, updatedFeature.featureKey, 'in', tier.tierKey);
+    console.log(`[Tier System] Feature updated by ${req.user?.email}:`, updatedFeature.feature_key, 'in', tier.tier_key);
 
     res.json({ feature: updatedFeature });
   } catch (error) {
@@ -679,11 +710,11 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
     const { sourceTierId, reason } = parsed.data;
 
     // Check if target tier exists
-    const targetTier = await prisma.subscriptionTier.findUnique({
-      where: { tierKey: tierId },
+    const targetTier = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: tierId },
       include: {
-        features: {
-          where: { isEnabled: true },
+        tier_features_list: {
+          where: { is_enabled: true },
         },
       },
     });
@@ -693,11 +724,11 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
     }
 
     // Check if source tier exists
-    const sourceTier = await prisma.subscriptionTier.findUnique({
-      where: { tierKey: sourceTierId },
+    const sourceTier = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: sourceTierId },
       include: {
-        features: {
-          where: { isEnabled: true },
+        tier_features_list: {
+          where: { is_enabled: true },
         },
       },
     });
@@ -712,25 +743,25 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
     }
 
     // Enforce tier hierarchy: can only inherit from lower tiers (lower sort order)
-    if (targetTier.sortOrder <= sourceTier.sortOrder) {
+    if (targetTier.sort_order <= sourceTier.sort_order) {
       return res.status(400).json({ 
         error: 'invalid_tier_hierarchy',
-        message: `Cannot inherit features from ${sourceTier.displayName}. You can only inherit from tiers with lower sort order (${targetTier.displayName} has sort order ${targetTier.sortOrder}, ${sourceTier.displayName} has sort order ${sourceTier.sortOrder}).`
+        message: `Cannot inherit features from ${sourceTier.display_name}. You can only inherit from tiers with lower sort order (${targetTier.display_name} has sort order ${targetTier.sort_order}, ${sourceTier.display_name} has sort order ${sourceTier.sort_order}).`
       });
     }
 
     // Get existing features in target tier for comparison
     const existingFeatures = new Map(
-      targetTier.features.map((f: any) => [f.featureKey, f])
+      targetTier.tier_features_list.map((f: any) => [f.feature_key, f]),
     );
 
     // Separate features into new and existing
-    const featuresToCreate = sourceTier.features.filter(
-      (f: any) => !existingFeatures.has(f.featureKey)
+    const featuresToCreate = sourceTier.tier_features_list.filter(
+      (f: any) => !existingFeatures.has(f.feature_key),
     );
     
-    const featuresToUpdate = sourceTier.features.filter(
-      (f: any) => existingFeatures.has(f.featureKey)
+    const featuresToUpdate = sourceTier.tier_features_list.filter(
+      (f: any) => existingFeatures.has(f.feature_key),
     );
 
     // Check if there's anything to do
@@ -748,14 +779,14 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
       
       // Create new features that don't exist
       for (const feature of featuresToCreate) {
-        const newFeature = await tx.tierFeatures.create({
+        const newFeature = await tx.tier_features_list.create({
           data: {
             id: generateFeatureId(),
-            tierId,
-            featureKey: feature.featureKey,
-            featureName: feature.featureName,
-            isInherited: true,
-            isEnabled: true,
+            tier_id: tierId,
+            feature_key: feature.feature_key,
+            feature_name: feature.feature_name,
+            is_inherited: true,
+            is_enabled: true,
             metadata: feature.metadata as any,
           },
         });
@@ -764,11 +795,11 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
 
       // Mark existing matching features as inherited
       for (const sourceFeature of featuresToUpdate) {
-        const existingFeature = existingFeatures.get(sourceFeature.featureKey);
-        if (existingFeature && !existingFeature.isInherited) {
-          const updatedFeature = await tx.tierFeatures.update({
+        const existingFeature = existingFeatures.get(sourceFeature.feature_key);
+        if (existingFeature && !existingFeature.is_inherited) {
+          const updatedFeature = await tx.tier_features_list.update({
             where: { id: existingFeature.id },
-            data: { isInherited: true },
+            data: { is_inherited: true },
           });
           updatedFeatures.push(updatedFeature);
         }
@@ -788,16 +819,17 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
       action: 'update',
       changeType: 'features_inherited',
       beforeState: { 
-        tierKey: targetTier.tierKey,
-        featureCount: targetTier.features.length 
+        tierKey: targetTier.tier_key,
+        featureCount: targetTier.tier_features_list.length,
       },
       afterState: { 
-        tierKey: targetTier.tierKey,
-        featureCount: targetTier.features.length + result.createdFeatures.length,
+        tierKey: targetTier.tier_key,
+        featureCount:
+          targetTier.tier_features_list.length + result.createdFeatures.length,
         createdFeatures: result.createdFeatures.length,
         updatedFeatures: result.updatedFeatures.length,
         totalProcessed: result.totalProcessed,
-        sourceTier: sourceTier.tierKey
+        sourceTier: sourceTier.tier_key
       },
       changedBy: req.user?.userId || 'system',
       changedByEmail: req.user?.email,
@@ -807,7 +839,7 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
     });
 
     console.log(`[Tier System] ${result.totalProcessed} features processed by ${req.user?.email}:`, 
-      `${result.createdFeatures.length} created, ${result.updatedFeatures.length} marked as inherited from ${sourceTier.tierKey} to ${targetTier.tierKey}`);
+      `${result.createdFeatures.length} created, ${result.updatedFeatures.length} marked as inherited from ${sourceTier.tier_key} to ${targetTier.tier_key}`);
 
     res.json({ 
       message: 'Features inherited successfully',
@@ -817,8 +849,8 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
       summary: {
         created: result.createdFeatures.length,
         updated: result.updatedFeatures.length,
-        from: sourceTier.tierKey,
-        to: targetTier.tierKey
+        from: sourceTier.tier_key,
+        to: targetTier.tier_key
       }
     });
   } catch (error) {
@@ -851,17 +883,17 @@ router.delete('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async 
     const { reason } = parsed.data;
 
     // Get current state
-    const feature = await prisma.tierFeatures.findUnique({
+    const feature = await prisma.tier_features_list.findUnique({
       where: { id: featureId },
-      include: { tier: true },
+      include: { subscription_tiers_list: true },
     });
 
-    if (!feature || feature.tierId !== tierId) {
+    if (!feature || feature.tier_id !== tierId) {
       return res.status(404).json({ error: 'feature_not_found' });
     }
 
     // Delete feature
-    await prisma.tierFeatures.delete({
+    await prisma.tier_features_list.delete({
       where: { id: featureId },
     });
 
@@ -879,7 +911,7 @@ router.delete('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async 
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] Feature removed by ${req.user?.email}:`, feature.featureKey, 'from', feature.tier.tierKey);
+    console.log(`[Tier System] Feature removed by ${req.user?.email}:`, feature.feature_key, 'from', feature.subscription_tiers_list.tier_key);
 
     res.json({ success: true });
   } catch (error) {
@@ -901,9 +933,9 @@ router.get('/change-logs', requirePlatformStaff, async (req, res) => {
     if (entityType) where.entityType = entityType;
     if (entityId) where.entityId = entityId;
 
-    const logs = await prisma.tierChangeLogs.findMany({
+    const logs = await prisma.tier_change_logs_list.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
       take: parseInt(limit as string, 10),
     });
 

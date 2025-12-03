@@ -2,12 +2,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma, basePrisma } from '../prisma';
-import { generateQuickStartProducts } from '../lib/quick-start';
 import { validateOrganizationTier, validateOrganizationLimits, validateOrganizationTierChange } from '../middleware/organization-validation';
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
-import { generateItemId, generateQuickStart } from '../lib/id-generator';
+import { generateItemId, generatePhotoId, generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -45,32 +44,32 @@ function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
 // Permission: Platform support (view-only operation)
 router.get('/', requireSupportActions, async (req, res) => {
   try {
-    const organizations = await prisma.organization.findMany({
+    const organizations = await prisma.organizations_list.findMany({
       include: {
-        Tenant: {
+        tenants: {
           select: {
             id: true,
             name: true,
             _count: {
               select: {
-                inventoryItems: true,
+                inventory_items: true,
               },
             },
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
     });
 
     // Calculate stats for each organization
     const orgsWithStats = organizations.map(org => {
-      const totalSKUs = org.Tenant.reduce((sum, t) => sum + t._count.inventoryItems, 0);
+      const totalSKUs = org.tenants.reduce((sum, t) => sum + t._count.inventory_items, 0);
       return {
         ...org,
         stats: {
-          totalLocations: org.Tenant.length,
+          totalLocations: org.tenants.length,
           totalSKUs,
-          utilizationPercent: (totalSKUs / org.maxTotalSKUs) * 100,
+          utilizationPercent: (totalSKUs / org.max_total_skus) * 100,
         },
       };
     });
@@ -91,17 +90,17 @@ router.get('/', requireSupportActions, async (req, res) => {
 // Permission: Platform support (view-only operation)
 router.get('/:id', requireSupportActions, async (req, res) => {
   try {
-    const organization = await prisma.organization.findUnique({
+    const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
-        Tenant: {
+        tenants: {
           select: {
             id: true,
             name: true,
             metadata: true,
             _count: {
               select: {
-                inventoryItems: true,
+                inventory_items: true,
               },
             },
           },
@@ -151,17 +150,17 @@ router.post('/', requirePlatformAdmin, validateOrganizationTier, validateOrganiz
       return res.status(400).json({ error: 'owner_id_required', message: 'ownerId must be provided or user must be authenticated' });
     }
 
-    const organization = await prisma.organization.create({
+    const organization = await prisma.organizations_list.create({
       data: {
         id: generateQuickStart("org"),
         name: parsed.data.name,
-        ownerId,
-        subscriptionTier: parsed.data.subscriptionTier,
-        subscriptionStatus: parsed.data.subscriptionStatus,
-        maxLocations: parsed.data.maxLocations,
-        maxTotalSKUs: parsed.data.maxTotalSKUs,
-        trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-        updatedAt: new Date(),
+        owner_id: ownerId,
+        subscription_tier: parsed.data.subscriptionTier,
+        subscription_status: parsed.data.subscriptionStatus,
+        max_locations: parsed.data.maxLocations,
+        max_total_skus: parsed.data.maxTotalSKUs,
+        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        updated_at: new Date(),
       },
     });
 
@@ -190,7 +189,7 @@ router.put('/:id', requirePlatformAdmin, validateOrganizationTier, validateOrgan
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
-    const organization = await prisma.organization.update({
+    const organization = await prisma.organizations_list.update({
       where: { id: req.params.id },
       data: parsed.data,
     });
@@ -207,13 +206,13 @@ router.put('/:id', requirePlatformAdmin, validateOrganizationTier, validateOrgan
 router.delete('/:id', requirePlatformAdmin, async (req, res) => {
   try {
     // First, unlink all tenants from this organization
-    await prisma.tenant.updateMany({
-      where: { organizationId: req.params.id },
-      data: { organizationId: null },
+    await prisma.tenants.updateMany({
+      where: { organization_id: req.params.id },
+      data: { organization_id: null},
     });
 
     // Then delete the organization
-    await prisma.organization.delete({
+    await prisma.organizations_list.delete({
       where: { id: req.params.id },
     });
 
@@ -238,10 +237,10 @@ router.post('/:id/tenants', requirePlatformAdmin, async (req, res) => {
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
-    const tenant = await prisma.tenant.update({
+    const tenant = await prisma.tenants.update({
       where: { id: parsed.data.tenantId },
       data: {
-        organization: {
+        organizations_list: {
           connect: { id: req.params.id },
         },
       },
@@ -258,9 +257,9 @@ router.post('/:id/tenants', requirePlatformAdmin, async (req, res) => {
 // Permission: Platform admin only (modifies org structure)
 router.delete('/:id/tenants/:tenantId', requirePlatformAdmin, async (req, res) => {
   try {
-    const tenant = await prisma.tenant.update({
+    const tenant = await prisma.tenants.update({
       where: { id: req.params.tenantId },
-      data: { organizationId: null },
+      data: { organization_id: null },
     });
 
     res.json(tenant);
@@ -295,10 +294,10 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
     const { sourceItemId, targetTenantIds, mode, overrides } = parsed.data;
 
     // Verify organization exists
-    const organization = await prisma.organization.findUnique({
+    const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
-        Tenant: {
+        tenants: {
           select: { id: true },
         },
       },
@@ -309,7 +308,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
     }
 
     // Verify all target tenants belong to this organization
-    const orgTenantIds = organization.Tenant.map(t => t.id);
+    const orgTenantIds = organization.tenants.map(t => t.id);
     const invalidTenants = targetTenantIds.filter(id => !orgTenantIds.includes(id));
     if (invalidTenants.length > 0) {
       return res.status(400).json({ 
@@ -320,10 +319,10 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
     }
 
     // Get source item
-    const sourceItem = await prisma.inventoryItem.findUnique({
+    const sourceItem = await prisma.inventory_items.findUnique({
       where: { id: sourceItemId },
       include: {
-        photoAsset: true,
+        photo_assets: true,
       },
     });
 
@@ -332,7 +331,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
     }
 
     // Verify source item's tenant is in this organization
-    if (!orgTenantIds.includes(sourceItem.tenantId)) {
+    if (!orgTenantIds.includes(sourceItem.tenant_id)) {
       return res.status(400).json({ 
         error: 'source_item_not_in_organization',
         message: 'Source item does not belong to this organization',
@@ -350,15 +349,15 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
     for (const tenantId of targetTenantIds) {
       try {
         // Skip if it's the source tenant
-        if (tenantId === sourceItem.tenantId) {
+        if (tenantId === sourceItem.tenant_id) {
           results.skipped.push({ tenantId, reason: 'source_tenant' });
           continue;
         }
 
         // Check if SKU already exists for this tenant
-        const existing = await prisma.inventoryItem.findFirst({
+        const existing = await prisma.inventory_items.findFirst({
           where: {
-            tenantId,
+            tenant_id: tenantId,
             sku: sourceItem.sku,
           },
         });
@@ -371,7 +370,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
           }
           
           // Update mode - update existing item
-          const updatedItem = await prisma.inventoryItem.update({
+          const updatedItem = await prisma.inventory_items.update({
             where: { id: existing.id },
             data: {
               name: sourceItem.name,
@@ -379,48 +378,49 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
               brand: sourceItem.brand,
               description: sourceItem.description,
               price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
-              priceCents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.priceCents,
+              price_cents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
               stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
               quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
-              imageUrl: sourceItem.imageUrl, 
-              imageGallery: sourceItem.imageGallery,
-              marketingDescription: sourceItem.marketingDescription,
+              image_url: sourceItem.image_url, 
+              image_gallery: sourceItem.image_gallery,
+              marketing_description: sourceItem.marketing_description,
               metadata: sourceItem.metadata as any,
               availability: sourceItem.availability,
-              categoryPath: sourceItem.categoryPath,
+              category_path: sourceItem.category_path,
               condition: sourceItem.condition,
               currency: sourceItem.currency,
               gtin: sourceItem.gtin,
-              itemStatus: overrides?.itemStatus || sourceItem.itemStatus,
+              item_status: overrides?.itemStatus || sourceItem.item_status,
               mpn: sourceItem.mpn,
               visibility: overrides?.visibility || sourceItem.visibility,
               manufacturer: sourceItem.manufacturer,
               source: sourceItem.source,
-              enrichmentStatus: sourceItem.enrichmentStatus,
-              enrichedAt: sourceItem.enrichedAt,
-              enrichedBy: sourceItem.enrichedBy,
-              enrichedFromBarcode: sourceItem.enrichedFromBarcode,
-              missingImages: sourceItem.missingImages,
-              missingDescription: sourceItem.missingDescription,
-              missingSpecs: sourceItem.missingSpecs,
-              missingBrand: sourceItem.missingBrand,
+              enrichment_status: sourceItem.enrichment_status,
+              enriched_at: sourceItem.enriched_at,
+              enriched_by: sourceItem.enriched_by,
+              enriched_from_barcode: sourceItem.enriched_from_barcode,
+              missing_images: sourceItem.missing_images,
+              missing_description: sourceItem.missing_description,
+              missing_specs: sourceItem.missing_specs,
+              missing_brand: sourceItem.missing_brand,
             },
           });
 
           // Delete old photos and copy new ones
-          await prisma.photoAsset.deleteMany({
-            where: { inventoryItemId: existing.id },
+          await prisma.photo_assets.deleteMany({
+            where: { inventory_item_id: existing.id },
           });
 
-          if (sourceItem.photoAsset && sourceItem.photoAsset.length > 0) {
-            await prisma.photoAsset.createMany({
-              data: sourceItem.photoAsset.map((photo: any, index: number) => ({
-                tenantId,
-                inventoryItemId: updatedItem.id,
+          if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
+            await prisma.photo_assets.createMany({
+              data: sourceItem.photo_assets.map((photo: any, index: number) => ({
+                id: generateQuickStart("photo_asset"),
+                tenant_id: tenantId,
+                inventory_item_id: updatedItem.id,
                 url: photo.url,
                 width: photo.width,
                 height: photo.height,
-                contentType: photo.contentType,
+                content_type: photo.contentType,
                 bytes: photo.bytes,
                 position: photo.position !== undefined ? photo.position : index,
                 alt: photo.alt,
@@ -440,51 +440,52 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
         }
 
         // Create mode - create new item
-        const newItem = await prisma.inventoryItem.create({
+        const newItem = await prisma.inventory_items.create({
           data: {
             id: generateItemId(),
-            updatedAt: new Date(),
-            tenantId,
+            updated_at: new Date(),
+            tenant_id: tenantId,
             sku: sourceItem.sku,
             name: sourceItem.name,
             title: sourceItem.title,
             brand: sourceItem.brand,
             description: sourceItem.description,
             price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
-            priceCents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.priceCents,
+            price_cents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
             stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
             quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
-            imageUrl: sourceItem.imageUrl,
-            imageGallery: sourceItem.imageGallery,
-            marketingDescription: sourceItem.marketingDescription,
+            image_url: sourceItem.image_url,
+            image_gallery: sourceItem.image_gallery,
+            marketing_description: sourceItem.marketing_description,
             metadata: sourceItem.metadata as any,
             availability: sourceItem.availability,
-            categoryPath: sourceItem.categoryPath,
+            category_path: sourceItem.category_path,
             condition: sourceItem.condition,
             currency: sourceItem.currency,
             gtin: sourceItem.gtin,
-            itemStatus: overrides?.itemStatus || sourceItem.itemStatus,
+            item_status: overrides?.itemStatus || sourceItem.item_status,
             mpn: sourceItem.mpn,
             visibility: overrides?.visibility || sourceItem.visibility,
             manufacturer: sourceItem.manufacturer,
             source: sourceItem.source,
-            enrichmentStatus: sourceItem.enrichmentStatus,
-            enrichedAt: sourceItem.enrichedAt,
-            enrichedBy: sourceItem.enrichedBy,
-            enrichedFromBarcode: sourceItem.enrichedFromBarcode,
-            missingImages: sourceItem.missingImages,
-            missingDescription: sourceItem.missingDescription,
-            missingSpecs: sourceItem.missingSpecs,
-            missingBrand: sourceItem.missingBrand,
+            enrichment_status: sourceItem.enrichment_status,
+            enriched_at: sourceItem.enriched_at,
+            enriched_by: sourceItem.enriched_by,
+            enriched_from_barcode: sourceItem.enriched_from_barcode,
+            missing_images: sourceItem.missing_images,
+            missing_description: sourceItem.missing_description,
+            missing_specs: sourceItem.missing_specs,
+            missing_brand: sourceItem.missing_brand,
           },
         });
 
         // Copy photos if any
-        if (sourceItem.photoAsset && sourceItem.photoAsset.length > 0) {
-          await prisma.photoAsset.createMany({
-            data: sourceItem.photoAsset.map((photo: any, index: number) => ({
-              tenantId,
-              inventoryItemId: newItem.id,
+        if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
+          await prisma.photo_assets.createMany({
+            data: sourceItem.photo_assets.map((photo: any, index: number) => ({
+              id: generateQuickStart("photo_asset"),
+              tenant_id: tenantId,
+              inventory_item_id: newItem.id,
               url: photo.url,
               width: photo.width,
               height: photo.height,
@@ -546,10 +547,10 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
     const { sourceItemIds, targetTenantIds, overrides } = parsed.data;
 
     // Verify organization exists
-    const organization = await prisma.organization.findUnique({
+    const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
-        Tenant: {
+        tenants: {
           select: { id: true },
         },
       },
@@ -560,7 +561,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
     }
 
     // Verify all target tenants belong to this organization
-    const orgTenantIds = organization.Tenant.map(t => t.id);
+    const orgTenantIds = organization.tenants.map(t => t.id);
     const invalidTenants = targetTenantIds.filter(id => !orgTenantIds.includes(id));
     if (invalidTenants.length > 0) {
       return res.status(400).json({ 
@@ -571,12 +572,12 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
     }
 
     // Get all source items
-    const sourceItems = await prisma.inventoryItem.findMany({
+    const sourceItems = await prisma.inventory_items.findMany({
       where: { 
         id: { in: sourceItemIds },
       },
       include: {
-        photoAsset: true,
+        photo_assets: true,
       },
     });
 
@@ -585,7 +586,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
     }
 
     // Verify all source items belong to this organization
-    const invalidSourceItems = sourceItems.filter(item => !orgTenantIds.includes(item.tenantId));
+    const invalidSourceItems = sourceItems.filter(item => !orgTenantIds.includes(item.tenant_id));
     if (invalidSourceItems.length > 0) {
       return res.status(400).json({ 
         error: 'source_items_not_in_organization',
@@ -604,7 +605,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
       for (const tenantId of targetTenantIds) {
         try {
           // Skip if it's the source tenant
-          if (tenantId === sourceItem.tenantId) {
+          if (tenantId === sourceItem.tenant_id) {
             results.skipped.push({ 
               item_id: sourceItem.id, 
               tenantId, 
@@ -615,9 +616,9 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
           }
 
           // Check if SKU already exists for this tenant
-          const existing = await prisma.inventoryItem.findFirst({
+          const existing = await prisma.inventory_items.findFirst({
             where: {
-              tenantId,
+              tenant_id: tenantId,
               sku: sourceItem.sku,
             },
           });
@@ -633,49 +634,50 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
           }
 
           // Create the item for this tenant
-          const newItem = await prisma.inventoryItem.create({
+          const newItem = await prisma.inventory_items.create({
             data: {
-              tenantId,
+              tenant_id: tenantId,
               sku: sourceItem.sku,
               name: sourceItem.name,
               title: sourceItem.title,
               brand: sourceItem.brand,
               description: sourceItem.description,
               price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
-              priceCents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.priceCents,
+              priceCents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
               stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
               quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
-              imageUrl: sourceItem.imageUrl,
-              imageGallery: sourceItem.imageGallery,
-              marketingDescription: sourceItem.marketingDescription,
+              imageUrl: sourceItem.image_url,
+              imageGallery: sourceItem.image_gallery,
+              marketingDescription: sourceItem.marketing_description,
               metadata: sourceItem.metadata as any,
               availability: sourceItem.availability,
-              categoryPath: sourceItem.categoryPath,
+              categoryPath: sourceItem.category_path,
               condition: sourceItem.condition,
               currency: sourceItem.currency,
               gtin: sourceItem.gtin,
-              itemStatus: overrides?.itemStatus || sourceItem.itemStatus,
+              itemStatus: overrides?.itemStatus || sourceItem.item_status,
               mpn: sourceItem.mpn,
               visibility: overrides?.visibility || sourceItem.visibility,
               manufacturer: sourceItem.manufacturer,
               source: sourceItem.source,
-              enrichmentStatus: sourceItem.enrichmentStatus,
-              enrichedAt: sourceItem.enrichedAt,
-              enrichedBy: sourceItem.enrichedBy,
-              enrichedFromBarcode: sourceItem.enrichedFromBarcode,
-              missingImages: sourceItem.missingImages,
-              missingDescription: sourceItem.missingDescription,
-              missingSpecs: sourceItem.missingSpecs,
-              missingBrand: sourceItem.missingBrand,
+              enrichmentStatus: sourceItem.enrichment_status,
+              enrichedAt: sourceItem.enriched_at,
+              enrichedBy: sourceItem.enriched_by,
+              enrichedFromBarcode: sourceItem.enriched_from_barcode,
+              missingImages: sourceItem.missing_images,
+              missingDescription: sourceItem.missing_description,
+              missingSpecs: sourceItem.missing_specs,
+              missingBrand: sourceItem.missing_brand,
             } as any,
           });
 
           // Copy photos if any
-          if (sourceItem.photoAsset && sourceItem.photoAsset.length > 0) {
-            await prisma.photoAsset.createMany({
-              data: sourceItem.photoAsset.map((photo: any, index: number) => ({
-                tenantId,
-                inventoryItemId: newItem.id,
+          if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
+            await prisma.photo_assets.createMany({
+              data: sourceItem.photo_assets.map((photo: any, index: number) => ({
+                id: generateQuickStart("photo_asset"),
+                tenant_id: tenantId,
+                inventory_item_id: newItem.id,
                 url: photo.url,
                 width: photo.width,
                 height: photo.height,
@@ -739,10 +741,10 @@ router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
     const { tenantId } = parsed.data;
 
     // Verify organization exists
-    const organization = await prisma.organization.findUnique({
+    const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
-        Tenant: true,
+        tenants: true,
       },
     });
 
@@ -751,7 +753,7 @@ router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
     }
 
     // Verify tenant belongs to this organization
-    const tenant = organization.Tenant.find(t => t.id === tenantId);
+    const tenant = organization.tenants.find(t => t.id === tenantId);
     if (!tenant) {
       return res.status(400).json({ 
         error: 'tenant_not_in_organization',
@@ -762,8 +764,8 @@ router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
     // Update all tenants in a single transaction - clear all hero flags and set the new one
     // Note: Use basePrisma for transactions to avoid retry wrapper issues
     await basePrisma.$transaction(
-      organization.Tenant.map(t => 
-        basePrisma.tenant.update({
+      organization.tenants.map(t => 
+        basePrisma.tenants.update({
           where: { id: t.id },
           data: {
             metadata: {
@@ -776,7 +778,7 @@ router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
     );
 
     // Get the updated tenant for response
-    const updatedTenant = await prisma.tenant.findUnique({
+    const updatedTenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
     });
 
@@ -796,10 +798,10 @@ router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
 router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
   try {
     // Verify organization exists
-    const organization = await prisma.organization.findUnique({
+    const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
-        Tenant: true,
+        tenants: true,
       },
     });
 
@@ -808,7 +810,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
     }
 
     // Find hero location
-    const heroTenant = organization.Tenant.find(t => {
+    const heroTenant = organization.tenants.find(t => {
       const metadata = t.metadata as any;
       return metadata?.isHeroLocation === true;
     });
@@ -821,9 +823,9 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
     }
 
     // Get all items from hero location
-    const heroItems = await prisma.inventoryItem.findMany({
-      where: { tenantId: heroTenant.id },
-      include: { photoAsset: true },
+    const heroItems = await prisma.inventory_items.findMany({
+      where: { tenant_id: heroTenant.id },
+      include: { photo_assets: true },
     });
 
     if (heroItems.length === 0) {
@@ -834,7 +836,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
     }
 
     // Get all other tenants (excluding hero)
-    const targetTenants = organization.Tenant.filter(t => t.id !== heroTenant.id);
+    const targetTenants = organization.tenants.filter(t => t.id !== heroTenant.id);
 
     if (targetTenants.length === 0) {
       return res.status(400).json({ 
@@ -854,9 +856,9 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
       for (const targetTenant of targetTenants) {
         try {
           // Check if SKU already exists for this tenant
-          const existing = await prisma.inventoryItem.findFirst({
+          const existing = await prisma.inventory_items.findFirst({
             where: {
-              tenantId: targetTenant.id,
+              tenant_id: targetTenant.id,
               sku: sourceItem.sku,
             },
           });
@@ -872,51 +874,52 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
           }
 
           // Create the item for this tenant
-          const newItem = await prisma.inventoryItem.create({
+          const newItem = await prisma.inventory_items.create({
             data: {
               id: generateItemId(),
-              tenantId: targetTenant.id,
+              tenant_id: targetTenant.id,
               sku: sourceItem.sku,
               name: sourceItem.name,
               title: sourceItem.title,
               brand: sourceItem.brand,
               description: sourceItem.description,
               price: sourceItem.price,
-              priceCents: sourceItem.priceCents,
+              price_cents: sourceItem.price_cents,
               stock: sourceItem.stock,
               quantity: sourceItem.quantity,
-              imageUrl: sourceItem.imageUrl, 
-              imageGallery: sourceItem.imageGallery,
-              marketingDescription: sourceItem.marketingDescription,
+              image_url: sourceItem.image_url, 
+              image_gallery: sourceItem.image_gallery,
+              marketing_description: sourceItem.marketing_description,
               metadata: sourceItem.metadata as any,
               availability: sourceItem.availability,
-              categoryPath: sourceItem.categoryPath,
+              category_path: sourceItem.category_path,
               condition: sourceItem.condition,
               currency: sourceItem.currency,
               gtin: sourceItem.gtin,
-              itemStatus: sourceItem.itemStatus,
+              item_status: sourceItem.item_status,
               mpn: sourceItem.mpn,
               visibility: sourceItem.visibility,
               manufacturer: sourceItem.manufacturer,
               source: sourceItem.source,
-              enrichmentStatus: sourceItem.enrichmentStatus,
-              enrichedAt: sourceItem.enrichedAt,
-              enrichedBy: sourceItem.enrichedBy,
-              enrichedFromBarcode: sourceItem.enrichedFromBarcode,
-              missingImages: sourceItem.missingImages,
-              missingDescription: sourceItem.missingDescription,
-              missingSpecs: sourceItem.missingSpecs,
-              missingBrand: sourceItem.missingBrand,
-              updatedAt: new Date(),
+              enrichment_status: sourceItem.enrichment_status,
+              enriched_at: sourceItem.enriched_at,
+              enriched_by: sourceItem.enriched_by,
+              enriched_from_barcode: sourceItem.enriched_from_barcode,
+              missing_images: sourceItem.missing_images,
+              missing_description: sourceItem.missing_description,
+              missing_specs: sourceItem.missing_specs,
+              missing_brand: sourceItem.missing_brand,
+              updated_at: new Date(),
             },
           });
 
           // Copy photos if any
-          if (sourceItem.photoAsset && sourceItem.photoAsset.length > 0) {
-            await prisma.photoAsset.createMany({
-              data: sourceItem.photoAsset.map((photo: any, index: number) => ({
-                tenantId: targetTenant.id,
-                inventoryItemId: newItem.id,
+          if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
+            await prisma.photo_assets.createMany({
+              data: sourceItem.photo_assets.map((photo: any, index: number) => ({
+                id: generatePhotoId(),
+                tenant_id: targetTenant.id,
+                inventory_item_id: newItem.id,
                 url: photo.url,
                 width: photo.width,
                 height: photo.height,
@@ -948,12 +951,12 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
 
     res.json({
       success: true,
-      heroLocation: {
+      hero_location: {
         tenantId: heroTenant.id,
         tenantName: heroTenant.name,
         itemCount: heroItems.length,
       },
-      targetLocations: targetTenants.length,
+      target_locations: targetTenants.length,
       results,
       summary: {
         totalOperations: heroItems.length * targetTenants.length,
@@ -969,3 +972,4 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
 });
 
 export default router;
+

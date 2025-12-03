@@ -20,7 +20,7 @@ router.get('/:productId/likes', async (req: Request, res: Response) => {
 
     // For now, we'll use a simple approach with a likes count in metadata
     // In production, you'd want a proper likes table with user tracking
-    const product = await prisma.inventoryItem.findUnique({
+    const product = await prisma.inventory_items.findUnique({
       where: { id: productId },
       select: {
         id: true,
@@ -60,7 +60,7 @@ router.post('/:productId/like', authenticateToken, async (req: Request, res: Res
     }
 
     // Check if product exists
-    const product = await prisma.inventoryItem.findUnique({
+    const product = await prisma.inventory_items.findUnique({
       where: { id: productId },
       select: { id: true, metadata: true },
     });
@@ -88,7 +88,7 @@ router.post('/:productId/like', authenticateToken, async (req: Request, res: Res
       metadata.likedBy.push(userId);
 
       // Update product metadata
-      await prisma.inventoryItem.update({
+      await prisma.inventory_items.update({
         where: { id: productId },
         data: {
           metadata: metadata,
@@ -122,7 +122,7 @@ router.delete('/:productId/like', authenticateToken, async (req: Request, res: R
     }
 
     // Check if product exists
-    const product = await prisma.inventoryItem.findUnique({
+    const product = await prisma.inventory_items.findUnique({
       where: { id: productId },
       select: { id: true, metadata: true },
     });
@@ -143,7 +143,7 @@ router.delete('/:productId/like', authenticateToken, async (req: Request, res: R
         metadata.likedBy.splice(userIndex, 1);
 
         // Update product metadata
-        await prisma.inventoryItem.update({
+        await prisma.inventory_items.update({
           where: { id: productId },
           data: {
             metadata: metadata,

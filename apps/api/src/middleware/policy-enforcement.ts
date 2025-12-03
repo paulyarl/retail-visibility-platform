@@ -158,16 +158,16 @@ export async function getComplianceReport(tenantId: string) {
     }
 
     // Get all items for tenant
-    const items = await prisma.inventoryItem.findMany({
-      where: { tenantId },
+    const items = await prisma.inventory_items.findMany({
+      where: { tenant_id: tenantId },
       select: {
         id: true,
         sku: true,
         name: true,
-        imageUrl: true,
+        image_url: true,
         currency: true,
         price: true,
-        priceCents: true,
+        price_cents: true,
         availability: true,
         visibility: true,
       },

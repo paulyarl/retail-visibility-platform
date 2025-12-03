@@ -12,21 +12,21 @@ import { prisma } from '../prisma';
 
 interface TierWithFeatures {
   id: string;
-  tierKey: string;
+  tier_key: string;
   name: string;
-  displayName: string;
-  priceMonthly: number;
-  maxSkus: number | null;
-  maxLocations: number | null;
-  tierType: string;
-  isActive: boolean;
-  sortOrder: number;
+  display_name: string;
+  price_monthly: number;
+  max_skus: number | null;
+  max_locations: number | null;
+  tier_type: string;
+  is_active: boolean;
+  sort_order: number;
   features: Array<{
     id: string;
-    featureKey: string;
-    featureName: string;
-    isEnabled: boolean;
-    isInherited: boolean;
+    feature_key: string;
+    feature_name: string;
+    is_enabled: boolean;
+    is_inherited: boolean;
   }>;
 }
 
@@ -47,11 +47,11 @@ async function loadTiers(): Promise<Map<string, TierWithFeatures>> {
   }
 
   // Load from database
-  const tiers = await prisma.subscriptionTier.findMany({
-    where: { isActive: true },
+  const tiers = await prisma.subscription_tiers_list.findMany({
+    where: { is_active: true },
     include: {
-      features: {
-        where: { isEnabled: true },
+      tier_features_list: {
+        where: { is_enabled: true },
       },
     },
   });
@@ -59,7 +59,7 @@ async function loadTiers(): Promise<Map<string, TierWithFeatures>> {
   // Build cache map
   const cache = new Map<string, TierWithFeatures>();
   for (const tier of tiers) {
-    cache.set(tier.tierKey, tier as unknown as TierWithFeatures);
+    cache.set(tier.tier_key, tier as unknown as TierWithFeatures);
   }
 
   tierCache = cache;
@@ -81,7 +81,7 @@ export async function getTierByKey(tierKey: string): Promise<TierWithFeatures | 
  */
 export async function getAllTiers(): Promise<TierWithFeatures[]> {
   const tiers = await loadTiers();
-  return Array.from(tiers.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+  return Array.from(tiers.values()).sort((a, b) => a.sort_order - b.sort_order);
 }
 
 /**
@@ -92,7 +92,7 @@ export async function checkTierFeatureAccess(tierKey: string, featureKey: string
   if (!tier) return false;
 
   // Check if feature exists in tier's features
-  return tier.features.some(f => f.featureKey === featureKey && f.isEnabled);
+  return tier.features.some(f => f.feature_key === featureKey && f.is_enabled);
 }
 
 /**
@@ -103,8 +103,8 @@ export async function getTierFeatures(tierKey: string): Promise<string[]> {
   if (!tier) return [];
 
   return tier.features
-    .filter(f => f.isEnabled)
-    .map(f => f.featureKey);
+    .filter(f => f.is_enabled)
+    .map(f => f.feature_key);
 }
 
 /**
@@ -114,7 +114,7 @@ export async function getTierSKULimit(tierKey: string): Promise<number> {
   const tier = await getTierByKey(tierKey);
   if (!tier) return 500; // Default to starter limit
   
-  return tier.maxSkus ?? Infinity;
+  return tier.max_skus ?? Infinity;
 }
 
 /**
@@ -124,7 +124,7 @@ export async function getTierPrice(tierKey: string): Promise<number> {
   const tier = await getTierByKey(tierKey);
   if (!tier) return 0;
   
-  return tier.priceMonthly / 100; // Convert cents to dollars
+  return tier.price_monthly / 100; // Convert cents to dollars
 }
 
 /**
@@ -132,7 +132,7 @@ export async function getTierPrice(tierKey: string): Promise<number> {
  */
 export async function getTierDisplayName(tierKey: string): Promise<string> {
   const tier = await getTierByKey(tierKey);
-  return tier?.displayName || tierKey;
+  return tier?.display_name || tierKey;
 }
 
 /**
@@ -146,14 +146,14 @@ export async function getMinimumTierForFeature(featureKey: string): Promise<stri
   let minPrice = Infinity;
 
   for (const tier of tiers) {
-    const hasFeature = tier.features.some(f => f.featureKey === featureKey && f.isEnabled);
-    if (hasFeature && tier.priceMonthly < minPrice) {
+    const hasFeature = tier.features.some(f => f.feature_key === featureKey && f.is_enabled);
+    if (hasFeature && tier.price_monthly < minPrice) {
       minTier = tier;
-      minPrice = tier.priceMonthly;
+      minPrice = tier.price_monthly;
     }
   }
 
-  return minTier?.tierKey || null;
+  return minTier?.tier_key || null;
 }
 
 /**
@@ -161,7 +161,7 @@ export async function getMinimumTierForFeature(featureKey: string): Promise<stri
  */
 export async function isValidTier(tierKey: string): Promise<boolean> {
   const tier = await getTierByKey(tierKey);
-  return tier !== null && tier.isActive;
+  return tier !== null && tier.is_active;
 }
 
 /**
@@ -169,7 +169,7 @@ export async function isValidTier(tierKey: string): Promise<boolean> {
  */
 export async function getValidTierKeys(): Promise<string[]> {
   const tiers = await getAllTiers();
-  return tiers.map(t => t.tierKey);
+  return tiers.map(t => t.tier_key);
 }
 
 /**
@@ -190,16 +190,16 @@ export async function checkTenantFeatureAccess(
 ): Promise<{ hasAccess: boolean; source: 'tier' | 'override' | 'none'; override?: any }> {
   try {
     // Get tenant with tier and overrides
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
-      select: {
-        subscriptionTier: true,
-        tenantFeatureOverrides: {
+      select: { 
+        subscription_tier: true,
+        tenant_feature_overrides_list: {
           where: {
             feature: featureKey,
             OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } },
+              { expires_at: null },
+              { expires_at: { gt: new Date() } },
             ],
           },
         },
@@ -211,7 +211,7 @@ export async function checkTenantFeatureAccess(
     }
 
     // 1. Check for active override first (highest priority)
-    const override = tenant.tenantFeatureOverrides[0];
+    const override = tenant.tenant_feature_overrides_list[0];
     if (override) {
       return {
         hasAccess: override.granted,
@@ -219,14 +219,14 @@ export async function checkTenantFeatureAccess(
         override: {
           id: override.id,
           reason: override.reason,
-          expires_at: override.expiresAt,
-          grantedBy: override.grantedBy,
+          expires_at: override.expires_at,
+          granted_by: override.granted_by,
         },
       };
     }
 
     // 2. Fall back to tier-based access
-    const tierKey = tenant.subscriptionTier || 'starter';
+    const tierKey = tenant.subscription_tier || 'starter';
     const tierAccess = await checkTierFeatureAccess(tierKey, featureKey);
 
     return {

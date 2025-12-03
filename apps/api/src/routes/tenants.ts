@@ -21,29 +21,29 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
     }
 
-    const tenants = await prisma.tenant.findMany({
+    const tenants = await prisma.tenants.findMany({
       select: {
         id: true,
         name: true,
-        organizationId: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        createdAt: true,
+        organization_id: true,
+        subscription_tier: true,
+        subscription_status: true,
+        created_at: true,
         _count: {
           select: {
-            inventoryItems: true,
-            userTenants: true,
+            inventory_items: true,
+            user_tenants: true,
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
     });
 
     // Transform for frontend compatibility
     const transformedTenants = tenants.map(tenant => ({
       id: tenant.id,
       name: tenant.name,
-      organizationId: tenant.organizationId,
+      organizationId: tenant.organization_id,
     }));
 
     res.json(transformedTenants);
@@ -65,19 +65,19 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id },
       select: {
         id: true,
         name: true,
-        organizationId: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        createdAt: true,
+        organization_id: true,
+        subscription_tier: true,
+        subscription_status: true,
+        created_at: true,
         _count: {
           select: {
-            inventoryItems: true,
-            userTenants: true,
+            inventory_items: true,
+            user_tenants: true,
           },
         },
       },
@@ -97,13 +97,13 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
     const transformedTenant = {
       id: tenant.id,
       name: tenant.name,
-      organizationId: tenant.organizationId,
-      subscriptionTier: tenant.subscriptionTier,
-      subscriptionStatus: tenant.subscriptionStatus,
-      createdAt: tenant.createdAt,
+      organizationId: tenant.organization_id,
+      subscriptionTier: tenant.subscription_tier,
+      subscriptionStatus: tenant.subscription_status,
+      createdAt: tenant.created_at,
       stats: {
-        productCount: tenant._count.inventoryItems,
-        userCount: tenant._count.userTenants,
+        productCount: tenant._count.inventory_items,
+        userCount: tenant._count.user_tenants,
       },
     };
 

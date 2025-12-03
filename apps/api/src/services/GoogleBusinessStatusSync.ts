@@ -85,18 +85,18 @@ export async function syncLocationStatusToGoogle(
 ): Promise<StatusSyncResult> {
   try {
     // Get tenant with Google Business Profile connection
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
-        googleBusinessAccessToken: true,
-        googleBusinessRefreshToken: true,
-        googleBusinessTokenExpiry: true,
-        googleOauthAccounts: { 
+        google_business_access_token: true,
+        google_business_refresh_token: true,
+        google_business_token_expiry: true,
+        google_oauth_accounts_list: { 
           include: {
-            gbpLocations: true,
-            googleOauthTokens: true,
+            gbp_locations_list: true,
+            google_oauth_tokens_list: true,
           },
           take: 1, // Get first connected account
         },
@@ -111,8 +111,8 @@ export async function syncLocationStatusToGoogle(
     }
 
     // Check if tenant has Google Business Profile connected
-    const googleAccount = tenant.googleOauthAccounts[0]; 
-    const gbpLocation = googleAccount?.gbpLocations[0];
+    const googleAccount = tenant.google_oauth_accounts_list[0]; 
+    const gbpLocation = googleAccount?.gbp_locations_list[0];
 
     if (!gbpLocation) {
       return {
@@ -134,7 +134,7 @@ export async function syncLocationStatusToGoogle(
     }
 
     // Get access token (prefer OAuth token, fallback to legacy)
-    const accessToken = googleAccount?.googleOauthTokens?.accessTokenEncrypted || tenant.googleBusinessAccessToken;
+    const accessToken = googleAccount?.google_oauth_tokens_list?.access_token_encrypted || tenant.google_business_access_token;
 
     if (!accessToken) {
       return {
@@ -145,7 +145,7 @@ export async function syncLocationStatusToGoogle(
 
     // Check if token is expired
     const now = new Date();
-    const tokenExpiry = googleAccount?.googleOauthTokens?.expiresAt || tenant.googleBusinessTokenExpiry;
+    const tokenExpiry = googleAccount?.google_oauth_tokens_list?.expires_at || tenant.google_business_token_expiry;
     
     if (tokenExpiry && new Date(tokenExpiry) < now) {
       // Token expired - would need to refresh
@@ -160,7 +160,7 @@ export async function syncLocationStatusToGoogle(
     // Make API call to Google My Business API
     // Note: accessTokenEncrypted would need to be decrypted in production
     const response = await fetch(
-      `https://mybusinessbusinessinformation.googleapis.com/v1/${gbpLocation.locationId}?updateMask=openInfo`,
+      `https://mybusinessbusinessinformation.googleapis.com/v1/${gbpLocation.location_id}?updateMask=openInfo`,
       {
         method: 'PATCH',
         headers: {

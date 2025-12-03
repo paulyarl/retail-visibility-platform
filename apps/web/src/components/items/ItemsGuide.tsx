@@ -343,6 +343,100 @@ export default function ItemsGuide() {
                 </div>
               </section>
 
+              {/* Clone Products Feature - NEW */}
+              <section className="relative">
+                <div className="absolute -top-3 -left-3">
+                  <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg animate-pulse">
+                    🆕 NEW FEATURE
+                  </div>
+                </div>
+                
+                <div className="border-2 border-indigo-200 dark:border-indigo-800 rounded-xl p-6 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-900/20 dark:via-purple-900/20 dark:to-pink-900/20">
+                  <h4 className="text-lg font-bold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-center text-white text-sm font-bold shadow-lg">📋</span>
+                    Clone Products to Create Variants
+                  </h4>
+                  
+                  <div className="ml-10 space-y-4 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
+                    <p className="text-sm font-medium text-neutral-900 dark:text-white">
+                      Create product variants in <strong className="text-indigo-600 dark:text-indigo-400">one click</strong> - perfect for sizes, colors, or package variations!
+                    </p>
+                    
+                    <div className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
+                      <p className="font-semibold text-sm text-neutral-900 dark:text-white mb-3">
+                        🎯 What Clone Does:
+                      </p>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                            <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">✓</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-neutral-900 dark:text-white">Copies All Data</p>
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400">Images, descriptions, category, pricing structure, branding - everything!</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center">
+                            <span className="text-purple-600 dark:text-purple-400 font-bold text-sm">✓</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-neutral-900 dark:text-white">Auto-Generates New SKU</p>
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400">Creates unique SKU like "WIDGET-123-V789456" to avoid conflicts</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-pink-100 dark:bg-pink-900/40 flex items-center justify-center">
+                            <span className="text-pink-600 dark:text-pink-400 font-bold text-sm">✓</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-neutral-900 dark:text-white">Starts as Draft</p>
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400">Cloned product is inactive/private - customize before publishing</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
+                      <p className="font-semibold text-sm text-indigo-900 dark:text-indigo-100 mb-2">
+                        💡 Perfect For Creating:
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                          <span className="text-neutral-700 dark:text-neutral-300">Size variants (S, M, L, XL)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-purple-500" />
+                          <span className="text-neutral-700 dark:text-neutral-300">Color variants (Red, Blue, Green)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-pink-500" />
+                          <span className="text-neutral-700 dark:text-neutral-300">Package sizes (Single, 3-pack, 12-pack)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                          <span className="text-neutral-700 dark:text-neutral-300">Editions (Standard, Premium, Deluxe)</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3">
+                      <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <div className="text-sm text-indigo-900 dark:text-indigo-100">
+                        <p className="font-semibold mb-1">How to Use</p>
+                        <p>Look for the <strong className="text-indigo-600 dark:text-indigo-400">Clone</strong> button (indigo/purple gradient) on each product card. Click it, and the variant is created instantly with all data preserved!</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
               {/* CSV Bulk Import Guide - NEW */}
               <section className="relative">
                 <div className="border-2 border-green-200 dark:border-green-800 rounded-xl p-6 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-green-900/20 dark:via-emerald-900/20 dark:to-teal-900/20">

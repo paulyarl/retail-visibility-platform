@@ -31,11 +31,11 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
     const itemId = req.params.id;
 
     // verify item exists & get tenant
-    const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+    const item = await prisma.inventory_items.findUnique({ where: { id: itemId } });
     if (!item) return res.status(404).json({ error: "item not found" });
 
     // Enforce 11-photo limit
-    const existingCount = await prisma.photoAsset.count({ where: { inventoryItemId: item.id } }); 
+    const existingCount = await prisma.photo_assets.count({ where: { inventory_item_id: item.id } }); 
     if (existingCount >= 11) {
       return res.status(400).json({ error: "maximum 11 photos per item" });
     }
@@ -55,7 +55,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
         return res.status(500).json({ error: "server is not configured for direct uploads (missing SUPABASE envs)" });
       }
       const f = req.file; // buffer + mimetype + originalname
-      const path = `${item.tenantId}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
+      const path = `${item.tenant_id}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
 
       const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(path, f.buffer, {
         cacheControl: "3600",
@@ -91,7 +91,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
         
         const ext = mimeType.split('/')[1] || 'jpg';
         const filename = `${Date.now()}.${ext}`;
-        const path = `${item.tenantId}/${item.sku || item.id}/${filename}`;
+        const path = `${item.tenant_id}/${item.sku || item.id}/${filename}`;
         
         const { error: uploadError, data: uploadData } = await supabase.storage
           .from(StorageBuckets.PHOTOS.name)
@@ -126,24 +126,24 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
     if (!url) return res.status(400).json({ error: "missing image; provide multipart 'file', JSON 'url', or JSON 'dataUrl'" });
 
     // Find next available position (max + 1, or 0 if first)
-    const maxPos = await prisma.photoAsset.findFirst({
-      where: { inventoryItemId: item.id },
+    const maxPos = await prisma.photo_assets.findFirst({
+      where: { inventory_item_id: item.id },
       orderBy: { position: 'desc' },
       select: { position: true },
     });
     const nextPosition = maxPos ? maxPos.position + 1 : 0;
 
-    const created = await prisma.photoAsset.create({
+    const created = await prisma.photo_assets.create({
       data: {
         id: generateQuickStart("photo"),
-        tenantId: item.tenantId,
-        inventoryItemId: item.id,
+        tenant_id: item.tenant_id,
+        inventory_item_id: item.id,
         url,
         width: width ?? null,
         height: height ?? null,
-        contentType: contentType ?? null,
+        content_type: contentType ?? null,
         bytes: bytes ?? null,
-        exifRemoved: exifRemoved,
+        exif_removed: exifRemoved,
         position: nextPosition,
         alt: alt ?? null,
         caption: caption ?? null,
@@ -152,7 +152,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
 
     // Update item's image_url to primary photo (position 0)
     if (nextPosition === 0) {
-      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
+      await prisma.inventory_items.update({ where: { id: item.id }, data: { image_url: url } });
     }
 
     return res.status(201).json(created);
@@ -164,11 +164,11 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
 
 /** GET /items/:id/photos — list photos for an item, ordered by position */
 r.get("/items/:id/photos", async (req, res) => {
-  const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
+  const item = await prisma.inventory_items.findUnique({ where: { id: req.params.id } });
   if (!item) return res.status(404).json({ error: "item not found" });
 
-  const photos = await prisma.photoAsset.findMany({
-    where: { inventoryItemId: item.id },
+  const photos = await prisma.photo_assets.findMany({
+    where: { inventory_item_id: item.id },
     orderBy: { position: "asc" },
   });
   res.json(photos);
@@ -181,37 +181,37 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
     const { alt, caption, position } = req.body || {};
 
     // Verify item exists
-    const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+    const item = await prisma.inventory_items.findUnique({ where: { id: itemId } });
     if (!item) {
       return res.status(404).json({ error: "item not found" });
     }
 
     // Verify photo exists and belongs to this item
-    const photo = await prisma.photoAsset.findUnique({ where: { id: photoId } });
-    if (!photo || photo.inventoryItemId !== itemId) {
+    const photo = await prisma.photo_assets.findUnique({ where: { id: photoId } });
+    if (!photo || photo.inventory_item_id !== itemId) {
       return res.status(404).json({ error: "photo not found" });
     }
 
     // If position is changing, handle swap/reorder
     if (position !== undefined && position !== photo.position) {
       // Find photo at target position (if any)
-      const targetPhoto = await prisma.photoAsset.findFirst({
-        where: { inventoryItemId: itemId, position },
+      const targetPhoto = await prisma.photo_assets.findFirst({
+        where: { inventory_item_id: itemId, position },
       });
 
       // Use sequential updates to avoid Prisma transaction tracing issues
-      // The unique constraint on [inventoryItemId, position] requires careful ordering
+      // The unique constraint on [inventory_item_id, position] requires careful ordering
       try {
         if (targetPhoto) {
           // Step 1: Move target photo to a temporary position (-1)
-          await prisma.photoAsset.update({
+          await prisma.photo_assets.update({
             where: { id: targetPhoto.id },
             data: { position: -1 },
           });
         }
 
         // Step 2: Move this photo to target position
-        await prisma.photoAsset.update({
+        await prisma.photo_assets.update({
           where: { id: photoId },
           data: {
             position,
@@ -222,7 +222,7 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
 
         if (targetPhoto) {
           // Step 3: Move target photo to this photo's old position
-          await prisma.photoAsset.update({
+          await prisma.photo_assets.update({
             where: { id: targetPhoto.id },
             data: { position: photo.position },
           });
@@ -236,16 +236,16 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
       }
 
       // Refetch the updated photo to ensure we return the committed state
-      const updated = await prisma.photoAsset.findUnique({ where: { id: photoId } });
+      const updated = await prisma.photo_assets.findUnique({ where: { id: photoId } });
       if (!updated) {
         return res.status(500).json({ error: "photo update failed" });
       }
 
       // Update item image_url if primary changed
       if (position === 0) {
-        await prisma.inventoryItem.update({
+        await prisma.inventory_items.update({
           where: { id: itemId },
-          data: { imageUrl: updated.url },
+          data: { image_url: updated.url },
         });
       }
 
@@ -253,7 +253,7 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
     }
 
     // No position change, just update alt/caption
-    const updated = await prisma.photoAsset.update({
+    const updated = await prisma.photo_assets.update({
       where: { id: photoId },
       data: {
         ...(alt !== undefined && { alt }),
@@ -279,13 +279,13 @@ r.put("/items/:id/photos/reorder", async (req, res) => {
     }
 
     // Verify item exists
-    const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+    const item = await prisma.inventory_items.findUnique({ where: { id: itemId } });
     if (!item) return res.status(404).json({ error: "item not found" });
 
     // Verify all photos belong to this item
     const photoIds = updates.map(u => u.id);
-    const photos = await prisma.photoAsset.findMany({
-      where: { id: { in: photoIds }, inventoryItemId: itemId },
+    const photos = await prisma.photo_assets.findMany({
+      where: { id: { in: photoIds }, inventory_item_id: itemId },
     });
 
     if (photos.length !== photoIds.length) {
@@ -295,7 +295,7 @@ r.put("/items/:id/photos/reorder", async (req, res) => {
     // Update positions in transaction
     await prisma.$transaction(
       updates.map(({ id, position }) =>
-        prisma.photoAsset.update({
+        prisma.photo_assets.update({
           where: { id },
           data: { position },
         })
@@ -303,13 +303,13 @@ r.put("/items/:id/photos/reorder", async (req, res) => {
     );
 
     // Update item image_url to primary (position 0)
-    const primary = await prisma.photoAsset.findFirst({
-      where: { inventoryItemId: itemId, position: 0 },
+    const primary = await prisma.photo_assets.findFirst({
+      where: { inventory_item_id: itemId, position: 0 },
     });
     if (primary) {
-      await prisma.inventoryItem.update({
+      await prisma.inventory_items.update({
         where: { id: itemId },
-        data: { imageUrl: primary.url },
+        data: { image_url: primary.url },
       });
     }
 
@@ -326,12 +326,12 @@ r.delete("/items/:id/photos/:photoId", async (req, res) => {
     const { id: itemId, photoId } = req.params;
 
     // Verify item exists
-    const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+    const item = await prisma.inventory_items.findUnique({ where: { id: itemId } });
     if (!item) return res.status(404).json({ error: "item not found" });
 
     // Verify photo exists and belongs to this item
-    const photo = await prisma.photoAsset.findUnique({ where: { id: photoId } });
-    if (!photo || photo.inventoryItemId !== itemId) {
+    const photo = await prisma.photo_assets.findUnique({ where: { id: photoId } });
+    if (!photo || photo.inventory_item_id !== itemId) {
       return res.status(404).json({ error: "photo not found" });
     }
 
@@ -351,18 +351,18 @@ r.delete("/items/:id/photos/:photoId", async (req, res) => {
     }
 
     // Delete photo from DB
-    await prisma.photoAsset.delete({ where: { id: photoId } });
+    await prisma.photo_assets.delete({ where: { id: photoId } });
 
     // Re-pack positions: get all remaining photos and reassign positions 0, 1, 2...
-    const remaining = await prisma.photoAsset.findMany({
-      where: { inventoryItemId: itemId },
+    const remaining = await prisma.photo_assets.findMany({
+      where: { inventory_item_id: itemId },
       orderBy: { position: "asc" },
     });
 
     if (remaining.length > 0) {
       await prisma.$transaction(
         remaining.map((p, idx) =>
-          prisma.photoAsset.update({
+          prisma.photo_assets.update({
             where: { id: p.id },
             data: { position: idx },
           })
@@ -370,15 +370,15 @@ r.delete("/items/:id/photos/:photoId", async (req, res) => {
       );
 
       // Update item image_url to new primary (position 0)
-      await prisma.inventoryItem.update({
+      await prisma.inventory_items.update({
         where: { id: itemId },
-        data: { imageUrl: remaining[0].url }, 
+        data: { image_url: remaining[0].url }, 
       });
     } else {
       // No photos left, clear image_url
-      await prisma.inventoryItem.update({
+      await prisma.inventory_items.update({
         where: { id: itemId },
-        data: { imageUrl: null },
+        data: { image_url: null },
       });
     }
 

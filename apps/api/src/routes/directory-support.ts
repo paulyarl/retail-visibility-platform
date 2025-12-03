@@ -33,13 +33,13 @@ router.get('/tenant/:tenantId/status', authenticateToken, requireSupportAccess, 
     const { tenantId } = req.params;
 
     // Get tenant
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
+        subscription_tier: true,
+        subscription_status: true,
       },
     });
 
@@ -48,25 +48,25 @@ router.get('/tenant/:tenantId/status', authenticateToken, requireSupportAccess, 
     }
 
     // Get directory settings
-    const settings = await prisma.directorySettings.findUnique({
-      where: { tenantId },
+    const settings = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenantId },
     });
 
     // Get business profile
-    const profile = await prisma.tenantBusinessProfile.findUnique({
-      where: { tenantId },
+    const profile = await prisma.tenant_business_profiles_list.findUnique({
+      where: { tenant_id: tenantId },
     });
 
     // Get item count
-    const itemCount = await prisma.inventoryItem.count({
-      where: { tenantId, itemStatus: 'active' },
+    const itemCount = await prisma.inventory_items.count({
+      where: { tenant_id: tenantId, item_status: 'active' },
     });
 
     // Check if featured
-    const activeFeatured = await prisma.directoryFeaturedListings.findFirst({
+    const activeFeatured = await prisma.directory_featured_listings_list.findFirst({
       where: {
-        tenantId,
-        featuredUntil: { gt: new Date() },
+        tenant_id: tenantId,
+        featured_until: { gt: new Date() },
       },
     });
 
@@ -76,7 +76,7 @@ router.get('/tenant/:tenantId/status', authenticateToken, requireSupportAccess, 
       profile,
       itemCount,
       isFeatured: !!activeFeatured,
-      featuredUntil: activeFeatured?.featuredUntil,
+      featuredUntil: activeFeatured?.featured_until,
     });
   } catch (error: any) {
     console.error('[GET /support/directory/tenant/:tenantId/status] Error:', error);
@@ -92,29 +92,29 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
   try {
     const { tenantId } = req.params;
 
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenantId } });
     if (!tenant) {
       return res.status(404).json({ error: 'tenant_not_found' });
     }
 
-    const profile = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } });
-    const settings = await prisma.directorySettings.findUnique({ where: { tenantId } });
-    const itemCount = await prisma.inventoryItem.count({
-      where: { tenantId, itemStatus: 'active' },
+    const profile = await prisma.tenant_business_profiles_list.findUnique({ where: { tenant_id: tenantId } });
+    const settings = await prisma.directory_settings_list.findUnique({ where: { tenant_id: tenantId } });
+    const itemCount = await prisma.inventory_items.count({
+      where: { tenant_id: tenantId, item_status: 'active' },
     });
 
     // Calculate completeness
     const checks = {
-      business_name: !!profile?.businessName,
-      address: !!profile?.businessLine1,
+      business_name: !!profile?.business_name,
+      address: !!profile?.address_line1,
       cityState: !!(profile?.city && profile?.state),
-      phone: !!profile?.phoneNumber,
+      phone: !!profile?.phone_number,
       email: !!profile?.email,
       website: !!profile?.website,
-      logo: !!profile?.logoUrl,
+      logo: !!profile?.logo_url,
       hours: !!profile?.hours,
-      description: !!(settings?.seoDescription && settings.seoDescription.length > 100),
-      category: !!settings?.primaryCategory,
+      description: !!(settings?.seo_description && settings.seo_description.length > 100),
+      category: !!settings?.primary_category,
       hasItems: itemCount > 0,
       hasMultipleItems: itemCount > 10,
     };
@@ -159,9 +159,9 @@ router.get('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, a
   try {
     const { tenantId } = req.params;
 
-    const notes = await prisma.directorySupportNotes.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
+    const notes = await prisma.directory_support_notes_list.findMany({
+      where: { tenant_id: tenantId },
+      orderBy: { created_at: 'desc' },
     });
 
     return res.json({ notes });
@@ -185,11 +185,11 @@ router.post('/tenant/:tenantId/add-note', authenticateToken, requireSupportAcces
     }
 
     const user = (req as any).user;
-    const note = await prisma.directorySupportNotes.create({
+    const note = await prisma.directory_support_notes_list.create({
       data: {
-        tenantId,
+        tenant_id: tenantId,
         note: parsed.data.note,
-        createdBy: user.userId,
+        created_by: user.user_id,
       } as any,
     });
 
@@ -215,7 +215,7 @@ router.get('/search', authenticateToken, requireSupportAccess, async (req: Reque
     const searchTerm = q.toLowerCase();
 
     // Search tenants by name or ID
-    const tenants = await prisma.tenant.findMany({
+    const tenants = await prisma.tenants.findMany({
       where: {
         OR: [
           { id: { contains: searchTerm, mode: 'insensitive' } },
@@ -226,17 +226,17 @@ router.get('/search', authenticateToken, requireSupportAccess, async (req: Reque
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        directorySettings: {
+        subscription_tier: true,
+        subscription_status: true,
+        directory_settings_list: {
           select: {
-            isPublished: true,
-            isFeatured: true,
+            is_published: true,
+            is_featured: true,
           },
         },
-        tenantBusinessProfile: {
+        tenant_business_profiles_list: {
           select: {
-            businessName: true,
+            business_name: true,
             city: true,
             state: true,
           },

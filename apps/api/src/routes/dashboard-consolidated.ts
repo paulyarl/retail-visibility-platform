@@ -22,28 +22,28 @@ router.get('/dashboard/consolidated/:tenantId', authenticateToken, checkTenantAc
     // Fetch all data in parallel
     const [tenant, itemCounts] = await Promise.all([
       // 1. Tenant info with organization (for tier calculation)
-      prisma.tenant.findUnique({
+      prisma.tenants.findUnique({
         where: { id: tenantId },
         select: {
           id: true,
           name: true,
           metadata: true,
-          locationStatus: true,
-          reopeningDate: true,
-          subscriptionTier: true,
-          subscriptionStatus: true,
-          trialEndsAt: true,
-          subscriptionEndsAt: true,
-          organizationId: true,
-          monthlySkuQuota: true,
-          skusAddedThisMonth: true,
-          organization: {
+          location_status: true,
+          reopening_date: true,
+          subscription_tier: true,
+          subscription_status: true,
+          trial_ends_at: true,
+          subscription_ends_at: true,
+          organization_id: true,
+          monthly_sku_quota: true,
+          skus_added_this_month: true,
+          organizations_list: {
             select: {
               id: true,
               name: true,
-              subscriptionTier: true,
+              subscription_tier: true,
               _count: {
-                select: { Tenant: true }
+                select: { tenants: true }
               }
             }
           }
@@ -52,14 +52,14 @@ router.get('/dashboard/consolidated/:tenantId', authenticateToken, checkTenantAc
       
       // 2. Item counts (all in parallel)
       Promise.all([
-        prisma.inventoryItem.count({ where: { tenantId } }),
-        prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'active' } }),
-        prisma.inventoryItem.count({
+        prisma.inventory_items.count({ where: { tenant_id: tenantId } }),
+        prisma.inventory_items.count({ where: { tenant_id: tenantId, item_status: 'active' } }),
+        prisma.inventory_items.count({
           where: {
-            tenantId,
-            itemStatus: 'active',
+            tenant_id: tenantId,
+            item_status: 'active',
             OR: [
-              { directoryCategoryId: null },
+              { directory_category_id: null },
               { visibility: 'private' },
             ],
           },
@@ -74,20 +74,20 @@ router.get('/dashboard/consolidated/:tenantId', authenticateToken, checkTenantAc
     const [totalItems, activeItems, syncIssues] = itemCounts;
 
     // Calculate tier info (from tenant-tier.ts logic)
-    const effectiveTier = tenant.organization?.subscriptionTier || tenant.subscriptionTier || 'starter';
-    const isChain = tenant.organization ? tenant.organization._count.Tenant > 1 : false;
-    const tenantTierData = tenant.subscriptionTier ? await TierService.getTierByKey(tenant.subscriptionTier) : null;
-    const orgTierData = tenant.organization?.subscriptionTier ? await TierService.getTierByKey(tenant.organization.subscriptionTier) : null;
+    const effectiveTier = tenant.organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
+    const isChain = tenant.organizations_list ? tenant.organizations_list._count.tenants > 1 : false;
+    const tenantTierData = tenant.subscription_tier ? await TierService.getTierByKey(tenant.subscription_tier) : null;
+    const orgTierData = tenant.organizations_list?.subscription_tier ? await TierService.getTierByKey(tenant.organizations_list.subscription_tier) : null;
 
     // Calculate usage info (from tenant-tier.ts usage endpoint logic)
-    const skuLimit = tenant.monthlySkuQuota || 500;
+    const skuLimit = tenant.monthly_sku_quota || 500;
     const skuUsage = totalItems;
     const skuPercentage = Math.round((skuUsage / skuLimit) * 100);
 
     // Count tenant's owned locations for location usage
-    const ownedTenants = await prisma.userTenant.count({
+    const ownedTenants = await prisma.user_tenants.count({
       where: {
-        userId: (req as any).user?.userId,
+        user_id: (req as any).user?.userId,
         role: 'OWNER',
       },
     });
@@ -100,7 +100,7 @@ router.get('/dashboard/consolidated/:tenantId', authenticateToken, checkTenantAc
 
     // Add location status info
     const { getLocationStatusInfo } = await import('../utils/location-status');
-    const statusInfo = getLocationStatusInfo(tenant.locationStatus as any);
+    const statusInfo = getLocationStatusInfo(tenant.location_status as any);
 
     // Consolidated response
     res.json({
@@ -109,8 +109,8 @@ router.get('/dashboard/consolidated/:tenantId', authenticateToken, checkTenantAc
         name: tenant.name,
         logoUrl: (tenant.metadata as any)?.logo_url,
         bannerUrl: (tenant.metadata as any)?.banner_url,
-        locationStatus: tenant.locationStatus,
-        reopeningDate: tenant.reopeningDate,
+        locationStatus: tenant.location_status,
+        reopeningDate: tenant.reopening_date,
         statusInfo,
       },
       stats: {
@@ -123,13 +123,13 @@ router.get('/dashboard/consolidated/:tenantId', authenticateToken, checkTenantAc
         tenant_id: tenant.id,
         tenantName: tenant.name,
         tier: effectiveTier,
-        subscription_status: tenant.subscriptionStatus,
-        trialEndsAt: tenant.trialEndsAt,
-        subscription_ends_at: tenant.subscriptionEndsAt,
+        subscription_status: tenant.subscription_status,
+        trialEndsAt: tenant.trial_ends_at,
+        subscription_ends_at: tenant.subscription_ends_at,
         isChain,
-        organizationId: tenant.organizationId,
-        organizationName: tenant.organization?.name,
-        organizationTier: tenant.organization?.subscriptionTier,
+        organizationId: tenant.organization_id,
+        organizationName: tenant.organizations_list?.name,
+        organizationTier: tenant.organizations_list?.subscription_tier,
         tenantTier: tenantTierData,
         organizationTierData: orgTierData,
       },

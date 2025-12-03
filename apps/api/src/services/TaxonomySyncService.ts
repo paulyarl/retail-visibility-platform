@@ -9,9 +9,9 @@ function collectNodes(nodes: any[]): any[] {
     const parentId = node.path?.length > 1 ? node.path[node.path.length - 2] : null;
     const level = node.path?.length || 1;
     out.push({
-      categoryId: id,
-      categoryPath: node.path.join(' > '),
-      parentId,
+      category_id: id,
+      category_path: node.path.join(' > '),
+      parent_id: parentId,
       level,
     });
     // Taxonomy is flat - no children property
@@ -35,26 +35,26 @@ async function upsertInBatches(items: any[], batchSize = 200) {
     try {
       // Process items individually to avoid transaction issues
       for (const item of batch) {
-        await prisma.googleTaxonomy.upsert({
-          where: { categoryId: item.categoryId },
+        await prisma.google_taxonomy_list.upsert({
+          where: { category_id: item.category_id },
           create: {
-            id: item.categoryId, // Use categoryId as the id
-            categoryId: item.categoryId,
-            categoryPath: item.categoryPath,
-            parentId: item.parentId,
+            id: item.category_id, // Use categoryId as the id
+            category_id: item.category_id,
+            category_path: item.category_path,
+            parent_id: item.parent_id,
             level: item.level,
-            isActive: true,
+            is_active: true,
             version: '2024-09',
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            created_at: new Date(),
+            updated_at: new Date(),
           },
           update: {
-            categoryPath: item.categoryPath,
-            parentId: item.parentId,
+            category_path: item.category_path,
+            parent_id: item.parent_id,
             level: item.level,
-            isActive: true,
+            is_active: true,
             version: '2024-09',
-            updatedAt: new Date(),
+            updated_at: new Date(),
           },
         });
       }
@@ -138,7 +138,7 @@ export class TaxonomySyncService {
       await upsertInBatches(flat, 200);
       
       console.log('[TaxonomySyncService] applySafeUpdates: Counting total records after sync...');
-      const total = await prisma.googleTaxonomy.count();
+      const total = await prisma.google_taxonomy_list.count();
       console.log(`[TaxonomySyncService] applySafeUpdates: Total records after sync: ${total}`);
       
       console.log('[TaxonomySyncService] applySafeUpdates: Sync completed successfully');
@@ -275,11 +275,11 @@ export class TaxonomySyncService {
     try {
       console.log('[TaxonomySyncService] getCurrentTaxonomy: Querying database for current taxonomy...');
       // Fetch current taxonomy from database
-      const current = await prisma.googleTaxonomy.findMany({
+      const current = await prisma.google_taxonomy_list.findMany({
         select: {
-          categoryId: true,
-          categoryPath: true,
-          parentId: true,
+          category_id: true,
+          category_path: true,
+          parent_id: true,
           level: true,
           version: true
         }

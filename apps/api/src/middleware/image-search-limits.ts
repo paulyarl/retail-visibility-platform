@@ -45,11 +45,11 @@ export async function checkImageSearchLimit(
     // Get tenant to check tier
     let tier = 'starter'; // Default
     if (tenantId) {
-      const tenant = await prisma.tenant.findUnique({
+      const tenant = await prisma.tenants.findUnique({
         where: { id: tenantId },
-        select: { subscriptionTier: true },
+        select: { subscription_tier: true },
       });
-      tier = tenant?.subscriptionTier || 'starter';
+      tier = tenant?.subscription_tier || 'starter';
     }
 
     // Get rate limit for this tier

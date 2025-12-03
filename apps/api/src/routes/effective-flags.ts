@@ -10,7 +10,7 @@ console.log('[Effective Flags Router] Initializing routes...')
 // GET /api/admin/effective-flags - list effective platform flags (platform user_tenants: admin/support/viewer)
 router.get('/effective-flags', requirePlatformUser, async (_req, res) => {
   try {
-    const rows = await prisma.platformFeatureFlags.findMany({ orderBy: { flag: 'asc' } })
+    const rows = await prisma.platform_feature_flags_list.findMany({ orderBy: { flag: 'asc' } })
     const flags: string[] = [...new Set(rows.map(r => r.flag as string))]
     const effective = await Promise.all(flags.map(f => getEffectivePlatform(f)))
     res.json({ success: true, data: effective })
@@ -29,8 +29,8 @@ router.get('/effective-flags/:tenantId', checkTenantAccess, async (req, res) => 
 
     // Collect flags from platform and tenant scopes
     const [platform, tenant] = await Promise.all([
-      prisma.platformFeatureFlags.findMany({ orderBy: { flag: 'asc' } }),
-      prisma.tenantFeatureFlags.findMany({ where: { tenantId }, orderBy: { flag: 'asc' } }),
+      prisma.platform_feature_flags_list.findMany({ orderBy: { flag: 'asc' } }),
+      prisma.tenant_feature_flags_list.findMany({ where: { tenant_id: tenantId }, orderBy: { flag: 'asc' } }),
     ])
     const allFlags = new Set([...platform.map(p => p.flag as string), ...tenant.map(t => t.flag as string)])
     const effective = await Promise.all(Array.from(allFlags).sort().map(f => getEffectiveTenant(f, tenantId)))

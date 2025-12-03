@@ -16,8 +16,8 @@ const GBP_INSIGHTS_API = 'https://mybusinessaccountmanagement.googleapis.com/v1'
  */
 async function getValidAccessToken(account_id: string): Promise<string | null> {
   try {
-    const tokenRecord = await prisma.googleOauthTokens.findUnique({
-      where: { accountId: account_id },
+    const tokenRecord = await prisma.google_oauth_tokens_list.findUnique({
+      where: { account_id: account_id },
     });
 
     if (!tokenRecord) {
@@ -27,10 +27,10 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
 
     // Check if token is expired
     const now = new Date();
-    if (tokenRecord.expiresAt <= now) {
+    if (tokenRecord.expires_at <= now) {
       console.log('[GBP] Token expired, refreshing...');
       
-      const refreshToken = decryptToken(tokenRecord.refreshTokenEncrypted);
+      const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
       const newTokens = await refreshAccessToken(refreshToken);
       
       if (!newTokens) {
@@ -39,20 +39,20 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
       }
 
       const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-      await prisma.googleOauthTokens.update({
-        where: { accountId: account_id }, 
+      await prisma.google_oauth_tokens_list.update({
+        where: { account_id: account_id }, 
         data: {
-          accessTokenEncrypted: encryptToken(newTokens.access_token),
-          expiresAt: newExpiresAt,
+          access_token_encrypted: encryptToken(newTokens.access_token),
+          expires_at: newExpiresAt,
           scopes: newTokens.scope.split(' '),
-          updatedAt: new Date(),
+          updated_at: new Date(),
         },
       });
 
       return newTokens.access_token;
     }
 
-    return decryptToken(tokenRecord.accessTokenEncrypted);
+    return decryptToken(tokenRecord.access_token_encrypted);
   } catch (error) {
     console.error('[GBP] Error getting valid token:', error);
     return null;
@@ -175,39 +175,39 @@ export async function syncLocation(
     const address = locationData.storefrontAddress;
     const phone = locationData.phoneNumbers?.primaryPhone;
 
-    await prisma.gbpLocations.upsert({
+    await prisma.gbp_locations_list.upsert({
       where: {
-        accountId_locationId: { 
-          accountId: account_id,
-          locationId: locationId,
+        account_id_location_id: { 
+          account_id: account_id,
+          location_id: locationId,
         },
       },
       create: {
         id: `gbp_loc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        accountId: account_id,
-        locationId: locationId,
-        locationName: locationData.title,
-        storeCode: locationData.storeCode,
+        account_id: account_id,
+        location_id: locationId,
+        location_name: locationData.title,
+        store_code: locationData.storeCode,
         address: address ? formatAddress(address) : null,
-        phoneNumber: phone,
-        websiteUrl: locationData.websiteUri,
+        phone_number: phone,
+        website_url: locationData.websiteUri,
         category: locationData.categories?.primaryCategory?.displayName,
-        isVerified: locationData.metadata?.hasVoiceOfMerchant || false,
-        isPublished: !locationData.metadata?.duplicate,
-        lastFetchedAt: new Date(),
-        updatedAt: new Date(),
+        is_verified: locationData.metadata?.hasVoiceOfMerchant || false,
+        is_published: !locationData.metadata?.duplicate,
+        last_fetched_at: new Date(),
+        updated_at: new Date(), 
       },
       update: {
-        locationName: locationData.title,
-        storeCode: locationData.storeCode,
+        location_name: locationData.title,
+        store_code: locationData.storeCode,
         address: address ? formatAddress(address) : null,
-        phoneNumber: phone,
-        websiteUrl: locationData.websiteUri,
+        phone_number: phone,
+        website_url: locationData.websiteUri,
         category: locationData.categories?.primaryCategory?.displayName,
-        isVerified: locationData.metadata?.hasVoiceOfMerchant || false,
-        isPublished: !locationData.metadata?.duplicate,
-        lastFetchedAt: new Date(),
-        updatedAt: new Date(),
+        is_verified: locationData.metadata?.hasVoiceOfMerchant || false,
+        is_published: !locationData.metadata?.duplicate,
+        last_fetched_at: new Date(),
+        updated_at: new Date(),
       },
     });
 
@@ -312,32 +312,32 @@ export async function storeInsights(
   }
 ): Promise<boolean> {
   try {
-    await prisma.gbpInsightsDaily.upsert({
+    await prisma.gbp_insights_daily_list.upsert({
       where: {
-        locationId_date: { 
-          locationId: location_id,
+        location_id_date: { 
+          location_id: location_id,
           date,
         },
       },
       create: {
         id: `gbp_ins_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        locationId: location_id,
+        location_id: location_id,
         date,
-        viewsSearch: insights.viewsSearch,
-        viewsMaps: insights.viewsMaps,
-        actionsWebsite: insights.actionsWebsite,
-        actionsPhone: insights.actionsPhone,
-        actionsDirections: insights.actionsDirections,
-        photosCount: insights.photosCount,
-        createdAt: new Date(),
+        views_search: insights.viewsSearch,
+        views_maps: insights.viewsMaps,
+        actions_website: insights.actionsWebsite,
+        actions_phone: insights.actionsPhone,
+        actions_directions: insights.actionsDirections,
+        photos_count: insights.photosCount,
+        created_at: new Date(),
       },
       update: {
-        viewsSearch: insights.viewsSearch,
-        viewsMaps: insights.viewsMaps,
-        actionsWebsite: insights.actionsWebsite,
-        actionsPhone: insights.actionsPhone,
-        actionsDirections: insights.actionsDirections,
-        photosCount: insights.photosCount,
+        views_search: insights.viewsSearch,
+        views_maps: insights.viewsMaps,
+        actions_website: insights.actionsWebsite,
+        actions_phone: insights.actionsPhone,
+        actions_directions: insights.actionsDirections,
+        photos_count: insights.photosCount,
       },
     });
 
@@ -359,9 +359,9 @@ export async function getAggregatedInsights(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const insights = await prisma.gbpInsightsDaily.findMany({
+    const insights = await prisma.gbp_insights_daily_list.findMany({
       where: {
-        locationId: location_id,
+        location_id: location_id,
         date: {
           gte: startDate,
         },
@@ -372,8 +372,7 @@ export async function getAggregatedInsights(
     });
 
     // Calculate totals
-    const totals = insights.reduce(
-      (acc, day) => ({
+    const totals = insights.reduce((acc: any, day: any) => ({
         viewsSearch: acc.viewsSearch + day.viewsSearch,
         viewsMaps: acc.viewsMaps + day.viewsMaps,
         actionsWebsite: acc.actionsWebsite + day.actionsWebsite,

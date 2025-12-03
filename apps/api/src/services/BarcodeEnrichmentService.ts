@@ -63,7 +63,7 @@ export class BarcodeEnrichmentService {
 
     // Try to match by Google category ID first (most accurate)
     if (googleCategoryId) {
-      const byGoogleId = await prisma.directoryCategory.findFirst({
+      const byGoogleId = await prisma.directory_category.findFirst({
         where: {
           tenantId,
           googleCategoryId,
@@ -79,7 +79,7 @@ export class BarcodeEnrichmentService {
 
     // Try to match by name similarity
     const categoryName = categoryPath[categoryPath.length - 1]; // Use most specific category
-    const byName = await prisma.directoryCategory.findFirst({
+    const byName = await prisma.directory_category.findFirst({
       where: {
         tenantId,
         name: {
@@ -480,7 +480,7 @@ export class BarcodeEnrichmentService {
    */
   private async getFromDatabase(barcode: string): Promise<EnrichmentResult | null> {
     try {
-      const cached = await prisma.barcodeEnrichment.findUnique({
+      const cached = await prisma.barcode_enrichment.findUnique({
         where: { barcode },
       });
 
@@ -489,11 +489,11 @@ export class BarcodeEnrichmentService {
       }
 
       // Update fetch count and last fetched timestamp
-      await prisma.barcodeEnrichment.update({
+      await prisma.barcode_enrichment.update({
         where: { barcode },
         data: {
-          fetchCount: { increment: 1 },
-          lastFetchedAt: new Date(),
+          fetch_count: { increment: 1 },
+          last_fetched_at: new Date(),
         },
       });
 
@@ -502,10 +502,10 @@ export class BarcodeEnrichmentService {
         name: cached.name || undefined,
         brand: cached.brand || undefined,
         description: cached.description || undefined,
-        categoryPath: cached.categoryPath || undefined,
-        priceCents: cached.priceCents || undefined,
-        imageUrl: cached.imageUrl || undefined,
-        imageThumbnailUrl: cached.imageThumbnailUrl || undefined,
+        categoryPath: cached.category_path || undefined,
+        priceCents: cached.price_cents || undefined,
+        imageUrl: cached.image_url || undefined,
+        imageThumbnailUrl: cached.image_thumbnail_url || undefined,
         metadata: (cached.metadata as Record<string, any>) || undefined,
         source: cached.source as any,
       };
@@ -517,34 +517,34 @@ export class BarcodeEnrichmentService {
 
   private async saveToDatabase(barcode: string, data: EnrichmentResult): Promise<void> {
     try {
-      await prisma.barcodeEnrichment.upsert({
+      await prisma.barcode_enrichment.upsert({
         where: { barcode },
         create: {
           barcode,
           name: data.name || null,
           brand: data.brand || null,
           description: data.description || null,
-          categoryPath: data.categoryPath || [],
-          priceCents: data.priceCents || null,
-          imageUrl: data.imageUrl || null,
-          imageThumbnailUrl: data.imageThumbnailUrl || null,
+          category_path: data.categoryPath || [],
+          price_cents: data.priceCents || null,
+          image_url: data.imageUrl || null,
+          image_thumbnail_url: data.imageThumbnailUrl || null,
           metadata: data.metadata ? data.metadata : undefined,
           source: data.source,
-          lastFetchedAt: new Date(),
-          fetchCount: 1,
+          last_fetched_at: new Date(),
+          fetch_count: 1,
         } as any,
         update: {
           name: data.name || null,
           brand: data.brand || null,
           description: data.description || null,
-          categoryPath: data.categoryPath || [],
-          priceCents: data.priceCents || null,
-          imageUrl: data.imageUrl || null,
-          imageThumbnailUrl: data.imageThumbnailUrl || null,
+          category_path: data.categoryPath || [],
+          price_cents: data.priceCents || null,
+          image_url: data.imageUrl || null,
+          image_thumbnail_url: data.imageThumbnailUrl || null,
           metadata: data.metadata ? data.metadata : undefined,
           source: data.source,
-          lastFetchedAt: new Date(),
-          fetchCount: { increment: 1 },
+          last_fetched_at: new Date(),
+          fetch_count: { increment: 1 },
         },
       });
     } catch (error) {
@@ -591,7 +591,7 @@ export class BarcodeEnrichmentService {
     error?: string
   ): Promise<void> {
     try {
-      await prisma.barcodeLookupLog.create({
+      await prisma.barcode_lookup_log.create({
         data: {
           tenantId,
           barcode,

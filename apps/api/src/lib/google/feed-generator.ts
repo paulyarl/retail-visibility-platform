@@ -27,10 +27,10 @@ export interface FeedItem {
  */
 export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]> {
   try {
-    const items = await prisma.inventoryItem.findMany({
+    const items = await prisma.inventory_items.findMany({
       where: {
-        tenantId: tenant_id, 
-        itemStatus: 'active',  // Only active items
+        tenant_id: tenant_id, 
+        item_status: 'active',  // Only active items
         visibility: 'public',   // Only public items
       },
       select: {
@@ -43,20 +43,22 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
         price: true,
         currency: true,
         availability: true,
-        imageUrl: true,
-        directoryCategory: {
-          select: {
-            name: true,
-            googleCategoryId: true,
-          },
-        },
+        image_url: true,
+        // TODO: Add directoryCategory relationship back when schema supports it
+        // directoryCategory: {
+        //   select: {
+        //     name: true,
+        //     googleCategoryId: true,
+        //   },
+        // },
       },
     });
 
     return items.map(item => {
       // Use tenant category's Google ID if available
-      const googleProductCategory = item.directoryCategory?.googleCategoryId || undefined;
-      const productType = item.directoryCategory?.name || undefined;
+      // TODO: Add directoryCategory relationship back when schema supports it
+      const googleProductCategory = undefined;
+      const productType = undefined;
 
       return {
         id: item.id,
@@ -68,7 +70,7 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
         price: Number(item.price),
         currency: item.currency,
         availability: item.availability,
-        image_url: item.imageUrl || undefined,
+        image_url: item.image_url || undefined,
         additionalImageLinks: undefined,
         googleProductCategory, // Google category ID from tenant category
         productType, // Tenant category name
@@ -85,17 +87,17 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
  */
 export async function getFeedStats(tenant_id: string) {
   const [total, active, inactive, syncing, notSyncing] = await Promise.all([
-    prisma.inventoryItem.count({ where: { tenantId: tenant_id } }),
-    prisma.inventoryItem.count({ where: { tenantId: tenant_id, itemStatus: 'active' } }),
-    prisma.inventoryItem.count({ where: { tenantId: tenant_id, itemStatus: 'inactive' } }),
-    prisma.inventoryItem.count({ 
-      where: { tenantId: tenant_id, itemStatus: 'active', visibility: 'public' } 
+    prisma.inventory_items.count({ where: { tenant_id: tenant_id } }),
+    prisma.inventory_items.count({ where: { tenant_id: tenant_id, item_status: 'active' } }),
+    prisma.inventory_items.count({ where: { tenant_id: tenant_id, item_status: 'inactive' } }),
+    prisma.inventory_items.count({ 
+      where: { tenant_id: tenant_id, item_status: 'active', visibility: 'public' } 
     }),
-    prisma.inventoryItem.count({ 
+    prisma.inventory_items.count({ 
       where: { 
-        tenantId: tenant_id,
+        tenant_id: tenant_id,
         OR: [
-          { itemStatus: { not: 'active' } },
+          { item_status: { not: 'active' } },
           { visibility: { not: 'public' } },
         ]
       } 

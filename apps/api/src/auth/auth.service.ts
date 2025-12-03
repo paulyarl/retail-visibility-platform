@@ -1,6 +1,6 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { UserRole } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
+import { user_role } from '@prisma/client';
 import { prisma } from '../prisma';
 import { JWTPayload } from '../middleware/auth';
 import { generateSessionId, generateUserId } from '../lib/id-generator';
@@ -79,7 +79,7 @@ export class AuthService {
    */
   async register(data: RegisterData) {
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { email: data.email.toLowerCase() },
     });
 
@@ -91,26 +91,26 @@ export class AuthService {
     const passwordHash = await this.hashPassword(data.password);
 
     // Create user using snake_case Prisma fields, then map to camelCase DTO
-    const user = await prisma.user.create({
+    const user = await prisma.users.create({
       data: {
         id: generateUserId(),
         email: data.email.toLowerCase(),
-        passwordHash: passwordHash,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        role: UserRole.USER,
-        updatedAt: new Date(),
+        password_hash: passwordHash,
+        first_name: data.firstName,
+        last_name: data.lastName,
+        role: user_role.USER,
+        updated_at: new Date(),
       },
     });
 
     return {
       id: user.id,
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      first_name: user.first_name,
+      last_name: user.last_name,
       role: user.role,
-      emailVerified: user.emailVerified,
-      createdAt: user.createdAt,
+      email_verified: user.email_verified,
+      created_at: user.created_at,
     };
   }
 
@@ -119,10 +119,10 @@ export class AuthService {
    */
   async login(data: LoginData) {
     // Find user
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email: data.email.toLowerCase() },
       include: {
-        userTenants: true,
+        user_tenants: true,
       },
     });
 
@@ -131,18 +131,18 @@ export class AuthService {
     }
 
     // Check if user is active
-    if (!user.isActive) {
+    if (!user.is_active) {
       throw new Error('Account is deactivated');
     }
 
     // Verify password
-    const isValidPassword = await this.verifyPassword(data.password, user.passwordHash);
+    const isValidPassword = await this.verifyPassword(data.password, user.password_hash);
     if (!isValidPassword) {
       throw new Error('Invalid email or password');
     }
 
     // Get tenant IDs
-    const tenantIds = user.userTenants.map((ut) => ut.tenantId);
+    const tenantIds = user.user_tenants.map((ut) => ut.tenant_id);
 
     // Create JWT payload
     const payload: JWTPayload = {
@@ -157,17 +157,17 @@ export class AuthService {
     const refreshToken = this.generateRefreshToken(payload);
 
     // Update last login
-    await prisma.user.update({
+    await prisma.users.update({
       where: { id: user.id },
-      data: { lastLogin: new Date() },
+      data: { last_login: new Date() },
     });
 
     // Create session
-    await prisma.userSession.create({
+    await prisma.user_sessions_list.create({
       data: {
         id: generateSessionId(),
-        userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        user_id: user.id,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },
     });
 
@@ -176,12 +176,12 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        first_name: user.first_name,
+        last_name: user.last_name,
         role: user.role,
-        emailVerified: user.emailVerified,
-        tenants: user.userTenants.map((ut) => ({
-          id: ut.tenantId,
+        email_verified: user.email_verified,
+        tenants: user.user_tenants.map((ut) => ({
+          id: ut.tenant_id,
           name: 'Unknown',
           role: ut.role,
         })),
@@ -199,22 +199,22 @@ export class AuthService {
       const payload = this.verifyRefreshToken(refreshToken);
 
       // Verify user still exists and is active
-      const user = await prisma.user.findUnique({
+      const user = await prisma.users.findUnique({
         where: { id: payload.userId },
         select: {
           id: true,
           email: true,
           role: true,
-          isActive: true,
-          userTenants: {
+          is_active: true,
+          user_tenants: {
             select: {
-              tenantId: true,
+              tenant_id: true,
             },
           },
         },
       });
 
-      if (!user || !user.isActive) {
+      if (!user || !user.is_active) {
         throw new Error('Invalid refresh token');
       }
 
@@ -223,7 +223,7 @@ export class AuthService {
         userId: user.id,
         email: user.email,
         role: user.role,
-        tenantIds: user.userTenants.map((ut) => ut.tenantId),
+        tenantIds: user.user_tenants.map((ut) => ut.tenant_id),
       };
 
       const accessToken = this.generateAccessToken(newPayload);
@@ -241,17 +241,17 @@ export class AuthService {
     // Get user by ID
     
     // First get user without relations to avoid Prisma relation issues
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
+        first_name: true,
+        last_name: true,
         role: true,
-        emailVerified: true,
-        lastLogin: true,
-        createdAt: true,
+        email_verified: true,
+        last_login: true,
+        created_at: true,
       },
     });
 
@@ -260,12 +260,12 @@ export class AuthService {
     }
 
     // Get user tenants separately to avoid relation issues
-    let userTenants: { tenantId: string; role: any }[] = [];
+    let userTenants: { tenant_id: string; role: any }[] = [];
     try {
-      userTenants = await prisma.userTenant.findMany({
-        where: { userId: userId },
+      userTenants = await prisma.user_tenants.findMany({
+        where: { user_id: userId },
         select: {
-          tenantId: true,
+          tenant_id: true,
           role: true,
         },
       });
@@ -276,14 +276,14 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      first_name: user.first_name,
+      last_name: user.last_name,
       role: user.role,
-      emailVerified: user.emailVerified,
-      lastLogin: user.lastLogin,
-      createdAt: user.createdAt,
-      tenants: userTenants.map((ut: { tenantId: string; role: any }) => ({
-        id: ut.tenantId,
+      email_verified: user.email_verified,
+      last_login: user.last_login,
+      created_at: user.created_at,
+      tenants: userTenants.map((ut: { tenant_id: string; role: any }) => ({
+        id: ut.tenant_id,
         role: ut.role,
       })),
     };
@@ -294,9 +294,9 @@ export class AuthService {
    */
   async logout(userId: string) {
     // Deactivate all user sessions
-    await prisma.userSession.updateMany({
-      where: { userId: userId, isActive: true },
-      data: { isActive: false },
+    await prisma.user_sessions_list.updateMany({
+      where: { user_id: userId, is_active: true },
+      data: { is_active: false },
     });
 
     return { message: 'Logged out successfully' };

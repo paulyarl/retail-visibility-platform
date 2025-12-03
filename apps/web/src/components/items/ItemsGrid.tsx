@@ -1,6 +1,7 @@
 import { Card, CardContent, Badge, Button } from '@/components/ui';
 import { Item } from '@/services/itemsDataService';
 import SyncStatusIndicator from './SyncStatusIndicator';
+import InlineStockEditor from './InlineStockEditor';
 
 interface ItemsGridProps {
   items: Item[];
@@ -9,9 +10,11 @@ interface ItemsGridProps {
   onQRCode: (item: Item) => void;
   onPhotos: (item: Item) => void;
   onCategory: (item: Item) => void;
+  onClone?: (item: Item) => void;
   onPropagate?: (item: Item) => void;
   onVisibilityToggle?: (item: Item) => void;
   onStatusToggle?: (item: Item) => void;
+  onStockUpdate?: (itemId: string, newStock: number) => Promise<void>;
   tenantId?: string;
   bulkMode?: boolean;
   selectedItems?: Set<string>;
@@ -29,9 +32,11 @@ export default function ItemsGrid({
   onQRCode,
   onPhotos,
   onCategory,
+  onClone,
   onPropagate,
   onVisibilityToggle,
   onStatusToggle,
+  onStockUpdate,
   tenantId,
   bulkMode = false,
   selectedItems = new Set(),
@@ -131,9 +136,18 @@ export default function ItemsGrid({
                 <div className="text-lg font-bold text-neutral-900 dark:text-neutral-900">
                   {item.price && item.price > 0 ? `$${item.price.toFixed(2)}` : ''}
                 </div>
-                <div className={`text-sm ${item.stock < 10 ? 'text-warning font-medium' : 'text-neutral-600 dark:text-neutral-400'}`}>
-                  Stock: {item.stock}
-                </div>
+                {onStockUpdate ? (
+                  <InlineStockEditor
+                    itemId={item.id}
+                    itemName={item.name}
+                    currentStock={item.stock}
+                    onUpdate={onStockUpdate}
+                  />
+                ) : (
+                  <div className={`text-sm ${item.stock < 10 ? 'text-warning font-medium' : 'text-neutral-600 dark:text-neutral-400'}`}>
+                    Stock: {item.stock}
+                  </div>
+                )}
               </div>
 
               {item.tenantCategory && (
@@ -167,6 +181,21 @@ export default function ItemsGrid({
                 <span className="hidden xs:inline">Edit</span>
                 <span className="xs:hidden">✏️</span>
               </Button>
+              {onClone && (
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={() => onClone(item)} 
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white border-0 text-xs sm:text-sm min-h-[36px] sm:min-h-[32px]"
+                  title="Clone this product to create a variant (keeps all data, generates new SKU)"
+                >
+                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <span className="hidden xs:inline">Clone</span>
+                  <span className="xs:hidden">📋</span>
+                </Button>
+              )}
               <Button 
                 size="sm" 
                 variant="ghost" 

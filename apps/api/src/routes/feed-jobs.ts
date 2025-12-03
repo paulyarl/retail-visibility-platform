@@ -30,9 +30,9 @@ router.post('/', async (req, res) => {
 
     // Block feed pushes for fully frozen tenants, but allow google_only fallback
     // tenants to push feeds while they are active and within the maintenance window.
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: body.tenantId },
-      select: { subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true },
+      select: { subscription_tier: true, subscription_status: true, trial_ends_at: true },
     });
 
     if (!tenant) {
@@ -42,15 +42,15 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const tier = tenant.subscriptionTier || 'starter';
-    const status = tenant.subscriptionStatus || 'active';
+    const tier = tenant.subscription_tier || 'starter';
+    const status = tenant.subscription_status || 'active';
     const now = new Date();
     const isInactive = status === 'canceled' || status === 'expired';
 
     const inMaintenanceWindow =
       tier === 'google_only' &&
       status === 'active' &&
-      (!tenant.trialEndsAt || now < tenant.trialEndsAt);
+      (!tenant.trial_ends_at || now < tenant.trial_ends_at);
 
     const isFullyFrozen = isInactive || (tier === 'google_only' && !inMaintenanceWindow);
 
@@ -70,8 +70,8 @@ router.post('/', async (req, res) => {
 
       // Build item filter: active + public items
       const baseWhere: any = {
-        tenantId,
-        itemStatus: 'active',
+        tenant_id: tenantId,
+        item_status: 'active',
         visibility: 'public',
       };
       if (body.sku) {
@@ -81,14 +81,14 @@ router.post('/', async (req, res) => {
         ];
       }
 
-      const items = await prisma.inventoryItem.findMany({
+      const items = await prisma.inventory_items.findMany({
         where: baseWhere,
-        select: { id: true, sku: true, categoryPath: true },
+        select: { id: true, sku: true, category_path: true },
         take: body.sku ? 1 : 2000, // cap to avoid huge scans; job processor can chunk
       });
 
       const missingCategory: Array<{ id: string; sku: string | null } > = [];
-      const unmapped: Array<{ id: string; sku: string | null; categoryPath: string[] } > = [];
+      const unmapped: Array<{ id: string; sku: string | null; category_path: string[] } > = [];
 
       // Pre-load mapped slugs → googleCategoryId for efficiency
       // Collect slugs from items
@@ -102,16 +102,16 @@ router.post('/', async (req, res) => {
       const slugList = Array.from(slugs);
       const catMap: Record<string, string | null> = {};
       if (slugList.length > 0) {
-        const cats = await prisma.directoryCategory.findMany({
-          where: { tenantId, slug: { in: slugList }, isActive: true },
+        const cats = await prisma.directory_category.findMany({
+          where: { tenantId: tenantId, slug: { in: slugList }, isActive: true },
           select: { slug: true, googleCategoryId: true },
         });
         for (const c of cats) catMap[c.slug] = c.googleCategoryId;
       }
 
       for (const it of items) {
-        const path = (it as any).categoryPath as string[] | null;
-        const sku = typeof (it as any).sku === 'string' ? (it as any).sku : null;
+        const path = it.category_path as string[] | null;
+        const sku = typeof it.sku === 'string' ? it.sku : null;
         if (!path || path.length === 0) {
           missingCategory.push({ id: it.id, sku });
           continue;
@@ -119,7 +119,7 @@ router.post('/', async (req, res) => {
         const leaf = path[path.length - 1];
         const gId = leaf ? catMap[leaf] ?? null : null;
         if (!gId) {
-          unmapped.push({ id: it.id, sku, categoryPath: path });
+          unmapped.push({ id: it.id, sku, category_path: path });
         }
       }
 
@@ -145,14 +145,14 @@ router.post('/', async (req, res) => {
       }
     }
 
-    const job = await prisma.feedPushJobs.create({
+    const job = await prisma.feed_push_jobs_list.create({
       data: {
         id: generateQuickStart("feed"), // Generate unique ID
-        tenantId: body.tenantId,
+        tenant_id: body.tenantId,
         sku: body.sku,
         payload: body.payload as any || {},
-        jobStatus: 'queued',
-        updatedAt: new Date(), // Set updatedAt explicitly
+        job_status: 'queued',
+        updated_at: new Date(), // Set updatedAt explicitly
       },
     });
 
@@ -197,17 +197,17 @@ router.get('/', async (req, res) => {
     }
     
     if (status) {
-      where.jobStatus = status as string;
+      where.job_status = status as string;
     }
 
     const [jobs, total] = await Promise.all([
-      prisma.feedPushJobs.findMany({
+      prisma.feed_push_jobs_list.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
         take: parseInt(limit as string),
         skip: parseInt(offset as string),
       }),
-      prisma.feedPushJobs.count({ where }),
+      prisma.feed_push_jobs_list.count({ where }),
     ]);
 
     res.json({
@@ -236,7 +236,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const job = await prisma.feedPushJobs.findUnique({
+    const job = await prisma.feed_push_jobs_list.findUnique({
       where: { id },
     });
 
@@ -288,18 +288,18 @@ router.patch('/:id/status', async (req, res) => {
       updateData.errorCode = body.errorCode;
       
       // Increment retry count
-      const currentJob = await prisma.feedPushJobs.findUnique({
+      const currentJob = await prisma.feed_push_jobs_list.findUnique({
         where: { id },
-        select: { retryCount: true, maxRetries: true },
+        select: { retry_count: true, max_retries: true },
       });
 
       if (currentJob) {
-        updateData.retryCount = currentJob.retryCount + 1;
+        updateData.retry_count = currentJob.retry_count + 1;
         
         // Calculate next retry time if not exceeded max retries
-        if (currentJob.retryCount + 1 < currentJob.maxRetries) {
+        if (currentJob.retry_count + 1 < currentJob.max_retries) {
           const delays = [60, 300, 900, 3600, 3600]; // 1m, 5m, 15m, 1h, 1h
-          const delaySeconds = delays[currentJob.retryCount] || 3600;
+          const delaySeconds = delays[currentJob.retry_count] || 3600;
           updateData.nextRetry = new Date(Date.now() + delaySeconds * 1000);
           updateData.jobStatus = 'queued'; // Re-queue for retry
         } else {
@@ -308,7 +308,7 @@ router.patch('/:id/status', async (req, res) => {
       }
     }
 
-    const job = await prisma.feedPushJobs.update({
+    const job = await prisma.feed_push_jobs_list.update({
       where: { id },
       data: updateData,
     });
@@ -342,15 +342,15 @@ router.get('/queue/ready', async (req, res) => {
   try {
     const { limit = '10' } = req.query;
 
-    const jobs = await prisma.feedPushJobs.findMany({
+    const jobs = await prisma.feed_push_jobs_list.findMany({
       where: {
-        jobStatus: 'queued',
+        job_status: 'queued',
         OR: [
-          { nextRetry: null },
-          { nextRetry: { lte: new Date() } },
+          { next_retry: null },
+          { next_retry: { lte: new Date() } },
         ],
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { created_at: 'asc' },
       take: parseInt(limit as string),
     });
 
@@ -385,11 +385,11 @@ router.get('/stats/summary', async (req, res) => {
       successJobs,
       failedJobs,
     ] = await Promise.all([
-      prisma.feedPushJobs.count({ where }),
-      prisma.feedPushJobs.count({ where: { ...where, jobStatus: 'queued' } }),
-      prisma.feedPushJobs.count({ where: { ...where, jobStatus: 'processing' } }),
-      prisma.feedPushJobs.count({ where: { ...where, jobStatus: 'success' } }),
-      prisma.feedPushJobs.count({ where: { ...where, jobStatus: 'failed' } }),
+      prisma.feed_push_jobs_list.count({ where }),
+      prisma.feed_push_jobs_list.count({ where: { ...where, job_status: 'queued' } }),
+      prisma.feed_push_jobs_list.count({ where: { ...where, job_status: 'processing' } }),
+      prisma.feed_push_jobs_list.count({ where: { ...where, job_status: 'success' } }),
+      prisma.feed_push_jobs_list.count({ where: { ...where, job_status: 'failed' } }),
     ]);
 
     const successRate = totalJobs > 0 
@@ -424,7 +424,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    await prisma.feedPushJobs.delete({
+    await prisma.feed_push_jobs_list.delete({
       where: { id },
     });
 

@@ -1,4 +1,5 @@
 import { setTimeout as wait } from 'timers/promises';
+import { randomUUID } from 'crypto';
 import { categoryMirrorSuccess, categoryMirrorFail, categoryMirrorDurationMs, categoryOutOfSyncDetected } from '../metrics';
 import { prisma } from '../prisma';
 import { gbpClient } from '../clients/gbp';
@@ -7,9 +8,9 @@ export type MirrorStrategy = 'platform_to_gbp' | 'gbp_to_platform';
 
 export interface MirrorJobPayload {
   strategy: MirrorStrategy;
-  tenantId?: string | null;
-  requestedBy?: string | null;
-  dryRun?: boolean;
+  tenant_id: string | null;
+  requested_by: string | null;
+  dry_run: boolean;
 }
 
 // Very simple in-memory queue placeholder so we have a call site to evolve later.
@@ -31,17 +32,18 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
   let attempt = 0;
   let backoffMs = 500; // start small, exponential backoff with jitter
   const startedAt = Date.now();
-  const key = `${payload.strategy}:${payload.tenantId ?? 'all'}`;
+  const key = `${payload.strategy}:${payload.tenant_id ?? 'all'}`;
   // Create run record (pending)
   let runId: string | null = null;
   try {
-    const run = await prisma.categoryMirrorRuns.create({
+    const run = await prisma.category_mirror_runs.create({
       data: {
-        tenantId: payload.tenantId ?? null,
+        id: randomUUID(),
+        tenant_id: payload.tenant_id ?? null,
         strategy: payload.strategy,
-        dryRun: !!(payload as any).dryRun,
-        jobId,
-        startedAt: new Date(startedAt),
+        dry_run: !!(payload as any).dry_run,
+        job_id: jobId,
+        started_at: new Date(startedAt),
       },
       select: { id: true },
     });
@@ -57,38 +59,39 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
         console.log(`[GBP_SYNC][${jobId}] skipped due to cooldown for ${key}`);
         const summary = { created: 0, updated: 0, deleted: 0, skipped: true, reason: 'cooldown', dryRun } as const;
         try {
-          await prisma.categoryMirrorRuns.create({
+          await prisma.category_mirror_runs.create({
             data: {
-              tenantId: payload.tenantId ?? null,
+              id: randomUUID(),
+              tenant_id: payload.tenant_id ?? null,
               strategy: payload.strategy,
-              dryRun,
+              dry_run: dryRun,
               created: 0,
               updated: 0,
               deleted: 0,
               skipped: true,
               reason: 'cooldown',
-              jobId,
-              startedAt: new Date(startedAt),
-              completedAt: new Date(),
+              job_id: jobId,
+              started_at: new Date(startedAt),
+              completed_at: new Date(),
             },
           });
         } catch {}
-        categoryMirrorSuccess.inc({ strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all'), dryRun: String(dryRun), reason: 'cooldown' });
-        categoryMirrorDurationMs.observe(Date.now() - startedAt, { strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all') });
+        categoryMirrorSuccess.inc({ strategy: payload.strategy, tenant: String(payload.tenant_id ?? 'all'), dryRun: String(dryRun), reason: 'cooldown' });
+        categoryMirrorDurationMs.observe(Date.now() - startedAt, { strategy: payload.strategy, tenant: String(payload.tenant_id ?? 'all') });
         return summary;
       }
 
-      console.log(`[GBP_SYNC][${jobId}] attempt ${attempt} strategy=${payload.strategy} tenant=${payload.tenantId ?? 'all'} dryRun=${dryRun}`);
+      console.log(`[GBP_SYNC][${jobId}] attempt ${attempt} strategy=${payload.strategy} tenant=${payload.tenant_id ?? 'all'} dryRun=${dryRun}`);
       // Fetch and diff
-      const platformCats = await fetchPlatformCategories(payload.tenantId ?? null);
-      const gbpCats = await fetchGbpCategories(payload.tenantId ?? null);
+      const platformCats = await fetchPlatformCategories(payload.tenant_id ?? null);
+      const gbpCats = await fetchGbpCategories(payload.tenant_id ?? null);
       const diff = computeDiff(platformCats, gbpCats);
 
       // Detect out-of-sync state
       const isOutOfSync = diff.counts.created > 0 || diff.counts.updated > 0 || diff.counts.deleted > 0;
       if (isOutOfSync) {
         categoryOutOfSyncDetected.inc({
-          tenant: String(payload.tenantId ?? 'all'),
+          tenant: String(payload.tenant_id ?? 'all'),
           created: String(diff.counts.created),
           updated: String(diff.counts.updated),
           deleted: String(diff.counts.deleted),
@@ -97,17 +100,17 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
       }
 
       if (!dryRun) {
-        await applyDiffToGbp(diff, payload.tenantId ?? null);
+        await applyDiffToGbp(diff, payload.tenant_id ?? null);
       }
 
       const summary = { ...diff.counts, dryRun };
       lastRunAt[key] = Date.now();
-      categoryMirrorSuccess.inc({ strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all'), dryRun: String(dryRun) });
-      categoryMirrorDurationMs.observe(Date.now() - startedAt, { strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all') });
+      categoryMirrorSuccess.inc({ strategy: payload.strategy, tenant: String(payload.tenant_id ?? 'all'), dryRun: String(dryRun) });
+      categoryMirrorDurationMs.observe(Date.now() - startedAt, { strategy: payload.strategy, tenant: String(payload.tenant_id ?? 'all') });
       // Update run row
       try {
         if (runId) {
-          await prisma.categoryMirrorRuns.update({
+          await prisma.category_mirror_runs.update({
             where: { id: runId },
             data: {
               created: diff.counts.created,
@@ -115,22 +118,23 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
               deleted: diff.counts.deleted,
               skipped: false,
               reason: null,
-              completedAt: new Date(),
+              completed_at: new Date(),
             },
           });
         } else {
-          await prisma.categoryMirrorRuns.create({
+          await prisma.category_mirror_runs.create({
             data: {
-              tenantId: payload.tenantId ?? null,
+              id: randomUUID(),
+              tenant_id: payload.tenant_id ?? null,
               strategy: payload.strategy,
-              dryRun,
+              dry_run: dryRun,
               created: diff.counts.created,
               updated: diff.counts.updated,
               deleted: diff.counts.deleted,
               skipped: false,
-              jobId,
-              startedAt: new Date(startedAt),
-              completedAt: new Date(),
+              job_id: jobId,
+              started_at: new Date(startedAt),
+              completed_at: new Date(),
             },
           });
         }
@@ -145,28 +149,29 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
     }
   }
 
-  categoryMirrorFail.inc({ strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all') });
-  categoryMirrorDurationMs.observe(Date.now() - startedAt, { strategy: payload.strategy, tenant: String(payload.tenantId ?? 'all') });
+  categoryMirrorFail.inc({ strategy: payload.strategy, tenant: String(payload.tenant_id ?? 'all') });
+  categoryMirrorDurationMs.observe(Date.now() - startedAt, { strategy: payload.strategy, tenant: String(payload.tenant_id ?? 'all') });
   console.error(`[GBP_SYNC][${jobId}] failed after ${maxAttempts} attempts`);
   // Record failure
   try {
     if (runId) {
-      await prisma.categoryMirrorRuns.update({ where: { id: runId }, data: { error: 'failed', completedAt: new Date() } });
+      await prisma.category_mirror_runs.update({ where: { id: runId }, data: { error: 'failed', completed_at: new Date() } });
     } else {
-      await prisma.categoryMirrorRuns.create({
+      await prisma.category_mirror_runs.create({
         data: {
-          tenantId: payload.tenantId ?? null,
+          id: randomUUID(),
+          tenant_id: payload.tenant_id ?? null,
           strategy: payload.strategy,
-          dryRun: !!(payload as any).dryRun,
+          dry_run: !!(payload as any).dry_run,
           created: 0,
           updated: 0,
           deleted: 0,
           skipped: false,
           reason: null,
           error: 'failed',
-          jobId,
-          startedAt: new Date(startedAt),
-          completedAt: new Date(),
+          job_id: jobId,
+          started_at: new Date(startedAt),
+          completed_at: new Date(),
         },
       });
     }
@@ -179,8 +184,8 @@ type Cat = { id?: string | null; slug?: string | null; name: string };
 async function fetchPlatformCategories(tenantId: string | null): Promise<Cat[]> {
   if (!tenantId) return [];
   try {
-    const rows = await prisma.directoryCategory.findMany({
-      where: { tenantId, isActive: true },
+    const rows = await prisma.directory_category.findMany({
+      where: { tenantId: tenantId, isActive: true },
       select: { slug: true, name: true },
       orderBy: { sortOrder: 'asc' },
     });

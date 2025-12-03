@@ -38,7 +38,7 @@ export async function audit(opts: {
       diff: opts.payload || {}, // Required field
     };
 
-    await prisma.auditLog.create({
+    await prisma.audit_log.create({
       data: auditData,
     });
   } catch (e) {

@@ -233,7 +233,7 @@ async function testPhase2OAuth() {
 
     // Retrieve integration
     const integration = await squareIntegrationRepository.getIntegrationByTenantId(TEST_TENANT_ID);
-    if (integration && integration.merchantId === 'test-merchant') {
+    if (integration && integration.merchant_id === 'test-merchant') {
       success('Integration retrieved');
     } else {
       throw new Error('Integration retrieval failed');
@@ -475,9 +475,9 @@ async function testIntegration() {
         TEST_AUTH_CODE
       );
 
-      if (integration && integration.merchantId) {
+      if (integration && integration.merchant_id) {
         success('OAuth flow completed successfully');
-        success(`Merchant ID: ${integration.merchantId}`);
+        success(`Merchant ID: ${integration.merchant_id}`);
         
         // Cleanup
         await squareIntegrationService.disconnectTenant(TEST_TENANT_ID);

@@ -21,15 +21,15 @@ export async function requireActiveSubscription(
       });
     }
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
       },
     });
 
@@ -43,44 +43,44 @@ export async function requireActiveSubscription(
     const now = new Date();
 
     // Check if subscription is canceled
-    if (tenant.subscriptionStatus === "canceled") {
+    if (tenant.subscription_status === "canceled") {
       return res.status(402).json({
         error: "subscription_canceled",
         message: "Your subscription has been canceled. Please contact support to reactivate.",
         tenant: {
           id: tenant.id,
           name: tenant.name,
-          status: tenant.subscriptionStatus,
+          status: tenant.subscription_status,
         },
       });
     }
 
     // Check if trial has expired - convert to active status (keep same tier)
     if (
-      tenant.subscriptionStatus === "trial" &&
-      tenant.trialEndsAt &&
-      tenant.trialEndsAt < now
+      tenant.subscription_status === "trial" &&
+      tenant.trial_ends_at &&
+      tenant.trial_ends_at < now
     ) {
       // Trial expired - require payment to continue
-      console.log(`[Subscription Check] Trial expired for tenant ${tenant.id} (${tenant.subscriptionTier} tier).`);
+      console.log(`[Subscription Check] Trial expired for tenant ${tenant.id} (${tenant.subscription_tier} tier).`);
       
       return res.status(402).json({
         error: "trial_expired",
-        message: `Your 14-day trial of the ${tenant.subscriptionTier} plan has expired. Please add payment to continue.`,
+        message: `Your 14-day trial of the ${tenant.subscription_tier} plan has expired. Please add payment to continue.`,
         tenant: {
           id: tenant.id,
           name: tenant.name,
-          tier: tenant.subscriptionTier,
-          trialEndsAt: tenant.trialEndsAt,
+          tier: tenant.subscription_tier,
+          trialEndsAt: tenant.trial_ends_at,
         },
       });
     }
 
     // Check if subscription has expired
     if (
-      tenant.subscriptionStatus === "active" &&
-      tenant.subscriptionEndsAt &&
-      tenant.subscriptionEndsAt < now
+      tenant.subscription_status === "active" &&
+      tenant.subscription_ends_at &&
+      tenant.subscription_ends_at < now
     ) {
       return res.status(402).json({
         error: "subscription_expired",
@@ -89,20 +89,20 @@ export async function requireActiveSubscription(
           id: tenant.id,
           name: tenant.name,
           status: "expired",
-          subscriptionEndsAt: tenant.subscriptionEndsAt,
+          subscription_ends_at: tenant.subscription_ends_at,
         },
       });
     }
 
     // Check if payment is past due
-    if (tenant.subscriptionStatus === "past_due") {
+    if (tenant.subscription_status === "past_due") {
       return res.status(402).json({
         error: "payment_past_due",
         message: "Your payment is past due. Please update your payment method.",
         tenant: {
           id: tenant.id,
           name: tenant.name,
-          status: tenant.subscriptionStatus,
+          status: tenant.subscription_status,
         },
       });
     }
@@ -134,25 +134,25 @@ export async function checkSubscriptionLimits(
       return next();
     }
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        trialEndsAt: true,
-        organizationId: true,
-        organization: {
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
+        organization_id: true,
+        organizations_list: {
           select: {
             id: true,
             name: true,
-            maxTotalSKUs: true,
-            subscriptionTier: true,
-            Tenant: {
+            max_total_skus: true,
+            subscription_tier: true,
+            tenants: {
               select: {
                 _count: {
                   select: {
-                    inventoryItems: true,
+                    inventory_items: true,
                   },
                 },
               },
@@ -161,7 +161,7 @@ export async function checkSubscriptionLimits(
         },
         _count: {
           select: {
-            inventoryItems: true,
+            inventory_items: true,
           },
         },
       },
@@ -172,26 +172,26 @@ export async function checkSubscriptionLimits(
     }
 
     // Check if tenant is part of a chain organization
-    if (tenant.organizationId && tenant.organization) {
+    if (tenant.organization_id && tenant.organizations_list) {
       // CHAIN-LEVEL LIMIT ENFORCEMENT
-      const org = tenant.organization;
+      const org = tenant.organizations_list;
       
       // Calculate total SKUs across all locations in the chain
-      const totalChainSKUs = org.Tenant.reduce(
-        (sum: number, t: any) => sum + t._count.inventoryItems,
+      const totalChainSKUs = org.tenants.reduce(
+        (sum: number, t: any) => sum + t._count.inventory_items,
         0
       );
 
       // Check if adding new item would exceed chain limit
-      if (req.method === "POST" && totalChainSKUs >= org.maxTotalSKUs) {
+      if (req.method === "POST" && totalChainSKUs >= org.max_total_skus) {
         return res.status(402).json({
           error: "chain_limit_reached",
-          message: `Your organization "${org.name}" has reached the chain limit of ${org.maxTotalSKUs} total SKUs across all locations. Please upgrade or contact support.`,
-          limit: org.maxTotalSKUs,
+          message: `Your organization "${org.name}" has reached the chain limit of ${org.max_total_skus} total SKUs across all locations. Please upgrade or contact support.`,
+          limit: org.max_total_skus,
           current: totalChainSKUs,
           organizationId: org.id,
           organizationName: org.name,
-          tier: org.subscriptionTier,
+          tier: org.subscription_tier,
         });
       }
 
@@ -209,13 +209,13 @@ export async function checkSubscriptionLimits(
       enterprise: { items: Infinity },
     };
 
-    const tier = tenant.subscriptionTier || "starter";
+    const tier = tenant.subscription_tier || "starter";
     const limit = limits[tier] || limits.starter;
-    const status = tenant.subscriptionStatus || "active";
+    const status = tenant.subscription_status || "active";
     const maintenanceState = getMaintenanceState({
       tier,
       status,
-      trialEndsAt: tenant.trialEndsAt ?? undefined,
+      trialEndsAt: tenant.trial_ends_at ?? undefined,
     });
 
     // In maintenance mode, block growth (new items) even if numeric limits not reached
@@ -228,18 +228,18 @@ export async function checkSubscriptionLimits(
         subscriptionStatus: status,
         maintenanceState,
         limit: limit.items,
-        current: tenant._count.inventoryItems,
+        current: tenant._count.inventory_items,
         upgradeUrl: "/settings/subscription",
       });
     }
 
     // Check if creating new item would exceed numeric tier limit
-    if (req.method === "POST" && tenant._count.inventoryItems >= limit.items) {
+    if (req.method === "POST" && tenant._count.inventory_items >= limit.items) {
       return res.status(402).json({
         error: "item_limit_reached",
         message: `You've reached the ${tier} plan limit of ${limit.items} items. Please upgrade to add more.`,
         limit: limit.items,
-        current: tenant._count.inventoryItems,
+        current: tenant._count.inventory_items,
         tier,
       });
     }
@@ -273,15 +273,15 @@ export async function requireWritableSubscription(
       });
     }
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
       },
     });
 
@@ -303,8 +303,8 @@ export async function requireWritableSubscription(
       return res.status(403).json({
         error: "account_frozen",
         message: "Your account is in read-only mode. Your storefront and directory listing remain visible, but you cannot make changes. Please upgrade to regain full access.",
-        subscriptionStatus: tenant.subscriptionStatus,
-        subscriptionTier: tenant.subscriptionTier,
+        subscriptionStatus: tenant.subscription_status,
+        subscriptionTier: tenant.subscription_tier,
         internalStatus,
         upgradeUrl: "/settings/subscription",
       });
@@ -315,7 +315,7 @@ export async function requireWritableSubscription(
       return res.status(403).json({
         error: "subscription_canceled",
         message: "Your subscription has been canceled. Please contact support to reactivate or upgrade to a new plan.",
-        subscriptionStatus: tenant.subscriptionStatus,
+        subscriptionStatus: tenant.subscription_status,
         internalStatus,
       });
     }
@@ -325,8 +325,8 @@ export async function requireWritableSubscription(
       return res.status(402).json({
         error: "subscription_expired",
         message: "Your subscription has expired. Please upgrade to continue making changes.",
-        subscriptionStatus: tenant.subscriptionStatus,
-        subscriptionTier: tenant.subscriptionTier,
+        subscriptionStatus: tenant.subscription_status,
+        subscriptionTier: tenant.subscription_tier,
         internalStatus,
         upgradeUrl: "/settings/subscription",
       });

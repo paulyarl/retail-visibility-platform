@@ -65,11 +65,11 @@ export async function validateTierAssignment(
 
       // If updating existing tenant, check if already linked to org
       if (tenantId && !orgId) {
-        const existingTenant = await prisma.tenant.findUnique({
+        const existingTenant = await prisma.tenants.findUnique({
           where: { id: tenantId },
-          select: { organizationId: true },
+          select: { organization_id: true },
         });
-        orgId = existingTenant?.organizationId;
+        orgId = existingTenant?.organization_id;
       }
 
       if (!orgId) {
@@ -81,7 +81,7 @@ export async function validateTierAssignment(
       }
 
       // Validate organization exists
-      const org = await prisma.organization.findUnique({
+      const org = await prisma.organizations_list.findUnique({
         where: { id: orgId },
       });
 
@@ -124,10 +124,10 @@ export async function validateTierCompatibility(
     }
 
     // Get tenant's current state
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
-        subscriptionTier: true,
+        subscription_tier: true,
       },
     });
 
@@ -140,12 +140,12 @@ export async function validateTierCompatibility(
 
     // If changing TO organization tier, must have organization
     if (subscriptionTier === 'organization') {
-      const tenantWithOrg = await prisma.tenant.findUnique({
+      const tenantWithOrg = await prisma.tenants.findUnique({
         where: { id: tenantId },
-        select: { organizationId: true },
+        select: { organization_id: true },
       });
       
-      if (!tenantWithOrg?.organizationId) {
+      if (!tenantWithOrg?.organization_id) {
         return res.status(400).json({
           error: 'organization_required',
           message: 'Cannot set organization tier: tenant not linked to any organization',
@@ -155,7 +155,7 @@ export async function validateTierCompatibility(
     }
 
     // If changing FROM organization tier, warn about losing features
-    if (tenant.subscriptionTier === 'organization' && subscriptionTier !== 'organization') {
+    if (tenant.subscription_tier === 'organization' && subscriptionTier !== 'organization') {
       console.warn(`[Tier Validation] WARNING: Changing tenant ${tenantId} from organization tier to ${subscriptionTier}`);
       // Allow but log warning - admin may be intentionally removing from org
     }
@@ -188,14 +188,14 @@ export function requirePropagationTier(
         });
       }
 
-      const tenant = await prisma.tenant.findUnique({
+      const tenant = await prisma.tenants.findUnique({
         where: { id: tenantId },
         include: {
-          organization: {
+          organizations_list: {
             select: {
               id: true,
-              subscriptionTier: true,
-              _count: { select: { Tenant: true }
+              subscription_tier: true,
+              _count: { select: { tenants: true }
               }
             }
           }
@@ -210,10 +210,10 @@ export function requirePropagationTier(
       }
 
       // Get effective tier (org tier overrides tenant tier)
-      const effectiveTier = tenant.organization?.subscriptionTier || tenant.subscriptionTier || 'starter';
+      const effectiveTier = tenant.organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
       
       // Check if user has 2+ locations
-      const locationCount = tenant.organization?._count.Tenant || 1;
+      const locationCount = tenant.organizations_list?._count.tenants || 1;
       if (locationCount < 2) {
         return res.status(403).json({
           error: 'insufficient_locations',

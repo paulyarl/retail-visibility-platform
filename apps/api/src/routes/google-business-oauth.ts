@@ -121,12 +121,12 @@ router.get('/google/business/callback', async (req, res) => {
     }
 
     // Store tokens in database
-    await prisma.tenant.update({
+    await prisma.tenants.update({
       where: { id: tenantId },
       data: {
-        googleBusinessAccessToken: tokens.access_token,
-        googleBusinessRefreshToken: tokens.refresh_token,
-        googleBusinessTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+        google_business_access_token: tokens.access_token,
+        google_business_refresh_token: tokens.refresh_token,
+        google_business_token_expiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
       }
     });
 
@@ -157,12 +157,12 @@ router.post('/google/business/disconnect', async (req, res) => {
     }
 
     // Remove tokens from database
-    await prisma.tenant.update({
+    await prisma.tenants.update({
       where: { id: tenantId },
       data: {
-        googleBusinessAccessToken: null,
-        googleBusinessRefreshToken: null,
-        googleBusinessTokenExpiry: null,
+        google_business_access_token: null,
+        google_business_refresh_token: null,
+        google_business_token_expiry: null,
       }
     });
 

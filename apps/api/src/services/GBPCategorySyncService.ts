@@ -11,7 +11,7 @@ import { getDirectPool } from '../utils/db-pool';
 
 interface GBPCategory {
   categoryId: string;
-  displayName: string;
+  display_name: string;
   serviceTypes?: string[];
   moreHoursTypes?: string[];
 }
@@ -47,8 +47,8 @@ export class GBPCategorySyncService {
    */
   private async getAnyValidAccessToken(): Promise<string | null> {
     try {
-      const tokenRecord = await prisma.googleOauthTokens.findFirst({
-        orderBy: { createdAt: 'desc' },
+      const tokenRecord = await prisma.google_oauth_tokens_list.findFirst({
+        orderBy: { created_at: 'desc' },
       });
 
       if (!tokenRecord) {
@@ -57,10 +57,10 @@ export class GBPCategorySyncService {
       }
 
       const now = new Date();
-      if (tokenRecord.expiresAt <= now) {
+      if (tokenRecord.expires_at <= now) {
         console.log('[GBPCategorySync] Token expired, refreshing for GBP categories...');
 
-        const refreshToken = decryptToken(tokenRecord.refreshTokenEncrypted);
+        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
         const newTokens = await refreshAccessToken(refreshToken);
 
         if (!newTokens) {
@@ -69,11 +69,11 @@ export class GBPCategorySyncService {
         }
 
         const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-        await prisma.googleOauthTokens.update({
-          where: { accountId: tokenRecord.accountId },
+        await prisma.google_oauth_tokens_list.update({
+          where: { account_id: tokenRecord.account_id },
           data: {
-            accessTokenEncrypted: encryptToken(newTokens.access_token),
-            expiresAt: newExpiresAt,
+            access_token_encrypted: encryptToken(newTokens.access_token),
+            expires_at: newExpiresAt,
             scopes: newTokens.scope.split(' '),
           },
         });
@@ -81,7 +81,7 @@ export class GBPCategorySyncService {
         return newTokens.access_token;
       }
 
-      return decryptToken(tokenRecord.accessTokenEncrypted);
+      return decryptToken(tokenRecord.access_token_encrypted);
     } catch (error) {
       console.error('[GBPCategorySync] Error getting valid access token:', error);
       return null;
@@ -262,7 +262,7 @@ export class GBPCategorySyncService {
         if (data.categories) {
           categories.push(...data.categories.map((cat: any) => ({
             categoryId: cat.name || '',
-            displayName: cat.displayName || '',
+            display_name: cat.display_name || '',
             serviceTypes: cat.serviceTypes || [],
             moreHoursTypes: cat.moreHoursTypes || []
           })));
@@ -303,8 +303,8 @@ export class GBPCategorySyncService {
       const latest = await this.fetchLatestCategories();
       
       // Get current categories from database
-      const current = await prisma.gbpCategories.findMany({
-        where: { isActive: true }
+      const current = await prisma.gbp_categories_list.findMany({
+        where: { is_active: true }
       });
 
       // Detect changes
@@ -334,34 +334,34 @@ export class GBPCategorySyncService {
       try {
         switch (change.type) {
           case 'new':
-            await prisma.gbpCategories.create({
+            await prisma.gbp_categories_list.create({
               data: {
                 id: change.categoryId,
-                name: change.newData.displayName,
-                displayName: change.newData.displayName,
-                isActive: true
+                name: change.newData.display_name,
+                display_name: change.newData.display_name,
+                is_active: true
               } as any
             });
             applied++;
             break;
 
           case 'updated':
-            await prisma.gbpCategories.update({
+            await prisma.gbp_categories_list.update({
               where: { id: change.categoryId },
               data: {
-                displayName: change.newData.displayName,
-                updatedAt: new Date()
+                display_name: change.newData.display_name,
+                updated_at: new Date()
               }
             });
             applied++;
             break;
 
           case 'deleted':
-            await prisma.gbpCategories.update({
+            await prisma.gbp_categories_list.update({
               where: { id: change.categoryId },
               data: {
-                isActive: false,
-                updatedAt: new Date()
+                is_active: false,
+                updated_at: new Date()
               }
             });
             applied++;
@@ -381,35 +381,35 @@ export class GBPCategorySyncService {
    */
   async seedHardcodedCategories(): Promise<number> {
     const hardcodedCategories = [
-      { id: "gcid:grocery_store", name: "Grocery store", displayName: "Grocery store" },
-      { id: "gcid:convenience_store", name: "Convenience store", displayName: "Convenience store" },
-      { id: "gcid:supermarket", name: "Supermarket", displayName: "Supermarket" },
-      { id: "gcid:liquor_store", name: "Liquor store", displayName: "Liquor store" },
-      { id: "gcid:specialty_food_store", name: "Specialty food store", displayName: "Specialty food store" },
-      { id: "gcid:clothing_store", name: "Clothing store", displayName: "Clothing store" },
-      { id: "gcid:shoe_store", name: "Shoe store", displayName: "Shoe store" },
-      { id: "gcid:electronics_store", name: "Electronics store", displayName: "Electronics store" },
-      { id: "gcid:furniture_store", name: "Furniture store", displayName: "Furniture store" },
-      { id: "gcid:hardware_store", name: "Hardware store", displayName: "Hardware store" },
-      { id: "gcid:pharmacy", name: "Pharmacy", displayName: "Pharmacy" },
-      { id: "gcid:beauty_supply_store", name: "Beauty supply store", displayName: "Beauty supply store" },
-      { id: "gcid:cosmetics_store", name: "Cosmetics store", displayName: "Cosmetics store" },
-      { id: "gcid:health_and_beauty_shop", name: "Health and beauty shop", displayName: "Health and beauty shop" },
-      { id: "gcid:book_store", name: "Book store", displayName: "Book store" },
-      { id: "gcid:pet_store", name: "Pet store", displayName: "Pet store" },
-      { id: "gcid:toy_store", name: "Toy store", displayName: "Toy store" },
-      { id: "gcid:sporting_goods_store", name: "Sporting goods store", displayName: "Sporting goods store" },
-      { id: "gcid:gift_shop", name: "Gift shop", displayName: "Gift shop" },
-      { id: "gcid:department_store", name: "Department store", displayName: "Department store" },
-      { id: "gcid:discount_store", name: "Discount store", displayName: "Discount store" },
-      { id: "gcid:variety_store", name: "Variety store", displayName: "Variety store" },
-      { id: "gcid:home_goods_store", name: "Home goods store", displayName: "Home goods store" },
-      { id: "gcid:jewelry_store", name: "Jewelry store", displayName: "Jewelry store" },
-      { id: "gcid:florist", name: "Florist", displayName: "Florist" },
-      { id: "gcid:bakery", name: "Bakery", displayName: "Bakery" },
-      { id: "gcid:butcher_shop", name: "Butcher shop", displayName: "Butcher shop" },
-      { id: "gcid:produce_market", name: "Produce market", displayName: "Produce market" },
-      { id: "gcid:wine_store", name: "Wine store", displayName: "Wine store" },
+      { id: "gcid:grocery_store", name: "Grocery store", display_name: "Grocery store" },
+      { id: "gcid:convenience_store", name: "Convenience store", display_name: "Convenience store" },
+      { id: "gcid:supermarket", name: "Supermarket", display_name: "Supermarket" },
+      { id: "gcid:liquor_store", name: "Liquor store", display_name: "Liquor store" },
+      { id: "gcid:specialty_food_store", name: "Specialty food store", display_name: "Specialty food store" },
+      { id: "gcid:clothing_store", name: "Clothing store", display_name: "Clothing store" },
+      { id: "gcid:shoe_store", name: "Shoe store", display_name: "Shoe store" },
+      { id: "gcid:electronics_store", name: "Electronics store", display_name: "Electronics store" },
+      { id: "gcid:furniture_store", name: "Furniture store", display_name: "Furniture store" },
+      { id: "gcid:hardware_store", name: "Hardware store", display_name: "Hardware store" },
+      { id: "gcid:pharmacy", name: "Pharmacy", display_name: "Pharmacy" },
+      { id: "gcid:beauty_supply_store", name: "Beauty supply store", display_name: "Beauty supply store" },
+      { id: "gcid:cosmetics_store", name: "Cosmetics store", display_name: "Cosmetics store" },
+      { id: "gcid:health_and_beauty_shop", name: "Health and beauty shop", display_name: "Health and beauty shop" },
+      { id: "gcid:book_store", name: "Book store", display_name: "Book store" },
+      { id: "gcid:pet_store", name: "Pet store", display_name: "Pet store" },
+      { id: "gcid:toy_store", name: "Toy store", display_name: "Toy store" },
+      { id: "gcid:sporting_goods_store", name: "Sporting goods store", display_name: "Sporting goods store" },
+      { id: "gcid:gift_shop", name: "Gift shop", display_name: "Gift shop" },
+      { id: "gcid:department_store", name: "Department store", display_name: "Department store" },
+      { id: "gcid:discount_store", name: "Discount store", display_name: "Discount store" },
+      { id: "gcid:variety_store", name: "Variety store", display_name: "Variety store" },
+      { id: "gcid:home_goods_store", name: "Home goods store", display_name: "Home goods store" },
+      { id: "gcid:jewelry_store", name: "Jewelry store", display_name: "Jewelry store" },
+      { id: "gcid:florist", name: "Florist", display_name: "Florist" },
+      { id: "gcid:bakery", name: "Bakery", display_name: "Bakery" },
+      { id: "gcid:butcher_shop", name: "Butcher shop", display_name: "Butcher shop" },
+      { id: "gcid:produce_market", name: "Produce market", display_name: "Produce market" },
+      { id: "gcid:wine_store", name: "Wine store", display_name: "Wine store" },
     ];
 
     try {
@@ -421,29 +421,29 @@ export class GBPCategorySyncService {
 
         for (const category of hardcodedCategories) {
           // Check if category exists
-          const existing = await tx.gbpCategories.findUnique({
+          const existing = await tx.gbp_categories_list.findUnique({
             where: { id: category.id },
-            select: { id: true, displayName: true }
+            select: { id: true, display_name: true }
           });
 
           if (!existing) {
             // Create new category
-            await tx.gbpCategories.create({
+            await tx.gbp_categories_list.create({
               data: {
                 id: category.id,
                 name: category.name,
-                displayName: category.displayName,
-                isActive: true
+                display_name: category.display_name,
+                is_active: true
               } as any
             });
             upserted++;
-          } else if (existing.displayName !== category.displayName) { 
+          } else if (existing.display_name !== category.display_name) { 
             // Update existing category if displayName changed
-            await tx.gbpCategories.update({
+            await tx.gbp_categories_list.update({
               where: { id: category.id },
               data: {
-                displayName: category.displayName,
-                updatedAt: new Date()
+                display_name: category.display_name,
+                updated_at: new Date()
               }
             });
             upserted++;
@@ -471,19 +471,19 @@ export class GBPCategorySyncService {
 
       for (const category of hardcodedCategories) {
         try {
-          await prisma.gbpCategories.upsert({
+          await prisma.gbp_categories_list.upsert({
             where: { id: category.id },
             update: {
-              displayName: category.displayName,
-              updatedAt: new Date()
+              display_name: category.display_name,
+              updated_at: new Date()
             },
             create: {
               id: category.id,
               name: category.name,
-              displayName: category.displayName,
-              isActive: true,
-              createdAt: new Date(),
-              updatedAt: new Date()
+              display_name: category.display_name,
+              is_active: true,
+              created_at: new Date(),
+              updated_at: new Date()
             }
           });
           seeded++;
@@ -513,43 +513,43 @@ export class GBPCategorySyncService {
   } {
     const categories: GBPCategory[] = [
       // Food & Beverage
-      { categoryId: 'gcid:grocery_store', displayName: 'Grocery store' },
-      { categoryId: 'gcid:convenience_store', displayName: 'Convenience store' },
-      { categoryId: 'gcid:supermarket', displayName: 'Supermarket' },
-      { categoryId: 'gcid:liquor_store', displayName: 'Liquor store' },
-      { categoryId: 'gcid:specialty_food_store', displayName: 'Specialty food store' },
+      { categoryId: 'gcid:grocery_store', display_name: 'Grocery store' },
+      { categoryId: 'gcid:convenience_store', display_name: 'Convenience store' },
+      { categoryId: 'gcid:supermarket', display_name: 'Supermarket' },
+      { categoryId: 'gcid:liquor_store', display_name: 'Liquor store' },
+      { categoryId: 'gcid:specialty_food_store', display_name: 'Specialty food store' },
 
       // General Retail
-      { categoryId: 'gcid:clothing_store', displayName: 'Clothing store' },
-      { categoryId: 'gcid:shoe_store', displayName: 'Shoe store' },
-      { categoryId: 'gcid:electronics_store', displayName: 'Electronics store' },
-      { categoryId: 'gcid:furniture_store', displayName: 'Furniture store' },
-      { categoryId: 'gcid:hardware_store', displayName: 'Hardware store' },
+      { categoryId: 'gcid:clothing_store', display_name: 'Clothing store' },
+      { categoryId: 'gcid:shoe_store', display_name: 'Shoe store' },
+      { categoryId: 'gcid:electronics_store', display_name: 'Electronics store' },
+      { categoryId: 'gcid:furniture_store', display_name: 'Furniture store' },
+      { categoryId: 'gcid:hardware_store', display_name: 'Hardware store' },
 
       // Health & Beauty
-      { categoryId: 'gcid:pharmacy', displayName: 'Pharmacy' },
-      { categoryId: 'gcid:beauty_supply_store', displayName: 'Beauty supply store' },
-      { categoryId: 'gcid:cosmetics_store', displayName: 'Cosmetics store' },
-      { categoryId: 'gcid:health_and_beauty_shop', displayName: 'Health and beauty shop' },
+      { categoryId: 'gcid:pharmacy', display_name: 'Pharmacy' },
+      { categoryId: 'gcid:beauty_supply_store', display_name: 'Beauty supply store' },
+      { categoryId: 'gcid:cosmetics_store', display_name: 'Cosmetics store' },
+      { categoryId: 'gcid:health_and_beauty_shop', display_name: 'Health and beauty shop' },
 
       // Specialty Stores
-      { categoryId: 'gcid:book_store', displayName: 'Book store' },
-      { categoryId: 'gcid:pet_store', displayName: 'Pet store' },
-      { categoryId: 'gcid:toy_store', displayName: 'Toy store' },
-      { categoryId: 'gcid:sporting_goods_store', displayName: 'Sporting goods store' },
-      { categoryId: 'gcid:gift_shop', displayName: 'Gift shop' },
+      { categoryId: 'gcid:book_store', display_name: 'Book store' },
+      { categoryId: 'gcid:pet_store', display_name: 'Pet store' },
+      { categoryId: 'gcid:toy_store', display_name: 'Toy store' },
+      { categoryId: 'gcid:sporting_goods_store', display_name: 'Sporting goods store' },
+      { categoryId: 'gcid:gift_shop', display_name: 'Gift shop' },
 
       // Additional common categories
-      { categoryId: 'gcid:department_store', displayName: 'Department store' },
-      { categoryId: 'gcid:discount_store', displayName: 'Discount store' },
-      { categoryId: 'gcid:variety_store', displayName: 'Variety store' },
-      { categoryId: 'gcid:home_goods_store', displayName: 'Home goods store' },
-      { categoryId: 'gcid:jewelry_store', displayName: 'Jewelry store' },
-      { categoryId: 'gcid:florist', displayName: 'Florist' },
-      { categoryId: 'gcid:bakery', displayName: 'Bakery' },
-      { categoryId: 'gcid:butcher_shop', displayName: 'Butcher shop' },
-      { categoryId: 'gcid:produce_market', displayName: 'Produce market' },
-      { categoryId: 'gcid:wine_store', displayName: 'Wine store' },
+      { categoryId: 'gcid:department_store', display_name: 'Department store' },
+      { categoryId: 'gcid:discount_store', display_name: 'Discount store' },
+      { categoryId: 'gcid:variety_store', display_name: 'Variety store' },
+      { categoryId: 'gcid:home_goods_store', display_name: 'Home goods store' },
+      { categoryId: 'gcid:jewelry_store', display_name: 'Jewelry store' },
+      { categoryId: 'gcid:florist', display_name: 'Florist' },
+      { categoryId: 'gcid:bakery', display_name: 'Bakery' },
+      { categoryId: 'gcid:butcher_shop', display_name: 'Butcher shop' },
+      { categoryId: 'gcid:produce_market', display_name: 'Produce market' },
+      { categoryId: 'gcid:wine_store', display_name: 'Wine store' },
     ];
 
     return {
@@ -580,7 +580,7 @@ export class GBPCategorySyncService {
           categoryId: id,
           newData: latestCat
         });
-      } else if (currentCat.displayName !== latestCat.displayName) {
+      } else if (currentCat.display_name !== latestCat.display_name) {
         changes.push({
           type: 'updated',
           categoryId: id,

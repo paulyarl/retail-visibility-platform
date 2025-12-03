@@ -81,19 +81,34 @@ export async function createQuickStartCategoriesForTenant(tenantId: string): Pro
   
   for (const category of categories) {
     try {
-      await prisma.directoryCategory.create({
+      // Check if category already exists for this tenant
+      const existing = await prisma.directory_category.findFirst({
+        where: {
+          tenantId: tenantId,
+          slug: category.slug,
+        },
+      });
+      
+      if (existing) {
+        console.log(`[Quick Start Categories] Skipping duplicate category: ${category.name} for tenant ${tenantId}`);
+        continue;
+      }
+      
+      // Create new category
+      await prisma.directory_category.create({
         data: {
-          /**id: `cat_${tenantId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, */
           id: generateQsCatId(),
-          tenantId,
+          tenantId: tenantId,
           name: category.name,
           slug: category.slug,
+          isActive: true, 
           updatedAt: new Date(),
         },
       });
+      console.log(`[Quick Start Categories] Created category: ${category.name} for tenant ${tenantId}`);
     } catch (error: any) {
       // Log error but continue with other categories
-      console.error(`Failed to create category ${category.name} for tenant ${tenantId}:`, error);
+      console.error(`[Quick Start Categories] Failed to create category ${category.name} for tenant ${tenantId}:`, error);
     }
   }
 }

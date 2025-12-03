@@ -30,21 +30,21 @@ async function upsertInBatches(items: any[], batchSize = 200) {
     try {
       await prisma.$transaction(
         batch.map((it) =>
-          prisma.googleTaxonomy.upsert({
-            where: { categoryId: it.categoryId },
+          prisma.google_taxonomy_list.upsert({
+            where: { category_id: it.categoryId },
             create: {
-              categoryId: it.categoryId,
-              categoryPath: it.categoryPath,
-              parentId: it.parentId,
+              category_id: it.categoryId,
+              category_path: it.categoryPath,
+              parent_id: it.parentId,
               level: it.level,
-              isActive: true,
+              is_active: true,
               version: '2024-09',
             } as any,
             update: {
-              categoryPath: it.categoryPath,
-              parentId: it.parentId,
+              category_path: it.categoryPath,
+              parent_id: it.parentId,
               level: it.level,
-              isActive: true,
+              is_active: true,
               version: '2024-09',
             },
           })
@@ -73,9 +73,9 @@ router.post('/sync', async (_req, res) => {
     // Upsert in batches
     await upsertInBatches(flat, 200);
 
-    const total = await prisma.googleTaxonomy.count();
+    const total = await prisma.google_taxonomy_list.count();
     console.log(`[POST /admin/taxonomy/sync] Total records after sync: ${total}`);
-    const versions = await prisma.googleTaxonomy.groupBy({ by: ['version'], _count: { version: true } });
+    const versions = await prisma.google_taxonomy_list.groupBy({ by: ['version'], _count: { version: true } });
 
     res.status(201).json({
       success: true,

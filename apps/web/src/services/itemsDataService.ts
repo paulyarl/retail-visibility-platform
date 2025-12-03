@@ -85,7 +85,9 @@ export class ItemsDataService {
       const response = await api.get(`api/items?${params.toString()}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch items');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[fetchItems] API error:', response.status, response.statusText, errorData);
+        throw new Error(`Failed to fetch items: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -164,7 +166,8 @@ export class ItemsDataService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData?.error || 'Failed to update item');
+        console.error('[updateItem] API error response:', response.status, errorData);
+        throw new Error(errorData?.error || `Failed to update item (${response.status})`);
       }
 
       const result = await response.json();

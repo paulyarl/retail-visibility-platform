@@ -14,6 +14,7 @@ import {
   getEnrichableFields,
   calculateEnrichmentValue
 } from '../../utils/productMatcher';
+import { generatePhotoId } from '../../lib/id-generator';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -97,27 +98,27 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     }
 
     // Enforce subscription state with 6-month maintenance window for google_only fallback
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
-      select: { subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true }, 
+      select: { subscription_tier: true, subscription_status: true, trial_ends_at: true }, 
     });
 
     if (!tenant) {
       return res.status(404).json({ error: 'Tenant not found' });
     }
 
-    const tier = tenant.subscriptionTier || 'starter';
-    const status = tenant.subscriptionStatus || 'active';
+    const tier = tenant.subscription_tier || 'starter';
+    const status = tenant.subscription_status || 'active';
     const now = new Date();
     const isInactive = status === 'canceled' || status === 'expired';
 
-    // google_only maintenance window: allow enrichment while active and before trialEndsAt boundary.
-    // trialEndsAt is treated as the current maintenance boundary and should be extended externally
+    // google_only maintenance window: allow enrichment while active and before trial_ends_at boundary.
+    // trial_ends_at is treated as the current maintenance boundary and should be extended externally
     // in 6-month increments while the subscription remains active.
     const inMaintenanceWindow =
       tier === 'google_only' &&
       status === 'active' &&
-      (!tenant.trialEndsAt || now < tenant.trialEndsAt);
+      (!tenant.trial_ends_at || now < tenant.trial_ends_at);
 
     const isFullyFrozen = isInactive || (tier === 'google_only' && !inMaintenanceWindow);
 
@@ -125,18 +126,18 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
       return res.status(403).json({
         error: 'subscription_read_only',
         message: 'Your account is in read-only visibility mode. Upgrade to add or update products or sync new changes.',
-        subscriptionTier: tier,
-        subscriptionStatus: status,
+        subscription_tier: tier,
+        subscription_status: status,
       });
     }
 
     // Get existing product
-    const product = await prisma.inventoryItem.findUnique({
+    const product = await prisma.inventory_items.findUnique({
       where: { id: productId },
-      include: { photoAsset: true }
+      include: { photo_assets: true }
     });
 
-    if (!product || product.tenantId !== tenantId) {
+    if (!product || product.tenant_id !== tenantId) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
@@ -201,7 +202,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     }
 
     // Update product
-    const updatedProduct = await prisma.inventoryItem.update({
+    const updatedProduct = await prisma.inventory_items.update({
       where: { id: productId },
       data: updateData
     });
@@ -210,29 +211,30 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     let addedImages: any[] = [];
     if (enrichmentOptions.useImages && scannedData.images && scannedData.images.length > 0) {
       // Delete existing photos if any
-      await prisma.photoAsset.deleteMany({
-        where: { inventoryItemId: productId }
+      await prisma.photo_assets.deleteMany({
+        where: { inventory_item_id: productId }
       });
 
       // Add new photos
       const photoData = scannedData.images.map((url, index) => ({
-        tenantId,
-        inventoryItemId: productId,
+        id:generatePhotoId(),
+        tenant_id: tenantId,
+        inventory_item_id: productId,
         url,
         position: index,
-        contentType: 'image/jpeg', // Default, could be detected
+        content_type: 'image/jpeg', // Default, could be detected
         alt: `${updatedProduct.name} - Image ${index + 1}`
       }));
 
-      const batchResult = await prisma.photoAsset.createMany({
+      const batchResult = await prisma.photo_assets.createMany({
         data: photoData
       });
       addedImages = photoData; // Return the data we created
 
       // Update missing images flag
-      await prisma.inventoryItem.update({
+      await prisma.inventory_items.update({
         where: { id: productId },
-        data: { missingImages: false }
+        data: { missing_images: false }
       });
     }
 
@@ -244,21 +246,21 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
                           !missing.missingBrand;
 
     if (fullyEnriched) {
-      await prisma.inventoryItem.update({
+      await prisma.inventory_items.update({
         where: { id: productId },
-        data: { enrichmentStatus: 'COMPLETE' }
+        data: { enrichment_status: 'COMPLETE' }
       });
     } else {
-      await prisma.inventoryItem.update({
+      await prisma.inventory_items.update({
         where: { id: productId },
-        data: { enrichmentStatus: 'PARTIALLY_ENRICHED' }
+        data: { enrichment_status: 'PARTIALLY_ENRICHED' }
       });
     }
 
     // Get final product with photos
-    const enrichedProduct = await prisma.inventoryItem.findUnique({
+    const enrichedProduct = await prisma.inventory_items.findUnique({
       where: { id: productId },
-      include: { photoAsset: true }
+      include: { photo_assets: true }
     });
 
     // Track analytics
@@ -305,19 +307,19 @@ router.get('/needs-enrichment', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const products = await prisma.inventoryItem.findMany({
+    const products = await prisma.inventory_items.findMany({
       where: {
-        tenantId,
+        tenant_id:tenantId,
         OR: [
-          { enrichmentStatus: 'NEEDS_ENRICHMENT' },
-          { enrichmentStatus: 'PARTIALLY_ENRICHED' }
+          { enrichment_status: 'NEEDS_ENRICHMENT' },
+          { enrichment_status: 'PARTIALLY_ENRICHED' }
         ]
       },
       include: {
-        photoAsset: true
+        photo_assets: true
       },
       orderBy: {
-        createdAt: 'desc'
+        created_at: 'desc'
       }
     });
 
@@ -360,12 +362,12 @@ router.get('/:productId/enrichment-status', async (req: Request, res: Response) 
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const product = await prisma.inventoryItem.findUnique({
+    const product = await prisma.inventory_items.findUnique({
       where: { id: productId },
-      include: { photoAsset: true }
+      include: { photo_assets: true }
     });
 
-    if (!product || product.tenantId !== tenantId) {
+    if (!product || product.tenant_id !== tenantId) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
@@ -373,13 +375,13 @@ router.get('/:productId/enrichment-status', async (req: Request, res: Response) 
 
     return res.json({
       success: true,
-      enrichmentStatus: product.enrichmentStatus,
+      enrichment_status: product.enrichment_status,
       source: product.source,
-      enrichedAt: product.enrichedAt,
-      enrichedBy: product.enrichedBy,
-      enrichedFromBarcode: product.enrichedFromBarcode,
+      enrichedAt: product.enriched_at,
+      enrichedBy: product.enriched_by,
+      enrichedFromBarcode: product.enriched_from_barcode,
       missing,
-      photoCount: product.photoAsset.length
+      photoCount: product.photo_assets.length
     });
   } catch (error) {
     console.error('[Products] Get enrichment status error:', error);

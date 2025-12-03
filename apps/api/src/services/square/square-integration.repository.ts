@@ -58,27 +58,27 @@ export class SquareIntegrationRepository {
    */
   async createIntegration(data: CreateIntegrationData) {
     // Check if integration exists
-    const existing = await prisma.squareIntegrations.findFirst({
-      where: { tenantId: data.tenantId }
+    const existing = await prisma.square_integrations_list.findFirst({
+      where: { tenant_id: data.tenantId }
     });
 
     if (existing) {
       // Update existing
-      return await prisma.squareIntegrations.update({
+      return await prisma.square_integrations_list.update({
         where: { id: existing.id },
         data: {
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken || null,
-          merchantId: data.merchantId,
-          locationId: data.locationId || null,
-          tokenExpiresAt: data.tokenExpiresAt || null,
+          access_token: data.accessToken,
+          refresh_token: data.refreshToken || null,
+          merchant_id: data.merchantId,
+          location_id: data.locationId || null,
+          token_expires_at: data.tokenExpiresAt || null,
           scopes: data.scopes || [],
           mode: data.mode,
         }
       });
     } else {
       // Create new
-      return await prisma.squareIntegrations.create({
+      return await prisma.square_integrations_list.create({
         data: {
           tenantId: data.tenantId,
           accessToken: data.accessToken,
@@ -97,8 +97,8 @@ export class SquareIntegrationRepository {
    * Get integration by tenant ID
    */
   async getIntegrationByTenantId(tenantId: string) {
-    return await prisma.squareIntegrations.findFirst({
-      where: { tenantId },
+    return await prisma.square_integrations_list.findFirst({
+      where: { tenant_id:tenantId },
     });
   }
 

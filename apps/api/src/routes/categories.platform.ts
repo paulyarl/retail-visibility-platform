@@ -72,7 +72,7 @@ router.post('/categories/quick-start', authenticateToken, requireAdmin, async (r
     for (const category of categoriesToCreate) {
       try {
         // Check if category already exists
-        const existing = await prisma.directoryCategory.findFirst({
+        const existing = await prisma.directory_category.findFirst({
           where: {
             tenantId: 'platform',
             slug: category.slug,
@@ -84,7 +84,7 @@ router.post('/categories/quick-start', authenticateToken, requireAdmin, async (r
           continue;
         }
         
-        const created = await prisma.directoryCategory.create({
+        const created = await prisma.directory_category.create({
           data: {
             id: generateQsCatId(),
             tenantId: 'platform',

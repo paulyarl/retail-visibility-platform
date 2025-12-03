@@ -29,15 +29,15 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
     const { id: tenantId } = req.params;
 
     // Get or create directory settings
-    let settings = await prisma.directorySettings.findUnique({
-      where: { tenantId },
+    let settings = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenantId },
     });
 
     if (!settings) {
       // Auto-create settings from business profile
-      const tenant = await prisma.tenant.findUnique({
+      const tenant = await prisma.tenants.findUnique({
         where: { id: tenantId },
-        include: { tenantBusinessProfile: true },
+        include: { tenant_business_profiles_list: true },
       });
 
       if (!tenant) {
@@ -45,7 +45,7 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       }
 
       // Generate slug from business name
-      const businessName = tenant.tenantBusinessProfile?.businessName || tenant.name;
+      const businessName = tenant.tenant_business_profiles_list?.business_name || tenant.name;
       const baseSlug = businessName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
@@ -54,45 +54,45 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       // Ensure unique slug
       let slug = baseSlug;
       let counter = 1;
-      while (await prisma.directorySettings.findUnique({ where: { slug } })) {
+      while (await prisma.directory_settings_list.findUnique({ where: { slug } })) {
         slug = `${baseSlug}-${counter}`;
         counter++;
       }
 
-      settings = await prisma.directorySettings.upsert({
+      settings = await prisma.directory_settings_list.upsert({
         where: { id: `dir_${tenantId}` },
         update: {
           slug,
-          updatedAt: new Date(),
+          updated_at: new Date(),
         },
         create: {
           id: `dir_${tenantId}`,
-          tenantId,
+          tenant_id: tenantId,
           slug,
-          isPublished: false,
-          updatedAt: new Date(),
+          is_published: false,
+          updated_at: new Date(),
         },
       });
     }
 
     // Check if currently featured
-    const activeFeatured = await prisma.directoryFeaturedListings.findFirst({
+    const activeFeatured = await prisma.directory_featured_listings_list.findFirst({
       where: {
-        tenantId,
-        featuredUntil: { gt: new Date() },
+        tenant_id: tenantId,
+        featured_until: { gt: new Date() },
       },
-      orderBy: { featuredFrom: 'desc' },
+      orderBy: { featured_from: 'desc' },
     });
 
     // Get business profile for preview
-    const businessProfile = await prisma.tenantBusinessProfile.findUnique({
-      where: { tenantId },
+    const businessProfile = await prisma.tenant_business_profiles_list.findUnique({
+      where: { tenant_id: tenantId },
     });
 
     return res.json({
       ...settings,
       isFeatured: !!activeFeatured,
-      featuredUntil: activeFeatured?.featuredUntil,
+      featuredUntil: activeFeatured?.featured_until,
       businessProfile,
     });
   } catch (error: any) {
@@ -137,23 +137,23 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
     console.log('[PATCH /tenants/:id/directory/listing] Validation passed. Parsed data:', JSON.stringify(parsed.data, null, 2));
     console.log('[PATCH /tenants/:id/directory/listing] About to upsert...');
 
-    const updated = await prisma.directorySettings.upsert({
-      where: { tenantId },
+    const updated = await prisma.directory_settings_list.upsert({
+      where: { tenant_id: tenantId },
       update: {
-        seoDescription: parsed.data.seo_description,
-        seoKeywords: parsed.data.seo_keywords,
-        primaryCategory: parsed.data.primary_category,
-        secondaryCategories: parsed.data.secondary_categories,
-        updatedAt: new Date(),
+        seo_description: parsed.data.seo_description,
+        seo_keywords: parsed.data.seo_keywords,
+        primary_category: parsed.data.primary_category,
+        secondary_categories: parsed.data.secondary_categories,
+        updated_at: new Date(),
       },
       create: {
         id: `dir_${tenantId}`,
-        tenantId,
-        seoDescription: parsed.data.seo_description,
-        seoKeywords: parsed.data.seo_keywords,
-        primaryCategory: parsed.data.primary_category,
-        secondaryCategories: parsed.data.secondary_categories,
-        updatedAt: new Date(),
+        tenant_id: tenantId,
+        seo_description: parsed.data.seo_description,
+        seo_keywords: parsed.data.seo_keywords,
+        primary_category: parsed.data.primary_category,
+        secondary_categories: parsed.data.secondary_categories,
+        updated_at: new Date(),
       },
     });
 
@@ -220,18 +220,18 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
     const { id: tenantId } = req.params;
 
     // Check tier access (google_only doesn't get directory)
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenantId } });
     if (!tenant) {
       return res.status(404).json({ error: 'tenant_not_found' });
     }
 
-    if (tenant.subscriptionTier === 'google_only') {
+    if (tenant.subscription_tier === 'google_only') {
       return res.status(403).json({ error: 'directory_not_available_for_tier' });
     }
 
     // Verify business profile is complete enough
-    const profile = await prisma.tenantBusinessProfile.findUnique({ where: { tenantId } });
-    if (!profile || !profile.businessName || !profile.city || !profile.state) {
+    const profile = await prisma.tenant_business_profiles_list.findUnique({ where: { tenant_id: tenantId } });
+    if (!profile || !profile.business_name || !profile.city || !profile.state) {
       return res.status(400).json({ 
         error: 'incomplete_profile',
         message: 'Business name, city, and state are required to publish to directory'
@@ -239,14 +239,14 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
     }
 
     // Update directory settings
-    const updated = await prisma.directorySettings.upsert({
-      where: { tenantId },
-      update: { isPublished: true, updatedAt: new Date() },
+    const updated = await prisma.directory_settings_list.upsert({
+      where: { tenant_id: tenantId },
+      update: { is_published: true, updated_at: new Date() },
       create: { 
         id: `dir_${tenantId}`,
-        tenantId, 
-        isPublished: true,
-        updatedAt: new Date(),
+        tenant_id: tenantId, 
+        is_published: true,
+        updated_at: new Date(),
       },
     });
 
@@ -375,9 +375,9 @@ router.post('/:id/directory/unpublish', authenticateToken, checkTenantAccess, as
     const { id: tenantId } = req.params;
 
     // Update directory settings
-    const updated = await prisma.directorySettings.update({
-      where: { tenantId },
-      data: { isPublished: false, updatedAt: new Date() },
+    const updated = await prisma.directory_settings_list.update({
+      where: { tenant_id: tenantId },
+      data: { is_published: false, updated_at: new Date() },
     });
 
     // Also update the directory listing to unpublish it

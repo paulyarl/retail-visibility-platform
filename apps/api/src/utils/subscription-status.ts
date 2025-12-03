@@ -1,4 +1,4 @@
-import { Tenant, Organization } from "@prisma/client";
+import { tenants } from "@prisma/client";
 
 /**
  * Internal subscription status enum (derived from Tenant fields)

@@ -36,14 +36,14 @@ export async function validateSKULimits(
     }
 
     // Get tenant with tier, status, and current SKU count
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: actualTenantId },
       select: {
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        trialEndsAt: true,
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
         _count: {
-          select: { inventoryItems: true },
+          select: { inventory_items: true },
         },
       },
     });
@@ -55,13 +55,13 @@ export async function validateSKULimits(
       });
     }
 
-    const tier = tenant.subscriptionTier || 'starter';
-    const status = tenant.subscriptionStatus || 'active';
+    const tier = tenant.subscription_tier || 'starter';
+    const status = tenant.subscription_status || 'active';
 
     const maintenanceState = getMaintenanceState({
       tier,
       status,
-      trialEndsAt: tenant.trialEndsAt ?? undefined,
+      trialEndsAt: tenant.trial_ends_at ?? undefined,
     });
 
     // In maintenance mode, block growth (bulk product creation) even if numeric limits not reached
@@ -80,7 +80,7 @@ export async function validateSKULimits(
 
     // Try database-driven limit first, fallback to utility function
     const skuLimit = await TierService.getTierSKULimit(tier).catch(() => getSKULimit(tier));
-    const currentCount = tenant._count.inventoryItems;
+    const currentCount = tenant._count.inventory_items;
     const totalAfter = currentCount + productCount;
 
     // Check if adding products would exceed limit
@@ -124,12 +124,12 @@ export async function validateTierSKUCompatibility(
     }
 
     // Get tenant's current SKU count
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
-        subscriptionTier: true,
+        subscription_tier: true,
         _count: {
-          select: { inventoryItems: true },
+          select: { inventory_items: true },
         },
       },
     });
@@ -143,7 +143,7 @@ export async function validateTierSKUCompatibility(
 
     // Try database-driven limit first, fallback to utility function
     const newLimit = await TierService.getTierSKULimit(subscriptionTier).catch(() => getSKULimit(subscriptionTier));
-    const currentCount = tenant._count.inventoryItems; 
+    const currentCount = tenant._count.inventory_items; 
 
     // Check if current SKU count exceeds new tier limit
     if (newLimit !== Infinity && currentCount > newLimit) {
@@ -152,7 +152,7 @@ export async function validateTierSKUCompatibility(
         message: `Cannot change to ${subscriptionTier} tier: tenant has ${currentCount} SKUs, new tier limit is ${newLimit}`,
         current: currentCount,
         newLimit,
-        currentTier: tenant.subscriptionTier,
+        currentTier: tenant.subscription_tier,
         requestedTier: subscriptionTier,
         excessSKUs: currentCount - newLimit,
         hint: 'Reduce SKU count before changing tier, or choose a higher tier',

@@ -11,13 +11,13 @@ describe("Tenant global-readiness defaults (REQ-2025-901)", () => {
   afterAll(async () => {
     // Cleanup
     if (createdTenantId) {
-      await prisma.tenant.delete({ where: { id: createdTenantId } }).catch(() => {});
+      await prisma.tenants.delete({ where: { id: createdTenantId } }).catch(() => {});
     }
     await prisma.$disconnect();
   });
 
   it("should create tenant with default region, language, currency, and data_policy_accepted=false", async () => {
-    const tenant = await prisma.tenant.create({
+    const tenant = await prisma.tenants.create({
       data: { name: "Test Tenant for Defaults" } as any,
     });
 

@@ -23,10 +23,10 @@ router.get('/analytics', authenticateToken, async (req: Request, res: Response) 
       return res.status(403).json({ success: false, error: 'platform_access_required' });
     }
 
-    const totalProducts = await prisma.inventoryItem.count();
+    const totalProducts = await prisma.inventory_items.count();
 
     // Get products with nutrition data
-    const productsWithNutrition = await prisma.inventoryItem.count({
+    const productsWithNutrition = await prisma.inventory_items.count({
       where: {
         metadata: {
           path: ['nutritionData'],
@@ -36,16 +36,16 @@ router.get('/analytics', authenticateToken, async (req: Request, res: Response) 
     });
 
     // Get products with images
-    const productsWithImages = await prisma.inventoryItem.count({
+    const productsWithImages = await prisma.inventory_items.count({
       where: {
-        imageUrl: {
+        image_url: {
           not: null
         }
       }
     });
 
     // Get products with environmental data (if applicable)
-    const productsWithEnvironmental = await prisma.inventoryItem.count({
+    const productsWithEnvironmental = await prisma.inventory_items.count({
       where: {
         // Assuming environmental data might be stored in metadata
         metadata: {
@@ -69,8 +69,8 @@ router.get('/analytics', authenticateToken, async (req: Request, res: Response) 
       : '0.0';
 
     // Get source breakdown (if products have source info in metadata)
-    const sourceBreakdown = await prisma.inventoryItem.groupBy({
-      by: ['tenantId'],
+    const sourceBreakdown = await prisma.inventory_items.groupBy({
+      by: ['tenant_id'],
       _count: {
         id: true
       },
@@ -83,8 +83,8 @@ router.get('/analytics', authenticateToken, async (req: Request, res: Response) 
     });
 
     // Get tenant names for source breakdown
-    const tenantIds = sourceBreakdown.map(item => item.tenantId);
-    const tenants = await prisma.tenant.findMany({
+    const tenantIds = sourceBreakdown.map(item => item.tenant_id);
+    const tenants = await prisma.tenants.findMany({
       where: {
         id: {
           in: tenantIds
@@ -97,12 +97,12 @@ router.get('/analytics', authenticateToken, async (req: Request, res: Response) 
     });
 
     const sourceData = sourceBreakdown.map(item => {
-      const tenant = tenants.find(t => t.id === item.tenantId);
+      const tenant = tenants.find(t => t.id === item.tenant_id);
       return {
         source: tenant?.name || 'Unknown',
-        count: item._count.id,
+        count: item._count?.id || 0,
         percentage: totalProducts > 0 
-          ? ((item._count.id / totalProducts) * 100).toFixed(1)
+          ? (((item._count?.id || 0) / totalProducts) * 100).toFixed(1)
           : '0.0'
       };
     });
@@ -111,27 +111,27 @@ router.get('/analytics', authenticateToken, async (req: Request, res: Response) 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
-    const recentAdditions = await prisma.inventoryItem.count({
+    const recentAdditions = await prisma.inventory_items.count({
       where: {
-        createdAt: {
+        created_at: {
           gte: sevenDaysAgo
         }
       }
     });
 
     // Get popular products with enrichment data
-    const popularProducts = await prisma.inventoryItem.findMany({
+    const popularProducts = await prisma.inventory_items.findMany({
       take: 5,
       orderBy: {
-        createdAt: 'desc'
+        created_at: 'desc'
       },
       select: {
         id: true,
         name: true,
         sku: true,
-        tenantId: true,
-        imageUrl: true,
-        createdAt: true,
+        tenant_id: true,
+        image_url: true,
+        created_at: true,
         brand: true,
         source: true
       }
@@ -232,7 +232,7 @@ router.get('/search', authenticateToken, async (req: Request, res: Response) => 
 
     if (source && typeof source === 'string') {
       // Filter by tenant name
-      const tenants = await prisma.tenant.findMany({
+      const tenants = await prisma.tenants.findMany({
         where: {
           name: {
             contains: source,
@@ -252,10 +252,10 @@ router.get('/search', authenticateToken, async (req: Request, res: Response) => 
     }
 
     // Get total count
-    const total = await prisma.inventoryItem.count({ where });
+    const total = await prisma.inventory_items.count({ where });
 
     // Get products
-    const products = await prisma.inventoryItem.findMany({
+    const products = await prisma.inventory_items.findMany({
       where,
       select: {
         id: true,
@@ -264,13 +264,13 @@ router.get('/search', authenticateToken, async (req: Request, res: Response) => 
         brand: true,
         source: true,
         description: true,
-        priceCents: true,
-        imageUrl: true,
-        tenantId: true,
-        createdAt: true,
-        updatedAt: true,
+        price_cents: true,
+        image_url: true,
+        tenant_id: true,
+        created_at: true,
+        updated_at: true,
         metadata: true,
-        tenant: {
+        tenants: {
           select: {
             id: true,
             name: true
@@ -278,7 +278,7 @@ router.get('/search', authenticateToken, async (req: Request, res: Response) => 
         }
       },
       orderBy: {
-        createdAt: 'desc'
+        created_at: 'desc'
       },
       skip,
       take: limitNum
@@ -292,15 +292,15 @@ router.get('/search', authenticateToken, async (req: Request, res: Response) => 
       brand: product.brand || 'Unknown',
       source: product.source || 'Manual',
       fetchCount: Math.floor(Math.random() * 100) + 1, // Mock fetch count
-      imageThumbnailUrl: product.imageUrl,
+      imageThumbnailUrl: product.image_url,
       description: product.description,
-      price: product.priceCents ? product.priceCents / 100 : null,
-      tenant: product.tenant.name,
-      tenantId: product.tenantId,
-      createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
+      price: product.price_cents ? product.price_cents / 100 : null,
+      tenant: product.tenants.name,
+      tenantId: product.tenant_id,
+      createdAt: product.created_at,
+      updatedAt: product.updated_at,
       hasNutrition: product.metadata && typeof product.metadata === 'object' ? !!(product.metadata as any).nutritionData : false,
-      hasImage: !!product.imageUrl,
+      hasImage: !!product.image_url,
       hasEnvironmental: product.metadata && typeof product.metadata === 'object' ? !!(product.metadata as any).environmental : false,
       enrichmentScore: calculateEnrichmentScore(product)
     }));
@@ -343,12 +343,12 @@ router.get('/:barcode', authenticateToken, async (req: Request, res: Response) =
 
     const { barcode } = req.params;
 
-    const product = await prisma.inventoryItem.findFirst({
+    const product = await prisma.inventory_items.findFirst({
       where: {
         sku: barcode
       },
       include: {
-        tenant: {
+        tenants: {
           select: {
             id: true,
             name: true
@@ -372,15 +372,15 @@ router.get('/:barcode', authenticateToken, async (req: Request, res: Response) =
       brand: product.brand || 'Unknown',
       source: product.source || 'Manual',
       description: product.description,
-      price: product.priceCents ? product.priceCents / 100 : null,
-      imageUrl: product.imageUrl,
-      tenant: product.tenant.name,
-      tenantId: product.tenantId,
-      createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
+      price: product.price_cents ? product.price_cents / 100 : null,
+      imageUrl: product.image_url,
+      tenant: product.tenants.name,
+      tenantId: product.tenant_id,
+      createdAt: product.created_at,
+      updatedAt: product.updated_at,
       metadata: product.metadata,
       hasNutrition: product.metadata && typeof product.metadata === 'object' ? !!(product.metadata as any).nutritionData : false,
-      hasImage: !!product.imageUrl,
+      hasImage: !!product.image_url,
       hasEnvironmental: product.metadata && typeof product.metadata === 'object' ? !!(product.metadata as any).environmental : false,
       enrichmentScore: calculateEnrichmentScore(product)
     };

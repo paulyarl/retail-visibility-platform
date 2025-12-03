@@ -14,20 +14,20 @@ router.get("/status", async (req, res) => {
       return res.status(400).json({ error: "tenant_required" });
     }
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
-        stripeCustomerId: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        stripe_customer_id: true,
         _count: {
           select: {
-            inventoryItems: true,
-            userTenants: true,
+            inventory_items: true,
+            user_tenants: true,
           },
         },
       },
@@ -42,10 +42,10 @@ router.get("/status", async (req, res) => {
     // Calculate days remaining (trial or subscription)
     let daysRemaining = null;
     
-    if (tenant.subscriptionStatus === "trial" && tenant.trialEndsAt) {
-      daysRemaining = Math.ceil((tenant.trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    } else if (tenant.subscriptionEndsAt) {
-      daysRemaining = Math.ceil((tenant.subscriptionEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (tenant.subscription_status === "trial" && tenant.trial_ends_at) {
+      daysRemaining = Math.ceil((tenant.trial_ends_at.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    } else if (tenant.subscription_ends_at) {
+      daysRemaining = Math.ceil((tenant.subscription_ends_at.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     }
 
     // Get tier limits
@@ -55,7 +55,7 @@ router.get("/status", async (req, res) => {
       enterprise: { _count: Infinity, user_tenants: Infinity },
     };
 
-    const tier = tenant.subscriptionTier || "starter";
+    const tier = tenant.subscription_tier || "starter";
     const tierLimits = limits[tier] || limits.starter;
 
     res.json({
@@ -64,23 +64,23 @@ router.get("/status", async (req, res) => {
         name: tenant.name,
       },
       subscription: {
-        status: tenant.subscriptionStatus,
-        tier: tenant.subscriptionTier,
-        trialEndsAt: tenant.trialEndsAt,
-        subscriptionEndsAt: tenant.subscriptionEndsAt,
+        status: tenant.subscription_status,
+        tier: tenant.subscription_tier,
+        trialEndsAt: tenant.trial_ends_at,
+        subscriptionEndsAt: tenant.subscription_ends_at,
         daysRemaining,
-        hasStripeAccount: !!tenant.stripeCustomerId,
+        hasStripeAccount: !!tenant.stripe_customer_id,
       },
       usage: {
         _count: {
-          current: tenant._count.inventoryItems,
+          current: tenant._count.inventory_items,
           limit: tierLimits._count,
-          percentage: tierLimits._count === Infinity ? 0 : Math.round((tenant._count.inventoryItems / tierLimits._count) * 100),
+          percentage: tierLimits._count === Infinity ? 0 : Math.round((tenant._count.inventory_items / tierLimits._count) * 100),
         },
         user_tenants: {
-          current: tenant._count.userTenants,
+          current: tenant._count.user_tenants,
           limit: tierLimits.user_tenants,
-          percentage: tierLimits.user_tenants === Infinity ? 0 : Math.round((tenant._count.userTenants / tierLimits.user_tenants) * 100),
+          percentage: tierLimits.user_tenants === Infinity ? 0 : Math.round((tenant._count.user_tenants / tierLimits.user_tenants) * 100),
         },
       },
     });
@@ -123,16 +123,16 @@ router.patch("/update", async (req, res) => {
       data.subscriptionEndsAt = new Date(updates.subscriptionEndsAt);
     }
 
-    const tenant = await prisma.tenant.update({
+    const tenant = await prisma.tenants.update({
       where: { id: tenantId },
       data,
       select: {
         id: true,
         name: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
       },
     });
 

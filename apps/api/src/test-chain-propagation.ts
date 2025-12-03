@@ -32,10 +32,10 @@ async function cleanup() {
   console.log('\n🧹 Cleaning up previous test data...\n');
   
   // Find and delete test organizations
-  const testOrgs = await prisma.organization.findMany({
+  const testOrgs = await prisma.organizations_list.findMany({
     where: { name: { startsWith: 'Test Chain' } },
     include: {
-      Tenant: true,
+      tenants: true,
     },
   });
 
@@ -43,20 +43,20 @@ async function cleanup() {
     console.log(`  Deleting organization: ${org.name} (${org.id})`);
     
     // Delete all items from tenants
-    for (const tenant of org.Tenant) {
-      await prisma.inventoryItem.deleteMany({
-        where: { tenantId: tenant.id },
+    for (const tenant of org.tenants) {
+      await prisma.inventory_items.deleteMany({
+        where: { tenant_id: tenant.id },
       });
     }
     
     // Unlink tenants
-    await prisma.tenant.updateMany({
-      where: { organizationId: org.id },
-      data: { organizationId: null },
+    await prisma.tenants.updateMany({
+      where: { organization_id: org.id },
+      data: { organization_id: null },
     });
     
     // Delete organization
-    await prisma.organization.delete({
+    await prisma.organizations_list.delete({
       where: { id: org.id },
     });
   }
@@ -68,7 +68,7 @@ async function createTestChain(): Promise<TestContext> {
   console.log('\n🏢 Creating test chain organization...\n');
   
   // Create organization
-  const organization = await prisma.organization.create({
+  const organization = await prisma.organizations_list.create({
     data: {
       name: TEST_ORG_NAME,
       ownerId: 'test-owner',
@@ -81,7 +81,7 @@ async function createTestChain(): Promise<TestContext> {
   console.log(`✅ Organization created: ${organization.id}`);
 
   // Create hero location
-  const heroTenant = await prisma.tenant.create({
+  const heroTenant = await prisma.tenants.create({
     data: {
       id:generateTenantId(),
       name: HERO_LOCATION_NAME,
@@ -100,7 +100,7 @@ async function createTestChain(): Promise<TestContext> {
   // Create other locations
   const otherTenants = [];
   for (let i = 1; i <= NUM_LOCATIONS; i++) {
-    const tenant = await prisma.tenant.create({
+    const tenant = await prisma.tenants.create({
       data: {
         id:generateTenantId(),
         name: `Location ${i}`,
@@ -129,9 +129,9 @@ async function createTestProducts(ctx: TestContext): Promise<void> {
   console.log('\n📦 Creating test products at hero location...\n');
   
   for (let i = 1; i <= NUM_TEST_PRODUCTS; i++) {
-    const item = await prisma.inventoryItem.create({
+    const item = await prisma.inventory_items.create({
       data: { 
-        tenantId: ctx.heroTenantId,
+        tenant_id: ctx.heroTenantId,
         sku: `TEST-SKU-${String(i).padStart(3, '0')}`,
         name: `Test Product ${i}`,
         title: `Test Product ${i} - Full Title`,
@@ -164,7 +164,7 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
   console.log(`  Target: ${targetTenantIds[0]}`);
   
   // Simulate the API call logic
-  const sourceItem = await prisma.inventoryItem.findUnique({
+  const sourceItem = await prisma.inventory_items.findUnique({
     where: { id: sourceItemId },
   });
   
@@ -173,42 +173,42 @@ async function testSingleItemPropagation(ctx: TestContext): Promise<void> {
   }
   
   // Create copy at target
-  const newItem = await prisma.inventoryItem.create({
+  const newItem = await prisma.inventory_items.create({
     data: {
-      tenantId: targetTenantIds[0],
+      tenant_id: targetTenantIds[0],
       sku: sourceItem.sku,
       name: sourceItem.name,
       title: sourceItem.title,
       brand: sourceItem.brand,
       description: sourceItem.description,
       price: sourceItem.price,
-      priceCents: sourceItem.priceCents,
+      priceCents: sourceItem.price_cents,
       stock: sourceItem.stock,
       quantity: sourceItem.quantity,
-      imageUrl: sourceItem.imageUrl,
-      imageGallery: sourceItem.imageGallery,
-      marketingDescription: sourceItem.marketingDescription,
+      imageUrl: sourceItem.image_url,
+      imageGallery: sourceItem.image_gallery,
+      marketingDescription: sourceItem.marketing_description,
       metadata: sourceItem.metadata as any,
       availability: sourceItem.availability,
-      categoryPath: sourceItem.categoryPath,
+      categoryPath: sourceItem.category_path,
       condition: sourceItem.condition,
       currency: sourceItem.currency,
       gtin: sourceItem.gtin,
-      itemStatus: sourceItem.itemStatus,
+      itemStatus: sourceItem.item_status,
       mpn: sourceItem.mpn,
       visibility: sourceItem.visibility,
       manufacturer: sourceItem.manufacturer,
       source: sourceItem.source,
-      enrichmentStatus: sourceItem.enrichmentStatus,
+      enrichmentStatus: sourceItem.enrichment_status,
     } as any,
   });
   
   console.log(`✅ Item propagated successfully: ${newItem.id}`);
   
   // Verify
-  const targetItem = await prisma.inventoryItem.findFirst({
+  const targetItem = await prisma.inventory_items.findFirst({
     where: {
-      tenantId: targetTenantIds[0],
+      tenant_id: targetTenantIds[0],
       sku: sourceItem.sku,
     },
   });
@@ -231,8 +231,8 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
   };
   
   // Get all items from hero location
-  const heroItems = await prisma.inventoryItem.findMany({
-    where: { tenantId: ctx.heroTenantId },
+  const heroItems = await prisma.inventory_items.findMany({
+    where: { tenant_id: ctx.heroTenantId },
   });
   
   console.log(`  Found ${heroItems.length} items at hero location`);
@@ -245,9 +245,9 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
       
       try {
         // Check if already exists
-        const existing = await prisma.inventoryItem.findFirst({
+        const existing = await prisma.inventory_items.findFirst({
           where: {
-            tenantId: targetTenantId,
+            tenant_id: targetTenantId,
             sku: item.sku,
           },
         });
@@ -258,33 +258,33 @@ async function testBulkPropagation(ctx: TestContext): Promise<void> {
         }
         
         // Create copy
-        await prisma.inventoryItem.create({
+        await prisma.inventory_items.create({
           data: {
-            tenantId: targetTenantId,
+            tenant_id: targetTenantId,
             sku: item.sku,
             name: item.name,
             title: item.title,
             brand: item.brand,
             description: item.description,
             price: item.price,
-            priceCents: item.priceCents,
+            priceCents: item.price_cents,
             stock: item.stock,
             quantity: item.quantity,
-            imageUrl: item.imageUrl,
-            imageGallery: item.imageGallery,
-            marketingDescription: item.marketingDescription,
+            imageUrl: item.image_url,
+            imageGallery: item.image_gallery,
+            marketingDescription: item.marketing_description,
             metadata: item.metadata as any,
             availability: item.availability,
-            categoryPath: item.categoryPath,
+            categoryPath: item.category_path,
             condition: item.condition,
             currency: item.currency,
             gtin: item.gtin,
-            itemStatus: item.itemStatus,
+            itemStatus: item.item_status,
             mpn: item.mpn,
             visibility: item.visibility,
             manufacturer: item.manufacturer,
             source: item.source,
-            enrichmentStatus: item.enrichmentStatus,
+            enrichmentStatus: item.enrichment_status,
           } as any,
         });
         
@@ -308,11 +308,11 @@ async function validateResults(ctx: TestContext): Promise<void> {
   
   // Check each location has the items
   for (const tenantId of ctx.otherTenantIds) {
-    const itemCount = await prisma.inventoryItem.count({
-      where: { tenantId },
+    const itemCount = await prisma.inventory_items.count({
+      where: { tenant_id: tenantId },
     });
     
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
     });
     
@@ -324,14 +324,14 @@ async function validateResults(ctx: TestContext): Promise<void> {
   }
   
   // Check organization total
-  const org = await prisma.organization.findUnique({
+  const org = await prisma.organizations_list.findUnique({
     where: { id: ctx.organizationId },
     include: {
-      Tenant: {
+      tenants: {
         select: {
           _count: {
             select: {
-              inventoryItems: true,
+              inventory_items: true,
             },
           },
         },
@@ -339,7 +339,7 @@ async function validateResults(ctx: TestContext): Promise<void> {
     },
   });
   
-  const totalSKUs = org?.Tenant.reduce((sum: any, t: { _count: { inventoryItems: any; }; }) => sum + t._count.inventoryItems, 0) || 0;
+  const totalSKUs = org?.tenants.reduce((sum: any, t: { _count: { inventory_items: any; }; }) => sum + t._count.inventory_items, 0) || 0;
   const expectedTotal = NUM_TEST_PRODUCTS * (NUM_LOCATIONS + 1); // +1 for hero location
   
   console.log(`\n  Total SKUs across chain: ${totalSKUs}`);

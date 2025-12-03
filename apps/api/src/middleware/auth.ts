@@ -27,8 +27,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../auth/auth.service';
 import { prisma } from '../prisma';
-import jwt from 'jsonwebtoken';
-import { UserTenantRole, UserRole } from '@prisma/client';
+import * as jwt from 'jsonwebtoken';
+import { user_tenant_role, user_role } from '@prisma/client';
 import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 
 // JWT Payload interface
@@ -37,7 +37,7 @@ export interface JWTPayload {
   userId?: string; // Added by universal transform middleware
   user_id?: string; // JWT token contains this
   email: string;
-  role: UserRole;
+  role: user_role;
   tenantIds: string[];
 }
 
@@ -142,7 +142,7 @@ export const requireAuth = authenticateToken;
 /**
  * Middleware to check if user has required role
  */
-export function authorize(...roles: UserRole[]) {
+export function authorize(...roles: user_role[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
@@ -240,11 +240,11 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
   try {
     const { prisma } = await import('../prisma');
     const userId = req.user.userId || req.user.user_id;
-    const userTenant = await prisma.userTenant.findUnique({
+    const userTenant = await prisma.user_tenants.findUnique({
       where: {
-        userId_tenantId: {
-          userId: userId!, // Now guaranteed to be string
-          tenantId: tenantId as string,
+        user_id_tenant_id: {
+          user_id: userId!, // Now guaranteed to be string
+          tenant_id: tenantId as string,
         },
       },
       select: { id: true },
@@ -347,11 +347,11 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
   try {
     const { prisma } = await import('../prisma');
     const userId = req.user.userId || req.user.user_id;
-    const userTenant = await prisma.userTenant.findUnique({
+    const userTenant = await prisma.user_tenants.findUnique({
       where: {
-        userId_tenantId: {
-          userId: userId!, // Now guaranteed to be string
-          tenantId: tenantId as string,
+        user_id_tenant_id: {
+          user_id: userId!, // Now guaranteed to be string
+          tenant_id: tenantId as string,
         },
       },
       select: {
@@ -368,7 +368,7 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
     }
 
     // Must be OWNER or ADMIN role within the tenant to manage settings
-    if (userTenant.role !== UserTenantRole.OWNER && userTenant.role !== UserTenantRole.ADMIN) {
+    if (userTenant.role !== user_tenant_role.OWNER && userTenant.role !== user_tenant_role.ADMIN) {
       return res.status(403).json({ 
         error: 'owner_or_admin_required', 
         message: 'Only tenant owners/admins can manage feature flags' 
@@ -457,11 +457,11 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
   
   // Check if user is OWNER or ADMIN of this tenant
   const userId = req.user.userId || req.user.user_id;
-  const userTenant = await prisma.userTenant.findUnique({
+  const userTenant = await prisma.user_tenants.findUnique({
     where: {
-      userId_tenantId: {
-        userId: userId!, // Now guaranteed to be string
-        tenantId: tenantId
+      user_id_tenant_id: {
+        user_id: userId!, // Now guaranteed to be string
+        tenant_id: tenantId
       }
     },
     select: {
@@ -469,7 +469,7 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
     }
   });
 
-  if (!userTenant || (userTenant.role !== UserTenantRole.OWNER && userTenant.role !== UserTenantRole.ADMIN)) {
+  if (!userTenant || (userTenant.role !== user_tenant_role.OWNER && userTenant.role !== user_tenant_role.ADMIN)) {
     return res.status(403).json({
       error: 'tenant_admin_required',
       message: 'Tenant owner or administrator access required for this operation',

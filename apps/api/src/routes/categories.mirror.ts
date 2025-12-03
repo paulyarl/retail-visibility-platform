@@ -21,7 +21,7 @@ router.post('/api/categories/mirror', authenticateToken, requireAdmin, async (re
   }
 
   // Enqueue a background job (skeleton worker with retry/backoff)
-  const { jobId } = queueGbpCategoryMirrorJob({ strategy: strategy as any, tenantId: tenantId ?? null, requestedBy: (req.user as any)?.userId ?? null, dryRun });
+  const { jobId } = queueGbpCategoryMirrorJob({ strategy: strategy as any, tenant_id: tenantId ?? null, requested_by: (req.user as any)?.userId ?? null, dry_run: dryRun });
   return res.status(202).json({ success: true, accepted: true, jobId, strategy, tenantId: tenantId ?? null, dryRun });
 });
 

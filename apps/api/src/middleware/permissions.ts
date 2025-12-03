@@ -5,7 +5,7 @@ import { isPlatformAdmin } from '../utils/platform-admin';
 import { getTenantLimit, getTenantLimitConfig, canCreateTenant, getPlatformSupportLimit } from '../config/tenant-limits';
 // Type extensions are automatically loaded from src/types/express.d.ts
 
-import { UserTenantRole } from '@prisma/client';
+import { user_tenant_role } from '@prisma/client';
 
 /**
  * Get tenant ID from request
@@ -25,13 +25,13 @@ function getTenantIdFromRequest(req: Request): string | null {
  */
 export async function getUserTenantRole(
   userId: string,
-  tenantId: string
-): Promise<UserTenantRole | null> {
-  const userTenant = await prisma.userTenant.findUnique({
+  tenant_id: string
+): Promise<user_tenant_role | null> {
+  const userTenant = await prisma.user_tenants.findUnique({
     where: {
-      userId_tenantId: {
-        userId: userId,
-        tenantId: tenantId,
+      user_id_tenant_id: {
+        user_id: userId,
+        tenant_id: tenant_id,
       },
     },
   });
@@ -42,7 +42,7 @@ export async function getUserTenantRole(
 /**
  * Middleware to check if user has required tenant-level role
  */
-export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
+export function requireTenantRole(...allowedRoles: user_tenant_role[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
@@ -107,17 +107,17 @@ export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
  * Middleware to check if user can manage tenant (OWNER or ADMIN only)
  */
 export const requireTenantAdmin = requireTenantRole(
-  UserTenantRole.OWNER,
-  UserTenantRole.ADMIN
+  user_tenant_role.OWNER,
+  user_tenant_role.ADMIN
 );
 
 /**
  * Middleware to check if user can manage inventory (all except VIEWER)
  */
 export const requireInventoryAccess = requireTenantRole(
-  UserTenantRole.OWNER,
-  UserTenantRole.ADMIN,
-  UserTenantRole.MEMBER
+  user_tenant_role.OWNER,
+  user_tenant_role.ADMIN,
+  user_tenant_role.MEMBER
 );
 
 /**
@@ -205,16 +205,16 @@ export async function checkTenantCreationLimit(
 
     // Count user's owned tenants
     const userId = req.user.userId || req.user.user_id;
-    const ownedTenants = await prisma.userTenant.findMany({
+    const ownedTenants = await prisma.user_tenants.findMany({
       where: {
-        userId: userId,
-        role: UserTenantRole.OWNER,
+        user_id: userId,
+        role: user_tenant_role.OWNER,
       },
       include: {
-        tenant: {
+        tenants: {
           select: {
-            subscriptionTier: true,
-            subscriptionStatus: true,
+            subscription_tier: true,
+            subscription_status: true,
           },
         },
       },
@@ -237,8 +237,8 @@ export async function checkTenantCreationLimit(
     let highestPriority = 0;
 
     for (const ut of ownedTenants) {
-      const tier = ut.tenant.subscriptionTier || 'starter';
-      const status = ut.tenant.subscriptionStatus || 'trial';
+      const tier = ut.tenants.subscription_tier || 'starter';
+      const status = ut.tenants.subscription_status || 'trial';
       const priority = tierPriority[tier] || 0;
       
       if (priority > highestPriority) {
@@ -321,7 +321,7 @@ export async function requireTenantOwner(
 
     const userRole = await getUserTenantRole(userId, tenantId!);
 
-    if (userRole !== UserTenantRole.OWNER) {
+    if (userRole !== user_tenant_role.OWNER) {
       return res.status(403).json({
         error: 'owner_required',
         message: 'Only the tenant owner can perform this action',

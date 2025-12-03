@@ -55,16 +55,16 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
   const orgId = `org_test_${Date.now()}`;
   
   // Create organization
-  const org = await prisma.organization.create({
+  const org = await prisma.organizations_list.create({
     data: {
       id: orgId,
       name,
       // Store owner in both legacy snake_case and new camelCase columns
-      ownerId: 'admin_test', // Test organizations owned by admin
-      maxLocations: config.locations * 2, // Allow room for growth
-      maxTotalSKUs: config.skuRange[1] * 2,
+      owner_id: 'admin_test', // Test organizations owned by admin
+      max_locations: config.locations * 2, // Allow room for growth
+      max_total_skus: config.skuRange[1] * 2,
       // Required timestamps
-      updatedAt: new Date(),
+      updated_at: new Date(),
     },
   });
 
@@ -81,13 +81,13 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
     const skuCount = Math.floor(minSkus + (maxSkus - minSkus) * (1 - i * 0.3));
     
     // Create tenant
-    const currentTenant = await prisma.tenant.create({
+    const currentTenant = await prisma.tenants.create({
       data: {
         id: tenantId,
         name: `${name} - ${locationName}`,
-        subscriptionTier: 'professional',
-        subscriptionStatus: 'active',
-        organizationId: org.id,
+        subscription_tier: 'professional',
+        subscription_status: 'active',
+        organization_id: org.id,
       },
     });
 
@@ -128,32 +128,32 @@ export async function deleteTestChain(organizationId: string): Promise<{
   productsDeleted: number;
 }> {
   // Get all tenants in the organization
-  const tenants = await prisma.tenant.findMany({
-    where: { organizationId },
+  const tenants = await prisma.tenants.findMany({
+    where: { organization_id: organizationId },
     select: { id: true },
   });
 
   // Count products before deletion
-  const productCount = await prisma.inventoryItem.count({
+  const productCount = await prisma.inventory_items.count({
     where: {
-      tenantId: { in: tenants.map(t => t.id) },
+      tenant_id: { in: tenants.map(t => t.id) },
     },
   });
 
   // Delete all products
-  await prisma.inventoryItem.deleteMany({
+  await prisma.inventory_items.deleteMany({
     where: {
-      tenantId: { in: tenants.map(t => t.id) },
+      tenant_id: { in: tenants.map(t => t.id) },
     },
   });
 
   // Delete all tenants
-  await prisma.tenant.deleteMany({
-    where: { organizationId },
+  await prisma.tenants.deleteMany({
+    where: { organization_id: organizationId },
   });
 
   // Delete organization
-  await prisma.organization.delete({
+  await prisma.organizations_list.delete({
     where: { id: organizationId },
   });
 
@@ -190,25 +190,25 @@ export async function createTestTenant(options: {
   const tenantId = `tenant_test_${Date.now()}`;
 
   // Create tenant
-  const tenant = await prisma.tenant.create({
+  const tenant = await prisma.tenants.create({
     data: {
       id: tenantId,
       name,
-      subscriptionTier,
-      subscriptionStatus,
-      organizationId: organizationId || null,
+      subscription_tier: subscriptionTier,
+      subscription_status: subscriptionStatus,
+      organization_id: organizationId || null,
     },
   });
 
   // Link to owner if provided
   if (ownerId) {
-    await prisma.userTenant.create({
+    await prisma.user_tenants.create({
       data: {
         id: generateUserTenantId(ownerId, tenant.id),
-        userId: ownerId,
-        tenantId: tenant.id,
+        user_id: ownerId,
+        tenant_id: tenant.id,
         role: 'OWNER',
-        updatedAt: new Date(),
+        updated_at: new Date(),
       },
     });
     console.log(`[Admin Tools] Linked tenant ${tenant.id} to owner ${ownerId}`);
@@ -252,8 +252,8 @@ export async function bulkSeedProducts(options: {
     try {
       // Clear existing products if requested
       if (clearExisting) {
-        await prisma.inventoryItem.deleteMany({
-          where: { tenantId: tenantId },
+        await prisma.inventory_items.deleteMany({
+          where: { tenant_id: tenantId },
         });
       }
 
@@ -297,8 +297,8 @@ export async function bulkClearProducts(tenantIds: string[]) {
 
   for (const tenantId of tenantIds) {
     try {
-      const result = await prisma.inventoryItem.deleteMany({
-        where: { tenantId: tenantId },
+      const result = await prisma.inventory_items.deleteMany({
+        where: { tenant_id: tenantId },
       });
 
       results.push({

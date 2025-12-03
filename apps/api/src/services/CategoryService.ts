@@ -13,9 +13,9 @@ export type UpdateCategoryInput = Partial<{
 
 export const categoryService = {
   async getTenantCategories(tenantId: string) {
-    const categories = await prisma.directoryCategory.findMany({
+    const categories = await prisma.directory_category.findMany({
       where: {
-        tenantId,
+        tenantId: tenantId,
         isActive: true,
       },
       orderBy: [
@@ -27,30 +27,30 @@ export const categoryService = {
   },
 
   async createTenantCategory(tenantId: string, input: Required<Pick<UpdateCategoryInput, 'name' | 'slug'>> & Partial<UpdateCategoryInput>) {
-    const category = await prisma.directoryCategory.create({
+    const category = await prisma.directory_category.create({
       data: {
         id: generateQuickStart("tc"),
-        tenantId,
+        tenantId: tenantId,
         name: input.name,
         slug: input.slug,
         parentId: input.parentId ?? undefined,
         googleCategoryId: input.googleCategoryId ?? undefined,
         sortOrder: input.sortOrder ?? 0,
-        updatedAt: new Date(),
+        updated_at: new Date(),
       } as any,
     })
 
     try {
       await audit({
-        tenantId,
+        tenantId: tenantId,
         actor: null,
         action: 'category.create',
         payload: {
           id: category.id,
           name: category.name,
           slug: category.slug,
-          parentId: category.parentId,
-          googleCategoryId: category.googleCategoryId,
+          parent_id: category.parentId,
+          google_category_id: category.googleCategoryId,
         },
       })
     } catch {}
@@ -60,17 +60,17 @@ export const categoryService = {
   },
 
   async updateDirectoryCategory(tenantId: string, id: string, input: UpdateCategoryInput) {
-    const category = await prisma.directoryCategory.update({ where: { id }, data: input })
+    const category = await prisma.directory_category.update({ where: { id }, data: input })
     return category
   },
 
   async softDeleteDirectoryCategory(tenantId: string, id: string) {
-    const category = await prisma.directoryCategory.update({ where: { id }, data: { isActive: false } })
+    const category = await prisma.directory_category.update({ where: { id }, data: { isActive: false } })
     return category
   },
 
   async alignCategory(tenantId: string, id: string, googleCategoryId: string) {
-    const category = await prisma.directoryCategory.update({ where: { id }, data: { googleCategoryId } })
+    const category = await prisma.directory_category.update({ where: { id }, data: { googleCategoryId: googleCategoryId } })
     try {
       await audit({ tenantId, actor: null, action: 'category.align', payload: { id, googleCategoryId } })
     } catch {}
@@ -91,17 +91,29 @@ export const categoryService = {
     let category: { id: string; name: string; slug: string; parentId: string | null } | null = null
 
     if (directoryCategoryId) {
-      category = await prisma.directoryCategory.findFirst({
+      category = await prisma.directory_category.findFirst({
         where: {
           id: directoryCategoryId,
           isActive: true,
         },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          parentId: true,
+        },
       })
     } else if (categorySlug) {
-      category = await prisma.directoryCategory.findFirst({
+      category = await prisma.directory_category.findFirst({
         where: {
           slug: categorySlug,
           isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          parentId: true,
         },
       })
     }
@@ -115,17 +127,17 @@ export const categoryService = {
     }
 
     // Update item with category
-    await prisma.inventoryItem.update({
+    await prisma.inventory_items.update({
       where: { id: item_id },
       data: {
-        directoryCategoryId: category.id,
-        categoryPath: [category.slug] as any, // Keep for backward compatibility
+        directory_category_id: category.id,
+        category_path: [category.slug] as any, // Keep for backward compatibility
       },
     })
 
     try {
       await audit({
-        tenantId,
+        tenantId: tenantId,
         actor: null,
         action: 'item.category.assign',
         payload: {
@@ -137,16 +149,17 @@ export const categoryService = {
     } catch {}
 
     // Get the updated item to return
-    const updatedItem = await prisma.inventoryItem.findUnique({
+    const updatedItem = await prisma.inventory_items.findUnique({
       where: { id: item_id },
       include: {
-        directoryCategory: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
+        // TODO: Add directoryCategory relationship back when schema supports it
+        // directoryCategory: {
+        //   select: {
+        //     id: true,
+        //     name: true,
+        //     slug: true,
+        //   },
+        // },
       },
     });
 

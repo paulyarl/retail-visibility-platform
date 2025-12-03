@@ -4,6 +4,7 @@ import { prisma } from '../prisma';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
+import { generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -23,10 +24,10 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
     }
 
     // Verify item exists and belongs to tenant
-    const item = await prisma.inventoryItem.findFirst({
+    const item = await prisma.inventory_items.findFirst({
       where: {
         id: itemId,
-        tenantId,
+        tenant_id: tenantId,
       },
     });
 
@@ -59,10 +60,11 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
     await fs.writeFile(filepath, imageBuffer);
 
     // Create photo record
-    const photo = await prisma.photoAsset.create({
+    const photo = await prisma.photo_assets.create({
       data: {
-        tenantId,
-        inventoryItemId: itemId,
+        id: generateQuickStart("photo"),
+        tenant_id: tenantId,
+        inventory_item_id: itemId,
         url: `/uploads/items/${filename}`,
         position: 0, // Set as primary photo
         alt: photographer ? `Photo by ${photographer} on ${source}` : item.name,

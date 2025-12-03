@@ -95,7 +95,7 @@ export class InventorySync {
       }
 
       // Get current platform inventory
-      const currentInventory = await prisma.inventoryItem.findUnique({
+      const currentInventory = await prisma.inventory_items.findUnique({
         where: { id: mapping.inventory_item_id },
         select: { id: true, name: true, quantity: true },
       });
@@ -109,11 +109,11 @@ export class InventorySync {
       const oldQuantity = currentInventory.quantity || 0;
 
       // Update platform inventory
-      await prisma.inventoryItem.update({
+      await prisma.inventory_items.update({
         where: { id: mapping.inventory_item_id },
         data: {
           quantity: newQuantity,
-          updatedAt: new Date(),
+          updated_at: new Date(),
         },
       });
 
@@ -150,9 +150,9 @@ export class InventorySync {
       console.log(`[InventorySync] Exporting inventory for: ${platformProductId}`);
 
       // Get platform product
-      const platformProduct = await prisma.inventoryItem.findUnique({
+      const platformProduct = await prisma.inventory_items.findUnique({
         where: { id: platformProductId },
-        select: { id: true, name: true, quantity: true, updatedAt: true },
+        select: { id: true, name: true, quantity: true, updated_at: true },
       });
 
       if (!platformProduct) {
@@ -306,9 +306,9 @@ export class InventorySync {
         return null;
       }
 
-      const platformProduct = await prisma.inventoryItem.findUnique({
+      const platformProduct = await prisma.inventory_items.findUnique({
         where: { id: platformProductId },
-        select: { updatedAt: true },
+        select: { updated_at: true },
       });
 
       if (!platformProduct) {
@@ -351,7 +351,7 @@ export class InventorySync {
 
       for (const mapping of mappings) {
         // Get platform quantity
-        const platformProduct = await prisma.inventoryItem.findUnique({
+        const platformProduct = await prisma.inventory_items.findUnique({
           where: { id: mapping.inventory_item_id },
           select: { id: true, name: true, quantity: true },
         });

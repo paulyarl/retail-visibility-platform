@@ -265,12 +265,12 @@ export function requireTierFeature(feature: string) {
       }
       
       // Get tenant's subscription tier and status
-      const tenant = await prisma.tenant.findUnique({
+      const tenant = await prisma.tenants.findUnique({
         where: { id: String(tenantId || '') },
         select: { 
           id: true,
-          subscriptionTier: true,
-          subscriptionStatus: true,
+          subscription_tier: true,
+          subscription_status: true,
         },
       });
       
@@ -282,11 +282,11 @@ export function requireTierFeature(feature: string) {
       }
       
       // Check subscription status
-      if (tenant.subscriptionStatus === 'canceled' || tenant.subscriptionStatus === 'expired') {
+      if (tenant.subscription_status === 'canceled' || tenant.subscription_status === 'expired') {
         return res.status(403).json({
           error: 'subscription_inactive',
           message: 'Your subscription is inactive. Please renew to access features.',
-          subscription_status: tenant.subscriptionStatus,
+          subscription_status: tenant.subscription_status,
         });
       }
       
@@ -294,7 +294,7 @@ export function requireTierFeature(feature: string) {
       const access = await checkTierAccessWithOverrides(String(tenantId), feature);
       
       if (!access.hasAccess) {
-        const tierString = tenant.subscriptionTier || 'trial';
+        const tierString = tenant.subscription_tier || 'trial';
         const requiredTier = getRequiredTier(feature);
         const requiredTierDisplay = getTierDisplayName(requiredTier);
         const currentTierDisplay = getTierDisplayName(tierString);
@@ -305,7 +305,7 @@ export function requireTierFeature(feature: string) {
           error: 'feature_not_available',
           message: `This feature requires ${requiredTierDisplay} tier or higher`,
           feature,
-          currentTier: tenant.subscriptionTier,
+          currentTier: tenant.subscription_tier,
           currentTierDisplay,
           currentTierPrice,
           requiredTier,
@@ -364,16 +364,16 @@ export function requireAnyTierFeature(features: string[]) {
         });
       }
       
-      const tenant = await prisma.tenant.findUnique({
+      const tenant = await prisma.tenants.findUnique({
         where: { id: String(tenantId || '') },
-        select: { subscriptionTier: true, subscriptionStatus: true },
+        select: { subscription_tier: true, subscription_status: true },
       });
       
       if (!tenant) {
         return res.status(404).json({ error: 'tenant_not_found' });
       }
       
-      if (tenant.subscriptionStatus === 'canceled' || tenant.subscriptionStatus === 'expired') {
+      if (tenant.subscription_status === 'canceled' || tenant.subscription_status === 'expired') {
         return res.status(403).json({
           error: 'subscription_inactive',
           message: 'Your subscription is inactive',
@@ -381,7 +381,7 @@ export function requireAnyTierFeature(features: string[]) {
       }
       
       // Check if tenant has any of the features
-      const tierString = tenant.subscriptionTier || 'trial';
+      const tierString = tenant.subscription_tier || 'trial';
       const hasAnyAccess = features.some(feature => 
         checkTierAccess(tierString, feature)
       );
@@ -390,7 +390,7 @@ export function requireAnyTierFeature(features: string[]) {
         return res.status(403).json({
           error: 'feature_not_available',
           message: 'This feature requires a higher tier',
-          currentTier: tenant.subscriptionTier,
+          currentTier: tenant.subscription_tier,
         });
       }
       
@@ -413,12 +413,12 @@ export async function requireWritableSubscription(req: Request, res: Response, n
       });
     }
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: String(tenantId) },
       select: {
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        trialEndsAt: true,
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
       },
     });
 
@@ -429,12 +429,12 @@ export async function requireWritableSubscription(req: Request, res: Response, n
       });
     }
 
-    const tier = tenant.subscriptionTier || 'starter';
-    const status = tenant.subscriptionStatus || 'active';
+    const tier = tenant.subscription_tier || 'starter';
+    const status = tenant.subscription_status || 'active';
     const maintenanceState = getMaintenanceState({
       tier,
       status,
-      trialEndsAt: tenant.trialEndsAt ?? undefined,
+      trialEndsAt: tenant.trial_ends_at ?? undefined,
     });
 
     // Freeze: read-only visibility mode (canceled/expired or google_only outside maintenance window)

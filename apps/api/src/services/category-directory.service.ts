@@ -22,7 +22,7 @@ export class CategoryDirectoryService {
       console.log('[CategoryService] Fetching categories using Prisma ORM...');
       
       // Get all active categories first
-      const categories = await prisma.directoryCategory.findMany({
+      const categories = await prisma.directory_category.findMany({
         where: {
           isActive: true,
         },
@@ -38,44 +38,44 @@ export class CategoryDirectoryService {
       const categoriesWithCounts = await Promise.all(
         categories.map(async (category: any) => {
           // Count items in this category from published directory listings
-          const itemCount = await prisma.inventoryItem.count({
+          const itemCount = await prisma.inventory_items.count({
             where: {
-              directoryCategoryId: category.id,
-              itemStatus: 'active',
+              directory_category_id: category.id,
+              item_status: 'active',
               visibility: 'public',
-              tenant: {
-                locationStatus: 'active',
-                directorySettings: {
-                  isPublished: true,
+              tenants: {
+                location_status: 'active',
+                directory_settings_list : {
+                  is_published: true,
                 },
               },
             },
           });
 
           // Count distinct tenants with items in this category
-          const tenantCount = await prisma.inventoryItem.findMany({
+          const tenantCount = await prisma.inventory_items.findMany({
             where: {
-              directoryCategoryId: category.id,
-              itemStatus: 'active',
+              directory_category_id: category.id,
+              item_status: 'active',
               visibility: 'public',
-              tenant: {
-                locationStatus: 'active',
-                directorySettings: {
-                  isPublished: true,
+              tenants : {
+                location_status: 'active',
+                directory_settings_list: {
+                  is_published: true,
                 },
               },
             },
             select: {
-              tenantId: true,
+              tenant_id: true,
             },
-            distinct: ['tenantId'],
+            distinct: ['tenant_id'],
           });
 
           return {
             id: category.id,
             name: category.name,
             slug: category.slug,
-            googleCategoryId: category.googleCategoryId,
+            googleCategoryId: category.google_category_id,
             storeCount: tenantCount.length, // Distinct tenant count
             productCount: itemCount, // Total items count
           };
@@ -116,7 +116,7 @@ export class CategoryDirectoryService {
       console.log(`[CategoryService] Fetching stores for category: ${categorySlug}`);
       
       // 1. Find category by slug
-      const category = await prisma.directoryCategory.findFirst({
+      const category = await prisma.directory_category.findFirst({
         where: { 
           slug: categorySlug, 
           isActive: true 
@@ -129,15 +129,15 @@ export class CategoryDirectoryService {
       }
       
       // 2. Find tenants with products in this category
-      const stores = await prisma.tenant.findMany({
+      const stores = await prisma.tenants.findMany({
         where: {
-          googleSyncEnabled: true,
-          directoryVisible: true,
-          locationStatus: 'active',
-          inventoryItems: {
+          google_sync_enabled: true,
+          directory_visible: true,
+          location_status: 'active',
+          inventory_items: {
             some: {
-              directoryCategoryId: category.id,
-              itemStatus: 'active',
+              directory_category_id: category.id,
+              item_status: 'active',
               visibility: 'public',
             },
           },
@@ -146,13 +146,13 @@ export class CategoryDirectoryService {
           id: true,
           name: true,
           slug: true,
-          tenantBusinessProfile: {
+          tenant_business_profiles_list: {
             select: {
-              businessName: true,
-              businessLine1: true,
+              business_name: true,
+              address_line1: true,
               city: true,
               state: true,
-              postalCode: true,
+              postal_code: true,
               latitude: true,
               longitude: true,
             },
@@ -163,17 +163,17 @@ export class CategoryDirectoryService {
       // Count products for each store and get GBP category
       const storesWithCounts = await Promise.all(
         stores.map(async (store: any) => {
-          const productCount = await prisma.inventoryItem.count({
+          const productCount = await prisma.inventory_items.count({
             where: {
-              tenantId: store.id,
-              directoryCategoryId: category.id,
-              itemStatus: 'active',
+              tenant_id: store.id,
+              directory_category_id: category.id,
+              item_status: 'active',
               visibility: 'public',
             },
           });
 
           // Get tenant with metadata for GBP category
-          const tenantWithMetadata = await prisma.tenant.findUnique({
+          const tenantWithMetadata = await prisma.tenants.findUnique({
             where: { id: store.id },
             select: { metadata: true },
           });
@@ -183,15 +183,15 @@ export class CategoryDirectoryService {
 
           return {
             id: store.id,
-            name: store.tenantBusinessProfile?.businessName || store.name,
-            businessName: store.tenantBusinessProfile?.businessName || store.name,
+            name: store.tenant_business_profiles_list?.businessName || store.name,
+            businessName: store.tenant_business_profiles_list?.businessName || store.name,
             slug: store.slug,
-            address: store.tenantBusinessProfile?.businessLine1,
-            city: store.tenantBusinessProfile?.city,
-            state: store.tenantBusinessProfile?.state,
-            postalCode: store.tenantBusinessProfile?.postalCode,
-            latitude: store.tenantBusinessProfile?.latitude,
-            longitude: store.tenantBusinessProfile?.longitude,
+            address: store.tenant_business_profiles_list?.businessLine1,
+            city: store.tenant_business_profiles_list?.city,
+            state: store.tenant_business_profiles_list?.state,
+            postalCode: store.tenant_business_profiles_list?.postal_code,
+            latitude: store.tenant_business_profiles_list?.latitude,
+            longitude: store.tenant_business_profiles_list?.longitude,
             productCount: productCount,
             gbpPrimaryCategoryName: gbpPrimaryCategoryName,
           };
@@ -221,12 +221,12 @@ export class CategoryDirectoryService {
     try {
       console.log(`[CategoryService] Building category path for: ${categoryId}`);
       
-      const path: Array<{ id: string; name: string; slug: string; parentId: string | null }> = [];
+      const path: Array<{ id: string; name: string; slug: string; parent_id: string | null }> = [];
       let currentId: string | null = categoryId;
       
       // Walk up the parent chain
       while (currentId) {
-        const category: { id: string; name: string; slug: string; parentId: string | null } | null = await prisma.directoryCategory.findUnique({
+        const category: { id: string; name: string; slug: string; parentId: string | null } | null = await prisma.directory_category.findUnique({
           where: { id: currentId },
           select: {
             id: true,
@@ -236,10 +236,18 @@ export class CategoryDirectoryService {
           },
         });
         
-        if (!category) break;
+        // Map parentId to parent_id to match expected type
+        const mappedCategory: { id: string; name: string; slug: string; parent_id: string | null } | null = category ? {
+          id: category.id,
+          name: category.name,
+          slug: category.slug,
+          parent_id: category.parentId
+        } : null;
         
-        path.unshift(category); // Add to beginning for correct order
-        currentId = category.parentId;
+        if (!mappedCategory) break;
+        
+        path.unshift(mappedCategory); // Add to beginning for correct order
+        currentId = mappedCategory.parent_id;
       }
       
       console.log(`[CategoryService] Built path with ${path.length} levels`);

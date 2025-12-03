@@ -177,7 +177,7 @@ export async function generateQuickStartProducts(
   }
 
   // Validate tenant exists
-  const tenant = await prisma.tenant.findUnique({ where: { id: tenant_id } });
+  const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
   if (!tenant) {
     throw new Error(`Tenant not found: ${tenant_id}`);
   }
@@ -205,21 +205,21 @@ export async function generateQuickStartProducts(
       const categoryId = `${tenant_id}_${cat.slug}`;
       
       // Persist category to database (upsert to avoid duplicates)
-      await prisma.directoryCategory.upsert({
+      await prisma.directory_category.upsert({
         where: { id: categoryId },
         create: {
           id: categoryId,
           tenantId: tenant_id,
           name: cat.name,
           slug: cat.slug,
-          googleCategoryId,
-          sortOrder: categories.length,
+          googleCategoryId: googleCategoryId,  
+          sortOrder: categories.length, 
           isActive: true,
           updatedAt: new Date(),
         },
         update: {
           name: cat.name,
-          googleCategoryId,
+          googleCategoryId: googleCategoryId,
           isActive: true,
           updatedAt: new Date(),
         },
@@ -234,23 +234,32 @@ export async function generateQuickStartProducts(
     }
   }
 
-  // Generate products (cycle through available products)
+  // Generate products (cycle through available products with better variant naming)
   const allProducts = [];
   const baseProducts = scenarioData.products;
+  const variantSuffixes = ['', 'Deluxe', 'Premium', 'Pro', 'Plus', 'XL', 'Mini', 'Classic', 'Special Edition', 'Limited'];
   
   for (let i = 0; i < productCount; i++) {
     const baseProduct = baseProducts[i % baseProducts.length];
-    const variant = Math.floor(i / baseProducts.length);
+    const cycleCount = Math.floor(i / baseProducts.length);
+    
+    let productName = baseProduct.name;
+    if (cycleCount > 0) {
+      // Use variant suffixes for better naming
+      const suffixIndex = cycleCount % variantSuffixes.length;
+      const suffix = variantSuffixes[suffixIndex];
+      productName = suffix ? `${baseProduct.name} ${suffix}` : `${baseProduct.name} v${cycleCount + 1}`;
+    }
     
     allProducts.push({
       ...baseProduct,
-      name: variant > 0 ? `${baseProduct.name} (${variant + 1})` : baseProduct.name,
+      name: productName,
     });
   }
 
   // Get existing product names to avoid duplicates
-  const existingProducts = await prisma.inventoryItem.findMany({
-    where: { tenantId: tenant_id },
+  const existingProducts = await prisma.inventory_items.findMany({
+    where: { tenant_id: tenant_id },
     select: { name: true },
   });
   const existingNames = new Set(existingProducts.map(p => p.name));
@@ -295,18 +304,18 @@ export async function generateQuickStartProducts(
 
       items.push({
         id: generateItemId(),
-        tenantId: tenant_id,
+        tenant_id: tenant_id,
         sku: generateQuickStartSku(i + idx),
         name: product.name,
         title: product.name,
         brand: product.brand || 'Generic',
-        priceCents: product.price,
+        price_cents: product.price,
         price: product.price / 100,
         currency: 'USD',
         stock,
         availability,
-        itemStatus: itemStatus,
-        updatedAt: new Date(),
+        item_status: itemStatus,
+        updated_at: new Date(),
         ...categoryAssignment,
       });
       
@@ -315,7 +324,7 @@ export async function generateQuickStartProducts(
     }
 
     if (items.length > 0) {
-      await prisma.inventoryItem.createMany({ data: items });
+      await prisma.inventory_items.createMany({ data: items });
       createdCount += items.length;
     }
   }
@@ -325,20 +334,20 @@ export async function generateQuickStartProducts(
   }
 
   // Get final counts
-  const totalProducts = await prisma.inventoryItem.count({
-    where: { tenantId: tenant_id },
+  const totalProducts = await prisma.inventory_items.count({
+    where: { tenant_id: tenant_id }, 
   });
 
-  const activeProducts = await prisma.inventoryItem.count({
-    where: { tenantId: tenant_id, itemStatus: 'active' },
+  const activeProducts = await prisma.inventory_items.count({
+    where: { tenant_id: tenant_id, item_status: 'active' }, 
   });
 
-  const inStockProducts = await prisma.inventoryItem.count({
-    where: { tenantId: tenant_id, availability: 'in_stock' }, 
+  const inStockProducts = await prisma.inventory_items.count({
+    where: { tenant_id: tenant_id, availability: 'in_stock' }, 
   });
 
-  const categorizedProducts = await prisma.inventoryItem.count({
-    where: { tenantId: tenant_id, categoryPath: { isEmpty: false } },
+  const categorizedProducts = await prisma.inventory_items.count({
+    where: { tenant_id: tenant_id, category_path: { isEmpty: false } }, 
   });
 
   return {

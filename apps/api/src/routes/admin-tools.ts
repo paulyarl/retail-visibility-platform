@@ -166,26 +166,26 @@ router.delete('/tenants/:tenantId', async (req, res) => {
     console.log('[Admin Tools] Deleting test tenant:', tenantId);
 
     // Delete all products for this tenant
-    const deletedProducts = await prisma.inventoryItem.deleteMany({
-      where: { tenantId },
+    const deletedProducts = await prisma.inventory_items.deleteMany({
+      where: { tenant_id: tenantId },
     });
 
     // Delete all categories for this tenant
-    const deletedCategories = await prisma.directoryCategory.deleteMany({
-      where: { tenantId },
+    const deletedCategories = await prisma.directory_category.deleteMany({
+      where: { tenantId: tenantId },
     });
 
     // Delete directory-related data
-    const deletedFeaturedListings = await prisma.directoryFeaturedListings.deleteMany({
-      where: { tenantId },
+    const deletedFeaturedListings = await prisma.directory_featured_listings_list.deleteMany({
+      where: { tenant_id: tenantId },
     });
 
-    const deletedDirectorySettings = await prisma.directorySettings.deleteMany({
-      where: { tenantId },
+    const deletedDirectorySettings = await prisma.directory_settings_list.deleteMany({
+      where: { tenant_id: tenantId },
     });
 
     // Delete the tenant
-    const deletedTenant = await prisma.tenant.delete({
+    const deletedTenant = await prisma.tenants.delete({
       where: { id: tenantId },
     });
 
@@ -306,11 +306,11 @@ router.get('/scan-sessions/stats', async (req: Request, res: Response) => {
     }
 
     const [active, total] = await Promise.all([
-      prisma.scanSessions.count({
-        where: { tenantId, status: 'active' },
+      prisma.scan_results_list.count({
+        where: { tenant_id: tenantId, status: 'active' },
       }),
-      prisma.scanSessions.count({
-        where: { tenantId },
+      prisma.scan_sessions_list.count({
+        where: { tenant_id: tenantId },
       }),
     ]);
 
@@ -345,14 +345,14 @@ router.post('/scan-sessions/cleanup', async (req: Request, res: Response) => {
     const { tenantId } = parsed.data;
 
     // Close all active sessions for this tenant
-    const result = await prisma.scanSessions.updateMany({
+    const result = await prisma.scan_sessions_list.updateMany({
       where: {
-        tenantId,
+        tenant_id: tenantId,
         status: 'active',
       },
       data: {
         status: 'cancelled',
-        completedAt: new Date(),
+        completed_at: new Date(),
       },
     });
 
