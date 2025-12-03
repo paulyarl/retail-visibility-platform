@@ -75,13 +75,13 @@ export default async function TenantLayout({ children, params }: { children: Rea
   // Feature flags (server-side) for gating nav items/variants
   const ffTenantUrls = isFeatureEnabled('FF_TENANT_URLS', tenantId);
   const ffAppShellNav = isFeatureEnabled('FF_APP_SHELL_NAV', tenantId);
-  const ffCategoryMgmt = isFeatureEnabled('FF_CATEGORY_MANAGEMENT_PAGE' as any, tenantId as any);
 
   const nav = [
     { label: 'Dashboard', href: `/t/${tenantId}/dashboard` },
     { label: 'Items', href: `/t/${tenantId}/items` },
     { label: 'Scan Products', href: `/t/${tenantId}/scan` },
-    ...(ffCategoryMgmt ? [{ label: 'Categories', href: `/t/${tenantId}/categories` }] as const : []),
+    { label: 'Categories', href: `/t/${tenantId}/categories` },
+    { label: 'Manage Categories', href: `/t/${tenantId}/categories/manage` },
     { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
     { label: 'Insights', href: `/t/${tenantId}/insights` },
     { label: 'Storefront', href: `/tenant/${tenantId}` },

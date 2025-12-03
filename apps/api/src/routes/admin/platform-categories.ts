@@ -57,6 +57,7 @@ const getDirectPool = () => {
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
+    // Read from platform_categories table
     const result = await getDirectPool().query(`
       SELECT 
         pc.id,
@@ -71,14 +72,12 @@ router.get('/', async (req: Request, res: Response) => {
         pc.is_active,
         pc.created_at,
         pc.updated_at,
-        COALESCE(dcs.store_count, 0) as store_count,
-        COALESCE(dcs.total_products, 0) as product_count,
-        COALESCE(dcs.avg_rating, 0) as avg_rating,
-        COUNT(DISTINCT dlc.listing_id) as listing_count
+        0 as store_count,
+        0 as product_count,
+        0 as avg_rating,
+        0 as listing_count
       FROM platform_categories pc
-      LEFT JOIN directory_category_stats dcs ON dcs.category_slug = pc.slug
-      LEFT JOIN directory_listing_categories dlc ON dlc.category_id = pc.id
-      GROUP BY pc.id, dcs.store_count, dcs.total_products, dcs.avg_rating
+      WHERE pc.is_active = true
       ORDER BY pc.sort_order ASC, pc.name ASC
     `);
 
@@ -135,6 +134,9 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
+    // Ensure google_category_id is not null (required by database)
+    const finalGoogleCategoryId = googleCategoryId || `gcid:${slug}`;
+
     const result = await getDirectPool().query(
       `INSERT INTO platform_categories (
         name, slug, description, google_category_id, icon_emoji, 
@@ -145,7 +147,7 @@ router.post('/', async (req: Request, res: Response) => {
         name,
         slug,
         description || null,
-        googleCategoryId || null,
+        finalGoogleCategoryId,
         iconEmoji || '📦',
         sortOrder || 999,
         level || 0,

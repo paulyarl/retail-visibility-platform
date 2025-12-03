@@ -122,12 +122,12 @@ export async function getUncategorizedCount(
 ): Promise<number> {
   try {
     const where: any = {
-      tenantId,
-      directoryCategoryId: null,
+      tenant_id: tenantId,
+      directory_category_id: null,
     };
 
     if (!includeAll) {
-      where.itemStatus = 'active';
+      where.item_status = 'active';
       where.visibility = 'public';
     }
 
@@ -151,11 +151,11 @@ export async function getTotalProductCount(
 ): Promise<number> {
   try {
     const where: any = {
-      tenantId,
+      tenant_id: tenantId,
     };
 
     if (!includeAll) {
-      where.itemStatus = 'active';
+      where.item_status = 'active';
       where.visibility = 'public';
     }
 

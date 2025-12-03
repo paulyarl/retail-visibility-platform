@@ -89,11 +89,26 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       where: { tenant_id: tenantId },
     });
 
+    // Transform snake_case to camelCase for frontend
     return res.json({
-      ...settings,
+      id: settings.id,
+      tenantId: settings.tenant_id,
+      isPublished: settings.is_published,
+      seoDescription: settings.seo_description,
+      seoKeywords: settings.seo_keywords,
+      primaryCategory: settings.primary_category,
+      secondaryCategories: settings.secondary_categories,
+      slug: settings.slug,
+      createdAt: settings.created_at,
+      updatedAt: settings.updated_at,
       isFeatured: !!activeFeatured,
       featuredUntil: activeFeatured?.featured_until,
-      businessProfile,
+      businessProfile: businessProfile ? {
+        businessName: businessProfile.business_name,
+        city: businessProfile.city,
+        state: businessProfile.state,
+        logoUrl: businessProfile.logo_url,
+      } : undefined,
     });
   } catch (error: any) {
     console.error('[GET /tenants/:id/directory/listing] Error:', error);

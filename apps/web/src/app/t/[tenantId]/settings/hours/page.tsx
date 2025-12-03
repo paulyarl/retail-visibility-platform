@@ -8,43 +8,7 @@ import HoursPreview from "@/components/hours/HoursPreview";
 
 export default async function HoursSettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
-  
-  // Check if business hours feature is enabled via feature flag system
-  // Use effective-flags endpoint to check platform + tenant inheritance
-  const serverApiBase = process.env.API_BASE_URL || "http://localhost:4000";
   const clientApiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
-  let isEnabled = false;
-  
-  try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('ACCESS_TOKEN')?.value || cookieStore.get('access_token')?.value;
-    
-    const headers: HeadersInit = { 'Content-Type': 'application/json' };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    const res = await fetch(`${serverApiBase}/api/admin/effective-flags/${tenantId}`, {
-      cache: 'no-store',
-      headers
-    });
-    if (res.ok) {
-      const data = await res.json();
-      // Check if FF_TENANT_GBP_HOURS_SYNC is effectively enabled (platform or tenant)
-      const hoursFlag = data.data?.find((f: any) => f.flag === 'FF_TENANT_GBP_HOURS_SYNC');
-      isEnabled = hoursFlag?.tenantEffectiveOn === true;
-    }
-  } catch (e) {
-    console.error('Failed to check hours flag:', e);
-  }
-  
-  if (!isEnabled) {
-    return (
-      <div className="p-6 text-sm text-gray-500">
-        Business Hours is not enabled for this tenant. Enable the <strong>FF_TENANT_GBP_HOURS_SYNC</strong> flag in Admin → Tenant Flags.
-      </div>
-    );
-  }
 
   return (
     <div className="p-8 max-w-7xl mx-auto">

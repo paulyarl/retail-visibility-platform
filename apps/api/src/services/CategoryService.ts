@@ -36,7 +36,7 @@ export const categoryService = {
         parentId: input.parentId ?? undefined,
         googleCategoryId: input.googleCategoryId ?? undefined,
         sortOrder: input.sortOrder ?? 0,
-        updated_at: new Date(),
+        updatedAt: new Date(),
       } as any,
     })
 

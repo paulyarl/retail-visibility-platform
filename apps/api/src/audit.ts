@@ -29,12 +29,12 @@ export async function audit(opts: {
 
     const auditData: any = {
       id: generateQuickStart("audit"),
-      tenantId: opts.tenantId,
+      tenant_id: opts.tenantId,
       action: mappedAction, // Use mapped enum value instead of string
-      actorId: opts.actor || 'system', // Prisma model expects this
-      actorType: 'system', // Prisma model expects this
-      entityId: opts.payload?.id || 'unknown', // Prisma model expects this
-      entityType: 'other', // Valid EntityType enum value for categories
+      actor_id: opts.actor || 'system', // Prisma model expects snake_case
+      actor_type: 'system', // Prisma model expects snake_case
+      entity_id: opts.payload?.id || 'unknown', // Prisma model expects snake_case
+      entity_type: 'other', // Valid EntityType enum value for categories
       diff: opts.payload || {}, // Required field
     };
 

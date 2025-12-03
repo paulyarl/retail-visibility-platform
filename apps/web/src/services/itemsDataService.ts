@@ -79,8 +79,8 @@ export class ItemsDataService {
       if (filters.status && filters.status !== 'all') params.append('status', filters.status);
       if (filters.visibility && filters.visibility !== 'all') params.append('visibility', filters.visibility);
 
-      // Add tenant identifier (camelCase as expected by backend)
-      params.append('tenantId', tenantId);
+      // Add tenant identifier (snake_case as expected by backend)
+      params.append('tenant_id', tenantId);
       
       const response = await api.get(`api/items?${params.toString()}`);
       

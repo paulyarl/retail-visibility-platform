@@ -193,8 +193,8 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // 🌟 UNIVERSAL TRANSFORM MIDDLEWARE - Makes naming conventions irrelevant!
 // Both snake_case AND camelCase work everywhere - API code and frontend get what they expect
-import { universalTransformMiddleware } from './middleware/universal-transform';
-app.use(universalTransformMiddleware);
+// import { universalTransformMiddleware } from './middleware/universal-transform';
+// app.use(universalTransformMiddleware);
 
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(setRequestContext);
@@ -2797,17 +2797,24 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     
     console.log('[PUT /items/:id] About to update with:', { 
       itemId: req.params.id, 
+      itemIdType: typeof req.params.id,
       updateData: JSON.stringify(updateData),
-      stockType: typeof updateData.stock
+      stockType: typeof updateData.stock,
+      stockValue: updateData.stock
     });
     
     // Simple approach - just update stock, skip quantity for now
     console.log('[PUT /items/:id] Updating with Prisma.update, stock only');
+    console.log('[PUT /items/:id] DEBUG - id:', String(req.params.id), 'type:', typeof req.params.id);
+    console.log('[PUT /items/:id] DEBUG - stock value:', updateData.stock, 'type:', typeof updateData.stock);
+    const stockInt = parseInt(String(updateData.stock), 10);
+    console.log('[PUT /items/:id] DEBUG - stockInt:', stockInt, 'type:', typeof stockInt);
+    
+    // Update stock using regular Prisma update (raw SQL was causing issues)
+    console.log('[PUT /items/:id] Updating with Prisma.update');
     const updated = await prisma.inventory_items.update({
       where: { id: req.params.id },
-      data: {
-        stock: Number(updateData.stock)
-      }
+      data: { stock: stockInt },
     });
     
     if (!updated) {
@@ -2824,8 +2831,9 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     };
     
     res.json(transformed);
-  } catch {
-    res.status(500).json({ error: "failed_to_update_item" });
+  } catch (error) {
+    console.error('[PUT /items/:id] Error updating item:', error);
+    res.status(500).json({ error: "failed_to_update_item", details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

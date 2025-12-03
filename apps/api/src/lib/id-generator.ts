@@ -113,6 +113,15 @@ export function generateQsCatId(): string {
 }
 
 /**
+ * Generates short directory category IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateDsCatId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `dircat-${nanoid()}`;
+}
+
+/**
  * Generates short quick start with optional prefix
  * Format: SKU-abc123 or CUSTOM-abc123
  */

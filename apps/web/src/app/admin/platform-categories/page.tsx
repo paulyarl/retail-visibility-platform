@@ -41,13 +41,26 @@ const PRESET_ICONS = {
 
 export default function PlatformCategoriesPage() {
   const [categories, setCategories] = useState<PlatformCategory[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<PlatformCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<PlatformCategory | null>(null);
   const [saving, setSaving] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [reordering, setReordering] = useState(false);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [importResults, setImportResults] = useState<any>(null);
+  const [gbpSearch, setGbpSearch] = useState('');
+  const [gbpResults, setGbpResults] = useState<Array<{ id: string; name: string; description?: string; icon_emoji?: string }>>([]);
+  const [gbpLoading, setGbpLoading] = useState(false);
+  const [selectedGbpCategories, setSelectedGbpCategories] = useState<Set<string>>(new Set());
+  
+  // Pagination and search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -65,6 +78,31 @@ export default function PlatformCategoriesPage() {
   useEffect(() => {
     loadCategories();
   }, []);
+
+  // Filter and search effect
+  useEffect(() => {
+    let filtered = categories;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(cat => 
+        cat.name.toLowerCase().includes(query) ||
+        cat.slug.toLowerCase().includes(query) ||
+        cat.description?.toLowerCase().includes(query) ||
+        cat.google_category_id?.toLowerCase().includes(query)
+      );
+    }
+    
+    setFilteredCategories(filtered);
+    setCurrentPage(1); // Reset to first page when search changes
+  }, [categories, searchQuery]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredCategories.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedCategories = filteredCategories.slice(startIndex, endIndex);
 
   const loadCategories = async () => {
     try {
@@ -97,6 +135,125 @@ export default function PlatformCategoriesPage() {
       isActive: true,
     });
     setShowModal(true);
+  };
+
+  const searchGbpCategories = async (query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setGbpResults([]);
+      return;
+    }
+    
+    setGbpLoading(true);
+    try {
+      // Load seed file and filter
+      const response = await fetch('/api/platform/categories/gbp-seed');
+      if (response.ok) {
+        const data = await response.json();
+        const allCategories = data.categories || [];
+        const filtered = allCategories.filter((cat: any) =>
+          cat.name.toLowerCase().includes(query.toLowerCase())
+        );
+        // Show all results (no limit) - admins can handle large result sets
+        setGbpResults(filtered);
+      }
+    } catch (error) {
+      console.error('Failed to search GBP categories:', error);
+    } finally {
+      setGbpLoading(false);
+    }
+  };
+
+  const toggleGbpSelection = (id: string) => {
+    const newSelected = new Set(selectedGbpCategories);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedGbpCategories(newSelected);
+  };
+
+  const handleImportSelected = async () => {
+    if (selectedGbpCategories.size === 0) return;
+    
+    const selected = gbpResults.filter(cat => selectedGbpCategories.has(cat.id));
+    let successCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    
+    for (const category of selected) {
+      try {
+        const slug = category.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        
+        const response = await api.post('/api/platform/categories', {
+          name: category.name,
+          slug,
+          googleCategoryId: category.id,
+          description: category.description || '',
+          icon_emoji: category.icon_emoji || '📦',
+        });
+        
+        if (response.ok) {
+          successCount++;
+        } else {
+          const data = await response.json();
+          if (data.error === 'duplicate_slug') {
+            skippedCount++; // Already exists, skip silently
+          } else {
+            errorCount++;
+          }
+        }
+      } catch (error) {
+        errorCount++;
+      }
+    }
+    
+    await loadCategories();
+    setShowBulkImportModal(false);
+    setGbpSearch('');
+    setGbpResults([]);
+    setSelectedGbpCategories(new Set());
+    
+    // Build success message
+    const messages = [];
+    if (successCount > 0) {
+      messages.push(`✅ Imported ${successCount} ${successCount === 1 ? 'category' : 'categories'}`);
+    }
+    if (skippedCount > 0) {
+      messages.push(`⏭️ Skipped ${skippedCount} duplicate${skippedCount === 1 ? '' : 's'}`);
+    }
+    if (errorCount > 0) {
+      messages.push(`❌ ${errorCount} failed`);
+    }
+    
+    if (messages.length > 0) {
+      alert(messages.join('\n'));
+    } else {
+      alert('No categories were imported.');
+    }
+  };
+
+  const handleBulkImport = async (source: 'default' | 'custom' = 'default') => {
+    try {
+      setBulkImporting(true);
+      setImportResults(null);
+      
+      const response = await api.post('/api/platform/categories/bulk-import', {
+        source,
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setImportResults(data.import_results);
+        await loadCategories();
+      } else {
+        throw new Error('Failed to import categories');
+      }
+    } catch (err) {
+      alert('Failed to import categories: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setBulkImporting(false);
+    }
   };
 
   const handleEdit = (category: PlatformCategory) => {
@@ -229,8 +386,8 @@ export default function PlatformCategoriesPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <PageHeader
-        title="Platform Categories"
-        description="Manage directory categories available to all stores"
+        title="Directory Categories"
+        description="Manage business categories for the directory - sourced from Google Business Profile"
       />
 
       {error && (
@@ -265,18 +422,60 @@ export default function PlatformCategoriesPage() {
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="mt-6 flex justify-between items-center">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {categories.length} {categories.length === 1 ? 'category' : 'categories'}
-        </p>
-        <button
-          onClick={handleAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Category
-        </button>
+      {/* Search and Actions */}
+      <div className="mt-6 space-y-4">
+        {/* Search Bar */}
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search categories by name, slug, description..."
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div className="flex gap-2">
+          <button
+            onClick={() => setShowBulkImportModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            📥 Bulk Import
+          </button>
+          <button
+            onClick={handleAdd}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Category
+          </button>
+        </div>
+        </div>
+        
+        {/* Results Count */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {searchQuery ? (
+              <>
+                Showing {filteredCategories.length} of {categories.length} categories
+                {filteredCategories.length > 0 && ` (page ${currentPage} of ${totalPages})`}
+              </>
+            ) : (
+              <>
+                {categories.length} {categories.length === 1 ? 'category' : 'categories'}
+                {categories.length > 0 && ` (page ${currentPage} of ${totalPages})`}
+              </>
+            )}
+          </p>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              Clear search
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Categories Table */}
@@ -309,7 +508,7 @@ export default function PlatformCategoriesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {categories.map((category, index) => (
+              {paginatedCategories.map((category, index) => (
                 <tr 
                   key={category.id} 
                   draggable
@@ -389,10 +588,69 @@ export default function PlatformCategoriesPage() {
                   </td>
                 </tr>
               ))}
+              {paginatedCategories.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                    {searchQuery ? 'No categories found matching your search.' : 'No categories yet.'}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredCategories.length)} of {filteredCategories.length}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            <div className="flex gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1 rounded-lg transition-colors ${
+                      currentPage === pageNum
+                        ? 'bg-primary-600 text-white'
+                        : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showModal && (
@@ -574,6 +832,238 @@ export default function PlatformCategoriesPage() {
                 >
                   <Save className="w-4 h-4" />
                   {saving ? 'Saving...' : 'Save Category'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Modal */}
+      {showBulkImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal Header - Sticky */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                  📥 Bulk Import Categories
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowBulkImportModal(false);
+                    setImportResults(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+                {/* Search Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Search Google Business Profile Categories
+                  </label>
+                  <input
+                    type="text"
+                    value={gbpSearch}
+                    onChange={(e) => {
+                      setGbpSearch(e.target.value);
+                      searchGbpCategories(e.target.value);
+                    }}
+                    placeholder="e.g., grocery, pharmacy, pet store..."
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                {/* Loading State */}
+                {gbpLoading && (
+                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                    Searching...
+                  </div>
+                )}
+
+                {/* Search Results */}
+                {!gbpLoading && gbpResults.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {selectedGbpCategories.size} selected of {gbpResults.length} results
+                      </div>
+                      <div className="flex gap-2">
+                        {selectedGbpCategories.size > 0 && (
+                          <button
+                            onClick={() => {
+                              const newSelected = new Set(selectedGbpCategories);
+                              gbpResults.forEach(cat => newSelected.delete(cat.id));
+                              setSelectedGbpCategories(newSelected);
+                            }}
+                            className="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                          >
+                            Deselect All
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            const newSelected = new Set(selectedGbpCategories);
+                            gbpResults.forEach(cat => newSelected.add(cat.id));
+                            setSelectedGbpCategories(newSelected);
+                          }}
+                          className="px-3 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
+                        >
+                          Select All ({gbpResults.length})
+                        </button>
+                      </div>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
+                      {gbpResults.map((result) => (
+                        <div
+                          key={result.id}
+                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                            selectedGbpCategories.has(result.id)
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                          }`}
+                          onClick={() => toggleGbpSelection(result.id)}
+                        >
+                          <div className="flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedGbpCategories.has(result.id)}
+                              onChange={() => {}}
+                              className="mt-1"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900 dark:text-white">{result.name}</div>
+                              {result.description && (
+                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                  {result.description}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {!gbpLoading && gbpSearch.length >= 2 && gbpResults.length === 0 && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    No categories found. Try a different search term.
+                  </div>
+                )}
+
+                {/* Initial State */}
+                {gbpSearch.length < 2 && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <p className="mb-2">Enter at least 2 characters to search</p>
+                    <p className="text-xs">Search from 25 GBP business type categories</p>
+                  </div>
+                )}
+
+                {/* Help Text */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                    💡 About GBP Categories
+                  </h4>
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    These business type categories are sourced from Google Business Profile. 
+                    They represent what type of business stores ARE (Grocery Store, Pharmacy, Pet Store, etc.).
+                  </p>
+                </div>
+
+                {/* Categories Preview (when no search) */}
+                {gbpSearch.length === 0 && (
+                  <div>
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                      Available Categories (25):
+                    </h4>
+                    <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 max-h-64 overflow-y-auto">
+                      <ul className="space-y-2 text-sm">
+                      <li className="flex items-center gap-2">
+                        <span>🛒</span>
+                        <span>Grocery Store</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>🏪</span>
+                        <span>Supermarket</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>💊</span>
+                        <span>Pharmacy</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>🐾</span>
+                        <span>Pet Store</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>👕</span>
+                        <span>Clothing Store</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>👟</span>
+                        <span>Shoe Store</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>📱</span>
+                        <span>Electronics Store</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>🛋️</span>
+                        <span>Furniture Store</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>🔧</span>
+                        <span>Hardware Store</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>💄</span>
+                        <span>Beauty Supply Store</span>
+                      </li>
+                      <li className="text-gray-500 dark:text-gray-400">
+                        ... and 15 more business types
+                      </li>
+                    </ul>
+                  </div>
+                  </div>
+                )}
+
+                {/* Warning */}
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    ⚠️ <strong>Note:</strong> Duplicate categories (same slug) will be skipped automatically.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer - Sticky */}
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowBulkImportModal(false);
+                    setGbpSearch('');
+                    setGbpResults([]);
+                    setSelectedGbpCategories(new Set());
+                  }}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImportSelected}
+                  disabled={selectedGbpCategories.size === 0}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Import {selectedGbpCategories.size > 0 ? `(${selectedGbpCategories.size})` : ''}
                 </button>
               </div>
             </div>

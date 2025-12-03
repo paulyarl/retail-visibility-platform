@@ -5,8 +5,7 @@
 
 import { PrismaClient, user_role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
-import { generateTenantId } from '../src/lib/id-generator';
+import { generateUserId } from '../src/lib/id-generator';
 
 const prisma = new PrismaClient();
 
@@ -16,26 +15,27 @@ async function seedAdmin() {
   const adminData = {
     email: 'admin@rvp.com',
     password: 'Admin123!',
-    firstName: 'Admin',
-    lastName: 'User',
-    role: user_role.ADMIN,
+    first_name: 'Admin',
+    last_name: 'User',
+    role: user_role.PLATFORM_ADMIN,
   };
 
   try {
-    // Check if admin already exists
+    // Check if admin already exists and delete it
     const existingAdmin = await prisma.users.findUnique({
       where: { email: adminData.email },
     });
 
     if (existingAdmin) {
-      console.log('⚠️  Admin user already exists!');
+      console.log('🗑️  Deleting existing admin user...');
       console.log('   Email:', existingAdmin.email);
       console.log('   ID:', existingAdmin.id);
-      console.log('   Role:', existingAdmin.role);
-      console.log('\n✅ You can log in with:');
-      console.log('   Email:', adminData.email);
-      console.log('   Password:', adminData.password);
-      return;
+      
+      await prisma.users.delete({
+        where: { email: adminData.email },
+      });
+      
+      console.log('✅ Existing admin deleted\n');
     }
 
     // Hash password
@@ -44,11 +44,11 @@ async function seedAdmin() {
     // Create admin user
     const admin = await prisma.users.create({
       data: {
-        id: generateTenantId(),
+        id: generateUserId(),
         email: adminData.email,
-        password_hash: "Admin123!",
-        first_name: adminData.firstName,
-        last_name: adminData.lastName,
+        password_hash: passwordHash,
+        first_name: adminData.first_name,
+        last_name: adminData.last_name,
         role: adminData.role,
         email_verified: true, // Auto-verify admin
         updated_at: new Date(),

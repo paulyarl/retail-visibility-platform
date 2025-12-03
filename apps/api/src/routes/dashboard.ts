@@ -117,8 +117,8 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
       targetMembership = userTenants[0];
     }
     
-    const tenantId = (targetMembership as any).tenant_id;
-    const organizationId = (targetMembership as any).tenant.organization_id;
+    const tenantId = (targetMembership as any).tenantId || (targetMembership as any).tenant?.id;
+    const organizationId = (targetMembership as any).tenant?.organization_id;
 
     // Fetch data with error handling
     let itemStats, tenant, organization;

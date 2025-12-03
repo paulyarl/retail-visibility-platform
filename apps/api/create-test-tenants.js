@@ -137,7 +137,7 @@ async function createTenant(index) {
 
   // Create tenant
   console.log('1️⃣  Creating tenant...');
-  const tenant = await prisma.tenant.create({
+  const tenant = await prisma.tenants.create({
     data: {
       id: `tenant_${timestamp}`,
       name: tenantName,
@@ -177,7 +177,7 @@ async function createTenant(index) {
     });
   }
 
-  await prisma.inventoryItem.createMany({ data: items });
+  await prisma.inventory_items.createMany({ data: items });
   console.log(`   ✅ ${skuCount} SKUs added`);
 
   // Summary

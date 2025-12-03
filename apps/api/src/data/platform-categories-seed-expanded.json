@@ -1,0 +1,254 @@
+{
+  "categories": [
+    {
+      "id": "gcid:grocery_store",
+      "name": "Grocery Store",
+      "slug": "grocery-store",
+      "description": "Supermarket selling groceries, fresh produce, and household items",
+      "icon_emoji": "🛒",
+      "google_category_id": "gcid:grocery_store",
+      "sort_order": 10,
+      "level": 0
+    },
+    {
+      "id": "gcid:supermarket",
+      "name": "Supermarket",
+      "slug": "supermarket",
+      "description": "Large grocery store with wide selection of food and products",
+      "icon_emoji": "🏪",
+      "google_category_id": "gcid:supermarket",
+      "sort_order": 20,
+      "level": 0
+    },
+    {
+      "id": "gcid:convenience_store",
+      "name": "Convenience Store",
+      "slug": "convenience-store",
+      "description": "Small retail store with everyday essentials",
+      "icon_emoji": "🏬",
+      "google_category_id": "gcid:convenience_store",
+      "sort_order": 30,
+      "level": 0
+    },
+    {
+      "id": "gcid:pharmacy",
+      "name": "Pharmacy",
+      "slug": "pharmacy",
+      "description": "Drugstore selling medications, health products, and prescriptions",
+      "icon_emoji": "💊",
+      "google_category_id": "gcid:pharmacy",
+      "sort_order": 40,
+      "level": 0
+    },
+    {
+      "id": "gcid:drug_store",
+      "name": "Drug Store",
+      "slug": "drug-store",
+      "description": "Retail pharmacy with health and wellness products",
+      "icon_emoji": "💉",
+      "google_category_id": "gcid:drug_store",
+      "sort_order": 50,
+      "level": 0
+    },
+    {
+      "id": "gcid:pet_store",
+      "name": "Pet Store",
+      "slug": "pet-store",
+      "description": "Retail store selling pet supplies and accessories",
+      "icon_emoji": "🐾",
+      "google_category_id": "gcid:pet_store",
+      "sort_order": 60,
+      "level": 0
+    },
+    {
+      "id": "gcid:pet_supply_store",
+      "name": "Pet Supply Store",
+      "slug": "pet-supply-store",
+      "description": "Store specializing in pet food, toys, and supplies",
+      "icon_emoji": "🦴",
+      "google_category_id": "gcid:pet_supply_store",
+      "sort_order": 70,
+      "level": 0
+    },
+    {
+      "id": "gcid:clothing_store",
+      "name": "Clothing Store",
+      "slug": "clothing-store",
+      "description": "Retail store selling apparel and fashion items",
+      "icon_emoji": "👕",
+      "google_category_id": "gcid:clothing_store",
+      "sort_order": 80,
+      "level": 0
+    },
+    {
+      "id": "gcid:shoe_store",
+      "name": "Shoe Store",
+      "slug": "shoe-store",
+      "description": "Retail store specializing in footwear",
+      "icon_emoji": "👟",
+      "google_category_id": "gcid:shoe_store",
+      "sort_order": 90,
+      "level": 0
+    },
+    {
+      "id": "gcid:electronics_store",
+      "name": "Electronics Store",
+      "slug": "electronics-store",
+      "description": "Retail store selling electronics and technology products",
+      "icon_emoji": "📱",
+      "google_category_id": "gcid:electronics_store",
+      "sort_order": 100,
+      "level": 0
+    },
+    {
+      "id": "gcid:furniture_store",
+      "name": "Furniture Store",
+      "slug": "furniture-store",
+      "description": "Retail store selling furniture and home furnishings",
+      "icon_emoji": "🛋️",
+      "google_category_id": "gcid:furniture_store",
+      "sort_order": 110,
+      "level": 0
+    },
+    {
+      "id": "gcid:home_goods_store",
+      "name": "Home Goods Store",
+      "slug": "home-goods-store",
+      "description": "Retail store selling home decor and household items",
+      "icon_emoji": "🏠",
+      "google_category_id": "gcid:home_goods_store",
+      "sort_order": 120,
+      "level": 0
+    },
+    {
+      "id": "gcid:hardware_store",
+      "name": "Hardware Store",
+      "slug": "hardware-store",
+      "description": "Store selling tools, building materials, and hardware supplies",
+      "icon_emoji": "🔧",
+      "google_category_id": "gcid:hardware_store",
+      "sort_order": 130,
+      "level": 0
+    },
+    {
+      "id": "gcid:beauty_supply_store",
+      "name": "Beauty Supply Store",
+      "slug": "beauty-supply-store",
+      "description": "Store selling cosmetics, beauty products, and personal care items",
+      "icon_emoji": "💄",
+      "google_category_id": "gcid:beauty_supply_store",
+      "sort_order": 140,
+      "level": 0
+    },
+    {
+      "id": "gcid:health_and_beauty_shop",
+      "name": "Health and Beauty Shop",
+      "slug": "health-beauty-shop",
+      "description": "Shop selling health and beauty products",
+      "icon_emoji": "💅",
+      "google_category_id": "gcid:health_and_beauty_shop",
+      "sort_order": 150,
+      "level": 0
+    },
+    {
+      "id": "gcid:sporting_goods_store",
+      "name": "Sporting Goods Store",
+      "slug": "sporting-goods-store",
+      "description": "Store selling sports equipment and athletic gear",
+      "icon_emoji": "⚽",
+      "google_category_id": "gcid:sporting_goods_store",
+      "sort_order": 160,
+      "level": 0
+    },
+    {
+      "id": "gcid:book_store",
+      "name": "Book Store",
+      "slug": "book-store",
+      "description": "Retail store selling books and reading materials",
+      "icon_emoji": "📚",
+      "google_category_id": "gcid:book_store",
+      "sort_order": 170,
+      "level": 0
+    },
+    {
+      "id": "gcid:toy_store",
+      "name": "Toy Store",
+      "slug": "toy-store",
+      "description": "Store selling toys, games, and children's products",
+      "icon_emoji": "🧸",
+      "google_category_id": "gcid:toy_store",
+      "sort_order": 180,
+      "level": 0
+    },
+    {
+      "id": "gcid:liquor_store",
+      "name": "Liquor Store",
+      "slug": "liquor-store",
+      "description": "Retail store selling alcoholic beverages",
+      "icon_emoji": "🍷",
+      "google_category_id": "gcid:liquor_store",
+      "sort_order": 190,
+      "level": 0
+    },
+    {
+      "id": "gcid:bakery",
+      "name": "Bakery",
+      "slug": "bakery",
+      "description": "Shop selling fresh bread, pastries, and baked goods",
+      "icon_emoji": "🥖",
+      "google_category_id": "gcid:bakery",
+      "sort_order": 200,
+      "level": 0
+    },
+    {
+      "id": "gcid:butcher_shop",
+      "name": "Butcher Shop",
+      "slug": "butcher-shop",
+      "description": "Shop selling fresh meat and poultry",
+      "icon_emoji": "🥩",
+      "google_category_id": "gcid:butcher_shop",
+      "sort_order": 210,
+      "level": 0
+    },
+    {
+      "id": "gcid:fish_store",
+      "name": "Fish Store",
+      "slug": "fish-store",
+      "description": "Store selling fresh fish and seafood",
+      "icon_emoji": "🐟",
+      "google_category_id": "gcid:fish_store",
+      "sort_order": 220,
+      "level": 0
+    },
+    {
+      "id": "gcid:florist",
+      "name": "Florist",
+      "slug": "florist",
+      "description": "Shop selling flowers, plants, and floral arrangements",
+      "icon_emoji": "💐",
+      "google_category_id": "gcid:florist",
+      "sort_order": 230,
+      "level": 0
+    },
+    {
+      "id": "gcid:garden_center",
+      "name": "Garden Center",
+      "slug": "garden-center",
+      "description": "Store selling plants, gardening supplies, and outdoor items",
+      "icon_emoji": "🌱",
+      "google_category_id": "gcid:garden_center",
+      "sort_order": 240,
+      "level": 0
+    },
+    {
+      "id": "gcid:gift_shop",
+      "name": "Gift Shop",
+      "slug": "gift-shop",
+      "description": "Store selling gifts, souvenirs, and specialty items",
+      "icon_emoji": "🎁",
+      "google_category_id": "gcid:gift_shop",
+      "sort_order": 250,
+      "level": 0
+    }
+  ]
+}

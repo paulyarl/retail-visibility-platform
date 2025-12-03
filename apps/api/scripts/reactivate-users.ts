@@ -7,32 +7,32 @@ async function reactivateUsers() {
 
   try {
     // Update all users to be active
-    const result = await prisma.user.updateMany({
+    const result = await prisma.users.updateMany({
       where: {
-        isActive: false,
+        is_active: false,
       },
       data: {
-        isActive: true,
+        is_active: true,
       },
     });
 
     console.log(`✅ Reactivated ${result.count} user(s)\n`);
 
     // Show all users and their status
-    const allUsers = await prisma.user.findMany({
+    const allUsers = await prisma.users.findMany({
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
+        first_name: true,
+        last_name: true,
         role: true,
-        isActive: true,
+        is_active: true,
       },
     });
 
     console.log('📋 Current users:');
     allUsers.forEach((user) => {
-      const status = user.isActive ? '✅ Active' : '❌ Inactive';
+      const status = user.is_active ? '✅ Active' : '❌ Inactive';
       console.log(`   ${status} - ${user.email} (${user.role})`);
     });
 

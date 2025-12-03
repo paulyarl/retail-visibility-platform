@@ -5,6 +5,7 @@ interface AppLinks {
   dashboard: string;
   inventory: string;
   trash?: string;
+  categories?: string;
   tenants: string;
   propagation?: string;
   integrations?: string;
@@ -44,6 +45,7 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
         dashboard: `/t/${tenantId}/dashboard`,
         inventory: `/t/${tenantId}/items`,
         trash: `/t/${tenantId}/trash`,
+        categories: `/t/${tenantId}/categories/manage`,
         tenants: '/tenants',
         propagation: `/t/${tenantId}/propagation`,
         integrations: `/t/${tenantId}/settings/integrations`,
@@ -55,6 +57,7 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
         dashboard: '/',
         inventory: '/items',
         trash: undefined,
+        categories: undefined,
         tenants: '/tenants',
         propagation: undefined,
         integrations: undefined,

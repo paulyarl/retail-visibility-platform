@@ -158,7 +158,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         ii.created_at,
         ii.updated_at
       FROM inventory_items ii
-      LEFT JOIN directory_categories_list dcl ON dcl.id = ii.directory_category_id
+      LEFT JOIN platform_categories dcl ON dcl.id = ii.directory_category_id
       WHERE ${whereClause}
       ORDER BY ii.updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -167,7 +167,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const countQuery = `
       SELECT COUNT(*) as count
       FROM inventory_items ii
-      LEFT JOIN directory_categories_list dcl ON dcl.id = ii.directory_category_id
+      LEFT JOIN platform_categories dcl ON dcl.id = ii.directory_category_id
       WHERE ${whereClause}
     `;
     
