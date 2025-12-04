@@ -4,6 +4,7 @@ import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
 import { useFeatureFlag } from '@/lib/featureFlags';
 import { apiRequest } from '@/lib/api';
 import TenantCategorySelector from './TenantCategorySelector';
+import { Item } from '@/services/itemsDataService';
 
 // Helper component to display category name by ID
 function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
@@ -33,26 +34,6 @@ function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
   }, [categoryId, tenantId]);
 
   return <span className="font-medium">{categoryName}</span>;
-}
-
-interface Item {
-  id: string;
-  sku: string;
-  name: string;
-  brand?: string;
-  manufacturer?: string;
-  price: number;
-  stock?: number;
-  description?: string;
-  status?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing';
-  categoryPath?: string[];
-  tenantCategoryId?: string | null;
-  tenantCategory?: {
-    id: string;
-    name: string;
-    slug?: string;
-    googleCategoryId?: string | null;
-  };
 }
 
 interface EditItemModalProps {
@@ -106,7 +87,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
       // Map 'inactive' to 'archived' since we no longer have an Inactive button
-      const mappedStatus = item.status === 'inactive' ? 'archived' : item.status;
+      const currentStatus = item.itemStatus || item.status || 'draft';
+      const mappedStatus = currentStatus === 'inactive' ? 'archived' : currentStatus;
       setStatus((mappedStatus === 'draft' || mappedStatus === 'active' || mappedStatus === 'archived') ? mappedStatus : 'draft');
       setTenantCategoryId(item.tenantCategoryId || '');
     }
@@ -160,8 +142,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         price: price ? parseFloat(price) : undefined,
         stock: stock ? parseInt(stock) : undefined,
         description: description.trim() || undefined,
-        status,
-        itemStatus: status === 'draft' ? 'active' : status, // Map draft to active for API
+        itemStatus: status === 'draft' ? 'active' : status, // Map draft to active for API, send as itemStatus
+        item_status: status === 'draft' ? 'active' : status, // Also send snake_case version for backend
         tenantCategoryId: tenantCategoryId || null,
       } as Item;
 

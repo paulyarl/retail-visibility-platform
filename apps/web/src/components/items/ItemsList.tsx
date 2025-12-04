@@ -142,8 +142,8 @@ export default function ItemsList({
                   {/* Badges & Sync Status */}
                   <div className="flex flex-col gap-2 items-end">
                     <div className="flex flex-wrap gap-2 justify-end">
-                      <Badge variant={item.status === 'active' ? 'success' : item.status === 'syncing' ? 'info' : item.status === 'draft' ? 'info' : 'default'}>
-                        {item.status === 'active' ? 'Active' : item.status === 'syncing' ? 'Syncing' : item.status === 'draft' ? 'Draft' : 'Archived'}
+                      <Badge variant={(item.itemStatus || item.status) === 'active' ? 'success' : (item.itemStatus || item.status) === 'syncing' ? 'info' : (item.itemStatus || item.status) === 'draft' ? 'info' : 'default'}>
+                        {(item.itemStatus || item.status) === 'active' ? 'Active' : (item.itemStatus || item.status) === 'syncing' ? 'Syncing' : (item.itemStatus || item.status) === 'draft' ? 'Draft' : 'Archived'}
                       </Badge>
                       <Badge variant={item.visibility === 'public' ? 'info' : 'default'}>
                         {item.visibility}
@@ -295,17 +295,17 @@ export default function ItemsList({
                   size="sm" 
                   variant="ghost" 
                   onClick={() => onStatusToggle(item)}
-                  title={item.status === 'active' ? 'Archive this product (will stop syncing to Google, but keeps the data)' : 'Restore from archive (required for Google sync)'}
-                  className={`ml-auto ${item.status === 'active' ? 'text-green-600 hover:text-green-700' : 'text-amber-600 hover:text-amber-700'}`}
+                  title={(item.itemStatus || item.status) === 'active' ? 'Archive this product (will stop syncing to Google, but keeps the data)' : 'Restore from archive (required for Google sync)'}
+                  className={`ml-auto ${(item.itemStatus || item.status) === 'active' ? 'text-green-600 hover:text-green-700' : 'text-amber-600 hover:text-amber-700'}`}
                 >
                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    {item.status === 'active' ? (
+                    {(item.itemStatus || item.status) === 'active' ? (
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     ) : (
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     )}
                   </svg>
-                  {item.status === 'active' ? 'Active' : 'Archived'}
+                  {(item.itemStatus || item.status) === 'active' ? 'Active' : 'Archived'}
                 </Button>
               )}
               {onVisibilityToggle && (

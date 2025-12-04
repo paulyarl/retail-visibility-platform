@@ -3,6 +3,7 @@
  */
 
 export interface CSVItem {
+  itemStatus: string | undefined;
   name: string;
   title: string;
   brand: string;
@@ -188,8 +189,9 @@ export function parseCSV(csvText: string): CSVItem[] {
         availability: item.availability || 'in_stock',
         imageUrl: item.imageUrl || undefined,
         category: item.category || undefined,
-        status: (item.status as any) || 'active',
-        visibility: (item.visibility as any) || 'public'
+        status: (item.itemStatus || item.status as any) || 'active',
+        visibility: (item.visibility as any) || 'public',
+        itemStatus: undefined
       };
 
       // Basic validation
@@ -279,10 +281,11 @@ export function validateCSVItems(items: CSVItem[]): { valid: boolean; errors: st
     }
 
     // Validate status
-    if (item.status) {
+    const itemStatus = item.itemStatus || item.status;
+    if (itemStatus) {
       const validStatus = ['active', 'inactive', 'archived', 'draft'];
-      if (!validStatus.includes(item.status)) {
-        errors.push(`Invalid status at row ${index + 2}: ${item.status}. Must be one of: ${validStatus.join(', ')}`);
+      if (!validStatus.includes(itemStatus)) {
+        errors.push(`Invalid status at row ${index + 2}: ${itemStatus}. Must be one of: ${validStatus.join(', ')}`);
       }
     }
 
@@ -334,7 +337,7 @@ export async function analyzeCSVImport(
   // Status breakdown
   const statusBreakdown: Record<string, number> = {};
   items.forEach(item => {
-    const status = item.status || 'active';
+    const status = item.itemStatus || item.status || 'active';
     statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
   });
   

@@ -98,61 +98,216 @@ router.delete('/categories/:id', authenticateToken, requireAdmin, async (req: Re
   }
 });
 
-// Quick start endpoint for platform categories (for frontend compatibility)
+// Quick start endpoint for platform categories (aligned with tenant quick-start)
 router.post('/categories/quick-start', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { categoryCount = 12 } = req.body;
-    
-    // Import the quick start logic
-    const { generateQuickStartCategories } = await import('../lib/quick-start-categories');
+    const { businessType = 'general', categoryCount = 15 } = req.body;
     const { prisma } = await import('../prisma');
     const { generateQsCatId } = await import('../lib/id-generator');
     
-    // Get all available categories
-    const allCategories = await generateQuickStartCategories();
+    // Use the same taxonomy branches as tenant quick-start
+    const taxonomyBranches: Record<string, string[][]> = {
+      grocery: [
+        ['Food, Beverages & Tobacco', 'Food Items'],
+        ['Food, Beverages & Tobacco', 'Beverages'],
+      ],
+      fashion: [
+        ['Apparel & Accessories', 'Clothing'],
+        ['Apparel & Accessories', 'Shoes'],
+        ['Apparel & Accessories', 'Clothing Accessories'],
+      ],
+      electronics: [
+        ['Electronics', 'Computers'],
+        ['Electronics', 'Audio'],
+        ['Electronics', 'Cameras & Optics'],
+        ['Electronics', 'Communications'],
+      ],
+      home_garden: [
+        ['Home & Garden', 'Home Decor'],
+        ['Home & Garden', 'Kitchen & Dining'],
+        ['Home & Garden', 'Furniture'],
+        ['Home & Garden', 'Lawn & Garden'],
+      ],
+      health_beauty: [
+        ['Health & Beauty', 'Personal Care'],
+        ['Health & Beauty', 'Health Care'],
+        ['Health & Beauty', 'Bath & Body'],
+      ],
+      sports_outdoors: [
+        ['Sporting Goods', 'Exercise & Fitness'],
+        ['Sporting Goods', 'Outdoor Recreation'],
+        ['Sporting Goods', 'Athletics'],
+      ],
+      toys_games: [
+        ['Toys & Games', 'Toys'],
+        ['Toys & Games', 'Games'],
+        ['Toys & Games', 'Puzzles'],
+      ],
+      automotive: [
+        ['Vehicles & Parts', 'Vehicle Parts & Accessories'],
+        ['Vehicles & Parts', 'Motor Vehicle Care & Cleaning'],
+      ],
+      books_media: [
+        ['Media', 'Books'],
+        ['Media', 'Music & Sound Recordings'],
+        ['Media', 'DVDs & Videos'],
+      ],
+      pet_supplies: [
+        ['Animals & Pet Supplies', 'Pet Supplies'],
+        ['Animals & Pet Supplies', 'Pet Food'],
+      ],
+      office_supplies: [
+        ['Office Supplies', 'General Office Supplies'],
+        ['Office Supplies', 'Paper Products'],
+        ['Office Supplies', 'Presentation Supplies'],
+      ],
+      jewelry: [
+        ['Apparel & Accessories', 'Jewelry'],
+        ['Apparel & Accessories', 'Watches'],
+      ],
+      baby_kids: [
+        ['Baby & Toddler', 'Baby Care'],
+        ['Baby & Toddler', 'Baby Toys & Activity Equipment'],
+        ['Baby & Toddler', 'Baby Transport'],
+      ],
+      arts_crafts: [
+        ['Arts & Entertainment', 'Hobbies & Creative Arts'],
+        ['Arts & Entertainment', 'Party & Celebration'],
+      ],
+      hardware_tools: [
+        ['Hardware', 'Building Materials'],
+        ['Hardware', 'Power & Hand Tools'],
+        ['Hardware', 'Plumbing'],
+      ],
+      furniture: [
+        ['Furniture', 'Living Room Furniture'],
+        ['Furniture', 'Bedroom Furniture'],
+        ['Furniture', 'Office Furniture'],
+      ],
+      restaurant: [
+        ['Food, Beverages & Tobacco', 'Food Items', 'Prepared Foods'],
+        ['Food, Beverages & Tobacco', 'Beverages'],
+      ],
+      pharmacy: [
+        ['Health & Beauty', 'Health Care'],
+        ['Health & Beauty', 'Personal Care'],
+        ['Health & Beauty', 'Vitamins & Supplements'],
+      ],
+      general: [
+        ['Home & Garden'],
+        ['Health & Beauty'],
+        ['Sporting Goods'],
+        ['Toys & Games'],
+        ['Office Supplies'],
+        ['Arts & Entertainment'],
+      ],
+    };
     
-    // Limit to requested count
-    const categoriesToCreate = allCategories.slice(0, Math.min(categoryCount, allCategories.length));
+    // Fetch existing categories to avoid duplicates
+    const existingCategories = await prisma.directory_category.findMany({
+      where: { tenantId: 'platform' },
+      select: { name: true, slug: true },
+    });
     
-    // Create categories for the "platform" tenant
+    const existingNames = new Set(existingCategories.map(c => c.name.toLowerCase()));
+    
+    // Import Google taxonomy functions
+    const { selectRandomFromBranch, getCategoryById } = await import('../lib/google/taxonomy');
+    
+    // Use hierarchical branch-based generation
+    const branches = taxonomyBranches[businessType] || taxonomyBranches.general;
+    let hierarchicalCategories: Array<{ node: any; name: string }> = [];
+    
+    console.log(`[Platform Quick Start] Using hierarchical branch generation for ${businessType}`);
+    
+    // Distribute category count across branches
+    const perBranch = Math.ceil(categoryCount / branches.length);
+    
+    for (const branch of branches) {
+      const branchCategories = selectRandomFromBranch(branch, perBranch, {
+        minDepth: 1,
+        maxDepth: 3,
+        diversify: true,
+      });
+      
+      // Use the last part of the path as the friendly name
+      hierarchicalCategories.push(...branchCategories.map(node => ({
+        node,
+        name: node.path[node.path.length - 1],
+      })));
+    }
+    
+    // Trim to requested count
+    hierarchicalCategories = hierarchicalCategories.slice(0, categoryCount);
+    
+    // Filter out duplicates
+    const categoriesToCreate = hierarchicalCategories.filter(cat => {
+      const nameExists = existingNames.has(cat.name.toLowerCase());
+      if (nameExists) {
+        console.log(`[Platform Quick Start] Skipping duplicate category: "${cat.name}"`);
+      }
+      return !nameExists;
+    });
+    
+    if (categoriesToCreate.length === 0) {
+      const categories = await categoryService.getTenantCategories('platform');
+      return res.json({
+        success: true,
+        data: categories,
+        categoriesCreated: 0,
+        duplicatesSkipped: hierarchicalCategories.length,
+        message: 'All categories already exist. No new categories were created.',
+      });
+    }
+    
+    console.log(`[Platform Quick Start] Creating ${categoriesToCreate.length} new categories (${hierarchicalCategories.length - categoriesToCreate.length} duplicates skipped)`);
+    
+    // Create categories with Google taxonomy alignment
     const createdCategories = [];
-    for (const category of categoriesToCreate) {
+    for (const cat of categoriesToCreate) {
       try {
-        // Check if category already exists
-        const existing = await prisma.directory_category.findFirst({
-          where: {
-            tenantId: 'platform',
-            slug: category.slug,
-          },
-        });
+        const googleCategoryId = cat.node.id;
+        const categoryName = cat.name;
         
-        if (existing) {
-          console.log(`[Quick Start] Skipping duplicate category: ${category.name}`);
-          continue;
-        }
+        console.log(`[Platform Quick Start] Creating category: "${categoryName}" (${cat.node.path.join(' > ')})`);
         
         const created = await prisma.directory_category.create({
           data: {
             id: generateQsCatId(),
             tenantId: 'platform',
-            name: category.name,
-            slug: category.slug,
+            name: categoryName,
+            slug: categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            googleCategoryId,
+            isActive: true,
             updatedAt: new Date(),
             createdAt: new Date(),
           } as any,
         });
         createdCategories.push(created);
       } catch (error: any) {
-        console.error(`Failed to create category ${category.name}:`, error);
+        console.error(`[Platform Quick Start] Failed to create category ${cat.name}:`, error);
       }
     }
+    
+    console.log(`[Platform Quick Start] Created ${createdCategories.length} categories for platform`);
     
     // Fetch all platform categories to return
     const categories = await categoryService.getTenantCategories('platform');
     
-    return res.json({ success: true, data: categories, categoriesCreated: createdCategories.length });
+    const duplicatesSkipped = hierarchicalCategories.length - categoriesToCreate.length;
+    const responseMessage = duplicatesSkipped > 0
+      ? `Created ${createdCategories.length} new categories. Skipped ${duplicatesSkipped} duplicate${duplicatesSkipped === 1 ? '' : 's'}.`
+      : undefined;
+    
+    return res.json({
+      success: true,
+      data: categories,
+      categoriesCreated: createdCategories.length,
+      duplicatesSkipped,
+      ...(responseMessage && { message: responseMessage }),
+    });
   } catch (e: any) {
-    console.error('[Quick Start Categories] Error:', e);
+    console.error('[Platform Quick Start] Error:', e);
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
   }
 });

@@ -331,7 +331,9 @@ export default function ItemsClient({
   };
 
   const handleStatusToggle = (item: Item) => {
-    const newStatus = item.status === 'active' ? 'archived' : 'active';
+    // Fix: Use itemStatus instead of status (correct field name)
+    const currentStatus = item.itemStatus || item.status || 'active';
+    const newStatus = currentStatus === 'active' ? 'archived' : 'active';
     
     // Only confirm when archiving (blocks sync)
     if (newStatus === 'archived') {
@@ -345,7 +347,7 @@ export default function ItemsClient({
             console.log('[ItemsClient] Toggling status:', {
               itemId: item.id,
               itemName: item.name,
-              from: item.status,
+              from: currentStatus,
               to: newStatus,
             });
             

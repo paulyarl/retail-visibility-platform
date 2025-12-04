@@ -162,6 +162,10 @@ export default function CategoriesPage() {
   const [isGuideExpanded, setIsGuideExpanded] = useState(false)
   const [isQuickStartExpanded, setIsQuickStartExpanded] = useState(false)
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   // Toasts
   const [toast, setToast] = useState<{ type: 'success'|'error'|'info'; message: string } | null>(null)
   const showToast = (type: 'success'|'error'|'info', message: string) => {
@@ -198,9 +202,10 @@ export default function CategoriesPage() {
     return filteredCategories.slice(startIndex, endIndex)
   }, [filteredCategories, currentPage, pageSize])
 
-  // Reset to page 1 when filter or search changes
+  // Reset to page 1 and clear selection when filter or search changes
   useEffect(() => {
     setCurrentPage(1)
+    setSelectedIds(new Set())
   }, [filterUnmapped, searchQuery])
 
   useEffect(() => {
@@ -396,6 +401,78 @@ export default function CategoriesPage() {
       showToast('error', err?.message || 'Failed to delete category')
     }
   }
+
+  // Bulk delete function
+  async function bulkDeleteCategories() {
+    if (selectedIds.size === 0) return
+    
+    const count = selectedIds.size
+    if (!confirm(`Delete ${count} selected ${count === 1 ? 'category' : 'categories'}? This is a soft delete and may be blocked if they have dependencies.`)) return
+    
+    setBulkDeleting(true)
+    try {
+      const deletePromises = Array.from(selectedIds).map(id =>
+        api.delete(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${id}`)
+      )
+      
+      const results = await Promise.allSettled(deletePromises)
+      const succeeded = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected').length
+      
+      // Refresh data
+      const [catRes, statusRes] = await Promise.all([
+        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`),
+        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
+      ])
+      const catData = await catRes.json()
+      const statusData = await statusRes.json()
+      setCategories(catData.data || [])
+      setAlignmentStatus(statusData.data)
+      
+      // Clear selection
+      setSelectedIds(new Set())
+      
+      if (failed === 0) {
+        showToast('success', `Successfully deleted ${succeeded} ${succeeded === 1 ? 'category' : 'categories'}`)
+      } else {
+        showToast('error', `Deleted ${succeeded}, failed ${failed}. Some categories may have dependencies.`)
+      }
+    } catch (err: any) {
+      showToast('error', err?.message || 'Failed to delete categories')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  // Toggle selection for a single category
+  function toggleSelection(id: string) {
+    const newSelection = new Set(selectedIds)
+    if (newSelection.has(id)) {
+      newSelection.delete(id)
+    } else {
+      newSelection.add(id)
+    }
+    setSelectedIds(newSelection)
+  }
+
+  // Toggle select all on current page
+  function toggleSelectAll() {
+    if (selectedIds.size === paginatedCategories.length && paginatedCategories.every(cat => selectedIds.has(cat.id))) {
+      // Deselect all on current page
+      const newSelection = new Set(selectedIds)
+      paginatedCategories.forEach(cat => newSelection.delete(cat.id))
+      setSelectedIds(newSelection)
+    } else {
+      // Select all on current page
+      const newSelection = new Set(selectedIds)
+      paginatedCategories.forEach(cat => newSelection.add(cat.id))
+      setSelectedIds(newSelection)
+    }
+  }
+
+  // Check if all on current page are selected
+  const allPageSelected = paginatedCategories.length > 0 && paginatedCategories.every(cat => selectedIds.has(cat.id))
+  const somePageSelected = paginatedCategories.some(cat => selectedIds.has(cat.id)) && !allPageSelected
 
   // Debounced taxonomy search
   useEffect(() => {
@@ -636,7 +713,43 @@ export default function CategoriesPage() {
               </button>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
+            {/* Bulk Actions */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600 font-medium">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={bulkDeleteCategories}
+                  disabled={bulkDeleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {bulkDeleting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete Selected
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-800 underline"
+                >
+                  Clear selection
+                </button>
+              </div>
+            )}
             {organizationInfo && categories.length > 0 && (
               <button
                 onClick={openPropagateModal}
@@ -676,10 +789,38 @@ export default function CategoriesPage() {
               No categories found. Create your first category to get started.
             </div>
           ) : (
-            paginatedCategories.map((cat) => (
-              <div key={cat.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
+            <>
+              {/* Select All Header */}
+              {paginatedCategories.length > 0 && (
+                <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      ref={input => {
+                        if (input) input.indeterminate = somePageSelected
+                      }}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Select all on this page ({paginatedCategories.length})
+                    </span>
+                  </label>
+                </div>
+              )}
+              {paginatedCategories.map((cat) => (
+                <div key={cat.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(cat.id)}
+                      onChange={() => toggleSelection(cat.id)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
                       <h3 className="font-medium text-gray-900">{cat.name}</h3>
                       {cat.googleCategoryId ? (
@@ -702,21 +843,22 @@ export default function CategoriesPage() {
                       <GoogleCategoryPath googleCategoryId={cat.googleCategoryId} />
                     )}
                   </div>
-                  <button
-                    onClick={() => openEdit(cat)}
-                    className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => deleteCategory(cat)}
-                    className="ml-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
-                  >
-                    Delete
-                  </button>
+                    <button
+                      onClick={() => openEdit(cat)}
+                      className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteCategory(cat)}
+                      className="ml-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </>
           )}
         </div>
         {categories.length > 0 && (

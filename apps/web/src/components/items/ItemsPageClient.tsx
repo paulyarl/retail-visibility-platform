@@ -294,7 +294,9 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   };
 
   const handleStatusToggle = (item: Item) => {
-    const newStatus = item.status === "active" ? "archived" : "active";
+    // Fix: Use itemStatus instead of status (correct field name)
+    const currentStatus = item.itemStatus || item.status || "active";
+    const newStatus = currentStatus === "active" ? "archived" : "active";
 
     if (newStatus === "archived") {
       setConfirmDialog({
@@ -305,6 +307,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
         onConfirm: async () => {
           try {
             await updateItem(item.id, { itemStatus: newStatus });
+            refresh(); // Refresh the list after update
           } catch (error) {
             console.error("[ItemsPageClient] Status toggle failed:", error);
           }
@@ -314,6 +317,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       (async () => {
         try {
           await updateItem(item.id, { itemStatus: newStatus });
+          refresh(); // Refresh the list after update
         } catch (error) {
           console.error("[ItemsPageClient] Status toggle failed:", error);
         }

@@ -56,7 +56,7 @@ export function useItemsFilters(): UseItemsFiltersReturn {
 
     // Apply status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(item => item.status === statusFilter);
+      filtered = filtered.filter(item => (item.itemStatus || item.status) === statusFilter);
     }
 
     // Apply visibility filter

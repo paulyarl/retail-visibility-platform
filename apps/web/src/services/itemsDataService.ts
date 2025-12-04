@@ -5,6 +5,8 @@ export interface Item {
   sku: string;
   name: string;
   description?: string;
+  brand?: string;
+  manufacturer?: string;
   price: number;
   stock: number;
   status: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing';
@@ -95,7 +97,8 @@ export class ItemsDataService {
       // Normalize itemStatus to status for all items
       const normalizeItem = (item: any): Item => ({
         ...item,
-        status: item.itemStatus || item.status || 'inactive',
+        status: item.itemStatus || item.item_status || item.status || 'active',
+        itemStatus: item.itemStatus || item.item_status || item.status || 'active',
       });
 
       // Handle both paginated and non-paginated responses
@@ -148,7 +151,14 @@ export class ItemsDataService {
         throw new Error(errorData?.error || 'Failed to create item');
       }
 
-      return await response.json();
+      const result = await response.json();
+      
+      // Normalize status fields from API response
+      return {
+        ...result,
+        status: result.itemStatus || result.item_status || result.status || 'active',
+        itemStatus: result.itemStatus || result.item_status || result.status || 'active',
+      };
     } catch (error) {
       // Error will be caught and displayed in UI
       throw error;
@@ -172,7 +182,13 @@ export class ItemsDataService {
 
       const result = await response.json();
       console.log('[updateItem] Result:', result);
-      return result;
+      
+      // Normalize status fields from API response
+      return {
+        ...result,
+        status: result.itemStatus || result.item_status || result.status || 'active',
+        itemStatus: result.itemStatus || result.item_status || result.status || 'active',
+      };
     } catch (error) {
       console.error('[updateItem] Error:', error);
       // Error will be caught and displayed in UI

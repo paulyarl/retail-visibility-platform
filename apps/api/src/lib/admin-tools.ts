@@ -100,7 +100,7 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
         productCount: skuCount,
         assignCategories: true,
         createAsDrafts,
-      });
+      }, prisma);
       actualSkuCount = result.productsCreated;
     }
 
@@ -223,7 +223,7 @@ export async function createTestTenant(options: {
       productCount,
       assignCategories: true,
       createAsDrafts,
-    });
+    }, prisma);
   }
 
   return {
@@ -264,7 +264,7 @@ export async function bulkSeedProducts(options: {
         productCount,
         assignCategories: true,
         createAsDrafts,
-      });
+      }, prisma);
 
       results.push({
         tenantId,

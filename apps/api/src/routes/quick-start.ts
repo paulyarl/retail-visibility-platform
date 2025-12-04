@@ -217,7 +217,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       productCount,
       assignCategories,
       createAsDrafts,
-    });
+    }, prisma);
 
     console.log(`[Quick Start] Success:`, result);
 
@@ -312,7 +312,27 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
  * Generate starter categories for a tenant
  */
 const categoryQuickStartSchema = z.object({
-  businessType: z.enum(['grocery', 'fashion', 'electronics', 'general']),
+  businessType: z.enum([
+    'grocery',
+    'fashion', 
+    'electronics',
+    'home_garden',
+    'health_beauty',
+    'sports_outdoors',
+    'toys_games',
+    'automotive',
+    'books_media',
+    'pet_supplies',
+    'office_supplies',
+    'jewelry',
+    'baby_kids',
+    'arts_crafts',
+    'hardware_tools',
+    'furniture',
+    'restaurant',
+    'pharmacy',
+    'general'
+  ]),
   categoryCount: z.number().int().min(5).max(30).optional().default(15),
 });
 
@@ -412,6 +432,105 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
       });
     }
 
+    // Define taxonomy branches for each business type
+    // These are the root paths in the Google Product Taxonomy hierarchy
+    const taxonomyBranches: Record<string, string[][]> = {
+      grocery: [
+        ['Food, Beverages & Tobacco', 'Food Items'],
+        ['Food, Beverages & Tobacco', 'Beverages'],
+      ],
+      fashion: [
+        ['Apparel & Accessories', 'Clothing'],
+        ['Apparel & Accessories', 'Shoes'],
+        ['Apparel & Accessories', 'Clothing Accessories'],
+      ],
+      electronics: [
+        ['Electronics', 'Computers'],
+        ['Electronics', 'Audio'],
+        ['Electronics', 'Cameras & Optics'],
+        ['Electronics', 'Communications'],
+      ],
+      home_garden: [
+        ['Home & Garden', 'Home Decor'],
+        ['Home & Garden', 'Kitchen & Dining'],
+        ['Home & Garden', 'Furniture'],
+        ['Home & Garden', 'Lawn & Garden'],
+      ],
+      health_beauty: [
+        ['Health & Beauty', 'Personal Care'],
+        ['Health & Beauty', 'Health Care'],
+        ['Health & Beauty', 'Bath & Body'],
+      ],
+      sports_outdoors: [
+        ['Sporting Goods', 'Exercise & Fitness'],
+        ['Sporting Goods', 'Outdoor Recreation'],
+        ['Sporting Goods', 'Athletics'],
+      ],
+      toys_games: [
+        ['Toys & Games', 'Toys'],
+        ['Toys & Games', 'Games'],
+        ['Toys & Games', 'Puzzles'],
+      ],
+      automotive: [
+        ['Vehicles & Parts', 'Vehicle Parts & Accessories'],
+        ['Vehicles & Parts', 'Motor Vehicle Care & Cleaning'],
+      ],
+      books_media: [
+        ['Media', 'Books'],
+        ['Media', 'Music & Sound Recordings'],
+        ['Media', 'DVDs & Videos'],
+      ],
+      pet_supplies: [
+        ['Animals & Pet Supplies', 'Pet Supplies'],
+        ['Animals & Pet Supplies', 'Pet Food'],
+      ],
+      office_supplies: [
+        ['Office Supplies', 'General Office Supplies'],
+        ['Office Supplies', 'Paper Products'],
+        ['Office Supplies', 'Presentation Supplies'],
+      ],
+      jewelry: [
+        ['Apparel & Accessories', 'Jewelry'],
+        ['Apparel & Accessories', 'Watches'],
+      ],
+      baby_kids: [
+        ['Baby & Toddler', 'Baby Care'],
+        ['Baby & Toddler', 'Baby Toys & Activity Equipment'],
+        ['Baby & Toddler', 'Baby Transport'],
+      ],
+      arts_crafts: [
+        ['Arts & Entertainment', 'Hobbies & Creative Arts'],
+        ['Arts & Entertainment', 'Party & Celebration'],
+      ],
+      hardware_tools: [
+        ['Hardware', 'Building Materials'],
+        ['Hardware', 'Power & Hand Tools'],
+        ['Hardware', 'Plumbing'],
+      ],
+      furniture: [
+        ['Furniture', 'Living Room Furniture'],
+        ['Furniture', 'Bedroom Furniture'],
+        ['Furniture', 'Office Furniture'],
+      ],
+      restaurant: [
+        ['Food, Beverages & Tobacco', 'Food Items', 'Prepared Foods'],
+        ['Food, Beverages & Tobacco', 'Beverages'],
+      ],
+      pharmacy: [
+        ['Health & Beauty', 'Health Care'],
+        ['Health & Beauty', 'Personal Care'],
+        ['Health & Beauty', 'Vitamins & Supplements'],
+      ],
+      general: [
+        ['Home & Garden'],
+        ['Health & Beauty'],
+        ['Sporting Goods'],
+        ['Toys & Games'],
+        ['Office Supplies'],
+        ['Arts & Entertainment'],
+      ],
+    };
+
     // Generate categories based on business type with Google taxonomy alignment
     const categoryTemplates: Record<string, Array<{ name: string; searchTerm: string }>> = {
       grocery: [
@@ -486,15 +605,86 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     // Limit to requested count
     const categories = allCategories.slice(0, categoryCount);
 
+    // Fetch existing categories to avoid duplicates
+    const existingCategories = await prisma.directory_category.findMany({
+      where: { tenantId: tenantId },
+      select: { name: true, slug: true },
+    });
+
+    const existingNames = new Set(existingCategories.map(c => c.name.toLowerCase()));
+    const existingSlugs = new Set(existingCategories.map(c => c.slug));
+
+    // Filter out categories that already exist (by name)
+    const categoriesToCreate = categories.filter(cat => {
+      const nameExists = existingNames.has(cat.name.toLowerCase());
+      if (nameExists) {
+        console.log(`[Category Quick Start] Skipping duplicate category: "${cat.name}"`);
+      }
+      return !nameExists;
+    });
+
+    if (categoriesToCreate.length === 0) {
+      return res.json({
+        success: true,
+        categoriesCreated: 0,
+        categories: [],
+        message: 'All categories already exist. No new categories were created.',
+      });
+    }
+
+    console.log(`[Category Quick Start] Creating ${categoriesToCreate.length} new categories (${categories.length - categoriesToCreate.length} duplicates skipped)`);
+
     // Import Google taxonomy functions
-    const { suggestCategories, getCategoryById } = await import('../lib/google/taxonomy');
+    const { suggestCategories, getCategoryById, selectRandomFromBranch } = await import('../lib/google/taxonomy');
+
+    // NEW: Use hierarchical branch-based generation if branches are defined
+    const branches = taxonomyBranches[businessType];
+    let hierarchicalCategories: Array<{ node: any; name: string }> = [];
+    
+    if (branches && branches.length > 0) {
+      console.log(`[Category Quick Start] Using hierarchical branch generation for ${businessType}`);
+      
+      // Distribute category count across branches
+      const perBranch = Math.ceil(categoriesToCreate.length / branches.length);
+      
+      for (const branch of branches) {
+        const branchCategories = selectRandomFromBranch(branch, perBranch, {
+          minDepth: 1,
+          maxDepth: 3,
+          diversify: true,
+        });
+        
+        // Use the last part of the path as the friendly name
+        hierarchicalCategories.push(...branchCategories.map(node => ({
+          node,
+          name: node.path[node.path.length - 1], // Use leaf name
+        })));
+      }
+      
+      // Trim to requested count
+      hierarchicalCategories = hierarchicalCategories.slice(0, categoriesToCreate.length);
+      
+      console.log(`[Category Quick Start] Generated ${hierarchicalCategories.length} hierarchical categories from ${branches.length} branches`);
+    }
 
     // Create categories with Google taxonomy alignment
     const createdCategories = await Promise.all(
-      categories.map(async (cat, index) => {
-        // Use live Google taxonomy to find best matching category
-        const suggestions = suggestCategories(cat.searchTerm, 1);
-        const googleCategoryId = suggestions.length > 0 ? suggestions[0].id : null;
+      categoriesToCreate.map(async (cat, index) => {
+        let googleCategoryId: string | null = null;
+        let categoryName = cat.name;
+        
+        // Use hierarchical category if available
+        if (hierarchicalCategories[index]) {
+          const hierarchical = hierarchicalCategories[index];
+          googleCategoryId = hierarchical.node.id;
+          categoryName = hierarchical.name;
+          
+          console.log(`[Category Quick Start] Using hierarchical category: "${categoryName}" (${hierarchical.node.path.join(' > ')})`);
+        } else {
+          // Fallback to keyword matching
+          const suggestions = suggestCategories(cat.searchTerm, 1);
+          googleCategoryId = suggestions.length > 0 ? suggestions[0].id : null;
+        }
         
         // Log the mapping for transparency
         if (googleCategoryId) {
@@ -508,8 +698,8 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
           data: {
             id: generateQsCatId(),
             tenantId,
-            name: cat.name,
-            slug: cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            name: categoryName, // Use the hierarchical or template name
+            slug: categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
             googleCategoryId,
             sortOrder: index,
             isActive: true,
@@ -521,10 +711,17 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
 
     console.log(`[Category Quick Start] Created ${createdCategories.length} categories for tenant ${tenantId}`);
 
+    const duplicatesSkipped = categories.length - categoriesToCreate.length;
+    const responseMessage = duplicatesSkipped > 0
+      ? `Created ${createdCategories.length} new categories. Skipped ${duplicatesSkipped} duplicate${duplicatesSkipped === 1 ? '' : 's'}.`
+      : undefined;
+
     res.json({
       success: true,
       categoriesCreated: createdCategories.length,
+      duplicatesSkipped,
       categories: createdCategories.map(c => ({ id: c.id, name: c.name })),
+      ...(responseMessage && { message: responseMessage }),
     });
   } catch (error: any) {
     console.error('[Category Quick Start] Error:', error);

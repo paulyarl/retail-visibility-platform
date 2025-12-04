@@ -2673,6 +2673,7 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
 
 const baseItemSchema = z.object({
   tenant_id: z.string().min(1).optional(),
+  tenantId: z.string().min(1).optional(), // Accept camelCase from frontend
   sku: z.string().min(1),
   name: z.string().min(1),
   price_cents: z.number().int().nonnegative(),
@@ -2689,11 +2690,14 @@ const baseItemSchema = z.object({
   availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
   // Item status and visibility
   item_status: z.enum(['active', 'inactive', 'archived']).optional(),
+  itemStatus: z.enum(['active', 'inactive', 'archived']).optional(), // Accept camelCase from frontend
+  status: z.string().optional(), // Legacy field, ignore
   visibility: z.enum(['public', 'private']).optional(),
   // Category path for Google Shopping
   category_path: z.array(z.string()).optional(),
   // Tenant category assignment
   directory_category_id: z.string().nullable().optional(),
+  tenantCategoryId: z.string().nullable().optional(), // Accept camelCase from frontend
 });
 
 const createItemSchema = baseItemSchema.extend({
@@ -2701,10 +2705,12 @@ const createItemSchema = baseItemSchema.extend({
   price_cents: z.number().int().nonnegative().default(0),
   stock: z.number().int().nonnegative().default(0),
 }).transform((data) => {
-  const { tenant_id,  ...rest } = data;
+  const { tenant_id, tenantId, itemStatus, item_status, tenantCategoryId, directory_category_id, status, ...rest } = data;
   return {
     ...rest,
-    tenant_id: tenant_id || tenant_id, // Use tenant_id or tenant_id
+    tenant_id: tenant_id || tenantId, // Prefer snake_case, fallback to camelCase
+    item_status: item_status || itemStatus || 'active', // Prefer snake_case, fallback to camelCase, default to active
+    directory_category_id: directory_category_id || tenantCategoryId || null, // Prefer snake_case, fallback to camelCase
   };
 });
 
@@ -2773,48 +2779,49 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   }
   console.log('[PUT /items/:id] Validation passed, parsed data:', JSON.stringify(parsed.data));
   try {
-    // Auto-sync availability based on stock count
-    const { tenant_id: _, ...dataWithoutTenantId } = parsed.data;
-    const updateData = dataWithoutTenantId;
+    // Remove tenant_id from update data (can't be changed)
+    const { tenant_id: _, tenantId: __, itemStatus, item_status, tenantCategoryId, directory_category_id, status, ...rest } = parsed.data;
+    
+    // Build update data with proper field mappings
+    const updateData: any = { ...rest };
+    
+    // Map camelCase to snake_case for item_status
+    if (itemStatus !== undefined || item_status !== undefined) {
+      updateData.item_status = item_status || itemStatus;
+    }
+    
+    // Map camelCase to snake_case for directory_category_id
+    if (tenantCategoryId !== undefined || directory_category_id !== undefined) {
+      updateData.directory_category_id = directory_category_id || tenantCategoryId;
+    }
+    
+    // Handle stock updates
     if (updateData.stock !== undefined) {
-      // Ensure stock is an integer
       const stockValue = typeof updateData.stock === 'string' ? parseInt(updateData.stock, 10) : updateData.stock;
-      updateData.stock = stockValue;
-      // Sync quantity with stock (don't update availability for now to test)
-      // TODO: Add quantity field back to schema
-      // updateData.quantity = stockValue;
-      console.log('[PUT /items/:id] Stock update:', { original: parsed.data.stock, converted: stockValue });
+      if (!isNaN(stockValue)) {
+        updateData.stock = stockValue;
+        // Auto-sync availability based on stock
+        updateData.availability = stockValue > 0 ? 'in_stock' : 'out_of_stock';
+      } else {
+        delete updateData.stock; // Remove invalid stock value
+      }
     }
 
     // Sync price and price_cents fields
     if (updateData.price !== undefined) {
-      // If price (dollars) is being updated, sync price_cents
       updateData.price_cents = Math.round(updateData.price * 100);
     } else if (updateData.price_cents !== undefined) {
-      // If price_cents is being updated, sync price
       updateData.price = updateData.price_cents / 100;
     }
     
-    console.log('[PUT /items/:id] About to update with:', { 
-      itemId: req.params.id, 
-      itemIdType: typeof req.params.id,
-      updateData: JSON.stringify(updateData),
-      stockType: typeof updateData.stock,
-      stockValue: updateData.stock
-    });
+    // Add updated_at timestamp
+    updateData.updated_at = new Date();
     
-    // Simple approach - just update stock, skip quantity for now
-    console.log('[PUT /items/:id] Updating with Prisma.update, stock only');
-    console.log('[PUT /items/:id] DEBUG - id:', String(req.params.id), 'type:', typeof req.params.id);
-    console.log('[PUT /items/:id] DEBUG - stock value:', updateData.stock, 'type:', typeof updateData.stock);
-    const stockInt = parseInt(String(updateData.stock), 10);
-    console.log('[PUT /items/:id] DEBUG - stockInt:', stockInt, 'type:', typeof stockInt);
+    console.log('[PUT /items/:id] Final update data:', JSON.stringify(updateData));
     
-    // Update stock using regular Prisma update (raw SQL was causing issues)
-    console.log('[PUT /items/:id] Updating with Prisma.update');
     const updated = await prisma.inventory_items.update({
       where: { id: req.params.id },
-      data: { stock: stockInt },
+      data: updateData,
     });
     
     if (!updated) {

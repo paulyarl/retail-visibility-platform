@@ -5,11 +5,9 @@
  * Used by both CLI seeding script and Quick Start API endpoint.
  */
 
-import { PrismaClient } from '@prisma/client';
 import { generateItemId, generateQuickStartSku } from './id-generator';
 import { suggestCategories, getCategoryById } from './google/taxonomy';
-
-const prisma = new PrismaClient();
+import { productCacheService } from '../services/ProductCacheService';
 
 // Product scenarios with realistic data
 const SCENARIOS = {
@@ -161,7 +159,8 @@ export interface QuickStartResult {
  * Generate quick start products for a tenant
  */
 export async function generateQuickStartProducts(
-  options: QuickStartOptions
+  options: QuickStartOptions,
+  prismaClient: any
 ): Promise<QuickStartResult> {
   const {
     tenant_id,
@@ -177,7 +176,7 @@ export async function generateQuickStartProducts(
   }
 
   // Validate tenant exists
-  const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
+  const tenant = await prismaClient.tenants.findUnique({ where: { id: tenant_id } });
   if (!tenant) {
     throw new Error(`Tenant not found: ${tenant_id}`);
   }
@@ -205,7 +204,7 @@ export async function generateQuickStartProducts(
       const categoryId = `${tenant_id}_${cat.slug}`;
       
       // Persist category to database (upsert to avoid duplicates)
-      await prisma.directory_category.upsert({
+      await prismaClient.directory_category.upsert({
         where: { id: categoryId },
         create: {
           id: categoryId,
@@ -234,35 +233,73 @@ export async function generateQuickStartProducts(
     }
   }
 
-  // Generate products (cycle through available products with better variant naming)
+  // Generate products using intelligent cache + AI system
   const allProducts = [];
-  const baseProducts = scenarioData.products;
-  const variantSuffixes = ['', 'Deluxe', 'Premium', 'Pro', 'Plus', 'XL', 'Mini', 'Classic', 'Special Edition', 'Limited'];
   
-  for (let i = 0; i < productCount; i++) {
-    const baseProduct = baseProducts[i % baseProducts.length];
-    const cycleCount = Math.floor(i / baseProducts.length);
+  if (categories.length > 0) {
+    // NEW: Use ProductCacheService for intelligent product generation
+    console.log(`[Quick Start] Using intelligent product cache for ${categories.length} categories`);
     
-    let productName = baseProduct.name;
-    if (cycleCount > 0) {
-      // Use variant suffixes for better naming
-      const suffixIndex = cycleCount % variantSuffixes.length;
-      const suffix = variantSuffixes[suffixIndex];
-      productName = suffix ? `${baseProduct.name} ${suffix}` : `${baseProduct.name} v${cycleCount + 1}`;
+    const productsPerCategory = Math.ceil(productCount / categories.length);
+    
+    for (const category of categories) {
+      try {
+        const products = await productCacheService.getProductsForScenario({
+          businessType: scenario,
+          categoryName: category.name,
+          googleCategoryId: category.id,
+          count: productsPerCategory
+        });
+        
+        // Convert to quick-start format and assign category
+        for (const product of products) {
+          allProducts.push({
+            name: product.name,
+            price: product.price,
+            brand: product.brand || 'Generic',
+            category: category.originalName || category.name,
+            description: product.description
+          });
+        }
+      } catch (error: any) {
+        console.error(`[Quick Start] Failed to generate products for ${category.name}:`, error.message);
+      }
     }
     
-    allProducts.push({
-      ...baseProduct,
-      name: productName,
-    });
+    // Trim to exact count if we generated too many
+    if (allProducts.length > productCount) {
+      allProducts.splice(productCount);
+    }
+  } else {
+    // FALLBACK: Use old hardcoded method if no categories
+    console.log(`[Quick Start] No categories available, using fallback products`);
+    const baseProducts = scenarioData.products;
+    const variantSuffixes = ['', 'Deluxe', 'Premium', 'Pro', 'Plus', 'XL', 'Mini', 'Classic', 'Special Edition', 'Limited'];
+    
+    for (let i = 0; i < productCount; i++) {
+      const baseProduct = baseProducts[i % baseProducts.length];
+      const cycleCount = Math.floor(i / baseProducts.length);
+      
+      let productName = baseProduct.name;
+      if (cycleCount > 0) {
+        const suffixIndex = cycleCount % variantSuffixes.length;
+        const suffix = variantSuffixes[suffixIndex];
+        productName = suffix ? `${baseProduct.name} ${suffix}` : `${baseProduct.name} v${cycleCount + 1}`;
+      }
+      
+      allProducts.push({
+        ...baseProduct,
+        name: productName,
+      });
+    }
   }
 
   // Get existing product names to avoid duplicates
-  const existingProducts = await prisma.inventory_items.findMany({
+  const existingProducts = await prismaClient.inventory_items.findMany({
     where: { tenant_id: tenant_id },
     select: { name: true },
   });
-  const existingNames = new Set(existingProducts.map(p => p.name));
+  const existingNames = new Set(existingProducts.map((p: { name: string }) => p.name));
   
   // Create products in batches
   const batchSize = 100;
@@ -287,13 +324,13 @@ export async function generateQuickStartProducts(
       const stock = availability === 'in_stock' ? Math.floor(Math.random() * 96) + 5 : 0;
 
       // Assign category if enabled
-      let categoryAssignment: { directoryCategoryId?: string; categoryPath?: string[] } = {};
+      let categoryAssignment: { directory_category_id?: string; category_path?: string[] } = {};
       if (assignCategories && categories.length > 0) {
         const matchingCat = categories.find((c) => c.originalName === product.category);
         const selectedCat = matchingCat || categories[Math.floor(Math.random() * categories.length)];
         categoryAssignment = {
-          directoryCategoryId: selectedCat.id,
-          categoryPath: [selectedCat.slug],
+          directory_category_id: selectedCat.id,
+          category_path: [selectedCat.slug],
         };
       }
 
@@ -324,7 +361,11 @@ export async function generateQuickStartProducts(
     }
 
     if (items.length > 0) {
-      await prisma.inventory_items.createMany({ data: items });
+      // Use transaction to create items with all fields (createMany has limitations)
+      // Note: Don't await the individual creates - pass unawaited promises to $transaction
+      await prismaClient.$transaction(
+        items.map(item => prismaClient.inventory_items.create({ data: item }))
+      );
       createdCount += items.length;
     }
   }
@@ -334,19 +375,19 @@ export async function generateQuickStartProducts(
   }
 
   // Get final counts
-  const totalProducts = await prisma.inventory_items.count({
+  const totalProducts = await prismaClient.inventory_items.count({
     where: { tenant_id: tenant_id }, 
   });
 
-  const activeProducts = await prisma.inventory_items.count({
+  const activeProducts = await prismaClient.inventory_items.count({
     where: { tenant_id: tenant_id, item_status: 'active' }, 
   });
 
-  const inStockProducts = await prisma.inventory_items.count({
+  const inStockProducts = await prismaClient.inventory_items.count({
     where: { tenant_id: tenant_id, availability: 'in_stock' }, 
   });
 
-  const categorizedProducts = await prisma.inventory_items.count({
+  const categorizedProducts = await prismaClient.inventory_items.count({
     where: { tenant_id: tenant_id, category_path: { isEmpty: false } }, 
   });
 
