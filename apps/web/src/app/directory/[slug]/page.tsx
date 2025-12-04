@@ -7,6 +7,7 @@ import RelatedStores from '@/components/directory/RelatedStores';
 import DirectoryActions from '@/components/directory/DirectoryActions';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
+import { computeStoreStatus } from '@/lib/hours-utils';
 
 interface StoreDetailPageProps {
   params: {
@@ -424,6 +425,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
   const totalProducts = storefrontCategories.reduce((sum: number, cat: any) => sum + (cat.count || 0), 0) + uncategorizedCount;
   
+  // Compute store status from business profile hours
+  const storeStatus = businessProfile?.hours ? computeStoreStatus(businessProfile.hours) : null;
+  
   // Track user behavior for recommendations (fire and forget, don't await)
   trackStoreView(listing.tenant_id, listing.categories).catch(err => 
     console.error('Failed to track store view:', err)
@@ -548,6 +552,14 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   {listing.product_count > 0 && (
                     <p className="text-gray-600 mt-2">
                       {listing.product_count} products available
+                    </p>
+                  )}
+                  
+                  {/* Store Status */}
+                  {storeStatus && (
+                    <p className="text-gray-600 mt-3 flex items-center gap-2">
+                      <span className={`inline-block w-2 h-2 rounded-full ${storeStatus.isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      {storeStatus.label}
                     </p>
                   )}
                 </div>
@@ -781,14 +793,16 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             </div>
 
             {/* Business Hours */}
-            {listing.business_hours && (
+            {businessProfile?.hours && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Clock className="w-5 h-5" />
                   Business Hours
                 </h2>
                 <div className="space-y-2">
-                  {Object.entries(listing.business_hours).map(([day, hours]: [string, any]) => (
+                  {Object.entries(businessProfile.hours)
+                    .filter(([key]) => key !== 'special' && key !== 'timezone')
+                    .map(([day, hours]: [string, any]) => (
                     <div key={day} className="flex justify-between text-sm">
                       <span className="font-medium text-gray-900 capitalize">{day}</span>
                       <span className="text-gray-600">
@@ -796,6 +810,26 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                       </span>
                     </div>
                   ))}
+                  
+                  {/* Special Hours */}
+                  {businessProfile.hours.special && businessProfile.hours.special.length > 0 && (
+                    <>
+                      <div className="border-t pt-3 mt-3">
+                        <h3 className="text-sm font-medium text-gray-900 mb-2">Special Hours</h3>
+                        <div className="space-y-1">
+                          {businessProfile.hours.special.map((special: any, index: number) => (
+                            <div key={index} className="flex justify-between text-sm">
+                              <span className="font-medium text-gray-900">{special.date}</span>
+                              <span className="text-gray-600">
+                                {special.isClosed ? 'Closed' : `${special.open} - ${special.close}`}
+                                {special.note && ` (${special.note})`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}

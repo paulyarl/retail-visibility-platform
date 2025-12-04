@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import TimeInput from "./TimeInput";
+import { apiRequest } from "@/lib/api";
 
 type Override = { date: string; open?: string; close?: string; note?: string; isClosed?: boolean };
 
@@ -32,14 +33,18 @@ export default function SpecialHoursCalendar({ apiBase, tenantId }: { apiBase: s
 
   useEffect(() => {
     const load = async () => {
-      const r = await fetch(`${apiBase}/api/tenant/${tenantId}/business-hours/special`, { cache: "no-store" });
-      if (r.ok) {
-        const j = await r.json();
-        setOverrides(Array.isArray(j?.data?.overrides) ? j.data.overrides : []);
+      try {
+        const r = await apiRequest(`api/tenant/${tenantId}/business-hours/special`);
+        if (r.ok) {
+          const j = await r.json();
+          setOverrides(Array.isArray(j?.data?.overrides) ? j.data.overrides : []);
+        }
+      } catch (error) {
+        console.error('Failed to load special hours:', error);
       }
     };
     load();
-  }, [apiBase, tenantId]);
+  }, [tenantId]);
 
   const add = () => setOverrides([...overrides, { date: new Date().toISOString().slice(0,10), open: "10:00", close: "14:00", note: "" }]);
   const update = (i: number, k: keyof Override, v: any) => {
@@ -99,14 +104,20 @@ export default function SpecialHoursCalendar({ apiBase, tenantId }: { apiBase: s
 
     setSaving(true);
     setMsg(null);
-    const r = await fetch(`${apiBase}/api/tenant/${tenantId}/business-hours/special`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ overrides }),
-    });
-    setSaving(false);
-    setMsg(r.ok ? "✓ Saved" : "✗ Failed");
-    setTimeout(() => setMsg(null), 2000);
+    try {
+      const r = await apiRequest(`api/tenant/${tenantId}/business-hours/special`, {
+        method: "PUT",
+        body: JSON.stringify({ overrides }),
+      });
+      setSaving(false);
+      setMsg(r.ok ? "✓ Saved" : "✗ Failed");
+      setTimeout(() => setMsg(null), 2000);
+    } catch (error) {
+      console.error('Failed to save special hours:', error);
+      setSaving(false);
+      setMsg("✗ Failed");
+      setTimeout(() => setMsg(null), 2000);
+    }
   };
 
   return (

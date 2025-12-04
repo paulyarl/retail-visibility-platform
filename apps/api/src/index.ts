@@ -1411,7 +1411,7 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
       const specialHoursResults = await basePrisma.$queryRaw`
         SELECT * FROM "business_hours_special_list" WHERE tenant_id = ${tenant_id}
       `;
-      specialHours = (specialHoursResults as any[])[0] || null;
+      specialHours = (specialHoursResults as any[]) || [];
     } catch (error) {
       // Business hours tables don't exist yet - continue without them
       console.log('[GET /public/tenant/:tenant_id/profile] Business hours tables not found, continuing without them');

@@ -1,8 +1,10 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import TimeInput from "./TimeInput";
+import { apiRequest } from "@/lib/api";
 
 type Period = { day: string; open: string; close: string };
+type SpecialHour = { date: string; isClosed: boolean; open?: string; close?: string; note?: string };
 
 // Convert 24-hour to 12-hour format
 function to12Hour(time24: string): string {
@@ -28,20 +30,33 @@ function to24Hour(time12: string): string {
 export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; tenantId: string }) {
   const [timezone, setTimezone] = useState("America/New_York");
   const [periods, setPeriods] = useState<Period[]>([]);
+  const [specialHours, setSpecialHours] = useState<SpecialHour[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
-      const r = await fetch(`${apiBase}/api/tenant/${tenantId}/business-hours`, { cache: "no-store" });
-      if (r.ok) {
-        const j = await r.json();
-        setTimezone(j?.data?.timezone || "America/New_York");
-        setPeriods(Array.isArray(j?.data?.periods) ? j.data.periods : []);
+      try {
+        // Load regular business hours
+        const r = await apiRequest(`api/tenant/${tenantId}/business-hours`);
+        if (r.ok) {
+          const j = await r.json();
+          setTimezone(j?.data?.timezone || "America/New_York");
+          setPeriods(Array.isArray(j?.data?.periods) ? j.data.periods : []);
+        }
+        
+        // Load special hours
+        const specialRes = await apiRequest(`api/tenant/${tenantId}/business-hours/special`);
+        if (specialRes.ok) {
+          const specialData = await specialRes.json();
+          setSpecialHours(Array.isArray(specialData?.data?.overrides) ? specialData.data.overrides : []);
+        }
+      } catch (error) {
+        console.error('Failed to load business hours:', error);
       }
     };
     load();
-  }, [apiBase, tenantId]);
+  }, [tenantId]);
 
   const add = () => setPeriods([...periods, { day: "MONDAY", open: "09:00", close: "17:00" }]);
   const update = (i: number, k: keyof Period, v: string) => {
@@ -95,22 +110,63 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
 
     setSaving(true);
     setMsg(null);
-    const r = await fetch(`${apiBase}/api/tenant/${tenantId}/business-hours`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ timezone, periods }),
-    });
-    setSaving(false);
-    setMsg(r.ok ? "✓ Saved" : "✗ Failed");
-    setTimeout(() => setMsg(null), 2000);
+    try {
+      const r = await apiRequest(`api/tenant/${tenantId}/business-hours`, {
+        method: "PUT",
+        body: JSON.stringify({ timezone, periods }),
+      });
+      setSaving(false);
+      setMsg(r.ok ? "✓ Saved" : "✗ Failed");
+      setTimeout(() => setMsg(null), 2000);
+    } catch (error) {
+      console.error('Failed to save business hours:', error);
+      setSaving(false);
+      setMsg("✗ Failed");
+      setTimeout(() => setMsg(null), 2000);
+    }
   };
 
-  // Calculate current status
+  // Calculate current status - considering both regular and special hours
   const now = new Date();
+  const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format
   const currentDay = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone }).toUpperCase();
   const currentTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: timezone });
-  const todayPeriod = periods.find(p => p.day === currentDay);
-  const isOpen = todayPeriod && currentTime >= todayPeriod.open && currentTime < todayPeriod.close;
+  
+  // Check for special hours for today
+  const todaySpecial = specialHours.find(special => special.date === today);
+  
+  let isOpen = false;
+  let statusMessage = '';
+  
+  if (todaySpecial) {
+    // Use special hours if they exist for today
+    if (todaySpecial.isClosed) {
+      isOpen = false;
+      statusMessage = 'Closed today (special hours)';
+    } else if (todaySpecial.open && todaySpecial.close) {
+      // Special hours with specific times
+      isOpen = currentTime >= todaySpecial.open && currentTime < todaySpecial.close;
+      statusMessage = isOpen 
+        ? `Open now • Closes at ${to12Hour(todaySpecial.close)} (special hours)`
+        : `Closed • Opens at ${to12Hour(todaySpecial.open)} (special hours)`;
+    } else {
+      // Special hours but no specific times (treat as closed)
+      isOpen = false;
+      statusMessage = 'Closed today (special hours)';
+    }
+  } else {
+    // Use regular business hours
+    const todayPeriod = periods.find(p => p.day === currentDay);
+    if (todayPeriod) {
+      isOpen = currentTime >= todayPeriod.open && currentTime < todayPeriod.close;
+      statusMessage = isOpen 
+        ? `Open now • Closes at ${to12Hour(todayPeriod.close)}`
+        : 'Closed';
+    } else {
+      isOpen = false;
+      statusMessage = 'Closed';
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -118,7 +174,7 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
       <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
         <span className={`inline-block w-3 h-3 rounded-full ${isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
         <span className="font-medium text-gray-900">
-          {isOpen ? `Open now • Closes at ${to12Hour(todayPeriod!.close)}` : 'Closed'}
+          {statusMessage}
         </span>
       </div>
 

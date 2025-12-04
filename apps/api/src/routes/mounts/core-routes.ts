@@ -17,6 +17,7 @@ import userRoutes from '../users';
 import tenantUserRoutes from '../tenant-users';
 import platformSettingsRoutes from '../platform-settings';
 import platformStatsRoutes from '../platform-stats';
+import businessHoursRoutes from '../business-hours';
 
 /**
  * Mount core business routes
@@ -43,6 +44,7 @@ export function mountCoreRoutes(app: Express) {
   app.use('/api/tenants', tenantUserRoutes);
   app.use(platformSettingsRoutes);
   app.use('/api/platform-stats', platformStatsRoutes);
+  app.use('/api', businessHoursRoutes);
 
   console.log('✅ Core business routes mounted');
 }

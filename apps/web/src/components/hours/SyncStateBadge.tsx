@@ -1,15 +1,20 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { apiRequest } from "@/lib/api";
 
 export default function SyncStateBadge({ apiBase, tenantId }: { apiBase: string; tenantId: string }) {
   const [status, setStatus] = useState<{ in_sync: boolean; last_synced_at?: string; attempts?: number } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
-    const r = await fetch(`${apiBase}/api/tenant/${tenantId}/gbp/hours/status`, { cache: "no-store" });
-    if (r.ok) {
-      const j = await r.json();
-      setStatus(j?.data || null);
+    try {
+      const r = await apiRequest(`api/tenant/${tenantId}/gbp/hours/status`);
+      if (r.ok) {
+        const j = await r.json();
+        setStatus(j?.data || null);
+      }
+    } catch (error) {
+      console.error('Failed to load GBP hours status:', error);
     }
   };
 
@@ -19,7 +24,13 @@ export default function SyncStateBadge({ apiBase, tenantId }: { apiBase: string;
     setBusy(true);
     const prevLast = status?.last_synced_at;
     const prevAttempts = status?.attempts || 0;
-    await fetch(`${apiBase}/api/tenant/${tenantId}/gbp/hours/mirror`, { method: "POST" });
+    try {
+      await apiRequest(`api/tenant/${tenantId}/gbp/hours/mirror`, {
+        method: "POST",
+      });
+    } catch (error) {
+      console.error('Failed to trigger GBP hours mirroring:', error);
+    }
 
     // Poll for a short window to reflect runner update
     const start = Date.now();

@@ -57,7 +57,7 @@ export default function ProfileCompletenessPage() {
           return
         }
         const data = await res.json()
-        setCompleteness(data.data)
+        setCompleteness(data) // Fixed: use data directly, not data.data
         setError(null)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
@@ -141,8 +141,21 @@ export default function ProfileCompletenessPage() {
         contextLabel="Profile"
       />
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Business Profile Completeness</h1>
-        <p className="text-gray-600">Complete your profile to improve visibility and trust</p>
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Business Profile Completeness</h1>
+            <p className="text-gray-600">Complete your profile to improve visibility and trust</p>
+          </div>
+          <button
+            onClick={() => router.push(`/t/${tenantId}/settings/tenant`)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit Profile
+          </button>
+        </div>
       </div>
 
       {/* Score Card */}
@@ -204,10 +217,11 @@ export default function ProfileCompletenessPage() {
             <ChecklistItem label="Email" weight="Important" completed={score >= 60} />
             <ChecklistItem label="Website (HTTPS)" weight="Important" completed={score >= 70} />
             <ChecklistItem label="Geocode (Lat/Lng)" weight="Important" completed={score >= 75} />
-            <ChecklistItem label="Logo" weight="Optional" completed={score >= 80} />
-            <ChecklistItem label="Business Hours" weight="Optional" completed={score >= 85} />
-            <ChecklistItem label="Social Links" weight="Optional" completed={score >= 90} />
-            <ChecklistItem label="SEO Tags" weight="Optional" completed={score >= 95} />
+            <ChecklistItem label="Business Description" weight="Important" completed={score >= 80} />
+            <ChecklistItem label="Logo" weight="Optional" completed={score >= 85} />
+            <ChecklistItem label="Business Hours" weight="Optional" completed={score >= 90} />
+            <ChecklistItem label="Social Links" weight="Optional" completed={score >= 95} />
+            <ChecklistItem label="SEO Tags" weight="Optional" completed={score >= 99} />
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { apiRequest } from "@/lib/api";
 
 export default function TimezonePicker({ tenantId, apiBase }: { tenantId: string; apiBase: string }) {
   const [loading, setLoading] = useState(true);
@@ -37,24 +38,18 @@ export default function TimezonePicker({ tenantId, apiBase }: { tenantId: string
     try {
       setSaving(true);
       setError(null);
-      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-      const res = await fetch("/api/tenant/profile", {
+      const res = await apiRequest("tenant/profile", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({
           tenant_id: tenantId,
           hours: { ...(existingHours || {}), timezone },
         }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to save timezone");
+        throw new Error("Failed to save timezone");
       }
-    } catch (e: any) {
-      setError(e?.message || "Failed to save timezone");
+    } catch (e) {
+      setError("Failed to save timezone");
     } finally {
       setSaving(false);
     }

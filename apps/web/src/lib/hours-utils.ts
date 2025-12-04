@@ -39,7 +39,7 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; label: string
   const closedSpecial = todaySpecials.find((sh: any) => sh.isClosed);
   if (closedSpecial) {
     const note = closedSpecial.note ? ` (${closedSpecial.note})` : '';
-    return { isOpen: false, label: `Closed today${note}` };
+    return { isOpen: false, label: `Closed today (special hours)${note}` };
   }
   
   const regularToday = (hours as any)[todayName];
@@ -74,21 +74,22 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; label: string
   for (const { range, note } of specialRanges) {
     if (range && currentMins >= range.openM && currentMins < range.closeM) {
       const noteText = note ? ` (${note})` : '';
-      return { isOpen: true, label: `Open now${noteText} • Closes at ${minutesToLabel(range.closeM, timeZone)}` };
+      return { isOpen: true, label: `Open now${noteText} • Closes at ${minutesToLabel(range.closeM, timeZone)} (special hours)` };
     }
   }
   
-  // Not currently open - check when we open next (regular hours first)
-  if (regularRange && currentMins < regularRange.openM) {
-    return { isOpen: false, label: `Closed • Opens today at ${minutesToLabel(regularRange.openM, timeZone)}` };
-  }
-  
-  // Check special hours that haven't started yet
+  // Not currently open - check when we open next today
+  // Priority: Special hours first, then regular hours
   for (const { range, note } of specialRanges) {
     if (range && currentMins < range.openM) {
       const noteText = note ? ` (${note})` : '';
-      return { isOpen: false, label: `Closed • Opens today at ${minutesToLabel(range.openM, timeZone)}${noteText}` };
+      return { isOpen: false, label: `Closed • Opens today at ${minutesToLabel(range.openM, timeZone)}${noteText} (special hours)` };
     }
+  }
+  
+  // Check regular hours if no special hours apply
+  if (regularRange && currentMins < regularRange.openM) {
+    return { isOpen: false, label: `Closed • Opens today at ${minutesToLabel(regularRange.openM, timeZone)}` };
   }
   
   // After both regular and special hours close, find next open day

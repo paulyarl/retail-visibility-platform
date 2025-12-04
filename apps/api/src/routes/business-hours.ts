@@ -1,7 +1,6 @@
 import { Router } from 'express'
 import { prisma } from '../prisma'
 import { requireFlag } from '../middleware/flags'
-import crypto from 'crypto'
 import { generateQuickStart } from '../lib/id-generator'
 
 const router = Router()
@@ -11,7 +10,6 @@ const mirrorAttempts = new Map<string, number>()
 
 // GET /api/tenant/:tenantId/business-hours
 router.get('/tenant/:tenantId/business-hours',
-  requireFlag({ flag: 'FF_TENANT_GBP_HOURS_SYNC', scope: 'tenant', tenantParam: 'tenantId' }),
   async (req, res) => {
   const { tenantId } = req.params
   const row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } })
@@ -22,19 +20,18 @@ router.get('/tenant/:tenantId/business-hours',
 
 // PUT /api/tenant/:tenantId/business-hours
 router.put('/tenant/:tenantId/business-hours',
-  requireFlag({ flag: 'FF_TENANT_GBP_HOURS_SYNC', scope: 'tenant', tenantParam: 'tenantId' }),
   async (req, res) => {
   const { tenantId } = req.params
   const { timezone, periods } = req.body || {}
   const nextTz = timezone || 'America/New_York'
   const nextPeriods = Array.isArray(periods) ? periods : []
   await prisma.business_hours_list.upsert({
-    where: { tenant_id: tenantId }, 
+    where: { tenant_id: tenantId },
     update: { timezone: nextTz, periods: nextPeriods as any },
-    create: { 
-      id: `${tenantId}_hours`, 
-      tenant_id: tenantId, 
-      timezone: nextTz, 
+    create: {
+      id: `${tenantId}_hours`,
+      tenant_id: tenantId,
+      timezone: nextTz,
       periods: nextPeriods as any,
       updated_at: new Date()
     },
@@ -44,7 +41,6 @@ router.put('/tenant/:tenantId/business-hours',
 
 // GET /api/tenant/:tenantId/business-hours/special
 router.get('/tenant/:tenantId/business-hours/special',
-  requireFlag({ flag: 'FF_TENANT_GBP_HOURS_SYNC', scope: 'tenant', tenantParam: 'tenantId' }),
   async (req, res) => {
   const { tenantId } = req.params
   const rows = await prisma.business_hours_special_list.findMany({ where: { tenant_id: tenantId }, orderBy: { date: 'asc' } })
@@ -54,7 +50,6 @@ router.get('/tenant/:tenantId/business-hours/special',
 
 // PUT /api/tenant/:tenantId/business-hours/special
 router.put('/tenant/:tenantId/business-hours/special',
-  requireFlag({ flag: 'FF_TENANT_GBP_HOURS_SYNC', scope: 'tenant', tenantParam: 'tenantId' }),
   async (req, res) => {
   const { tenantId } = req.params
   const { overrides } = req.body || {}
@@ -90,7 +85,6 @@ router.put('/tenant/:tenantId/business-hours/special',
 
 // POST /api/tenant/:tenantId/gbp/hours/mirror
 router.post('/tenant/:tenantId/gbp/hours/mirror',
-  requireFlag({ flag: 'FF_TENANT_GBP_HOURS_SYNC', scope: 'tenant', tenantParam: 'tenantId' }),
   async (req, res) => {
   const { tenantId } = req.params
   // Enqueue sync job; runner loop will process it
@@ -109,7 +103,6 @@ router.post('/tenant/:tenantId/gbp/hours/mirror',
 
 // GET /api/tenant/:tenantId/gbp/hours/status
 router.get('/tenant/:tenantId/gbp/hours/status',
-  requireFlag({ flag: 'FF_TENANT_GBP_HOURS_SYNC', scope: 'tenant', tenantParam: 'tenantId' }),
   async (req, res) => {
   const { tenantId } = req.params
   const row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } })

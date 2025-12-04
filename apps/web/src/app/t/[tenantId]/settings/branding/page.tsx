@@ -61,7 +61,7 @@ export default function TenantBrandingPage() {
       let businessDescription = '';
       
       try {
-        const response = await api.get(`${apiBaseUrl}/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`);
+        const response = await api.get(`${apiBaseUrl}/api/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`);
         if (response.ok) {
           const data = await response.json();
           // Use tenant name if no business_name is set, otherwise use business_name
@@ -216,7 +216,7 @@ export default function TenantBrandingPage() {
       }
       
       // Update profile (business description, logo, banner)
-      const response = await fetch(`${apiBaseUrl}/tenant/profile`, {
+      const response = await fetch(`${apiBaseUrl}/api/tenant/profile`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

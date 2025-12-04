@@ -89,6 +89,19 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       where: { tenant_id: tenantId },
     });
 
+    // If published, get the actual slug from the published listing
+    let actualSlug = settings.slug;
+    if (settings.is_published) {
+      const pool = getDirectPool();
+      const publishedListing = await pool.query(
+        'SELECT slug FROM directory_listings_list WHERE tenant_id = $1 AND is_published = true LIMIT 1',
+        [tenantId]
+      );
+      if (publishedListing.rows.length > 0) {
+        actualSlug = publishedListing.rows[0].slug;
+      }
+    }
+
     // Transform snake_case to camelCase for frontend
     return res.json({
       id: settings.id,
@@ -98,7 +111,7 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       seoKeywords: settings.seo_keywords,
       primaryCategory: settings.primary_category,
       secondaryCategories: settings.secondary_categories,
-      slug: settings.slug,
+      slug: actualSlug,
       createdAt: settings.created_at,
       updatedAt: settings.updated_at,
       isFeatured: !!activeFeatured,
@@ -289,21 +302,9 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
         bp.website,
         bp.latitude,
         bp.longitude,
-        -- Use Platform Directory Categories instead of GBP categories
-        COALESCE(
-          (SELECT dc.name FROM directory_categories_list dc 
-           WHERE dc.tenant_id = t.id AND dc.is_active = true 
-           ORDER BY dc.sort_order ASC LIMIT 1), 
-          'Uncategorized'
-        ) as primary_category,
-        COALESCE(
-          ARRAY(
-            SELECT dc.name FROM directory_categories_list dc 
-            WHERE dc.tenant_id = t.id AND dc.is_active = true 
-            ORDER BY dc.sort_order ASC OFFSET 1
-          ),
-          ARRAY[]::text[]
-        ) as secondary_categories,
+        -- Use Platform Directory Categories from directory settings instead of GBP categories
+        ds.primary_category as primary_category,
+        ds.secondary_categories as secondary_categories,
         bp.logo_url,
         ds.seo_description as description,
         true as is_published,
