@@ -2865,12 +2865,36 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     }
   }
 
+  // Fetch tenant category if directory_category_id exists
+  let tenantCategory = null;
+  if (it.directory_category_id) {
+    const category = await prisma.directory_category.findUnique({
+      where: { id: it.directory_category_id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        googleCategoryId: true,
+      },
+    });
+    if (category) {
+      tenantCategory = {
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        googleCategoryId: category.googleCategoryId,
+      };
+    }
+  }
+
   // Convert Decimal price to number for frontend compatibility
   // Hide price_cents from frontend since price is the authoritative field
   const { price_cents, ...itemWithoutPriceCents } = it;
   const transformed = {
     ...itemWithoutPriceCents,
     price: it.price !== null && it.price !== undefined ? Number(it.price) : null,
+    tenantCategory,
+    tenantCategoryId: it.directory_category_id,
   };
 
   res.json(transformed);

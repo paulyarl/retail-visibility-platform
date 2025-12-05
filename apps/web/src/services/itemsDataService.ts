@@ -84,7 +84,7 @@ export class ItemsDataService {
       // Add tenant identifier (snake_case as expected by backend)
       params.append('tenant_id', tenantId);
       
-      const response = await api.get(`api/items?${params.toString()}`);
+      const response = await api.get(`/api/items?${params.toString()}`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -171,7 +171,7 @@ export class ItemsDataService {
   async updateItem(itemId: string, data: Partial<Item>): Promise<Item> {
     try {
       console.log('[updateItem] Sending data:', { itemId, data });
-      const response = await api.put(`api/items/${itemId}`, data);
+      const response = await api.put(`/api/items/${itemId}`, data);
       console.log('[updateItem] Response status:', response.status);
 
       if (!response.ok) {
@@ -201,7 +201,7 @@ export class ItemsDataService {
    */
   async deleteItem(itemId: string): Promise<void> {
     try {
-      const response = await api.delete(`api/items/${itemId}`);
+      const response = await api.delete(`/api/items/${itemId}`);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -221,7 +221,7 @@ export class ItemsDataService {
       const formData = new FormData();
       files.forEach((file) => formData.append('photos', file));
 
-      const response = await api.post(`api/items/${itemId}/photos`, formData);
+      const response = await api.post(`/api/items/${itemId}/photos`, formData);
 
       if (!response.ok) {
         throw new Error('Failed to upload photos');

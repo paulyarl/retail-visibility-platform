@@ -30,7 +30,7 @@ interface Item {
   description?: string;
   price: number;
   stock: number;
-  status: 'active' | 'inactive' | 'syncing';
+  status: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing';
   visibility: 'public' | 'private';
   categoryPath?: string[];
   tenantCategoryId?: string | null;
@@ -117,9 +117,17 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       // Normalize the item data to match frontend expectations
       const normalizedItem = {
         ...itemData,
-        status: itemData.itemStatus || itemData.status || 'inactive',
+        status: itemData.itemStatus || itemData.item_status || itemData.status || 'active',
+        tenantCategory: itemData.tenantCategory,
+        tenantCategoryId: itemData.tenantCategoryId || itemData.directory_category_id,
       };
       
+      console.log('[ItemDetailPage] Loaded item:', {
+        id: normalizedItem.id,
+        status: normalizedItem.status,
+        tenantCategory: normalizedItem.tenantCategory,
+        tenantCategoryId: normalizedItem.tenantCategoryId,
+      });
       setItem(normalizedItem);
 
       // Fetch photos
@@ -254,11 +262,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <Badge variant={item.status === 'active' ? 'success' : item.status === 'syncing' ? 'info' : 'default'}>
-                    {item.status}
+                  <Badge variant={item.status === 'active' ? 'success' : item.status === 'syncing' ? 'info' : item.status === 'draft' ? 'info' : 'default'}>
+                    {item.status === 'active' ? 'Active' : item.status === 'syncing' ? 'Syncing' : item.status === 'draft' ? 'Draft' : item.status === 'inactive' ? 'Inactive' : 'Archived'}
                   </Badge>
                   <Badge variant={item.visibility === 'public' ? 'info' : 'default'}>
-                    {item.visibility}
+                    {item.visibility === 'public' ? 'Public' : 'Private'}
                   </Badge>
                 </div>
 
@@ -270,6 +278,28 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 />
               </CardContent>
             </Card>
+
+            {/* Category Info */}
+            {item.tenantCategory && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Category
+                  </h2>
+                  <div className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm font-medium rounded-lg border border-blue-200 dark:border-blue-800">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    <span>{item.tenantCategory.name}</span>
+                    {item.tenantCategory.googleCategoryId && (
+                      <span className="text-blue-600 dark:text-blue-400 font-mono text-xs" title="Google Category ID">
+                        ({item.tenantCategory.googleCategoryId})
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Basic Info */}
             <Card>
