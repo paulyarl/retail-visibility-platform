@@ -38,7 +38,7 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
     const load = async () => {
       try {
         // Load regular business hours
-        const r = await apiRequest(`api/tenant/${tenantId}/business-hours`);
+        const r = await apiRequest(`/api/tenant/${tenantId}/business-hours`);
         if (r.ok) {
           const j = await r.json();
           setTimezone(j?.data?.timezone || "America/New_York");
@@ -46,7 +46,7 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
         }
         
         // Load special hours
-        const specialRes = await apiRequest(`api/tenant/${tenantId}/business-hours/special`);
+        const specialRes = await apiRequest(`/api/tenant/${tenantId}/business-hours/special`);
         if (specialRes.ok) {
           const specialData = await specialRes.json();
           setSpecialHours(Array.isArray(specialData?.data?.overrides) ? specialData.data.overrides : []);
@@ -111,7 +111,7 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
     setSaving(true);
     setMsg(null);
     try {
-      const r = await apiRequest(`api/tenant/${tenantId}/business-hours`, {
+      const r = await apiRequest(`/api/tenant/${tenantId}/business-hours`, {
         method: "PUT",
         body: JSON.stringify({ timezone, periods }),
       });

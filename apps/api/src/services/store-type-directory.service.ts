@@ -337,8 +337,8 @@ class StoreTypeDirectoryService {
           dsl.rating_count,
           -- Calculate real product count from inventory_items
           COALESCE(real_counts.product_count, 0) as product_count,
-          -- Get logo URL from tenants metadata
-          (t.metadata->>'logo_url') as logo_url,
+          -- Get logo URL from directory listings
+          dsl.logo_url as logo_url,
           null as description,
           dsl.is_featured,
           t.subscription_tier,
@@ -349,11 +349,12 @@ class StoreTypeDirectoryService {
         JOIN tenants t ON t.id = tgc.tenant_id
         LEFT JOIN directory_listings_list dsl ON dsl.tenant_id = t.id
         LEFT JOIN (
-          SELECT 
+          SELECT
             tenant_id,
             COUNT(*) as product_count
           FROM inventory_items
           WHERE item_status = 'active' AND visibility = 'public'
+            AND directory_category_id IS NOT NULL  -- Only count products with categories (matches storefront filter)
           GROUP BY tenant_id
         ) real_counts ON t.id = real_counts.tenant_id
         WHERE tgc.gbp_category_id = $1
@@ -434,11 +435,12 @@ class StoreTypeDirectoryService {
           ARRAY[]::text[] as states
         FROM directory_category_products dcp
         LEFT JOIN (
-          SELECT 
+          SELECT
             tenant_id,
             COUNT(*) as product_count
           FROM inventory_items
           WHERE item_status = 'active' AND visibility = 'public'
+            AND directory_category_id IS NOT NULL  -- Only count products with categories (matches storefront filter)
           GROUP BY tenant_id
         ) real_counts ON dcp.tenant_id = real_counts.tenant_id
         WHERE dcp.category_name = $1

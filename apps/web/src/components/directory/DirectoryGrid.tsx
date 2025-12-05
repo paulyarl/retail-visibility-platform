@@ -1,6 +1,6 @@
 "use client";
 
-import StoreCard from './StoreCard';
+import { UnifiedStoreCard } from './UnifiedStoreCard';
 import { Skeleton } from '@/components/ui';
 
 interface DirectoryListing {
@@ -11,19 +11,23 @@ interface DirectoryListing {
   address?: string;
   city?: string;
   state?: string;
-  phone?: string;
-  logoUrl?: string;
+  zipCode?: string;
+  latitude?: number;
+  longitude?: number;
   primaryCategory?: string;
-  ratingAvg: number;
-  ratingCount: number;
-  productCount: number;
-  isFeatured: boolean;
-  subscriptionTier: string;
-  useCustomWebsite: boolean;
-  website?: string;
-  distance?: number;
-  isOpen?: boolean;
-  directoryPublished?: boolean; // Add directory publish status
+  gbpPrimaryCategoryName?: string;
+  category?: {
+    name: string;
+    slug: string;
+    icon?: string;
+  };
+  logoUrl?: string;
+  ratingAvg?: number;
+  ratingCount?: number;
+  productCount?: number;
+  isFeatured?: boolean;
+  subscriptionTier?: string;
+  directoryPublished?: boolean;
 }
 
 interface Pagination {
@@ -96,10 +100,11 @@ export default function DirectoryGrid({
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {listings.map((listing, index) => (
-          <StoreCard
+          <UnifiedStoreCard
             key={listing.id}
             listing={listing}
-            index={index}
+            viewMode="grid"
+            contextCategory={categorySlug ? categorySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : undefined}
           />
         ))}
       </div>

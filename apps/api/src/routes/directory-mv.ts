@@ -209,8 +209,16 @@ router.get('/search', async (req: Request, res: Response) => {
         dcp.listing_updated_at as updated_at,
         -- Get primary category from directory listing
         dll.primary_category as gbp_primary_category_name,
-        -- Get logo URL from tenants metadata
-        (t.metadata->>'logo_url') as logo_url,
+        -- Get logo URL from directory listings
+        dll.logo_url as logo_url,
+        -- Get address data with fallback from directory listings
+        COALESCE(dll.address, dcp.address) as address,
+        COALESCE(dll.city, dcp.city) as city,
+        COALESCE(dll.state, dcp.state) as state,
+        COALESCE(dll.zip_code, dcp.zip_code) as zip_code,
+        -- Get coordinates with fallback
+        COALESCE(dll.latitude, dcp.latitude) as latitude,
+        COALESCE(dll.longitude, dcp.longitude) as longitude,
         -- Check if store has published directory listing
         COALESCE(dll.is_published, false) as directory_published
       FROM directory_category_products dcp
@@ -226,7 +234,7 @@ router.get('/search', async (req: Request, res: Response) => {
         GROUP BY tenant_id
       ) real_counts ON dcp.tenant_id = real_counts.tenant_id
       LEFT JOIN (
-        SELECT tenant_id, is_published, primary_category, secondary_categories
+        SELECT tenant_id, is_published, primary_category, secondary_categories, address, city, state, zip_code, latitude, longitude, logo_url
         FROM directory_listings_list
         WHERE is_published = true
       ) dll ON dcp.tenant_id = dll.tenant_id
@@ -246,6 +254,7 @@ router.get('/search', async (req: Request, res: Response) => {
     const countQuery = `
       SELECT COUNT(DISTINCT dcp.tenant_id) as count 
       FROM directory_category_products dcp
+      LEFT JOIN tenants t ON dcp.tenant_id = t.id
       LEFT JOIN (
         SELECT tenant_id, is_published, primary_category, secondary_categories
         FROM directory_listings_list
@@ -521,6 +530,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
           COUNT(*) as product_count
         FROM inventory_items
         WHERE item_status = 'active' AND visibility = 'public'
+          AND directory_category_id IS NOT NULL  -- Only count products with categories (matches storefront filter)
         GROUP BY tenant_id
       ) real_counts ON dcp.tenant_id = real_counts.tenant_id
       LEFT JOIN (

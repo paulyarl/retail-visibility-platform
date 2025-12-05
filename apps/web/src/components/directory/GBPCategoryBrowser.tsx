@@ -82,7 +82,7 @@ export default function GBPCategoryBrowser({ gbpCategories, className = '' }: GB
                       {originalCategory.categoryName}
                     </span>
                     {originalCategory.isPrimary === 1 && (
-                      <span className="px-1.5 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300 rounded-full whitespace-nowrap">
+                      <span className="px-1.5 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-800 rounded-full whitespace-nowrap">
                         Primary
                       </span>
                     )}

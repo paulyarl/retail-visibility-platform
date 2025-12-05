@@ -34,7 +34,7 @@ export default function SpecialHoursCalendar({ apiBase, tenantId }: { apiBase: s
   useEffect(() => {
     const load = async () => {
       try {
-        const r = await apiRequest(`api/tenant/${tenantId}/business-hours/special`);
+        const r = await apiRequest(`/api/tenant/${tenantId}/business-hours/special`);
         if (r.ok) {
           const j = await r.json();
           setOverrides(Array.isArray(j?.data?.overrides) ? j.data.overrides : []);
@@ -105,7 +105,7 @@ export default function SpecialHoursCalendar({ apiBase, tenantId }: { apiBase: s
     setSaving(true);
     setMsg(null);
     try {
-      const r = await apiRequest(`api/tenant/${tenantId}/business-hours/special`, {
+      const r = await apiRequest(`/api/tenant/${tenantId}/business-hours/special`, {
         method: "PUT",
         body: JSON.stringify({ overrides }),
       });

@@ -123,7 +123,7 @@ export default function GBPCategoryBadges({
             href={`${basePath}/${category.slug}`}
             className={`inline-flex items-center gap-1.5 ${sizeClasses.badge} rounded-full font-medium transition-colors hover:opacity-80 ${
               category.isPrimary
-                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600'
+                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-900 border border-purple-300 dark:border-purple-600'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
             }`}
           >
@@ -131,13 +131,13 @@ export default function GBPCategoryBadges({
             <span>{category.name}</span>
             
             {showCount && count !== undefined && (
-              <span className={`${sizeClasses.count} bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300 rounded-full`}>
+              <span className={`${sizeClasses.count} bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-800 rounded-full`}>
                 {count} stores
               </span>
             )}
             
             {category.isPrimary && (
-              <span className={`${sizeClasses.primaryLabel} bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-200 rounded-full`}>
+              <span className={`${sizeClasses.primaryLabel} bg-purple-200 dark:bg-purple-800/50 text-purple-700 dark:text-purple-200 rounded-full`}>
                 Primary
               </span>
             )}
