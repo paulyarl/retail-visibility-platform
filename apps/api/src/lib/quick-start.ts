@@ -145,6 +145,8 @@ export interface QuickStartOptions {
   productCount: number;
   assignCategories?: boolean;
   createAsDrafts?: boolean;
+  generateImages?: boolean; // NEW: Generate AI images for products
+  imageQuality?: 'standard' | 'hd'; // NEW: Image quality
 }
 
 export interface QuickStartResult {
@@ -168,12 +170,9 @@ export async function generateQuickStartProducts(
     productCount,
     assignCategories = true,
     createAsDrafts = true,
+    generateImages = false,
+    imageQuality = 'standard',
   } = options;
-
-  // Validate scenario
-  if (!SCENARIOS[scenario]) {
-    throw new Error(`Invalid scenario: ${scenario}`);
-  }
 
   // Validate tenant exists
   const tenant = await prismaClient.tenants.findUnique({ where: { id: tenant_id } });
@@ -181,7 +180,8 @@ export async function generateQuickStartProducts(
     throw new Error(`Tenant not found: ${tenant_id}`);
   }
 
-  const scenarioData = SCENARIOS[scenario];
+  // Use fallback scenario data if not in SCENARIOS (for new business types)
+  const scenarioData = SCENARIOS[scenario] || SCENARIOS.general;
   const timestamp = Date.now();
 
   // Create categories with live Google taxonomy alignment and persist to database
@@ -305,6 +305,7 @@ export async function generateQuickStartProducts(
   const batchSize = 100;
   let createdCount = 0;
   let skippedCount = 0;
+  let globalIndex = 0; // Track global index for unique SKUs
 
   for (let i = 0; i < allProducts.length; i += batchSize) {
     const batch = allProducts.slice(i, i + batchSize);
@@ -342,7 +343,7 @@ export async function generateQuickStartProducts(
       items.push({
         id: generateItemId(),
         tenant_id: tenant_id,
-        sku: generateQuickStartSku(i + idx),
+        sku: generateQuickStartSku(timestamp + globalIndex), // Use timestamp + global index for unique SKUs
         name: product.name,
         title: product.name,
         brand: product.brand || 'Generic',
@@ -358,15 +359,62 @@ export async function generateQuickStartProducts(
       
       // Add to existing names set to prevent duplicates within this batch
       existingNames.add(product.name);
+      globalIndex++; // Increment for next product
     }
 
     if (items.length > 0) {
-      // Use transaction to create items with all fields (createMany has limitations)
-      // Note: Don't await the individual creates - pass unawaited promises to $transaction
-      await prismaClient.$transaction(
-        items.map(item => prismaClient.inventory_items.create({ data: item }))
-      );
-      createdCount += items.length;
+      // Create items individually to avoid transaction issues
+      const createdItems: any[] = [];
+      
+      for (const item of items) {
+        try {
+          const created = await prismaClient.inventory_items.create({ data: item });
+          createdItems.push(created);
+          createdCount++;
+        } catch (error: any) {
+          if (error.code === 'P2002') {
+            // Duplicate SKU - skip
+            console.log(`[Quick Start] Skipping duplicate SKU: ${item.sku}`);
+            skippedCount++;
+          } else {
+            throw error;
+          }
+        }
+      }
+      
+      // Generate images if requested
+      if (generateImages && createdItems.length > 0) {
+        console.log(`[Quick Start] Generating ${createdItems.length} product images...`);
+        const { aiImageService } = await import('../services/AIImageService');
+        
+        let imagesGenerated = 0;
+        let imagesFailed = 0;
+        
+        for (const item of createdItems) {
+          try {
+            const image = await aiImageService.generateProductImage(
+              item.name,
+              item.tenant_id,
+              item.id,
+              'openai', // Use DALL-E for now
+              imageQuality
+            );
+            
+            if (image) {
+              console.log(`[Quick Start] ✓ Image generated for: ${item.name}`);
+              imagesGenerated++;
+            } else {
+              console.log(`[Quick Start] ✗ Image generation failed for: ${item.name}`);
+              imagesFailed++;
+            }
+          } catch (error: any) {
+            console.error(`[Quick Start] Image generation error for "${item.name}":`, error.message);
+            imagesFailed++;
+          }
+        }
+        
+        console.log(`[Quick Start] Images: ${imagesGenerated} generated, ${imagesFailed} failed`);
+      }
     }
   }
   

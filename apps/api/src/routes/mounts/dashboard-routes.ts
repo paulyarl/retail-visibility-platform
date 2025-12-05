@@ -9,6 +9,7 @@ import tenantLimitsRoutes from '../tenant-limits';
 import promotionRoutes from '../promotion';
 import businessHoursRoutes from '../business-hours';
 import quickStartRoutes from '../quick-start';
+import cacheStatsRoutes from '../cache-stats';
 import feedJobsRoutes from '../feed-jobs';
 import feedbackRoutes from '../feedback';
 import tenantCategoriesRoutes from '../tenant-categories';
@@ -51,6 +52,7 @@ export function mountDashboardRoutes(app: Express) {
   app.use('/api/feedback', feedbackRoutes);
   app.use('/api/v1/tenants', authenticateToken, checkTenantAccess, tenantCategoriesRoutes);
   app.use('/api/v1', quickStartRoutes);
+  app.use('/api/v1', cacheStatsRoutes); // Cache statistics
   app.use('/api', feedValidationRoutes);
 
   // Category scaffolds (M3 start)

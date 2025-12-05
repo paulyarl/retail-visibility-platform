@@ -78,10 +78,32 @@ router.get('/scenarios', async (req, res) => {
  * - createAsDrafts: boolean (default: true)
  */
 const quickStartSchema = z.object({
-  scenario: z.enum(['grocery', 'fashion', 'electronics', 'general']),
-  productCount: z.number().int().min(1).max(100).default(50),
+  scenario: z.enum([
+    'grocery',
+    'pharmacy',
+    'fashion', 
+    'electronics',
+    'home_garden',
+    'health_beauty',
+    'sports_outdoors',
+    'toys_games',
+    'automotive',
+    'books_media',
+    'pet_supplies',
+    'office_supplies',
+    'jewelry',
+    'baby_kids',
+    'arts_crafts',
+    'hardware_tools',
+    'furniture',
+    'restaurant',
+    'general'
+  ]),
+  productCount: z.number().int().min(5).max(200).default(50),
   assignCategories: z.boolean().optional().default(true),
   createAsDrafts: z.boolean().optional().default(true),
+  generateImages: z.boolean().optional().default(false), // NEW: Generate AI images
+  imageQuality: z.enum(['standard', 'hd']).optional().default('standard'), // NEW: Image quality
 });
 
 router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quick_start_wizard'), validateSKULimits, async (req, res) => {
@@ -182,7 +204,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       });
     }
 
-    const { scenario, productCount, assignCategories, createAsDrafts} = parsed.data;
+    const { scenario, productCount, assignCategories, createAsDrafts, generateImages, imageQuality } = quickStartSchema.parse(normalizedBody);
 
     // Check rate limit (platform support bypasses - they're helping multiple customers)
     // Tenant owners/admins are subject to rate limits on their own tenant
@@ -210,6 +232,13 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
 
     // Generate products
     console.log(`[Quick Start] Generating ${productCount} ${scenario} products for tenant ${tenantId}`);
+    if (generateImages) {
+      console.log(`[Quick Start] ⏳ This may take 2-3 minutes. AI is generating products with images (${imageQuality} quality)...`);
+      console.log(`[Quick Start] 💡 Images: Using DALL-E 3 for professional product photography`);
+    } else {
+      console.log(`[Quick Start] ⏳ This may take 30-60 seconds. AI is generating realistic products with detailed descriptions...`);
+      console.log(`[Quick Start] 💡 Tip: Using OpenAI for product generation with automatic fallback`);
+    }
     
     const result = await generateQuickStartProducts({
       tenant_id: tenantId,
@@ -217,6 +246,8 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       productCount,
       assignCategories,
       createAsDrafts,
+      generateImages,
+      imageQuality,
     }, prisma);
 
     console.log(`[Quick Start] Success:`, result);

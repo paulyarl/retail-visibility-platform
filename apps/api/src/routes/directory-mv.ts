@@ -126,12 +126,18 @@ router.get('/search', async (req: Request, res: Response) => {
       'is_published = true'
     ];
 
-    // Category filter - match by slug for both product categories and GBP store types
+    // Category filter - match by slug for directory listing categories (store types)
+    // This filters by the categories assigned in the directory settings page
     if (category && typeof category === 'string') {
-      // Use slug directly for matching (e.g., "supermarket", "books-media", "grocery-store")
-      conditions.push(`dcp.category_slug = $${paramIndex}`);
-      gbpConditions.push(`gbp_category_slug = $${paramIndex}`); // GBP uses different column name
-      params.push(category);
+      // Convert slug to category name (e.g., "indian-grocery-store" -> "Indian Grocery Store")
+      const categoryName = category
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      // Filter will be applied in the WHERE clause after the JOIN with directory_listings_list
+      // We'll check both primary_category and secondary_categories array
+      params.push(categoryName);
       paramIndex++;
     }
 
@@ -172,77 +178,82 @@ router.get('/search', async (req: Request, res: Response) => {
 
     // Query using directory_category_products for consistency with categories API
     const listingsQuery = `
-      (
-        -- Search directory_category_products but calculate real product counts and check directory publish status
-        SELECT DISTINCT
-          dcp.tenant_id as id,
-          dcp.tenant_id,
-          dcp.tenant_name as business_name,
-          dcp.tenant_name as business_name,
-          dcp.tenant_slug as slug,
-          dcp.address,
-          dcp.city as city,
-          dcp.state as state,
-          dcp.zip_code,
-          null as phone,
-          null as email,
-          null as website,
-          dcp.latitude,
-          dcp.longitude,
-          dcp.category_name,
-          dcp.category_name as category_slug,
-          dcp.google_category_id,
-          dcp.google_category_id as googleCategoryId,
-          dcp.category_icon as icon,
-          false as is_primary,  -- DEFAULT: no primary flag since column doesn't exist
-          dcp.rating_avg as rating_avg,
-          dcp.rating_avg as rating_avg,
-          dcp.rating_count,
-          dcp.rating_count as rating_count,
-          -- Calculate real product count from inventory_items
-          COALESCE(real_counts.product_count, 0) as product_count,
-          dcp.is_featured,
-          dcp.is_featured as is_featured,
-          dcp.subscription_tier,
-          dcp.subscription_tier as subscription_tier,
-          null as use_custom_website,
-          dcp.listing_created_at as created_at,
-          dcp.listing_created_at as created_at,
-          dcp.listing_updated_at as updated_at,
-          dcp.listing_updated_at as updated_at,
-          null as gbp_primary_category_name,
-          -- Get logo URL from tenants metadata
-          (t.metadata->>'logo_url') as logo_url,
-          -- Check if store has published directory listing
-          COALESCE(dll.is_published, false) as directory_published
-        FROM directory_category_products dcp
-        LEFT JOIN tenants t ON dcp.tenant_id = t.id
-        LEFT JOIN (
-          SELECT 
-            tenant_id,
-            COUNT(*) as product_count
-          FROM inventory_items
-          WHERE item_status = 'active' AND visibility = 'public'
-          GROUP BY tenant_id
-        ) real_counts ON dcp.tenant_id = real_counts.tenant_id
-        LEFT JOIN (
-          SELECT tenant_id, is_published
-          FROM directory_listings_list
-          WHERE is_published = true
-        ) dll ON dcp.tenant_id = dll.tenant_id
-          WHERE ${whereClause}
-      )
-      ORDER BY ${orderByClause.replace(/^/, '')}
+      SELECT DISTINCT ON (dcp.tenant_id)
+        dcp.tenant_id as id,
+        dcp.tenant_id,
+        dcp.tenant_name as business_name,
+        dcp.tenant_slug as slug,
+        dcp.address,
+        dcp.city as city,
+        dcp.state as state,
+        dcp.zip_code,
+        null as phone,
+        null as email,
+        null as website,
+        dcp.latitude,
+        dcp.longitude,
+        dcp.category_name,
+        dcp.category_name as category_slug,
+        dcp.google_category_id,
+        dcp.google_category_id as googleCategoryId,
+        dcp.category_icon as icon,
+        false as is_primary,
+        dcp.rating_avg,
+        dcp.rating_count,
+        -- Calculate real product count matching storefront filter (only products WITH categories)
+        COALESCE(real_counts.product_count, 0) as product_count,
+        dcp.is_featured,
+        dcp.subscription_tier,
+        null as use_custom_website,
+        dcp.listing_created_at as created_at,
+        dcp.listing_updated_at as updated_at,
+        -- Get primary category from directory listing
+        dll.primary_category as gbp_primary_category_name,
+        -- Get logo URL from tenants metadata
+        (t.metadata->>'logo_url') as logo_url,
+        -- Check if store has published directory listing
+        COALESCE(dll.is_published, false) as directory_published
+      FROM directory_category_products dcp
+      LEFT JOIN tenants t ON dcp.tenant_id = t.id
+      LEFT JOIN (
+        SELECT 
+          tenant_id,
+          COUNT(*) as product_count
+        FROM inventory_items
+        WHERE item_status = 'active' 
+          AND visibility = 'public'
+          AND directory_category_id IS NOT NULL  -- Only count products with categories (matches storefront filter)
+        GROUP BY tenant_id
+      ) real_counts ON dcp.tenant_id = real_counts.tenant_id
+      LEFT JOIN (
+        SELECT tenant_id, is_published, primary_category, secondary_categories
+        FROM directory_listings_list
+        WHERE is_published = true
+      ) dll ON dcp.tenant_id = dll.tenant_id
+      WHERE ${whereClause}
+        AND dll.is_published = true
+        ${category ? `AND (dll.primary_category = $1 OR $1 = ANY(dll.secondary_categories))` : ''}
+      ORDER BY dcp.tenant_id, ${orderByClause.replace(/^/, '')}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
+    console.log('[Directory MV Search] Query:', listingsQuery);
+    console.log('[Directory MV Search] Params:', [...params, limitNum, skip]);
+    
     const listingsResult = await getDirectPool().query(listingsQuery, [...params, limitNum, skip]);
 
-    // Get total count (using same source as search)
+    // Get total count (using same source as search) - count distinct tenants
     const countQuery = `
-      SELECT COUNT(*) as count 
+      SELECT COUNT(DISTINCT dcp.tenant_id) as count 
       FROM directory_category_products dcp
+      LEFT JOIN (
+        SELECT tenant_id, is_published, primary_category, secondary_categories
+        FROM directory_listings_list
+        WHERE is_published = true
+      ) dll ON dcp.tenant_id = dll.tenant_id
       WHERE ${whereClause}
+        AND dll.is_published = true
+        ${category ? `AND (dll.primary_category = $1 OR $1 = ANY(dll.secondary_categories))` : ''}
     `;
     const countResult = await getDirectPool().query(countQuery, params);
 
@@ -264,6 +275,8 @@ router.get('/search', async (req: Request, res: Response) => {
       website: row.website,
       latitude: row.latitude,
       longitude: row.longitude,
+      primaryCategory: row.gbp_primary_category_name, // GBP store type (primary category)
+      gbpPrimaryCategoryName: row.gbp_primary_category_name, // Alias for compatibility
       category: {
         name: row.category_name,
         slug: row.category_slug,

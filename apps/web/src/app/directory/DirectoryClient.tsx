@@ -163,11 +163,24 @@ export default function DirectoryClient() {
         const location = await getUserLocation();
         setUserLocation(location);
         
-        // Fetch product categories from materialized view (10,000x faster!)
-        // Now with normalized categories and Google taxonomy alignment
-        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/mv/categories${location ? `?lat=${location.latitude}&lng=${location.longitude}&city=${encodeURIComponent(location.city)}&state=${location.state}` : ''}`);
-        const categoriesData = await categoriesRes.json();
-        setCategories(categoriesData.categories || []);
+        // Fetch directory listing categories (store types) with counts
+        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories-optimized/counts-by-name`);
+        if (categoriesRes.ok) {
+          const categoriesData = await categoriesRes.json();
+          const counts = categoriesData.counts || {};
+          
+          // Convert counts map to category array format expected by the component
+          const categoryArray = Object.entries(counts).map(([name, count]) => ({
+            id: name.toLowerCase().replace(/\s+/g, '-'),
+            name: name,
+            slug: name.toLowerCase().replace(/\s+/g, '-'),
+            googleCategoryId: null,
+            storeCount: count as number,
+            productCount: 0, // Not relevant for directory categories
+          }));
+          
+          setCategories(categoryArray);
+        }
 
         // Fetch store types
         const storeTypesRes = await fetch(`${apiBaseUrl}/api/directory/store-types`);
@@ -205,7 +218,9 @@ export default function DirectoryClient() {
         const response = await fetch(`${apiBaseUrl}/api/directory/mv/search?${params.toString()}`);
         
         if (!response.ok) {
-          throw new Error('Failed to fetch directory listings');
+          const errorText = await response.text();
+          console.error('Directory API error:', response.status, errorText);
+          throw new Error(`Failed to fetch directory listings: ${response.status} ${errorText}`);
         }
 
         const result = await response.json();

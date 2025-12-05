@@ -109,20 +109,34 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
+    console.log('[AUTH] authenticateToken called for:', req.method, req.path, 'Token present:', !!token);
+
     if (!token) {
+      console.log('[AUTH] No token provided');
       return res.status(401).json({ error: 'authentication_required', message: 'No token provided' });
     }
 
+    console.log('[AUTH] JWT verification attempted for token:', token.substring(0, 20) + '...');
     const payload = authService.verifyAccessToken(token);
+    console.log('[AUTH] Token verified successfully, payload:', { userId: payload.userId, user_id: payload.user_id, email: payload.email, role: payload.role });
     
     // Apply universal transform to JWT payload to ensure both naming conventions
     const transformedPayload = makeBothConventionsAvailable(payload);
+    console.log('[AUTH] Payload transformed, setting req.user');
     
     req.user = transformedPayload;
+    console.log('[AUTH] req.user set successfully, calling next()');
+    console.log('[AUTH] About to call next() for route:', req.method, req.path);
     next();
+    console.log('[AUTH] next() called successfully - should proceed to next middleware');
   } catch (error) {
-    console.log('[Auth Middleware] Token verification failed:', error);
+    console.error('[AUTH] Exception in authenticateToken:', error);
     if (error instanceof Error) {
+      console.error('[AUTH] Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 500)
+      });
       if (error.name === 'TokenExpiredError') {
         return res.status(401).json({ error: 'token_expired', message: 'Token has expired' });
       }

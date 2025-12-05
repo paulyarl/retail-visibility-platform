@@ -12,6 +12,7 @@
 
 import { prisma } from '../prisma';
 import { generateItemId } from '../lib/id-generator';
+import { aiProviderService } from './AIProviderService';
 
 export interface CachedProduct {
   id: string;
@@ -23,7 +24,20 @@ export interface CachedProduct {
   brand: string | null;
   description: string | null;
   skuPattern: string | null;
+  // Image data
+  imageUrl: string | null;
+  thumbnailUrl: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
+  imageBytes: number | null;
+  // Enhanced content
+  enhancedDescription: string | null;
+  features: any | null;
+  specifications: any | null;
+  // Metadata
   generationSource: string;
+  hasImage: boolean;
+  imageQuality: string | null;
   usageCount: number;
   qualityScore: number;
   createdAt: Date;
@@ -39,10 +53,20 @@ export interface ProductRequest {
 
 export interface GeneratedProduct {
   name: string;
-  price: number;
+  price: number; // in cents
   brand?: string;
   description?: string;
   sku?: string;
+  // Image data (NEW)
+  imageUrl?: string;
+  thumbnailUrl?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageBytes?: number;
+  // Enhanced content (NEW)
+  enhancedDescription?: string;
+  features?: string[];
+  specifications?: Record<string, string>;
 }
 
 export class ProductCacheService {
@@ -100,13 +124,23 @@ export class ProductCacheService {
       aiProducts.push(...variations);
     }
     
-    // Step 5: Combine cached + AI products
+    // Step 5: Combine cached + AI products (with complete data)
     const cachedConverted = cachedProducts.map(p => ({
       name: p.productName,
       price: p.priceCents,
       brand: p.brand || undefined,
       description: p.description || undefined,
       sku: p.skuPattern || undefined,
+      // Include image data if available
+      imageUrl: p.imageUrl || undefined,
+      thumbnailUrl: p.thumbnailUrl || undefined,
+      imageWidth: p.imageWidth || undefined,
+      imageHeight: p.imageHeight || undefined,
+      imageBytes: p.imageBytes || undefined,
+      // Include enhanced content if available
+      enhancedDescription: p.enhancedDescription || undefined,
+      features: p.features ? JSON.parse(JSON.stringify(p.features)) : undefined,
+      specifications: p.specifications ? JSON.parse(JSON.stringify(p.specifications)) : undefined,
     }));
     
     return [...cachedConverted, ...aiProducts];
@@ -120,104 +154,90 @@ export class ProductCacheService {
     categoryName: string,
     limit: number
   ): Promise<CachedProduct[]> {
-    const products = await prisma.$queryRaw<any[]>`
-      SELECT 
-        id,
-        business_type as "businessType",
-        category_name as "categoryName",
-        google_category_id as "googleCategoryId",
-        product_name as "productName",
-        price_cents as "priceCents",
-        brand,
-        description,
-        sku_pattern as "skuPattern",
-        generation_source as "generationSource",
-        usage_count as "usageCount",
-        quality_score as "qualityScore",
-        created_at as "createdAt",
-        last_used_at as "lastUsedAt"
-      FROM quick_start_product_cache
-      WHERE business_type = ${businessType}
-        AND category_name = ${categoryName}
-        AND quality_score >= 0.0  -- Filter out negatively rated products
-      ORDER BY 
-        usage_count DESC,  -- Prefer frequently used products
-        quality_score DESC,  -- Then by quality
-        created_at DESC  -- Then by recency
-      LIMIT ${limit}
-    `;
-    
-    return products;
+    try {
+      // Use Prisma client to query cache
+      const products = await prisma.quick_start_product_caches.findMany({
+        where: {
+          business_type: businessType,
+          category_name: categoryName,
+          quality_score: { gte: 0.0 }
+        },
+        orderBy: [
+          { usage_count: 'desc' },
+          { quality_score: 'desc' },
+          { created_at: 'desc' }
+        ],
+        take: limit
+      });
+      
+      if (products.length > 0) {
+        console.log(`[ProductCache] Cache HIT: Found ${products.length} products for ${businessType} > ${categoryName}`);
+      } else {
+        console.log(`[ProductCache] Cache MISS: No products for ${businessType} > ${categoryName}`);
+      }
+      
+      // Convert to CachedProduct format
+      return products.map(p => ({
+        id: p.id,
+        businessType: p.business_type,
+        categoryName: p.category_name,
+        googleCategoryId: p.google_category_id,
+        productName: p.product_name,
+        priceCents: p.price_cents,
+        brand: p.brand,
+        description: p.description,
+        skuPattern: p.sku_pattern,
+        imageUrl: p.image_url,
+        thumbnailUrl: p.thumbnail_url,
+        imageWidth: p.image_width,
+        imageHeight: p.image_height,
+        imageBytes: p.image_bytes,
+        enhancedDescription: p.enhanced_description,
+        features: p.features,
+        specifications: p.specifications,
+        generationSource: p.generation_source,
+        hasImage: p.has_image,
+        imageQuality: p.image_quality,
+        usageCount: p.usage_count,
+        qualityScore: p.quality_score,
+        createdAt: p.created_at,
+        lastUsedAt: p.last_used_at,
+      }));
+    } catch (error: any) {
+      console.error('[ProductCache] Cache lookup failed:', error.message);
+      return [];
+    }
   }
   
   /**
-   * Generate products using AI (OpenAI)
+   * Generate products using AI (Multi-provider: Gemini or OpenAI)
    */
   private async generateWithAI(
     businessType: string,
     categoryName: string,
     count: number
   ): Promise<GeneratedProduct[]> {
-    // Check if OpenAI is configured
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) {
-      console.warn('[ProductCache] OpenAI API key not configured, using fallback');
-      return this.getFallbackProducts(businessType, categoryName, count);
-    }
-    
     try {
-      const OpenAI = (await import('openai')).default;
-      const openai = new OpenAI({ apiKey: openaiKey });
-      
-      const prompt = `Generate ${count} realistic products for a ${businessType} business in the category "${categoryName}".
-
-For each product, provide:
-1. name: Realistic product name (include size/quantity if relevant)
-2. price: Realistic price in cents (integer)
-3. brand: Real or realistic brand name
-4. description: 1-2 sentence description
-5. sku: Generate a realistic SKU format
-
-Requirements:
-- Products must be realistic and commonly sold
-- Prices should reflect actual market prices (in cents)
-- Use real brand names when appropriate
-- Vary the products within the category
-- Include size/quantity in product names when relevant
-
-Return ONLY a JSON object with a "products" array. No additional text.`;
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a product data expert. Return only valid JSON with a products array.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.8,
-        max_tokens: 2000
-      });
-      
-      const content = response.choices[0].message.content;
-      if (!content) {
-        throw new Error('Empty response from OpenAI');
-      }
-      
-      const data = JSON.parse(content);
-      const products = data.products || [];
+      // Use the multi-provider service (Gemini with OpenAI fallback)
+      const products = await aiProviderService.generateProducts(
+        businessType,
+        categoryName,
+        count
+      );
       
       console.log(`[ProductCache] AI generated ${products.length} products`);
       
-      // Validate products
-      return products
-        .filter((p: any) => this.validateProduct(p))
-        .slice(0, count);
+      // Convert to GeneratedProduct format (includes enhanced fields)
+      return products.map(p => ({
+        name: p.name,
+        price: p.price,
+        brand: p.brand,
+        description: p.description,
+        enhancedDescription: p.enhancedDescription,
+        features: p.features,
+        specifications: p.specifications,
+        sku: p.sku,
+      }));
       
     } catch (error: any) {
       console.error('[ProductCache] AI generation failed:', error.message);
@@ -251,39 +271,46 @@ Return ONLY a JSON object with a "products" array. No additional text.`;
     
     for (const product of products) {
       try {
-        await prisma.$executeRaw`
-          INSERT INTO quick_start_product_cache (
-            id,
-            business_type,
-            category_name,
-            google_category_id,
-            product_name,
-            price_cents,
-            brand,
-            description,
-            sku_pattern,
-            generation_source,
-            usage_count,
-            created_at
-          ) VALUES (
-            ${generateItemId()},
-            ${businessType},
-            ${categoryName},
-            ${googleCategoryId || null},
-            ${product.name},
-            ${product.price},
-            ${product.brand || null},
-            ${product.description || null},
-            ${product.sku || null},
-            'ai',
-            1,
-            CURRENT_TIMESTAMP
-          )
-          ON CONFLICT (business_type, category_name, product_name) 
-          DO UPDATE SET
-            usage_count = quick_start_product_cache.usage_count + 1,
-            last_used_at = CURRENT_TIMESTAMP
-        `;
+        await prisma.quick_start_product_caches.upsert({
+          where: {
+            unique_product_per_scenario: {
+              business_type: businessType,
+              category_name: categoryName,
+              product_name: product.name
+            }
+          },
+          create: {
+            id: generateItemId(),
+            business_type: businessType,
+            category_name: categoryName,
+            google_category_id: googleCategoryId || null,
+            product_name: product.name,
+            price_cents: product.price,
+            brand: product.brand || null,
+            description: product.description || null,
+            sku_pattern: product.sku || null,
+            // Enhanced content
+            enhanced_description: product.enhancedDescription || undefined,
+            features: product.features || undefined,
+            specifications: product.specifications || undefined,
+            // Image data (will be null for now, added in Phase 2)
+            image_url: product.imageUrl || null,
+            thumbnail_url: product.thumbnailUrl || null,
+            image_width: product.imageWidth || null,
+            image_height: product.imageHeight || null,
+            image_bytes: product.imageBytes || null,
+            has_image: !!product.imageUrl,
+            // Metadata
+            generation_source: 'ai',
+            usage_count: 1,
+            quality_score: 0.0,
+          },
+          update: {
+            usage_count: { increment: 1 },
+            last_used_at: new Date(),
+          }
+        });
+        console.log(`[ProductCache] ✓ Saved: ${product.name}`);
       } catch (error: any) {
         console.error(`[ProductCache] Failed to save product "${product.name}":`, error.message);
       }
@@ -296,13 +323,20 @@ Return ONLY a JSON object with a "products" array. No additional text.`;
   private async incrementUsageCount(productIds: string[]): Promise<void> {
     if (productIds.length === 0) return;
     
-    await prisma.$executeRaw`
-      UPDATE quick_start_product_cache
-      SET 
-        usage_count = usage_count + 1,
-        last_used_at = CURRENT_TIMESTAMP
-      WHERE id = ANY(${productIds}::text[])
-    `;
+    // Update usage count for cached products
+    for (const id of productIds) {
+      try {
+        await prisma.quick_start_product_caches.update({
+          where: { id },
+          data: {
+            usage_count: { increment: 1 },
+            last_used_at: new Date()
+          }
+        });
+      } catch (error: any) {
+        console.error(`[ProductCache] Failed to increment usage for ${id}:`, error.message);
+      }
+    }
   }
   
   /**
@@ -375,11 +409,11 @@ Return ONLY a JSON object with a "products" array. No additional text.`;
   async recordFeedback(productId: string, isPositive: boolean): Promise<void> {
     const delta = isPositive ? 0.1 : -0.1;
     
-    await prisma.$executeRaw`
+    await prisma.$executeRawUnsafe(`
       UPDATE quick_start_product_cache
-      SET quality_score = GREATEST(-1.0, LEAST(1.0, quality_score + ${delta}))
-      WHERE id = ${productId}
-    `;
+      SET quality_score = GREATEST(-1.0, LEAST(1.0, quality_score + $1))
+      WHERE id = $2
+    `, delta, productId);
   }
   
   /**
@@ -390,24 +424,24 @@ Return ONLY a JSON object with a "products" array. No additional text.`;
     byBusinessType: Record<string, number>;
     topProducts: Array<{ name: string; usageCount: number }>;
   }> {
-    const total = await prisma.$queryRaw<[{ count: bigint }]>`
+    const total = await prisma.$queryRawUnsafe<[{ count: bigint }]>(`
       SELECT COUNT(*) as count
       FROM quick_start_product_cache
-    `;
+    `);
     
-    const byType = await prisma.$queryRaw<Array<{ businessType: string; count: bigint }>>`
+    const byType = await prisma.$queryRawUnsafe<Array<{ businessType: string; count: bigint }>>(`
       SELECT business_type as "businessType", COUNT(*) as count
       FROM quick_start_product_cache
       GROUP BY business_type
       ORDER BY count DESC
-    `;
+    `);
     
-    const topProducts = await prisma.$queryRaw<Array<{ name: string; usageCount: number }>>`
+    const topProducts = await prisma.$queryRawUnsafe<Array<{ name: string; usageCount: number }>>(`
       SELECT product_name as name, usage_count as "usageCount"
       FROM quick_start_product_cache
       ORDER BY usage_count DESC
       LIMIT 10
-    `;
+    `);
     
     return {
       totalProducts: Number(total[0].count),

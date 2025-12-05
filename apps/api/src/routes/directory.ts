@@ -409,7 +409,88 @@ router.get('/:slug', async (req, res) => {
       return res.status(404).json({ error: 'listing_not_found' });
     }
 
-    return res.json(result[0]);
+    const listing = result[0];
+    
+    // Transform primary_category and secondary_categories into categories array
+    const categories = [];
+    
+    if (listing.primaryCategory) {
+      try {
+        // Handle both string and object formats
+        let primary;
+        if (typeof listing.primaryCategory === 'string') {
+          try {
+            // Try to parse as JSON first
+            primary = JSON.parse(listing.primaryCategory);
+          } catch {
+            // If not JSON, treat as plain string (category name)
+            primary = { name: listing.primaryCategory };
+          }
+        } else {
+          primary = listing.primaryCategory;
+        }
+        
+        if (primary && primary.name) {
+          // Generate slug from name if id not present
+          const slug = primary.id 
+            ? primary.id.replace('gcid:', '').replace(/_/g, '-')
+            : primary.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-');
+          
+          categories.push({
+            id: primary.id || `gcid:${slug}`,
+            name: primary.name,
+            slug: slug,
+            isPrimary: true
+          });
+        }
+      } catch (e) {
+        console.error('[Directory] Error parsing primary category:', e);
+      }
+    }
+    
+    if (listing.secondaryCategories) {
+      try {
+        let secondary;
+        if (typeof listing.secondaryCategories === 'string') {
+          try {
+            // Try to parse as JSON
+            secondary = JSON.parse(listing.secondaryCategories);
+          } catch {
+            // If not JSON, wrap in array
+            secondary = [listing.secondaryCategories];
+          }
+        } else {
+          secondary = listing.secondaryCategories;
+        }
+        
+        if (Array.isArray(secondary)) {
+          secondary.forEach((cat: any) => {
+            // Handle both string and object formats
+            const categoryData = typeof cat === 'string' ? { name: cat } : cat;
+            
+            if (categoryData && categoryData.name) {
+              const slug = categoryData.id 
+                ? categoryData.id.replace('gcid:', '').replace(/_/g, '-')
+                : categoryData.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-');
+              
+              categories.push({
+                id: categoryData.id || `gcid:${slug}`,
+                name: categoryData.name,
+                slug: slug,
+                isPrimary: false
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.error('[Directory] Error parsing secondary categories:', e);
+      }
+    }
+    
+    // Add categories array to the response
+    listing.categories = categories;
+
+    return res.json(listing);
   } catch (error: any) {
     console.error('[GET /api/directory/:slug] Error:', error);
     return res.status(500).json({ error: 'failed_to_get_listing' });

@@ -8,6 +8,29 @@ import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { Badge } from '@/components/ui';
 import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 
+// Add slider thumb styling
+const sliderStyles = `
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgb(59, 130, 246), rgb(147, 51, 234));
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    border: 3px solid white;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgb(59, 130, 246), rgb(147, 51, 234));
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    border: 3px solid white;
+  }
+`;
+
 type Scenario = {
   id: string;
   name: string;
@@ -37,15 +60,30 @@ export default function QuickStartPage() {
   const wizardBadge = getFeatureBadgeWithPermission('quick_start_wizard_full', 'canManage', 'use Quick Start');
   const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
 
-  // Fallback scenarios in case API fails
-  const fallbackScenarios: Scenario[] = [
+  // All 19 business type scenarios (aligned with backend)
+  const allScenarios: Scenario[] = [
     { id: 'grocery', name: 'Grocery Store', categoryCount: 8, sampleProductCount: 50 },
+    { id: 'pharmacy', name: 'Pharmacy', categoryCount: 6, sampleProductCount: 45 },
     { id: 'fashion', name: 'Fashion Boutique', categoryCount: 7, sampleProductCount: 40 },
-    { id: 'electronics', name: 'Electronics Store', categoryCount: 6, sampleProductCount: 30 },
-    { id: 'general', name: 'General Store', categoryCount: 5, sampleProductCount: 35 },
+    { id: 'electronics', name: 'Electronics Store', categoryCount: 6, sampleProductCount: 35 },
+    { id: 'home_garden', name: 'Home & Garden', categoryCount: 6, sampleProductCount: 40 },
+    { id: 'health_beauty', name: 'Health & Beauty', categoryCount: 5, sampleProductCount: 35 },
+    { id: 'sports_outdoors', name: 'Sports & Outdoors', categoryCount: 5, sampleProductCount: 35 },
+    { id: 'toys_games', name: 'Toys & Games', categoryCount: 5, sampleProductCount: 30 },
+    { id: 'automotive', name: 'Automotive', categoryCount: 4, sampleProductCount: 30 },
+    { id: 'books_media', name: 'Books & Media', categoryCount: 5, sampleProductCount: 30 },
+    { id: 'pet_supplies', name: 'Pet Supplies', categoryCount: 4, sampleProductCount: 30 },
+    { id: 'office_supplies', name: 'Office Supplies', categoryCount: 5, sampleProductCount: 30 },
+    { id: 'jewelry', name: 'Jewelry', categoryCount: 4, sampleProductCount: 25 },
+    { id: 'baby_kids', name: 'Baby & Kids', categoryCount: 5, sampleProductCount: 35 },
+    { id: 'arts_crafts', name: 'Arts & Crafts', categoryCount: 4, sampleProductCount: 30 },
+    { id: 'hardware_tools', name: 'Hardware & Tools', categoryCount: 5, sampleProductCount: 35 },
+    { id: 'furniture', name: 'Furniture', categoryCount: 5, sampleProductCount: 30 },
+    { id: 'restaurant', name: 'Restaurant', categoryCount: 4, sampleProductCount: 40 },
+    { id: 'general', name: 'General Store', categoryCount: 6, sampleProductCount: 40 },
   ];
 
-  const [scenarios, setScenarios] = useState<Scenario[]>(fallbackScenarios);
+  const [scenarios, setScenarios] = useState<Scenario[]>(allScenarios);
   const [eligibility, setEligibility] = useState<EligibilityResponse | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<string>('grocery');
   const [productCount, setProductCount] = useState<number>(50);
@@ -63,32 +101,10 @@ export default function QuickStartPage() {
     }
   };
 
-  // Fetch scenarios and eligibility on mount
+  // Fetch eligibility on mount
   useEffect(() => {
-    fetchScenarios();
     checkEligibility();
   }, []);
-
-  const fetchScenarios = async () => {
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const res = await fetch(`${apiUrl}/api/v1/scenarios`, {
-        headers,
-        credentials: 'include',
-      });
-      const data = await res.json();
-      setScenarios(data.scenarios);
-    } catch (err) {
-      console.error('Failed to fetch scenarios:', err);
-    }
-  };
 
   const checkEligibility = async () => {
     try {
@@ -333,9 +349,11 @@ export default function QuickStartPage() {
 
   // Show main wizard
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
+    <>
+      <style dangerouslySetInnerHTML={{ __html: sliderStyles }} />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
         {/* Page Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -519,33 +537,72 @@ export default function QuickStartPage() {
             </div>
           </div>
 
-          {/* Product Count Selection */}
+          {/* Product Count Slider */}
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-              How many products to start with?
-            </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                How many products to start with?
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+                  {productCount}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">products</span>
+              </div>
+            </div>
+            
+            {/* Slider */}
+            <div className="relative">
+              <input
+                type="range"
+                min="5"
+                max="200"
+                step="1"
+                value={productCount}
+                onChange={(e) => setProductCount(parseInt(e.target.value))}
+                className="w-full h-3 bg-gradient-to-r from-blue-200 via-purple-200 to-pink-200 dark:from-blue-900 dark:via-purple-900 dark:to-pink-900 rounded-lg appearance-none cursor-pointer slider-thumb"
+                style={{
+                  background: `linear-gradient(to right, 
+                    rgb(59, 130, 246) 0%, 
+                    rgb(147, 51, 234) ${((productCount - 5) / 195) * 100}%, 
+                    rgb(229, 231, 235) ${((productCount - 5) / 195) * 100}%, 
+                    rgb(229, 231, 235) 100%)`
+                }}
+              />
+              
+              {/* Slider Labels */}
+              <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <span>5</span>
+                <span className="text-gray-400 dark:text-gray-500">|</span>
+                <span>50</span>
+                <span className="text-gray-400 dark:text-gray-500">|</span>
+                <span>100</span>
+                <span className="text-gray-400 dark:text-gray-500">|</span>
+                <span>150</span>
+                <span className="text-gray-400 dark:text-gray-500">|</span>
+                <span>200</span>
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex gap-2 mt-4">
               {[
-                { value: 25, label: 'Small', desc: 'Perfect for testing' },
-                { value: 50, label: 'Medium', desc: 'Recommended' },
-                { value: 100, label: 'Large', desc: 'Full catalog' },
-              ].map((option) => (
+                { value: 5, label: 'Test' },
+                { value: 10, label: 'Tiny' },
+                { value: 25, label: 'Small' },
+                { value: 50, label: 'Medium' },
+                { value: 100, label: 'Large' },
+              ].map((preset) => (
                 <button
-                  key={option.value}
-                  onClick={() => setProductCount(option.value)}
-                  className={`p-4 rounded-lg border-2 transition-all duration-200 text-center ${
-                    productCount === option.value
-                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  key={preset.value}
+                  onClick={() => setProductCount(preset.value)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                    productCount === preset.value
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                    {option.value}
-                  </div>
-                  <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    {option.label}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">{option.desc}</div>
+                  {preset.label}
                 </button>
               ))}
             </div>
@@ -598,5 +655,6 @@ export default function QuickStartPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

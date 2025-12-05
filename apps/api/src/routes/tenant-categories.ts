@@ -11,6 +11,8 @@ import { requirePropagationTier } from '../middleware/tier-validation';
 import { generateQsCatId, generateQuickStart, generateUserTenantId } from '../lib/id-generator';
 import { getDirectPool } from '../utils/db-pool';
 
+console.log('🔥 TENANT CATEGORIES ROUTES MODULE LOADED');
+
 const router = Router();
 
 /**
@@ -1554,5 +1556,120 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
     res.status(500).json({ success: false, error: 'Failed to propagate business profile' });
   }
 });
+
+/**
+ * PUT /api/tenant/gbp-category
+ * Update GBP categories for a tenant
+ * Permission: Platform support OR tenant owner/admin
+ */
+router.put('/gbp-category', async (req, res) => {
+  console.log('🔥 GBP CATEGORY ENDPOINT HIT! User:', req.user?.userId, 'Role:', req.user?.role);
+  console.log('🔥 GBP CATEGORY ENDPOINT HIT!');
+  try {
+    const { tenantId, primary, secondary } = req.body;
+    console.log('[GBP Category] Request received:', { tenantId, primary, secondary });
+
+    if (!tenantId) {
+      console.log('[GBP Category] Tenant ID missing');
+      return res.status(400).json({
+        success: false,
+        error: 'tenant_required',
+        message: 'Tenant ID is required'
+      });
+    }
+
+    // Check permissions inline (user is now authenticated by middleware)
+    const user = (req as any).user;
+    const userId = user?.userId;
+    console.log('[GBP Category] User check:', { userId: userId, userRole: user?.role });
+
+    // Platform support can manage any tenant
+    const { canPerformSupportActions } = await import('../utils/platform-admin');
+    const canSupport = canPerformSupportActions(user);
+    console.log('[GBP Category] Platform support check:', canSupport);
+
+    if (!canSupport) {
+      console.log('[GBP Category] Checking tenant permissions for tenantId:', tenantId);
+      // Check tenant-level permissions
+      const userTenant = await prisma.user_tenants.findUnique({
+        where: {
+          user_id_tenant_id: {
+            user_id: userId,
+            tenant_id: tenantId,
+          },
+        },
+      });
+
+      console.log('[GBP Category] User tenant result:', userTenant);
+
+      if (!userTenant || (userTenant.role !== 'OWNER' && userTenant.role !== 'ADMIN')) {
+        console.log('[GBP Category] Permission denied');
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden',
+          message: 'Tenant owner or admin access required for this operation',
+        });
+      }
+    }
+
+    if (!primary) {
+      console.log('[GBP Category] Primary category missing');
+      return res.status(400).json({
+        success: false,
+        error: 'Primary category is required'
+      });
+    }
+
+    // Validate tenant exists
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId }
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found'
+      });
+    }
+
+    // Use the GBPCategorySyncService to sync categories
+    const { GBPCategorySyncService } = await import('../services/GBPCategorySync');
+    const syncService = new GBPCategorySyncService(getDirectPool());
+
+    const result = await syncService.syncGBPToDirectory(tenantId, {
+      primary,
+      secondary: secondary || []
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to sync GBP categories'
+      });
+    }
+
+    // Update usage statistics
+    const allCategoryIds = [primary.id, ...(secondary || []).map((s: any) => s.id)];
+    await syncService.updateUsageStats(allCategoryIds);
+
+    res.json({
+      success: true,
+      syncedCategories: result.syncedCategories,
+      unmappedCategories: result.unmappedCategories,
+      message: result.unmappedCategories.length > 0
+        ? `Synced ${result.syncedCategories} categories. ${result.unmappedCategories.length} categories need mapping.`
+        : `Successfully synced ${result.syncedCategories} categories`
+    });
+
+  } catch (error) {
+    console.error('Error updating GBP categories:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update GBP categories'
+    });
+  }
+});
+
+console.log('🔥 TENANT CATEGORIES ROUTES EXPORTED');
 
 export default router;

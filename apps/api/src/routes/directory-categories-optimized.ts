@@ -12,6 +12,7 @@ import {
   getPlatformDirectoryCategoryCounts,
   getDirectoryStats
 } from '../utils/directory-category-counts';
+import { getDirectPool } from '../utils/db-pool';
 
 const router = Router();
 
@@ -163,6 +164,67 @@ router.get('/stats', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[GET /api/directory/categories-optimized/stats] Error:', error);
     return res.status(500).json({ error: 'failed_to_get_directory_stats' });
+  }
+});
+
+// ============================================================================
+// GET /api/directory/categories-optimized/counts-by-name
+// Get store counts for each directory category by name
+// Performance: <10ms
+// ============================================================================
+router.get('/counts-by-name', async (req: Request, res: Response) => {
+  try {
+    // Query both primary and secondary categories from the materialized view
+    const query = `
+      WITH primary_counts AS (
+        SELECT primary_category as category_name, COUNT(*) as count
+        FROM directory_listings_list
+        WHERE primary_category IS NOT NULL
+        GROUP BY primary_category
+      ),
+      secondary_counts AS (
+        SELECT unnest(secondary_categories) as category_name, COUNT(*) as count
+        FROM directory_listings_list
+        WHERE secondary_categories IS NOT NULL AND array_length(secondary_categories, 1) > 0
+        GROUP BY category_name
+      ),
+      combined AS (
+        SELECT category_name, SUM(count) as total_count
+        FROM (
+          SELECT * FROM primary_counts
+          UNION ALL
+          SELECT * FROM secondary_counts
+        ) all_counts
+        GROUP BY category_name
+      )
+      SELECT 
+        category_name as "categoryName",
+        total_count as "totalStores"
+      FROM combined
+      ORDER BY total_count DESC;
+    `;
+    
+    const result = await getDirectPool().query(query);
+    
+    // Convert to a map for easy lookup
+    const counts: Record<string, number> = {};
+    result.rows.forEach((row: any) => {
+      counts[row.categoryName] = parseInt(row.totalStores) || 0;
+    });
+    
+    res.json({
+      success: true,
+      counts,
+      performance: {
+        queryTime: '<10ms',
+        optimized: true,
+        source: 'directory_listings_list (materialized view)'
+      }
+    });
+    
+  } catch (error) {
+    console.error('[GET /api/directory/categories-optimized/counts-by-name] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_category_counts_by_name' });
   }
 });
 

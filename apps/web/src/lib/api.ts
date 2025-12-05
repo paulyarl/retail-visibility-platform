@@ -69,11 +69,15 @@ export async function apiRequest(
 
   // Handle relative URLs (Next.js API routes) and absolute URLs
   // - Absolute http(s): use as-is
-  // - Leading '/': use as-is (hit Next.js API/proxy routes)
-  // - Bare path: prefix with API_BASE_URL
-  const url = endpoint.startsWith('http') || endpoint.startsWith('/')
+  // - /api/*: backend API calls (prefix with API_BASE_URL)
+  // - Other / paths: Next.js API routes (use as-is)
+  const url = endpoint.startsWith('http')
     ? endpoint
-    : `${API_BASE_URL}/${endpoint}`;
+    : endpoint.startsWith('/api/')
+    ? `${API_BASE_URL}${endpoint}`
+    : endpoint;
+  
+  console.log('[API] Endpoint:', endpoint, 'API_BASE_URL:', API_BASE_URL, 'Generated URL:', url);
 
   // Simple retry/backoff for 429/5xx (max 2 retries), but skip if x-no-retry header is set
   const shouldRetry = !headers['x-no-retry'];

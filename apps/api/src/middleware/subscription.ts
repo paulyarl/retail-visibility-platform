@@ -265,8 +265,10 @@ export async function requireWritableSubscription(
 ) {
   try {
     const tenantId = req.query.tenantId as string || req.body?.tenantId;
+    console.log('[requireWritableSubscription] Method:', req.method, 'Path:', req.path, 'tenantId found:', !!tenantId, 'value:', tenantId);
 
     if (!tenantId) {
+      console.log('[requireWritableSubscription] No tenantId found, returning 400');
       return res.status(400).json({
         error: "tenant_required",
         message: "Tenant ID is required",

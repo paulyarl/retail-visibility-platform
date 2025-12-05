@@ -85,28 +85,8 @@ export default function DirectoryCategoryBrowser({
                 {category.name}
               </h3>
               <div className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
-                {/* Show primary/secondary breakdown if available */}
-                {category.primaryStoreCount !== undefined && category.secondaryStoreCount !== undefined ? (
-                  <>
-                    <span className="font-medium text-blue-600 dark:text-blue-400">
-                      {category.primaryStoreCount} specialized
-                    </span>
-                    {category.secondaryStoreCount > 0 && (
-                      <span className="text-neutral-500">
-                        {' + '}{category.secondaryStoreCount} also carry
-                      </span>
-                    )}
-                    <div className="mt-0.5">
-                      {category.productCount} {category.productCount === 1 ? 'product' : 'products'}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {category.storeCount} {category.storeCount === 1 ? 'store' : 'stores'}
-                    {' · '}
-                    {category.productCount} {category.productCount === 1 ? 'product' : 'products'}
-                  </>
-                )}
+                {/* For directory listing categories (store types), just show store count */}
+                {category.storeCount} {category.storeCount === 1 ? 'store' : 'stores'}
               </div>
             </div>
           </button>

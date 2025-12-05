@@ -148,10 +148,10 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
               )}
             </div>
 
-            {/* Category - Context-aware display */}
-            {(contextCategory || listing.category?.name || listing.gbpPrimaryCategoryName) && (
+            {/* Category - Show GBP primary category (store type) */}
+            {(contextCategory || listing.gbpPrimaryCategoryName || listing.primaryCategory) && (
               <p className="text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
-                {contextCategory || listing.category?.name || listing.gbpPrimaryCategoryName}
+                {contextCategory || listing.gbpPrimaryCategoryName || listing.primaryCategory}
               </p>
             )}
 

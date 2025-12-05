@@ -10,6 +10,7 @@ import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductDisplay from '@/components/storefront/ProductDisplay';
 import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
 import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
+import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 import LocationClosedBanner from '@/components/storefront/LocationClosedBanner';

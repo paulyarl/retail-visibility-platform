@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Heart, Printer, Share2 } from 'lucide-react';
 
 interface DirectoryActionsProps {
   listing: {
@@ -8,15 +9,52 @@ interface DirectoryActionsProps {
     slug: string;
     tenantId?: string;
     description?: string;
+    id?: string;
   };
   currentUrl: string;
 }
 
 export default function DirectoryActions({ listing, currentUrl }: DirectoryActionsProps) {
   const [showShareOptions, setShowShareOptions] = useState(false);
+  const [favorited, setFavorited] = useState(false);
+  const [favoriteCount, setFavoriteCount] = useState(0);
 
   const shareText = `Check out ${listing.business_name} in our business directory!`;
   const shareUrl = currentUrl;
+
+  // Load favorite status from localStorage
+  useEffect(() => {
+    const favorites = JSON.parse(localStorage.getItem('directory_favorites') || '{}');
+    setFavorited(!!favorites[listing.slug]);
+    
+    // Load favorite count (mock for now - could be from API)
+    const counts = JSON.parse(localStorage.getItem('directory_favorite_counts') || '{}');
+    setFavoriteCount(counts[listing.slug] || 0);
+  }, [listing.slug]);
+
+  const handleFavorite = () => {
+    const favorites = JSON.parse(localStorage.getItem('directory_favorites') || '{}');
+    const counts = JSON.parse(localStorage.getItem('directory_favorite_counts') || '{}');
+    
+    if (favorited) {
+      delete favorites[listing.slug];
+      counts[listing.slug] = Math.max(0, (counts[listing.slug] || 0) - 1);
+      setFavorited(false);
+      setFavoriteCount(counts[listing.slug]);
+    } else {
+      favorites[listing.slug] = true;
+      counts[listing.slug] = (counts[listing.slug] || 0) + 1;
+      setFavorited(true);
+      setFavoriteCount(counts[listing.slug]);
+    }
+    
+    localStorage.setItem('directory_favorites', JSON.stringify(favorites));
+    localStorage.setItem('directory_favorite_counts', JSON.stringify(counts));
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   const handleShare = async () => {
     if (navigator.share) {
@@ -42,21 +80,43 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
   };
 
   return (
-    <div className="relative">
+    <div className="flex items-center gap-2">
+      {/* Favorite Button with Count */}
       <button
-        onClick={handleShare}
-        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        title="Share this business"
+        onClick={handleFavorite}
+        className="flex items-center gap-1 p-2 hover:bg-gray-100 rounded-lg transition-colors group"
+        title={favorited ? "Remove from favorites" : "Add to favorites"}
       >
-        <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
-          />
-        </svg>
+        <Heart 
+          className={`w-5 h-5 transition-colors ${
+            favorited 
+              ? 'fill-red-500 text-red-500' 
+              : 'text-gray-600 group-hover:text-red-500'
+          }`}
+        />
+        {favoriteCount > 0 && (
+          <span className="text-xs font-medium text-gray-600">{favoriteCount}</span>
+        )}
       </button>
+
+      {/* Print Button */}
+      <button
+        onClick={handlePrint}
+        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        title="Print this page"
+      >
+        <Printer className="w-5 h-5 text-gray-600" />
+      </button>
+
+      {/* Share Button */}
+      <div className="relative">
+        <button
+          onClick={handleShare}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Share this business"
+        >
+          <Share2 className="w-5 h-5 text-gray-600" />
+        </button>
 
       {showShareOptions && (
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
@@ -109,6 +169,7 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

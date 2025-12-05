@@ -35,10 +35,19 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; label: string
   const specialHours = hours.special as any[] | undefined;
   const todaySpecials = specialHours?.filter((sh: any) => sh.date === todayDate) || [];
   
+  // console.log('[StoreStatus] Checking hours for tenant:', {
+  //   todayDate,
+  //   todayName,
+  //   specialHoursCount: specialHours?.length || 0,
+  //   todaySpecialsCount: todaySpecials.length,
+  //   todaySpecials: todaySpecials.map(sh => ({ date: sh.date, isClosed: sh.isClosed, note: sh.note }))
+  // });
+  
   // If any special hour is marked as closed, the store is closed all day
   const closedSpecial = todaySpecials.find((sh: any) => sh.isClosed);
   if (closedSpecial) {
     const note = closedSpecial.note ? ` (${closedSpecial.note})` : '';
+    // console.log('[StoreStatus] Store closed due to special hours:', closedSpecial);
     return { isOpen: false, label: `Closed today (special hours)${note}` };
   }
   

@@ -123,9 +123,51 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
   }
 
   const canPublish = !!primaryCategory && !!listing.businessProfile?.businessName;
+  
+  // Determine what's blocking publication
+  const missingBusinessName = !listing.businessProfile?.businessName;
+  const missingPrimaryCategory = !primaryCategory;
 
   return (
     <div className="space-y-8">
+      {/* Publication Requirements Alert */}
+      {!canPublish && !listing.isPublished && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 rounded-r-lg">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Complete these requirements to publish your listing
+              </h3>
+              <div className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                <ul className="list-disc list-inside space-y-1">
+                  {missingBusinessName && (
+                    <li>
+                      <strong>Business Name:</strong> Add your business name in{' '}
+                      <a 
+                        href={`/t/${tenantId}/settings/profile`}
+                        className="underline hover:text-amber-900 dark:hover:text-amber-100"
+                      >
+                        Business Profile Settings
+                      </a>
+                    </li>
+                  )}
+                  {missingPrimaryCategory && (
+                    <li>
+                      <strong>Primary Category:</strong> Select a primary category below
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -255,16 +297,24 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
                 onClick={handlePublish}
                 disabled={isSaving || !canPublish}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={!canPublish ? 'Select a primary category to publish' : ''}
+                title={
+                  !canPublish 
+                    ? missingBusinessName && missingPrimaryCategory
+                      ? 'Complete business profile and select primary category'
+                      : missingBusinessName
+                      ? 'Add business name in profile settings'
+                      : 'Select a primary category'
+                    : ''
+                }
               >
                 Publish
               </button>
             )}
           </div>
 
-          {!canPublish && (
-            <p className="text-sm text-amber-600 dark:text-amber-400">
-              ⚠️ Complete your business profile and select a primary category to publish
+          {saveMessage && (
+            <p className={`text-sm ${saveMessage.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}>
+              {saveMessage}
             </p>
           )}
         </div>

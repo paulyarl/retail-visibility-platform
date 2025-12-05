@@ -220,8 +220,20 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 // Serve uploads statically in both dev and production for MVP
 app.use("/uploads", express.static(UPLOAD_DIR));
 
-/* ----------------------------- health ----------------------------- */
-import healthRoutes from './routes/health';
+/* ------------------------------ tenants ------------------------------ */
+import tenantCategoriesRoutes from './routes/tenant-categories';
+
+// Health check route
+const healthRoutes = (req: any, res: any) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    version: process.env.npm_package_version || 'unknown'
+  });
+};
+
 app.use('/health', healthRoutes);
 
 /* ------------------------------ TENANTS ------------------------------ */
@@ -916,7 +928,7 @@ const tenantProfileSchema = z.object({
   map_privacy_mode: z.enum(["precise","neighborhood"]).optional(),
 });
 
-app.post("/tenant/profile", authenticateToken, async (req, res) => {
+app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
   const parsed = tenantProfileSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     console.error('[POST /tenant/profile] Validation failed:', parsed.error.flatten());
@@ -1061,8 +1073,8 @@ app.post("/tenant/profile", authenticateToken, async (req, res) => {
   }
 });
 
-// GET /tenant/profile - retrieve normalized profile
-app.get("/tenant/profile", authenticateToken, async (req, res) => {
+// GET /api/tenant/profile - retrieve normalized profile
+app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
   try {
     const tenant_id = (req.query.tenant_id as string) || (req.query.tenant_id as string);
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
@@ -1136,9 +1148,9 @@ app.get("/tenant/profile", authenticateToken, async (req, res) => {
 // PUT /api/tenant/gbp-category - update GBP categories
 app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
   try {
-    const { tenant_id, primary, secondary } = req.body;
+    const { tenantId, primary, secondary } = req.body;
     
-    if (!tenant_id) {
+    if (!tenantId) {
       return res.status(400).json({ error: "tenant_required" });
     }
     
@@ -1146,7 +1158,7 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "primary_category_required" });
     }
     
-    console.log('[PUT /api/tenant/gbp-category] Updating GBP categories for tenant:', tenant_id);
+    console.log('[PUT /api/tenant/gbp-category] Updating GBP categories for tenant:', tenantId);
     console.log('[PUT /api/tenant/gbp-category] Primary:', primary);
     console.log('[PUT /api/tenant/gbp-category] Secondary:', secondary);
     
@@ -1195,7 +1207,7 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
            gbp_category_last_mirrored = NOW(),
            updated_at = NOW()
        WHERE tenant_id = $3`,
-      [primary.id, primary.name, tenant_id]
+      [primary.id, primary.name, tenantId]
     );
     
     console.log('[PUT /api/tenant/gbp-category] Business profile updated successfully');
@@ -1217,23 +1229,20 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
        SET metadata = COALESCE(metadata, '{}'::jsonb) || 
          jsonb_build_object('gbp_categories', $1::jsonb)
        WHERE id = $2`,
-      [JSON.stringify(gbpMetadata), tenant_id]
+      [JSON.stringify(gbpMetadata), tenantId]
     );
     
     console.log('[PUT /api/tenant/gbp-category] Metadata updated with primary and secondary categories');
     
     // NEW: Update junction table with clean relational design
     // Delete existing categories for this tenant
-    await pool.query('DELETE FROM tenant_gbp_categories WHERE tenant_id = $1', [tenant_id]);
+    await pool.query('DELETE FROM tenant_gbp_categories WHERE tenant_id = $1', [tenantId]);
     
     // Insert primary category
     await pool.query(
       `INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type)
-       VALUES ($1, $2, 'primary')
-       ON CONFLICT (tenant_id, category_type) DO UPDATE SET
-         gbp_category_id = EXCLUDED.gbp_category_id,
-         updated_at = NOW()`,
-      [tenant_id, primary.id]
+       VALUES ($1, $2, 'primary')`,
+      [tenantId, primary.id]
     );
     
     console.log('[PUT /api/tenant/gbp-category] Primary category added to junction table');
@@ -1243,9 +1252,8 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
       for (const secCategory of secondary) {
         await pool.query(
           `INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type)
-           VALUES ($1, $2, 'secondary')
-           ON CONFLICT (tenant_id, gbp_category_id, category_type) DO NOTHING`,
-          [tenant_id, secCategory.id]
+           VALUES ($1, $2, 'secondary')`,
+          [tenantId, secCategory.id]
         );
       }
       console.log(`[PUT /api/tenant/gbp-category] ${secondary.length} secondary categories added to junction table`);
@@ -1255,16 +1263,14 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
     // Delete existing associations
     await pool.query(
       'DELETE FROM gbp_listing_categories WHERE listing_id = $1',
-      [tenant_id]
+      [tenantId]
     );
     
     // Insert primary category
     await pool.query(
       `INSERT INTO gbp_listing_categories (listing_id, gbp_category_id, is_primary)
-       VALUES ($1, $2, true)
-       ON CONFLICT (listing_id, gbp_category_id) DO UPDATE
-       SET is_primary = EXCLUDED.is_primary`,
-      [tenant_id, primary.id]
+       VALUES ($1, $2, true)`,
+      [tenantId, primary.id]
     );
     
     // Insert secondary categories
@@ -1272,10 +1278,8 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
       for (const cat of secondary) {
         await pool.query(
           `INSERT INTO gbp_listing_categories (listing_id, gbp_category_id, is_primary)
-           VALUES ($1, $2, false)
-           ON CONFLICT (listing_id, gbp_category_id) DO UPDATE
-           SET is_primary = EXCLUDED.is_primary`,
-          [tenant_id, cat.id]
+           VALUES ($1, $2, false)`,
+          [tenantId, cat.id]
         );
       }
     }
@@ -1439,17 +1443,19 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
       if (specialHours && specialHours.length > 0) {
         hoursByDay.special = specialHours.map((sh: any) => ({
           date: sh.date.toISOString().split('T')[0], // YYYY-MM-DD format
-          isClosed: sh.is_closed,
+          isClosed: sh.isClosed || sh.is_closed || false,  // ✅ Handle both camelCase and snake_case
           open: sh.open,
           close: sh.close,
           note: sh.note
         }));
+        // console.log('[Profile API] Special hours raw data:', specialHours.map(sh => ({ isClosed: sh.isClosed, is_closed: sh.is_closed, date: sh.date })));
+        // console.log('[Profile API] Special hours processed:', hoursByDay.special);
       }
       
       hoursData = hoursByDay;
-      console.log('[Profile API] Business hours for', tenant_id, ':', JSON.stringify(hoursData));
+      // console.log('[Profile API] Business hours for', tenant_id, ':', JSON.stringify(hoursData));
     } else {
-      console.log('[Profile API] No business hours found for', tenant_id);
+      // console.log('[Profile API] No business hours found for', tenant_id);
     }
     
     const md = (tenant.metadata as any) || {};
@@ -1472,6 +1478,7 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
       business_description: bp?.business_description || md.business_description || null,
       hours: hoursData || bp?.hours || md.hours || null,
       social_links: bp?.social_links || md.social_links || null,
+      metadata: tenant.metadata || null, // Include metadata for GBP categories
     };
     return res.json(profile);
   } catch (e: any) {
@@ -1583,24 +1590,92 @@ app.get("/api/categories/product-level/:tenant_id", async (req, res) => {
     const { tenant_id } = req.params;
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
     
-    // Import category count utility
-    const { getCategoryCounts } = await import('./utils/category-counts');
+    // Use direct database pool to avoid Prisma issues
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
     
-    // Get all categories from materialized view (these are product-level categories from directory_categories_list)
-    const productCategories = await getCategoryCounts(tenant_id, false);
+    // Query categories with product counts directly from inventory_items
+    // Group by slug to handle duplicate categories with same slug
+    const result = await pool.query(
+      `SELECT
+        slug,
+        SUM(count) as count,
+        -- Pick the first category by name for each slug group
+        (SELECT json_build_object(
+          'id', dc.id,
+          'name', dc.name,
+          'slug', dc.slug,
+          'googleCategoryId', dc."googleCategoryId"
+        )
+        FROM directory_category dc
+        WHERE dc.slug = category_counts.slug
+          AND dc."tenantId" = $1
+          AND dc."isActive" = true
+        ORDER BY dc.name
+        LIMIT 1) as category
+      FROM (
+        SELECT
+          dc.slug,
+          COUNT(DISTINCT ii.id)::int as count
+        FROM directory_category dc
+        INNER JOIN inventory_items ii ON ii.directory_category_id = dc.id
+        WHERE dc."tenantId" = $1
+          AND dc."isActive" = true
+          AND ii.tenant_id = $1
+          AND ii.item_status = 'active'
+          AND ii.visibility = 'public'
+        GROUP BY dc.slug
+        HAVING COUNT(DISTINCT ii.id) > 0
+      ) category_counts
+      GROUP BY slug
+      ORDER BY slug`,
+      [tenant_id]
+    );
     
-    // Get actual total product count (distinct count, not sum of categories)
-    const { getTotalProductCount } = await import('./utils/category-counts');
-    const totalProducts = await getTotalProductCount(tenant_id, false);
+    // Get total product count (ALL active/public products, including uncategorized)
+    const totalProductsResult = await pool.query(
+      `SELECT COUNT(*)::int as count
+       FROM inventory_items ii
+       WHERE ii.tenant_id = $1
+         AND ii.item_status = 'active'
+         AND ii.visibility = 'public'`,
+      [tenant_id]
+    );
+    const totalProducts = totalProductsResult.rows[0]?.count || 0;
     
-    // Clean response to avoid field duplication
+    // Debug: Check for uncategorized products
+    const uncategorizedResult = await pool.query(
+      `SELECT COUNT(*)::int as count
+       FROM inventory_items ii
+       WHERE ii.tenant_id = $1
+         AND ii.item_status = 'active'
+         AND ii.visibility = 'public'
+         AND ii.directory_category_id IS NULL`,
+      [tenant_id]
+    );
+    const uncategorizedCount = uncategorizedResult.rows[0]?.count || 0;
+    
+    if (uncategorizedCount > 0) {
+      console.log(`[Product Categories] Tenant ${tenant_id} has ${uncategorizedCount} uncategorized products`);
+    }
+    
+    // Transform to expected format
+    const categories = result.rows.map(cat => ({
+      id: cat.category.id,
+      name: cat.category.name,
+      slug: cat.category.slug,
+      googleCategoryId: cat.category.googleCategoryId,
+      count: parseInt(cat.count),
+      category_type: 'tenant'
+    }));
+    
     const cleanResponse = {
       success: true,
       data: {
         tenant_id: tenant_id,
-        categories: productCategories,
+        categories: categories,
         summary: {
-          total_categories: productCategories.length,
+          total_categories: categories.length,
           total_products: totalProducts,
           category_type: 'product-level'
         }
@@ -1614,6 +1689,130 @@ app.get("/api/categories/product-level/:tenant_id", async (req, res) => {
   } catch (e: any) {
     console.error("[GET /api/categories/product-level/:tenant_id] Error:", e);
     return res.status(500).json({ error: "failed_to_get_product_categories" });
+  }
+});
+
+// Diagnostic endpoint for category count investigation
+app.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+    
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
+    
+    // 1. Check raw inventory_items data
+    const rawProductsResult = await pool.query(`
+      SELECT 
+        directory_category_id,
+        COUNT(*) as total_count,
+        COUNT(CASE WHEN item_status = 'active' AND visibility = 'public' THEN 1 END) as active_public_count
+      FROM inventory_items 
+      WHERE tenant_id = $1
+      GROUP BY directory_category_id
+      ORDER BY directory_category_id
+    `, [tenant_id]);
+    
+    // 2. Check directory_category data
+    const categoriesResult = await pool.query(`
+      SELECT id, name, slug, "isActive", "tenantId"
+      FROM directory_category 
+      WHERE "tenantId" = $1
+      ORDER BY name
+    `, [tenant_id]);
+    
+    // 3. Check JOIN results (our current count query)
+    const joinCountResult = await pool.query(`
+      SELECT 
+        dc.id,
+        dc.name,
+        dc.slug,
+        COUNT(DISTINCT ii.id)::int as count
+      FROM directory_category dc
+      INNER JOIN inventory_items ii ON ii.directory_category_id = dc.id
+      WHERE dc."tenantId" = $1
+        AND dc."isActive" = true
+        AND ii.tenant_id = $1
+        AND ii.item_status = 'active'
+        AND ii.visibility = 'public'
+      GROUP BY dc.id, dc.name, dc.slug
+      ORDER BY dc.name
+    `, [tenant_id]);
+    
+    // 4. Check storefront filter query (what actually returns products)
+    const storefrontFilterResult = await pool.query(`
+      SELECT 
+        dc.id,
+        dc.name,
+        dc.slug,
+        COUNT(DISTINCT ii.id)::int as count
+      FROM inventory_items ii
+      LEFT JOIN directory_category dc ON dc.id = ii.directory_category_id
+      WHERE ii.tenant_id = $1
+        AND ii.item_status = 'active'
+        AND ii.visibility = 'public'
+        AND dc."tenantId" = $1
+        AND dc."isActive" = true
+      GROUP BY dc.id, dc.name, dc.slug
+      ORDER BY dc.name
+    `, [tenant_id]);
+    
+    // 5. Check for any products with invalid category IDs
+    const invalidCategoriesResult = await pool.query(`
+      SELECT 
+        COUNT(*) as count,
+        array_agg(DISTINCT directory_category_id) as invalid_category_ids
+      FROM inventory_items 
+      WHERE tenant_id = $1
+        AND directory_category_id IS NOT NULL
+        AND directory_category_id NOT IN (
+          SELECT id FROM directory_category WHERE "tenantId" = $1
+        )
+    `, [tenant_id]);
+    
+    // 6. Check materialized view if it exists
+    let mvResult = null;
+    try {
+      mvResult = await pool.query(`
+        SELECT 
+          category_id,
+          category_name,
+          category_slug,
+          product_count
+        FROM storefront_category_counts
+        WHERE tenant_id = $1
+          AND category_type = 'tenant'
+        ORDER BY category_name
+      `, [tenant_id]);
+    } catch (mvError) {
+      console.log('Materialized view not accessible:', (mvError as Error)?.message || 'Unknown error');
+    }
+    
+    const diagnostic = {
+      tenant_id,
+      timestamp: new Date().toISOString(),
+      raw_products: rawProductsResult.rows,
+      categories: categoriesResult.rows,
+      join_counts: joinCountResult.rows,
+      storefront_filter_counts: storefrontFilterResult.rows,
+      invalid_categories: invalidCategoriesResult.rows[0],
+      materialized_view: mvResult?.rows || null,
+      summary: {
+        total_raw_products: rawProductsResult.rows.reduce((sum, r) => sum + parseInt(r.total_count), 0),
+        total_active_public: rawProductsResult.rows.reduce((sum, r) => sum + parseInt(r.active_public_count), 0),
+        total_categories: categoriesResult.rows.length,
+        total_with_valid_categories: joinCountResult.rows.reduce((sum, r) => sum + parseInt(r.count), 0),
+        has_invalid_categories: invalidCategoriesResult.rows[0].count > 0
+      }
+    };
+    
+    res.json({
+      success: true,
+      data: diagnostic
+    });
+  } catch (e: any) {
+    console.error("[Diagnostic] Error:", e);
+    return res.status(500).json({ error: "diagnostic_failed", message: e.message });
   }
 });
 
@@ -1836,9 +2035,9 @@ app.get("/api/public/features-showcase-config", async (req, res) => {
   }
 });
 
-// PATCH /tenant/profile - partial update
+// PATCH /api/tenant/profile - partial update
 const tenantProfileUpdateSchema = tenantProfileSchema.partial().extend({ tenant_id: z.string().min(1) });
-app.patch("/tenant/profile", authenticateToken, async (req, res) => {
+app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
   const parsed = tenantProfileUpdateSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
@@ -2462,6 +2661,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 /* --------------------------- ITEMS / INVENTORY --------------------------- */
 const listQuery = z.object({
   tenant_id: z.string().min(1).optional(),
+  tenantId: z.string().min(1).optional(), // Accept camelCase variant
   count: z.string().optional(), // Return only count for performance
   page: z.string().optional(), // Page number (1-indexed)
   limit: z.string().optional(), // Items per page
@@ -2473,7 +2673,7 @@ const listQuery = z.object({
   sortOrder: z.enum(['asc', 'desc']).optional(),
 }).transform((data) => ({
   ...data,
-  tenant_id: data.tenant_id, // Use tenant_id
+  tenant_id: data.tenant_id || data.tenantId, // Accept both snake_case and camelCase
 }));
 
 app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateToken, async (req, res) => {
@@ -2593,37 +2793,41 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
       orderBy[sortBy] = sortOrder;
     }
     
-    // Fetch items with pagination (includes category relation for better UX)
+    // Fetch items with pagination
     const [items, totalCount] = await Promise.all([
       prisma.inventory_items.findMany({
         where,
         orderBy,
         skip,
         take: limit,
-        include: {
-          // TODO: Add directoryCategory relationship to Prisma schema
-          // directoryCategory: {
-          //   select: {
-          //     id: true,
-          //     name: true,
-          //     slug: true,
-          //     googleCategoryId: true,
-          //   },
-          // },
-        },
       }),
       prisma.inventory_items.count({ where }),
     ]);
     
+    // Fetch all unique category IDs from items
+    const categoryIds = [...new Set(items.map(item => item.directory_category_id).filter(Boolean))];
+    const categories = categoryIds.length > 0 
+      ? await prisma.directory_category.findMany({
+          where: { id: { in: categoryIds as string[] } },
+          select: { id: true, name: true, slug: true, googleCategoryId: true }
+        })
+      : [];
+    
+    // Create a category lookup map
+    const categoryMap = new Map(categories.map(cat => [cat.id, cat]));
+    
     // Return paginated response
     // Hide price_cents from frontend since price is the authoritative field
-    const itemsWithoutPriceCents = items.map((item: { [x: string]: any; price?: any; price_cents?: any; }) => {
-      const { price_cents, ...itemWithoutPriceCents } = item;
+    // Map directory_category_id to tenantCategoryId and include category object
+    const itemsWithoutPriceCents = items.map((item: { [x: string]: any; price?: any; price_cents?: any; directory_category_id?: any; }) => {
+      const { price_cents, directory_category_id, ...itemWithoutPriceCents } = item;
+      const category = directory_category_id ? categoryMap.get(directory_category_id) : null;
+      
       return {
         ...itemWithoutPriceCents,
         price: item.price !== null && item.price !== undefined ? Number(item.price) : null,
-        // TODO: Add directoryCategory back when relationship is added
-        // directoryCategory: item.directoryCategory || null,
+        tenantCategoryId: directory_category_id || null,
+        tenantCategory: category || null,
       };
     });
 
@@ -2791,8 +2995,13 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     }
     
     // Map camelCase to snake_case for directory_category_id
-    if (tenantCategoryId !== undefined || directory_category_id !== undefined) {
-      updateData.directory_category_id = directory_category_id || tenantCategoryId;
+    // CRITICAL: Must explicitly set this field as it was destructured out of rest
+    if (tenantCategoryId !== undefined) {
+      updateData.directory_category_id = tenantCategoryId;
+      console.log('[PUT /items/:id] Setting directory_category_id from tenantCategoryId:', tenantCategoryId);
+    } else if (directory_category_id !== undefined) {
+      updateData.directory_category_id = directory_category_id;
+      console.log('[PUT /items/:id] Setting directory_category_id from directory_category_id:', directory_category_id);
     }
     
     // Handle stock updates
@@ -2828,6 +3037,8 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       return res.status(404).json({ error: 'item_not_found' });
     }
     
+    console.log('[PUT /items/:id] Database returned directory_category_id:', updated.directory_category_id);
+    
     await audit({ tenantId: updated.tenant_id, actor: null, action: "inventory.update", payload: { id: updated.id } });
     
     // Convert Decimal price to number and hide price_cents for frontend compatibility
@@ -2836,6 +3047,8 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       ...itemWithoutPriceCents,
       price: updated.price !== null && updated.price !== undefined ? Number(updated.price) : null,
     };
+    
+    console.log('[PUT /items/:id] Sending to frontend directory_category_id:', transformed.directory_category_id);
     
     res.json(transformed);
   } catch (error) {
@@ -4185,6 +4398,10 @@ console.log('✅ GBP routes mounted (Google Business Profile category search)');
 /* ------------------------------ tenants ------------------------------ */
 app.use('/api/tenants', tenantsRoutes);
 console.log('✅ Tenants routes mounted at /api/tenants');
+
+/* ------------------------------ tenant categories (GBP) ------------------------------ */
+app.use('/api/tenant', authenticateToken, tenantCategoriesRoutes);
+console.log('✅ Tenant categories routes mounted at /api/tenant');
 
 /* ------------------------------ product likes ------------------------------ */
 app.use('/api/products', productLikesRoutes);

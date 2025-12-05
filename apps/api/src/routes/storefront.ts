@@ -92,22 +92,11 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const params: any[] = [tenantId];
     let paramIndex = 2;
     
-    // Category filter
+    // Category filter - filter by directory_category slug
     if (category && typeof category === 'string') {
-      // Check if this is a store-level category (GBP/Platform) or product-level category
-      // Product categories have slugs like "books-media", store categories have names like "Electronics store"
-      const isProductLevelCategory = category.includes('-') && !category.includes(' ');
-      
-      if (isProductLevelCategory) {
-        // Product-level category: filter by directory_categories_list slug
-        conditions.push(`dcl.slug = $${paramIndex}`);
-        params.push(category);
-        paramIndex++;
-      } else {
-        // Store-level category (GBP/Platform): return all products (no category filter)
-        // These categories inherit all store products, so no filtering needed
-        console.log(`[Storefront] Store-level category detected: ${category} - returning all products`);
-      }
+      conditions.push(`dc.slug = $${paramIndex}`);
+      params.push(category);
+      paramIndex++;
     }
     
     // Search filter (name or SKU)
@@ -148,17 +137,19 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         custom_branding,
         custom_sections,
         landing_page_theme,
-        dcl.id as category_id,
-        dcl.name as category_name,
-        dcl.slug as category_slug,
-        dcl.google_category_id,
+        dc.id as category_id,
+        dc.name as category_name,
+        dc.slug as category_slug,
+        dc."googleCategoryId" as google_category_id,
         CASE WHEN ii.image_url IS NOT NULL THEN true ELSE false END as has_image,
         CASE WHEN (ii.stock > 0 OR ii.quantity > 0) THEN true ELSE false END as in_stock,
         CASE WHEN array_length(ii.image_gallery, 1) > 0 THEN true ELSE false END as has_gallery,
         ii.created_at,
         ii.updated_at
       FROM inventory_items ii
-      LEFT JOIN platform_categories dcl ON dcl.id = ii.directory_category_id
+      INNER JOIN directory_category dc ON dc.id = ii.directory_category_id
+        AND dc."tenantId" = ii.tenant_id
+        AND dc."isActive" = true
       WHERE ${whereClause}
       ORDER BY ii.updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -167,7 +158,9 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const countQuery = `
       SELECT COUNT(*) as count
       FROM inventory_items ii
-      LEFT JOIN platform_categories dcl ON dcl.id = ii.directory_category_id
+      INNER JOIN directory_category dc ON dc.id = ii.directory_category_id
+        AND dc."tenantId" = ii.tenant_id
+        AND dc."isActive" = true
       WHERE ${whereClause}
     `;
     
@@ -178,6 +171,11 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     ]);
     
     const totalCount = parseInt(countResult.rows[0]?.count || '0');
+    
+    // Debug logging for category mismatches
+    if (category) {
+      console.log(`[Storefront] Category: ${category}, Count: ${totalCount}, Returned: ${itemsResult.rows.length}`);
+    }
     
     // Transform to camelCase for frontend compatibility
     const items = itemsResult.rows.map((row: any) => ({
