@@ -9,6 +9,7 @@ import StoreRatingsSection from '@/components/directory/StoreRatingsSection';
 import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
 import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
 import BusinessHoursDisplay from '@/components/shared/BusinessHoursDisplay';
+import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 
 interface StoreDetailPageProps {
@@ -773,28 +774,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
                     Location
                   </h2>
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="w-full h-64 rounded-lg overflow-hidden mb-3">
-                      <iframe
-                        width="100%"
-                        height="100%"
-                        style={{ border: 0 }}
-                        loading="lazy"
-                        allowFullScreen
-                        referrerPolicy="no-referrer-when-downgrade"
-                        src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}&q=${encodeURIComponent(listing.address)}`}
-                        title="Store Location"
-                      />
-                    </div>
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(listing.address)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                    >
-                      Get Directions
-                    </a>
-                  </div>
+                  <GoogleMapEmbed address={listing.address} />
                 </div>
               )}
             </div>
