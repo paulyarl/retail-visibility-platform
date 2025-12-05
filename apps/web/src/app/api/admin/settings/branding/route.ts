@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
+// Debug: Log what env vars are available
+console.log('[Branding Route] API_BASE_URL:', process.env.API_BASE_URL);
+console.log('[Branding Route] NEXT_PUBLIC_API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL);
+
+const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+console.log('[Branding Route] Using API_BASE_URL:', API_BASE_URL);
 
 export async function GET(req: NextRequest) {
   try {
