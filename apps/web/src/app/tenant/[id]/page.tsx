@@ -432,7 +432,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                       .map((category: Category) => (
                         <Link
                           key={category.id}
-                          href={getCategoryUrl(category)}
+                          href={getCategoryUrl(category, "/directory/stores")}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:shadow-md hover:scale-105 ${
                             category.is_primary
                               ? 'bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600 hover:border-blue-400 dark:hover:border-blue-500'

@@ -618,7 +618,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                     {listing.categories && listing.categories.length > 0 && (
                       <GBPCategoryBadges 
                         categories={listing.categories}
-                        basePath="/directory/categories"
+                        basePath="/directory/stores"
                         size="md"
                         className="mb-4"
                       />
