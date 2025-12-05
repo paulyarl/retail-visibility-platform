@@ -691,7 +691,11 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   {listing.email && (
                     <div className="flex items-center gap-2 mb-3">
                       <Mail className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                      <a href={`mailto:${listing.email}`} className="text-sm text-blue-600 hover:text-blue-700">
+                      <a 
+                        href={`mailto:${listing.email}`} 
+                        className="text-sm text-blue-600 hover:text-blue-700"
+                        suppressHydrationWarning
+                      >
                         {listing.email}
                       </a>
                     </div>
