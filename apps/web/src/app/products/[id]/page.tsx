@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import ProductGallery from '@/components/products/ProductGallery';
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
-import { BackToInventoryButton } from '@/components/products/BackToInventoryButton';
+import { ProductNavigation } from '@/components/products/ProductNavigation';
 import { computeStoreStatus } from '@/lib/hours-utils';
 
 // Force dynamic rendering for product pages
@@ -119,7 +119,7 @@ interface Tenant {
   };
 }
 
-async function getProduct(id: string): Promise<{ product: Product; tenant: Tenant; storeStatus?: any } | null> {
+async function getProduct(id: string): Promise<{ product: Product; tenant: Tenant; storeStatus?: any; directorySlug?: string } | null> {
   try {
     const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
     
@@ -170,8 +170,9 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
       // Extract store hours for status calculation
       storeStatus = computeStoreStatus(profile.hours);
     }
-        
-    return { product, tenant, storeStatus };
+    
+    // Return tenant ID for directory link (we'll use tenant ID directly)
+    return { product, tenant, storeStatus, directorySlug: product.tenantId };
   } catch (error) {
     console.error('Error fetching product:', error);
     return null;
@@ -240,7 +241,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     notFound();
   }
 
-  const { product, tenant, storeStatus } = data;
+  const { product, tenant, storeStatus, directorySlug } = data;
   const businessName = tenant.metadata?.businessName || tenant.name;
 
   // Check if product is publicly accessible
@@ -289,9 +290,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
 
-      {/* Back to Inventory Button (for authenticated users) */}
+      {/* Navigation Buttons (for authenticated users) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-        <BackToInventoryButton tenantId={product.tenantId} />
+        <ProductNavigation tenantId={product.tenantId} directorySlug={directorySlug} />
         
         {/* Alert for non-public products (only shown to authenticated users) */}
         {!isPubliclyAccessible && (

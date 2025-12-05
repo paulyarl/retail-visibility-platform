@@ -4,20 +4,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
 
-interface BackToInventoryButtonProps {
+interface ProductNavigationProps {
   tenantId: string;
   directorySlug?: string;
-  className?: string;
 }
 
-export function BackToInventoryButton({ tenantId, directorySlug, className = '' }: BackToInventoryButtonProps) {
+export function ProductNavigation({ tenantId, directorySlug }: ProductNavigationProps) {
   const { isAuthenticated } = useAuth();
   
   // Only show for authenticated users
   if (!isAuthenticated) return null;
   
   return (
-    <div className={`mb-4 flex flex-wrap gap-2 ${className}`}>
+    <div className="mb-4 flex flex-wrap gap-2">
       <Link href={`/items?tenantId=${tenantId}`}>
         <Button variant="ghost" size="sm">
           <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -37,7 +36,7 @@ export function BackToInventoryButton({ tenantId, directorySlug, className = '' 
       </Link>
       
       {directorySlug && (
-        <Link href={`/directory/${directorySlug}`}>
+        <Link href={`/directory/t/${directorySlug}`}>
           <Button variant="ghost" size="sm">
             <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -50,4 +49,4 @@ export function BackToInventoryButton({ tenantId, directorySlug, className = '' 
   );
 }
 
-export default BackToInventoryButton;
+export default ProductNavigation;
