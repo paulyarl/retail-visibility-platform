@@ -22,6 +22,13 @@ interface DirectoryMapGoogleProps {
   listings: DirectoryListing[];
   center?: { lat: number; lng: number };
   zoom?: number;
+  useMapEndpoint?: boolean; // Use unified map endpoint instead of passed listings
+  filters?: {
+    category?: string;
+    storeType?: string;
+    city?: string;
+    state?: string;
+  };
 }
 
 // Global flag to track if script is loading or loaded
@@ -31,7 +38,9 @@ let isScriptLoaded = false;
 export default function DirectoryMapGoogle({ 
   listings, 
   center = { lat: 39.8283, lng: -98.5795 }, // Center of USA
-  zoom = 4 
+  zoom = 4,
+  useMapEndpoint = false,
+  filters = {}
 }: DirectoryMapGoogleProps) {
   const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -39,9 +48,45 @@ export default function DirectoryMapGoogle({
   const infoWindowRef = useRef<any>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mapListings, setMapListings] = useState<DirectoryListing[]>(listings);
+
+  // Fetch from map endpoint if enabled
+  useEffect(() => {
+    if (!useMapEndpoint) {
+      setMapListings(listings);
+      return;
+    }
+
+    const fetchMapData = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const params = new URLSearchParams();
+        if (filters.category) params.append('category', filters.category);
+        if (filters.storeType) params.append('storeType', filters.storeType);
+        if (filters.city) params.append('city', filters.city);
+        if (filters.state) params.append('state', filters.state);
+        params.append('limit', '100');
+
+        const url = `${apiUrl}/api/directory/map/locations?${params.toString()}`;
+        
+        const response = await fetch(url);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setMapListings(data.data?.listings || []);
+        } else {
+          console.error('[DirectoryMapGoogle] API fetch failed:', response.status, response.statusText);
+        }
+      } catch (err) {
+        console.error('[DirectoryMapGoogle] Error fetching map data:', err);
+      }
+    };
+
+    fetchMapData();
+  }, [useMapEndpoint, filters.category, filters.storeType, filters.city, filters.state, listings]);
 
   // Filter listings with valid coordinates
-  const validListings = listings.filter(l => l.latitude && l.longitude);
+  const validListings = mapListings.filter(l => l.latitude && l.longitude);
 
   useEffect(() => {
     // Check if Google Maps is already loaded

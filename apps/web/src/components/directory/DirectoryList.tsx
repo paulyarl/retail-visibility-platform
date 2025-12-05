@@ -36,9 +36,10 @@ interface DirectoryListing {
 interface DirectoryListProps {
   listings: DirectoryListing[];
   loading?: boolean;
+  contextCategory?: string; // Override category display (e.g., for product category pages)
 }
 
-export default function DirectoryList({ listings, loading }: DirectoryListProps) {
+export default function DirectoryList({ listings, loading, contextCategory }: DirectoryListProps) {
   // Loading state
   if (loading) {
     return (
@@ -142,10 +143,10 @@ export default function DirectoryList({ listings, loading }: DirectoryListProps)
                         <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {listing.businessName}
                         </h3>
-                        {/* Category - Context-aware display */}
-                        {(listing.category?.name || listing.gbpPrimaryCategoryName || listing.primaryCategory) && (
+                        {/* Category - Show GBP primary category (store type) - matches grid view */}
+                        {(contextCategory || listing.gbpPrimaryCategoryName || listing.primaryCategory) && (
                           <p className="text-sm text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
-                            {listing.category?.name || listing.gbpPrimaryCategoryName || listing.primaryCategory?.replace(/_/g, ' ')}
+                            {contextCategory || listing.gbpPrimaryCategoryName || listing.primaryCategory}
                           </p>
                         )}
                       </div>

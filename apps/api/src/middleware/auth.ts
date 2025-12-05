@@ -116,19 +116,19 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       return res.status(401).json({ error: 'authentication_required', message: 'No token provided' });
     }
 
-    console.log('[AUTH] JWT verification attempted for token:', token.substring(0, 20) + '...');
+    //console.log('[AUTH] JWT verification attempted for token:', token.substring(0, 20) + '...');
     const payload = authService.verifyAccessToken(token);
-    console.log('[AUTH] Token verified successfully, payload:', { userId: payload.userId, user_id: payload.user_id, email: payload.email, role: payload.role });
+    //console.log('[AUTH] Token verified successfully, payload:', { userId: payload.userId, user_id: payload.user_id, email: payload.email, role: payload.role });
     
     // Apply universal transform to JWT payload to ensure both naming conventions
     const transformedPayload = makeBothConventionsAvailable(payload);
-    console.log('[AUTH] Payload transformed, setting req.user');
+    //console.log('[AUTH] Payload transformed, setting req.user');
     
     req.user = transformedPayload;
-    console.log('[AUTH] req.user set successfully, calling next()');
-    console.log('[AUTH] About to call next() for route:', req.method, req.path);
+    //console.log('[AUTH] req.user set successfully, calling next()');
+    //console.log('[AUTH] About to call next() for route:', req.method, req.path);
     next();
-    console.log('[AUTH] next() called successfully - should proceed to next middleware');
+    //console.log('[AUTH] next() called successfully - should proceed to next middleware');
   } catch (error) {
     console.error('[AUTH] Exception in authenticateToken:', error);
     if (error instanceof Error) {

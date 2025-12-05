@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Debug: Log what env vars are available
-console.log('[Branding Route] API_BASE_URL:', process.env.API_BASE_URL);
-console.log('[Branding Route] NEXT_PUBLIC_API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL);
+//console.log('[Branding Route] API_BASE_URL:', process.env.API_BASE_URL);
+//console.log('[Branding Route] NEXT_PUBLIC_API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL);
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-console.log('[Branding Route] Using API_BASE_URL:', API_BASE_URL);
+//console.log('[Branding Route] Using API_BASE_URL:', API_BASE_URL);
 
 export async function GET(req: NextRequest) {
   try {
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     // Only log actual network/parsing errors, not expected 404s
-    console.error('Unexpected error fetching branding settings:', error);
+    console.error('[Branding Route] Unexpected error fetching branding settings:', error);
     // Return default settings on error
     return NextResponse.json({
       platformName: 'Visible Shelf',
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     const data = await res.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error updating branding settings:', error);
+    console.error('[Branding Route] Error updating branding settings:', error);
     return new NextResponse('Internal server error', { status: 500 });
   }
 }

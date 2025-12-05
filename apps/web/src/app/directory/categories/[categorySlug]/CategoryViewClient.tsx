@@ -87,21 +87,21 @@ export default function CategoryViewClient({
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
   
-  // Persist view mode in localStorage
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('directory-view-mode');
-      return (saved as 'grid' | 'list' | 'map') || 'grid';
+  // Persist view mode in localStorage - start with default to avoid hydration mismatch
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+
+  // Load saved view mode after hydration
+  useEffect(() => {
+    const saved = localStorage.getItem('directory-view-mode');
+    if (saved && ['grid', 'list', 'map'].includes(saved)) {
+      setViewMode(saved as 'grid' | 'list' | 'map');
     }
-    return 'grid';
-  });
+  }, []);
 
   // Save view mode to localStorage when it changes
   const handleViewModeChange = (mode: 'grid' | 'list' | 'map') => {
     setViewMode(mode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('directory-view-mode', mode);
-    }
+    localStorage.setItem('directory-view-mode', mode);
   };
   
   const [primaryOnly, setPrimaryOnly] = useState(false);
@@ -382,6 +382,10 @@ export default function CategoryViewClient({
         {viewMode === 'map' && (
           <DirectoryMapGoogle
             listings={data?.listings || []}
+            useMapEndpoint={true}
+            filters={{
+              category: category?.name,
+            }}
           />
         )}
       </div>

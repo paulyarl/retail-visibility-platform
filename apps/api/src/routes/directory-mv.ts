@@ -237,8 +237,8 @@ router.get('/search', async (req: Request, res: Response) => {
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
-    console.log('[Directory MV Search] Query:', listingsQuery);
-    console.log('[Directory MV Search] Params:', [...params, limitNum, skip]);
+    //console.log('[Directory MV Search] Query:', listingsQuery);
+    //console.log('[Directory MV Search] Params:', [...params, limitNum, skip]);
     
     const listingsResult = await getDirectPool().query(listingsQuery, [...params, limitNum, skip]);
 

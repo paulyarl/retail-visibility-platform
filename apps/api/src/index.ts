@@ -121,6 +121,7 @@ import directoryCategoriesRoutes from './routes/directory-categories';
 import directoryStoreTypesRoutes from './routes/directory-store-types';
 import directoryOptimizedRoutes from './routes/directory-optimized';
 import directoryCategoriesOptimizedRoutes from './routes/directory-categories-optimized';
+import directoryMapRoutes from './routes/directory-map';
 import storefrontRoutes from './routes/storefront';
 import gbpRoutes from './routes/gbp';
 import scanRoutes from './routes/scan';
@@ -4381,6 +4382,10 @@ console.log('✅ Directory categories routes mounted (category-based discovery)'
 /* ------------------------------ directory store types ------------------------------ */
 app.use('/api/directory/store-types', directoryStoreTypesRoutes);
 console.log('✅ Directory store types routes mounted (store type discovery)');
+
+/* ------------------------------ directory map ------------------------------ */
+app.use('/api/directory', directoryMapRoutes);
+console.log('✅ Directory map routes mounted (unified map data with coordinates)');
 
 /* ------------------------------ recommendations ------------------------------ */
 import recommendationRoutes from './routes/recommendations';

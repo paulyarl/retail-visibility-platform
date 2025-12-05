@@ -26,9 +26,9 @@ export const getDirectPool = (): Pool => {
       throw new Error('DATABASE_URL environment variable is not set');
     }
 
-    console.log('[DB Pool] Creating new connection pool');
-    console.log('[DB Pool] Environment:', process.env.NODE_ENV);
-    console.log('[DB Pool] Is Production:', isProduction);
+    console.log('[DB Pool] Creating new connection pool (is production?): '+isProduction);
+    //console.log('[DB Pool] Environment:', process.env.NODE_ENV);
+    //console.log('[DB Pool] Is Production:', isProduction);
 
     // Check if we need SSL (cloud databases or production)
     const needsSSL = connectionString.includes('supabase.co') || 
@@ -51,7 +51,7 @@ export const getDirectPool = (): Pool => {
       connectionTimeoutMillis: 10000,
     });
 
-    console.log('[DB Pool] Pool created with SSL:', needsSSL ? 'enabled (no verification)' : 'disabled');
+    //console.log('[DB Pool] Pool created with SSL:', needsSSL ? 'enabled (no verification)' : 'disabled');
   }
 
   return directPool;

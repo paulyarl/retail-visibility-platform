@@ -128,21 +128,23 @@ export default function DirectoryClient() {
   }>>([]);
   const [locations, setLocations] = useState<Array<{ city: string; state: string; count: number }>>([]);
   
-  // Persist view mode in localStorage
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('directory-view-mode');
-      return (saved as 'grid' | 'list' | 'map') || 'grid';
+  // Persist view mode in localStorage - start with default to avoid hydration mismatch
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+  const [isClient, setIsClient] = useState(false);
+
+  // Load saved view mode after hydration
+  useEffect(() => {
+    setIsClient(true);
+    const saved = localStorage.getItem('directory-view-mode');
+    if (saved && ['grid', 'list', 'map'].includes(saved)) {
+      setViewMode(saved as 'grid' | 'list' | 'map');
     }
-    return 'grid';
-  });
+  }, []);
 
   // Save view mode to localStorage when it changes
   const handleViewModeChange = (mode: 'grid' | 'list' | 'map') => {
     setViewMode(mode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('directory-view-mode', mode);
-    }
+    localStorage.setItem('directory-view-mode', mode);
   };
   
   // NEW: User location for proximity-based scoring
@@ -403,8 +405,16 @@ export default function DirectoryClient() {
         )}
 
         {/* Map View */}
-        {viewMode === 'map' && !loading && data && (
-          <DirectoryMapGoogle listings={data.listings} />
+        {viewMode === 'map' && (
+          <DirectoryMapGoogle 
+            listings={data?.listings || []}
+            useMapEndpoint={true}
+            filters={{
+              category: searchParams.get('category') || undefined,
+              city: searchParams.get('city') || undefined,
+              state: searchParams.get('state') || undefined,
+            }}
+          />
         )}
 
         {/* Pagination */}

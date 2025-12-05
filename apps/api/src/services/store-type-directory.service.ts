@@ -61,17 +61,17 @@ const getPoolConfig = () => {
                       process.env.NODE_ENV === 'production';
 
   if (!isProduction) {
-    console.log('[StoreType Pool] Local development detected - disabling SSL completely');
-    console.log('[StoreType Pool] Original connection string:', connectionString);
+    //console.log('[StoreType Pool] Local development detected - disabling SSL completely');
+    //console.log('[StoreType Pool] Original connection string:', connectionString);
     // Completely remove SSL for development - this will work with rejectUnauthorized: false
     if (connectionString.includes('sslmode=')) {
-      console.log('[StoreType Pool] Removing SSL mode entirely');
+      //console.log('[StoreType Pool] Removing SSL mode entirely');
       connectionString = connectionString.replace(/sslmode=[^&]+/, 'sslmode=disable');
     } else {
-      console.log('[StoreType Pool] Adding sslmode=disable');
+      //console.log('[StoreType Pool] Adding sslmode=disable');
       connectionString += '&sslmode=disable';
     }
-    console.log('[StoreType Pool] Modified connection string:', connectionString);
+    //console.log('[StoreType Pool] Modified connection string:', connectionString);
   }
 
   const config: any = {
@@ -103,7 +103,7 @@ const getDirectPool = () => {
                       process.env.NODE_ENV === 'production';
 
   if (!isProduction) {
-    console.log('[StoreType Pool] Creating fresh pool for development');
+    //console.log('[StoreType Pool] Creating fresh pool for development');
     return new Pool(getPoolConfig());
   }
 
@@ -129,7 +129,7 @@ class StoreTypeDirectoryService {
     radiusMiles?: number
   ) {
     try {
-      console.log('[StoreTypeService] Fetching GBP store types from both primary and secondary categories');
+      //console.log('[StoreTypeService] Fetching GBP store types from both primary and secondary categories');
 
       // Query using both primary (tenant_business_profiles_list) and secondary (metadata) GBP categories
       const result = await getDirectPool().query(`
@@ -195,7 +195,7 @@ class StoreTypeDirectoryService {
         ORDER BY store_count DESC, gbp_category_name ASC
       `);
 
-      console.log(`[StoreTypeService] Found ${result.rows.length} GBP store types`);
+      //console.log(`[StoreTypeService] Found ${result.rows.length} GBP store types`);
 
       // If no store types found, provide fallback hardcoded categories
       if (result.rows.length === 0) {
@@ -295,7 +295,7 @@ class StoreTypeDirectoryService {
     radius?: number
   ) {
     try {
-      console.log(`[StoreTypeService] Fetching stores for type: ${typeSlug}`);
+      //console.log(`[StoreTypeService] Fetching stores for type: ${typeSlug}`);
       
       // First, get the GBP category ID and name from the slug
       const categoryLookup = await getDirectPool().query(`
@@ -315,7 +315,7 @@ class StoreTypeDirectoryService {
       const categoryName = category.name;
       const categoryId = category.id;
       
-      console.log(`[StoreTypeService] Found category: ${categoryName} (${categoryId})`);
+      //console.log(`[StoreTypeService] Found category: ${categoryName} (${categoryId})`);
       
       // Query stores that have this GBP category (primary or secondary)
       const result = await getDirectPool().query(`
@@ -369,7 +369,7 @@ class StoreTypeDirectoryService {
 
       const stores = result.rows;
 
-      console.log(`[StoreTypeService] Found ${stores.length} stores`);
+      //console.log(`[StoreTypeService] Found ${stores.length} stores`);
 
       return stores.map((store) => ({
         id: store.tenant_id || store.id,
@@ -417,7 +417,7 @@ class StoreTypeDirectoryService {
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' & ');
       
-      console.log(`[StoreTypeService] Looking for category name: ${categoryName}`);
+      //console.log(`[StoreTypeService] Looking for category name: ${categoryName}`);
       
       // Query from directory_category_products view with real product counts
       const result = await pool.query(`
