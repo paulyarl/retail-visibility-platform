@@ -133,7 +133,14 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
       return null;
     }
 
-    const product: Product = await productRes.json();
+    const productData = await productRes.json();
+    
+    // Normalize field names from snake_case to camelCase
+    const product: Product = {
+      ...productData,
+      itemStatus: productData.itemStatus || productData.item_status || 'active',
+      tenantId: productData.tenantId || productData.tenant_id,
+    };
 
     // Fetch tenant info and business profile using public endpoint
     const profileRes = await fetch(`${apiBaseUrl}/public/tenant/${product.tenantId}/profile`, {
