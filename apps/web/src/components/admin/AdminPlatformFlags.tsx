@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import { api } from '@/lib/api';
 
 type FlagRow = { id: string; flag: string; enabled: boolean; description?: string | null; rollout?: string | null; allowTenantOverride?: boolean };
 type EffectiveRow = {
@@ -71,28 +72,18 @@ export default function AdminPlatformFlags() {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch(`/api/admin/platform-flags`, { cache: "no-store", credentials: 'include' });
-      const ct = r.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        const j = await r.json();
-        if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-        setRows(j.data || []);
-      } else {
-        const text = await r.text();
-        if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
-        throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
-      }
+      const r = await api.get(`/api/admin/platform-flags`);
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
+      setRows(j.data || []);
 
       // load effective
-      const e = await fetch(`/api/admin/effective-flags`, { cache: 'no-store', credentials: 'include' });
-      const ect = e.headers.get('content-type') || '';
-      if (ect.includes('application/json')) {
-        const ej = await e.json();
-        if (!e.ok || !ej?.success) throw new Error(ej?.error || `HTTP ${e.status}`);
-        const map: Record<string, EffectiveRow> = {};
-        for (const it of (ej.data || [])) map[it.flag] = it;
-        setEffective(map);
-      }
+      const e = await api.get(`/api/admin/effective-flags`);
+      const ej = await e.json();
+      if (!e.ok || !ej?.success) throw new Error(ej?.error || `HTTP ${e.status}`);
+      const map: Record<string, EffectiveRow> = {};
+      for (const it of (ej.data || [])) map[it.flag] = it;
+      setEffective(map);
     } catch (e: any) {
       setError(e?.message || String(e));
     } finally {
@@ -111,21 +102,14 @@ export default function AdminPlatformFlags() {
     setSaving(flag);
     setError(null);
     try {
-      const r = await fetch(`/api/admin/platform-flags`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flag, enabled: next.enabled, description: next.description ?? null, rollout: next.rollout ?? null, allowTenantOverride: next.allowTenantOverride }),
-        credentials: 'include',
+      const r = await api.put(`/api/admin/platform-flags/${encodeURIComponent(flag)}`, {
+        enabled: next.enabled,
+        description: next.description ?? null,
+        rollout: next.rollout ?? null,
+        allowTenantOverride: next.allowTenantOverride
       });
-      const ct = r.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        const j = await r.json();
-        if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-      } else {
-        const text = await r.text();
-        if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
-        throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
-      }
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
       await load();
     } catch (e: any) {
       setError(e?.message || String(e));
@@ -143,21 +127,9 @@ export default function AdminPlatformFlags() {
   const setOverride = async (flag: string, value: boolean | null) => {
     try {
       setSaving(flag);
-      const r = await fetch(`/api/admin/flags/override/platform/${encodeURIComponent(flag)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value }),
-        credentials: 'include',
-      });
-      const ct = r.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        const j = await r.json();
-        if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-      } else {
-        const text = await r.text();
-        if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
-        throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
-      }
+      const r = await api.post(`/api/admin/flags/override/platform/${encodeURIComponent(flag)}`, { value });
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
       await load();
     } catch (e: any) {
       setError(e?.message || String(e));
@@ -180,23 +152,14 @@ export default function AdminPlatformFlags() {
     setSaving(flag);
     setError(null);
     try {
-      const r = await fetch(`/api/admin/platform-flags`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+      const r = await api.delete(`/api/admin/platform-flags`, { 
         body: JSON.stringify({ flag }),
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
       });
-      const ct = r.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        const j = await r.json();
-        if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-        if (j.tenantUsageCount > 0) {
-          alert(`✅ Deleted flag and ${j.tenantUsageCount} tenant override(s)`);
-        }
-      } else {
-        const text = await r.text();
-        if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
-        throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
+      if (j.tenantUsageCount > 0) {
+        alert(`✅ Deleted flag and ${j.tenantUsageCount} tenant override(s)`);
       }
       await load();
     } catch (e: any) {

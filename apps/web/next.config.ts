@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "15mb" },
   },
 
+  // Proxy API requests to the external API server
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:4000/api/:path*',
+      },
+    ];
+  },
+
   // Add CSP headers to allow API calls in development
   async headers() {
     return [

@@ -207,7 +207,7 @@ const updateTenantTierSchema = z.object({
     'chain_professional',
     'chain_enterprise',
   ]).optional(),
-  subscription_status: z.enum([
+  subscriptionStatus: z.enum([
     'trial',
     'active',
     'past_due',
@@ -216,7 +216,7 @@ const updateTenantTierSchema = z.object({
   ]).optional(),
   reason: z.string().min(1, 'Reason is required for audit trail'),
   trialEndsAt: z.string().datetime().optional(),
-  subscription_ends_at: z.string().datetime().optional(),
+  subscriptionEndsAt: z.string().datetime().optional(),
 });
 
 router.patch('/tenants/:tenantId', async (req, res) => {
@@ -284,9 +284,9 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     // Convert date strings to Date objects
     const updatePayload: any = {};
     if (updateData.subscriptionTier) updatePayload.subscription_tier = updateData.subscriptionTier;
-    if (updateData.subscription_status) updatePayload.subscription_status = updateData.subscription_status;
+    if (updateData.subscriptionStatus) updatePayload.subscription_status = updateData.subscriptionStatus;
     if (updateData.trialEndsAt) updatePayload.trial_ends_at = new Date(updateData.trialEndsAt);
-    if (updateData.subscription_ends_at) updatePayload.subscription_ends_at = new Date(updateData.subscription_ends_at);
+    if (updateData.subscriptionEndsAt) updatePayload.subscription_ends_at = new Date(updateData.subscriptionEndsAt);
 
     // Update tenant
     const updatedTenant = await prisma.tenants.update({

@@ -307,7 +307,7 @@ export default function UsersManagementPage() {
       const [firstName, ...lastNameParts] = editName.split(' ');
       const lastName = lastNameParts.join(' ');
       
-      const res = await api.put(`/api/users/${editingUser.id}`, {
+      const res = await api.put(`/api/admin/users/${editingUser.id}`, {
         firstName,
         lastName,
         email: editEmail,
@@ -385,7 +385,7 @@ export default function UsersManagementPage() {
 
     try {
       setError(null);
-      const res = await api.delete(`/api/users/${userId}`);
+      const res = await api.delete(`/api/admin/users/${userId}`);
       
       if (res.status === 204 || res.ok) {
         setSuccess('User deleted successfully');

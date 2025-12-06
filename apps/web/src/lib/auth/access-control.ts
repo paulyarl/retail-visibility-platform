@@ -447,15 +447,15 @@ export function checkAccess(
 
   // 1. Platform admin override (if enabled)
   const userIsPlatformAdmin = isPlatformAdmin(user);
-  console.log('[Access Control] Platform admin check:', { 
+ /*  console.log('[Access Control] Platform admin check:', { 
     allowPlatformAdminOverride, 
     userIsPlatformAdmin,
     userRole: user.role,
     isPlatformAdminFlag: user.isPlatformAdmin 
   });
-  
+  */
   if (allowPlatformAdminOverride && userIsPlatformAdmin) {
-    console.log('[Access Control] ✅ Platform admin override - granting access');
+    //console.log('[Access Control] ✅ Platform admin override - granting access');
     return { hasAccess: true };
   }
 

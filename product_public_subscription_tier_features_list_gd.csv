@@ -1,0 +1,9 @@
+id,tier_key,name,display_name,description,price_monthly,max_skus,max_locations,tier_type,is_active,sort_order,metadata,created_at,updated_at,created_by,updated_by
+tier_google_only,google_only,Google-Only,Google-Only,Get discovered on Google,2900,250,1,individual,TRUE,1,null,2025-11-10 22:03:48,2025-11-10 22:03:48,admin,null
+tier_starter,starter,Starter,Starter,Get started with the basics,4900,500,1,individual,TRUE,2,null,2025-11-10 22:03:48,2025-11-10 22:03:48,admin,null
+tier_professional,professional,Professional,Professional,For established retail businesses,49900,5000,5,individual,TRUE,3,null,2025-11-10 22:03:48,2025-11-10 22:03:48,admin,null
+tier_enterprise,enterprise,Enterprise,Enterprise,For large single-location operations,99900,25000,20,individual,TRUE,4,null,2025-11-10 22:03:48,2025-11-10 22:03:48,admin,null
+tier_organization,organization,Organization,Organization,For franchise chains & multi-location businesses,99900,10000,50,organization,TRUE,5,null,2025-11-10 22:03:48,2025-11-10 22:03:48,admin,null
+tier_chain_starter,chain_starter,Chain Starter,Chain Starter,For small chains (2-5 locations),19900,2500,3,organization,TRUE,6,null,2025-11-10 22:03:48,2025-11-10 22:03:48,admin,null
+tier_chain_professional,chain_professional,Chain Professional,Chain Professional,For medium chains (6-25 locations),199900,25000,10,organization,TRUE,7,null,2025-11-10 22:03:48,2025-11-10 22:03:48,admin,null
+tier_chain_enterprise,chain_enterprise,Chain Enterprise,Chain Enterprise,For large chains (26+ locations),499900,50000,20,organization,TRUE,8,null,2025-11-10 22:03:48,2025-11-10 22:03:48,admin,null

@@ -56,7 +56,21 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
 
     return res.json({
       success: true,
-      data: logs,
+      data: logs.map(log => ({
+        id: log.id,
+        tenantId: log.tenant_id,
+        strategy: log.strategy,
+        dryRun: log.dry_run,
+        created: log.created,
+        updated: log.updated,
+        deleted: log.deleted,
+        skipped: log.skipped,
+        reason: log.reason,
+        error: log.error,
+        jobId: log.job_id,
+        startedAt: log.started_at,
+        completedAt: log.completed_at,
+      })),
       pagination: {
         total,
         limit,
@@ -137,7 +151,12 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
         failedRuns,
         successRate: Math.round(successRate * 10) / 10,
         outOfSyncCount,
-        recentErrors,
+        recentErrors: recentErrors.map(error => ({
+          id: error.id,
+          tenantId: error.tenant_id,
+          error: error.error,
+          startedAt: error.started_at,
+        })),
       },
     });
   } catch (e: any) {

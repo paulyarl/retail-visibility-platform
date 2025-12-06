@@ -39,6 +39,7 @@ interface Tier {
 }
 
 export default function TierSystemPage() {
+  console.log('TierSystemPage component mounted');
   const { hasAccess, loading: accessLoading, isPlatformAdmin, user } = useAccessControl(null, AccessPresets.PLATFORM_ADMIN_ONLY);
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +57,11 @@ export default function TierSystemPage() {
   const [includeInactive, setIncludeInactive] = useState(false);
 
   useEffect(() => {
-    if (hasAccess) loadTiers();
+    console.log('useEffect triggered, hasAccess:', hasAccess, 'includeInactive:', includeInactive);
+    if (hasAccess) {
+      console.log('Calling loadTiers');
+      loadTiers();
+    }
   }, [hasAccess, includeInactive]);
 
   const loadTiers = async () => {
@@ -67,6 +72,9 @@ export default function TierSystemPage() {
       const res = await api.get(url);
       if (res.ok) {
         const data = await res.json();
+        console.log('Loaded tiers data:', data.tiers);
+        console.log('First tier features:', data.tiers?.[0]?.features);
+        console.log('Setting tiers state with:', data.tiers || []);
         setTiers(data.tiers || []);
       }
     } catch (e) {
@@ -411,7 +419,14 @@ export default function TierSystemPage() {
 
         {/* Tiers List */}
         <div className="grid grid-cols-1 gap-4">
-          {tiers.map((tier, index) => (
+          {(() => {
+            console.log('About to render tiers:', tiers);
+            console.log('Tiers length:', tiers.length);
+            return null;
+          })()}
+          {tiers.map((tier, index) => {
+            console.log(`Rendering tier ${tier.tierKey}:`, tier.features);
+            return (
             <motion.div
               key={tier.tierKey}
               initial={{ opacity: 0, y: 20 }}
@@ -486,8 +501,8 @@ export default function TierSystemPage() {
                             Features ({tier.features.length})
                           </h4>
                           {isPlatformAdmin && (
-                            <div className="flex gap-2">
-                              <Button
+                            <div className="flex gap-2 dark:bg-gray-900/10">
+                              <Button className="dark:bg-gray-300"
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => {
@@ -497,7 +512,7 @@ export default function TierSystemPage() {
                               >
                                 Add Feature
                               </Button>
-                              <Button
+                              <Button className="dark:bg-gray-200"
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => {
@@ -511,7 +526,9 @@ export default function TierSystemPage() {
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {tier.features.map((f) => (
+                          {tier.features.map((f) => {
+                            console.log(`Rendering feature ${f.featureName} for tier ${tier.tierKey}`);
+                            return (
                             <div
                               key={f.id}
                               className="group relative inline-flex items-center gap-1 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 rounded-full text-xs"
@@ -550,7 +567,8 @@ export default function TierSystemPage() {
                                 </div>
                               )}
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -583,7 +601,8 @@ export default function TierSystemPage() {
                 </CardContent>
               </Card>
             </motion.div>
-          ))}
+            );
+          })}
 
           {tiers.length === 0 && (
             <Card>

@@ -262,9 +262,75 @@ router.post('/users', requirePlatformAdmin, async (req: Request, res: Response) 
 });
 
 /**
- * PUT /api/admin/users/:userId/password
- * Reset user password
+ * PUT /api/admin/users/:userId
+ * Update user details (admin only)
  */
+router.put('/users/:userId', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { firstName, lastName, email, role, isActive } = req.body;
+
+    // Check if user exists
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    // Update user
+    const updatedUser = await prisma.users.update({
+      where: { id: userId },
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        role: role as user_role,
+        is_active: isActive,
+        updated_at: new Date(),
+      },
+      select: {
+        id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        role: true,
+        is_active: true,
+        updated_at: true,
+      },
+    });
+
+    // Audit log
+    await audit({
+      tenantId: 'platform',
+      actor: (req as any).user?.userId || 'system',
+      action: 'admin.user.update',
+      payload: { 
+        userId, 
+        email: updatedUser.email, 
+        role: updatedUser.role,
+        changes: { firstName, lastName, email, role, isActive }
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'User updated successfully',
+      user: updatedUser,
+    });
+  } catch (error: any) {
+    console.error('[Admin Users] Error updating user:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update user',
+      message: error.message,
+    });
+  }
+});
 const resetPasswordSchema = z.object({
   password: z.string().min(8),
 });

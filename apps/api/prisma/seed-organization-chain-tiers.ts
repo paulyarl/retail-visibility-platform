@@ -2,6 +2,7 @@
  * Seed script to add features to organization and chain tiers
  * Run with: npx tsx prisma/seed-organization-chain-tiers.ts
  */
+/// <reference types="node" />
 
 import { PrismaClient } from '@prisma/client';
 
@@ -11,121 +12,121 @@ async function main() {
   console.log('🌱 Adding features to organization and chain tiers...');
 
   // Find organization tier
-  const orgTier = await prisma.subscriptionTier.findFirst({
-    where: { tierKey: 'organization' },
+  const orgTier = await prisma.subscription_tiers_list.findFirst({
+    where: { tier_key: 'organization' },
   });
 
   // Find chain tiers
-  const chainStarterTier = await prisma.subscriptionTier.findFirst({
-    where: { tierKey: 'chain_starter' },
+  const chainStarterTier = await prisma.subscription_tiers_list.findFirst({
+    where: { tier_key: 'chain_starter' },
   });
   
-  const chainProfessionalTier = await prisma.subscriptionTier.findFirst({
-    where: { tierKey: 'chain_professional' },
+  const chainProfessionalTier = await prisma.subscription_tiers_list.findFirst({
+    where: { tier_key: 'chain_professional' },
   });
   
-  const chainEnterpriseTier = await prisma.subscriptionTier.findFirst({
-    where: { tierKey: 'chain_enterprise' },
+  const chainEnterpriseTier = await prisma.subscription_tiers_list.findFirst({
+    where: { tier_key: 'chain_enterprise' },
   });
 
   if (!orgTier && !chainStarterTier && !chainProfessionalTier && !chainEnterpriseTier) {
     console.log('⚠️  No organization or chain tiers found. Creating them...');
     
     // Create organization tier
-    const newOrgTier = await prisma.subscriptionTier.create({
+    const newOrgTier = await prisma.subscription_tiers_list.create({
       data: {
         id: generateTierId(),
-        tierKey: 'organization',
+        tier_key: 'organization',
         name: 'Organization',
-        displayName: 'Organization',
+        display_name: 'Organization',
         description: 'For multi-location businesses managed as an organization',
-        priceMonthly: 0, // Custom pricing
-        maxSkus: null, // Unlimited
-        maxLocations: null, // Unlimited
-        tierType: 'organization',
-        isActive: true,
-        sortOrder: 5,
+        price_monthly: 0, // Custom pricing
+        max_skus: null, // Unlimited
+        max_locations: null, // Unlimited
+        tier_type: 'organization',
+        is_active: true,
+        sort_order: 5,
       },
     });
     console.log(`✓ Created organization tier: ${newOrgTier.id}`);
 
     // Create chain tiers (mirror individual tiers)
-    const newChainStarter = await prisma.subscriptionTier.create({
+    const newChainStarter = await prisma.subscription_tiers_list.create({
       data: {
         id: generateTierId(),
-        tierKey: 'chain_starter',
+        tier_key: 'chain_starter',
         name: 'Chain Starter',
-        displayName: 'Chain Starter',
+        display_name: 'Chain Starter',
         description: 'Starter tier for retail chains',
-        priceMonthly: 19900, // $199/mo
-        maxSkus: 500,
-        maxLocations: null,
-        tierType: 'organization',
-        isActive: true,
-        sortOrder: 6,
+        price_monthly: 19900, // $199/mo
+        max_skus: 500,
+        max_locations: null,
+        tier_type: 'organization',
+        is_active: true,
+        sort_order: 6,
       },
     });
     console.log(`✓ Created chain starter tier: ${newChainStarter.id}`);
 
-    const newChainProfessional = await prisma.subscriptionTier.create({
+    const newChainProfessional = await prisma.subscription_tiers_list.create({
       data: {
         id: generateTierId(),
-        tierKey: 'chain_professional',
+        tier_key: 'chain_professional',
         name: 'Chain Professional',
-        displayName: 'Chain Professional',
+        display_name: 'Chain Professional',
         description: 'Professional tier for retail chains',
-        priceMonthly: 199900, // $1,999/mo
-        maxSkus: 5000,
-        maxLocations: null,
-        tierType: 'organization',
-        isActive: true,
-        sortOrder: 7,
+        price_monthly: 199900, // $1,999/mo
+        max_skus: 5000,
+        max_locations: null,
+        tier_type: 'organization',
+        is_active: true,
+        sort_order: 7,
       },
     });
     console.log(`✓ Created chain professional tier: ${newChainProfessional.id}`);
 
-    const newChainEnterprise = await prisma.subscriptionTier.create({
+    const newChainEnterprise = await prisma.subscription_tiers_list.create({
       data: {
         id:generateTierId(),
-        tierKey: 'chain_enterprise',
+        tier_key: 'chain_enterprise',
         name: 'Chain Enterprise',
-        displayName: 'Chain Enterprise',
+        display_name: 'Chain Enterprise',
         description: 'Enterprise tier for retail chains',
-        priceMonthly: 499900, // $4,999/mo
-        maxSkus: null,
-        maxLocations: null,
-        tierType: 'organization',
-        isActive: true,
-        sortOrder: 8,
+        price_monthly: 499900, // $4,999/mo
+        max_skus: null,
+        max_locations: null,
+        tier_type: 'organization',
+        is_active: true,
+        sort_order: 8,
       },
     });
     console.log(`✓ Created chain enterprise tier: ${newChainEnterprise.id}`);
   }
 
   // Re-fetch to ensure we have the IDs
-  const organizationTier = await prisma.subscriptionTier.findFirst({
-    where: { tierKey: 'organization' },
-    include: { features: true },
+  const organizationTier = await prisma.subscription_tiers_list.findFirst({
+    where: { tier_key: 'organization' },
+    include: { tier_features_list: true },
   });
 
-  const chainStarterFinal = await prisma.subscriptionTier.findFirst({
-    where: { tierKey: 'chain_starter' },
-    include: { features: true },
+  const chainStarterFinal = await prisma.subscription_tiers_list.findFirst({
+    where: { tier_key: 'chain_starter' },
+    include: { tier_features_list: true },
   });
 
-  const chainProfessionalFinal = await prisma.subscriptionTier.findFirst({
-    where: { tierKey: 'chain_professional' },
-    include: { features: true },
+  const chainProfessionalFinal = await prisma.subscription_tiers_list.findFirst({
+    where: { tier_key: 'chain_professional' },
+    include: { tier_features_list: true },
   });
 
-  const chainEnterpriseFinal = await prisma.subscriptionTier.findFirst({
-    where: { tierKey: 'chain_enterprise' },
-    include: { features: true },
+  const chainEnterpriseFinal = await prisma.subscription_tiers_list.findFirst({
+    where: { tier_key: 'chain_enterprise' },
+    include: { tier_features_list: true },
   });
 
   // Organization Tier Features (inherits all Enterprise features + adds organization-specific)
   if (organizationTier) {
-    if (organizationTier.features.length === 0) {
+    if (organizationTier.tier_features_list.length === 0) {
       console.log('Adding features to Organization tier...');
       
       const orgFeatures = [
@@ -154,18 +155,20 @@ async function main() {
       ];
 
       for (const feature of orgFeatures) {
-        await prisma.tierFeatures.create({
+        await prisma.tier_features_list.create({
           data: {
             id: generateFeatureId(),
-            tierId: organizationTier.id,
-            ...feature,
-            isEnabled: true,
+            tier_id: organizationTier.id,
+            feature_key: feature.featureKey,
+            feature_name: feature.featureName,
+            is_inherited: feature.isInherited,
+            is_enabled: true,
           },
         });
       }
       console.log(`✓ Added ${orgFeatures.length} features to Organization tier`);
     } else {
-      console.log(`✓ Organization tier already has ${organizationTier.features.length} features`);
+      console.log(`✓ Organization tier already has ${organizationTier.tier_features_list.length} features`);
     }
   }
 
@@ -181,7 +184,7 @@ async function main() {
   ];
 
   // Chain Starter Features (mirrors Starter + chain features)
-  if (chainStarterFinal && chainStarterFinal.features.length === 0) {
+  if (chainStarterFinal && chainStarterFinal.tier_features_list.length === 0) {
     console.log('Adding features to Chain Starter tier...');
     
     const chainStarterFeatures = [
@@ -200,12 +203,14 @@ async function main() {
     ];
 
     for (const feature of chainStarterFeatures) {
-      await prisma.tierFeatures.create({
+      await prisma.tier_features_list.create({
         data: {
           id: generateFeatureId(),
-          tierId: chainStarterFinal.id,
-          ...feature,
-          isEnabled: true,
+          tier_id: chainStarterFinal.id,
+          feature_key: feature.featureKey,
+          feature_name: feature.featureName,
+          is_inherited: feature.isInherited,
+          is_enabled: true,
         },
       });
     }
@@ -213,7 +218,7 @@ async function main() {
   }
 
   // Chain Professional Features (mirrors Professional + chain features)
-  if (chainProfessionalFinal && chainProfessionalFinal.features.length === 0) {
+  if (chainProfessionalFinal && chainProfessionalFinal.tier_features_list.length === 0) {
     console.log('Adding features to Chain Professional tier...');
     
     const chainProfessionalFeatures = [
@@ -243,12 +248,14 @@ async function main() {
     ];
 
     for (const feature of chainProfessionalFeatures) {
-      await prisma.tierFeatures.create({
+      await prisma.tier_features_list.create({
         data: {
           id: generateFeatureId(),
-          tierId: chainProfessionalFinal.id,
-          ...feature,
-          isEnabled: true,
+          tier_id: chainProfessionalFinal.id,
+          feature_key: feature.featureKey,
+          feature_name: feature.featureName,
+          is_inherited: feature.isInherited,
+          is_enabled: true,
         },
       });
     }
@@ -256,7 +263,7 @@ async function main() {
   }
 
   // Chain Enterprise Features (mirrors Enterprise + chain features + enterprise SSO)
-  if (chainEnterpriseFinal && chainEnterpriseFinal.features.length === 0) {
+  if (chainEnterpriseFinal && chainEnterpriseFinal.tier_features_list.length === 0) {
     console.log('Adding features to Chain Enterprise tier...');
     
     const chainEnterpriseFeatures = [
@@ -281,12 +288,14 @@ async function main() {
     ];
 
     for (const feature of chainEnterpriseFeatures) {
-      await prisma.tierFeatures.create({
+      await prisma.tier_features_list.create({
         data: {
           id: generateFeatureId(),
-          tierId: chainEnterpriseFinal.id,
-          ...feature,
-          isEnabled: true,
+          tier_id: chainEnterpriseFinal.id,
+          feature_key: feature.featureKey,
+          feature_name: feature.featureName,
+          is_inherited: feature.isInherited,
+          is_enabled: true,
         },
       });
     }
@@ -294,6 +303,14 @@ async function main() {
   }
 
   console.log('✅ Organization and Chain tiers updated successfully!');
+}
+
+function generateTierId(): string {
+  return `tier_${crypto.randomUUID()}`;
+}
+
+function generateFeatureId(): string {
+  return `feat_${crypto.randomUUID()}`;
 }
 
 main()
@@ -304,11 +321,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-function generateTierId(): any {
-  throw new Error('Function not implemented.');
-}
-
-function generateFeatureId(): any {
-  throw new Error('Function not implemented.');
-}
-

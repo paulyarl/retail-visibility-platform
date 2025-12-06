@@ -104,7 +104,21 @@ export default function TierManagementPage() {
         const tenantsRes = await api.get(`${apiBaseUrl}/api/admin/tier-management/tenants?limit=1000`);
         if (tenantsRes.ok) {
           const tenantsData = await tenantsRes.json();
-          setTenants(tenantsData.tenants || []);
+          const transformedTenants = (tenantsData.tenants || []).map((tenant: any) => ({
+            id: tenant.id,
+            name: tenant.name,
+            subscriptionTier: tenant.subscription_tier,
+            subscriptionStatus: tenant.subscription_status,
+            trialEndsAt: tenant.trial_ends_at,
+            subscriptionEndsAt: tenant.subscription_ends_at,
+            createdAt: tenant.created_at,
+            organizationId: tenant.organization_id,
+            organization: tenant.organization,
+            _count: {
+              items: tenant._count.inventory_items,
+            },
+          }));
+          setTenants(transformedTenants);
         }
       } catch (e) {
         console.error('Failed to load tier management data:', e);
@@ -197,7 +211,21 @@ export default function TierManagementPage() {
         const tenantsRes = await api.get(`${apiBaseUrl}/api/admin/tier-management/tenants?limit=1000`);
         if (tenantsRes.ok) {
           const tenantsData = await tenantsRes.json();
-          setTenants(tenantsData.tenants || []);
+          const transformedTenants = (tenantsData.tenants || []).map((tenant: any) => ({
+            id: tenant.id,
+            name: tenant.name,
+            subscriptionTier: tenant.subscription_tier,
+            subscriptionStatus: tenant.subscription_status,
+            trialEndsAt: tenant.trial_ends_at,
+            subscriptionEndsAt: tenant.subscription_ends_at,
+            createdAt: tenant.created_at,
+            organizationId: tenant.organization_id,
+            organization: tenant.organization,
+            _count: {
+              items: tenant._count.inventory_items,
+            },
+          }));
+          setTenants(transformedTenants);
         }
 
         // Reload stats
@@ -433,7 +461,7 @@ export default function TierManagementPage() {
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        <p className="font-medium text-neutral-900 dark:text-neutral-100">{tenant.name}</p>
+                        <p className="font-medium text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100">{tenant.name}</p>
                         {getStatusBadge(tenant.subscriptionStatus)}
                         <Badge className={getTierBadgeColor(tenant.subscriptionTier)}>
                           {getTierDisplayName(tenant.subscriptionTier)}
@@ -501,7 +529,7 @@ export default function TierManagementPage() {
         {showUpdateModal && selectedTenant && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-neutral-800 rounded-lg max-w-2xl w-full p-6">
-              <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-4">
+              <h2 className="text-2xl font-bold text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100 mb-4">
                 Update Tier: {selectedTenant.name}
               </h2>
 
@@ -513,7 +541,7 @@ export default function TierManagementPage() {
                   <select
                     value={updateForm.subscriptionTier}
                     onChange={(e) => setUpdateForm({ ...updateForm, subscriptionTier: e.target.value })}
-                    className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
+                    className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-neutral-800 text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100"
                   >
                     <option value="">Select a tier...</option>
                     {tiers && (
@@ -550,7 +578,7 @@ export default function TierManagementPage() {
                   <select
                     value={updateForm.subscriptionStatus}
                     onChange={(e) => setUpdateForm({ ...updateForm, subscriptionStatus: e.target.value })}
-                    className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
+                    className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white dark:bg-neutral-800 text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100"
                   >
                     <option value="trial">Trial</option>
                     <option value="active">Active</option>

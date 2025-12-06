@@ -32,8 +32,21 @@ export function useBillingData(): UseBillingDataResult {
           const data = await res.json();
           // API returns array directly, not { tenants: [...] }
           const tenantsArray = Array.isArray(data) ? data : (data.tenants || []);
-          console.log('[useBillingData] Tenants loaded:', tenantsArray.length);
-          setTenants(tenantsArray);
+          
+          // Transform snake_case fields to camelCase for frontend compatibility
+          const transformedTenants = tenantsArray.map((tenant: any) => ({
+            id: tenant.id,
+            name: tenant.name,
+            subscriptionTier: tenant.subscription_tier,
+            organization: tenant.organizations_list ? {
+              id: tenant.organizations_list.id,
+              name: tenant.organizations_list.name,
+            } : null,
+            metadata: tenant.metadata,
+          }));
+          
+          console.log('[useBillingData] Tenants loaded:', transformedTenants.length);
+          setTenants(transformedTenants);
         } else {
           console.error('[useBillingData] Failed to load tenants:', res.status);
           setError('Failed to load tenants');

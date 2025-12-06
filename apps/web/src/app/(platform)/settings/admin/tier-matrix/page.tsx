@@ -29,6 +29,7 @@ interface Tier {
 }
 
 export default function TierMatrixPage() {
+  console.log('TierMatrixPage component mounted');
   const { user, isPlatformAdmin, loading: accessLoading } = useAccessControl(null);
   const [selectedView, setSelectedView] = useState<'matrix' | 'details'>('matrix');
   const [dbTiers, setDbTiers] = useState<Tier[]>([]);
@@ -37,16 +38,24 @@ export default function TierMatrixPage() {
 
   // Load tiers from database
   useEffect(() => {
+    console.log('useEffect triggered for loadTiers');
     async function loadTiers() {
       try {
         setLoading(true);
+        console.log('Starting to load tiers...');
         // Call Railway API directly - api.get() will include auth token from cookies
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const res = await api.get(`${apiBaseUrl}/api/admin/tier-system/tiers`);
+        console.log('API response received:', res);
         if (res.ok) {
           const data = await res.json();
+          console.log('Parsed data:', data);
+          console.log('Tiers array:', data.tiers);
+          console.log('First tier features:', data.tiers?.[0]?.features);
           setDbTiers(data.tiers || []);
+          console.log('dbTiers state set');
         } else {
+          console.error('API call failed:', res);
           setError('Failed to load tiers');
         }
       } catch (e) {
@@ -57,7 +66,10 @@ export default function TierMatrixPage() {
       }
     }
     if (user) {
+      console.log('User exists, calling loadTiers');
       loadTiers();
+    } else {
+      console.log('No user, skipping loadTiers');
     }
   }, [user]);
 
@@ -123,20 +135,22 @@ export default function TierMatrixPage() {
   // Get all unique features from database tiers
   const allFeatures = new Map<string, string>();
   dbTiers.forEach(tier => {
+    console.log(`Processing tier ${tier.tierKey}, features:`, tier.features);
     tier.features.forEach(feature => {
       if (!allFeatures.has(feature.featureKey)) {
         allFeatures.set(feature.featureKey, feature.featureName);
       }
     });
   });
+  console.log('All features collected:', allFeatures);
 
   // Sort features by commonality
   const features = Array.from(allFeatures.keys()).sort((a, b) => {
     const countA = dbTiers.filter(tier => 
-      tier.features.some(f => f.featureKey === a && f.isEnabled)
+      tier.features.some(f => f.featureKey === a)
     ).length;
     const countB = dbTiers.filter(tier => 
-      tier.features.some(f => f.featureKey === b && f.isEnabled)
+      tier.features.some(f => f.featureKey === b)
     ).length;
     
     if (countB !== countA) return countB - countA;
@@ -145,7 +159,7 @@ export default function TierMatrixPage() {
 
   // Check if a tier has a feature
   const tierHasFeature = (tier: Tier, featureKey: string): boolean => {
-    return tier.features.some(f => f.featureKey === featureKey && f.isEnabled);
+    return tier.features.some(f => f.featureKey === featureKey);
   };
 
   // Get tier color based on tier type
@@ -244,7 +258,8 @@ export default function TierMatrixPage() {
           {/* Tier Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {dbTiers.map((tier) => {
-              const featureCount = tier.features.filter(f => f.isEnabled).length;
+              console.log(`Rendering tier card for ${tier.tierKey}:`, tier.features);
+              const featureCount = tier.features.length;
               const price = tier.priceMonthly / 100;
               
               return (
@@ -384,7 +399,7 @@ export default function TierMatrixPage() {
         /* Details View */
         <div className="space-y-6">
           {dbTiers.map((tier) => {
-            const tierFeatures = tier.features.filter(f => f.isEnabled);
+            const tierFeatures = tier.features;
             const price = tier.priceMonthly / 100;
             
             return (

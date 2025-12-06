@@ -14,8 +14,8 @@ interface User {
   email: string;
   name?: string;
   role: string;
-  createdAt: string;
-  lastLoginAt?: string;
+  created_at: string;
+  last_login_at?: string;
 }
 
 export default function AdminUsersPage() {
@@ -259,11 +259,11 @@ export default function AdminUsersPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {new Date(user.createdAt).toLocaleDateString()}
+                        {new Date(user.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {user.lastLoginAt 
-                          ? new Date(user.lastLoginAt).toLocaleDateString()
+                        {user.last_login_at 
+                          ? new Date(user.last_login_at).toLocaleDateString()
                           : 'Never'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

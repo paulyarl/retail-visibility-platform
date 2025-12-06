@@ -65,7 +65,7 @@ export default function BillingFilters({
             <select
               value={selectedTierFilter}
               onChange={(e) => onTierFilterChange(e.target.value)}
-              className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900/50 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
               <option value="all">All Tiers</option>
               {tiers.map((tier) => (

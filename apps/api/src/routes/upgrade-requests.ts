@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { z } from 'zod';
+import { authenticateToken, requireTenantOwner } from '../middleware/auth';
+import { generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -21,7 +23,7 @@ const updateUpgradeRequestSchema = z.object({
 });
 
 // GET /upgrade-requests - List all upgrade requests with filters
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { status, page = '1', limit = '20', tenantId } = req.query;
     
@@ -40,7 +42,7 @@ router.get('/', async (req, res) => {
       }
     }
     if (tenantId) {
-      where.tenantId = tenantId;
+      where.tenant_id = tenantId;
     }
 
     const [requests, total] = await Promise.all([
@@ -87,7 +89,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /upgrade-requests - Create new upgrade request
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const parsed = createUpgradeRequestSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -98,7 +100,15 @@ router.post('/', async (req, res) => {
     }
 
     const request = await prisma.upgrade_requests.create({
-      data: parsed.data as any,
+      data: {
+        id: generateQuickStart("upgrade"),
+        tenant_id: parsed.data.tenantId,
+        business_name: parsed.data.business_name,
+        current_tier: parsed.data.currentTier,
+        requested_tier: parsed.data.requestedTier,
+        notes: parsed.data.notes,
+        updated_at: new Date(),
+      },
     });
 
     // TODO: Send email notification to admin
@@ -127,12 +137,12 @@ router.patch('/:id', async (req, res) => {
     };
 
     if (parsed.data.adminNotes !== undefined) {
-      updateData.adminNotes = parsed.data.adminNotes;
+      updateData.admin_notes = parsed.data.adminNotes;
     }
 
     if (parsed.data.processedBy) {
-      updateData.processedBy = parsed.data.processedBy;
-      updateData.processedAt = new Date();
+      updateData.processed_by = parsed.data.processedBy;
+      updateData.processed_at = new Date();
     }
 
     const request = await prisma.upgrade_requests.update({

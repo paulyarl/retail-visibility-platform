@@ -803,8 +803,8 @@ export function AddFeatureModal({ isOpen, tier, onClose, onSubmit, submitting }:
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const response = await api.get(`${apiBaseUrl}/api/admin/tier-system/features`);
       if (response.ok) {
-        const features = await response.json();
-        setExistingFeatures(features);
+        const data = await response.json();
+        setExistingFeatures(data.features || []);
       }
     } catch (error) {
       console.error('Failed to load existing features:', error);
@@ -874,7 +874,7 @@ export function AddFeatureModal({ isOpen, tier, onClose, onSubmit, submitting }:
                         handleFeatureSelect(selected.featureKey, selected.featureName);
                       }
                     }}
-                    className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
+                    className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900/50 text-neutral-900 dark:text-neutral-100"
                     disabled={loadingFeatures}
                   >
                     <option value="">

@@ -44,13 +44,21 @@ export default function BrandingSettings() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const res = await fetch('/api/admin/settings/branding');
+        console.log('Loading branding settings from /api/platform-settings');
+        const res = await fetch('/api/platform-settings');
+        console.log('Load response status:', res.status);
+        
         if (res.ok) {
           const data = await res.json();
+          console.log('Loaded branding settings:', data);
           setValue('platformName', data.platformName || '');
           setValue('platformDescription', data.platformDescription || '');
           if (data.logoUrl) setLogoPreview(data.logoUrl);
           if (data.faviconUrl) setFaviconPreview(data.faviconUrl);
+        } else {
+          console.error('Failed to load branding settings, status:', res.status);
+          const errorText = await res.text();
+          console.error('Error response:', errorText);
         }
       } catch (err) {
         console.error('Failed to load branding settings:', err);
@@ -98,17 +106,47 @@ export default function BrandingSettings() {
       if (data.logo) formData.append('logo', data.logo);
       if (data.favicon) formData.append('favicon', data.favicon);
 
-      const res = await fetch('/api/admin/settings/branding', {
+      console.log('Sending branding update request to /api/platform-settings');
+      console.log('Form data:', {
+        platformName: data.platformName,
+        platformDescription: data.platformDescription,
+        hasLogo: !!data.logo,
+        hasFavicon: !!data.favicon
+      });
+
+      const res = await fetch('/api/platform-settings', {
         method: 'POST',
         body: formData,
       });
 
-      if (!res.ok) throw new Error('Failed to update branding');
+      console.log('API response status:', res.status);
+      console.log('API response headers:', Object.fromEntries(res.headers.entries()));
 
+      // Enhanced error handling with more details
+      if (!res.ok) {
+        let errorMessage = 'Failed to update branding';
+        let errorDetails = '';
+        
+        try {
+          const errorData = await res.json();
+          console.log('API error response:', errorData);
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          errorDetails = errorData.details ? JSON.stringify(errorData.details, null, 2) : '';
+        } catch (e) {
+          console.log('Could not parse error response as JSON');
+          // If we can't parse the error response, use the status text
+          errorMessage = res.statusText || errorMessage;
+        }
+        
+        throw new Error(`${errorMessage}${errorDetails ? `\n\nDetails: ${errorDetails}` : ''}`);
+      }
+
+      const successData = await res.json();
+      console.log('API success response:', successData);
       success('Branding settings updated successfully');
     } catch (err) {
       console.error('Failed to update branding:', err);
-      showError('Failed to update branding settings');
+      showError(err instanceof Error ? err.message : 'Failed to update branding settings');
     }
   };
 

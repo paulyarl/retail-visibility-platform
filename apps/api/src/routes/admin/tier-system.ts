@@ -20,6 +20,34 @@ const router = Router();
 router.use(authenticateToken);
 
 /**
+ * Helper to transform tier data from Prisma format to frontend format
+ */
+function transformTier(tier: any) {
+  return {
+    id: tier.id,
+    tierKey: tier.tier_key,
+    name: tier.name,
+    displayName: tier.display_name,
+    description: tier.description,
+    priceMonthly: tier.price_monthly,
+    maxSkus: tier.max_skus,
+    maxLocations: tier.max_locations,
+    tierType: tier.tier_type,
+    isActive: tier.is_active,
+    sortOrder: tier.sort_order,
+    features: (tier.tier_features_list || []).map((feature: any) => ({
+      id: feature.id,
+      featureKey: feature.feature_key,
+      featureName: feature.feature_name,
+      isEnabled: feature.is_enabled,
+      isInherited: feature.is_inherited,
+    })),
+    createdAt: tier.created_at,
+    updatedAt: tier.updated_at,
+  };
+}
+
+/**
  * Middleware to check if user is platform staff (admin, support, or viewer)
  */
 const requirePlatformStaff = (req: any, res: any, next: any) => {
@@ -118,7 +146,10 @@ router.get('/tiers', requirePlatformStaff, async (req, res) => {
       },
     });
 
-    res.json({ tiers });
+    // Transform the response to match frontend expectations
+    const transformedTiers = tiers.map(transformTier);
+
+    res.json({ tiers: transformedTiers });
   } catch (error) {
     console.error('[GET /api/admin/tier-system/tiers] Error:', error);
     res.status(500).json({ error: 'failed_to_list_tiers' });
@@ -177,7 +208,10 @@ router.get('/tiers/:tierId', requirePlatformStaff, async (req, res) => {
       return res.status(404).json({ error: 'tier_not_found' });
     }
 
-    res.json({ tier });
+    // Transform the response to match frontend expectations
+    const transformedTier = transformTier(tier);
+
+    res.json({ tier: transformedTier });
   } catch (error) {
     console.error('[GET /api/admin/tier-system/tiers/:tierId] Error:', error);
     res.status(500).json({ error: 'failed_to_get_tier' });
@@ -288,7 +322,10 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
 
     console.log(`[Tier System] Tier created by ${req.user?.email}:`, tier.tier_key);
 
-    res.status(201).json({ tier });
+    // Transform the response to match frontend expectations
+    const transformedTier = transformTier(tier);
+
+    res.status(201).json({ tier: transformedTier });
   } catch (error) {
     console.error('[POST /api/admin/tier-system/tiers] Error:', error);
     res.status(500).json({ error: 'failed_to_create_tier' });
@@ -341,7 +378,7 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     // Update tier
     const dbUpdateData: any = {};
     if (updateData.name !== undefined) dbUpdateData.name = updateData.name;
-    if (updateData.displayName !== undefined) dbUpdateData.display_display_name = updateData.displayName;
+    if (updateData.displayName !== undefined) dbUpdateData.display_name = updateData.displayName;
     if (updateData.description !== undefined) dbUpdateData.description = updateData.description;
     if (updateData.priceMonthly !== undefined) dbUpdateData.price_monthly = updateData.priceMonthly;
     if (updateData.maxSkus !== undefined) dbUpdateData.max_skus = updateData.maxSkus;
@@ -377,7 +414,10 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
 
     console.log(`[Tier System] Tier updated by ${req.user?.email}:`, updatedTier.tier_key);
 
-    res.json({ tier: updatedTier });
+    // Transform the response to match frontend expectations
+    const transformedTier = transformTier(updatedTier);
+
+    res.json({ tier: transformedTier });
   } catch (error) {
     console.error('[PATCH /api/admin/tier-system/tiers/:tierId] Error:', error);
     res.status(500).json({ error: 'failed_to_update_tier' });
@@ -479,7 +519,10 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
 
       console.log(`[Tier System] Tier soft deleted by ${req.user?.email}:`, currentTier.tier_key);
 
-      res.json({ success: true, deactivated: true, tier: updatedTier });
+    // Transform the response to match frontend expectations
+    const transformedTier = transformTier(updatedTier);
+
+    res.json({ success: true, deactivated: true, tier: transformedTier });
     }
   } catch (error) {
     console.error('[DELETE /api/admin/tier-system/tiers/:tierId] Error:', error);
@@ -554,7 +597,7 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
     const existing = await prisma.tier_features_list.findUnique({
       where: {
         tier_id_feature_key: {
-          tier_id: tierId,
+          tier_id: tier.id, // Use the actual tier ID
           feature_key: featureData.featureKey,
         },
       },
@@ -571,13 +614,13 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
     const feature = await prisma.tier_features_list.create({
       data: {
         id: generateFeatureId(),
-        tierId,
-        featureKey: featureData.featureKey,
-        featureName: featureData.featureName,
-        isEnabled: true, // Default to enabled for new features
-        isInherited: featureData.isInherited || false,
+        tier_id: tier.id, // Use the actual tier ID, not the tier_key
+        feature_key: featureData.featureKey,
+        feature_name: featureData.featureName,
+        is_enabled: true, // Default to enabled for new features
+        is_inherited: featureData.isInherited || false,
         metadata: featureData.metadata as any,
-      } as any,
+      },
     });
 
     // Log the change
@@ -645,7 +688,7 @@ router.patch('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async (
       include: { subscription_tiers_list: true },
     });
 
-    if (!currentFeature || currentFeature.tier_id !== tierId) {
+    if (!currentFeature || currentFeature.tier_id !== tier.id) {
       return res.status(404).json({ error: 'feature_not_found' });
     }
 
@@ -782,7 +825,7 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
         const newFeature = await tx.tier_features_list.create({
           data: {
             id: generateFeatureId(),
-            tier_id: tierId,
+            tier_id: targetTier.id, // Use the actual tier ID
             feature_key: feature.feature_key,
             feature_name: feature.feature_name,
             is_inherited: true,
@@ -882,13 +925,22 @@ router.delete('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async 
 
     const { reason } = parsed.data;
 
+    // Check if tier exists
+    const tier = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: tierId },
+    });
+
+    if (!tier) {
+      return res.status(404).json({ error: 'tier_not_found' });
+    }
+
     // Get current state
     const feature = await prisma.tier_features_list.findUnique({
       where: { id: featureId },
       include: { subscription_tiers_list: true },
     });
 
-    if (!feature || feature.tier_id !== tierId) {
+    if (!feature || feature.tier_id !== tier.id) {
       return res.status(404).json({ error: 'feature_not_found' });
     }
 

@@ -83,7 +83,25 @@ export default function AdminTiersPage() {
       const res = await api.get('/api/tenants');
       if (!res.ok) throw new Error('Failed to load tenants');
       const data = await res.json();
-      setTenants(Array.isArray(data) ? data : []);
+      
+      // Transform snake_case fields to camelCase for frontend compatibility
+      const tenantsArray = Array.isArray(data) ? data : [];
+      const transformedTenants = tenantsArray.map((tenant: any) => ({
+        id: tenant.id,
+        name: tenant.name,
+        subscriptionTier: tenant.subscription_tier,
+        subscriptionStatus: tenant.subscription_status,
+        trialEndsAt: tenant.trial_ends_at,
+        subscriptionEndsAt: tenant.subscription_ends_at,
+        createdAt: tenant.created_at,
+        metadata: tenant.metadata,
+        organization: tenant.organizations_list ? {
+          id: tenant.organizations_list.id,
+          name: tenant.organizations_list.name,
+        } : null,
+      }));
+      
+      setTenants(transformedTenants);
     } catch (err: any) {
       setError(err.message || 'Failed to load tenants');
     } finally {

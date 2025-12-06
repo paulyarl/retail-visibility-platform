@@ -3,6 +3,7 @@
  * 
  * Provides easy-to-use hooks for checking user permissions in React components
  */
+'use client';
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';

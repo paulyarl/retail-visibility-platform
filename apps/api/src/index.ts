@@ -96,12 +96,11 @@ import { requireActiveSubscription, checkSubscriptionLimits, requireWritableSubs
 import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 // All route imports temporarily disabled for isolation
 // import performanceRoutes from './routes/performance';
-// import platformSettingsRoutes from './routes/platform-settings';
-// import platformStatsRoutes from './routes/platform-stats';
+import platformSettingsRoutes from './routes/platform-settings';
 // import organizationRoutes from './routes/organizations';
-// import organizationRequestRoutes from './routes/organization-requests';
-// import upgradeRequestsRoutes from './routes/upgrade-requests';
-// import permissionRoutes from './routes/permissions';
+import organizationRequestRoutes from './routes/organization-requests';
+import upgradeRequestsRoutes from './routes/upgrade-requests';
+import permissionRoutes from './routes/permissions';
 // import userRoutes from './routes/users';
 // import tenantUserRoutes from './routes/tenant-users';
 // import categoriesPlatformRoutes from './routes/categories.platform';
@@ -4370,9 +4369,13 @@ app.get("/api/gbp/categories", async (req, res) => {
 // Mount test GBP sync routes
 // app.use('/test', testGbpSyncRoutes);
 
-/* ------------------------------ admin users ------------------------------ */
-app.use('/api/admin', adminUsersRoutes);
-console.log('✅ Admin users routes mounted at /api/admin');
+/* ------------------------------ platform settings ------------------------------ */
+app.use('/api', platformSettingsRoutes);
+console.log('✅ Platform settings routes mounted at /api');
+
+/* ------------------------------ permissions ------------------------------ */
+app.use('/api/permissions', permissionRoutes);
+console.log('✅ Permissions routes mounted at /api/permissions');
 
 /* ------------------------------ admin enrichment ------------------------------ */
 app.use('/api/admin/enrichment', adminEnrichmentRoutes);
@@ -4445,6 +4448,14 @@ console.log('✅ Store reviews routes mounted at /api');
 import cloneRoutes from './routes/clone';
 app.use('/api/clone', cloneRoutes);
 console.log('✅ Clone routes mounted at /api/clone (product & category cloning)');
+
+/* ------------------------------ upgrade requests ------------------------------ */
+app.use('/api/upgrade-requests', upgradeRequestsRoutes);
+console.log('✅ Upgrade requests routes mounted at /api/upgrade-requests');
+
+/* ------------------------------ organization requests ------------------------------ */
+app.use('/api/organization-requests', organizationRequestRoutes);
+console.log('✅ Organization requests routes mounted at /api/organization-requests');
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);

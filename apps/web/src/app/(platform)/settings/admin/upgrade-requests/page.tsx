@@ -5,20 +5,21 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Spinner } from
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { TIER_LIMITS } from '@/lib/tiers';
 import { CHAIN_TIERS } from '@/lib/chain-tiers';
+import { api } from '@/lib/api';
 
 interface UpgradeRequest {
   id: string;
-  tenantId: string;
-  businessName: string;
-  currentTier: string;
-  requestedTier: string;
+  tenant_id: string;
+  business_name: string;
+  current_tier: string;
+  requested_tier: string;
   status: 'new' | 'pending' | 'waiting' | 'complete' | 'denied';
   notes?: string;
-  adminNotes?: string;
-  processedBy?: string;
-  processedAt?: string;
-  createdAt: string;
-  updatedAt: string;
+  admin_notes?: string;
+  processed_by?: string;
+  processed_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Pagination {
@@ -54,7 +55,7 @@ export default function UpgradeRequestsPage() {
         params.append('status', status);
       }
 
-      const res = await fetch(`/api/upgrade-requests?${params}`);
+      const res = await api.get(`/api/upgrade-requests?${params}`);
       const data = await res.json();
       
       // Backend returns data.data, not data.requests
@@ -81,14 +82,10 @@ export default function UpgradeRequestsPage() {
 
     try {
       setProcessing(true);
-      const res = await fetch(`/api/upgrade-requests/${selectedRequest.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: newStatus,
-          adminNotes,
-          processedBy: 'admin', // TODO: Get from auth context
-        }),
+      const res = await api.patch(`/api/upgrade-requests/${selectedRequest.id}`, {
+        status: newStatus,
+        adminNotes,
+        processedBy: 'admin', // TODO: Get from auth context
       });
 
       if (res.ok) {
@@ -180,8 +177,8 @@ export default function UpgradeRequestsPage() {
         ) : (
           <div className="space-y-4">
             {requests.map((request) => {
-              const currentTierInfo = getTierInfo(request.currentTier);
-              const requestedTierInfo = getTierInfo(request.requestedTier);
+              const currentTierInfo = getTierInfo(request.current_tier);
+              const requestedTierInfo = getTierInfo(request.requested_tier);
 
               return (
                 <Card key={request.id} className="hover:shadow-md transition-shadow">
@@ -190,16 +187,16 @@ export default function UpgradeRequestsPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-lg font-semibold text-neutral-900">
-                            {request.businessName}
+                            {request.business_name}
                           </h3>
                           {getStatusBadge(request.status)}
                         </div>
                         
                         <div className="flex items-center gap-4 text-sm text-neutral-600 mb-3">
-                          <span>Tenant ID: {request.tenantId}</span>
+                          <span>Tenant ID: {request.tenant_id}</span>
                           <span>•</span>
                           <span>
-                            {new Date(request.createdAt).toLocaleDateString('en-US', {
+                            {new Date(request.created_at).toLocaleDateString('en-US', {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric',
@@ -233,10 +230,10 @@ export default function UpgradeRequestsPage() {
                           </div>
                         )}
 
-                        {request.adminNotes && (
+                        {request.admin_notes && (
                           <div className="bg-blue-50 p-3 rounded-lg">
                             <p className="text-sm text-blue-900">
-                              <span className="font-medium">Admin Notes:</span> {request.adminNotes}
+                              <span className="font-medium">Admin Notes:</span> {request.admin_notes}
                             </p>
                           </div>
                         )}
@@ -297,18 +294,18 @@ export default function UpgradeRequestsPage() {
               <div className="space-y-4">
                 <div>
                   <p className="text-sm font-medium text-neutral-700 mb-2">Business:</p>
-                  <p className="text-neutral-900">{selectedRequest.businessName}</p>
+                  <p className="text-neutral-900">{selectedRequest.business_name}</p>
                 </div>
 
                 <div>
                   <p className="text-sm font-medium text-neutral-700 mb-2">Upgrade:</p>
                   <div className="flex items-center gap-2">
-                    <Badge className={getTierInfo(selectedRequest.currentTier).color}>
-                      {getTierInfo(selectedRequest.currentTier).name}
+                    <Badge className={getTierInfo(selectedRequest.current_tier).color}>
+                      {getTierInfo(selectedRequest.current_tier).name}
                     </Badge>
                     <span>→</span>
-                    <Badge className={getTierInfo(selectedRequest.requestedTier).color}>
-                      {getTierInfo(selectedRequest.requestedTier).name}
+                    <Badge className={getTierInfo(selectedRequest.requested_tier).color}>
+                      {getTierInfo(selectedRequest.requested_tier).name}
                     </Badge>
                   </div>
                 </div>

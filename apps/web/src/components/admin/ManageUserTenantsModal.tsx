@@ -90,8 +90,14 @@ export default function ManageUserTenantsModal({
       const data = await response.json();
       
       if (response.ok) {
-        console.log('[Modal] Loaded tenant assignments:', data.tenants);
-        setTenantAssignments(data.tenants || []);
+        console.log('[Modal] Loaded tenant assignments:', data.tenant);
+        // Transform API response to match frontend interface
+        const transformedAssignments = (data.tenant || []).map((assignment: any) => ({
+          tenantId: assignment.tenant_id,
+          tenantName: assignment.tenantName,
+          role: assignment.role,
+        }));
+        setTenantAssignments(transformedAssignments);
       } else {
         console.error('[Modal] Failed to load tenant assignments:', data);
         setError(data.error || 'Failed to load tenant assignments');
@@ -109,8 +115,9 @@ export default function ManageUserTenantsModal({
       const data = await response.json();
       
       if (response.ok) {
-        console.log('[Modal] Loaded available tenants:', data.tenants);
-        setAvailableTenants(data.tenants || []);
+        console.log('[Modal] Loaded available tenants:', data);
+        // API returns array directly, not wrapped in { tenants: [...] }
+        setAvailableTenants(Array.isArray(data) ? data : []);
       } else {
         console.error('[Modal] Failed to load available tenants:', data);
       }
@@ -128,7 +135,7 @@ export default function ManageUserTenantsModal({
 
     try {
       const response = await api.post(`/api/admin/users/${user.id}/tenants`, {
-        tenantId: newTenantId,
+        tenant_id: newTenantId,
         role: newRole,
       });
 

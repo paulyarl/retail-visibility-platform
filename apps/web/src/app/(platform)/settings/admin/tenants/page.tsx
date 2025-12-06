@@ -46,32 +46,19 @@ export default function AdminTenantsPage() {
           return;
         }
         
-        // Fetch item counts for each tenant in parallel
-        const tenantsWithCounts = await Promise.all(
-          data.map(async (t: any) => {
-            try {
-              const itemsRes = await api.get(`/api/tenants/${t.id}/items`);
-              const items = itemsRes.ok ? await itemsRes.json() : [];
-              
-              // Determine status based on subscriptionStatus (treat trial as active for this view)
-              const isActive = t.subscriptionStatus === 'active' || isTrialStatus(t.subscriptionStatus);
-              
-              return {
-                ...t,
-                status: isActive ? 'active' : 'inactive',
-                itemCount: Array.isArray(items) ? items.length : 0,
-              };
-            } catch {
-              return {
-                ...t,
-                status: t.subscriptionStatus === 'active' || isTrialStatus(t.subscriptionStatus) ? 'active' : 'inactive',
-                itemCount: 0,
-              };
-            }
-          })
-        );
+        // Transform tenants with status
+        const tenantsWithStatus = data.map((t: any) => {
+          // Determine status based on subscription_status (treat trial as active for this view)
+          const isActive = t.subscription_status === 'active' || isTrialStatus(t.subscription_status);
+          
+          return {
+            ...t,
+            status: isActive ? 'active' : 'inactive',
+            itemCount: 0, // TODO: Implement item count fetching when endpoint exists
+          };
+        });
         
-        setTenants(tenantsWithCounts);
+        setTenants(tenantsWithStatus);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load tenants');
       } finally {

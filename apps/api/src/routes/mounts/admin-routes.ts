@@ -23,10 +23,10 @@ export function mountAdminRoutes(app: Express) {
 
   // Specific admin routes - MUST be mounted BEFORE generic routes to prevent conflicts
   app.use('/api/admin/platform-categories', authenticateToken, requireAdmin, platformCategoriesRoutes);
-  app.use('/api/admin/feature-overrides', featureOverridesRoutes);
-  app.use('/api/admin/tier-management', tierManagementRoutes);
-  app.use('/api/admin/tier-system', tierSystemRoutes);
-  app.use('/api/admin/tenants', adminTenantsRoutes);
+  app.use('/api/admin/feature-overrides', authenticateToken, requireAdmin, featureOverridesRoutes);
+  app.use('/api/admin/tier-management', authenticateToken, tierManagementRoutes);
+  app.use('/api/admin/tier-system', authenticateToken, requireAdmin, tierSystemRoutes);
+  app.use('/api/admin/tenants', authenticateToken, requireAdmin, adminTenantsRoutes);
   
   // Tenant flags: accessible by platform admins OR store owners of that specific tenant
   app.use('/admin', authenticateToken, tenantFlagsRoutes);

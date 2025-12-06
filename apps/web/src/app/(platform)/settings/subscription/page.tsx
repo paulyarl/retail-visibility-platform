@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
+import { TIER_LIMITS, type SubscriptionTier, getTierInfo } from '@/lib/tiers';
 import { isTrialStatus, getTrialEndLabel } from '@/lib/trial';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 import { getAllAdminEmails } from '@/lib/admin-emails';
@@ -33,9 +33,9 @@ interface PendingRequest {
   requestedTier: string;
   currentTier: string;
   status: string;
-  createdAt: string;
+  created_at: string;
   adminNotes?: string;
-  processedAt?: string;
+  processed_at?: string;
   processedBy?: string;
 }
 
@@ -316,9 +316,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
 
   const currentTier = tenant.subscriptionTier || 'trial';
   const isChainTier = currentTier.startsWith('chain_');
-  const tierInfo = isChainTier 
-    ? CHAIN_TIERS[currentTier as ChainTier]
-    : TIER_LIMITS[currentTier as SubscriptionTier];
+  const tierInfo = getTierInfo(currentTier);
   
   // Use capacity data from centralized hook
   const skuUsage = capacityData?.skuUsage || 0;
@@ -330,13 +328,6 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   const handleRequestChange = (newTier: SubscriptionTier | ChainTier) => {
     setSelectedTier(newTier);
     setShowChangeModal(true);
-  };
-
-  const getTierInfo = (tier: SubscriptionTier | ChainTier) => {
-    if (tier.startsWith('chain_')) {
-      return CHAIN_TIERS[tier as ChainTier];
-    }
-    return TIER_LIMITS[tier as SubscriptionTier];
   };
 
   const handleSubmitChange = async () => {
@@ -358,7 +349,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
       // Create upgrade request in database (queue)
       const response = await api.post('/api/upgrade-requests', {
         tenantId: tenant.id,
-        businessName: metadata?.businessName || tenant.name,
+        business_name: metadata?.businessName || tenant.name,
         currentTier: tenant.subscriptionTier || 'starter',
         requestedTier: selectedTier,
         notes: `Subscription change request from ${metadata?.businessName || tenant.name}`,
@@ -673,7 +664,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                             </Badge>
                           </div>
                           <p className="text-sm text-neutral-600">
-                            Submitted: {new Date(request.createdAt).toLocaleDateString('en-US', {
+                            Submitted: {new Date(request.created_at).toLocaleDateString('en-US', {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric',
@@ -769,17 +760,17 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                             </div>
                             <div className="flex items-center gap-3 text-sm text-neutral-600">
                               <span>
-                                Requested: {new Date(request.createdAt).toLocaleDateString('en-US', {
+                                Requested: {new Date(request.created_at).toLocaleDateString('en-US', {
                                   year: 'numeric',
                                   month: 'short',
                                   day: 'numeric'
                                 })}
                               </span>
-                              {request.processedAt && (
+                              {request.processed_at && (
                                 <>
                                   <span>•</span>
                                   <span>
-                                    {isApproved ? 'Approved' : 'Denied'}: {new Date(request.processedAt).toLocaleDateString('en-US', {
+                                    {isApproved ? 'Approved' : 'Denied'}: {new Date(request.processed_at).toLocaleDateString('en-US', {
                                       year: 'numeric',
                                       month: 'short',
                                       day: 'numeric'

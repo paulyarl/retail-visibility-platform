@@ -1,26 +1,28 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
 import { useAccessControl } from '@/lib/auth/useAccessControl';
 import { FEATURE_DISPLAY_NAMES } from '@/lib/tiers/tier-features';
 
 interface FeatureOverride {
   id: string;
   tenantId: string;
+  tenant_id: string;
   feature: string;
   granted: boolean;
   reason?: string;
-  expiresAt?: string;
+  expires_at?: string;
   expiresAtDate?: string;
   expiresAtTime?: string;
   grantedBy: string;
   createdAt: string;
   updatedAt: string;
-  tenant: {
+  tenants: {
     id: string;
     name: string;
-    subscriptionTier: string;
-    subscriptionStatus: string;
+    subscription_tier: string;
+    subscription_status: string;
   };
   isExpired: boolean;
   isActive: boolean;
@@ -72,7 +74,7 @@ export default function FeatureOverridesPage() {
       if (filterFeature) params.append('feature', filterFeature);
       if (filterActive !== 'all') params.append('active', filterActive);
 
-      const res = await fetch(`/api/admin/feature-overrides?${params}`);
+      const res = await api.get(`/api/admin/feature-overrides?${params}`);
       if (!res.ok) throw new Error('Failed to fetch overrides');
       
       const data = await res.json();
@@ -87,7 +89,7 @@ export default function FeatureOverridesPage() {
 
   const fetchTenants = async () => {
     try {
-      const res = await fetch('/api/admin/tenants');
+      const res = await api.get('/api/admin/tenants');
       if (!res.ok) throw new Error('Failed to fetch tenants');
       
       const data = await res.json();
@@ -110,16 +112,14 @@ export default function FeatureOverridesPage() {
       }
 
       const payload = {
-        ...formData,
-        expiresAt,
+        tenantId: formData.tenantId,
+        feature: formData.feature,
+        granted: formData.granted,
+        reason: formData.reason,
+        expires_at: expiresAt,
       };
 
-      const res = await fetch('/api/admin/feature-overrides', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
+      const res = await api.post('/api/admin/feature-overrides', payload);
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || 'Failed to create override');
@@ -159,15 +159,10 @@ export default function FeatureOverridesPage() {
       const payload = {
         granted: formData.granted,
         reason: formData.reason,
-        expiresAt,
+        expires_at: expiresAt,
       };
 
-      const res = await fetch(`/api/admin/feature-overrides/${editingOverride.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
+      const res = await api.put(`/api/admin/feature-overrides/${editingOverride.id}`, payload);
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || 'Failed to update override');
@@ -193,10 +188,7 @@ export default function FeatureOverridesPage() {
     if (!confirm('Are you sure you want to delete this override?')) return;
 
     try {
-      const res = await fetch(`/api/admin/feature-overrides/${id}`, {
-        method: 'DELETE',
-      });
-
+      const res = await api.delete(`/api/admin/feature-overrides/${id}`);
       if (!res.ok) throw new Error('Failed to delete override');
       
       fetchOverrides();
@@ -207,11 +199,11 @@ export default function FeatureOverridesPage() {
 
   const handleEdit = (override: FeatureOverride) => {
     setEditingOverride(override);
-    // Parse the expiresAt date into separate date and time fields
+    // Parse the expires_at date into separate date and time fields
     let expiresAtDate = '';
     let expiresAtTime = '';
-    if (override.expiresAt) {
-      const date = new Date(override.expiresAt);
+    if (override.expires_at) {
+      const date = new Date(override.expires_at);
       expiresAtDate = date.toISOString().slice(0, 10); // YYYY-MM-DD
       expiresAtTime = date.toISOString().slice(11, 16); // HH:MM
     }
@@ -221,7 +213,7 @@ export default function FeatureOverridesPage() {
       feature: override.feature,
       granted: override.granted,
       reason: override.reason || '',
-      expiresAt: override.expiresAt ? new Date(override.expiresAt).toISOString().slice(0, 16) : '',
+      expiresAt: override.expires_at ? new Date(override.expires_at).toISOString().slice(0, 16) : '',
       expiresAtDate,
       expiresAtTime,
     });
@@ -231,10 +223,7 @@ export default function FeatureOverridesPage() {
     if (!confirm('Remove all expired overrides?')) return;
 
     try {
-      const res = await fetch('/api/admin/feature-overrides/cleanup-expired', {
-        method: 'POST',
-      });
-
+      const res = await api.post('/api/admin/feature-overrides/cleanup-expired');
       if (!res.ok) throw new Error('Failed to cleanup expired overrides');
       
       const data = await res.json();
@@ -384,10 +373,10 @@ export default function FeatureOverridesPage() {
                     <td className="p-4">
                       <div>
                         <div className="font-medium text-neutral-900 dark:text-neutral-100">
-                          {override.tenant.name}
+                          {override.tenants.name}
                         </div>
                         <div className="text-sm text-neutral-600 dark:text-neutral-400">
-                          {override.tenant.subscriptionTier}
+                          {override.tenants.subscription_tier}
                         </div>
                       </div>
                     </td>
@@ -415,8 +404,8 @@ export default function FeatureOverridesPage() {
                       {override.reason || '-'}
                     </td>
                     <td className="p-4 text-neutral-700 dark:text-neutral-300 text-sm">
-                      {override.expiresAt 
-                        ? new Date(override.expiresAt).toLocaleDateString()
+                      {override.expires_at 
+                        ? new Date(override.expires_at).toLocaleDateString()
                         : 'Never'}
                     </td>
                     <td className="p-4">
@@ -584,7 +573,7 @@ export default function FeatureOverridesPage() {
                 </label>
                 <input
                   type="text"
-                  value={editingOverride.tenant.name}
+                  value={editingOverride.tenants.name}
                   disabled
                   className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400"
                 />
