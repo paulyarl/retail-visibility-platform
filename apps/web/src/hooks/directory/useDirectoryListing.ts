@@ -74,14 +74,15 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to publish listing');
+        const errorMessage = errorData.message || 'Failed to publish listing';
+        setError(errorMessage);
+        return;
       }
 
       await fetchListing();
     } catch (err) {
       console.error('Error publishing listing:', err);
       setError(err instanceof Error ? err.message : 'Failed to publish');
-      throw err;
     }
   }, [tenantId, fetchListing]);
 

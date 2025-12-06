@@ -102,10 +102,10 @@ export default function TenantBrandingPage() {
         contentType: result.contentType,
       });
 
-      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
+      const res = await api.post(`/api/tenant/${encodeURIComponent(tenantId)}/logo`, {
+        tenant_id: tenantId,
+        dataUrl: result.dataUrl,
+        contentType: result.contentType,
       });
 
       if (!res.ok) {
@@ -118,10 +118,13 @@ export default function TenantBrandingPage() {
       const uploadedUrl = payload.url;
       
       if (uploadedUrl) {
+        console.log('[Branding] Logo upload successful, URL:', uploadedUrl);
         setLogoUrl(uploadedUrl);
         setLogoPreview(uploadedUrl);
         setSuccess('Logo uploaded successfully!');
         setTimeout(() => setSuccess(null), 3000);
+      } else {
+        console.error('[Branding] Logo upload response missing URL:', payload);
       }
     } catch (err: any) {
       console.error('Logo upload error:', err);
@@ -153,10 +156,10 @@ export default function TenantBrandingPage() {
         contentType: result.contentType,
       });
 
-      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/banner`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
+      const res = await api.post(`/api/tenant/${encodeURIComponent(tenantId)}/banner`, {
+        tenant_id: tenantId,
+        dataUrl: result.dataUrl,
+        contentType: result.contentType,
       });
 
       if (!res.ok) {
@@ -169,10 +172,13 @@ export default function TenantBrandingPage() {
       const uploadedUrl = payload.url;
       
       if (uploadedUrl) {
+        console.log('[Branding] Banner upload successful, URL:', uploadedUrl);
         setBannerUrl(uploadedUrl);
         setBannerPreview(uploadedUrl);
         setSuccess('Banner uploaded successfully!');
         setTimeout(() => setSuccess(null), 3000);
+      } else {
+        console.error('[Branding] Banner upload response missing URL:', payload);
       }
     } catch (err: any) {
       console.error('Banner upload error:', err);
@@ -190,23 +196,20 @@ export default function TenantBrandingPage() {
   };
 
   const handleSave = async () => {
+    console.log('[Branding] Save clicked with values:', {
+      businessName,
+      tagline,
+      logoUrl,
+      bannerUrl
+    });
+    
     try {
       setSaving(true);
       setError(null);
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
       // Update tenant name
-      const tenantResponse = await fetch(`${apiBaseUrl}/api/tenants/${encodeURIComponent(tenantId)}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: businessName,
-        }),
+      const tenantResponse = await api.put(`/api/tenants/${encodeURIComponent(tenantId)}`, {
+        name: businessName,
       });
 
       if (!tenantResponse.ok) {
@@ -216,19 +219,20 @@ export default function TenantBrandingPage() {
       }
       
       // Update profile (business description, logo, banner)
-      const response = await fetch(`${apiBaseUrl}/api/tenant/profile`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          tenant_id: tenantId,
-          business_name: businessName,
-          business_description: tagline,
-          logo_url: logoUrl,
-          banner_url: bannerUrl,
-        }),
+      console.log('[Branding] Sending profile update:', {
+        tenant_id: tenantId,
+        business_name: businessName,
+        business_description: tagline,
+        logo_url: logoUrl,
+        banner_url: bannerUrl,
+      });
+      
+      const response = await api.patch(`/api/tenant/profile`, {
+        tenant_id: tenantId,
+        business_name: businessName,
+        business_description: tagline,
+        logo_url: logoUrl,
+        banner_url: bannerUrl,
       });
 
       if (response.ok) {

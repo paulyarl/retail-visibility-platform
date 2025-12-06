@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useDirectoryListing } from '@/hooks/directory/useDirectoryListing';
-import DirectoryCategorySelectorMulti from './DirectoryCategorySelectorMulti';
+import DirectoryCategorySelectorAdapter from './DirectoryCategorySelectorAdapter';
 import DirectoryListingPreview from './DirectoryListingPreview';
 import DirectoryStatusBadge from './DirectoryStatusBadge';
 
@@ -31,6 +31,14 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     }
   }, [listing]);
 
+  // Show success message when listing becomes published
+  useEffect(() => {
+    if (listing?.isPublished && !saveMessage.includes('success')) {
+      setSaveMessage('Listing published successfully!');
+      setTimeout(() => setSaveMessage(''), 3000);
+    }
+  }, [listing?.isPublished, saveMessage]);
+
   const handleSave = async () => {
     try {
       setIsSaving(true);
@@ -58,17 +66,10 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
       return;
     }
 
-    try {
-      setIsSaving(true);
-      setSaveMessage('');
-      await publish();
-      setSaveMessage('Listing published successfully!');
-      setTimeout(() => setSaveMessage(''), 3000);
-    } catch (err) {
-      setSaveMessage('Failed to publish listing');
-    } finally {
-      setIsSaving(false);
-    }
+    setIsSaving(true);
+    setSaveMessage('');
+    await publish();
+    setIsSaving(false);
   };
 
   const handleUnpublish = async () => {
@@ -203,7 +204,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Categories
             </h3>
-            <DirectoryCategorySelectorMulti
+            <DirectoryCategorySelectorAdapter
               primary={primaryCategory}
               secondary={secondaryCategories}
               onPrimaryChange={setPrimaryCategory}

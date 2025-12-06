@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
-import GBPCategorySelectorMulti from './GBPCategorySelectorMulti';
+import GBPCategorySelectorAdapter from './GBPCategorySelectorAdapter';
 import { api } from '@/lib/api';
 import { CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
@@ -178,7 +178,7 @@ export default function GBPCategoryCard({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <GBPCategorySelectorMulti
+          <GBPCategorySelectorAdapter
             tenantId={tenantId}
             primary={primary}
             secondary={secondary}

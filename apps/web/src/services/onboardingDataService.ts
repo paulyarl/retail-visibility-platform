@@ -126,6 +126,14 @@ export class OnboardingDataService {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      
+      // Extract validation errors from the details field
+      if (errorData.details?.fieldErrors) {
+        const fieldErrors = errorData.details.fieldErrors;
+        const firstError = Object.values(fieldErrors).flat()[0];
+        throw new Error(String(firstError) || 'Validation failed');
+      }
+      
       throw new Error(errorData?.error || 'Failed to save business profile');
     }
   }

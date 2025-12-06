@@ -743,6 +743,22 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
       newStatus: updated.location_status,
     });
 
+    // Record status change in history (using raw SQL since table is ignored in Prisma)
+    try {
+      const { basePrisma } = await import('./prisma');
+      await basePrisma.$executeRaw`
+        INSERT INTO location_status_logs (
+          tenant_id, old_status, new_status, changed_by, reason, reopening_date
+        ) VALUES (
+          ${id}, ${tenant.location_status}::location_status, ${status}::location_status, ${req.user?.userId || null}, ${reason || null}, ${reopening_date ? new Date(reopening_date) : null}
+        )
+      `;
+      console.log(`[PATCH /tenants/${id}/status] Status change logged to history`);
+    } catch (historyError) {
+      console.error(`[PATCH /tenants/${id}/status] Failed to log status change to history:`, historyError);
+      // Don't fail the request if history logging fails
+    }
+
     // Sync to Google Business Profile (async, don't block response)
     const { syncLocationStatusToGoogle } = await import('./services/GoogleBusinessStatusSync');
     console.log(`[PATCH /tenants/${id}/status] Triggering GBP sync`);
@@ -820,26 +836,33 @@ app.get("/api/tenants/:id/status-history", authenticateToken, checkTenantAccess,
     const { id } = req.params;
     const limit = parseInt(req.query.limit as string) || 50;
 
-    // Note: location_status_logs model is ignored in Prisma schema
-    // Return empty array for now to prevent 500 errors
-    const history: any[] = [];
-    
-    // TODO: Fix location_status_logs model in schema or use raw SQL
-    // const history = await prisma.location_status_logs.findMany({
-    //   where: { tenant_id: id },
-    //   orderBy: { created_at: 'desc' },
-    //   take: limit,
-    // });
+    // Fetch status history using raw SQL
+    const { basePrisma } = await import('./prisma');
+    const historyResults = await basePrisma.$queryRaw`
+      SELECT 
+        id, tenant_id, old_status::text, new_status::text, changed_by, reason, reopening_date, created_at
+      FROM location_status_logs 
+      WHERE tenant_id = ${id}
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `;
 
-    // Enrich with user information if needed
-    const enrichedHistory = history.map(log => ({
-      ...log,
-      oldStatusInfo: getLocationStatusInfo(log.oldStatus as any),
-      newStatusInfo: getLocationStatusInfo(log.newStatus as any),
+    // Enrich with user information and status info
+    const history = (historyResults as any[]).map(log => ({
+      id: log.id,
+      tenantId: log.tenant_id,
+      oldStatus: log.old_status,
+      newStatus: log.new_status,
+      changedBy: log.changed_by,
+      reason: log.reason,
+      reopeningDate: log.reopening_date,
+      createdAt: log.created_at,
+      oldStatusInfo: getLocationStatusInfo(log.old_status),
+      newStatusInfo: getLocationStatusInfo(log.new_status),
     }));
 
     res.json({
-      history: enrichedHistory,
+      history,
       count: history.length,
     });
   } catch (error: any) {
@@ -2175,7 +2198,7 @@ const logoDataUrlSchema = z.object({
   contentType: z.string().min(1),
 });
 
-app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) => {
+app.post("/api/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) => {
   try {
     const tenant_id = req.params.id;
     console.log(`[Logo Upload] Starting upload for tenant ${tenant_id}`, {

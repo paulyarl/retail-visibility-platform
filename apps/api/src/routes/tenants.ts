@@ -8,6 +8,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { canViewAllTenants } from '../utils/platform-admin';
+import { getLocationStatusInfo } from '../utils/location-status';
 
 const router = Router();
 
@@ -73,6 +74,7 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
         organization_id: true,
         subscription_tier: true,
         subscription_status: true,
+        location_status: true,
         created_at: true,
         _count: {
           select: {
@@ -101,12 +103,25 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
       subscriptionTier: tenant.subscription_tier,
       subscriptionStatus: tenant.subscription_status,
       createdAt: tenant.created_at,
+      locationStatus: tenant.location_status,
+      statusInfo: getLocationStatusInfo(tenant.location_status as any),
       stats: {
         productCount: tenant._count.inventory_items,
         userCount: tenant._count.user_tenants,
       },
     };
 
+    console.log(`[TENANTS] Returning tenant data:`, {
+      id: transformedTenant.id,
+      locationStatus: transformedTenant.locationStatus,
+      statusInfo: transformedTenant.statusInfo
+    });
+
+    // Prevent caching to ensure fresh status data
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
     res.json(transformedTenant);
   } catch (error: any) {
     console.error('[TENANTS] Error fetching tenant details:', error);

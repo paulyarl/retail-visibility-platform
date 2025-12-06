@@ -98,10 +98,18 @@ export default function ChangeLocationStatusModal({
   const fetchCurrentStatus = async () => {
     setStatusLoading(true);
     try {
-      const response = await api.get(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tenants/${tenantId}`);
+      // Add timestamp to bust cache
+      const timestamp = Date.now();
+      const response = await api.get(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tenants/${tenantId}?_t=${timestamp}`);
       if (response.ok) {
         const tenantData = await response.json();
-        const backendStatus = tenantData.locationStatus || 'active';
+        console.log('[ChangeLocationStatusModal] Tenant data from API:', tenantData);
+        console.log('[ChangeLocationStatusModal] Available fields:', Object.keys(tenantData));
+        console.log('[ChangeLocationStatusModal] locationStatus field:', tenantData.locationStatus);
+        console.log('[ChangeLocationStatusModal] location_status field:', tenantData.location_status);
+        
+        const backendStatus = tenantData.locationStatus || tenantData.location_status || 'active';
+        console.log('[ChangeLocationStatusModal] Setting current status to:', backendStatus);
         setCurrentStatus(backendStatus);
         setSelectedStatus(backendStatus); // Reset selected status to current
       } else {
@@ -214,19 +222,11 @@ export default function ChangeLocationStatusModal({
   const selectedOption = STATUS_OPTIONS.find(opt => opt.value === selectedStatus);
   const allowedTransitions = STATUS_OPTIONS.filter(opt => {
     // Can't transition to current status
-    if (opt.value === currentStatus) return false;
-    
-    // Define allowed transitions (must stay in sync with backend STATUS_TRANSITIONS)
-    const transitions: Record<string, string[]> = {
-      pending: ['active', 'archived'],
-      active: ['inactive', 'closed', 'archived'],
-      inactive: ['active', 'closed', 'archived'],
-      closed: ['archived'],
-      archived: ['active'],
-    };
-    
-    return transitions[currentStatus]?.includes(opt.value);
+    return opt.value !== currentStatus;
   });
+  
+  console.log('[ChangeLocationStatusModal] Current status:', currentStatus);
+  console.log('[ChangeLocationStatusModal] Allowed transitions:', allowedTransitions.map(opt => opt.value));
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
