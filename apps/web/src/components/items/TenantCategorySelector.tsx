@@ -36,9 +36,13 @@ export default function TenantCategorySelector({
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const response = await apiRequest(`api/v1/tenants/${tenantId}/categories`);
+        console.log('[TenantCategorySelector] tenantId:', tenantId);
+        console.log('[TenantCategorySelector] calling apiRequest with:', `/api/tenant/${tenantId}/categories`);
+        const response = await apiRequest(`/api/tenant/${tenantId}/categories`);
+        console.log('[TenantCategorySelector] response status:', response.status);
         if (response.ok) {
           const result = await response.json();
+          console.log('[TenantCategorySelector] response data:', result);
           setCategories(result.data || []);
         } else {
           console.error('Failed to fetch categories:', response.status, response.statusText);

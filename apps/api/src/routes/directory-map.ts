@@ -25,8 +25,15 @@ const router = Router();
  */
 router.get('/map/locations', async (req: Request, res: Response) => {
   try {
-    const queryParams = req.query as { category?: string; storeType?: string; city?: string; state?: string; limit?: string };
-    const { category, storeType, city, state, limit = '100' } = queryParams;
+    const queryParams = req.query as { 
+      category?: string; 
+      storeType?: string; 
+      city?: string; 
+      state?: string; 
+      q?: string; // Search query
+      limit?: string 
+    };
+    const { category, storeType, city, state, q: searchQuery, limit = '100' } = queryParams;
     
     const pool = getDirectPool();
     const conditions: string[] = [];
@@ -66,6 +73,13 @@ router.get('/map/locations', async (req: Request, res: Response) => {
     if (state) {
       conditions.push(`dll.state = $${paramIndex}`);
       params.push(state);
+      paramIndex++;
+    }
+
+    // Filter by search query (name or city)
+    if (searchQuery) {
+      conditions.push(`(t.name ILIKE $${paramIndex} OR dll.city ILIKE $${paramIndex})`);
+      params.push(`%${searchQuery}%`);
       paramIndex++;
     }
 

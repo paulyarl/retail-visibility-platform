@@ -124,9 +124,20 @@ export default function ProductDisplay({ products, tenantId }: ProductDisplayPro
                   <p className="text-lg font-bold text-primary-600 dark:text-primary-400">
                     {product.currency} {typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
                   </p>
-                  <p className="text-xs text-neutral-500">
-                    SKU: {product.sku}
-                  </p>
+                  <div className="text-right">
+                    <p className="text-xs text-neutral-500">
+                      SKU: {product.sku}
+                    </p>
+                    <p className={`text-xs font-medium ${
+                      product.stock === 0 
+                        ? 'text-red-600 dark:text-red-400' 
+                        : product.stock < 10 
+                        ? 'text-amber-600 dark:text-amber-400' 
+                        : 'text-green-600 dark:text-green-400'
+                    }`}>
+                      Stock: {product.stock}
+                    </p>
+                  </div>
                 </div>
               </div>
             </Link>
@@ -232,9 +243,20 @@ export default function ProductDisplay({ products, tenantId }: ProductDisplayPro
                   <p className="text-lg font-bold text-primary-600 dark:text-primary-400">
                     {product.currency} {typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
                   </p>
-                  <p className="text-xs text-neutral-500">
-                    SKU: {product.sku}
-                  </p>
+                  <div className="text-right">
+                    <p className="text-xs text-neutral-500">
+                      SKU: {product.sku}
+                    </p>
+                    <p className={`text-xs font-medium ${
+                      product.stock === 0 
+                        ? 'text-red-600 dark:text-red-400' 
+                        : product.stock < 10 
+                        ? 'text-amber-600 dark:text-amber-400' 
+                        : 'text-green-600 dark:text-green-400'
+                    }`}>
+                      Stock: {product.stock}
+                    </p>
+                  </div>
                 </div>
               </div>
             </Link>
@@ -285,9 +307,16 @@ export default function ProductDisplay({ products, tenantId }: ProductDisplayPro
                 <div>
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
-                        {product.brand}
-                      </p>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                          {product.brand}
+                        </p>
+                        {product.tenantCategory && (
+                          <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
+                            {product.tenantCategory.name}
+                          </span>
+                        )}
+                      </div>
                       <h3 className="font-semibold text-lg text-neutral-900 dark:text-white mb-2">
                         {product.title}
                       </h3>
@@ -304,7 +333,15 @@ export default function ProductDisplay({ products, tenantId }: ProductDisplayPro
                 </div>
                 <div className="flex items-center justify-between text-xs text-neutral-500">
                   <span>SKU: {product.sku}</span>
-                  <span>Stock: {product.stock}</span>
+                  <span className={`font-medium ${
+                    product.stock === 0 
+                      ? 'text-red-600 dark:text-red-400' 
+                      : product.stock < 10 
+                      ? 'text-amber-600 dark:text-amber-400' 
+                      : 'text-green-600 dark:text-green-400'
+                  }`}>
+                    Stock: {product.stock}
+                  </span>
                 </div>
               </div>
             </Link>

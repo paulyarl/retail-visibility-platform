@@ -8,6 +8,51 @@
 import { generateItemId, generateQuickStartSku } from './id-generator';
 import { suggestCategories, getCategoryById } from './google/taxonomy';
 import { productCacheService } from '../services/ProductCacheService';
+import { z } from 'zod';
+
+// Item schema validation (copied from index.ts for consistency)
+const baseItemSchema = z.object({
+  tenant_id: z.string().min(1).optional(),
+  tenantId: z.string().min(1).optional(), // Accept camelCase from frontend
+  sku: z.string().min(1),
+  name: z.string().min(1),
+  price_cents: z.number().int().nonnegative(),
+  stock: z.number().int().nonnegative(),
+  image_url: z.string().url().nullable().optional(),
+  metadata: z.any().optional(),
+  description: z.string().optional(),
+  // v3.4 SWIS fields (required by schema)
+  title: z.string().min(1).optional(),
+  brand: z.string().min(1).optional(),
+  manufacturer: z.string().optional(),
+  price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
+  currency: z.string().length(3).optional(),
+  availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
+  // Item status and visibility
+  item_status: z.enum(['active', 'inactive', 'archived']).optional(),
+  itemStatus: z.enum(['active', 'inactive', 'archived']).optional(), // Accept camelCase from frontend
+  status: z.string().optional(), // Legacy field, ignore
+  visibility: z.enum(['public', 'private']).optional(),
+  // Category path for Google Shopping
+  category_path: z.array(z.string()).optional(),
+  // Tenant category assignment
+  directory_category_id: z.string().nullable().optional(),
+  tenantCategoryId: z.string().nullable().optional(), // Accept camelCase from frontend
+});
+
+const createItemSchema = baseItemSchema.extend({
+  // Apply defaults only for creation
+  price_cents: z.number().int().nonnegative().default(0),
+  stock: z.number().int().nonnegative().default(0),
+}).transform((data) => {
+  const { tenant_id, tenantId, itemStatus, item_status, tenantCategoryId, directory_category_id, status, ...rest } = data;
+  return {
+    ...rest,
+    tenant_id: tenant_id || tenantId, // Prefer snake_case, fallback to camelCase
+    item_status: item_status || itemStatus || 'active', // Prefer snake_case, fallback to camelCase, default to active
+    directory_category_id: directory_category_id || tenantCategoryId || null, // Prefer snake_case, fallback to camelCase
+  };
+});
 
 // Product scenarios with realistic data
 const SCENARIOS = {
@@ -386,10 +431,10 @@ export async function generateQuickStartProducts(
         brand: product.brand || 'Generic',
         description: product.description || null,
         metadata: Object.keys(metadata).length > 0 ? metadata : null,
-        price_cents: product.price,
-        price: product.price / 100,
+        price_cents: Math.round(Number(product.price)), // Ensure integer
+        price: Number(product.price) / 100, // Ensure decimal
         currency: 'USD',
-        stock,
+        stock: Math.max(0, Math.round(stock)), // Ensure non-negative integer
         availability,
         item_status: itemStatus,
         updated_at: new Date(),
@@ -424,8 +469,41 @@ export async function generateQuickStartProducts(
       for (const item of items) {
         try {
           // Remove temporary tracking fields before creating
-          const { _categoryName, ...itemData } = item as any;
-          const created = await prismaClient.inventory_items.create({ data: itemData });
+          const { _categoryName, ...rawItemData } = item as any;
+          
+          // Use the same validation and transformation as the regular items API
+          const parsed = createItemSchema.safeParse(rawItemData);
+          if (!parsed.success) {
+            console.error('[Quick Start] Validation failed for item:', rawItemData.name, parsed.error.flatten());
+            throw new Error(`Validation failed for item ${rawItemData.name}: ${JSON.stringify(parsed.error.flatten())}`);
+          }
+          
+          // Apply the same transformations as the regular API
+          const data = {
+            ...parsed.data,
+            title: parsed.data.title || parsed.data.name,
+            brand: parsed.data.brand || 'Unknown',
+            // Price logic: prioritize price (dollars) over price_cents (cents)
+            price: parsed.data.price ?? (parsed.data.price_cents ? parsed.data.price_cents / 100 : 0),
+            price_cents: parsed.data.price_cents ?? (parsed.data.price ? Math.round(parsed.data.price * 100) : 0),
+            currency: parsed.data.currency || 'USD',
+            // Auto-set availability based on stock if not explicitly provided
+            availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
+            tenant_id: parsed.data.tenant_id || '', // Ensure tenant_id is always a string
+            // Handle both category_path and category_path (from transform middleware)
+            category_path: parsed.data.category_path || parsed.data.category_path || [],
+          };
+          
+          // Remove any conflicting fields that might be added by the middleware
+          const { category_path, ...cleanData } = data;
+          
+          const created = await prismaClient.inventory_items.create({ 
+            data: {
+              id: generateItemId(),
+              ...cleanData,
+              updated_at: new Date(),
+            }
+          });
           // Add back the tracking field for photo generation
           (created as any)._categoryName = _categoryName;
           createdItems.push(created);

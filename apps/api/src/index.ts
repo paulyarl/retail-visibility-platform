@@ -2833,31 +2833,39 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
       prisma.inventory_items.count({ where }),
     ]);
     
-    // Fetch all unique category IDs from items
-    const categoryIds = [...new Set(items.map(item => item.directory_category_id).filter(Boolean))];
-    const categories = categoryIds.length > 0 
+    // Fetch all unique category slugs from items' category_path arrays
+    const categorySlugs = [...new Set(items.flatMap(item => item.category_path || []).filter(Boolean))];
+    const categories = categorySlugs.length > 0 
       ? await prisma.directory_category.findMany({
-          where: { id: { in: categoryIds as string[] } },
+          where: { 
+            slug: { in: categorySlugs },
+            tenantId: tenant_id
+          },
           select: { id: true, name: true, slug: true, googleCategoryId: true }
         })
       : [];
     
     // Create a category lookup map
-    const categoryMap = new Map(categories.map(cat => [cat.id, cat]));
+    const categoryMap = new Map(categories.map(cat => [cat.slug, cat]));
     
     // Return paginated response
     // Hide price_cents from frontend since price is the authoritative field
     // Map directory_category_id to tenantCategoryId and include category object
     // Map image_url to imageUrl for frontend compatibility
-    const itemsWithoutPriceCents = items.map((item: { [x: string]: any; price?: any; price_cents?: any; directory_category_id?: any; image_url?: any; }) => {
+    const itemsWithoutPriceCents = items.map((item: { [x: string]: any; price?: any; price_cents?: any; directory_category_id?: any; image_url?: any; category_path?: any; }) => {
       const { price_cents, directory_category_id, image_url, ...itemWithoutPriceCents } = item;
-      const category = directory_category_id ? categoryMap.get(directory_category_id) : null;
+      
+      // Find tenant category from category_path (prefer the first one)
+      let tenantCategory = null;
+      if (item.category_path && item.category_path.length > 0) {
+        tenantCategory = categoryMap.get(item.category_path[0]) || null;
+      }
       
       return {
         ...itemWithoutPriceCents,
         price: item.price !== null && item.price !== undefined ? Number(item.price) : null,
-        tenantCategoryId: directory_category_id || null,
-        tenantCategory: category || null,
+        tenantCategoryId: tenantCategory ? tenantCategory.id : null,
+        tenantCategory: tenantCategory || null,
         imageUrl: image_url || null, // Map image_url to imageUrl for frontend
       };
     });
@@ -2895,11 +2903,14 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     }
   }
 
-  // Fetch tenant category if directory_category_id exists
+  // Fetch tenant category if category_path exists
   let tenantCategory = null;
-  if (it.directory_category_id) {
-    const category = await prisma.directory_category.findUnique({
-      where: { id: it.directory_category_id },
+  if (it.category_path && it.category_path.length > 0) {
+    const category = await prisma.directory_category.findFirst({
+      where: { 
+        slug: it.category_path[0],
+        tenantId: it.tenant_id
+      },
       select: {
         id: true,
         name: true,
@@ -3056,6 +3067,26 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     if (tenantCategoryId !== undefined) {
       updateData.directory_category_id = tenantCategoryId;
       console.log('[PUT /items/:id] Setting directory_category_id from tenantCategoryId:', tenantCategoryId);
+      
+      // When assigning a tenant category, we need to get the category slug and update category_path
+      try {
+        const category = await prisma.directory_category.findFirst({
+          where: { 
+            id: tenantCategoryId,
+            isActive: true
+          },
+          select: { slug: true }
+        });
+        
+        if (category) {
+          updateData.category_path = [category.slug];
+          console.log('[PUT /items/:id] Setting category_path from category slug:', category.slug);
+        } else {
+          console.warn('[PUT /items/:id] Category not found for tenantCategoryId:', tenantCategoryId);
+        }
+      } catch (error) {
+        console.error('[PUT /items/:id] Error fetching category for tenantCategoryId:', tenantCategoryId, error);
+      }
     } else if (directory_category_id !== undefined) {
       updateData.directory_category_id = directory_category_id;
       console.log('[PUT /items/:id] Setting directory_category_id from directory_category_id:', directory_category_id);

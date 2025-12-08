@@ -826,6 +826,22 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                       <p className="text-sm font-semibold text-gray-900 mt-1">
                         ${Number(product.price).toFixed(2)}
                       </p>
+                      <div className="flex items-center justify-between mt-2">
+                        {product.tenantCategory && (
+                          <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
+                            {product.tenantCategory.name}
+                          </span>
+                        )}
+                        <span className={`text-xs font-medium ${
+                          product.stock === 0 
+                            ? 'text-red-600 dark:text-red-400' 
+                            : product.stock < 10 
+                            ? 'text-amber-600 dark:text-amber-400' 
+                            : 'text-green-600 dark:text-green-400'
+                        }`}>
+                          Stock: {product.stock}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </Link>

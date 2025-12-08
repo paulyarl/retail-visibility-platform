@@ -114,17 +114,12 @@ router.get('/search', async (req: Request, res: Response) => {
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Build WHERE clause for directory_category_listings
+    // Build WHERE clause for directory listings
     const conditions: string[] = [
-      'dcp.is_published = true'
+      'dll.is_published = true'
     ];
     const params: any[] = [];
     let paramIndex = 1;
-
-    // Build WHERE clause for directory_gbp_listings (same base conditions)
-    const gbpConditions: string[] = [
-      'is_published = true'
-    ];
 
     // Category filter - match by slug for directory listing categories (store types)
     // This filters by the categories assigned in the directory settings page
@@ -145,23 +140,7 @@ router.get('/search', async (req: Request, res: Response) => {
     const { primaryOnly } = req.query;
     // REMOVED: is_primary filter since column doesn't exist in materialized view
 
-    // Location filters
-    if (city && typeof city === 'string') {
-      conditions.push(`LOWER(dcp.city) = LOWER($${paramIndex})`);
-      gbpConditions.push(`LOWER(city) = LOWER($${paramIndex})`);
-      params.push(city);
-      paramIndex++;
-    }
-
-    if (state && typeof state === 'string') {
-      conditions.push(`LOWER(dcp.state) = LOWER($${paramIndex})`);
-      gbpConditions.push(`LOWER(state) = LOWER($${paramIndex})`);
-      params.push(state);
-      paramIndex++;
-    }
-
-    const whereClause = conditions.join(' AND ');
-    const gbpWhereClause = gbpConditions.join(' AND ');
+    // Location filters are now handled directly in the query
 
     // Determine ORDER BY clause (uses indexed columns)
     let orderByClause = 'rating_avg DESC NULLS LAST, rating_count DESC';
@@ -176,53 +155,53 @@ router.get('/search', async (req: Request, res: Response) => {
       orderByClause = 'is_featured DESC, rating_avg DESC NULLS LAST';
     }
 
-    // Query using directory_category_products for consistency with categories API
+    // Query using directory_listings_list directly, with MV data where available
     const listingsQuery = `
-      SELECT DISTINCT ON (dcp.tenant_id)
-        dcp.tenant_id as id,
-        dcp.tenant_id,
-        dcp.tenant_name as business_name,
-        dcp.tenant_slug as slug,
-        dcp.address,
-        dcp.city as city,
-        dcp.state as state,
-        dcp.zip_code,
-        null as phone,
-        null as email,
-        null as website,
-        dcp.latitude,
-        dcp.longitude,
-        dcp.category_name,
-        dcp.category_name as category_slug,
-        dcp.google_category_id,
-        dcp.google_category_id as googleCategoryId,
-        dcp.category_icon as icon,
-        false as is_primary,
-        dcp.rating_avg,
-        dcp.rating_count,
-        -- Calculate real product count matching storefront filter (only products WITH categories)
+      SELECT DISTINCT ON (dll.tenant_id)
+        dll.tenant_id as id,
+        dll.tenant_id,
+        dll.business_name,
+        dll.business_name,
+        dll.slug,
+        dll.address,
+        dll.city,
+        dll.state,
+        dll.zip_code,
+        dll.phone,
+        dll.email,
+        dll.website,
+        dll.latitude,
+        dll.longitude,
+        dll.primary_category as category_name,
+        dll.primary_category as category_slug,
+        null as google_category_id,
+        null as googleCategoryId,
+        null as icon,
+        ${category ? 'CASE WHEN dll.primary_category = $1 THEN true ELSE false END' : 'false'} as is_primary,
+        dll.rating_avg,
+        dll.rating_count,
+        -- Calculate real product count from inventory_items
         COALESCE(real_counts.product_count, 0) as product_count,
-        dcp.is_featured,
-        dcp.subscription_tier,
+        dll.is_featured,
+        dll.subscription_tier,
         null as use_custom_website,
-        dcp.listing_created_at as created_at,
-        dcp.listing_updated_at as updated_at,
-        -- Get primary category from directory listing
+        dll.created_at,
+        dll.updated_at,
+        -- GBP primary category name
         dll.primary_category as gbp_primary_category_name,
         -- Get logo URL from directory listings
-        dll.logo_url as logo_url,
-        -- Get address data with fallback from directory listings
-        COALESCE(dll.address, dcp.address) as address,
-        COALESCE(dll.city, dcp.city) as city,
-        COALESCE(dll.state, dcp.state) as state,
-        COALESCE(dll.zip_code, dcp.zip_code) as zip_code,
-        -- Get coordinates with fallback
-        COALESCE(dll.latitude, dcp.latitude) as latitude,
-        COALESCE(dll.longitude, dcp.longitude) as longitude,
-        -- Check if store has published directory listing
-        COALESCE(dll.is_published, false) as directory_published
-      FROM directory_category_products dcp
-      LEFT JOIN tenants t ON dcp.tenant_id = t.id
+        dll.logo_url,
+        -- Address data from directory listings
+        dll.address,
+        dll.city,
+        dll.state,
+        dll.zip_code,
+        dll.latitude,
+        dll.longitude,
+        -- Directory publish status (always true since we're filtering)
+        true as directory_published
+      FROM directory_listings_list dll
+      LEFT JOIN tenants t ON dll.tenant_id = t.id
       LEFT JOIN (
         SELECT 
           tenant_id,
@@ -232,16 +211,12 @@ router.get('/search', async (req: Request, res: Response) => {
           AND visibility = 'public'
           AND directory_category_id IS NOT NULL  -- Only count products with categories (matches storefront filter)
         GROUP BY tenant_id
-      ) real_counts ON dcp.tenant_id = real_counts.tenant_id
-      LEFT JOIN (
-        SELECT tenant_id, is_published, primary_category, secondary_categories, address, city, state, zip_code, latitude, longitude, logo_url
-        FROM directory_listings_list
-        WHERE is_published = true
-      ) dll ON dcp.tenant_id = dll.tenant_id
-      WHERE ${whereClause}
-        AND dll.is_published = true
+      ) real_counts ON dll.tenant_id = real_counts.tenant_id
+      WHERE dll.is_published = true
+        ${city ? `AND LOWER(dll.city) = LOWER($${paramIndex})` : ''}
+        ${state ? `AND LOWER(dll.state) = LOWER($${paramIndex})` : ''}
         ${category ? `AND (dll.primary_category = $1 OR $1 = ANY(dll.secondary_categories))` : ''}
-      ORDER BY dcp.tenant_id, ${orderByClause.replace(/^/, '')}
+      ORDER BY dll.tenant_id, dll.rating_avg DESC NULLS LAST, dll.rating_count DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
@@ -252,16 +227,11 @@ router.get('/search', async (req: Request, res: Response) => {
 
     // Get total count (using same source as search) - count distinct tenants
     const countQuery = `
-      SELECT COUNT(DISTINCT dcp.tenant_id) as count 
-      FROM directory_category_products dcp
-      LEFT JOIN tenants t ON dcp.tenant_id = t.id
-      LEFT JOIN (
-        SELECT tenant_id, is_published, primary_category, secondary_categories
-        FROM directory_listings_list
-        WHERE is_published = true
-      ) dll ON dcp.tenant_id = dll.tenant_id
-      WHERE ${whereClause}
-        AND dll.is_published = true
+      SELECT COUNT(DISTINCT dll.tenant_id) as count
+      FROM directory_listings_list dll
+      WHERE dll.is_published = true
+        ${city ? `AND LOWER(dll.city) = LOWER($${paramIndex})` : ''}
+        ${state ? `AND LOWER(dll.state) = LOWER($${paramIndex})` : ''}
         ${category ? `AND (dll.primary_category = $1 OR $1 = ANY(dll.secondary_categories))` : ''}
     `;
     const countResult = await getDirectPool().query(countQuery, params);
@@ -360,17 +330,34 @@ router.get('/categories', async (req: Request, res: Response) => {
       `;
     }
 
-    // Query using directory_category_products view for complete category data
+    // Query using directory_listings_list for accurate store counts - simplified approach
     const statsQuery = `
+      WITH category_counts AS (
+        SELECT 
+          category_name,
+          COUNT(*) as store_count,
+          COUNT(*) FILTER (WHERE category_source = 'primary') as primary_store_count,
+          COUNT(*) FILTER (WHERE category_source = 'secondary') as secondary_store_count
+        FROM (
+          SELECT dll.primary_category as category_name, 'primary' as category_source
+          FROM directory_listings_list dll
+          WHERE dll.is_published = true AND dll.primary_category IS NOT NULL
+          UNION ALL
+          SELECT unnest(dll.secondary_categories) as category_name, 'secondary' as category_source
+          FROM directory_listings_list dll
+          WHERE dll.is_published = true AND dll.secondary_categories IS NOT NULL
+        ) all_categories
+        GROUP BY category_name
+      )
       SELECT 
         pc.id as category_id,
         pc.name as category_name,
         pc.slug as category_slug,
         pc.google_category_id,
         pc.icon_emoji as category_icon,
-        COALESCE(dcp.store_count, 0) as store_count,
-        COALESCE(dcp.store_count, 0) as primary_store_count,
-        0 as secondary_store_count,
+        COALESCE(cc.store_count, 0) as store_count,
+        COALESCE(cc.primary_store_count, 0) as primary_store_count,
+        COALESCE(cc.secondary_store_count, 0) as secondary_store_count,
         COALESCE(dcp.product_count, 0) as total_products,
         0 as avg_rating,
         0 as unique_locations,
@@ -378,21 +365,20 @@ router.get('/categories', async (req: Request, res: Response) => {
         ARRAY[]::text[] as states,
         0 as featured_store_count
       FROM platform_categories pc
+      INNER JOIN category_counts cc ON cc.category_name = pc.name
       LEFT JOIN (
         SELECT 
           category_slug,
-          COUNT(DISTINCT tenant_id) as store_count,
           SUM(CAST(actual_product_count AS INTEGER)) as product_count
         FROM directory_category_products 
         WHERE is_published = true
         GROUP BY category_slug
       ) dcp ON dcp.category_slug = pc.slug
       WHERE pc.is_active = true
-        AND COALESCE(dcp.store_count, 0) >= $1
       ORDER BY store_count DESC, pc.sort_order ASC
     `;
     
-    const params = [minStoresNum];
+    const params: any[] = [];
     const result = await getDirectPool().query(statsQuery, params);
 
     const categories = result.rows.map((row: any) => ({
@@ -444,7 +430,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Support both category ID and slug
+    // Support both category ID and slug - count from directory listings
     const categoryQuery = `
       SELECT 
         pc.id as category_id,
@@ -452,13 +438,29 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         pc.slug as category_slug,
         pc.google_category_id,
         pc.icon_emoji as category_icon,
-        COALESCE(dcp.store_count, 0) as store_count,
+        COALESCE(dll.store_count, 0) as store_count,
         COALESCE(dcp.product_count, 0) as product_count
       FROM platform_categories pc
       LEFT JOIN (
         SELECT 
+          category_name,
+          COUNT(*) as store_count
+        FROM (
+          SELECT pc.name as category_name
+          FROM directory_listings_list dll
+          JOIN platform_categories pc ON pc.name = dll.primary_category
+          WHERE dll.is_published = true AND dll.primary_category IS NOT NULL
+          UNION ALL
+          SELECT pc.name as category_name
+          FROM directory_listings_list dll
+          JOIN platform_categories pc ON pc.name = ANY(dll.secondary_categories)
+          WHERE dll.is_published = true AND dll.secondary_categories IS NOT NULL
+        ) all_categories
+        GROUP BY category_name
+      ) dll ON dll.category_name = pc.name
+      LEFT JOIN (
+        SELECT 
           category_slug,
-          COUNT(DISTINCT tenant_id) as store_count,
           SUM(CAST(actual_product_count AS INTEGER)) as product_count
         FROM directory_category_products 
         WHERE is_published = true
@@ -479,51 +481,50 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
 
     // Get stores in this category
     const storesQuery = `
-      -- Search directory_category_products but calculate real product counts and check directory publish status
+      -- Query directory listings directly, with MV data where available
       SELECT 
-        dcp.tenant_id as id,
-        dcp.tenant_id,
-        dcp.tenant_name as business_name,
-        dcp.tenant_name as business_name,
-        dcp.tenant_slug as slug,
-        dcp.address,
-        dcp.tenant_city as city,
-        dcp.tenant_state as state,
-        dcp.zip_code,
-        null as phone,
-        null as email,
-        null as website,
-        dcp.latitude,
-        dcp.longitude,
-        dcp.category_name,
-        dcp.category_name as category_slug,
-        dcp.google_category_id,
-        dcp.google_category_id as googleCategoryId,
-        dcp.category_icon as icon,
-        dcp.is_primary,
-        dcp.is_primary as is_primary,
-        dcp.rating_avg,
-        dcp.rating_avg as rating_avg,
-        dcp.rating_count,
-        dcp.rating_count as rating_count,
+        dll.tenant_id as id,
+        dll.tenant_id,
+        dll.business_name,
+        dll.business_name,
+        dll.slug,
+        dll.address,
+        dll.city,
+        dll.state,
+        dll.zip_code,
+        dll.phone,
+        dll.email,
+        dll.website,
+        dll.latitude,
+        dll.longitude,
+        '${category.category_name}' as category_name,
+        '${category.category_slug}' as category_slug,
+        '${category.google_category_id || ''}' as google_category_id,
+        '${category.google_category_id || ''}' as googleCategoryId,
+        '${category.category_icon || ''}' as icon,
+        CASE WHEN dll.primary_category = '${category.category_name}' THEN true ELSE false END as is_primary,
+        dll.rating_avg,
+        dll.rating_avg as rating_avg,
+        dll.rating_count,
+        dll.rating_count as rating_count,
         -- Calculate real product count from inventory_items
         COALESCE(real_counts.product_count, 0) as product_count,
-        dcp.is_featured,
-        dcp.is_featured as is_featured,
-        dcp.subscription_tier,
-        dcp.subscription_tier as subscription_tier,
+        dll.is_featured,
+        dll.is_featured as is_featured,
+        dll.subscription_tier,
+        dll.subscription_tier as subscription_tier,
         null as use_custom_website,
-        dcp.listing_created_at as created_at,
-        dcp.listing_created_at as created_at,
-        dcp.listing_updated_at as updated_at,
-        dcp.listing_updated_at as updated_at,
-        null as gbp_primary_category_name,
+        dll.created_at,
+        dll.created_at as created_at,
+        dll.updated_at,
+        dll.updated_at as updated_at,
+        dll.primary_category as gbp_primary_category_name,
         -- Get logo URL from tenants metadata
         (t.metadata->>'logo_url') as logo_url,
-        -- Check if store has published directory listing
-        COALESCE(dll.is_published, false) as directory_published
-      FROM directory_category_products dcp
-      LEFT JOIN tenants t ON dcp.tenant_id = t.id
+        -- Directory publish status (always true since we're filtering)
+        true as directory_published
+      FROM directory_listings_list dll
+      LEFT JOIN tenants t ON dll.tenant_id = t.id
       LEFT JOIN (
         SELECT 
           tenant_id,
@@ -532,31 +533,26 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         WHERE item_status = 'active' AND visibility = 'public'
           AND directory_category_id IS NOT NULL  -- Only count products with categories (matches storefront filter)
         GROUP BY tenant_id
-      ) real_counts ON dcp.tenant_id = real_counts.tenant_id
-      LEFT JOIN (
-        SELECT tenant_id, is_published
-        FROM directory_listings_list
-        WHERE is_published = true
-      ) dll ON dcp.tenant_id = dll.tenant_id
-      WHERE dcp.category_name = $1
-        AND dcp.is_published = true
+      ) real_counts ON dll.tenant_id = real_counts.tenant_id
+      WHERE dll.is_published = true
+        AND (dll.primary_category = '${category.category_name}' OR '${category.category_name}' = ANY(dll.secondary_categories))
       ORDER BY 
-        dcp.rating_avg DESC NULLS LAST,
+        dll.rating_avg DESC NULLS LAST,
         real_counts.product_count DESC NULLS LAST,
-        dcp.listing_created_at DESC
-      LIMIT $2 OFFSET $3
+        dll.created_at DESC
+      LIMIT $1 OFFSET $2
     `;
     
-    const storesResult = await getDirectPool().query(storesQuery, [category.category_name, limitNum, skip]);
+    const storesResult = await getDirectPool().query(storesQuery, [limitNum, skip]);
 
     // Get total count
     const countQuery = `
-      SELECT COUNT(*) as count 
-      FROM directory_category_products dcp
-      WHERE dcp.category_name = $1
-        AND dcp.is_published = true
+      SELECT COUNT(*) as count
+      FROM directory_listings_list dll
+      WHERE dll.is_published = true
+        AND (dll.primary_category = '${category.category_name}' OR '${category.category_name}' = ANY(dll.secondary_categories))
     `;
-    const countResult = await getDirectPool().query(countQuery, [category.category_name]);
+    const countResult = await getDirectPool().query(countQuery);
 
     const total = parseInt(countResult.rows[0]?.count || '0');
     const totalPages = Math.ceil(total / limitNum);
@@ -603,8 +599,8 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         slug: category.category_slug,
         google_category_id: category.google_category_id,
         icon: category.category_icon,
-        storeCount: parseInt(category.store_count),
-        productCount: parseInt(category.product_count),
+        storeCount: total, // Use actual count from directory listings
+        productCount: parseInt(category.product_count) || 0, // Keep MV product count
       },
       stores,
       pagination: {

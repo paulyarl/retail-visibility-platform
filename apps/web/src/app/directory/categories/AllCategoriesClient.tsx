@@ -63,9 +63,11 @@ export default function AllCategoriesClient() {
     fetchCategories();
   }, []);
 
-  const filteredCategories = categories.filter((cat) =>
-    cat.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCategories = categories
+    .filter((cat) => cat.storeCount > 0) // Only show categories that have stores
+    .filter((cat) =>
+      cat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   if (loading) {
     return (
@@ -154,8 +156,8 @@ export default function AllCategoriesClient() {
         ) : (
           <>
             <div className="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
-              Showing {filteredCategories.length} of {categories.length}{' '}
-              {categories.length === 1 ? 'category' : 'categories'}
+              Showing {filteredCategories.length} of {categories.filter(cat => cat.storeCount > 0).length}{' '}
+              {categories.filter(cat => cat.storeCount > 0).length === 1 ? 'category' : 'categories'} with stores
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

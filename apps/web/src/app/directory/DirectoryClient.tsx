@@ -413,6 +413,7 @@ export default function DirectoryClient() {
               category: searchParams.get('category') || undefined,
               city: searchParams.get('city') || undefined,
               state: searchParams.get('state') || undefined,
+              q: searchParams.get('q') || undefined, // Search query
             }}
           />
         )}

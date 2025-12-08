@@ -36,6 +36,11 @@ router.put('/tenant/:tenantId/business-hours',
       updated_at: new Date()
     },
   })
+
+  // Update business profile hours
+  const { updateBusinessProfileHours } = await import('../utils/business-hours-utils');
+  await updateBusinessProfileHours(tenantId);
+
   res.json({ success: true })
 })
 
@@ -54,32 +59,35 @@ router.put('/tenant/:tenantId/business-hours/special',
   const { tenantId } = req.params
   const { overrides } = req.body || {}
   if (!Array.isArray(overrides)) return res.status(400).json({ success: false, error: 'invalid_overrides' })
-  // Upsert per date
+
+  // Delete all existing special hours for this tenant first
+  await prisma.business_hours_special_list.deleteMany({
+    where: { tenant_id: tenantId }
+  })
+
+  // Then insert the new set
   for (const o of overrides) {
     const dateStr = o?.date
     if (!dateStr) continue
     const date = new Date(`${dateStr}T00:00:00.000Z`)
-    await prisma.business_hours_special_list.upsert({
-      where: { tenant_id_date: { tenant_id: tenantId, date } },
-      update: { 
-        isClosed: !!o.isClosed, 
-        open: o.open || null, 
-        close: o.close || null, 
-        note: o.note || null,
-        updated_at: new Date()
-      },
-      create: { 
+    await prisma.business_hours_special_list.create({
+      data: {
         id: `${tenantId}_${date.toISOString().split('T')[0]}`,
-        tenant_id: tenantId, 
-        date, 
-        isClosed: !!o.isClosed, 
-        open: o.open || null, 
-        close: o.close || null, 
+        tenant_id: tenantId,
+        date,
+        isClosed: !!o.isClosed,
+        open: o.open || null,
+        close: o.close || null,
         note: o.note || null,
         updated_at: new Date()
       },
     })
   }
+
+  // Update business profile hours
+  const { updateBusinessProfileHours } = await import('../utils/business-hours-utils');
+  await updateBusinessProfileHours(tenantId);
+
   res.json({ success: true })
 })
 

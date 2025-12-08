@@ -104,8 +104,6 @@ export default function CategoryViewClient({
     localStorage.setItem('directory-view-mode', mode);
   };
   
-  const [primaryOnly, setPrimaryOnly] = useState(false);
-
   // Helper to format slug into readable name
   const formatCategoryName = (slug: string) => {
     return decodeURIComponent(slug)
@@ -113,41 +111,6 @@ export default function CategoryViewClient({
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   };
-
-  // Track category page view
-  useEffect(() => {
-    // Track category browsing when component mounts
-    trackBehaviorClient({
-      entityType: 'category',
-      entityId: categorySlug, // Use slug as ID for now
-      entityName: formatCategoryName(categorySlug),
-      context: {
-        category_slug: categorySlug,
-        category_name: formatCategoryName(categorySlug),
-        search_params: searchParams,
-        view_mode: viewMode
-      },
-      pageType: 'directory_home'
-    });
-  }, [categorySlug]); // Only track once when category changes
-
-  // Track view mode changes
-  useEffect(() => {
-    if (data) { // Only track after data is loaded
-      trackBehaviorClient({
-        entityType: 'category',
-        entityId: categorySlug,
-        context: {
-          category_slug: categorySlug,
-          action: 'view_mode_change',
-          view_mode: viewMode,
-          stores_count: data.pagination.totalItems,
-          primary_only: primaryOnly
-        },
-        pageType: 'directory_home'
-      });
-    }
-  }, [viewMode, primaryOnly, categorySlug, data]);
 
   // Fetch category info and stores
   useEffect(() => {
@@ -183,21 +146,9 @@ export default function CategoryViewClient({
           }
         }
 
-        // 2. Fetch stores in this category using directory search API
-        const params = new URLSearchParams();
-        params.set('category', decodedSlug); // Use decoded category slug as filter
-        params.set('sort', 'rating'); // Sort by rating
-        params.set('limit', '100'); // Get up to 100 stores
-        if (primaryOnly) {
-          params.set('primaryOnly', 'true'); // Filter to primary category stores only
-        }
-        
-        // Location filtering not yet implemented in MV
-        // if (searchParams.lat) params.set('lat', searchParams.lat);
-        // if (searchParams.lng) params.set('lng', searchParams.lng);
-        
+        // 2. Fetch stores in this category using directory categories API
         const storesRes = await fetch(
-          `${apiBaseUrl}/api/directory/mv/search?${params}`
+          `${apiBaseUrl}/api/directory/mv/categories/${decodedSlug}`
         );
 
         if (!storesRes.ok) {
@@ -206,12 +157,12 @@ export default function CategoryViewClient({
 
         const storesData = await storesRes.json();
 
-        // 3. Transform to DirectoryResponse format (MV already returns correct format)
+        // 3. Transform to DirectoryResponse format (categories API returns stores directly)
         setData({
-          listings: storesData.listings || [],
+          listings: storesData.stores || [],
           pagination: storesData.pagination || {
             page: 1,
-            limit: 100,
+            limit: 12,
             totalItems: 0,
             totalPages: 1,
           },
@@ -225,7 +176,7 @@ export default function CategoryViewClient({
     };
 
     fetchData();
-  }, [categorySlug, searchParams.lat, searchParams.lng, searchParams.radius, primaryOnly]);
+  }, [categorySlug, searchParams.lat, searchParams.lng, searchParams.radius]);
 
   const currentPage = data?.pagination.page || 1;
   const totalPages = data?.pagination.totalPages || 1;
@@ -264,32 +215,6 @@ export default function CategoryViewClient({
             <p className="text-neutral-600 dark:text-neutral-400">
               {totalItems} {totalItems === 1 ? 'store' : 'stores'} · {category?.productCount || 0} products
             </p>
-            
-            {/* Primary/Secondary Filter Toggle */}
-            {category && category.primaryStoreCount !== undefined && category.secondaryStoreCount !== undefined && (
-              <div className="flex items-center gap-2 border-l border-neutral-300 dark:border-neutral-600 pl-4">
-                <button
-                  onClick={() => setPrimaryOnly(false)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                    !primaryOnly
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                  }`}
-                >
-                  All ({category.storeCount})
-                </button>
-                <button
-                  onClick={() => setPrimaryOnly(true)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                    primaryOnly
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                  }`}
-                >
-                  Specialized ({category.primaryStoreCount})
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -381,11 +306,9 @@ export default function CategoryViewClient({
 
         {viewMode === 'map' && (
           <DirectoryMapGoogle
-            listings={data?.listings || []}
-            useMapEndpoint={true}
-            filters={{
-              category: category?.name,
-            }}
+            listings={data?.listings || []} // Use the already-filtered listings
+            useMapEndpoint={false} // Don't use the endpoint to avoid data sync issues
+            filters={{}}
           />
         )}
       </div>

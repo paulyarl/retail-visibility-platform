@@ -28,6 +28,7 @@ interface DirectoryMapGoogleProps {
     storeType?: string;
     city?: string;
     state?: string;
+    q?: string; // Search query
   };
 }
 
@@ -65,6 +66,7 @@ export default function DirectoryMapGoogle({
         if (filters.storeType) params.append('storeType', filters.storeType);
         if (filters.city) params.append('city', filters.city);
         if (filters.state) params.append('state', filters.state);
+        if (filters.q) params.append('q', filters.q); // Search query
         params.append('limit', '100');
 
         const url = `${apiUrl}/api/directory/map/locations?${params.toString()}`;
@@ -83,7 +85,7 @@ export default function DirectoryMapGoogle({
     };
 
     fetchMapData();
-  }, [useMapEndpoint, filters.category, filters.storeType, filters.city, filters.state, listings]);
+  }, [useMapEndpoint, filters.category, filters.storeType, filters.city, filters.state, filters.q, listings]);
 
   // Filter listings with valid coordinates
   const validListings = mapListings.filter(l => l.latitude && l.longitude);

@@ -135,65 +135,37 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch map location using utility
     const mapLocation = await getTenantMapLocation(tenantId);
 
-    // Fetch categories with counts - using new separate endpoints
+    // Fetch categories with counts - using storefront categories API
     let categories: Category[] = [];
     let productCategories: Category[] = [];
     let storeCategories: Category[] = [];
     let uncategorizedCount = 0;
     try {
-      // Fetch product-level categories
-      const productCategoriesRes = await fetch(`${apiBaseUrl}/api/categories/product-level/${tenantId}`, {
+      // Get product counts per category from storefront categories API
+      const storefrontCategoriesRes = await fetch(`${apiBaseUrl}/api/storefront/${tenantId}/categories`, {
         cache: 'no-store',
       });
-      if (productCategoriesRes.ok) {
-        const productCategoriesData = await productCategoriesRes.json();
-        let rawProductCategories = productCategoriesData.data?.categories || [];
-        
-        // Deduplicate by keeping tenant categories over platform categories for same name
-        const deduplicatedProductCategories = rawProductCategories.reduce((acc: Category[], cat: Category) => {
-          const existing = acc.find(existing => existing.name.toLowerCase() === cat.name.toLowerCase());
-          if (!existing) {
-            acc.push(cat);
-          } else {
-            // Keep tenant categories over platform categories
-            if (cat.category_type === 'tenant' && existing.category_type === 'platform') {
-              const index = acc.indexOf(existing);
-              acc[index] = cat;
-            }
-          }
-          return acc;
-        }, []);
-        
-        productCategories = deduplicatedProductCategories;
-      }
+      if (storefrontCategoriesRes.ok) {
+        const storefrontData = await storefrontCategoriesRes.json();
+        const storefrontCategories = storefrontData.categories || [];
+        uncategorizedCount = storefrontData.uncategorizedCount || 0;
 
-      // Fetch store-level categories
-      const storeCategoriesRes = await fetch(`${apiBaseUrl}/api/categories/store-level/${tenantId}`, {
-        cache: 'no-store',
-      });
-      if (storeCategoriesRes.ok) {
-        const storeCategoriesData = await storeCategoriesRes.json();
-        storeCategories = storeCategoriesData.data?.categories || [];
-      }
+        // Convert storefront categories to the expected format
+        categories = storefrontCategories.map((cat: any) => ({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+          count: cat.count,
+          googleCategoryId: cat.googleCategoryId,
+          category_type: 'platform', // All storefront categories are platform categories
+        }));
 
-      // For backward compatibility, combine all categories
-      categories = [...productCategories, ...storeCategories];
-      uncategorizedCount = 0; // No uncategorized in new structure
+        // All categories are product categories for storefront
+        productCategories = categories;
+        storeCategories = [];
+      }
     } catch (e) {
       console.error('Failed to fetch categories:', e);
-      // Fallback to old endpoint
-      try {
-        const categoriesRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/categories`, {
-          cache: 'no-store',
-        });
-        if (categoriesRes.ok) {
-          const categoriesData = await categoriesRes.json();
-          categories = categoriesData.categories || [];
-          uncategorizedCount = categoriesData.uncategorizedCount || 0;
-        }
-      } catch (fallbackError) {
-        console.error('Failed to fetch categories (fallback):', fallbackError);
-      }
     }
 
     // Fetch products for this tenant with optional search and category filter

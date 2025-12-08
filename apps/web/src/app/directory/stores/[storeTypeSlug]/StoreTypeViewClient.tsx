@@ -341,10 +341,8 @@ export default function StoreTypeViewClient({
         {viewMode === 'map' && (
           <DirectoryMapGoogle
             listings={data?.listings || []}
-            useMapEndpoint={true}
-            filters={{
-              storeType: storeTypeSlug,
-            }}
+            useMapEndpoint={false} // Use the listings directly since map endpoint doesn't support store type filtering
+            filters={{}}
           />
         )}
 

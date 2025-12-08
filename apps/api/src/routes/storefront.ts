@@ -92,9 +92,15 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const params: any[] = [tenantId];
     let paramIndex = 2;
     
-    // Category filter - filter by directory_category slug
+    // When no specific category is selected, only show products that have categories
+    // This aligns with the category counts which only show categories with products
+    if (!category) {
+      conditions.push('(ii.category_path IS NOT NULL AND array_length(ii.category_path, 1) > 0)');
+    }
+    
+    // Category filter - filter by tenant category slug
     if (category && typeof category === 'string') {
-      conditions.push(`dc.slug = $${paramIndex}`);
+      conditions.push(`$${paramIndex} = ANY(ii.category_path)`);
       params.push(category);
       paramIndex++;
     }
@@ -108,7 +114,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     
     const whereClause = conditions.join(' AND ');
     
-    // Query base tables for individual products (MV is aggregated)
+    // Query base tables for individual products
     const query = `
       SELECT 
         ii.id,
@@ -137,19 +143,13 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         custom_branding,
         custom_sections,
         landing_page_theme,
-        dc.id as category_id,
-        dc.name as category_name,
-        dc.slug as category_slug,
-        dc."googleCategoryId" as google_category_id,
+        ii.category_path,
         CASE WHEN ii.image_url IS NOT NULL THEN true ELSE false END as has_image,
         CASE WHEN (ii.stock > 0 OR ii.quantity > 0) THEN true ELSE false END as in_stock,
         CASE WHEN array_length(ii.image_gallery, 1) > 0 THEN true ELSE false END as has_gallery,
         ii.created_at,
         ii.updated_at
       FROM inventory_items ii
-      INNER JOIN directory_category dc ON dc.id = ii.directory_category_id
-        AND dc."tenantId" = ii.tenant_id
-        AND dc."isActive" = true
       WHERE ${whereClause}
       ORDER BY ii.updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -158,9 +158,6 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const countQuery = `
       SELECT COUNT(*) as count
       FROM inventory_items ii
-      INNER JOIN directory_category dc ON dc.id = ii.directory_category_id
-        AND dc."tenantId" = ii.tenant_id
-        AND dc."isActive" = true
       WHERE ${whereClause}
     `;
     
@@ -177,46 +174,66 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       console.log(`[Storefront] Category: ${category}, Count: ${totalCount}, Returned: ${itemsResult.rows.length}`);
     }
     
+    // Fetch all unique category slugs from items' category_path arrays for this page
+    const categorySlugs = [...new Set(itemsResult.rows.flatMap((item: any) => item.category_path || []).filter(Boolean))];
+    const categories = categorySlugs.length > 0 
+      ? await getDirectPool().query(
+          `SELECT id, name, slug, "googleCategoryId" FROM directory_category WHERE slug = ANY($1) AND "tenantId" = $2 AND "isActive" = true`,
+          [categorySlugs, tenantId]
+        )
+      : { rows: [] };
+    
+    // Create a category lookup map
+    const categoryMap = new Map(categories.rows.map((cat: any) => [cat.slug, cat]));
+    
     // Transform to camelCase for frontend compatibility
-    const items = itemsResult.rows.map((row: any) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      sku: row.sku,
-      name: row.name,
-      title: row.title,
-      description: row.description,
-      marketingDescription: row.marketing_description,
-      price: row.price,
-      priceCents: row.price_cents,
-      currency: row.currency,
-      stock: row.stock,
-      quantity: row.quantity,
-      availability: row.availability,
-      imageUrl: row.image_url,
-      imageGallery: row.image_gallery,
-      brand: row.brand,
-      manufacturer: row.manufacturer,
-      condition: row.condition,
-      gtin: row.gtin,
-      mpn: row.mpn,
-      metadata: row.metadata,
-      customCta: row.custom_cta,
-      socialLinks: row.social_links,
-      customBranding: row.custom_branding,
-      customSections: row.custom_sections,
-      landingPageTheme: row.landing_page_theme,
-      tenantCategory: row.category_id ? {
-        id: row.category_id,
-        name: row.category_name,
-        slug: row.category_slug,
-        googleCategoryId: row.google_category_id,
-      } : null,
-      hasImage: row.has_image,
-      inStock: row.in_stock,
-      hasGallery: row.has_gallery,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
+    const items = itemsResult.rows.map((row: any) => {
+      // Find tenant category from category_path (prefer the first one)
+      let tenantCategory = null;
+      if (row.category_path && row.category_path.length > 0) {
+        tenantCategory = categoryMap.get(row.category_path[0]) || null;
+      }
+      
+      return {
+        id: row.id,
+        tenantId: row.tenant_id,
+        sku: row.sku,
+        name: row.name,
+        title: row.title,
+        description: row.description,
+        marketingDescription: row.marketing_description,
+        price: row.price,
+        priceCents: row.price_cents,
+        currency: row.currency,
+        stock: row.stock,
+        quantity: row.quantity,
+        availability: row.availability,
+        imageUrl: row.image_url,
+        imageGallery: row.image_gallery,
+        brand: row.brand,
+        manufacturer: row.manufacturer,
+        condition: row.condition,
+        gtin: row.gtin,
+        mpn: row.mpn,
+        metadata: row.metadata,
+        customCta: row.custom_cta,
+        socialLinks: row.social_links,
+        customBranding: row.custom_branding,
+        customSections: row.custom_sections,
+        landingPageTheme: row.landing_page_theme,
+        tenantCategory: tenantCategory ? {
+          id: tenantCategory.id,
+          name: tenantCategory.name,
+          slug: tenantCategory.slug,
+          googleCategoryId: tenantCategory.googleCategoryId,
+        } : null,
+        hasImage: row.has_image,
+        inStock: row.in_stock,
+        hasGallery: row.has_gallery,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    });
     
     return res.json({
       items,
@@ -248,32 +265,39 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'tenant_required' });
     }
     
-    // Query product category counts from storefront_category_counts MV
+    // Query product category counts based on tenant categories from category_path
     const query = `
-      SELECT 
-        category_id,
-        category_name,
-        category_slug,
-        product_count as count,
-        products_with_images,
-        products_with_descriptions,
-        avg_price_cents,
-        min_price_cents,
-        max_price_cents
-      FROM storefront_category_counts
-      WHERE tenant_id = $1
-        AND product_count > 0
-      ORDER BY category_level ASC, category_name ASC
+      SELECT
+        dc.id as category_id,
+        dc.name as category_name,
+        dc.slug as category_slug,
+        dc."googleCategoryId" as google_category_id,
+        COUNT(ii.id) as count,
+        COUNT(ii.id) FILTER (WHERE ii.image_url IS NOT NULL) as products_with_images,
+        COUNT(ii.id) FILTER (WHERE ii.description IS NOT NULL OR ii.marketing_description IS NOT NULL) as products_with_descriptions,
+        AVG(ii.price_cents) as avg_price_cents,
+        MIN(ii.price_cents) as min_price_cents,
+        MAX(ii.price_cents) as max_price_cents
+      FROM directory_category dc
+      INNER JOIN inventory_items ii ON ii.category_path && ARRAY[dc.slug]
+        AND ii.tenant_id = dc."tenantId"
+        AND ii.item_status = 'active'
+        AND ii.visibility = 'public'
+      WHERE dc."tenantId" = $1
+        AND dc."isActive" = true
+      GROUP BY dc.id, dc.name, dc.slug, dc."googleCategoryId"
+      HAVING COUNT(ii.id) > 0
+      ORDER BY dc.name ASC
     `;
     
-    // Get uncategorized count
+    // Get uncategorized count - products with empty category_path
     const uncategorizedQuery = `
       SELECT COUNT(*) as count
       FROM inventory_items ii
       WHERE ii.tenant_id = $1
         AND ii.item_status = 'active'
         AND ii.visibility = 'public'
-        AND ii.directory_category_id IS NULL
+        AND (ii.category_path IS NULL OR array_length(ii.category_path, 1) = 0)
     `;
     
     const [categoriesResult, uncategorizedResult] = await Promise.all([
@@ -281,17 +305,30 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       getDirectPool().query(uncategorizedQuery, [tenantId]),
     ]);
     
-    const categories = categoriesResult.rows.map((row: any) => ({
-      id: row.category_id,
-      name: row.category_name,
-      slug: row.category_slug,
-      count: parseInt(row.count),
-      productsWithImages: row.products_with_images,
-      productsWithDescriptions: row.products_with_descriptions,
-      avgPriceCents: row.avg_price_cents,
-      minPriceCents: row.min_price_cents,
-      maxPriceCents: row.max_price_cents,
-    }));
+    // Simple deduplication: group by name and count to avoid duplicate entries
+    // This handles cases where there are identical categories with same name and count
+    const categoryMap = new Map();
+    
+    categoriesResult.rows.forEach((row: any) => {
+      const key = `${row.category_name}-${row.count}`; // Unique key by name and count
+      
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, {
+          id: row.category_id,
+          name: row.category_name,
+          slug: row.category_slug,
+          googleCategoryId: row.google_category_id,
+          count: parseInt(row.count),
+          productsWithImages: row.products_with_images,
+          productsWithDescriptions: row.products_with_descriptions,
+          avgPriceCents: row.avg_price_cents,
+          minPriceCents: row.min_price_cents,
+          maxPriceCents: row.max_price_cents,
+        });
+      }
+    });
+    
+    const categories = Array.from(categoryMap.values());
     
     const uncategorizedCount = parseInt(uncategorizedResult.rows[0]?.count || '0');
     
