@@ -20,7 +20,7 @@ export default function ProfileCompletenessPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchCompleteness() {
+    async function fetchProfile() {
       try {
         setLoading(true)
         const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -30,34 +30,75 @@ export default function ProfileCompletenessPage() {
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const res = await fetch(`${API_BASE_URL}/tenant/${tenantId}/profile/completeness`, {
+        // Fetch profile data from the public endpoint
+        const res = await fetch(`${API_BASE_URL}/public/tenant/${tenantId}/profile`, {
           headers,
           credentials: 'include',
         })
 
-        // Mock response since backend endpoint doesn't exist yet
-        if (!res.ok && res.status === 404) {
-          console.log('[ProfileCompleteness] Backend endpoint not implemented, showing mock data')
-          // Mock complete profile data
-          const mockData = {
-            score: 95,
-            grade: 'excellent'
-          }
-          setCompleteness(mockData)
-          setError(null)
-          return
-        }
-
         if (!res.ok) {
           if (res.status === 404) {
-            setError('Profile not found. Please create your business profile first.')
+            throw new Error('Profile not found. Please create your business profile first.')
           } else {
-            throw new Error('Failed to fetch completeness data')
+            throw new Error('Failed to fetch profile data')
           }
-          return
         }
-        const data = await res.json()
-        setCompleteness(data) // Fixed: use data directly, not data.data
+        
+        const profileData = await res.json()
+        
+        // Calculate completeness score based on available fields
+        let score = 0
+        const totalFields = 13
+        
+        // Business name (required)
+        if (profileData.business_name) score += 1
+        
+        // Address fields
+        if (profileData.address_line1) score += 1
+        if (profileData.city) score += 1
+        if (profileData.postal_code) score += 1
+        if (profileData.country_code) score += 1
+        
+        // Contact info
+        if (profileData.phone_number) score += 1
+        if (profileData.email) score += 1
+        
+        // Website (HTTPS validation)
+        if (profileData.website && profileData.website.startsWith('https://')) score += 1
+        
+        // Geocoding (lat/lng) - check for coordinates in profile data
+        if ((profileData.latitude !== null && profileData.latitude !== undefined) || 
+            (profileData.longitude !== null && profileData.longitude !== undefined)) score += 1
+        
+        // Business description
+        if (profileData.business_description) score += 1
+        
+        // Business hours - count if timezone is set (timezone indicates hours are configured)
+        if (profileData.hours && profileData.hours.timezone) score += 1
+        
+        // Logo
+        if (profileData.logo_url) score += 1
+        
+        // Social links
+        if (profileData.social_links && Object.keys(profileData.social_links).length > 0) score += 1
+        
+        // SEO tags (bonus)
+        if (profileData.seo_tags && profileData.seo_tags.length > 0) score += 1
+        
+        const completenessScore = Math.round((score / totalFields) * 100)
+        
+        // Determine grade
+        let grade = 'poor'
+        if (completenessScore >= 90) grade = 'excellent'
+        else if (completenessScore >= 75) grade = 'good'
+        else if (completenessScore >= 50) grade = 'fair'
+        
+        const completenessData = {
+          score: completenessScore,
+          grade: grade
+        }
+        
+        setCompleteness(completenessData)
         setError(null)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
@@ -67,7 +108,7 @@ export default function ProfileCompletenessPage() {
     }
 
     if (tenantId) {
-      fetchCompleteness()
+      fetchProfile()
     }
   }, [tenantId])
 

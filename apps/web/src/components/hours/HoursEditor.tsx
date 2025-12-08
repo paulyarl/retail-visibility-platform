@@ -27,12 +27,22 @@ function to24Hour(time12: string): string {
   return `${hour.toString().padStart(2, "0")}:${m}`;
 }
 
-export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; tenantId: string }) {
+export default function HoursEditor({ apiBase, tenantId, timezone: externalTimezone }: { apiBase: string; tenantId: string; timezone?: string }) {
   const [timezone, setTimezone] = useState("America/New_York");
   const [periods, setPeriods] = useState<Period[]>([]);
   const [specialHours, setSpecialHours] = useState<SpecialHour[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  // Use external timezone if provided, otherwise use internal state
+  const currentTimezone = externalTimezone || timezone;
+
+  // Sync with external timezone changes
+  useEffect(() => {
+    if (externalTimezone) {
+      setTimezone(externalTimezone);
+    }
+  }, [externalTimezone]);
 
   useEffect(() => {
     const load = async () => {
@@ -129,8 +139,8 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
   // Calculate current status - considering both regular and special hours
   const now = new Date();
   const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format
-  const currentDay = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone }).toUpperCase();
-  const currentTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: timezone });
+  const currentDay = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: currentTimezone }).toUpperCase();
+  const currentTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: currentTimezone });
   
   // Check for special hours for today
   const todaySpecial = specialHours.find(special => special.date === today);
@@ -180,7 +190,7 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
 
       <div className="flex items-center gap-2 text-sm text-gray-600">
         <span className="w-32">Timezone</span>
-        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">{timezone}</span>
+        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">{currentTimezone}</span>
         <span className="ml-2 text-gray-500">Manage timezone above.</span>
       </div>
       

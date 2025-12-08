@@ -51,6 +51,9 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
   const [description, setDescription] = useState('');
+  const [enhancedDescription, setEnhancedDescription] = useState('');
+  const [features, setFeatures] = useState('');
+  const [specifications, setSpecifications] = useState('');
   const [status, setStatus] = useState<'draft' | 'active' | 'archived'>('draft');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +89,11 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setPrice(item.price ? item.price.toFixed(2) : '');
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
+      // Extract enriched fields from metadata
+      const metadata = (item as any).metadata || {};
+      setEnhancedDescription(metadata.enhancedDescription || '');
+      setFeatures(Array.isArray(metadata.features) ? metadata.features.join('\n') : '');
+      setSpecifications(metadata.specifications ? JSON.stringify(metadata.specifications, null, 2) : '');
       // Map 'inactive' to 'archived' since we no longer have an Inactive button
       const currentStatus = item.itemStatus || item.status || 'draft';
       const mappedStatus = currentStatus === 'inactive' ? 'archived' : currentStatus;
@@ -133,6 +141,28 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
     setError(null);
 
     try {
+      // Build metadata with enriched fields
+      const metadata: any = {};
+      if (enhancedDescription.trim()) metadata.enhancedDescription = enhancedDescription.trim();
+      if (features.trim()) {
+        metadata.features = features.split('\n').map(f => f.trim()).filter(f => f.length > 0);
+      }
+      if (specifications.trim()) {
+        try {
+          metadata.specifications = JSON.parse(specifications);
+        } catch (e) {
+          // If JSON parsing fails, treat as key-value pairs
+          const specs: any = {};
+          specifications.split('\n').forEach(line => {
+            const [key, ...valueParts] = line.split(':');
+            if (key && valueParts.length > 0) {
+              specs[key.trim()] = valueParts.join(':').trim();
+            }
+          });
+          if (Object.keys(specs).length > 0) metadata.specifications = specs;
+        }
+      }
+
       const updatedItem = {
         ...item,
         sku: sku.trim(),
@@ -142,6 +172,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         price: price ? parseFloat(price) : undefined,
         stock: stock ? parseInt(stock) : undefined,
         description: description.trim() || undefined,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         itemStatus: status === 'draft' ? 'active' : status, // Map draft to active for API, send as itemStatus
         item_status: status === 'draft' ? 'active' : status, // Also send snake_case version for backend
         tenantCategoryId: tenantCategoryId || null,
@@ -338,12 +369,96 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             onChange={(e) => setDescription(e.target.value)}
             placeholder="e.g., Premium organic honey sourced from local beekeepers..."
             disabled={saving}
-            rows={4}
+            rows={3}
             className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed"
           />
           <p className="text-xs text-neutral-500 mt-1">
-            Product description for landing page (optional, not sent to Google Shopping)
+            Short 1-2 sentence description
           </p>
+        </div>
+
+        {/* Enhanced Description Field */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Enhanced Description <span className="text-neutral-400">(AI-generated)</span>
+          </label>
+          <textarea
+            value={enhancedDescription}
+            onChange={(e) => setEnhancedDescription(e.target.value)}
+            placeholder="Detailed 2-3 paragraph marketing description..."
+            disabled={saving}
+            rows={5}
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed"
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            Detailed marketing copy for product pages (optional)
+          </p>
+        </div>
+
+        {/* Key Features Field */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Key Features <span className="text-neutral-400">(AI-generated)</span>
+          </label>
+          <textarea
+            value={features}
+            onChange={(e) => setFeatures(e.target.value)}
+            placeholder="One feature per line&#10;Another great feature&#10;Third amazing feature"
+            disabled={saving}
+            rows={4}
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed font-mono text-sm"
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            One feature per line - displayed with checkmarks
+          </p>
+        </div>
+
+        {/* Specifications Field */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Specifications <span className="text-neutral-400">(AI-generated)</span>
+          </label>
+          <textarea
+            value={specifications}
+            onChange={(e) => setSpecifications(e.target.value)}
+            placeholder='JSON format:&#10;{&#10;  "size": "12 oz",&#10;  "weight": "1.5 lbs",&#10;  "material": "Glass"&#10;}'
+            disabled={saving}
+            rows={6}
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed font-mono text-sm"
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            JSON format or key:value pairs (one per line)
+          </p>
+        </div>
+
+        {/* Photo Section */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">
+            Product Photo
+          </label>
+          <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
+            {item?.imageUrl ? (
+              <div className="space-y-2">
+                <div className="aspect-square w-32 mx-auto bg-white dark:bg-neutral-900 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700">
+                  <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <p className="text-xs text-center text-neutral-600 dark:text-neutral-400">
+                  Current product photo
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <svg className="w-12 h-12 mx-auto text-neutral-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-sm text-neutral-500">No photo</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Category Section */}

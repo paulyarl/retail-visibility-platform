@@ -191,6 +191,8 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       productCount: req.body.productCount || req.body.product_count,
       assignCategories: req.body.assignCategories || req.body.assign_categories,
       createAsDrafts: req.body.createAsDrafts || req.body.create_as_drafts,
+      generateImages: req.body.generateImages || req.body.generate_images,
+      imageQuality: req.body.imageQuality || req.body.image_quality,
     };
     
     console.log('[Quick Start] Normalized body:', normalizedBody);

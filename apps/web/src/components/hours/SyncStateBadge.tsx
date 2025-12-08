@@ -8,7 +8,7 @@ export default function SyncStateBadge({ apiBase, tenantId }: { apiBase: string;
 
   const load = async () => {
     try {
-      const r = await apiRequest(`api/tenant/${tenantId}/gbp/hours/status`);
+      const r = await apiRequest(`/api/tenant/${tenantId}/gbp/hours/status`);
       if (r.ok) {
         const j = await r.json();
         setStatus(j?.data || null);
@@ -25,7 +25,7 @@ export default function SyncStateBadge({ apiBase, tenantId }: { apiBase: string;
     const prevLast = status?.last_synced_at;
     const prevAttempts = status?.attempts || 0;
     try {
-      await apiRequest(`api/tenant/${tenantId}/gbp/hours/mirror`, {
+      await apiRequest(`/api/tenant/${tenantId}/gbp/hours/mirror`, {
         method: "POST",
       });
     } catch (error) {

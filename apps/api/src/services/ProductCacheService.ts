@@ -49,6 +49,7 @@ export interface ProductRequest {
   categoryName: string;
   googleCategoryId?: string;
   count: number;
+  requireImages?: boolean; // NEW: Only return products with images
 }
 
 export interface GeneratedProduct {
@@ -75,12 +76,12 @@ export class ProductCacheService {
    * Get products for a scenario, using cache or AI generation
    */
   async getProductsForScenario(request: ProductRequest): Promise<GeneratedProduct[]> {
-    const { businessType, categoryName, googleCategoryId, count } = request;
+    const { businessType, categoryName, googleCategoryId, count, requireImages = false } = request;
     
-    console.log(`[ProductCache] Requesting ${count} products for ${businessType} > ${categoryName}`);
+    console.log(`[ProductCache] Requesting ${count} products for ${businessType} > ${categoryName}${requireImages ? ' (with images)' : ''}`);
     
     // Step 1: Check cache
-    const cachedProducts = await this.getCachedProducts(businessType, categoryName, count);
+    const cachedProducts = await this.getCachedProducts(businessType, categoryName, count, requireImages);
     
     if (cachedProducts.length >= count) {
       console.log(`[ProductCache] Cache HIT: Found ${cachedProducts.length} cached products`);
@@ -88,13 +89,19 @@ export class ProductCacheService {
       // Update usage stats
       await this.incrementUsageCount(cachedProducts.map(p => p.id));
       
-      // Convert to GeneratedProduct format
+      // Convert to GeneratedProduct format (include image data)
       return cachedProducts.slice(0, count).map(p => ({
         name: p.productName,
         price: p.priceCents,
         brand: p.brand || undefined,
         description: p.description || undefined,
         sku: p.skuPattern || undefined,
+        // Include image data if available
+        imageUrl: p.imageUrl || undefined,
+        thumbnailUrl: p.thumbnailUrl || undefined,
+        imageWidth: p.imageWidth || undefined,
+        imageHeight: p.imageHeight || undefined,
+        imageBytes: p.imageBytes || undefined,
       }));
     }
     
@@ -107,6 +114,11 @@ export class ProductCacheService {
     try {
       aiProducts = await this.generateWithAI(businessType, categoryName, needed);
       console.log(`[ProductCache] AI generated ${aiProducts.length} products`);
+      
+      // Debug: Log first product to see what fields AI is returning
+      if (aiProducts.length > 0) {
+        console.log(`[ProductCache] Sample AI product:`, JSON.stringify(aiProducts[0], null, 2));
+      }
       
       // Save AI-generated products to cache
       await this.saveToCache(businessType, categoryName, googleCategoryId, aiProducts);
@@ -152,16 +164,24 @@ export class ProductCacheService {
   private async getCachedProducts(
     businessType: string,
     categoryName: string,
-    limit: number
+    limit: number,
+    requireImages: boolean = false
   ): Promise<CachedProduct[]> {
     try {
       // Use Prisma client to query cache
+      const whereClause: any = {
+        business_type: businessType,
+        category_name: categoryName,
+        quality_score: { gte: 0.0 }
+      };
+      
+      // Filter by images if required
+      if (requireImages) {
+        whereClause.has_image = true;
+      }
+      
       const products = await prisma.quick_start_product_caches.findMany({
-        where: {
-          business_type: businessType,
-          category_name: categoryName,
-          quality_score: { gte: 0.0 }
-        },
+        where: whereClause,
         orderBy: [
           { usage_count: 'desc' },
           { quality_score: 'desc' },
@@ -171,9 +191,11 @@ export class ProductCacheService {
       });
       
       if (products.length > 0) {
-        console.log(`[ProductCache] Cache HIT: Found ${products.length} products for ${businessType} > ${categoryName}`);
+        const imageInfo = requireImages ? ' (all with images)' : '';
+        console.log(`[ProductCache] Cache HIT: Found ${products.length} products for ${businessType} > ${categoryName}${imageInfo}`);
       } else {
-        console.log(`[ProductCache] Cache MISS: No products for ${businessType} > ${categoryName}`);
+        const imageInfo = requireImages ? ' (with images)' : '';
+        console.log(`[ProductCache] Cache MISS: No products for ${businessType} > ${categoryName}${imageInfo}`);
       }
       
       // Convert to CachedProduct format
@@ -414,6 +436,63 @@ export class ProductCacheService {
       SET quality_score = GREATEST(-1.0, LEAST(1.0, quality_score + $1))
       WHERE id = $2
     `, delta, productId);
+  }
+  
+  /**
+   * Update cache entry with photo metadata
+   */
+  async updateCacheWithPhoto(
+    businessType: string,
+    productName: string,
+    photoData: {
+      imageUrl: string;
+      thumbnailUrl: string;
+      imageWidth: number;
+      imageHeight: number;
+      imageBytes: number;
+      imageQuality: string;
+    },
+    categoryName?: string
+  ): Promise<void> {
+    try {
+      // Find the cache entry by business type and product name
+      // If category provided, match that too for precision
+      const whereClause: any = {
+        business_type: businessType,
+        product_name: productName,
+      };
+      
+      if (categoryName) {
+        whereClause.category_name = categoryName;
+      }
+      
+      const cacheEntry = await prisma.quick_start_product_caches.findFirst({
+        where: whereClause
+      });
+      
+      if (!cacheEntry) {
+        console.warn(`[ProductCache] No cache entry found for ${businessType} > ${categoryName || '?'} > ${productName}`);
+        return;
+      }
+      
+      // Update with photo data
+      await prisma.quick_start_product_caches.update({
+        where: { id: cacheEntry.id },
+        data: {
+          image_url: photoData.imageUrl,
+          thumbnail_url: photoData.thumbnailUrl,
+          image_width: photoData.imageWidth,
+          image_height: photoData.imageHeight,
+          image_bytes: photoData.imageBytes,
+          has_image: true,
+          image_quality: photoData.imageQuality,
+        }
+      });
+      
+      console.log(`[ProductCache] ✓ Updated cache with photo for: ${productName}`);
+    } catch (error: any) {
+      console.error(`[ProductCache] Failed to update cache with photo for "${productName}":`, error.message);
+    }
   }
   
   /**

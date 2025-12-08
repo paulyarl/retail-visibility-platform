@@ -69,7 +69,7 @@ import {
 // import billingRoutes from './routes/billing';
 // import subscriptionRoutes from './routes/subscriptions';
 // import categoryRoutes from './routes/categories';
-// import photosRouter from './photos';
+import photosRouter from './photos';
 
 // v3.6.2-prep imports - temporarily disabled
 // import feedJobsRoutes from './routes/feed-jobs';
@@ -935,8 +935,15 @@ const tenantProfileSchema = z.object({
   email: z.string().email().optional(),
   website: z
     .string()
-    .url()
-    .refine((v) => !v || HTTPS_URL.test(v), { message: "website_must_be_https" })
+    .refine((v) => {
+      if (!v) return true; // Allow empty
+      try {
+        new URL(v); // Check if it's a valid URL
+        return HTTPS_URL.test(v); // Check if it starts with https://
+      } catch {
+        return false; // Invalid URL format
+      }
+    }, { message: "Invalid URL" })
     .optional(),
   contact_person: z.string().optional(),
   logo_url: z.string().url().optional().or(z.literal('')),
@@ -2659,8 +2666,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 };
 
 // Mount photos router (handles all photo endpoints with position support)
-// Temporarily disable photos router
-// app.use('/photos', photosRouter);
+app.use('/api', photosRouter);
 
 // Legacy photo upload handler removed - now handled by photos router
 // Old routes:
@@ -2842,8 +2848,9 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     // Return paginated response
     // Hide price_cents from frontend since price is the authoritative field
     // Map directory_category_id to tenantCategoryId and include category object
-    const itemsWithoutPriceCents = items.map((item: { [x: string]: any; price?: any; price_cents?: any; directory_category_id?: any; }) => {
-      const { price_cents, directory_category_id, ...itemWithoutPriceCents } = item;
+    // Map image_url to imageUrl for frontend compatibility
+    const itemsWithoutPriceCents = items.map((item: { [x: string]: any; price?: any; price_cents?: any; directory_category_id?: any; image_url?: any; }) => {
+      const { price_cents, directory_category_id, image_url, ...itemWithoutPriceCents } = item;
       const category = directory_category_id ? categoryMap.get(directory_category_id) : null;
       
       return {
@@ -2851,6 +2858,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         price: item.price !== null && item.price !== undefined ? Number(item.price) : null,
         tenantCategoryId: directory_category_id || null,
         tenantCategory: category || null,
+        imageUrl: image_url || null, // Map image_url to imageUrl for frontend
       };
     });
 
@@ -2911,10 +2919,12 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
 
   // Convert Decimal price to number for frontend compatibility
   // Hide price_cents from frontend since price is the authoritative field
-  const { price_cents, ...itemWithoutPriceCents } = it;
+  // Map image_url to imageUrl for frontend compatibility
+  const { price_cents, image_url, ...itemWithoutPriceCents } = it;
   const transformed = {
     ...itemWithoutPriceCents,
     price: it.price !== null && it.price !== undefined ? Number(it.price) : null,
+    imageUrl: image_url || null,
     tenantCategory,
     tenantCategoryId: it.directory_category_id,
   };

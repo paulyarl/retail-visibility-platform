@@ -1,14 +1,16 @@
-import React from "react";
-import { cookies } from "next/headers";
+"use client";
+
+import React, { useState, use } from "react";
 import HoursEditor from "@/components/hours/HoursEditor";
 import SpecialHoursCalendar from "@/components/hours/SpecialHoursCalendar";
 import SyncStateBadge from "@/components/hours/SyncStateBadge";
 import TimezonePicker from "@/components/hours/TimezonePicker";
 import HoursPreview from "@/components/hours/HoursPreview";
 
-export default async function HoursSettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {
-  const { tenantId } = await params;
+export default function HoursSettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {
+  const { tenantId } = use(params);
   const clientApiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
+  const [currentTimezone, setCurrentTimezone] = useState<string | undefined>();
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -33,7 +35,11 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Timezone */}
-      <TimezonePicker tenantId={tenantId} apiBase={clientApiBase} />
+      <TimezonePicker 
+        tenantId={tenantId} 
+        apiBase={clientApiBase} 
+        onTimezoneChange={setCurrentTimezone}
+      />
 
       {/* Helpful Reminder */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -58,7 +64,11 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
               <p className="text-sm text-gray-600 mt-1">Set your weekly operating schedule</p>
             </div>
             <div className="p-6">
-              <HoursEditor apiBase={clientApiBase} tenantId={tenantId} />
+              <HoursEditor 
+                apiBase={clientApiBase} 
+                tenantId={tenantId} 
+                timezone={currentTimezone}
+              />
             </div>
           </div>
 

@@ -248,7 +248,8 @@ export async function generateQuickStartProducts(
           businessType: scenario,
           categoryName: category.name,
           googleCategoryId: category.id,
-          count: productsPerCategory
+          count: productsPerCategory,
+          requireImages: generateImages, // NEW: Request products with images if photos enabled
         });
         
         // Convert to quick-start format and assign category
@@ -258,7 +259,17 @@ export async function generateQuickStartProducts(
             price: product.price,
             brand: product.brand || 'Generic',
             category: category.originalName || category.name,
-            description: product.description
+            description: product.description,
+            // Include photo data from cache if available
+            imageUrl: product.imageUrl,
+            thumbnailUrl: product.thumbnailUrl,
+            imageWidth: product.imageWidth,
+            imageHeight: product.imageHeight,
+            imageBytes: product.imageBytes,
+            // Include enriched AI content from cache if available
+            enhancedDescription: product.enhancedDescription,
+            features: product.features,
+            specifications: product.specifications,
           });
         }
       } catch (error: any) {
@@ -294,12 +305,15 @@ export async function generateQuickStartProducts(
     }
   }
 
-  // Get existing product names to avoid duplicates
+  // Get existing products to handle duplicates intelligently
   const existingProducts = await prismaClient.inventory_items.findMany({
     where: { tenant_id: tenant_id },
-    select: { name: true },
+    select: { id: true, name: true, image_url: true },
   });
   const existingNames = new Set(existingProducts.map((p: { name: string }) => p.name));
+  const existingProductsMap = new Map(
+    existingProducts.map((p: { id: string; name: string; image_url: string | null }) => [p.name, p])
+  );
   
   // Create products in batches
   const batchSize = 100;
@@ -314,11 +328,25 @@ export async function generateQuickStartProducts(
     for (let idx = 0; idx < batch.length; idx++) {
       const product = batch[idx];
       
-      // Skip if product name already exists
-      if (existingNames.has(product.name)) {
-        console.log(`[Quick Start] Skipping duplicate product: ${product.name}`);
-        skippedCount++;
-        continue;
+      // Smart duplicate handling
+      const existingProduct = existingProductsMap.get(product.name) as { id: string; name: string; image_url: string | null } | undefined;
+      if (existingProduct) {
+        // If new product has photo but existing doesn't, update existing instead of skipping
+        const newHasPhoto = !!(product as any).imageUrl;
+        const existingHasPhoto = !!existingProduct.image_url;
+        
+        if (newHasPhoto && !existingHasPhoto && generateImages) {
+          console.log(`[Quick Start] Will upgrade existing product with photo: ${product.name}`);
+          // Mark for photo upgrade instead of creating new item
+          (product as any)._existingProductId = existingProduct.id;
+          (product as any)._isUpgrade = true;
+          // Don't create new item, just track for photo generation
+          continue;
+        } else {
+          console.log(`[Quick Start] Skipping duplicate product: ${product.name}`);
+          skippedCount++;
+          continue;
+        }
       }
       
       const availability = Math.random() > 0.25 ? 'in_stock' as const : 'out_of_stock' as const;
@@ -340,13 +368,24 @@ export async function generateQuickStartProducts(
         ? 'inactive' as const
         : (Math.random() > 0.25 ? 'active' as const : 'inactive' as const);
 
-      items.push({
-        id: generateItemId(),
+      const itemId = generateItemId();
+      
+      // Build metadata with enriched AI content (following scanner enrichment pattern)
+      const metadata: any = {};
+      const enrichedProduct = product as any;
+      if (enrichedProduct.enhancedDescription) metadata.enhancedDescription = enrichedProduct.enhancedDescription;
+      if (enrichedProduct.features && enrichedProduct.features.length > 0) metadata.features = enrichedProduct.features;
+      if (enrichedProduct.specifications && Object.keys(enrichedProduct.specifications).length > 0) metadata.specifications = enrichedProduct.specifications;
+      
+      const itemData = {
+        id: itemId,
         tenant_id: tenant_id,
         sku: generateQuickStartSku(timestamp + globalIndex), // Use timestamp + global index for unique SKUs
         name: product.name,
         title: product.name,
         brand: product.brand || 'Generic',
+        description: product.description || null,
+        metadata: Object.keys(metadata).length > 0 ? metadata : null,
         price_cents: product.price,
         price: product.price / 100,
         currency: 'USD',
@@ -354,8 +393,24 @@ export async function generateQuickStartProducts(
         availability,
         item_status: itemStatus,
         updated_at: new Date(),
+        // Attach cached photo if available
+        image_url: (product as any).imageUrl || null,
+        // Enrichment tracking (following scanner enrichment pattern)
+        source: 'MANUAL' as const,
+        enrichment_status: 'COMPLETE' as const,
+        enriched_at: new Date(),
+        enriched_by: 'ai_quick_start',
+        missing_images: !(product as any).imageUrl,
+        missing_description: !product.description,
+        missing_specs: !enrichedProduct.specifications || Object.keys(enrichedProduct.specifications).length === 0,
+        missing_brand: !product.brand,
         ...categoryAssignment,
-      });
+      };
+      
+      // Store category name for photo cache updates
+      (itemData as any)._categoryName = product.category;
+      
+      items.push(itemData);
       
       // Add to existing names set to prevent duplicates within this batch
       existingNames.add(product.name);
@@ -368,7 +423,11 @@ export async function generateQuickStartProducts(
       
       for (const item of items) {
         try {
-          const created = await prismaClient.inventory_items.create({ data: item });
+          // Remove temporary tracking fields before creating
+          const { _categoryName, ...itemData } = item as any;
+          const created = await prismaClient.inventory_items.create({ data: itemData });
+          // Add back the tracking field for photo generation
+          (created as any)._categoryName = _categoryName;
           createdItems.push(created);
           createdCount++;
         } catch (error: any) {
@@ -382,38 +441,97 @@ export async function generateQuickStartProducts(
         }
       }
       
-      // Generate images if requested
-      if (generateImages && createdItems.length > 0) {
-        console.log(`[Quick Start] Generating ${createdItems.length} product images...`);
-        const { aiImageService } = await import('../services/AIImageService');
-        
-        let imagesGenerated = 0;
-        let imagesFailed = 0;
-        
-        for (const item of createdItems) {
-          try {
-            const image = await aiImageService.generateProductImage(
-              item.name,
-              item.tenant_id,
-              item.id,
-              'openai', // Use DALL-E for now
-              imageQuality
-            );
-            
-            if (image) {
-              console.log(`[Quick Start] ✓ Image generated for: ${item.name}`);
-              imagesGenerated++;
-            } else {
-              console.log(`[Quick Start] ✗ Image generation failed for: ${item.name}`);
-              imagesFailed++;
-            }
-          } catch (error: any) {
-            console.error(`[Quick Start] Image generation error for "${item.name}":`, error.message);
-            imagesFailed++;
+      // Handle photo upgrades for existing products
+      if (generateImages) {
+        const upgradeProducts = batch.filter(p => (p as any)._isUpgrade);
+        if (upgradeProducts.length > 0) {
+          console.log(`[Quick Start] Found ${upgradeProducts.length} existing products to upgrade with photos`);
+          for (const product of upgradeProducts) {
+            createdItems.push({
+              id: (product as any)._existingProductId,
+              name: product.name,
+              tenant_id: tenant_id,
+              image_url: null, // Will be updated after photo generation
+              _categoryName: product.category,
+              _isUpgrade: true,
+            });
           }
         }
+      }
+      
+      // Generate images if requested (only for items without cached photos)
+      if (generateImages && createdItems.length > 0) {
+        const itemsNeedingPhotos = createdItems.filter(item => !item.image_url);
         
-        console.log(`[Quick Start] Images: ${imagesGenerated} generated, ${imagesFailed} failed`);
+        if (itemsNeedingPhotos.length > 0) {
+          console.log(`[Quick Start] Generating ${itemsNeedingPhotos.length} product images...`);
+          const { aiImageService } = await import('../services/AIImageService');
+          
+          let imagesGenerated = 0;
+          let imagesFailed = 0;
+          
+          for (const item of itemsNeedingPhotos) {
+            try {
+              const image = await aiImageService.generateProductImage(
+                item.name,
+                item.tenant_id,
+                item.id,
+                'openai', // Use DALL-E for now
+                imageQuality
+              );
+              
+              if (image) {
+                console.log(`[Quick Start] Image generated, updating item ${item.id} with URL: ${image.url}`);
+                
+                try {
+                  // Update inventory item with image URL
+                  const updated = await prismaClient.inventory_items.update({
+                    where: { id: item.id },
+                    data: { image_url: image.url },
+                    select: { id: true, name: true, image_url: true }
+                  });
+                  
+                  console.log(`[Quick Start] ✓ Item updated with image_url:`, updated);
+                  
+                  const upgradeMsg = (item as any)._isUpgrade ? ' (upgraded existing)' : '';
+                  
+                  // Save to cache for future reuse
+                  await productCacheService.updateCacheWithPhoto(
+                    scenario,
+                    item.name,
+                    {
+                      imageUrl: image.url,
+                      thumbnailUrl: image.thumbnailUrl,
+                      imageWidth: image.width,
+                      imageHeight: image.height,
+                      imageBytes: image.bytes,
+                      imageQuality: imageQuality,
+                    },
+                    (item as any)._categoryName // Pass category for accurate cache matching
+                  );
+                  
+                  console.log(`[Quick Start] ✓ Image generated and attached for: ${item.name}${upgradeMsg}`);
+                  imagesGenerated++;
+                } catch (updateError: any) {
+                  console.error(`[Quick Start] Failed to update item ${item.id} with image_url:`, updateError);
+                  imagesFailed++;
+                }
+              } else {
+                console.log(`[Quick Start] ✗ Image generation failed for: ${item.name}`);
+                imagesFailed++;
+              }
+            } catch (error: any) {
+              console.error(`[Quick Start] Image generation error for "${item.name}":`, error.message);
+              imagesFailed++;
+            }
+          }
+          
+          const upgradeCount = itemsNeedingPhotos.filter(i => (i as any)._isUpgrade).length;
+          const newCount = imagesGenerated - upgradeCount;
+          console.log(`[Quick Start] Images: ${imagesGenerated} generated (${newCount} new, ${upgradeCount} upgrades), ${imagesFailed} failed`);
+        } else {
+          console.log(`[Quick Start] All ${createdItems.length} items already have cached photos`);
+        }
       }
     }
   }

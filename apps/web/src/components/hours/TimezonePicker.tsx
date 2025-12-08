@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api";
 
-export default function TimezonePicker({ tenantId, apiBase }: { tenantId: string; apiBase: string }) {
+export default function TimezonePicker({ tenantId, apiBase, onTimezoneChange }: { tenantId: string; apiBase: string; onTimezoneChange?: (timezone: string) => void }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +19,9 @@ export default function TimezonePicker({ tenantId, apiBase }: { tenantId: string
           const prof = await res.json();
           const tz = prof?.hours?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
           setTimezone(tz);
-          setExistingHours(prof?.hours || {});
+          // Store existing hours without timezone (timezone is managed separately)
+          const { timezone: _, ...hoursWithoutTimezone } = prof?.hours || {};
+          setExistingHours(hoursWithoutTimezone);
         } else {
           setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
           setExistingHours({});
@@ -38,7 +40,7 @@ export default function TimezonePicker({ tenantId, apiBase }: { tenantId: string
     try {
       setSaving(true);
       setError(null);
-      const res = await apiRequest("tenant/profile", {
+      const res = await apiRequest("/api/tenant/profile", {
         method: "POST",
         body: JSON.stringify({
           tenant_id: tenantId,
@@ -48,6 +50,8 @@ export default function TimezonePicker({ tenantId, apiBase }: { tenantId: string
       if (!res.ok) {
         throw new Error("Failed to save timezone");
       }
+      // Notify parent of timezone change
+      onTimezoneChange?.(timezone);
     } catch (e) {
       setError("Failed to save timezone");
     } finally {

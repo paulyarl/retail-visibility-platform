@@ -87,6 +87,8 @@ export default function QuickStartPage() {
   const [eligibility, setEligibility] = useState<EligibilityResponse | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<string>('grocery');
   const [productCount, setProductCount] = useState<number>(50);
+  const [generateImages, setGenerateImages] = useState<boolean>(false);
+  const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +162,8 @@ export default function QuickStartPage() {
           productCount,
           assignCategories: true,
           createAsDrafts: true,
+          generateImages,
+          imageQuality,
         }),
       });
 
@@ -385,7 +389,7 @@ export default function QuickStartPage() {
               Generate Products
             </h2>
             <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
-              Create 25-100 realistic products instantly with AI
+              Create 5-200 realistic products with AI (optional photos)
             </p>
             
             <div className="space-y-3 mb-6">
@@ -398,8 +402,8 @@ export default function QuickStartPage() {
                 <span>Auto-categorized with prices</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                <span>Ready in 1 second</span>
+                <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                <span>Optional AI-generated photos</span>
               </div>
             </div>
 
@@ -608,6 +612,64 @@ export default function QuickStartPage() {
             </div>
           </div>
 
+          {/* Photo Generation Toggle */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Generate AI Product Photos
+              </label>
+              <button
+                onClick={() => setGenerateImages(!generateImages)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  generateImages ? 'bg-gradient-to-r from-blue-600 to-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    generateImages ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
+            {generateImages && (
+              <div className="space-y-3 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  ⚠️ Enabling photos will increase generation time to 2-3 minutes
+                </p>
+                
+                {/* Image Quality Selector */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    Image Quality
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setImageQuality('standard')}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        imageQuality === 'standard'
+                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      Standard
+                    </button>
+                    <button
+                      onClick={() => setImageQuality('hd')}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        imageQuality === 'hd'
+                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      HD (Slower)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Features */}
           <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg">
             <div className="space-y-2">
@@ -623,6 +685,12 @@ export default function QuickStartPage() {
                 <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                 <span>Realistic prices and product names</span>
               </div>
+              {generateImages && (
+                <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>AI-generated product photos ({imageQuality === 'hd' ? 'HD quality' : 'Standard quality'})</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -642,12 +710,12 @@ export default function QuickStartPage() {
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Generating...
+                  {generateImages ? 'Generating with Photos (2-3 min)...' : 'Generating...'}
                 </>
               ) : (
                 <>
-                  <Rocket className="w-5 h-5" />
-                  Generate Products
+                  {generateImages ? <Sparkles className="w-5 h-5" /> : <Rocket className="w-5 h-5" />}
+                  {generateImages ? 'Generate with AI Photos' : 'Generate Products'}
                 </>
               )}
             </button>

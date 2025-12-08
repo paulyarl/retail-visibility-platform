@@ -135,9 +135,28 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
 
     const productData = await productRes.json();
     
+    // Extract enriched fields from metadata if present
+    const metadata = productData.metadata || {};
+    const enrichedFields: any = {};
+    
+    // Extract AI-generated enriched content from metadata
+    if (metadata.enhancedDescription) {
+      enrichedFields.marketingDescription = metadata.enhancedDescription;
+    }
+    if (metadata.features && Array.isArray(metadata.features)) {
+      enrichedFields.environmentalInfo = metadata.features; // Reuse environmentalInfo for features display
+    }
+    if (metadata.specifications && typeof metadata.specifications === 'object') {
+      enrichedFields.specifications = {
+        ...(productData.specifications || {}),
+        ...metadata.specifications
+      };
+    }
+    
     // Normalize field names from snake_case to camelCase
     const product: Product = {
       ...productData,
+      ...enrichedFields,
       itemStatus: productData.itemStatus || productData.item_status || 'active',
       tenantId: productData.tenantId || productData.tenant_id,
     };
@@ -189,7 +208,7 @@ type Photo = {
 async function getProductPhotos(id: string): Promise<Photo[]> {
   try {
     const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${apiBaseUrl}/items/${id}/photos`, { cache: 'no-store' });
+    const res = await fetch(`${apiBaseUrl}/api/items/${id}/photos`, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = await res.json();
     if (!Array.isArray(data)) return [];

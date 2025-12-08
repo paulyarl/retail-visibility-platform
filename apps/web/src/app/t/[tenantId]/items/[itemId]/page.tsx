@@ -7,6 +7,8 @@ import { Card, CardContent, Badge, Button } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import SyncStatusIndicator from '@/components/items/SyncStatusIndicator';
 import { QRCodeModal } from '@/components/items/QRCodeModal';
+import EditItemModal from '@/components/items/EditItemModal';
+import { Item as ItemType } from '@/services/itemsDataService';
 
 interface ItemDetailPageProps {
   params: Promise<{
@@ -99,10 +101,24 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     loadItemData();
   }, [itemId]);
+
+  const handleSaveItem = async (updatedItem: ItemType) => {
+    try {
+      const response = await api.put(`/api/items/${itemId}`, updatedItem);
+      if (!response.ok) throw new Error('Failed to update item');
+      
+      // Reload item data to show updated values
+      await loadItemData();
+    } catch (err) {
+      console.error('Error updating item:', err);
+      throw err;
+    }
+  };
 
   const loadItemData = async () => {
     try {
@@ -114,9 +130,28 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       if (!itemRes.ok) throw new Error('Failed to load item');
       const itemData = await itemRes.json();
       
+      // Extract enriched fields from metadata if present
+      const metadata = itemData.metadata || {};
+      const enrichedFields: any = {};
+      
+      // Extract AI-generated enriched content from metadata
+      if (metadata.enhancedDescription) {
+        enrichedFields.marketingDescription = metadata.enhancedDescription;
+      }
+      if (metadata.features && Array.isArray(metadata.features)) {
+        enrichedFields.environmentalInfo = metadata.features; // Reuse environmentalInfo for features display
+      }
+      if (metadata.specifications && typeof metadata.specifications === 'object') {
+        enrichedFields.specifications = {
+          ...(itemData.specifications || {}),
+          ...metadata.specifications
+        };
+      }
+      
       // Normalize the item data to match frontend expectations
       const normalizedItem = {
         ...itemData,
+        ...enrichedFields,
         status: itemData.itemStatus || itemData.item_status || itemData.status || 'active',
         tenantCategory: itemData.tenantCategory,
         tenantCategoryId: itemData.tenantCategoryId || itemData.directory_category_id,
@@ -186,8 +221,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Back Button */}
-        <div className="mb-6">
+        {/* Back Button & Actions */}
+        <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() => router.push(`/t/${tenantId}/items`)}
             className="text-primary-600 hover:text-primary-700 font-medium inline-flex items-center gap-2"
@@ -197,12 +232,39 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             </svg>
             Back to Items
           </button>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                // Scroll to photos section
+                const photosSection = document.querySelector('[data-section="photos"]');
+                if (photosSection) {
+                  photosSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors font-medium shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Manage Photos
+            </button>
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit Item
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Photos */}
           <div className="space-y-4">
-            <Card>
+            <Card data-section="photos">
               <CardContent className="p-6">
                 <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
                   Photos ({displayPhotos.length})
@@ -579,12 +641,12 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </Card>
             )}
 
-            {/* Environmental Info */}
+            {/* Key Features */}
             {item.environmentalInfo && item.environmentalInfo.length > 0 && (
               <Card>
                 <CardContent className="p-6">
                   <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                    🌱 Environmental Information
+                    ✨ Key Features
                   </h2>
                   <ul className="space-y-2 text-sm">
                     {item.environmentalInfo.map((info, idx) => (
@@ -696,6 +758,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           onClose={() => setShowQRModal(false)}
         />
       )}
+
+      {/* Edit Item Modal */}
+      <EditItemModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        item={item}
+        onSave={handleSaveItem}
+      />
     </div>
   );
 }
