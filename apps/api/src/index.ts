@@ -3064,7 +3064,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     
     // Map camelCase to snake_case for directory_category_id
     // CRITICAL: Must explicitly set this field as it was destructured out of rest
-    if (tenantCategoryId !== undefined) {
+    if (tenantCategoryId !== undefined && tenantCategoryId !== null) {
       updateData.directory_category_id = tenantCategoryId;
       console.log('[PUT /items/:id] Setting directory_category_id from tenantCategoryId:', tenantCategoryId);
       
