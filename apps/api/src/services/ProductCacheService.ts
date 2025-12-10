@@ -218,10 +218,10 @@ export class ProductCacheService {
         features: p.features,
         specifications: p.specifications,
         generationSource: p.generation_source,
-        hasImage: p.has_image,
+        hasImage: !!p.has_image,
         imageQuality: p.image_quality,
         usageCount: p.usage_count,
-        qualityScore: p.quality_score,
+        qualityScore: p.quality_score || 0,
         createdAt: p.created_at,
         lastUsedAt: p.last_used_at,
       }));

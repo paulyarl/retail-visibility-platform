@@ -249,10 +249,10 @@ export function hasFeature(resolvedTier: ResolvedTier, featureId: string): boole
     return checkTierFeature(tierKey, featureId);
   }
   
-  // Check both id and featureKey for compatibility with backend
+  // Check both id and featureKey/feature_key for compatibility with backend
   // If enabled is undefined, treat as true (feature exists = enabled)
   return resolvedTier.effective.features.some(
-    f => (f.id === featureId || (f as any).featureKey === featureId) && (f.enabled !== false)
+    f => (f.id === featureId || (f as any).featureKey === featureId || (f as any).feature_key === featureId) && (f.enabled !== false)
   );
 }
 

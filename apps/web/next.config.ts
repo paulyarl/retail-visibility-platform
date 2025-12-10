@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
   // Proxy API requests to the external API server
   async rewrites() {
     return [
+      // Exclude admin/tier-system routes so they can be handled by Next.js API routes
+      {
+        source: '/api/admin/tier-system/:path*',
+        destination: '/api/admin/tier-system/:path*', // Pass through to Next.js
+      },
+      // Proxy all other API requests to the external API server
       {
         source: '/api/:path*',
         destination: 'http://localhost:4000/api/:path*',

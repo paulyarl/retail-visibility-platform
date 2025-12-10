@@ -32,7 +32,6 @@ export default function TenantScanPage() {
   const hasScannerAccess = canAccess('barcode_scan', 'canEdit');
   const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
   
-  
   const [sessions, setSessions] = useState<ScanSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);

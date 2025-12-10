@@ -21,7 +21,7 @@ export interface User {
  */
 export function isPlatformAdmin(user: User | null | undefined): boolean {
   if (!user) return false;
-  return user.role === 'PLATFORM_ADMIN';
+  return user.role === 'PLATFORM_ADMIN' || user.role === 'OWNER';
 }
 
 /**

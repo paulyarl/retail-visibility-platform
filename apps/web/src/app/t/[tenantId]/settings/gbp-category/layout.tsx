@@ -29,7 +29,7 @@ export default function GBPCategoryLayout({ children }: { children: React.ReactN
           headers['Authorization'] = `Bearer ${token}`;
         }
         
-        const res = await fetch(`${apiUrl}/tenants/${tenantId}`, {
+        const res = await fetch(`${apiUrl}/api/tenants/${tenantId}`, {
           headers,
           credentials: 'include',
         });

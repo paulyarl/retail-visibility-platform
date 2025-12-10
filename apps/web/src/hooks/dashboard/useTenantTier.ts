@@ -67,11 +67,11 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
   // Helper function to map API tier response to TierInfo format
   const mapApiTierToTierInfo = (apiTier: any): TierInfo => {
     return {
-      id: apiTier.tierKey,
-      name: apiTier.displayName || apiTier.name,
-      level: mapTierKeyToLevel(apiTier.tierKey),
+      id: apiTier.tier_key || apiTier.tierKey,
+      name: apiTier.display_name || apiTier.displayName || apiTier.name,
+      level: mapTierKeyToLevel(apiTier.tier_key || apiTier.tierKey),
       source: 'tenant', // Default to tenant, will be overridden if needed
-      features: apiTier.features || [],
+      features: apiTier.tier_features_list || apiTier.features || [],
       limits: apiTier.limits || {}
     };
   };
@@ -102,7 +102,7 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
       setError(null);
 
       // Check user's platform role and tenant role
-      const userResponse = await api.get('auth/me');
+      const userResponse = await api.get('/api/auth/me');
       if (userResponse.ok) {
         const userDataResponse = await userResponse.json();
         setUserData(userDataResponse.user);  // Store for emergency bypass
@@ -194,7 +194,7 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
 
   // EMERGENCY: Feature name mapping to fix frontend/backend conflicts
   const EMERGENCY_FEATURE_MAPPING: Record<string, string> = {
-    'product_scanning': 'barcode_scan',  // Map frontend name to backend
+    'barcode_scan': 'product_scanning',  // Map frontend name to backend
     'quick_start_wizard_full': 'quick_start_wizard',  // Normalize variants
     'propagation': 'propagation_products',  // Default propagation to products
   };

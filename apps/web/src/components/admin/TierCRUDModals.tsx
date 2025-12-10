@@ -665,7 +665,7 @@ export function InheritTierModal({ isOpen, tier, tiers, onClose, onSubmit, submi
   // Filter out current tier and enforce hierarchy (can only inherit from lower tiers)
   const availableSourceTiers = tiers.filter(t => {
     // Can't inherit from self
-    if (t.id === tier?.id) return false;
+    if (t.tierKey === tier?.tierKey) return false;
     
     // Can only inherit from lower tiers (lower sort order)
     // Lower tiers have smaller sortOrder numbers (e.g., Trial=1, Starter=2, Pro=3)
@@ -719,7 +719,7 @@ export function InheritTierModal({ isOpen, tier, tiers, onClose, onSubmit, submi
               >
                 <option value="">Select a tier to inherit from...</option>
                 {availableSourceTiers.map((sourceTier) => (
-                  <option key={sourceTier.id} value={sourceTier.id}>
+                  <option key={sourceTier.tierKey} value={sourceTier.tierKey}>
                     {sourceTier.displayName} ({sourceTier.features.length} features)
                   </option>
                 ))}
@@ -741,7 +741,7 @@ export function InheritTierModal({ isOpen, tier, tiers, onClose, onSubmit, submi
             <div className="bg-neutral-50 dark:bg-neutral-900/20 border border-neutral-200 dark:border-neutral-700 rounded-lg p-3">
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 <strong>Features to inherit:</strong>{' '}
-                {availableSourceTiers.find(t => t.id === form.sourceTierId)?.features.length || 0} features
+                {availableSourceTiers.find(t => t.tierKey === form.sourceTierId)?.features.length || 0} features
               </p>
             </div>
           )}

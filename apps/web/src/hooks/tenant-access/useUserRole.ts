@@ -31,7 +31,7 @@ export function useUserRole(tenantId: string | null): UserRoleResult {
       setError(null);
 
       // Fetch user profile and platform role
-      const userResponse = await api.get('auth/me');
+      const userResponse = await api.get('/api/auth/me');
       if (!userResponse.ok) {
         throw new Error(`Failed to fetch user data: ${userResponse.status}`);
       }

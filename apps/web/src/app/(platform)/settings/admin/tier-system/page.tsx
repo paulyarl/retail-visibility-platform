@@ -247,8 +247,36 @@ export default function TierSystemPage() {
     setError(null);
     setSuccess(null);
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const res = await api.post(`${apiBaseUrl}/api/admin/tier-system/tiers/${selectedTier.tierKey}/inherit-features`, data);
+      // Get auth token from localStorage first, then cookies
+      const getCookie = (name: string) => {
+        const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : null;
+      };
+      
+      // Debug: Check localStorage and cookies
+      console.log('[InheritTier] localStorage access_token:', localStorage.getItem('access_token'));
+      console.log('[InheritTier] All cookies:', document.cookie);
+      
+      const authToken = localStorage.getItem('access_token') || getCookie('auth_token');
+      console.log('[InheritTier] Auth token found:', !!authToken);
+      
+      if (!authToken) {
+        setError('Authentication required. Please log in again.');
+        return;
+      }
+
+      // Use fetch directly to avoid API_BASE_URL prefixing
+      const response = await fetch(`/api/admin/tier-system/tiers/${selectedTier.tierKey}/inherit-features`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+      
+      const res = response;
 
       if (res.ok) {
         const result = await res.json();
@@ -420,12 +448,12 @@ export default function TierSystemPage() {
         {/* Tiers List */}
         <div className="grid grid-cols-1 gap-4">
           {(() => {
-            console.log('About to render tiers:', tiers);
-            console.log('Tiers length:', tiers.length);
+            //console.log('About to render tiers:', tiers);
+            //console.log('Tiers length:', tiers.length);
             return null;
           })()}
           {tiers.map((tier, index) => {
-            console.log(`Rendering tier ${tier.tierKey}:`, tier.features);
+            // console.log(`Rendering tier ${tier.tierKey}:`, tier.features);
             return (
             <motion.div
               key={tier.tierKey}
@@ -527,7 +555,7 @@ export default function TierSystemPage() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {tier.features.map((f) => {
-                            console.log(`Rendering feature ${f.featureName} for tier ${tier.tierKey}`);
+                            // console.log(`Rendering feature ${f.featureName} for tier ${tier.tierKey}`);
                             return (
                             <div
                               key={f.id}

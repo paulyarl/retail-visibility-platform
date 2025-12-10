@@ -76,8 +76,8 @@ import photosRouter from './photos';
 // import feedbackRoutes from './routes/feedback';
 // import tenantCategoriesRoutes from './routes/tenant-categories';
    import taxonomyAdminRoutes from './routes/taxonomy-admin';
-// import feedValidationRoutes from './routes/feed-validation';
-// import businessProfileValidationRoutes from './routes/business-profile-validation';
+   import feedValidationRoutes from './routes/feed-validation';
+   import businessProfileValidationRoutes from './routes/business-profile-validation';
 
 // Authentication middleware and utilities
 // import authRoutes from './auth/auth.routes'; // Now handled by modular mounting
@@ -128,12 +128,12 @@ import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
 import tenantsRoutes from './routes/tenants';
 import productLikesRoutes from './routes/product-likes';
-// import adminToolsRoutes from './routes/admin-tools';
+import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
 import adminEnrichmentRoutes from './routes/admin-enrichment';
-// import featureOverridesRoutes from './routes/admin/feature-overrides';
-// import tierManagementRoutes from './routes/admin/tier-management';
-// import tierSystemRoutes from './routes/admin/tier-system';
+import featureOverridesRoutes from './routes/admin/feature-overrides';
+import tierManagementRoutes from './routes/admin/tier-management';
+import tierSystemRoutes from './routes/admin/tier-system';
 // import testGbpRoutes from './routes/test-gbp';
 // import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 // import cloverRoutes from './routes/integrations/clover';
@@ -4467,6 +4467,10 @@ console.log('✅ Permissions routes mounted at /api/permissions');
 app.use('/api/admin/enrichment', adminEnrichmentRoutes);
 console.log('✅ Admin enrichment routes mounted at /api/admin/enrichment');
 
+/* ------------------------------ admin tier system ------------------------------ */
+app.use('/api/admin/tier-system', authenticateToken, requireAdmin, tierSystemRoutes);
+console.log('✅ Admin tier system routes mounted at /api/admin/tier-system');
+
 /* ------------------------------ admin scan metrics ------------------------------ */
 app.use('/api/admin/scan-metrics', scanMetricsRoutes);
 console.log('✅ Admin scan metrics routes mounted at /api/admin/scan-metrics');
@@ -4520,6 +4524,10 @@ console.log('✅ Tenants routes mounted at /api/tenants');
 /* ------------------------------ tenant categories (GBP) ------------------------------ */
 app.use('/api/tenant', authenticateToken, tenantCategoriesRoutes);
 console.log('✅ Tenant categories routes mounted at /api/tenant');
+
+/* ------------------------------ feed validation ------------------------------ */
+app.use('/api/tenant', authenticateToken, feedValidationRoutes);
+console.log('✅ Feed validation routes mounted at /api/tenant');
 
 /* ------------------------------ photos ------------------------------ */
 app.use('/api/items', photosRouter);

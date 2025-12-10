@@ -660,7 +660,7 @@ router.put('/scan/:sessionId/results/:resultId/enrichment', authenticateToken, a
 
     // Merge the new enrichment data with existing data
     const updatedEnrichment = {
-      ...result.enrichment,
+      ...(result.enrichment as object || {}),
       ...enrichment,
     };
 
