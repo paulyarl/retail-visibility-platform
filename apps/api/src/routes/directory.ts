@@ -126,8 +126,9 @@ router.get('/search', async (req, res) => {
     }
 
     query = Prisma.sql`${query}
-      FROM directory_listings_list
-      WHERE is_published = true
+      FROM directory_listings_list dll
+      INNER JOIN tenants t ON dll.tenant_id = t.id
+      WHERE dll.is_published = true
         AND (business_hours IS NULL OR business_hours::text != 'null')
     `;
 
@@ -242,8 +243,9 @@ router.get('/search', async (req, res) => {
     // Get total count for pagination
     let countQuery = Prisma.sql`
       SELECT COUNT(*) as total
-      FROM directory_listings_list
-      WHERE is_published = true
+      FROM directory_listings_list dll
+      INNER JOIN tenants t ON dll.tenant_id = t.id
+      WHERE dll.is_published = true
         AND (business_hours IS NULL OR business_hours::text != 'null')
     `;
 
@@ -336,16 +338,17 @@ router.get('/locations', async (req, res) => {
   try {
     const result = await prisma.$queryRaw<Array<{ city: string; state: string; count: bigint }>>`
       SELECT 
-        city,
-        state,
+        dll.city,
+        dll.state,
         COUNT(*) as count
-      FROM directory_listings_list
-      WHERE is_published = true
+      FROM directory_listings_list dll
+      INNER JOIN tenants t ON dll.tenant_id = t.id
+      WHERE dll.is_published = true
         AND (business_hours IS NULL OR business_hours::text != 'null')
-        AND city IS NOT NULL
-        AND state IS NOT NULL
-      GROUP BY city, state
-      ORDER BY count DESC, city ASC
+        AND dll.city IS NOT NULL
+        AND dll.state IS NOT NULL
+      GROUP BY dll.city, dll.state
+      ORDER BY count DESC, dll.city ASC
       LIMIT 100
     `;
 
@@ -373,35 +376,36 @@ router.get('/:slug', async (req, res) => {
 
     const result = await prisma.$queryRaw<Array<any>>`
       SELECT 
-        id,
-        tenantId as "tenantId",
-        business_name as "businessName",
-        slug,
-        address,
-        city,
-        state,
-        zip_code as "zipCode",
-        phone,
-        email,
-        website,
-        latitude,
-        longitude,
-        primary_category as "primaryCategory",
-        secondary_categories as "secondaryCategories",
-        logo_url as "logoUrl",
-        description,
-        business_hours as "businessHours",
-        rating_avg as "ratingAvg",
-        rating_count as "ratingCount",
-        product_count as "productCount",
-        is_featured as "isFeatured",
-        subscription_tier as "subscriptionTier",
-        use_custom_website as "useCustomWebsite",
-        map_privacy_mode as "mapPrivacyMode",
-        display_map as "displayMap"
-      FROM directory_listings_list
-      WHERE slug = ${slug}
-        AND is_published = true
+        dll.id,
+        dll.tenantId as "tenantId",
+        dll.business_name as "businessName",
+        dll.slug,
+        dll.address,
+        dll.city,
+        dll.state,
+        dll.zip_code as "zipCode",
+        dll.phone,
+        dll.email,
+        dll.website,
+        dll.latitude,
+        dll.longitude,
+        dll.primary_category as "primaryCategory",
+        dll.secondary_categories as "secondaryCategories",
+        dll.logo_url as "logoUrl",
+        dll.description,
+        dll.business_hours as "businessHours",
+        dll.rating_avg as "ratingAvg",
+        dll.rating_count as "ratingCount",
+        dll.product_count as "productCount",
+        dll.is_featured as "isFeatured",
+        dll.subscription_tier as "subscriptionTier",
+        dll.use_custom_website as "useCustomWebsite",
+        dll.map_privacy_mode as "mapPrivacyMode",
+        dll.display_map as "displayMap"
+      FROM directory_listings_list dll
+      INNER JOIN tenants t ON dll.tenant_id = t.id
+      WHERE dll.slug = ${slug}
+        AND dll.is_published = true
       LIMIT 1
     `;
 

@@ -201,7 +201,7 @@ router.get('/search', async (req: Request, res: Response) => {
         -- Directory publish status (always true since we're filtering)
         true as directory_published
       FROM directory_listings_list dll
-      LEFT JOIN tenants t ON dll.tenant_id = t.id
+      INNER JOIN tenants t ON dll.tenant_id = t.id
       LEFT JOIN (
         SELECT 
           tenant_id,
@@ -229,6 +229,7 @@ router.get('/search', async (req: Request, res: Response) => {
     const countQuery = `
       SELECT COUNT(DISTINCT dll.tenant_id) as count
       FROM directory_listings_list dll
+      INNER JOIN tenants t ON dll.tenant_id = t.id
       WHERE dll.is_published = true
         ${city ? `AND LOWER(dll.city) = LOWER($${paramIndex})` : ''}
         ${state ? `AND LOWER(dll.state) = LOWER($${paramIndex})` : ''}
@@ -341,10 +342,12 @@ router.get('/categories', async (req: Request, res: Response) => {
         FROM (
           SELECT dll.primary_category as category_name, 'primary' as category_source
           FROM directory_listings_list dll
+          INNER JOIN tenants t ON dll.tenant_id = t.id
           WHERE dll.is_published = true AND dll.primary_category IS NOT NULL
           UNION ALL
           SELECT unnest(dll.secondary_categories) as category_name, 'secondary' as category_source
           FROM directory_listings_list dll
+          INNER JOIN tenants t ON dll.tenant_id = t.id
           WHERE dll.is_published = true AND dll.secondary_categories IS NOT NULL
         ) all_categories
         GROUP BY category_name
@@ -449,11 +452,13 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
           SELECT pc.name as category_name
           FROM directory_listings_list dll
           JOIN platform_categories pc ON pc.name = dll.primary_category
+          INNER JOIN tenants t ON dll.tenant_id = t.id
           WHERE dll.is_published = true AND dll.primary_category IS NOT NULL
           UNION ALL
           SELECT pc.name as category_name
           FROM directory_listings_list dll
           JOIN platform_categories pc ON pc.name = ANY(dll.secondary_categories)
+          INNER JOIN tenants t ON dll.tenant_id = t.id
           WHERE dll.is_published = true AND dll.secondary_categories IS NOT NULL
         ) all_categories
         GROUP BY category_name
@@ -524,7 +529,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         -- Directory publish status (always true since we're filtering)
         true as directory_published
       FROM directory_listings_list dll
-      LEFT JOIN tenants t ON dll.tenant_id = t.id
+      INNER JOIN tenants t ON dll.tenant_id = t.id
       LEFT JOIN (
         SELECT 
           tenant_id,
@@ -549,6 +554,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
     const countQuery = `
       SELECT COUNT(*) as count
       FROM directory_listings_list dll
+      INNER JOIN tenants t ON dll.tenant_id = t.id
       WHERE dll.is_published = true
         AND (dll.primary_category = '${category.category_name}' OR '${category.category_name}' = ANY(dll.secondary_categories))
     `;

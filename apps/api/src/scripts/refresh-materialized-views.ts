@@ -33,6 +33,7 @@ async function refreshMaterializedViews() {
     
     // Also refresh other directory views for consistency
     const viewsToRefresh = [
+      'directory_listings_list',
       'directory_category_listings',
       'directory_category_stats',
       'directory_gbp_listings'
