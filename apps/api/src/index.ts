@@ -2903,12 +2903,34 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     }
   }
 
-  // Fetch tenant category if category_path exists
+  // Fetch tenant category if category_path exists or if directory_category_id exists
   let tenantCategory = null;
   if (it.category_path && it.category_path.length > 0) {
     const category = await prisma.directory_category.findFirst({
       where: { 
         slug: it.category_path[0],
+        tenantId: it.tenant_id
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        googleCategoryId: true,
+      },
+    });
+    if (category) {
+      tenantCategory = {
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        googleCategoryId: category.googleCategoryId,
+      };
+    }
+  } else if (it.directory_category_id) {
+    // If no category_path but directory_category_id exists, fetch by ID
+    const category = await prisma.directory_category.findFirst({
+      where: { 
+        id: it.directory_category_id,
         tenantId: it.tenant_id
       },
       select: {
@@ -4499,9 +4521,9 @@ console.log('✅ Tenants routes mounted at /api/tenants');
 app.use('/api/tenant', authenticateToken, tenantCategoriesRoutes);
 console.log('✅ Tenant categories routes mounted at /api/tenant');
 
-/* ------------------------------ product likes ------------------------------ */
-app.use('/api/products', productLikesRoutes);
-console.log('✅ Product likes routes mounted at /api/products');
+/* ------------------------------ photos ------------------------------ */
+app.use('/api/items', photosRouter);
+console.log('✅ Photos routes mounted at /api/items');
 
 /* ------------------------------ store reviews ------------------------------ */
 import storeReviewsRoutes from './routes/store-reviews';

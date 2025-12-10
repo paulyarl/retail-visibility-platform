@@ -48,9 +48,25 @@ export function resolveTier(
   tenantTier: TierInfo | null,
   isChain: boolean
 ): ResolvedTier {
+  // Helper function to map tier levels to resolver format
+  const mapTierLevel = (tierId: string): TierInfo['level'] => {
+    switch (tierId) {
+      case 'google_only': return 'starter';
+      case 'starter': return 'starter';
+      case 'professional': return 'pro';
+      case 'enterprise': return 'enterprise';
+      case 'organization': return 'enterprise'; // Map organization to enterprise level
+      case 'chain_starter': return 'starter';
+      case 'chain_professional': return 'pro';
+      case 'chain_enterprise': return 'enterprise';
+      default: return 'starter';
+    }
+  };
+
   // For chains: organization tier is primary, tenant can have overrides
   if (isChain && organizationTier) {
     const effectiveTier = mergeTiers(organizationTier, tenantTier);
+    effectiveTier.level = mapTierLevel(effectiveTier.id);
     
     return {
       effective: effectiveTier,
@@ -64,6 +80,7 @@ export function resolveTier(
 
   // For individual tenants: tenant tier is primary
   if (tenantTier) {
+    tenantTier.level = mapTierLevel(tenantTier.id);
     return {
       effective: tenantTier,
       tenant: tenantTier,
@@ -75,6 +92,7 @@ export function resolveTier(
 
   // Fallback to organization tier if available
   if (organizationTier) {
+    organizationTier.level = mapTierLevel(organizationTier.id);
     return {
       effective: organizationTier,
       organization: organizationTier,
@@ -225,8 +243,12 @@ function getDefaultTier(): TierInfo {
 export function hasFeature(resolvedTier: ResolvedTier, featureId: string): boolean {
   // Safety check for undefined features
   if (!resolvedTier?.effective?.features) {
-    return false;
+    // Fallback to static tier features if API doesn't provide features
+    const { checkTierFeature } = require('./tier-features');
+    const tierKey = resolvedTier?.effective?.id || 'starter';
+    return checkTierFeature(tierKey, featureId);
   }
+  
   // Check both id and featureKey for compatibility with backend
   // If enabled is undefined, treat as true (feature exists = enabled)
   return resolvedTier.effective.features.some(

@@ -6,7 +6,7 @@ import { triggerRevalidate } from '../utils/revalidate';
 import { categoryService } from '../services/CategoryService';
 import { getCategoryById } from '../lib/google/taxonomy';
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
-import { requireTenantAdmin } from '../middleware/auth';
+import { authenticateToken, requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
 import { generateQsCatId, generateQuickStart, generateUserTenantId } from '../lib/id-generator';
 import { getDirectPool } from '../utils/db-pool';
@@ -14,6 +14,13 @@ import { getDirectPool } from '../utils/db-pool';
 console.log('🔥 TENANT CATEGORIES ROUTES MODULE LOADED');
 
 const router = Router();
+
+// Helper to check tenant access
+function hasAccessToTenant(req: Request, tenantId: string): boolean {
+  if (!req.user) return false;
+  if (isPlatformAdmin(req.user as any)) return true;
+  return (req.user as any).tenantIds?.includes(tenantId) || false;
+}
 
 /**
  * Refresh directory_category_products materialized view after category changes
@@ -86,7 +93,7 @@ async function requireTenantManagement(req: Request, res: Response, next: NextFu
     return next();
   }
 
-  // Check tenant-level permissions
+  // Check tenant-level permissions - allow MEMBER+ for category access
   try {
     const { prisma: prismaClient } = await import('../prisma');
     const userTenant = await prismaClient.user_tenants.findUnique({
@@ -98,14 +105,14 @@ async function requireTenantManagement(req: Request, res: Response, next: NextFu
       },
     });
 
-    if (userTenant && (userTenant.role === 'OWNER' || userTenant.role === 'ADMIN')) {
+    if (userTenant && (userTenant.role === 'OWNER' || userTenant.role === 'ADMIN' || userTenant.role === 'MEMBER')) {
       return next();
     }
 
     return res.status(403).json({
       success: false,
       error: 'Forbidden',
-      message: 'Tenant owner or admin access required for this operation',
+      message: 'Tenant member access required for this operation',
     });
   } catch (error) {
     console.error('[requireTenantManagement] Error checking permissions:', error);
@@ -150,9 +157,19 @@ const alignCategorySchema = z.object({
  *  - limit: number (max 50, default 50)
  *  - cursor: string (id of last item from previous page)
  */
-router.get('/:tenantId/categories', async (req, res) => {
+router.get('/:tenantId/categories', authenticateToken, async (req, res) => {
   try {
     const { tenantId } = req.params;
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, tenantId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'Access to this tenant is not allowed',
+      });
+    }
+
     const { 
       includeInactive = 'false',
       parentId,
@@ -379,6 +396,11 @@ router.post('/:tenantId/categories', requireTenantManagement, async (req, res) =
  * Body: { name, googleCategoryId?, itemId? }
  */
 router.post('/:tenantId/categories/from-enrichment', requireTenantManagement, async (req, res) => {
+  console.log('[from-enrichment] Endpoint called:', {
+    tenantId: req.params.tenantId,
+    body: req.body,
+    user: req.user?.userId
+  });
   try {
     const { tenantId } = req.params;
     const enrichmentCategorySchema = z.object({

@@ -2,14 +2,14 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { requireTierFeature, requireWritableSubscription } from '../middleware/tier-access';
 import { prisma } from '../prisma';
-// import { Flags } from '../config';
+import { Flags } from '../config';
+import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import { audit } from '../audit';
 import { z } from 'zod';
 import { user_role, Prisma } from '@prisma/client';
 import { BarcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
-// import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
-import { generateItemId, generateSessionId } from '../lib/id-generator';
+import { generateItemId, generateSessionId, generatePhotoId } from '../lib/id-generator';
 
 // Initialize enrichment service
 const barcodeEnrichmentService = new BarcodeEnrichmentService();
@@ -153,7 +153,21 @@ router.get('/scan/my-sessions', authenticateToken, async (req: Request, res: Res
       take: 20, // Limit to 20 most recent
     });
 
-    return res.json({ success: true, sessions });
+    // Transform the response to include camelCase fields and a "committed" date field
+    const transformedSessions = sessions.map(session => ({
+      id: session.id,
+      status: session.status,
+      deviceType: session.device_type,
+      scannedCount: session.scanned_count,
+      committedCount: session.committed_count,
+      duplicateCount: session.duplicate_count,
+      startedAt: session.started_at?.toISOString(),
+      completedAt: session.completed_at?.toISOString(),
+      // Add "committed" field for backward compatibility - maps to completed_at
+      committed: session.completed_at?.toISOString(),
+    }));
+
+    return res.json({ success: true, sessions: transformedSessions });
   } catch (error: any) {
     console.error('[scan/my-sessions GET] Error:', error);
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
@@ -226,11 +240,12 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
       return res.status(409).json({ success: false, error: 'duplicate_barcode', result: existing });
     }
 
-    // Check for duplicates in inventory
+    // Check for duplicates in inventory (exclude soft-deleted items)
     const duplicateItem = await prisma.inventory_items.findFirst({
       where: {
-        tenant_id:session.tenant_id,
+        tenant_id: session.tenant_id,
         sku: sku || barcode,
+        item_status: { not: 'trashed' }, // Exclude soft-deleted items
       },
       select: { id: true, name: true, sku: true },
     });
@@ -377,53 +392,203 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
           hasCategoryPath: !!enrichment.categoryPath,
           categoryPathLength: enrichment.categoryPath?.length,
           categoryPath: enrichment.categoryPath,
+          tenantCategoryId: enrichment.tenantCategoryId,
           templateDefault: session.scan_templates_list?.default_category 
         });
-        const stock = enrichment.stock || 0;
-        const item = await prisma.inventory_items.create({
-          data: {
-            id: generateItemId(),
+
+        // Extract rich metadata from enrichment
+        const enrichmentMetadata = enrichment.metadata || {};
+        
+        // Extract multiple images from enrichment images object/array
+        const imageGallery: string[] = [];
+        if (enrichmentMetadata.images) {
+          // Add main image first if available
+          if (enrichment.imageUrl) {
+            imageGallery.push(enrichment.imageUrl);
+          }
+
+          const images = enrichmentMetadata.images;
+          
+          // Handle array format (UPC Database)
+          if (Array.isArray(images)) {
+            images.forEach((imageUrl: string) => {
+              if (imageUrl && typeof imageUrl === 'string') {
+                imageGallery.push(imageUrl);
+              }
+            });
+          } 
+          // Handle object format (Open Food Facts)
+          else if (typeof images === 'object') {
+            if (images.front) imageGallery.push(images.front);
+            if (images.ingredients) imageGallery.push(images.ingredients);
+            if (images.nutrition) imageGallery.push(images.nutrition);
+            if (images.packaging) imageGallery.push(images.packaging);
+            if (images.other) imageGallery.push(images.other);
+            // Also include small/thumbnail versions if available
+            if (images.small_front) imageGallery.push(images.small_front);
+            if (images.thumb_front) imageGallery.push(images.thumb_front);
+          }
+          
+          // Deduplicate images
+          const uniqueImages = Array.from(new Set(imageGallery));
+          imageGallery.length = 0;
+          imageGallery.push(...uniqueImages);
+        } else if (enrichment.imageUrl) {
+          // Fallback to single image
+          imageGallery.push(enrichment.imageUrl);
+        }
+
+        // Merge enrichment metadata with scanned session info
+        const itemMetadata = {
+          ...extractStructuredMetadata(enrichmentMetadata),
+          scannedFrom: sessionId,
+          enrichmentSource: enrichment.source,
+          enrichedAt: new Date().toISOString(),
+        };
+
+        // Check if there's a trashed item with the same SKU that we should restore
+        const sku = result.sku || result.barcode;
+        const existingTrashedItem = await prisma.inventory_items.findFirst({
+          where: {
             tenant_id: session.tenant_id,
-            name: enrichment.name || `Product ${result.barcode}`,
-            title: enrichment.name || `Product ${result.barcode}`,
-            brand: enrichment.brand || 'Unknown',
-            description: enrichment.description || null,
-            sku: result.sku || result.barcode,
-            price: (enrichment.priceCents || session.scan_templates_list?.default_price_cents || 0) / 100,
-            price_cents: enrichment.priceCents || session.scan_templates_list?.default_price_cents || 0,
-            stock: stock,
-            currency: session.scan_templates_list?.default_currency || 'USD',
-            visibility: (session.scan_templates_list?.default_visibility as any) || 'private',
-            availability: stock > 0 ? 'in_stock' : 'out_of_stock',
-            category_path: (enrichment.categoryPath && enrichment.categoryPath.length > 0)
-              ? enrichment.categoryPath
-              : (session.scan_templates_list?.default_category ? [session.scan_templates_list.default_category] : []),
-            metadata: { ...enrichment.metadata, scannedFrom: sessionId },
-            updated_at: new Date(),
+            sku: sku,
+            item_status: 'trashed',
           },
         });
-        console.log(`[commit] Created item ${item.id} with categoryPath:`, item.category_path);
-        committed.push(item.id);
+
+        let item;
+        if (existingTrashedItem) {
+          // Restore the trashed item with updated data
+          console.log(`[commit] Restoring trashed item ${existingTrashedItem.id} for SKU ${sku}`);
+          item = await prisma.inventory_items.update({
+            where: { id: existingTrashedItem.id },
+            data: {
+              name: enrichment.name || `Product ${result.barcode}`,
+              title: enrichment.name || `Product ${result.barcode}`,
+              brand: enrichment.brand || 'Unknown',
+              description: enrichment.description || null,
+              price: (enrichment.priceCents || session.scan_templates_list?.default_price_cents || 0) / 100,
+              price_cents: enrichment.priceCents || session.scan_templates_list?.default_price_cents || 0,
+              stock: enrichment.stock || 0,
+              currency: session.scan_templates_list?.default_currency || 'USD',
+              visibility: (session.scan_templates_list?.default_visibility as any) || 'private',
+              availability: (enrichment.stock || 0) > 0 ? 'in_stock' : 'out_of_stock',
+              category_path: (enrichment.categoryPath && enrichment.categoryPath.length > 0)
+                ? enrichment.categoryPath
+                : (session.scan_templates_list?.default_category ? [session.scan_templates_list.default_category] : []),
+              directory_category_id: enrichment.tenantCategoryId || null,
+              metadata: itemMetadata,
+              image_url: null, // Will be set after photo assets are created
+              // image_gallery: imageGallery, // Removed - using photo_assets table instead
+              item_status: 'active', // Restore to active
+              updated_at: new Date(),
+            },
+          });
+          console.log(`[commit] Saved category data for restored item ${item!.id}:`, {
+            category_path: item!.category_path,
+            directory_category_id: item!.directory_category_id,
+            tenantCategoryId: enrichment.tenantCategoryId
+          });
+        } else {
+          // Create new item
+          const stock = enrichment.stock || 0;
+          item = await prisma.inventory_items.create({
+            data: {
+              id: generateItemId(),
+              tenant_id: session.tenant_id,
+              name: enrichment.name || `Product ${result.barcode}`,
+              title: enrichment.name || `Product ${result.barcode}`,
+              brand: enrichment.brand || 'Unknown',
+              description: enrichment.description || null,
+              sku: sku,
+              price: (enrichment.priceCents || session.scan_templates_list?.default_price_cents || 0) / 100,
+              price_cents: enrichment.priceCents || session.scan_templates_list?.default_price_cents || 0,
+              stock: stock,
+              currency: session.scan_templates_list?.default_currency || 'USD',
+              visibility: (session.scan_templates_list?.default_visibility as any) || 'private',
+              availability: stock > 0 ? 'in_stock' : 'out_of_stock',
+              category_path: (enrichment.categoryPath && enrichment.categoryPath.length > 0)
+                ? enrichment.categoryPath
+                : (session.scan_templates_list?.default_category ? [session.scan_templates_list.default_category] : []),
+              directory_category_id: enrichment.tenantCategoryId || null,
+              metadata: itemMetadata,
+              image_url: null, // Will be set after photo assets are created
+              // image_gallery: imageGallery, // Removed - using photo_assets table instead
+              updated_at: new Date(),
+            },
+          });
+          console.log(`[commit] Saved category data for new item ${item!.id}:`, {
+            category_path: item!.category_path,
+            directory_category_id: item!.directory_category_id,
+            tenantCategoryId: enrichment.tenantCategoryId
+          });
+        }
+        console.log(`[commit] ${existingTrashedItem ? 'Restored' : 'Created'} item ${item!.id} with rich metadata`);
+        committed.push(item!.id);
+
+        // Create photo assets for each image in the gallery
+        // First delete any existing photo assets for this item
+        const deletedCount = await prisma.photo_assets.deleteMany({
+          where: { inventory_item_id: item!.id },
+        });
+        if (deletedCount.count > 0) {
+          console.log(`[commit] Deleted ${deletedCount.count} existing photo assets for restored item ${item!.id}`);
+        }
+        
+        const photoAssets = [];
+        for (let i = 0; i < imageGallery.length && i < 11; i++) { // Limit to 11 photos max
+          const imageUrl = imageGallery[i];
+          try {
+            const photoAsset = await prisma.photo_assets.create({
+              data: {
+                id: generatePhotoId(), // Generate unique photo ID
+                tenant_id: session.tenant_id,
+                inventory_item_id: item!.id,
+                url: imageUrl,
+                position: i,
+                alt: item!.name,
+                caption: null,
+                content_type: 'image/jpeg', // Assume JPEG for scanned images
+                exif_removed: true,
+              },
+            });
+            photoAssets.push(photoAsset);
+          } catch (photoError) {
+            console.error(`[commit] Failed to create photo asset for ${imageUrl}:`, photoError);
+            // Continue with other photos even if one fails
+          }
+        }
+
+        console.log(`[commit] Created ${photoAssets.length} photo assets for item ${item!.id}`);
+
+        // Update item image_url if photo assets were created
+        if (photoAssets.length > 0) {
+          await prisma.inventory_items.update({
+            where: { id: item!.id },
+            data: { image_url: photoAssets[0].url },
+          });
+          console.log(`[commit] Updated item ${item!.id} image_url to ${photoAssets[0].url}`);
+        }
 
         // Process product images if available
-        // if (Flags.SCAN_ENRICHMENT && enrichment) {
-        //   try {
-        //     const imageUrls = imageEnrichmentService.extractImageUrls(enrichment);
-        //     if (imageUrls.length > 0) {
-        //       const imageCount = await imageEnrichmentService.processProductImages(
-        //         session.tenantId,
-        //         item.id,
-        //         item.sku,
-        //         imageUrls,
-        //         item.name
-        //       );
-        //       console.log(`[commit] Processed ${imageCount}/${imageUrls.length} images for ${item.sku}`);
-        //     }
-        //   } catch (imageError) {
-        //     // Don't fail commit if image processing fails
-        //     console.error(`[commit] Failed to process images for ${item.sku}:`, imageError);
-        //   }
-        // }
+        if (Flags.SCAN_ENRICHMENT && enrichment) {
+          try {
+            const imageUrls = imageEnrichmentService.extractImageUrls(enrichment);
+            if (imageUrls.length > 0) {
+              const imageCount = await imageEnrichmentService.processProductImages(
+                session.tenant_id,
+                item!.id,
+                item!.sku,
+                imageUrls,
+                item!.name
+              );
+              console.log(`[commit] Processed ${imageCount}/${imageUrls.length} images for ${item!.sku}`);
+            }
+          } catch (imageError) {
+            // Don't fail commit if image processing fails
+            console.error(`[commit] Failed to process images for ${item!.sku}:`, imageError);
+          }
+        }
       } catch (error) {
         console.error(`[commit] Failed to create item for barcode ${result.barcode}:`, error);
       }
@@ -462,7 +627,57 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
   }
 });
 
-// GET /scan/:sessionId - Get session details
+// PUT /scan/:sessionId/results/:resultId/enrichment - Update enrichment data for a scan result
+router.put('/scan/:sessionId/results/:resultId/enrichment', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { sessionId, resultId } = req.params;
+    const { enrichment } = req.body;
+
+    // Validate input
+    if (!enrichment || typeof enrichment !== 'object') {
+      return res.status(400).json({ success: false, error: 'invalid_enrichment_data' });
+    }
+
+    // Find the scan result
+    const result = await prisma.scan_results_list.findUnique({
+      where: { id: resultId },
+      include: { scan_sessions_list: true },
+    });
+
+    if (!result) {
+      return res.status(404).json({ success: false, error: 'result_not_found' });
+    }
+
+    // Check session ownership
+    if (result.session_id !== sessionId) {
+      return res.status(400).json({ success: false, error: 'result_not_in_session' });
+    }
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, result.tenant_id)) {
+      return res.status(403).json({ success: false, error: 'forbidden' });
+    }
+
+    // Merge the new enrichment data with existing data
+    const updatedEnrichment = {
+      ...result.enrichment,
+      ...enrichment,
+    };
+
+    // Update the scan result
+    await prisma.scan_results_list.update({
+      where: { id: resultId },
+      data: { enrichment: updatedEnrichment as any },
+    });
+
+    console.log(`[scan/update-enrichment] Updated enrichment for result ${resultId}:`, enrichment);
+
+    return res.json({ success: true, enrichment: updatedEnrichment });
+  } catch (error: any) {
+    console.error('[scan/update-enrichment] Error:', error);
+    return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
+  }
+});
 router.get('/scan/:sessionId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
@@ -487,7 +702,29 @@ router.get('/scan/:sessionId', authenticateToken, async (req: Request, res: Resp
       return res.status(403).json({ success: false, error: 'forbidden' });
     }
 
-    return res.json({ success: true, session });
+    // Transform the response to use camelCase
+    const transformedSession = {
+      id: session.id,
+      status: session.status,
+      deviceType: session.device_type,
+      scannedCount: session.scanned_count,
+      committedCount: session.committed_count,
+      duplicateCount: session.duplicate_count,
+      startedAt: session.started_at?.toISOString(),
+      completedAt: session.completed_at?.toISOString(),
+      template: session.scan_templates_list,
+      results: session.scan_results_list.map(result => ({
+        id: result.id,
+        barcode: result.barcode,
+        sku: result.sku,
+        status: result.status,
+        enrichment: result.enrichment,
+        duplicateOf: result.duplicate_of,
+        createdAt: result.created_at?.toISOString(),
+      })),
+    };
+
+    return res.json({ success: true, session: transformedSession });
   } catch (error: any) {
     console.error('[scan/:sessionId] Error:', error);
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
@@ -1005,13 +1242,104 @@ router.get('/scan/preview/:barcode', authenticateToken, async (req: Request, res
   }
 });
 
+// Helper: Extract and structure enrichment metadata
+function extractStructuredMetadata(enrichmentMetadata: any): any {
+  if (!enrichmentMetadata) return {};
+
+  const structured = { ...enrichmentMetadata };
+
+  // Extract nutrition data
+  if (structured.nutrition) {
+    // If nutrition is already an object, keep it as is
+    if (typeof structured.nutrition === 'object' && !Array.isArray(structured.nutrition)) {
+      // Ensure it's properly structured
+      structured.nutrition = {
+        per_100g: structured.nutrition.per_100g || structured.nutrition['100g'] || {},
+        per_serving: structured.nutrition.per_serving || structured.nutrition.serving || {},
+        ...structured.nutrition
+      };
+    }
+  }
+
+  // Extract environmental data
+  if (structured.environmental) {
+    if (typeof structured.environmental === 'object' && !Array.isArray(structured.environmental)) {
+      // Ensure it's properly structured
+      structured.environmental = {
+        ecoscore_grade: structured.environmental.ecoscore_grade || structured.environmental.grade,
+        ecoscore_score: structured.environmental.ecoscore_score || structured.environmental.score,
+        ...structured.environmental
+      };
+    }
+  }
+
+  // Extract ingredients data
+  if (structured.ingredients) {
+    if (typeof structured.ingredients === 'string') {
+      // If it's a string, keep it as is
+      structured.ingredients = structured.ingredients;
+    } else if (Array.isArray(structured.ingredients)) {
+      // If it's an array, extract text
+      structured.ingredients = structured.ingredients.map((ing: any) =>
+        typeof ing === 'string' ? ing : ing.text || ing.name || JSON.stringify(ing)
+      ).join(', ');
+    } else if (typeof structured.ingredients === 'object') {
+      // If it's an object, try to extract text field
+      structured.ingredients = structured.ingredients.text || structured.ingredients.name || JSON.stringify(structured.ingredients);
+    }
+  }
+
+  // Extract ingredients analysis
+  if (structured.ingredients_analysis) {
+    if (typeof structured.ingredients_analysis === 'object') {
+      // Keep the analysis object as is
+      structured.ingredients_analysis = structured.ingredients_analysis;
+    }
+  }
+
+  // Extract allergens
+  if (structured.allergens) {
+    if (typeof structured.allergens === 'string') {
+      structured.allergens = structured.allergens;
+    } else if (Array.isArray(structured.allergens)) {
+      structured.allergens = structured.allergens.join(', ');
+    }
+  }
+
+  // Extract allergens tags
+  if (structured.allergens_tags) {
+    if (Array.isArray(structured.allergens_tags)) {
+      structured.allergens_tags = structured.allergens_tags;
+    }
+  }
+
+  // Extract additives
+  if (structured.additives_tags) {
+    if (Array.isArray(structured.additives_tags)) {
+      structured.additives_tags = structured.additives_tags;
+    }
+  }
+
+  // Extract nova group
+  if (structured.nova_group || structured['nova-group']) {
+    structured.nova_group = structured.nova_group || structured['nova-group'];
+  }
+
+  // Extract completeness score
+  if (structured.completeness !== undefined) {
+    structured.completeness = structured.completeness;
+  }
+
+  return structured;
+}
+
 // Helper: Validate scan results
 async function validateScanResults(scan_results_list: any[], template: any): Promise<{ valid: boolean; errors: any[] }> {
   const errors = [];
 
   for (const result of scan_results_list) {
     const enrichment = result.enrichment as any || {};
-    
+
     // Check required fields
     if (!enrichment.name && !template?.defaultCategory) {
       errors.push({
@@ -1023,7 +1351,7 @@ async function validateScanResults(scan_results_list: any[], template: any): Pro
     }
 
     // Check category
-    if (!enrichment.categoryPath?.length && !template?.defaultCategory) {
+    if (!enrichment.tenantCategoryId && !template?.defaultCategory) {
       errors.push({
         resultId: result.id,
         barcode: result.barcode,
@@ -1046,7 +1374,7 @@ router.patch('/scan/:sessionId/results/:resultId/enrichment', authenticateToken,
     const updates = req.body;
 
     // Validate updates (only allow specific fields)
-    const allowedFields = ['name', 'brand', 'description', 'categoryPath'];
+    const allowedFields = ['name', 'brand', 'description', 'tenantCategoryId'];
     const filteredUpdates: any = {};
 
     for (const field of allowedFields) {

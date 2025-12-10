@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Item } from '@/services/itemsDataService';
 import TenantCategorySelector from './TenantCategorySelector';
+import { apiRequest } from '@/lib/api';
 
 interface CategoryAssignmentModalProps {
   item: Item;
@@ -18,6 +19,63 @@ export default function CategoryAssignmentModal({
   onClose,
 }: CategoryAssignmentModalProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(item.tenantCategoryId || '');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
+  const handleCategorySelect = async (categoryId: string, googleCategoryPath?: string, googleTaxonomyId?: string) => {
+    // If it's a Google taxonomy selection, create a tenant category first
+    if (googleCategoryPath && googleTaxonomyId) {
+      try {
+        setIsCreatingCategory(true);
+
+        // Extract tenant ID from URL
+        const tenantId = window.location.pathname.match(/\/t\/([^/]+)/)?.[1];
+        if (!tenantId) throw new Error('Could not extract tenant ID');
+
+        // Get the category name (last part of path)
+        const categoryName = googleCategoryPath.split(' > ').pop() || 'Unknown Category';
+
+        console.log('[CategoryAssignment] Creating category from Google taxonomy:', {
+          googleCategoryPath,
+          googleTaxonomyId,
+          categoryName
+        });
+
+        // Create category with Google taxonomy ID
+        const createResponse = await apiRequest(`/api/v1/tenants/${tenantId}/categories/from-enrichment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: categoryName,
+            googleCategoryId: googleTaxonomyId,
+          }),
+        });
+
+        if (createResponse.ok) {
+          const createResult = await createResponse.json();
+          console.log('[CategoryAssignment] Category created successfully:', createResult);
+          setSelectedCategoryId(createResult.data.id);
+        } else {
+          const errorText = await createResponse.text();
+          console.error('[CategoryAssignment] Category creation failed:', {
+            status: createResponse.status,
+            statusText: createResponse.statusText,
+            errorText
+          });
+          // Fallback: just set the category ID (though it won't work)
+          setSelectedCategoryId(categoryId);
+        }
+      } catch (error) {
+        console.error('[CategoryAssignment] Error creating category from Google taxonomy:', error);
+        // Fallback: just set the category ID
+        setSelectedCategoryId(categoryId);
+      } finally {
+        setIsCreatingCategory(false);
+      }
+    } else {
+      // Regular tenant category selection
+      setSelectedCategoryId(categoryId);
+    }
+  };
 
   const handleSave = async () => {
     if (!selectedCategoryId) return;
@@ -62,7 +120,7 @@ export default function CategoryAssignmentModal({
 
           <TenantCategorySelector
             selectedCategoryId={selectedCategoryId}
-            onSelect={setSelectedCategoryId}
+            onSelect={handleCategorySelect}
           />
         </div>
 
@@ -76,10 +134,10 @@ export default function CategoryAssignmentModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={!selectedCategoryId}
+            disabled={!selectedCategoryId || isCreatingCategory}
             className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            Assign Category
+            {isCreatingCategory ? 'Creating Category...' : 'Assign Category'}
           </button>
         </div>
       </div>

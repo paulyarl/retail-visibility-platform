@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { generateSessionId } from '../lib/id-generator';
 import {
   enrichmentCacheHit,
   enrichmentCacheMiss,
@@ -520,6 +521,7 @@ export class BarcodeEnrichmentService {
       await prisma.barcode_enrichment.upsert({
         where: { barcode },
         create: {
+          id: generateSessionId(), // Generate ID for new records
           barcode,
           name: data.name || null,
           brand: data.brand || null,
@@ -532,6 +534,7 @@ export class BarcodeEnrichmentService {
           source: data.source,
           last_fetched_at: new Date(),
           fetch_count: 1,
+          updated_at: new Date(), // Required field for create
         } as any,
         update: {
           name: data.name || null,
@@ -593,12 +596,13 @@ export class BarcodeEnrichmentService {
     try {
       await prisma.barcode_lookup_log.create({
         data: {
-          tenantId,
+          id: generateSessionId(), // Generate ID for new records
+          tenant_id: tenantId, // Correct field name
           barcode,
           provider: provider || 'unknown',
           status,
           response: response || undefined,
-          latencyMs: Math.round(latencyMs),
+          latency_ms: Math.round(latencyMs), // Correct field name
           error: error || undefined,
         } as any,
       });
@@ -635,13 +639,13 @@ export class BarcodeEnrichmentService {
   getRateLimitStats() {
     const stats: Record<string, any> = {};
     
-    for (const [provider, state] of rateLimitState.entries()) {
+    Array.from(rateLimitState.entries()).forEach(([provider, state]) => {
       stats[provider] = {
         count: state.count,
         remaining: RATE_LIMIT_MAX_REQUESTS - state.count,
         resetAt: new Date(state.resetAt).toISOString(),
       };
-    }
+    });
 
     return stats;
   }

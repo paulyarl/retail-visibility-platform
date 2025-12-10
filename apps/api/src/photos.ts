@@ -360,14 +360,13 @@ r.delete("/items/:id/photos/:photoId", async (req, res) => {
     });
 
     if (remaining.length > 0) {
-      await prisma.$transaction(
-        remaining.map((p, idx) =>
-          prisma.photo_assets.update({
-            where: { id: p.id },
-            data: { position: idx },
-          })
-        )
-      );
+      // Update positions sequentially to avoid Prisma transaction issues
+      for (let idx = 0; idx < remaining.length; idx++) {
+        await prisma.photo_assets.update({
+          where: { id: remaining[idx].id },
+          data: { position: idx },
+        });
+      }
 
       // Update item image_url to new primary (position 0)
       await prisma.inventory_items.update({

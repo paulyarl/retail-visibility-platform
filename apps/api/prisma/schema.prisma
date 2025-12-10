@@ -177,16 +177,16 @@ model clover_sync_logs_list {
 }
 
 model directory_category {
-  id                 String   @id
-  tenantId           String   @map("tenantId")
-  name               String
-  slug               String
-  parentId           String?  @map("parentId")
-  googleCategoryId   String?  @map("googleCategoryId")
-  isActive           Boolean  @default(true) @map("isActive")
-  sortOrder          Int      @default(0) @map("sortOrder")
-  createdAt          DateTime @default(now()) @map("createdAt")
-  updatedAt          DateTime @updatedAt @map("updatedAt")
+  id               String   @id
+  tenantId         String   @map("tenantId")
+  name             String
+  slug             String
+  parentId         String?  @map("parentId")
+  googleCategoryId String?  @map("googleCategoryId")
+  isActive         Boolean  @default(true) @map("isActive")
+  sortOrder        Int      @default(0) @map("sortOrder")
+  createdAt        DateTime @default(now()) @map("createdAt")
+  updatedAt        DateTime @updatedAt @map("updatedAt")
 }
 
 model directory_category_mv_refresh_log {
@@ -260,6 +260,8 @@ model directory_listings_list {
   is_published         Boolean?  @default(true)
   created_at           DateTime? @default(now()) @db.Timestamptz(6)
   updated_at           DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([is_published], map: "idx_directory_listings_is_published")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -551,19 +553,19 @@ model invitations {
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model location_status_logs {
-  id             String
-  tenant_id      String
+  id             Int             @id @default(autoincrement())
+  tenant_id      String          @db.VarChar(255)
   old_status     location_status
   new_status     location_status
-  changed_by     String
+  changed_by     String?         @db.VarChar(255)
   reason         String?
-  reopening_date DateTime?
-  metadata       Json?
-  created_at     DateTime        @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime        @default(now()) @db.Timestamptz(6)
+  reopening_date DateTime?       @db.Timestamp(6)
+  created_at     DateTime        @default(now()) @db.Timestamp(6)
+  updated_at     DateTime        @default(now()) @db.Timestamp(6)
+  tenants        tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([changed_by])
-  @@index([tenant_id, created_at])
+  @@index([created_at(sort: Desc)], map: "idx_location_status_logs_created_at")
+  @@index([tenant_id], map: "idx_location_status_logs_tenant_id")
   @@ignore
 }
 
@@ -666,18 +668,18 @@ model permission_matrix_list {
 
 model photo_assets {
   id                String          @id
-  tenant_id          String          @map("tenantId")
-  inventory_item_id   String          @map("inventoryItemId")
+  tenant_id         String          @map("tenantId")
+  inventory_item_id String          @map("inventoryItemId")
   url               String
   width             Int?
   height            Int?
-  content_type       String?         @map("contentType")
+  content_type      String?         @map("contentType")
   bytes             Int?
-  exif_removed       Boolean         @default(false) @map("exifRemoved")
-  captured_at        DateTime?       @db.Timestamptz(6) @map("capturedAt")
-  created_at         DateTime        @default(now()) @db.Timestamptz(6) @map("createdAt")
-  public_url         String?         @map("publicUrl")
-  signed_url         String?         @map("signedUrl")
+  exif_removed      Boolean         @default(false) @map("exifRemoved")
+  captured_at       DateTime?       @map("capturedAt") @db.Timestamptz(6)
+  created_at        DateTime        @default(now()) @map("createdAt") @db.Timestamptz(6)
+  public_url        String?         @map("publicUrl")
+  signed_url        String?         @map("signedUrl")
   position          Int             @default(0)
   alt               String?
   caption           String?
@@ -685,8 +687,8 @@ model photo_assets {
   tenants           tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@unique([inventory_item_id, position], map: "photo_assets_inventory_item_id_position_unique")
-  @@index([inventory_item_id], map:"idx_photo_assets_inventory_item_id")
-  @@index([tenant_id], map:"idx_photo_assets_tenant_id")
+  @@index([inventory_item_id], map: "idx_photo_assets_inventory_item_id")
+  @@index([tenant_id], map: "idx_photo_assets_tenant_id")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -1127,6 +1129,7 @@ model tenants {
   google_oauth_accounts_list       google_oauth_accounts_list[]
   inventory_items                  inventory_items[]
   invitations                      invitations[]
+  location_status_logs             location_status_logs[] @ignore
   photo_assets                     photo_assets[]
   product_performances             product_performances[]
   scan_results_list                scan_results_list[]
@@ -1249,7 +1252,7 @@ model user_tenants {
   tenants    tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   users      users            @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@unique([user_id, tenant_id],map:"user_id_tenant_id_unique")
+  @@unique([user_id, tenant_id], map: "user_id_tenant_id_unique")
   @@index([tenant_id])
   @@index([user_id])
 }
@@ -1273,6 +1276,41 @@ model users {
   invitations                      invitations[]
   user_sessions_list               user_sessions_list[]
   user_tenants                     user_tenants[]
+}
+
+/// Quick Start Product Caches
+/// Stores AI-generated products for reuse across tenants
+model quick_start_product_caches {
+  id                   String    @id
+  business_type        String
+  category_name        String
+  google_category_id   String?
+  product_name         String
+  price_cents          Int
+  brand                String?
+  description          String?
+  sku_pattern          String?
+  generation_source    String    @default("ai")
+  usage_count          Int       @default(0)
+  quality_score        Float?    @default(0.0) @db.Real
+  created_at           DateTime  @default(now()) @db.Timestamp(6)
+  last_used_at         DateTime? @db.Timestamp(6)
+  image_url            String?
+  thumbnail_url        String?
+  image_width          Int?
+  image_height         Int?
+  image_bytes          Int?
+  enhanced_description String?
+  features             Json?
+  specifications       Json?
+  has_image            Boolean?  @default(false)
+  image_quality        String?
+
+  @@unique([business_type, category_name, product_name], name: "unique_product_per_scenario", map: "unique_product_per_scenario")
+  @@index([business_type, category_name], map: "idx_qspc_scenario")
+  @@index([quality_score(sort: Desc)], map: "idx_qspc_quality")
+  @@index([usage_count(sort: Desc)], map: "idx_qspc_usage")
+  @@map("quick_start_product_cache")
 }
 
 enum action {
@@ -1404,50 +1442,4 @@ enum user_tenant_role {
   SUPPORT
   MEMBER
   VIEWER
-}
-
-/// Quick Start Product Caches
-/// Stores AI-generated products for reuse across tenants
-model quick_start_product_caches {
-  id                    String    @id
-  business_type         String
-  category_name         String
-  google_category_id    String?
-  product_name          String
-  price_cents           Int
-  brand                 String?
-  description           String?
-  sku_pattern           String?
-  
-  // Image data
-  image_url             String?
-  thumbnail_url         String?
-  image_width           Int?
-  image_height          Int?
-  image_bytes           Int?
-  
-  // Enhanced content
-  enhanced_description  String?
-  features              Json?
-  specifications        Json?
-  
-  // Metadata
-  generation_source     String    @default("ai")
-  has_image             Boolean   @default(false)
-  image_quality         String?
-  usage_count           Int       @default(0)
-  quality_score         Float     @default(0.0)
-  
-  created_at            DateTime  @default(now()) @db.Timestamptz(6)
-  last_used_at          DateTime? @db.Timestamptz(6)
-  
-  @@unique([business_type, category_name, product_name], name: "unique_product_per_scenario")
-  @@index([business_type, category_name], name: "idx_qspc_scenario")
-  @@index([quality_score(sort: Desc)], name: "idx_qspc_quality")
-  @@index([usage_count(sort: Desc)], name: "idx_qspc_usage")
-  @@index([has_image], name: "idx_qspc_has_image")
-  
-  // Map to existing singular table name (created before naming standards)
-  // TODO: Rename table to quick_start_product_caches in future migration
-  @@map("quick_start_product_cache")
 }

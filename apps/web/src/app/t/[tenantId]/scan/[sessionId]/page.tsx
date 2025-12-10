@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import BarcodeScanner from '@/components/scan/BarcodeScanner';
 import BatchReview from '@/components/scan/BatchReview';
@@ -25,6 +26,9 @@ interface ScanSession {
   scannedCount: number;
   committedCount: number;
   duplicateCount: number;
+  startedAt: string;
+  completedAt?: string;
+  template?: any;
   results: ScanResult[];
 }
 
@@ -276,6 +280,17 @@ export default function TenantActiveScanPage() {
         description={`${session.scannedCount} items scanned • ${session.duplicateCount} duplicates`}
         icon={Icons.Inventory}
         backLink={{ href: `/t/${tenantId}/scan`, label: 'Back to Sessions' }}
+        actions={
+          <Link
+            href={`/t/${tenantId}/items`}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Items
+          </Link>
+        }
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -307,7 +322,7 @@ export default function TenantActiveScanPage() {
                     message: 'Product name is required',
                     severity: 'error' as const,
                   }] : []),
-                  ...(!selectedResult.enrichment?.categoryPath?.length ? [{
+                  ...(!selectedResult.enrichment?.tenantCategoryId ? [{
                     field: 'category',
                     message: 'Category is required',
                     severity: 'error' as const,

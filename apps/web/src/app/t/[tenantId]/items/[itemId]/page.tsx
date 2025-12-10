@@ -147,6 +147,113 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           ...metadata.specifications
         };
       }
+
+      // Extract barcode enrichment data from metadata
+      if (metadata.nutrition) {
+        // Extract nutrition facts
+        const nutrition = metadata.nutrition;
+        enrichedFields.nutritionFacts = {};
+
+        if (nutrition.per_100g) {
+          // Map OpenFoodFacts nutrition data to frontend format
+          const per100g = nutrition.per_100g;
+          enrichedFields.nutritionFacts = {
+            servingSize: nutrition.serving_size || 'Per 100g',
+            calories: per100g['energy-kcal_100g'] || per100g.energy_kcal || per100g.energy,
+            totalFat: per100g.fat_100g ? `${per100g.fat_100g}g` : per100g.fat,
+            saturatedFat: per100g['saturated-fat_100g'] ? `${per100g['saturated-fat_100g']}g` : per100g.saturated_fat,
+            transFat: per100g['trans-fat_100g'] ? `${per100g['trans-fat_100g']}g` : per100g.trans_fat,
+            cholesterol: per100g.cholesterol_100g ? `${per100g.cholesterol_100g}mg` : per100g.cholesterol,
+            sodium: per100g.sodium_100g ? `${per100g.sodium_100g}mg` : per100g.sodium,
+            totalCarbohydrate: per100g.carbohydrates_100g ? `${per100g.carbohydrates_100g}g` : per100g.carbohydrates,
+            dietaryFiber: per100g.fiber_100g ? `${per100g.fiber_100g}g` : per100g.fiber,
+            sugars: per100g.sugars_100g ? `${per100g.sugars_100g}g` : per100g.sugars,
+            protein: per100g.proteins_100g ? `${per100g.proteins_100g}g` : per100g.proteins,
+          };
+        }
+
+        // Extract Nutri-Score if available
+        if (nutrition.grade || nutrition.nutrition_grade_fr) {
+          enrichedFields.nutriScore = nutrition.grade || nutrition.nutrition_grade_fr;
+        }
+      }
+
+      // Extract ingredients
+      if (metadata.ingredients) {
+        if (typeof metadata.ingredients === 'string') {
+          enrichedFields.ingredients = metadata.ingredients;
+        } else if (Array.isArray(metadata.ingredients)) {
+          enrichedFields.ingredients = metadata.ingredients.join(', ');
+        }
+      }
+
+      // Extract allergens
+      if (metadata.allergens) {
+        if (typeof metadata.allergens === 'string') {
+          enrichedFields.allergens = metadata.allergens.split(',').map((a: string) => a.trim());
+        } else if (Array.isArray(metadata.allergens)) {
+          enrichedFields.allergens = metadata.allergens;
+        }
+      }
+
+      // Extract allergens tags (additional allergens)
+      if (metadata.allergens_tags && Array.isArray(metadata.allergens_tags)) {
+        enrichedFields.allergens = enrichedFields.allergens || [];
+        enrichedFields.allergens = [...new Set([...enrichedFields.allergens, ...metadata.allergens_tags])];
+      }
+
+      // Extract dietary information from ingredients analysis
+      if (metadata.ingredients_analysis) {
+        const analysis = metadata.ingredients_analysis;
+        enrichedFields.dietaryInfo = [];
+
+        if (analysis.vegan) enrichedFields.dietaryInfo.push('Vegan');
+        if (analysis.vegetarian) enrichedFields.dietaryInfo.push('Vegetarian');
+        if (analysis.palm_oil_free) enrichedFields.dietaryInfo.push('Palm Oil Free');
+      }
+
+      // Extract environmental information
+      if (metadata.environmental) {
+        const env = metadata.environmental;
+        enrichedFields.environmentalInfo = enrichedFields.environmentalInfo || [];
+
+        if (env.ecoscore_grade) {
+          enrichedFields.environmentalInfo.push(`Eco-Score: ${env.ecoscore_grade.toUpperCase()}`);
+        }
+        if (env.carbon_footprint) {
+          enrichedFields.environmentalInfo.push(`Carbon Footprint: ${env.carbon_footprint}g CO₂`);
+        }
+      }
+
+      // Extract Nova group (food processing level)
+      if (metadata.nova_group) {
+        enrichedFields.environmentalInfo = enrichedFields.environmentalInfo || [];
+        enrichedFields.environmentalInfo.push(`Processing Level: NOVA ${metadata.nova_group}`);
+      }
+
+      // Extract product identifiers
+      if (metadata.barcode) enrichedFields.upc = metadata.barcode;
+      if (metadata.ean) enrichedFields.gtin = metadata.ean;
+      if (metadata.mpn) enrichedFields.mpn = metadata.mpn;
+
+      // Extract physical attributes
+      if (metadata.specifications) {
+        const specs = metadata.specifications;
+        if (specs.weight || specs.length || specs.width || specs.height) {
+          enrichedFields.weight = specs.weight ? { value: specs.weight, unit: 'g' } : undefined;
+          enrichedFields.dimensions = specs.length ? {
+            length: specs.length,
+            width: specs.width,
+            height: specs.height,
+            unit: 'cm'
+          } : undefined;
+        }
+      }
+
+      // Extract completeness score
+      if (metadata.completeness) {
+        enrichedFields.completeness = metadata.completeness;
+      }
       
       // Normalize the item data to match frontend expectations
       const normalizedItem = {

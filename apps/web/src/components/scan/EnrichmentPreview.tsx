@@ -1,14 +1,63 @@
 'use client';
 
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
-import { useState } from 'react';
-import CategorySelector from '@/components/items/CategorySelector';
+import { useState, useEffect } from 'react';
+import TenantCategorySelector from '@/components/items/TenantCategorySelector';
+import { apiRequest } from '@/lib/api';
+
+// Helper component to display category name by ID
+function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
+  const [categoryName, setCategoryName] = useState<string>('Loading...');
+  const [tenantId, setTenantId] = useState<string>('');
+
+  useEffect(() => {
+    // Extract tenant ID from URL
+    try {
+      const m = window.location.pathname.match(/\/t\/([^/]+)/);
+      if (m) setTenantId(m[1]);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    async function fetchCategory() {
+      if (!tenantId) return;
+      
+      try {
+        const response = await apiRequest(`/api/tenant/${tenantId}/categories`);
+        if (response.ok) {
+          const result = await response.json();
+          const category = result.data?.find((c: any) => c.id === categoryId);
+          if (category) {
+            setCategoryName(category.name);
+            if (category.googleCategoryId) {
+              setCategoryName(`${category.name} (${category.googleCategoryId})`);
+            }
+          }
+        }
+      } catch (error) {
+        setCategoryName('Unknown category');
+      }
+    }
+    fetchCategory();
+  }, [categoryId, tenantId]);
+
+  return (
+    <div className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+      <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+      </svg>
+      <span>{categoryName}</span>
+      <Badge variant="success" className="text-xs">Assigned</Badge>
+    </div>
+  );
+}
 
 interface EnrichmentData {
   name?: string;
   description?: string;
   brand?: string;
   categoryPath?: string[];
+  tenantCategoryId?: string;
   priceCents?: number;
   metadata?: Record<string, any>;
   source?: string;
@@ -228,19 +277,13 @@ export default function EnrichmentPreview({
               {/* Category */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Category {!enrichment?.categoryPath?.length && <span className="text-red-500">*</span>}
+                  Category {!enrichment?.tenantCategoryId && <span className="text-red-500">*</span>}
                 </label>
                 {editable && onEdit ? (
                   <div className="space-y-2">
-                    {enrichment?.categoryPath && enrichment.categoryPath.length > 0 ? (
+                    {enrichment?.tenantCategoryId ? (
                       <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                        <div className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                          <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                          </svg>
-                          <span>{enrichment.categoryPath.join(' > ')}</span>
-                          <Badge variant="success" className="text-xs">Assigned</Badge>
-                        </div>
+                        <CategoryNameDisplay categoryId={enrichment.tenantCategoryId} />
                         <button
                           type="button"
                           onClick={() => setShowCategorySelector(true)}
@@ -268,14 +311,8 @@ export default function EnrichmentPreview({
                     )}
                   </div>
                 ) : (
-                  enrichment?.categoryPath && enrichment.categoryPath.length > 0 ? (
-                    <div className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                      <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                      </svg>
-                      <span>{enrichment.categoryPath.join(' > ')}</span>
-                      <Badge variant="success" className="text-xs">Suggested</Badge>
-                    </div>
+                  enrichment?.tenantCategoryId ? (
+                    <CategoryNameDisplay categoryId={enrichment.tenantCategoryId} />
                   ) : (
                     <div className="text-sm text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                       <p className="font-medium">Category Required</p>
@@ -363,9 +400,73 @@ export default function EnrichmentPreview({
             </div>
 
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              <CategorySelector
-                currentCategory={enrichment?.categoryPath || []}
-                onCategorySelect={handleCategorySelect}
+              <TenantCategorySelector
+                selectedCategoryId={enrichment?.tenantCategoryId || null}
+                categoryPath={enrichment?.categoryPath}
+                onSelect={async (categoryId, googleCategoryPath, googleTaxonomyId) => {
+                  if (onEdit) {
+                    // If it's a Google taxonomy selection, create a new tenant category
+                    if (googleCategoryPath) {
+                      try {
+                        const categoryName = enrichment?.name || 'Unknown';
+                        console.log('[EnrichmentPreview] Creating category from Google taxonomy:', {
+                          googleCategoryPath,
+                          googleTaxonomyId,
+                          categoryName
+                        });
+
+                        // Extract tenant ID from URL
+                        const tenantId = window.location.pathname.match(/\/t\/([^/]+)/)?.[1];
+                        if (!tenantId) throw new Error('Could not extract tenant ID');
+
+                        // Create category with Google taxonomy ID
+                        const createResponse = await apiRequest(`/api/v1/tenants/${tenantId}/categories/from-enrichment`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            name: categoryName,
+                            googleCategoryId: googleTaxonomyId,
+                          }),
+                        });
+
+                        console.log('[EnrichmentPreview] Category creation response:', {
+                          ok: createResponse.ok,
+                          status: createResponse.status,
+                          statusText: createResponse.statusText
+                        });
+
+                        if (createResponse.ok) {
+                          const createResult = await createResponse.json();
+                          console.log('[EnrichmentPreview] Category created successfully:', createResult);
+                          onEdit('tenantCategoryId', createResult.data.id);
+                        } else {
+                          const errorText = await createResponse.text();
+                          console.error('[EnrichmentPreview] Category creation failed:', {
+                            status: createResponse.status,
+                            statusText: createResponse.statusText,
+                            errorText
+                          });
+                          // Don't set tenantCategoryId to avoid storing invalid Google taxonomy IDs
+                          alert(`Failed to create category from Google taxonomy. Please try selecting a different category or contact support.`);
+                        }
+                      } catch (error) {
+                        console.error('[EnrichmentPreview] Error creating category from Google taxonomy:', error);
+                        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+                        alert(`Error creating category from Google taxonomy: ${errorMessage}. Please try selecting a different category.`);
+                        // Don't set tenantCategoryId to avoid storing invalid Google taxonomy IDs
+                      }
+                    } else {
+                      // Validate that categoryId is not a Google taxonomy ID (numeric only)
+                      if (/^\d+$/.test(categoryId)) {
+                        console.warn('[EnrichmentPreview] Rejecting numeric categoryId that looks like Google taxonomy ID:', categoryId);
+                        alert('Invalid category selection. Please select a proper tenant category.');
+                        return;
+                      }
+                      onEdit('tenantCategoryId', categoryId);
+                    }
+                  }
+                  setShowCategorySelector(false);
+                }}
                 onCancel={handleCategoryCancel}
               />
             </div>

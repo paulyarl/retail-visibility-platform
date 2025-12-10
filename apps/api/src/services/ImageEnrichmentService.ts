@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../prisma";
 import { StorageBuckets } from "../storage-config";
 import { generatePhotoId } from "../lib/id-generator";
+const sharp = require("sharp");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -20,14 +21,116 @@ interface ImageDownloadResult {
 
 export class ImageEnrichmentService {
   /**
-   * Download and store product image from external URL
-   * Uses existing Supabase storage infrastructure
+   * Compress and optimize image buffer for better quality and smaller file size
+   * Uses Sharp for image processing with appropriate settings for product photos
+   */
+  async compressImage(
+    imageBuffer: Buffer,
+    contentType: string,
+    isPrimary: boolean = false
+  ): Promise<{ buffer: Buffer; width?: number; height?: number; contentType: string }> {
+    try {
+      let sharpInstance = sharp(imageBuffer);
+
+      // Get original dimensions
+      const metadata = await sharpInstance.metadata();
+      const originalWidth = metadata.width || 0;
+      const originalHeight = metadata.height || 0;
+
+      // Resize logic: primary images get higher quality, secondary images are smaller
+      let targetWidth: number | null = null;
+      let targetHeight: number | null = null;
+      let quality = isPrimary ? 85 : 75; // Higher quality for primary images
+
+      if (originalWidth > 1200) {
+        // Resize large images down to max 1200px width while maintaining aspect ratio
+        targetWidth = 1200;
+        targetHeight = null; // Maintain aspect ratio
+      } else if (originalWidth < 400) {
+        // Don't resize small images up, just compress
+        targetWidth = null;
+        targetHeight = null;
+      }
+
+      // Apply resizing if needed
+      if (targetWidth) {
+        sharpInstance = sharpInstance.resize(targetWidth, targetHeight, {
+          withoutEnlargement: true, // Don't enlarge images
+          fit: 'inside', // Fit within dimensions
+        });
+      }
+
+      // Compress based on format
+      let outputBuffer: Buffer;
+      let finalContentType = contentType;
+
+      if (contentType === 'image/jpeg' || contentType === 'image/jpg') {
+        outputBuffer = await sharpInstance
+          .jpeg({
+            quality: quality,
+            progressive: true,
+            mozjpeg: true
+          })
+          .toBuffer();
+        finalContentType = 'image/jpeg';
+      } else if (contentType === 'image/png') {
+        outputBuffer = await sharpInstance
+          .png({
+            quality: quality,
+            progressive: true,
+            compressionLevel: 6 // Good balance of size vs speed
+          })
+          .toBuffer();
+      } else if (contentType === 'image/webp') {
+        outputBuffer = await sharpInstance
+          .webp({
+            quality: quality,
+            effort: 4 // Good balance of quality vs speed
+          })
+          .toBuffer();
+        finalContentType = 'image/webp';
+      } else {
+        // For other formats, convert to JPEG
+        outputBuffer = await sharpInstance
+          .jpeg({
+            quality: quality,
+            progressive: true,
+            mozjpeg: true
+          })
+          .toBuffer();
+        finalContentType = 'image/jpeg';
+      }
+
+      // Get final dimensions
+      const finalMetadata = await sharp(outputBuffer).metadata();
+
+      console.log(`[ImageCompression] Original: ${originalWidth}x${originalHeight} (${(imageBuffer.length / 1024).toFixed(1)}KB) -> Optimized: ${finalMetadata.width}x${finalMetadata.height} (${(outputBuffer.length / 1024).toFixed(1)}KB)`);
+
+      return {
+        buffer: outputBuffer,
+        width: finalMetadata.width,
+        height: finalMetadata.height,
+        contentType: finalContentType
+      };
+    } catch (error) {
+      console.error('[ImageCompression] Error compressing image:', error);
+      // Return original buffer if compression fails
+      return {
+        buffer: imageBuffer,
+        contentType: contentType
+      };
+    }
+  }
+  /**
+   * Download, compress, and store product image from external URL
+   * Uses Sharp for image optimization and Supabase storage infrastructure
    */
   async downloadAndStoreImage(
     image_url: string,
     tenantId: string,
     item_id: string,
-    sku: string
+    sku: string,
+    isPrimary: boolean = false
   ): Promise<ImageDownloadResult | null> {
     if (!supabase) {
       console.warn('[ImageEnrichment] Supabase not configured');
@@ -46,8 +149,7 @@ export class ImageEnrichmentService {
       }
 
       const contentType = response.headers.get('content-type') || 'image/jpeg';
-      const buffer = Buffer.from(await response.arrayBuffer());
-      const bytes = buffer.length;
+      const originalBuffer = Buffer.from(await response.arrayBuffer());
 
       // Validate it's an image
       if (!contentType.startsWith('image/')) {
@@ -55,17 +157,20 @@ export class ImageEnrichmentService {
         return null;
       }
 
+      // Compress and optimize the image
+      const compressedImage = await this.compressImage(originalBuffer, contentType, isPrimary);
+      
       // Generate storage path
-      const ext = this.getExtensionFromContentType(contentType);
+      const ext = this.getExtensionFromContentType(compressedImage.contentType);
       const filename = `${Date.now()}.${ext}`;
       const path = `${tenantId}/${sku || item_id}/${filename}`;
 
-      // Upload to Supabase Storage
+      // Upload compressed image to Supabase Storage
       const { error, data } = await supabase.storage
         .from(StorageBuckets.PHOTOS.name)
-        .upload(path, buffer, {
+        .upload(path, compressedImage.buffer, {
           cacheControl: "3600",
-          contentType,
+          contentType: compressedImage.contentType,
           upsert: false,
         });
 
@@ -81,8 +186,10 @@ export class ImageEnrichmentService {
 
       return {
         url: pub.data.publicUrl,
-        bytes,
-        contentType,
+        width: compressedImage.width,
+        height: compressedImage.height,
+        bytes: compressedImage.buffer.length,
+        contentType: compressedImage.contentType,
       };
     } catch (error: any) {
       console.error('[ImageEnrichment] Error downloading/storing image:', error);
@@ -135,6 +242,7 @@ export class ImageEnrichmentService {
   /**
    * Process multiple images for a scanned product
    * Supports up to 11 images (1 primary + 10 additional) per Google Merchant Center requirements
+   * Starts positioning after existing photo assets to avoid conflicts
    */
   async processProductImages(
     tenantId: string,
@@ -147,12 +255,30 @@ export class ImageEnrichmentService {
       return 0;
     }
 
-    // Limit to 11 images (Google Merchant Center max)
-    const urlsToProcess = imageUrls.slice(0, 11);
+    // Find the highest existing position to start from there
+    const existingPositions = await prisma.photo_assets.findMany({
+      where: { inventory_item_id: item_id },
+      select: { position: true },
+      orderBy: { position: 'desc' },
+      take: 1,
+    });
+
+    const startPosition = existingPositions.length > 0 ? existingPositions[0].position + 1 : 0;
+
+    // Limit to 11 images total (Google Merchant Center max), starting from startPosition
+    const maxImages = 11 - startPosition;
+    const urlsToProcess = imageUrls.slice(0, maxImages);
+
+    if (urlsToProcess.length === 0) {
+      console.log(`[ImageEnrichment] Skipping ${imageUrls.length} images - already at max capacity for item ${item_id}`);
+      return 0;
+    }
+
     let successCount = 0;
 
     for (let i = 0; i < urlsToProcess.length; i++) {
       const imageUrl = urlsToProcess[i];
+      const position = startPosition + i;
       
       try {
         // Download and store image
@@ -160,7 +286,8 @@ export class ImageEnrichmentService {
           imageUrl,
           tenantId,
           item_id,
-          sku
+          sku,
+          position === startPosition // First image in this batch is primary if no existing images
         );
 
         if (!imageData) {
@@ -169,8 +296,8 @@ export class ImageEnrichmentService {
         }
 
         // Create PhotoAsset record
-        const alt = i === 0 ? productName : `${productName} - Image ${i + 1}`;
-        await this.createPhotoAsset(tenantId, item_id, imageData, i, alt);
+        const alt = position === 0 ? productName : `${productName} - Image ${position + 1}`;
+        await this.createPhotoAsset(tenantId, item_id, imageData, position, alt);
         
         successCount++;
       } catch (error) {
@@ -229,7 +356,7 @@ export class ImageEnrichmentService {
     }
 
     // Remove duplicates and invalid URLs
-    return [...new Set(urls)].filter(url => 
+    return Array.from(new Set(urls)).filter(url => 
       url && typeof url === 'string' && url.startsWith('http')
     );
   }

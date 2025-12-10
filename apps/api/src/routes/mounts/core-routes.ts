@@ -18,6 +18,7 @@ import tenantUserRoutes from '../tenant-users';
 import platformSettingsRoutes from '../platform-settings';
 import platformStatsRoutes from '../platform-stats';
 import businessHoursRoutes from '../business-hours';
+import taxonomyRoutes from '../taxonomy';
 
 /**
  * Mount core business routes
@@ -45,6 +46,7 @@ export function mountCoreRoutes(app: Express) {
   app.use(platformSettingsRoutes);
   app.use('/api/platform-stats', platformStatsRoutes);
   app.use('/api', businessHoursRoutes);
+  app.use('/api/taxonomy', taxonomyRoutes);
 
   console.log('✅ Core business routes mounted');
 }

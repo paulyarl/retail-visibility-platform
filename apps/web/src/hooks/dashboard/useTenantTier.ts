@@ -64,6 +64,33 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
   const [userRole, setUserRole] = useState<UserTenantRole | null>(null);
   const [userData, setUserData] = useState<any>(null);
 
+  // Helper function to map API tier response to TierInfo format
+  const mapApiTierToTierInfo = (apiTier: any): TierInfo => {
+    return {
+      id: apiTier.tierKey,
+      name: apiTier.displayName || apiTier.name,
+      level: mapTierKeyToLevel(apiTier.tierKey),
+      source: 'tenant', // Default to tenant, will be overridden if needed
+      features: apiTier.features || [],
+      limits: apiTier.limits || {}
+    };
+  };
+
+  // Helper function to map tier keys to levels
+  const mapTierKeyToLevel = (tierKey: string): TierInfo['level'] => {
+    switch (tierKey) {
+      case 'google_only': return 'starter';
+      case 'starter': return 'starter';
+      case 'professional': return 'pro';
+      case 'enterprise': return 'enterprise';
+      case 'organization': return 'enterprise';
+      case 'chain_starter': return 'starter';
+      case 'chain_professional': return 'pro';
+      case 'chain_enterprise': return 'enterprise';
+      default: return 'starter';
+    }
+  };
+
   const fetchTierData = async () => {
     if (!tenantId) {
       setLoading(false);
@@ -121,8 +148,8 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
       if (tenantResponse.ok) {
         const tierData = await tenantResponse.json();
         
-        organizationTier = tierData.organizationTier || null;
-        tenantTier = tierData.tenantTier || null;
+        organizationTier = tierData.organizationTier ? mapApiTierToTierInfo(tierData.organizationTier) : null;
+        tenantTier = tierData.tenantTier ? mapApiTierToTierInfo(tierData.tenantTier) : null;
         isChain = tierData.isChain || false;
       }
 

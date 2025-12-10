@@ -19,6 +19,7 @@ interface ScanSession {
   duplicateCount: number;
   startedAt: string;
   completedAt?: string;
+  committed?: string; // Date when session was committed (maps to completedAt)
 }
 
 export default function TenantScanPage() {
@@ -167,6 +168,10 @@ export default function TenantScanPage() {
         title="Barcode Products"
         description="Scan or enter barcodes to quickly add products with auto-filled details"
         icon={Icons.Inventory}
+        backLink={{
+          href: `/t/${tenantId}/items`,
+          label: 'Back to Items'
+        }}
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">

@@ -16,6 +16,7 @@ interface ScanSession {
   duplicateCount: number;
   startedAt: string;
   completedAt?: string;
+  committed?: string; // Date when session was committed (maps to completedAt)
 }
 
 export default function ScanPage() {
