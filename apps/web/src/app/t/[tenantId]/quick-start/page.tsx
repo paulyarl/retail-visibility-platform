@@ -89,6 +89,11 @@ export default function QuickStartPage() {
   const [productCount, setProductCount] = useState<number>(50);
   const [generateImages, setGenerateImages] = useState<boolean>(false);
   const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
+  const [textModel, setTextModel] = useState<'openai' | 'google'>('openai');
+  const [imageModel, setImageModel] = useState<'openai' | 'google'>('openai');
+  
+  // Check if any Google model is selected (for warning display)
+  const usesGoogle = textModel === 'google' || (generateImages && imageModel === 'google');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +169,8 @@ export default function QuickStartPage() {
           createAsDrafts: true,
           generateImages,
           imageQuality,
+          textModel,
+          imageModel,
         }),
       });
 
@@ -612,6 +619,55 @@ export default function QuickStartPage() {
             </div>
           </div>
 
+          {/* AI Provider Selection */}
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              AI Provider for Product Generation
+            </label>
+            <div className="flex gap-2 mb-2">
+              <button
+                onClick={() => setTextModel('openai')}
+                className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  textModel === 'openai'
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  🤖 OpenAI GPT-4
+                </span>
+                <span className="text-xs opacity-75 mt-1 block">Fast & reliable</span>
+              </button>
+              <button
+                onClick={() => setTextModel('google')}
+                className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  textModel === 'google'
+                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  ✨ Google Gemini
+                </span>
+                <span className="text-xs opacity-75 mt-1 block">Free tier available</span>
+              </button>
+            </div>
+            
+            {/* Google Warning */}
+            {textModel === 'google' && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
+                  <span className="text-amber-500">⏳</span>
+                  <span>
+                    <strong>Slower generation:</strong> Google Gemini has rate limits. 
+                    If limits are hit, the system will wait ~40 seconds before retrying. 
+                    This may significantly increase total generation time.
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Photo Generation Toggle */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
@@ -637,6 +693,54 @@ export default function QuickStartPage() {
                 <p className="text-xs text-gray-600 dark:text-gray-400">
                   ⚠️ Enabling photos will increase generation time to 2-3 minutes
                 </p>
+                
+                {/* AI Model Selector */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    AI Model
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setImageModel('openai')}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        imageModel === 'openai'
+                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1">
+                        🤖 DALL-E 3
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setImageModel('google')}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        imageModel === 'google'
+                          ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1">
+                        🎨 Imagen 3
+                      </span>
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    {imageModel === 'openai' 
+                      ? 'OpenAI DALL-E 3 - High quality, reliable' 
+                      : 'Google Imagen 3 - Cost-effective (preview)'}
+                  </p>
+                  
+                  {/* Google Image Warning */}
+                  {imageModel === 'google' && (
+                    <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <p className="text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
+                        <span className="text-amber-500">⏳</span>
+                        <span>Rate limits may cause ~40s waits between images.</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Image Quality Selector */}
                 <div>

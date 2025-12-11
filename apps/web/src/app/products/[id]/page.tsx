@@ -33,6 +33,15 @@ interface Product {
   createdAt: string;
   updatedAt: string;
   
+  // Category assignment
+  tenantCategoryId?: string | null;
+  tenantCategory?: {
+    id: string;
+    name: string;
+    slug: string;
+    googleCategoryId?: string | null;
+  } | null;
+  
   // Enriched barcode data
   upc?: string;
   
@@ -159,6 +168,8 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
       ...enrichedFields,
       itemStatus: productData.itemStatus || productData.item_status || 'active',
       tenantId: productData.tenantId || productData.tenant_id,
+      tenantCategoryId: productData.tenantCategoryId || productData.directory_category_id || null,
+      tenantCategory: productData.tenantCategory || null,
     };
 
     // Fetch tenant info and business profile using public endpoint

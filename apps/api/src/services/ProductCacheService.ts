@@ -50,6 +50,7 @@ export interface ProductRequest {
   googleCategoryId?: string;
   count: number;
   requireImages?: boolean; // NEW: Only return products with images
+  textModel?: 'openai' | 'google'; // NEW: AI model for text generation
 }
 
 export interface GeneratedProduct {
@@ -76,9 +77,9 @@ export class ProductCacheService {
    * Get products for a scenario, using cache or AI generation
    */
   async getProductsForScenario(request: ProductRequest): Promise<GeneratedProduct[]> {
-    const { businessType, categoryName, googleCategoryId, count, requireImages = false } = request;
+    const { businessType, categoryName, googleCategoryId, count, requireImages = false, textModel } = request;
     
-    console.log(`[ProductCache] Requesting ${count} products for ${businessType} > ${categoryName}${requireImages ? ' (with images)' : ''}`);
+    console.log(`[ProductCache] Requesting ${count} products for ${businessType} > ${categoryName}${requireImages ? ' (with images)' : ''}${textModel ? ` [${textModel}]` : ''}`);
     
     // Step 1: Check cache
     const cachedProducts = await this.getCachedProducts(businessType, categoryName, count, requireImages);
@@ -112,7 +113,7 @@ export class ProductCacheService {
     // Step 3: Try AI generation for missing products
     let aiProducts: GeneratedProduct[] = [];
     try {
-      aiProducts = await this.generateWithAI(businessType, categoryName, needed);
+      aiProducts = await this.generateWithAI(businessType, categoryName, needed, textModel);
       console.log(`[ProductCache] AI generated ${aiProducts.length} products`);
       
       // Debug: Log first product to see what fields AI is returning
@@ -237,14 +238,16 @@ export class ProductCacheService {
   private async generateWithAI(
     businessType: string,
     categoryName: string,
-    count: number
+    count: number,
+    textModel?: 'openai' | 'google'
   ): Promise<GeneratedProduct[]> {
     try {
-      // Use the multi-provider service (Gemini with OpenAI fallback)
+      // Use the multi-provider service with optional provider override
       const products = await aiProviderService.generateProducts(
         businessType,
         categoryName,
-        count
+        count,
+        textModel
       );
       
       console.log(`[ProductCache] AI generated ${products.length} products`);
@@ -413,13 +416,13 @@ export class ProductCacheService {
     categoryName: string,
     count: number
   ): GeneratedProduct[] {
-    // Generic fallback products
+    // Generic fallback products with descriptions to pass validation
     const fallbacks: GeneratedProduct[] = [
-      { name: `${categoryName} Item 1`, price: 999, brand: 'Generic' },
-      { name: `${categoryName} Item 2`, price: 1499, brand: 'Generic' },
-      { name: `${categoryName} Item 3`, price: 1999, brand: 'Generic' },
-      { name: `${categoryName} Item 4`, price: 2499, brand: 'Generic' },
-      { name: `${categoryName} Item 5`, price: 2999, brand: 'Generic' },
+      { name: `${categoryName} Item 1`, price: 999, brand: 'Generic', description: `Quality ${categoryName.toLowerCase()} product for everyday use.` },
+      { name: `${categoryName} Item 2`, price: 1499, brand: 'Generic', description: `Premium ${categoryName.toLowerCase()} product with enhanced features.` },
+      { name: `${categoryName} Item 3`, price: 1999, brand: 'Generic', description: `Professional-grade ${categoryName.toLowerCase()} product.` },
+      { name: `${categoryName} Item 4`, price: 2499, brand: 'Generic', description: `Deluxe ${categoryName.toLowerCase()} product for discerning customers.` },
+      { name: `${categoryName} Item 5`, price: 2999, brand: 'Generic', description: `Top-tier ${categoryName.toLowerCase()} product with all the bells and whistles.` },
     ];
     
     return fallbacks.slice(0, count);

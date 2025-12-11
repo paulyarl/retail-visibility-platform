@@ -20,11 +20,11 @@ const baseItemSchema = z.object({
   stock: z.number().int().nonnegative(),
   image_url: z.string().url().nullable().optional(),
   metadata: z.any().optional(),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   // v3.4 SWIS fields (required by schema)
   title: z.string().min(1).optional(),
   brand: z.string().min(1).optional(),
-  manufacturer: z.string().optional(),
+  manufacturer: z.string().nullable().optional(),
   price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
   currency: z.string().length(3).optional(),
   availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
@@ -180,6 +180,482 @@ const SCENARIOS = {
       { name: 'Cookbook', price: 2499, category: 'Books & Media', brand: 'Random House' },
     ],
   },
+  
+  // ============================================
+  // NEW SCENARIOS - Realistic Retail Shelf Products
+  // ============================================
+  
+  pharmacy: {
+    name: 'Pharmacy',
+    categories: [
+      { name: 'Over-the-Counter Medicine', slug: 'otc-medicine', searchTerm: 'otc medicine pain relief cold flu' },
+      { name: 'Vitamins & Supplements', slug: 'vitamins-supplements', searchTerm: 'vitamins supplements minerals health' },
+      { name: 'First Aid', slug: 'first-aid', searchTerm: 'first aid bandages antiseptic medical' },
+      { name: 'Personal Care', slug: 'personal-care', searchTerm: 'personal care hygiene toiletries' },
+      { name: 'Baby Care', slug: 'baby-care', searchTerm: 'baby care diapers formula infant' },
+      { name: 'Eye & Ear Care', slug: 'eye-ear-care', searchTerm: 'eye care ear care drops contacts' },
+    ],
+    products: [
+      { name: 'Ibuprofen 200mg (100 ct)', price: 899, category: 'Over-the-Counter Medicine', brand: 'Advil' },
+      { name: 'Acetaminophen 500mg (50 ct)', price: 699, category: 'Over-the-Counter Medicine', brand: 'Tylenol' },
+      { name: 'Allergy Relief 24hr (30 ct)', price: 1899, category: 'Over-the-Counter Medicine', brand: 'Claritin' },
+      { name: 'Cold & Flu Severe (24 ct)', price: 1299, category: 'Over-the-Counter Medicine', brand: 'DayQuil' },
+      { name: 'Antacid Tablets (72 ct)', price: 799, category: 'Over-the-Counter Medicine', brand: 'Tums' },
+      { name: 'Multivitamin Daily (150 ct)', price: 1499, category: 'Vitamins & Supplements', brand: 'Centrum' },
+      { name: 'Vitamin D3 2000IU (200 ct)', price: 1199, category: 'Vitamins & Supplements', brand: 'Nature Made' },
+      { name: 'Fish Oil 1000mg (120 ct)', price: 1699, category: 'Vitamins & Supplements', brand: 'Nature\'s Bounty' },
+      { name: 'Probiotic Daily (30 ct)', price: 2499, category: 'Vitamins & Supplements', brand: 'Culturelle' },
+      { name: 'Adhesive Bandages (100 ct)', price: 599, category: 'First Aid', brand: 'Band-Aid' },
+      { name: 'Hydrogen Peroxide 16oz', price: 299, category: 'First Aid', brand: 'Swan' },
+      { name: 'Triple Antibiotic Ointment', price: 699, category: 'First Aid', brand: 'Neosporin' },
+      { name: 'Digital Thermometer', price: 1299, category: 'First Aid', brand: 'Vicks' },
+      { name: 'Toothpaste Whitening 4.8oz', price: 549, category: 'Personal Care', brand: 'Crest' },
+      { name: 'Deodorant Antiperspirant', price: 599, category: 'Personal Care', brand: 'Dove' },
+      { name: 'Hand Sanitizer 8oz', price: 449, category: 'Personal Care', brand: 'Purell' },
+      { name: 'Diapers Size 3 (88 ct)', price: 2999, category: 'Baby Care', brand: 'Pampers' },
+      { name: 'Baby Wipes (400 ct)', price: 1499, category: 'Baby Care', brand: 'Huggies' },
+      { name: 'Infant Formula 22.2oz', price: 3499, category: 'Baby Care', brand: 'Similac' },
+      { name: 'Contact Lens Solution 12oz', price: 1099, category: 'Eye & Ear Care', brand: 'Opti-Free' },
+      { name: 'Eye Drops Lubricant', price: 899, category: 'Eye & Ear Care', brand: 'Visine' },
+    ],
+  },
+  
+  home_garden: {
+    name: 'Home & Garden',
+    categories: [
+      { name: 'Kitchen & Dining', slug: 'kitchen-dining', searchTerm: 'kitchen dining cookware dishes' },
+      { name: 'Bedding & Bath', slug: 'bedding-bath', searchTerm: 'bedding bath towels sheets pillows' },
+      { name: 'Home Decor', slug: 'home-decor', searchTerm: 'home decor wall art frames mirrors' },
+      { name: 'Storage & Organization', slug: 'storage-organization', searchTerm: 'storage organization bins containers' },
+      { name: 'Garden & Outdoor', slug: 'garden-outdoor', searchTerm: 'garden outdoor plants pots tools' },
+      { name: 'Cleaning Supplies', slug: 'cleaning-supplies', searchTerm: 'cleaning supplies household cleaners' },
+    ],
+    products: [
+      { name: 'Non-Stick Frying Pan 12"', price: 2999, category: 'Kitchen & Dining', brand: 'T-fal' },
+      { name: 'Stainless Steel Pot Set (10pc)', price: 8999, category: 'Kitchen & Dining', brand: 'Cuisinart' },
+      { name: 'Dinnerware Set (16pc)', price: 4999, category: 'Kitchen & Dining', brand: 'Corelle' },
+      { name: 'Knife Block Set (14pc)', price: 7999, category: 'Kitchen & Dining', brand: 'Henckels' },
+      { name: 'Queen Sheet Set 400TC', price: 4999, category: 'Bedding & Bath', brand: 'Threshold' },
+      { name: 'Memory Foam Pillow (2pk)', price: 3999, category: 'Bedding & Bath', brand: 'Tempur-Pedic' },
+      { name: 'Bath Towel Set (6pc)', price: 2999, category: 'Bedding & Bath', brand: 'Fieldcrest' },
+      { name: 'Shower Curtain & Hooks', price: 1999, category: 'Bedding & Bath', brand: 'Threshold' },
+      { name: 'Decorative Throw Blanket', price: 3499, category: 'Home Decor', brand: 'Threshold' },
+      { name: 'Wall Art Canvas 24x36"', price: 4999, category: 'Home Decor', brand: 'Americanflat' },
+      { name: 'Scented Candle 3-Wick', price: 2499, category: 'Home Decor', brand: 'Yankee Candle' },
+      { name: 'Picture Frame Set (7pc)', price: 2999, category: 'Home Decor', brand: 'Gallery Perfect' },
+      { name: 'Plastic Storage Bins (6pk)', price: 2499, category: 'Storage & Organization', brand: 'Sterilite' },
+      { name: 'Closet Organizer System', price: 5999, category: 'Storage & Organization', brand: 'ClosetMaid' },
+      { name: 'Potting Soil 25qt', price: 1299, category: 'Garden & Outdoor', brand: 'Miracle-Gro' },
+      { name: 'Garden Hose 50ft', price: 2999, category: 'Garden & Outdoor', brand: 'Flexzilla' },
+      { name: 'Ceramic Planter 12"', price: 1999, category: 'Garden & Outdoor', brand: 'Costa Farms' },
+      { name: 'All-Purpose Cleaner 32oz', price: 449, category: 'Cleaning Supplies', brand: 'Lysol' },
+      { name: 'Laundry Detergent 100oz', price: 1299, category: 'Cleaning Supplies', brand: 'Tide' },
+      { name: 'Paper Towels (8 rolls)', price: 1599, category: 'Cleaning Supplies', brand: 'Bounty' },
+    ],
+  },
+  
+  health_beauty: {
+    name: 'Health & Beauty',
+    categories: [
+      { name: 'Skincare', slug: 'skincare', searchTerm: 'skincare moisturizer cleanser serum' },
+      { name: 'Haircare', slug: 'haircare', searchTerm: 'haircare shampoo conditioner styling' },
+      { name: 'Makeup', slug: 'makeup', searchTerm: 'makeup cosmetics foundation lipstick' },
+      { name: 'Fragrance', slug: 'fragrance', searchTerm: 'fragrance perfume cologne body spray' },
+      { name: 'Men\'s Grooming', slug: 'mens-grooming', searchTerm: 'mens grooming shaving beard' },
+    ],
+    products: [
+      { name: 'Daily Moisturizer SPF 30', price: 1899, category: 'Skincare', brand: 'CeraVe' },
+      { name: 'Facial Cleanser 16oz', price: 1499, category: 'Skincare', brand: 'Cetaphil' },
+      { name: 'Vitamin C Serum 1oz', price: 2999, category: 'Skincare', brand: 'TruSkin' },
+      { name: 'Retinol Night Cream', price: 2499, category: 'Skincare', brand: 'RoC' },
+      { name: 'Eye Cream Anti-Aging', price: 2199, category: 'Skincare', brand: 'Olay' },
+      { name: 'Shampoo Moisturizing 13oz', price: 799, category: 'Haircare', brand: 'Pantene' },
+      { name: 'Conditioner Repair 13oz', price: 799, category: 'Haircare', brand: 'Pantene' },
+      { name: 'Hair Styling Gel 8oz', price: 599, category: 'Haircare', brand: 'Got2b' },
+      { name: 'Dry Shampoo 4.3oz', price: 899, category: 'Haircare', brand: 'Batiste' },
+      { name: 'Heat Protectant Spray', price: 1099, category: 'Haircare', brand: 'TRESemmé' },
+      { name: 'Foundation Medium Coverage', price: 1299, category: 'Makeup', brand: 'Maybelline' },
+      { name: 'Mascara Volumizing', price: 999, category: 'Makeup', brand: 'L\'Oréal' },
+      { name: 'Lipstick Matte', price: 899, category: 'Makeup', brand: 'Revlon' },
+      { name: 'Eyeshadow Palette (12 colors)', price: 1499, category: 'Makeup', brand: 'NYX' },
+      { name: 'Setting Spray 4oz', price: 1099, category: 'Makeup', brand: 'e.l.f.' },
+      { name: 'Women\'s Eau de Parfum 3.4oz', price: 8999, category: 'Fragrance', brand: 'Calvin Klein' },
+      { name: 'Body Mist 8oz', price: 1899, category: 'Fragrance', brand: 'Victoria\'s Secret' },
+      { name: 'Men\'s Cologne 3.4oz', price: 7999, category: 'Fragrance', brand: 'Versace' },
+      { name: 'Razor Cartridges (8 ct)', price: 2999, category: 'Men\'s Grooming', brand: 'Gillette' },
+      { name: 'Shaving Cream 7oz', price: 599, category: 'Men\'s Grooming', brand: 'Barbasol' },
+      { name: 'Beard Oil 2oz', price: 1499, category: 'Men\'s Grooming', brand: 'Honest Amish' },
+    ],
+  },
+  
+  sports_outdoors: {
+    name: 'Sports & Outdoors',
+    categories: [
+      { name: 'Fitness Equipment', slug: 'fitness-equipment', searchTerm: 'fitness equipment weights dumbbells' },
+      { name: 'Athletic Apparel', slug: 'athletic-apparel', searchTerm: 'athletic apparel workout clothes' },
+      { name: 'Camping & Hiking', slug: 'camping-hiking', searchTerm: 'camping hiking tents backpacks' },
+      { name: 'Team Sports', slug: 'team-sports', searchTerm: 'team sports balls equipment' },
+      { name: 'Water Sports', slug: 'water-sports', searchTerm: 'water sports swimming pool beach' },
+    ],
+    products: [
+      { name: 'Yoga Mat 6mm', price: 2499, category: 'Fitness Equipment', brand: 'Gaiam' },
+      { name: 'Resistance Bands Set (5pc)', price: 1999, category: 'Fitness Equipment', brand: 'Fit Simplify' },
+      { name: 'Dumbbell Set 20lb (pair)', price: 4999, category: 'Fitness Equipment', brand: 'CAP Barbell' },
+      { name: 'Jump Rope Speed', price: 1299, category: 'Fitness Equipment', brand: 'Crossrope' },
+      { name: 'Foam Roller 18"', price: 1999, category: 'Fitness Equipment', brand: 'TriggerPoint' },
+      { name: 'Men\'s Running Shorts', price: 2999, category: 'Athletic Apparel', brand: 'Nike' },
+      { name: 'Women\'s Sports Bra', price: 3499, category: 'Athletic Apparel', brand: 'Under Armour' },
+      { name: 'Athletic Socks (6 pair)', price: 1499, category: 'Athletic Apparel', brand: 'Adidas' },
+      { name: 'Compression Leggings', price: 3999, category: 'Athletic Apparel', brand: 'Lululemon' },
+      { name: '2-Person Tent', price: 7999, category: 'Camping & Hiking', brand: 'Coleman' },
+      { name: 'Sleeping Bag 20°F', price: 4999, category: 'Camping & Hiking', brand: 'Kelty' },
+      { name: 'Hiking Backpack 40L', price: 8999, category: 'Camping & Hiking', brand: 'Osprey' },
+      { name: 'LED Headlamp', price: 1999, category: 'Camping & Hiking', brand: 'Black Diamond' },
+      { name: 'Basketball Official Size', price: 2999, category: 'Team Sports', brand: 'Spalding' },
+      { name: 'Soccer Ball Size 5', price: 2499, category: 'Team Sports', brand: 'Adidas' },
+      { name: 'Football Official', price: 2999, category: 'Team Sports', brand: 'Wilson' },
+      { name: 'Baseball Glove 12"', price: 4999, category: 'Team Sports', brand: 'Rawlings' },
+      { name: 'Swim Goggles', price: 1499, category: 'Water Sports', brand: 'Speedo' },
+      { name: 'Beach Towel Oversized', price: 1999, category: 'Water Sports', brand: 'Dock & Bay' },
+      { name: 'Pool Float Lounger', price: 2999, category: 'Water Sports', brand: 'Intex' },
+    ],
+  },
+  
+  toys_games: {
+    name: 'Toys & Games',
+    categories: [
+      { name: 'Action Figures & Dolls', slug: 'action-figures-dolls', searchTerm: 'action figures dolls toys collectibles' },
+      { name: 'Building Sets', slug: 'building-sets', searchTerm: 'building sets lego blocks construction' },
+      { name: 'Board Games & Puzzles', slug: 'board-games-puzzles', searchTerm: 'board games puzzles family games' },
+      { name: 'Outdoor Play', slug: 'outdoor-play', searchTerm: 'outdoor play toys bikes scooters' },
+      { name: 'Educational Toys', slug: 'educational-toys', searchTerm: 'educational toys learning stem' },
+    ],
+    products: [
+      { name: 'Barbie Dreamhouse', price: 19999, category: 'Action Figures & Dolls', brand: 'Barbie' },
+      { name: 'Action Figure 6" Collectible', price: 1999, category: 'Action Figures & Dolls', brand: 'Marvel Legends' },
+      { name: 'Baby Doll with Accessories', price: 2999, category: 'Action Figures & Dolls', brand: 'Baby Alive' },
+      { name: 'Plush Teddy Bear 18"', price: 2499, category: 'Action Figures & Dolls', brand: 'Build-A-Bear' },
+      { name: 'LEGO City Set (500pc)', price: 4999, category: 'Building Sets', brand: 'LEGO' },
+      { name: 'LEGO Star Wars Set', price: 7999, category: 'Building Sets', brand: 'LEGO' },
+      { name: 'Magnetic Building Tiles (100pc)', price: 3999, category: 'Building Sets', brand: 'Magna-Tiles' },
+      { name: 'Lincoln Logs Classic', price: 2999, category: 'Building Sets', brand: 'Lincoln Logs' },
+      { name: 'Monopoly Classic', price: 1999, category: 'Board Games & Puzzles', brand: 'Hasbro' },
+      { name: 'Scrabble Deluxe', price: 2999, category: 'Board Games & Puzzles', brand: 'Hasbro' },
+      { name: 'Puzzle 1000 Pieces', price: 1499, category: 'Board Games & Puzzles', brand: 'Ravensburger' },
+      { name: 'Uno Card Game', price: 799, category: 'Board Games & Puzzles', brand: 'Mattel' },
+      { name: 'Jenga Classic', price: 1499, category: 'Board Games & Puzzles', brand: 'Hasbro' },
+      { name: 'Kids Scooter 2-Wheel', price: 4999, category: 'Outdoor Play', brand: 'Razor' },
+      { name: 'Sidewalk Chalk (24 ct)', price: 599, category: 'Outdoor Play', brand: 'Crayola' },
+      { name: 'Bubble Machine', price: 1999, category: 'Outdoor Play', brand: 'Little Tikes' },
+      { name: 'STEM Robot Kit', price: 5999, category: 'Educational Toys', brand: 'LEGO Mindstorms' },
+      { name: 'Microscope Kids Set', price: 3999, category: 'Educational Toys', brand: 'National Geographic' },
+      { name: 'LeapFrog Learning Tablet', price: 2499, category: 'Educational Toys', brand: 'LeapFrog' },
+    ],
+  },
+  
+  automotive: {
+    name: 'Automotive',
+    categories: [
+      { name: 'Motor Oil & Fluids', slug: 'motor-oil-fluids', searchTerm: 'motor oil fluids automotive lubricants' },
+      { name: 'Car Care & Cleaning', slug: 'car-care-cleaning', searchTerm: 'car care cleaning wash wax detail' },
+      { name: 'Interior Accessories', slug: 'interior-accessories', searchTerm: 'car interior accessories mats covers' },
+      { name: 'Exterior Accessories', slug: 'exterior-accessories', searchTerm: 'car exterior accessories lights covers' },
+    ],
+    products: [
+      { name: 'Full Synthetic Motor Oil 5qt', price: 2999, category: 'Motor Oil & Fluids', brand: 'Mobil 1' },
+      { name: 'Conventional Motor Oil 5qt', price: 1999, category: 'Motor Oil & Fluids', brand: 'Pennzoil' },
+      { name: 'Windshield Washer Fluid 1gal', price: 399, category: 'Motor Oil & Fluids', brand: 'Rain-X' },
+      { name: 'Brake Fluid 12oz', price: 799, category: 'Motor Oil & Fluids', brand: 'Prestone' },
+      { name: 'Antifreeze/Coolant 1gal', price: 1499, category: 'Motor Oil & Fluids', brand: 'Prestone' },
+      { name: 'Car Wash Soap 64oz', price: 999, category: 'Car Care & Cleaning', brand: 'Meguiar\'s' },
+      { name: 'Tire Shine Spray 15oz', price: 799, category: 'Car Care & Cleaning', brand: 'Armor All' },
+      { name: 'Interior Cleaner 16oz', price: 699, category: 'Car Care & Cleaning', brand: 'Chemical Guys' },
+      { name: 'Microfiber Towels (24 pk)', price: 1499, category: 'Car Care & Cleaning', brand: 'Kirkland' },
+      { name: 'Car Wax Paste 11oz', price: 1299, category: 'Car Care & Cleaning', brand: 'Turtle Wax' },
+      { name: 'Floor Mats All-Weather (4pc)', price: 3999, category: 'Interior Accessories', brand: 'WeatherTech' },
+      { name: 'Seat Covers Universal (2pc)', price: 2999, category: 'Interior Accessories', brand: 'FH Group' },
+      { name: 'Phone Mount Dashboard', price: 1999, category: 'Interior Accessories', brand: 'iOttie' },
+      { name: 'Air Freshener 3-Pack', price: 599, category: 'Interior Accessories', brand: 'Little Trees' },
+      { name: 'Dash Cam 1080p', price: 4999, category: 'Exterior Accessories', brand: 'Garmin' },
+      { name: 'License Plate Frame (2pk)', price: 1299, category: 'Exterior Accessories', brand: 'Motorup' },
+    ],
+  },
+  
+  books_media: {
+    name: 'Books & Media',
+    categories: [
+      { name: 'Fiction', slug: 'fiction', searchTerm: 'fiction novels bestsellers literature' },
+      { name: 'Non-Fiction', slug: 'non-fiction', searchTerm: 'non-fiction biography history self-help' },
+      { name: 'Children\'s Books', slug: 'childrens-books', searchTerm: 'children books kids picture books' },
+      { name: 'Magazines & Periodicals', slug: 'magazines', searchTerm: 'magazines periodicals subscriptions' },
+      { name: 'Music & Movies', slug: 'music-movies', searchTerm: 'music cds vinyl movies dvd blu-ray' },
+    ],
+    products: [
+      { name: 'Bestseller Thriller Novel', price: 1699, category: 'Fiction', brand: 'Random House' },
+      { name: 'Romance Paperback', price: 999, category: 'Fiction', brand: 'Harlequin' },
+      { name: 'Science Fiction Hardcover', price: 2799, category: 'Fiction', brand: 'Tor Books' },
+      { name: 'Mystery Novel', price: 1599, category: 'Fiction', brand: 'Penguin' },
+      { name: 'Self-Help Bestseller', price: 1899, category: 'Non-Fiction', brand: 'Simon & Schuster' },
+      { name: 'Biography Hardcover', price: 2999, category: 'Non-Fiction', brand: 'Little, Brown' },
+      { name: 'Cookbook Illustrated', price: 3499, category: 'Non-Fiction', brand: 'America\'s Test Kitchen' },
+      { name: 'History Book', price: 2199, category: 'Non-Fiction', brand: 'Oxford Press' },
+      { name: 'Picture Book Ages 3-5', price: 899, category: 'Children\'s Books', brand: 'Scholastic' },
+      { name: 'Chapter Book Ages 6-9', price: 799, category: 'Children\'s Books', brand: 'Scholastic' },
+      { name: 'Activity Book with Stickers', price: 1099, category: 'Children\'s Books', brand: 'Melissa & Doug' },
+      { name: 'Dr. Seuss Collection', price: 1499, category: 'Children\'s Books', brand: 'Random House' },
+      { name: 'Monthly Magazine Subscription', price: 599, category: 'Magazines & Periodicals', brand: 'Time' },
+      { name: 'Weekly News Magazine', price: 699, category: 'Magazines & Periodicals', brand: 'The Economist' },
+      { name: 'Vinyl Record Classic Album', price: 2999, category: 'Music & Movies', brand: 'Various' },
+      { name: 'Blu-ray Movie New Release', price: 2499, category: 'Music & Movies', brand: 'Universal' },
+      { name: 'DVD Box Set TV Series', price: 3999, category: 'Music & Movies', brand: 'Warner Bros' },
+    ],
+  },
+  
+  pet_supplies: {
+    name: 'Pet Supplies',
+    categories: [
+      { name: 'Dog Food & Treats', slug: 'dog-food-treats', searchTerm: 'dog food treats kibble' },
+      { name: 'Cat Food & Treats', slug: 'cat-food-treats', searchTerm: 'cat food treats wet dry' },
+      { name: 'Pet Toys', slug: 'pet-toys', searchTerm: 'pet toys dog cat interactive' },
+      { name: 'Pet Care & Grooming', slug: 'pet-care-grooming', searchTerm: 'pet grooming shampoo brushes' },
+    ],
+    products: [
+      { name: 'Dry Dog Food 30lb', price: 4999, category: 'Dog Food & Treats', brand: 'Blue Buffalo' },
+      { name: 'Wet Dog Food (12 cans)', price: 2499, category: 'Dog Food & Treats', brand: 'Pedigree' },
+      { name: 'Dog Treats Training (16oz)', price: 999, category: 'Dog Food & Treats', brand: 'Milk-Bone' },
+      { name: 'Dental Chews (30 ct)', price: 2499, category: 'Dog Food & Treats', brand: 'Greenies' },
+      { name: 'Dry Cat Food 16lb', price: 3499, category: 'Cat Food & Treats', brand: 'Purina ONE' },
+      { name: 'Wet Cat Food (24 cans)', price: 1999, category: 'Cat Food & Treats', brand: 'Fancy Feast' },
+      { name: 'Cat Treats Crunchy (16oz)', price: 699, category: 'Cat Food & Treats', brand: 'Temptations' },
+      { name: 'Catnip Organic 1oz', price: 499, category: 'Cat Food & Treats', brand: 'SmartyKat' },
+      { name: 'Dog Chew Toy Durable', price: 1299, category: 'Pet Toys', brand: 'KONG' },
+      { name: 'Dog Ball Launcher', price: 1999, category: 'Pet Toys', brand: 'Chuckit!' },
+      { name: 'Cat Feather Wand', price: 799, category: 'Pet Toys', brand: 'SmartyKat' },
+      { name: 'Cat Scratching Post 32"', price: 2999, category: 'Pet Toys', brand: 'Amazon Basics' },
+      { name: 'Pet Shampoo 16oz', price: 899, category: 'Pet Care & Grooming', brand: 'Burt\'s Bees' },
+      { name: 'Dog Brush Deshedding', price: 1999, category: 'Pet Care & Grooming', brand: 'FURminator' },
+      { name: 'Pet Nail Clippers', price: 999, category: 'Pet Care & Grooming', brand: 'Safari' },
+      { name: 'Cat Litter 40lb', price: 1999, category: 'Pet Care & Grooming', brand: 'Tidy Cats' },
+    ],
+  },
+  
+  office_supplies: {
+    name: 'Office Supplies',
+    categories: [
+      { name: 'Writing Instruments', slug: 'writing-instruments', searchTerm: 'pens pencils markers highlighters' },
+      { name: 'Paper Products', slug: 'paper-products', searchTerm: 'paper notebooks copy paper notepads' },
+      { name: 'Filing & Organization', slug: 'filing-organization', searchTerm: 'folders binders filing organization' },
+      { name: 'Desk Accessories', slug: 'desk-accessories', searchTerm: 'desk accessories organizers staplers' },
+      { name: 'Mailing & Shipping', slug: 'mailing-shipping', searchTerm: 'mailing shipping envelopes boxes tape' },
+    ],
+    products: [
+      { name: 'Ballpoint Pens (12 pk)', price: 599, category: 'Writing Instruments', brand: 'Bic' },
+      { name: 'Gel Pens Assorted (8 pk)', price: 899, category: 'Writing Instruments', brand: 'Pilot G2' },
+      { name: 'Mechanical Pencils (10 pk)', price: 799, category: 'Writing Instruments', brand: 'Pentel' },
+      { name: 'Highlighters (6 pk)', price: 599, category: 'Writing Instruments', brand: 'Sharpie' },
+      { name: 'Permanent Markers (12 pk)', price: 999, category: 'Writing Instruments', brand: 'Sharpie' },
+      { name: 'Copy Paper 500 Sheets', price: 799, category: 'Paper Products', brand: 'HP' },
+      { name: 'Legal Pads (12 pk)', price: 1499, category: 'Paper Products', brand: 'TOPS' },
+      { name: 'Spiral Notebook 5-Subject', price: 599, category: 'Paper Products', brand: 'Five Star' },
+      { name: 'Sticky Notes 3x3 (12 pk)', price: 999, category: 'Paper Products', brand: 'Post-it' },
+      { name: 'Index Cards 3x5 (500 ct)', price: 599, category: 'Paper Products', brand: 'Oxford' },
+      { name: 'Manila Folders (100 ct)', price: 1299, category: 'Filing & Organization', brand: 'Pendaflex' },
+      { name: '3-Ring Binder 2" (4 pk)', price: 1999, category: 'Filing & Organization', brand: 'Avery' },
+      { name: 'Sheet Protectors (100 ct)', price: 999, category: 'Filing & Organization', brand: 'Avery' },
+      { name: 'File Cabinet 2-Drawer', price: 8999, category: 'Filing & Organization', brand: 'HON' },
+      { name: 'Desktop Stapler', price: 1299, category: 'Desk Accessories', brand: 'Swingline' },
+      { name: 'Tape Dispenser with Tape', price: 799, category: 'Desk Accessories', brand: 'Scotch' },
+      { name: 'Desk Organizer Mesh', price: 1999, category: 'Desk Accessories', brand: 'Rolodex' },
+      { name: 'Paper Clips (1000 ct)', price: 499, category: 'Desk Accessories', brand: 'ACCO' },
+      { name: 'Shipping Boxes 12x12x12 (25pk)', price: 2999, category: 'Mailing & Shipping', brand: 'Uline' },
+      { name: 'Packing Tape 6-Roll', price: 1499, category: 'Mailing & Shipping', brand: 'Scotch' },
+      { name: 'Bubble Mailers (25 pk)', price: 1999, category: 'Mailing & Shipping', brand: 'Poly' },
+    ],
+  },
+  
+  jewelry: {
+    name: 'Jewelry',
+    categories: [
+      { name: 'Necklaces & Pendants', slug: 'necklaces-pendants', searchTerm: 'necklaces pendants chains jewelry' },
+      { name: 'Earrings', slug: 'earrings', searchTerm: 'earrings studs hoops drops jewelry' },
+      { name: 'Bracelets & Bangles', slug: 'bracelets-bangles', searchTerm: 'bracelets bangles cuffs jewelry' },
+      { name: 'Rings', slug: 'rings', searchTerm: 'rings bands statement jewelry' },
+    ],
+    products: [
+      { name: 'Sterling Silver Chain 18"', price: 4999, category: 'Necklaces & Pendants', brand: 'Pandora' },
+      { name: 'Gold Plated Pendant', price: 3999, category: 'Necklaces & Pendants', brand: 'Kate Spade' },
+      { name: 'Pearl Necklace Classic', price: 7999, category: 'Necklaces & Pendants', brand: 'Mikimoto' },
+      { name: 'Layered Chain Set (3pc)', price: 2999, category: 'Necklaces & Pendants', brand: 'BaubleBar' },
+      { name: 'Diamond Stud Earrings', price: 19999, category: 'Earrings', brand: 'Blue Nile' },
+      { name: 'Gold Hoop Earrings', price: 4999, category: 'Earrings', brand: 'Mejuri' },
+      { name: 'Pearl Drop Earrings', price: 5999, category: 'Earrings', brand: 'Swarovski' },
+      { name: 'Crystal Stud Set (6 pair)', price: 1999, category: 'Earrings', brand: 'Claire\'s' },
+      { name: 'Tennis Bracelet Silver', price: 8999, category: 'Bracelets & Bangles', brand: 'Pandora' },
+      { name: 'Charm Bracelet Starter', price: 6999, category: 'Bracelets & Bangles', brand: 'Pandora' },
+      { name: 'Bangle Set Gold (5pc)', price: 3999, category: 'Bracelets & Bangles', brand: 'Alex and Ani' },
+      { name: 'Leather Wrap Bracelet', price: 2499, category: 'Bracelets & Bangles', brand: 'Chan Luu' },
+      { name: 'Engagement Ring Solitaire', price: 99999, category: 'Rings', brand: 'Tiffany & Co.' },
+      { name: 'Stackable Rings Set (3pc)', price: 4999, category: 'Rings', brand: 'Kendra Scott' },
+      { name: 'Statement Cocktail Ring', price: 5999, category: 'Rings', brand: 'Swarovski' },
+      { name: 'Men\'s Wedding Band Titanium', price: 14999, category: 'Rings', brand: 'Blue Nile' },
+    ],
+  },
+  
+  baby_kids: {
+    name: 'Baby & Kids',
+    categories: [
+      { name: 'Baby Gear', slug: 'baby-gear', searchTerm: 'baby gear strollers car seats carriers' },
+      { name: 'Nursery', slug: 'nursery', searchTerm: 'nursery cribs bedding decor' },
+      { name: 'Baby Feeding', slug: 'baby-feeding', searchTerm: 'baby feeding bottles formula high chairs' },
+      { name: 'Kids Clothing', slug: 'kids-clothing', searchTerm: 'kids clothing children apparel' },
+      { name: 'Baby Toys', slug: 'baby-toys', searchTerm: 'baby toys infant rattles teethers' },
+    ],
+    products: [
+      { name: 'Convertible Car Seat', price: 24999, category: 'Baby Gear', brand: 'Graco' },
+      { name: 'Lightweight Stroller', price: 14999, category: 'Baby Gear', brand: 'Chicco' },
+      { name: 'Baby Carrier Ergonomic', price: 12999, category: 'Baby Gear', brand: 'Ergobaby' },
+      { name: 'Pack N Play Playard', price: 9999, category: 'Baby Gear', brand: 'Graco' },
+      { name: 'Convertible Crib 4-in-1', price: 29999, category: 'Nursery', brand: 'Delta Children' },
+      { name: 'Crib Mattress Waterproof', price: 8999, category: 'Nursery', brand: 'Newton' },
+      { name: 'Crib Bedding Set (4pc)', price: 4999, category: 'Nursery', brand: 'Lambs & Ivy' },
+      { name: 'Baby Monitor Video', price: 14999, category: 'Nursery', brand: 'Infant Optics' },
+      { name: 'Baby Bottles (6 pk)', price: 2499, category: 'Baby Feeding', brand: 'Dr. Brown\'s' },
+      { name: 'High Chair Convertible', price: 12999, category: 'Baby Feeding', brand: 'Graco' },
+      { name: 'Sippy Cups (4 pk)', price: 1499, category: 'Baby Feeding', brand: 'Munchkin' },
+      { name: 'Baby Food Maker', price: 9999, category: 'Baby Feeding', brand: 'Baby Brezza' },
+      { name: 'Toddler T-Shirt (3 pk)', price: 1999, category: 'Kids Clothing', brand: 'Carter\'s' },
+      { name: 'Kids Jeans', price: 2499, category: 'Kids Clothing', brand: 'OshKosh B\'gosh' },
+      { name: 'Baby Onesies (5 pk)', price: 1499, category: 'Kids Clothing', brand: 'Gerber' },
+      { name: 'Teething Toys Set', price: 1299, category: 'Baby Toys', brand: 'Sophie la Girafe' },
+      { name: 'Baby Rattle Set (4pc)', price: 999, category: 'Baby Toys', brand: 'Fisher-Price' },
+      { name: 'Activity Gym Play Mat', price: 4999, category: 'Baby Toys', brand: 'Skip Hop' },
+    ],
+  },
+  
+  arts_crafts: {
+    name: 'Arts & Crafts',
+    categories: [
+      { name: 'Drawing & Painting', slug: 'drawing-painting', searchTerm: 'drawing painting art supplies canvas' },
+      { name: 'Craft Supplies', slug: 'craft-supplies', searchTerm: 'craft supplies glue scissors paper' },
+      { name: 'Sewing & Fabric', slug: 'sewing-fabric', searchTerm: 'sewing fabric yarn needles' },
+      { name: 'Kids Crafts', slug: 'kids-crafts', searchTerm: 'kids crafts art projects children' },
+    ],
+    products: [
+      { name: 'Acrylic Paint Set (24 colors)', price: 1999, category: 'Drawing & Painting', brand: 'Liquitex' },
+      { name: 'Canvas Panels 8x10 (12 pk)', price: 1499, category: 'Drawing & Painting', brand: 'Arteza' },
+      { name: 'Colored Pencils (72 ct)', price: 2499, category: 'Drawing & Painting', brand: 'Prismacolor' },
+      { name: 'Watercolor Set (36 colors)', price: 2999, category: 'Drawing & Painting', brand: 'Winsor & Newton' },
+      { name: 'Paint Brush Set (15pc)', price: 1299, category: 'Drawing & Painting', brand: 'Royal & Langnickel' },
+      { name: 'Sketch Pad 9x12 (100 sheets)', price: 999, category: 'Drawing & Painting', brand: 'Strathmore' },
+      { name: 'Hot Glue Gun with Sticks', price: 1499, category: 'Craft Supplies', brand: 'Gorilla' },
+      { name: 'Craft Paper Assorted (200 sheets)', price: 999, category: 'Craft Supplies', brand: 'Crayola' },
+      { name: 'Scissors Craft Set (3pc)', price: 899, category: 'Craft Supplies', brand: 'Fiskars' },
+      { name: 'Mod Podge 16oz', price: 799, category: 'Craft Supplies', brand: 'Mod Podge' },
+      { name: 'Yarn Multipack (20 skeins)', price: 2499, category: 'Sewing & Fabric', brand: 'Red Heart' },
+      { name: 'Sewing Kit Complete', price: 1999, category: 'Sewing & Fabric', brand: 'Singer' },
+      { name: 'Fabric Quarters (10 pk)', price: 1499, category: 'Sewing & Fabric', brand: 'Waverly' },
+      { name: 'Crochet Hooks Set', price: 1299, category: 'Sewing & Fabric', brand: 'Clover' },
+      { name: 'Crayons (96 ct)', price: 799, category: 'Kids Crafts', brand: 'Crayola' },
+      { name: 'Play-Doh (10 pk)', price: 999, category: 'Kids Crafts', brand: 'Play-Doh' },
+      { name: 'Craft Kit Assorted', price: 2499, category: 'Kids Crafts', brand: 'Melissa & Doug' },
+      { name: 'Washable Markers (40 ct)', price: 1299, category: 'Kids Crafts', brand: 'Crayola' },
+    ],
+  },
+  
+  hardware_tools: {
+    name: 'Hardware & Tools',
+    categories: [
+      { name: 'Hand Tools', slug: 'hand-tools', searchTerm: 'hand tools hammers screwdrivers wrenches' },
+      { name: 'Power Tools', slug: 'power-tools', searchTerm: 'power tools drills saws sanders' },
+      { name: 'Fasteners & Hardware', slug: 'fasteners-hardware', searchTerm: 'screws nails bolts fasteners' },
+      { name: 'Paint & Supplies', slug: 'paint-supplies', searchTerm: 'paint brushes rollers primer' },
+      { name: 'Electrical', slug: 'electrical', searchTerm: 'electrical outlets switches wire' },
+    ],
+    products: [
+      { name: 'Hammer Claw 16oz', price: 1999, category: 'Hand Tools', brand: 'Stanley' },
+      { name: 'Screwdriver Set (20pc)', price: 2499, category: 'Hand Tools', brand: 'DeWalt' },
+      { name: 'Adjustable Wrench Set (3pc)', price: 2999, category: 'Hand Tools', brand: 'Craftsman' },
+      { name: 'Tape Measure 25ft', price: 1299, category: 'Hand Tools', brand: 'Stanley' },
+      { name: 'Pliers Set (5pc)', price: 3499, category: 'Hand Tools', brand: 'Klein Tools' },
+      { name: 'Level 24"', price: 1999, category: 'Hand Tools', brand: 'Empire' },
+      { name: 'Cordless Drill 20V', price: 9999, category: 'Power Tools', brand: 'DeWalt' },
+      { name: 'Circular Saw 7-1/4"', price: 12999, category: 'Power Tools', brand: 'Milwaukee' },
+      { name: 'Orbital Sander', price: 5999, category: 'Power Tools', brand: 'Makita' },
+      { name: 'Jigsaw Variable Speed', price: 7999, category: 'Power Tools', brand: 'Bosch' },
+      { name: 'Wood Screws Assorted (500pc)', price: 1999, category: 'Fasteners & Hardware', brand: 'Hillman' },
+      { name: 'Nails Finishing (1lb)', price: 799, category: 'Fasteners & Hardware', brand: 'Grip-Rite' },
+      { name: 'Anchor Kit Wall (100pc)', price: 1499, category: 'Fasteners & Hardware', brand: 'Toggler' },
+      { name: 'Interior Paint 1 Gallon', price: 3999, category: 'Paint & Supplies', brand: 'Behr' },
+      { name: 'Paint Roller Kit (9pc)', price: 1999, category: 'Paint & Supplies', brand: 'Purdy' },
+      { name: 'Painter\'s Tape 1.88" x 60yd', price: 799, category: 'Paint & Supplies', brand: 'ScotchBlue' },
+      { name: 'LED Light Bulbs (8 pk)', price: 1999, category: 'Electrical', brand: 'GE' },
+      { name: 'Extension Cord 50ft', price: 2499, category: 'Electrical', brand: 'Woods' },
+      { name: 'Outlet Covers (10 pk)', price: 599, category: 'Electrical', brand: 'Leviton' },
+    ],
+  },
+  
+  furniture: {
+    name: 'Furniture',
+    categories: [
+      { name: 'Living Room', slug: 'living-room', searchTerm: 'living room sofa couch coffee table' },
+      { name: 'Bedroom', slug: 'bedroom', searchTerm: 'bedroom bed frame dresser nightstand' },
+      { name: 'Office Furniture', slug: 'office-furniture', searchTerm: 'office desk chair bookshelf' },
+      { name: 'Outdoor Furniture', slug: 'outdoor-furniture', searchTerm: 'outdoor furniture patio chairs table' },
+      { name: 'Storage Furniture', slug: 'storage-furniture', searchTerm: 'storage shelves cabinets organizers' },
+    ],
+    products: [
+      { name: 'Sofa 3-Seater Gray', price: 59999, category: 'Living Room', brand: 'IKEA' },
+      { name: 'Coffee Table Wood', price: 19999, category: 'Living Room', brand: 'West Elm' },
+      { name: 'TV Stand 65"', price: 24999, category: 'Living Room', brand: 'Walker Edison' },
+      { name: 'Accent Chair Velvet', price: 29999, category: 'Living Room', brand: 'Wayfair' },
+      { name: 'Area Rug 8x10', price: 19999, category: 'Living Room', brand: 'Safavieh' },
+      { name: 'Queen Bed Frame Wood', price: 39999, category: 'Bedroom', brand: 'Zinus' },
+      { name: 'Dresser 6-Drawer', price: 34999, category: 'Bedroom', brand: 'IKEA' },
+      { name: 'Nightstand with Drawer', price: 12999, category: 'Bedroom', brand: 'Target' },
+      { name: 'Mattress Queen Memory Foam', price: 49999, category: 'Bedroom', brand: 'Casper' },
+      { name: 'Office Desk 48"', price: 19999, category: 'Office Furniture', brand: 'Bush Furniture' },
+      { name: 'Ergonomic Office Chair', price: 29999, category: 'Office Furniture', brand: 'Herman Miller' },
+      { name: 'Bookshelf 5-Tier', price: 8999, category: 'Office Furniture', brand: 'VASAGLE' },
+      { name: 'Filing Cabinet 3-Drawer', price: 14999, category: 'Office Furniture', brand: 'HON' },
+      { name: 'Patio Dining Set (5pc)', price: 49999, category: 'Outdoor Furniture', brand: 'Hampton Bay' },
+      { name: 'Outdoor Lounge Chair', price: 19999, category: 'Outdoor Furniture', brand: 'Christopher Knight' },
+      { name: 'Patio Umbrella 9ft', price: 7999, category: 'Outdoor Furniture', brand: 'California Umbrella' },
+      { name: 'Cube Storage Organizer (9 cube)', price: 6999, category: 'Storage Furniture', brand: 'ClosetMaid' },
+      { name: 'Shoe Rack 4-Tier', price: 2999, category: 'Storage Furniture', brand: 'Simple Houseware' },
+    ],
+  },
+  
+  restaurant: {
+    name: 'Restaurant',
+    categories: [
+      { name: 'Appetizers', slug: 'appetizers', searchTerm: 'appetizers starters small plates' },
+      { name: 'Main Courses', slug: 'main-courses', searchTerm: 'entrees main courses dinner' },
+      { name: 'Sides', slug: 'sides', searchTerm: 'side dishes accompaniments' },
+      { name: 'Beverages', slug: 'beverages', searchTerm: 'drinks beverages cocktails' },
+    ],
+    products: [
+      { name: 'Mozzarella Sticks (6pc)', price: 899, category: 'Appetizers', brand: 'House Made' },
+      { name: 'Buffalo Wings (10pc)', price: 1299, category: 'Appetizers', brand: 'House Made' },
+      { name: 'Loaded Nachos', price: 1099, category: 'Appetizers', brand: 'House Made' },
+      { name: 'Soup of the Day (Bowl)', price: 599, category: 'Appetizers', brand: 'House Made' },
+      { name: 'Caesar Salad', price: 899, category: 'Appetizers', brand: 'House Made' },
+      { name: 'Grilled Chicken Breast', price: 1599, category: 'Main Courses', brand: 'House Made' },
+      { name: 'NY Strip Steak 12oz', price: 2999, category: 'Main Courses', brand: 'House Made' },
+      { name: 'Grilled Salmon', price: 2199, category: 'Main Courses', brand: 'House Made' },
+      { name: 'Pasta Primavera', price: 1499, category: 'Main Courses', brand: 'House Made' },
+      { name: 'Classic Cheeseburger', price: 1399, category: 'Main Courses', brand: 'House Made' },
+      { name: 'Fish & Chips', price: 1699, category: 'Main Courses', brand: 'House Made' },
+      { name: 'French Fries', price: 499, category: 'Sides', brand: 'House Made' },
+      { name: 'Mashed Potatoes', price: 499, category: 'Sides', brand: 'House Made' },
+      { name: 'Seasonal Vegetables', price: 549, category: 'Sides', brand: 'House Made' },
+      { name: 'Coleslaw', price: 399, category: 'Sides', brand: 'House Made' },
+      { name: 'Soft Drink', price: 299, category: 'Beverages', brand: 'Coca-Cola' },
+      { name: 'Iced Tea', price: 299, category: 'Beverages', brand: 'House Made' },
+      { name: 'Coffee', price: 299, category: 'Beverages', brand: 'House Made' },
+      { name: 'Draft Beer', price: 599, category: 'Beverages', brand: 'Local Brewery' },
+      { name: 'House Wine (Glass)', price: 799, category: 'Beverages', brand: 'House Selection' },
+    ],
+  },
 };
 
 export type QuickStartScenario = keyof typeof SCENARIOS;
@@ -192,6 +668,8 @@ export interface QuickStartOptions {
   createAsDrafts?: boolean;
   generateImages?: boolean; // NEW: Generate AI images for products
   imageQuality?: 'standard' | 'hd'; // NEW: Image quality
+  textModel?: 'openai' | 'google'; // NEW: AI model for text/product generation
+  imageModel?: 'openai' | 'google'; // NEW: AI model for image generation
 }
 
 export interface QuickStartResult {
@@ -217,6 +695,8 @@ export async function generateQuickStartProducts(
     createAsDrafts = true,
     generateImages = false,
     imageQuality = 'standard',
+    textModel = 'openai',
+    imageModel = 'openai',
   } = options;
 
   // Validate tenant exists
@@ -295,6 +775,7 @@ export async function generateQuickStartProducts(
           googleCategoryId: category.id,
           count: productsPerCategory,
           requireImages: generateImages, // NEW: Request products with images if photos enabled
+          textModel, // NEW: Pass user-selected AI model for text generation
         });
         
         // Convert to quick-start format and assign category
@@ -406,6 +887,9 @@ export async function generateQuickStartProducts(
           directory_category_id: selectedCat.id,
           category_path: [selectedCat.slug],
         };
+        console.log(`[Quick Start] Assigning category to "${product.name}": ${selectedCat.name} (ID: ${selectedCat.id})${matchingCat ? '' : ' [random fallback]'}`);
+      } else {
+        console.log(`[Quick Start] Category assignment skipped for "${product.name}": assignCategories=${assignCategories}, categories.length=${categories.length}`);
       }
 
       // Determine item status (map "draft" semantics to inactive in new enum)
@@ -490,12 +974,18 @@ export async function generateQuickStartProducts(
             // Auto-set availability based on stock if not explicitly provided
             availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
             tenant_id: parsed.data.tenant_id || '', // Ensure tenant_id is always a string
-            // Handle both category_path and category_path (from transform middleware)
-            category_path: parsed.data.category_path || parsed.data.category_path || [],
+            // Category assignment - CRITICAL: preserve directory_category_id from parsed data
+            directory_category_id: parsed.data.directory_category_id || null,
+            category_path: parsed.data.category_path || [],
           };
           
-          // Remove any conflicting fields that might be added by the middleware
-          const { category_path, ...cleanData } = data;
+          // Log category assignment for debugging
+          if (data.directory_category_id) {
+            console.log(`[Quick Start] Creating item "${data.name}" with category ID: ${data.directory_category_id}, category_path: ${JSON.stringify(data.category_path)}`);
+          }
+          
+          // Keep category_path for storefront filtering (it uses category_path array, not directory_category_id)
+          const cleanData = data;
           
           const created = await prismaClient.inventory_items.create({ 
             data: {
@@ -554,7 +1044,7 @@ export async function generateQuickStartProducts(
                 item.name,
                 item.tenant_id,
                 item.id,
-                'openai', // Use DALL-E for now
+                imageModel, // Use selected AI model
                 imageQuality
               );
               
@@ -616,6 +1106,17 @@ export async function generateQuickStartProducts(
   
   if (skippedCount > 0) {
     console.log(`[Quick Start] Skipped ${skippedCount} duplicate products`);
+  }
+
+  // Refresh materialized view for storefront to show new products/categories
+  try {
+    console.log(`[Quick Start] Refreshing storefront materialized view...`);
+    const { getDirectPool } = await import('../utils/db-pool');
+    const pool = getDirectPool();
+    await pool.query('REFRESH MATERIALIZED VIEW storefront_category_counts');
+    console.log(`[Quick Start] ✓ Storefront materialized view refreshed`);
+  } catch (mvError: any) {
+    console.warn(`[Quick Start] Failed to refresh materialized view (non-critical):`, mvError.message);
   }
 
   // Get final counts

@@ -113,13 +113,14 @@ export default function GBPCategoryBadges({
 
   return (
     <div className={`flex flex-wrap ${sizeClasses.container} ${className}`}>
-      {sortedCategories.map((category) => {
+      {sortedCategories.map((category, index) => {
         const icon = CATEGORY_ICONS[category.name] || '🏢';
         const count = categoryCounts[category.slug];
+        const key = category.id || `${category.slug}-${index}`;
 
         return (
           <Link
-            key={category.id}
+            key={key}
             href={`${basePath}/${category.slug}`}
             className={`inline-flex items-center gap-1.5 ${sizeClasses.badge} rounded-full font-medium transition-colors hover:opacity-80 ${
               category.isPrimary

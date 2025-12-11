@@ -41,6 +41,7 @@ export class AIProviderService {
   private geminiCallCount: number = 0;
   private readonly GEMINI_RATE_LIMIT = 10; // Max calls per minute (conservative)
   private readonly GEMINI_RETRY_DELAY = 2000; // 2 seconds between calls
+  private readonly GEMINI_MAX_RETRIES = 2; // Max retries on rate limit
 
   constructor() {
     // Initialize OpenAI
@@ -96,33 +97,38 @@ export class AIProviderService {
 
   /**
    * Generate product data with configured provider
+   * @param providerOverride - Optional provider override from user selection
    */
   async generateProducts(
     businessType: string,
     categoryName: string,
-    count: number
+    count: number,
+    providerOverride?: 'openai' | 'google'
   ): Promise<GeneratedProductData[]> {
     const config = await this.getConfig();
     
-    console.log(`[AI] Generating ${count} products with ${config.textProvider}`);
+    // Use override if provided, otherwise use config
+    const provider = providerOverride || config.textProvider;
+    
+    console.log(`[AI] Generating ${count} products with ${provider}${providerOverride ? ' (user selected)' : ''}`);
     
     try {
-      if (config.textProvider === 'google' && this.gemini) {
+      if (provider === 'google' && this.gemini) {
         return await this.generateWithGemini(businessType, categoryName, count);
       } else if (this.openai) {
         return await this.generateWithOpenAI(businessType, categoryName, count);
       }
       throw new Error('No AI provider available');
     } catch (error: any) {
-      console.error(`[AI] ${config.textProvider} failed:`, error.message);
+      console.error(`[AI] ${provider} failed:`, error.message);
       
       // Try fallback if enabled
       if (config.fallbackEnabled) {
         console.log('[AI] Attempting fallback provider...');
         try {
-          if (config.textProvider === 'google' && this.openai) {
+          if (provider === 'google' && this.openai) {
             return await this.generateWithOpenAI(businessType, categoryName, count);
-          } else if (config.textProvider === 'openai' && this.gemini) {
+          } else if (provider === 'openai' && this.gemini) {
             return await this.generateWithGemini(businessType, categoryName, count);
           }
         } catch (fallbackError: any) {
@@ -165,12 +171,13 @@ export class AIProviderService {
   }
 
   /**
-   * Generate products with Google Gemini 2.0 Flash
+   * Generate products with Google Gemini 2.0 Flash (with retry on rate limit)
    */
   private async generateWithGemini(
     businessType: string,
     categoryName: string,
-    count: number
+    count: number,
+    retryCount: number = 0
   ): Promise<GeneratedProductData[]> {
     if (!this.gemini) throw new Error('Gemini not initialized');
     
@@ -209,26 +216,43 @@ Requirements:
 
 Return ONLY a JSON object with a "products" array. No markdown, no code blocks, just pure JSON.`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    
-    // Parse JSON from response (Gemini sometimes wraps in markdown)
-    let jsonText = text.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```\n?/g, '');
+    try {
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      // Parse JSON from response (Gemini sometimes wraps in markdown)
+      let jsonText = text.trim();
+      if (jsonText.startsWith('```json')) {
+        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+      } else if (jsonText.startsWith('```')) {
+        jsonText = jsonText.replace(/```\n?/g, '');
+      }
+      
+      const data = JSON.parse(jsonText);
+      const products = data.products || [];
+      
+      console.log(`[AI] Gemini generated ${products.length} products`);
+      
+      return products
+        .filter((p: any) => this.validateProduct(p))
+        .slice(0, count);
+    } catch (error: any) {
+      // Check for rate limit error (429)
+      if (error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('quota')) {
+        // Extract retry delay from error message if available, add 5s buffer
+        const retryMatch = error.message.match(/retry in ([\d.]+)s/i) || error.message.match(/retryDelay":"(\d+)s"/i);
+        const baseDelay = retryMatch ? Math.ceil(parseFloat(retryMatch[1]) * 1000) : 35000; // Default 35s
+        const retryDelay = baseDelay + 5000; // Add 5s buffer to avoid hitting limit again
+        
+        if (retryCount < this.GEMINI_MAX_RETRIES) {
+          console.log(`[AI] Gemini rate limited. Waiting ${Math.ceil(retryDelay / 1000)}s before retry ${retryCount + 1}/${this.GEMINI_MAX_RETRIES}...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return this.generateWithGemini(businessType, categoryName, count, retryCount + 1);
+        }
+      }
+      throw error;
     }
-    
-    const data = JSON.parse(jsonText);
-    const products = data.products || [];
-    
-    console.log(`[AI] Gemini generated ${products.length} products`);
-    
-    return products
-      .filter((p: any) => this.validateProduct(p))
-      .slice(0, count);
   }
 
   /**

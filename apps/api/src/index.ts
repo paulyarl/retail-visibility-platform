@@ -2852,12 +2852,33 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     // Hide price_cents from frontend since price is the authoritative field
     // Map directory_category_id to tenantCategoryId and include category object
     // Map image_url to imageUrl for frontend compatibility
+    
+    // Also fetch categories by directory_category_id for items that have it set
+    const directCategoryIds = [...new Set(items.map(item => item.directory_category_id).filter((id): id is string => !!id))];
+    const directCategories = directCategoryIds.length > 0
+      ? await prisma.directory_category.findMany({
+          where: { 
+            id: { in: directCategoryIds },
+            tenantId: tenant_id
+          },
+          select: { id: true, name: true, slug: true, googleCategoryId: true }
+        })
+      : [];
+    
+    // Create a category lookup map by ID
+    const categoryByIdMap = new Map(directCategories.map(cat => [cat.id, cat]));
+    
     const itemsWithoutPriceCents = items.map((item: { [x: string]: any; price?: any; price_cents?: any; directory_category_id?: any; image_url?: any; category_path?: any; }) => {
       const { price_cents, directory_category_id, image_url, ...itemWithoutPriceCents } = item;
       
-      // Find tenant category from category_path (prefer the first one)
+      // Find tenant category - prefer directory_category_id, fallback to category_path
       let tenantCategory = null;
-      if (item.category_path && item.category_path.length > 0) {
+      if (directory_category_id) {
+        // Direct category ID lookup (from Quick Start or manual assignment)
+        tenantCategory = categoryByIdMap.get(directory_category_id) || null;
+      }
+      if (!tenantCategory && item.category_path && item.category_path.length > 0) {
+        // Fallback to category_path lookup (legacy method)
         tenantCategory = categoryMap.get(item.category_path[0]) || null;
       }
       
@@ -2867,6 +2888,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         tenantCategoryId: tenantCategory ? tenantCategory.id : null,
         tenantCategory: tenantCategory || null,
         imageUrl: image_url || null, // Map image_url to imageUrl for frontend
+        categoryPath: item.category_path || [], // Also include category_path for completeness
       };
     });
 
@@ -3034,16 +3056,15 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       // Auto-set availability based on stock if not explicitly provided
       availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
       tenant_id: parsed.data.tenant_id || '', // Ensure tenant_id is always a string
-      // Handle both category_path and category_path (from transform middleware)
-      category_path: parsed.data.category_path || parsed.data.category_path || [],
+      // Category assignment - keep both directory_category_id and category_path for storefront compatibility
+      directory_category_id: parsed.data.directory_category_id || null,
+      category_path: parsed.data.category_path || [],
     };
     
-    // Remove any conflicting fields that might be added by the middleware
-    const { category_path, ...cleanData } = data;
     const created = await prisma.inventory_items.create({ 
       data: {
         id: generateItemId(),
-        ...cleanData,
+        ...data,
         updated_at: new Date(),
       }
     });
@@ -3109,9 +3130,27 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       } catch (error) {
         console.error('[PUT /items/:id] Error fetching category for tenantCategoryId:', tenantCategoryId, error);
       }
-    } else if (directory_category_id !== undefined) {
+    } else if (directory_category_id !== undefined && directory_category_id !== null) {
       updateData.directory_category_id = directory_category_id;
       console.log('[PUT /items/:id] Setting directory_category_id from directory_category_id:', directory_category_id);
+      
+      // Also update category_path for storefront compatibility
+      try {
+        const category = await prisma.directory_category.findFirst({
+          where: { 
+            id: directory_category_id,
+            isActive: true
+          },
+          select: { slug: true }
+        });
+        
+        if (category) {
+          updateData.category_path = [category.slug];
+          console.log('[PUT /items/:id] Setting category_path from category slug:', category.slug);
+        }
+      } catch (error) {
+        console.error('[PUT /items/:id] Error fetching category for directory_category_id:', directory_category_id, error);
+      }
     }
     
     // Handle stock updates

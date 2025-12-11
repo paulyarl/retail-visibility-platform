@@ -375,6 +375,7 @@ router.get('/:identifier', async (req: Request, res: Response) => {
     const row = result.rows[0];
 
     // Get Product Categories with counts from storefront_category_counts MV
+    // These are PRODUCT categories (what products are in), NOT store type categories
     const categoriesQuery = `
       SELECT 
         category_id as id,
@@ -392,7 +393,7 @@ router.get('/:identifier', async (req: Request, res: Response) => {
       ORDER BY category_level ASC, category_name ASC
     `;
     const categoriesResult = await getDirectPool().query(categoriesQuery, [row.tenant_id]);
-    const categories = categoriesResult.rows.map((cat: any) => ({
+    const productCategories = categoriesResult.rows.map((cat: any) => ({
       id: cat.id,
       name: cat.name,
       slug: cat.slug,
@@ -404,10 +405,35 @@ router.get('/:identifier', async (req: Request, res: Response) => {
       maxPriceCents: cat.max_price_cents,
     }));
 
+    // Build store type categories from primary_category and secondary_categories
+    // These are the GBP/store type categories (max 10: 1 primary + 9 secondary)
+    const storeCategories: any[] = [];
+    if (row.primary_category) {
+      const slug = row.primary_category.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-');
+      storeCategories.push({
+        id: `store-cat-${slug}`,
+        name: row.primary_category,
+        slug,
+        isPrimary: true
+      });
+    }
+    if (row.secondary_categories && Array.isArray(row.secondary_categories)) {
+      row.secondary_categories.forEach((catName: string, index: number) => {
+        const slug = catName.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-');
+        storeCategories.push({
+          id: `store-cat-${slug}-${index}`,
+          name: catName,
+          slug,
+          isPrimary: false
+        });
+      });
+    }
+
     return res.json({
       listing: {
         ...row,
-        categories, // Platform Directory Categories from MV
+        categories: storeCategories, // Store type categories (GBP categories, max 10)
+        productCategories, // Product categories from MV (what products are categorized under)
       }
     });
   } catch (error) {

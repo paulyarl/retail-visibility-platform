@@ -14,6 +14,14 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import { generateItemId } from '../lib/id-generator';
 
+// Import the new Google GenAI for Imagen 3
+let GoogleGenAI: any = null;
+try {
+  GoogleGenAI = require('@google/genai').GoogleGenAI;
+} catch (e) {
+  console.warn('[AIImage] @google/genai not available, Imagen 3 will be disabled');
+}
+
 export interface GeneratedImage {
   url: string;
   thumbnailUrl: string;
@@ -26,7 +34,12 @@ export interface GeneratedImage {
 export class AIImageService {
   private openai: any;
   private gemini: GoogleGenerativeAI | null;
+  private genai: any; // For Imagen 3
   private supabase: any;
+  
+  // Rate limit handling for Imagen
+  private readonly IMAGEN_MAX_RETRIES = 2;
+  private readonly IMAGEN_RETRY_BUFFER = 5000; // 5s buffer
 
   constructor() {
     // Initialize OpenAI
@@ -39,7 +52,7 @@ export class AIImageService {
       }
     }
 
-    // Initialize Gemini
+    // Initialize Gemini (for legacy)
     if (process.env.GOOGLE_AI_API_KEY) {
       try {
         this.gemini = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
@@ -49,6 +62,19 @@ export class AIImageService {
       }
     } else {
       this.gemini = null;
+    }
+    
+    // Initialize Google GenAI for Imagen 3
+    if (process.env.GOOGLE_AI_API_KEY && GoogleGenAI) {
+      try {
+        this.genai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY });
+        console.log('[AIImage] Google Imagen 3 initialized');
+      } catch (error) {
+        console.warn('[AIImage] Failed to initialize Google GenAI:', error);
+        this.genai = null;
+      }
+    } else {
+      this.genai = null;
     }
 
     // Initialize Supabase
@@ -78,7 +104,7 @@ export class AIImageService {
       // Step 1: Generate image with AI
       let imageUrl: string;
       
-      if (provider === 'google' && this.gemini) {
+      if (provider === 'google' && this.genai) {
         imageUrl = await this.generateWithImagen(productName, quality);
       } else if (this.openai) {
         imageUrl = await this.generateWithDALLE(productName, quality);
@@ -139,14 +165,61 @@ export class AIImageService {
   }
 
   /**
-   * Generate image with Google Imagen 3
+   * Generate image with Google Imagen 3 (with rate limit retry)
    */
-  private async generateWithImagen(productName: string, quality: 'standard' | 'hd'): Promise<string> {
-    if (!this.gemini) throw new Error('Gemini not initialized');
+  private async generateWithImagen(
+    productName: string, 
+    quality: 'standard' | 'hd',
+    retryCount: number = 0
+  ): Promise<string> {
+    if (!this.genai) throw new Error('Google GenAI not initialized');
     
-    // Note: Imagen 3 API is still in preview, using placeholder approach
-    // When available, this will use the actual Imagen API
-    throw new Error('Imagen 3 API not yet available - falling back to DALL-E');
+    const prompt = `Professional product photography of ${productName}. 
+White background, studio lighting, high quality, e-commerce style, 
+centered composition, sharp focus, product clearly visible, 
+commercial photography, clean and professional.`;
+    
+    console.log(`[AIImage] Generating with Imagen 3...`);
+    
+    try {
+      const response = await this.genai.models.generateImages({
+        model: 'imagen-3.0-generate-002',
+        prompt: prompt,
+        config: {
+          numberOfImages: 1,
+        },
+      });
+      
+      // Get the first generated image
+      const generatedImage = response.generatedImages?.[0];
+      if (!generatedImage?.image?.imageBytes) {
+        throw new Error('No image data in Imagen response');
+      }
+      
+      // Imagen returns base64 image bytes, we need to convert to a data URL
+      // that can be "downloaded" by our existing pipeline
+      const base64Data = generatedImage.image.imageBytes;
+      const dataUrl = `data:image/png;base64,${base64Data}`;
+      
+      console.log(`[AIImage] ✓ Imagen 3 generated image successfully`);
+      return dataUrl;
+      
+    } catch (error: any) {
+      // Check for rate limit error (429)
+      if (error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('quota')) {
+        // Extract retry delay from error message if available, add buffer
+        const retryMatch = error.message.match(/retry in ([\d.]+)s/i) || error.message.match(/retryDelay":"(\d+)s"/i);
+        const baseDelay = retryMatch ? Math.ceil(parseFloat(retryMatch[1]) * 1000) : 35000; // Default 35s
+        const retryDelay = baseDelay + this.IMAGEN_RETRY_BUFFER; // Add 5s buffer
+        
+        if (retryCount < this.IMAGEN_MAX_RETRIES) {
+          console.log(`[AIImage] Imagen rate limited. Waiting ${Math.ceil(retryDelay / 1000)}s before retry ${retryCount + 1}/${this.IMAGEN_MAX_RETRIES}...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return this.generateWithImagen(productName, quality, retryCount + 1);
+        }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -179,9 +252,20 @@ commercial photography, clean and professional.`;
   }
 
   /**
-   * Download image from URL
+   * Download image from URL or decode base64 data URL
    */
   private async downloadImage(url: string): Promise<Buffer> {
+    // Handle base64 data URLs (from Imagen 3)
+    if (url.startsWith('data:')) {
+      console.log('[AIImage] Decoding base64 image data...');
+      const base64Data = url.split(',')[1];
+      if (!base64Data) {
+        throw new Error('Invalid data URL format');
+      }
+      return Buffer.from(base64Data, 'base64');
+    }
+    
+    // Handle regular URLs (from DALL-E)
     console.log('[AIImage] Downloading image...');
     const response = await fetch(url);
     if (!response.ok) {
