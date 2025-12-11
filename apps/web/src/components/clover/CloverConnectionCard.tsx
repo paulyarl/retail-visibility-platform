@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, ExternalLink, Settings, RefreshCw, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { Package, ExternalLink, Settings, RefreshCw, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { CloverStatusBadge, CloverStatus } from './CloverStatusBadge';
 import { CloverDemoModeToggle } from './CloverDemoModeToggle';
@@ -93,7 +94,15 @@ export function CloverConnectionCard({
             </div>
           </div>
           
-          <CloverStatusBadge status={status} size="md" />
+          <div className="flex items-center gap-3">
+            <CloverStatusBadge status={status} size="md" />
+            <Link
+              href={`/t/${tenantId}/settings/integrations/clover`}
+              className="text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 flex items-center gap-1"
+            >
+              Manage <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </div>
 

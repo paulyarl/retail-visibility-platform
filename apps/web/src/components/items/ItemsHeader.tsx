@@ -170,6 +170,21 @@ export default function ItemsHeader({
           </Button>
         )}
 
+        {/* INTEGRATIONS - Sync with POS systems */}
+        {tenantId && (
+          <Button 
+            onClick={() => window.location.href = `/t/${tenantId}/settings/integrations/clover`}
+            variant="secondary"
+            className="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white border-0"
+            title="Sync inventory with Clover POS - import products or keep them in sync"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            Clover Sync
+          </Button>
+        )}
+
         {/* PREVIEW - View storefront (last) */}
         {tenantId && (
           <Button 

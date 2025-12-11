@@ -7,6 +7,32 @@
 
 import { availability_status, product_source } from '@prisma/client';
 
+/**
+ * Category mapping from Clover categories to Google taxonomy category paths
+ */
+const CLOVER_CATEGORY_MAPPING: Record<string, { path: string[]; googleCategoryId?: string }> = {
+  'Electronics': {
+    path: ['Electronics', 'Audio', 'Headphones'],
+    googleCategoryId: '240' // Electronics > Audio > Headphones
+  },
+  'Home & Kitchen': {
+    path: ['Home & Garden', 'Kitchen & Dining', 'Kitchen Tools'],
+    googleCategoryId: '212' // Home & Garden > Kitchen & Dining > Kitchen Tools
+  },
+  'Apparel': {
+    path: ['Apparel & Accessories', 'Clothing', 'T-Shirts'],
+    googleCategoryId: '1604' // Apparel & Accessories > Clothing > T-Shirts
+  },
+  'Sports & Outdoors': {
+    path: ['Sports & Fitness', 'Sports & Outdoors', 'Fitness Equipment'],
+    googleCategoryId: '185' // Sports & Fitness > Sports & Outdoors > Fitness Equipment
+  },
+  'Office Supplies': {
+    path: ['Office Supplies', 'Writing Instruments', 'Pens'],
+    googleCategoryId: '283' // Office Supplies > Writing Instruments > Pens
+  }
+};
+
 export interface DemoItem {
   id: string;
   name: string;
@@ -285,6 +311,374 @@ export function simulateInventoryUpdate(item_id: string, newStock: number): Demo
   };
 }
 
+// ============================================================================
+// ENHANCED DEMO MODE - Simulation Features
+// ============================================================================
+
+/**
+ * Simulation scenarios that users can trigger to learn the sync flow
+ */
+export type SimulationScenario = 
+  // Item scenarios
+  | 'stock_update'          // Clover stock changed, needs sync to RVP
+  | 'price_update'          // Clover price changed, needs sync to RVP
+  | 'new_item'              // New item added in Clover
+  | 'item_deleted'          // Item deleted in Clover
+  | 'conflict'              // SKU conflict between systems
+  | 'sync_failure'          // Simulated sync failure
+  | 'bulk_update'           // Multiple items changed at once
+  // Category scenarios
+  | 'new_category'          // New category added in Clover
+  | 'category_renamed'      // Category renamed in Clover
+  | 'category_items_moved'  // Items moved between categories
+  | 'category_conflict';    // Category name conflict between systems
+
+export interface SimulationEvent {
+  id: string;
+  scenario: SimulationScenario;
+  timestamp: Date;
+  status: 'pending' | 'syncing' | 'success' | 'failed' | 'conflict';
+  affectedItems: string[];
+  changes: {
+    field: string;
+    oldValue: any;
+    newValue: any;
+  }[];
+  message: string;
+  resolution?: string;
+}
+
+/**
+ * Pre-defined simulation scenarios with realistic data
+ */
+const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = {
+  stock_update: () => ({
+    id: `sim_${Date.now()}_stock`,
+    scenario: 'stock_update',
+    timestamp: new Date(),
+    status: 'pending',
+    affectedItems: ['demo_item_001', 'demo_item_006'],
+    changes: [
+      { field: 'stock', oldValue: 15, newValue: 8 },
+      { field: 'stock', oldValue: 65, newValue: 52 }
+    ],
+    message: 'Stock levels updated in Clover POS after sales transactions',
+    resolution: 'Auto-sync will update RVP inventory to match Clover'
+  }),
+  
+  price_update: () => ({
+    id: `sim_${Date.now()}_price`,
+    scenario: 'price_update',
+    timestamp: new Date(),
+    status: 'pending',
+    affectedItems: ['demo_item_003'],
+    changes: [
+      { field: 'price', oldValue: 2999, newValue: 2499 }
+    ],
+    message: 'Price reduced in Clover POS for promotional sale',
+    resolution: 'Price will sync to RVP and update storefront listings'
+  }),
+  
+  new_item: () => ({
+    id: `sim_${Date.now()}_new`,
+    scenario: 'new_item',
+    timestamp: new Date(),
+    status: 'pending',
+    affectedItems: ['demo_item_new_001'],
+    changes: [
+      { field: 'item', oldValue: null, newValue: {
+        name: 'Wireless Earbuds Pro',
+        sku: 'AUDIO-EB-PRO',
+        price: 9999,
+        stock: 20
+      }}
+    ],
+    message: 'New product added to Clover inventory',
+    resolution: 'Item will be imported to RVP with auto-categorization'
+  }),
+  
+  item_deleted: () => ({
+    id: `sim_${Date.now()}_delete`,
+    scenario: 'item_deleted',
+    timestamp: new Date(),
+    status: 'pending',
+    affectedItems: ['demo_item_020'],
+    changes: [
+      { field: 'status', oldValue: 'active', newValue: 'deleted' }
+    ],
+    message: 'Item discontinued and removed from Clover',
+    resolution: 'RVP item will be marked as archived (not deleted)'
+  }),
+  
+  conflict: () => ({
+    id: `sim_${Date.now()}_conflict`,
+    scenario: 'conflict',
+    timestamp: new Date(),
+    status: 'conflict',
+    affectedItems: ['demo_item_011'],
+    changes: [
+      { field: 'price', oldValue: 1999, newValue: 2199 }, // Clover price
+      { field: 'price_rvp', oldValue: 1999, newValue: 1799 } // RVP price (edited locally)
+    ],
+    message: 'Price conflict detected: Item was edited in both Clover and RVP',
+    resolution: 'Manual resolution required: Choose Clover value, RVP value, or custom'
+  }),
+  
+  sync_failure: () => ({
+    id: `sim_${Date.now()}_fail`,
+    scenario: 'sync_failure',
+    timestamp: new Date(),
+    status: 'failed',
+    affectedItems: ['demo_item_007', 'demo_item_008'],
+    changes: [],
+    message: 'Sync failed: Connection timeout to Clover API',
+    resolution: 'Retry sync or check Clover API status'
+  }),
+  
+  bulk_update: () => ({
+    id: `sim_${Date.now()}_bulk`,
+    scenario: 'bulk_update',
+    timestamp: new Date(),
+    status: 'pending',
+    affectedItems: ['demo_item_011', 'demo_item_012', 'demo_item_013', 'demo_item_014', 'demo_item_015'],
+    changes: [
+      { field: 'stock', oldValue: 85, newValue: 72 },
+      { field: 'stock', oldValue: 24, newValue: 18 },
+      { field: 'stock', oldValue: 48, newValue: 41 },
+      { field: 'stock', oldValue: 32, newValue: 28 },
+      { field: 'stock', oldValue: 120, newValue: 95 }
+    ],
+    message: 'End-of-day inventory reconciliation from Clover',
+    resolution: 'Bulk sync will update all affected items'
+  }),
+
+  // Category simulation scenarios
+  new_category: () => ({
+    id: `sim_${Date.now()}_newcat`,
+    scenario: 'new_category',
+    timestamp: new Date(),
+    status: 'pending',
+    affectedItems: [],
+    changes: [
+      { field: 'category', oldValue: null, newValue: {
+        id: 'clv_cat_seasonal',
+        name: 'Seasonal Specials',
+        itemCount: 0
+      }}
+    ],
+    message: 'New category "Seasonal Specials" created in Clover',
+    resolution: 'Category will be synced to RVP and available for item assignment'
+  }),
+
+  category_renamed: () => ({
+    id: `sim_${Date.now()}_catren`,
+    scenario: 'category_renamed',
+    timestamp: new Date(),
+    status: 'pending',
+    affectedItems: ['demo_item_001', 'demo_item_002', 'demo_item_003'],
+    changes: [
+      { field: 'category_name', oldValue: 'Electronics', newValue: 'Tech & Gadgets' }
+    ],
+    message: 'Category renamed from "Electronics" to "Tech & Gadgets" in Clover',
+    resolution: 'RVP category will be updated, all linked items remain assigned'
+  }),
+
+  category_items_moved: () => ({
+    id: `sim_${Date.now()}_catmove`,
+    scenario: 'category_items_moved',
+    timestamp: new Date(),
+    status: 'pending',
+    affectedItems: ['demo_item_006', 'demo_item_007'],
+    changes: [
+      { field: 'category', oldValue: 'Home & Kitchen', newValue: 'Office Supplies' },
+      { field: 'items_moved', oldValue: 2, newValue: 2 }
+    ],
+    message: '2 items moved from "Home & Kitchen" to "Office Supplies" in Clover',
+    resolution: 'Item category assignments will update in RVP to match Clover'
+  }),
+
+  category_conflict: () => ({
+    id: `sim_${Date.now()}_catconf`,
+    scenario: 'category_conflict',
+    timestamp: new Date(),
+    status: 'conflict',
+    affectedItems: [],
+    changes: [
+      { field: 'category_name', oldValue: 'Sports & Outdoors', newValue: 'Sports & Fitness' }, // Clover
+      { field: 'category_name_rvp', oldValue: 'Sports & Outdoors', newValue: 'Outdoor Recreation' } // RVP
+    ],
+    message: 'Category conflict: "Sports & Outdoors" renamed differently in both systems',
+    resolution: 'Manual resolution required: Choose Clover name, RVP name, or merge categories'
+  })
+};
+
+/**
+ * Generate a simulation event for a given scenario
+ */
+export function generateSimulationEvent(scenario: SimulationScenario): SimulationEvent {
+  const generator = SIMULATION_SCENARIOS[scenario];
+  if (!generator) {
+    throw new Error(`Unknown simulation scenario: ${scenario}`);
+  }
+  return generator();
+}
+
+/**
+ * Get all available simulation scenarios with descriptions
+ */
+export function getAvailableScenarios(): { scenario: SimulationScenario; name: string; description: string; type: 'item' | 'category' }[] {
+  return [
+    // Item scenarios
+    {
+      scenario: 'stock_update',
+      name: 'Stock Level Change',
+      description: 'Simulates stock decreasing after sales in Clover POS',
+      type: 'item'
+    },
+    {
+      scenario: 'price_update',
+      name: 'Price Change',
+      description: 'Simulates a price update in Clover (e.g., promotional discount)',
+      type: 'item'
+    },
+    {
+      scenario: 'new_item',
+      name: 'New Item Added',
+      description: 'Simulates adding a new product in Clover that needs to sync to RVP',
+      type: 'item'
+    },
+    {
+      scenario: 'item_deleted',
+      name: 'Item Discontinued',
+      description: 'Simulates removing a product from Clover inventory',
+      type: 'item'
+    },
+    {
+      scenario: 'conflict',
+      name: 'Sync Conflict',
+      description: 'Simulates a conflict when the same item was edited in both systems',
+      type: 'item'
+    },
+    {
+      scenario: 'sync_failure',
+      name: 'Sync Failure',
+      description: 'Simulates a failed sync due to connection issues',
+      type: 'item'
+    },
+    {
+      scenario: 'bulk_update',
+      name: 'Bulk Inventory Update',
+      description: 'Simulates end-of-day inventory reconciliation with multiple changes',
+      type: 'item'
+    },
+    // Category scenarios
+    {
+      scenario: 'new_category',
+      name: 'New Category Added',
+      description: 'Simulates Clover adding a new category that syncs to RVP',
+      type: 'category'
+    },
+    {
+      scenario: 'category_renamed',
+      name: 'Category Renamed',
+      description: 'Simulates renaming a category in Clover and syncing to RVP',
+      type: 'category'
+    },
+    {
+      scenario: 'category_items_moved',
+      name: 'Items Moved to Category',
+      description: 'Simulates moving items between categories in Clover',
+      type: 'category'
+    },
+    {
+      scenario: 'category_conflict',
+      name: 'Category Conflict',
+      description: 'Simulates a category name conflict between Clover and RVP',
+      type: 'category'
+    }
+  ];
+}
+
+/**
+ * Items that will be created with conflicts for demo purposes
+ */
+export const CONFLICT_DEMO_ITEMS = [
+  {
+    cloverItem: {
+      id: 'demo_conflict_001',
+      name: 'Premium Headphones',
+      sku: 'CONFLICT-HP-001',
+      price: 8999,
+      stock: 10,
+      category: 'Electronics'
+    },
+    rvpItem: {
+      name: 'Premium Headphones (Store Edition)',
+      sku: 'CONFLICT-HP-001', // Same SKU = conflict
+      price: 7999, // Different price
+      stock: 15 // Different stock
+    },
+    conflictType: 'sku_match_data_mismatch'
+  },
+  {
+    cloverItem: {
+      id: 'demo_conflict_002',
+      name: 'Organic Coffee Beans',
+      sku: 'FOOD-CB-ORG',
+      price: 1499,
+      stock: 50,
+      category: 'Home & Kitchen'
+    },
+    rvpItem: {
+      name: 'Organic Coffee Beans 1lb',
+      sku: 'FOOD-CB-ORG',
+      price: 1499,
+      stock: 45 // Only stock differs
+    },
+    conflictType: 'stock_mismatch'
+  }
+];
+
+/**
+ * Simulate the progression of a sync operation
+ * Returns status updates that can be polled by the frontend
+ */
+export function simulateSyncProgress(eventId: string): AsyncGenerator<{
+  progress: number;
+  status: string;
+  currentItem?: string;
+  itemsProcessed: number;
+  totalItems: number;
+}> {
+  return (async function* () {
+    const totalItems = 5;
+    const items = ['demo_item_001', 'demo_item_002', 'demo_item_003', 'demo_item_004', 'demo_item_005'];
+    
+    yield { progress: 0, status: 'initializing', itemsProcessed: 0, totalItems };
+    
+    for (let i = 0; i < totalItems; i++) {
+      yield {
+        progress: Math.round(((i + 0.5) / totalItems) * 100),
+        status: 'syncing',
+        currentItem: items[i],
+        itemsProcessed: i,
+        totalItems
+      };
+      
+      // Simulate processing time (in real usage, this would be actual work)
+      yield {
+        progress: Math.round(((i + 1) / totalItems) * 100),
+        status: 'syncing',
+        currentItem: items[i],
+        itemsProcessed: i + 1,
+        totalItems
+      };
+    }
+    
+    yield { progress: 100, status: 'complete', itemsProcessed: totalItems, totalItems };
+  })();
+}
+
 /**
  * Get demo items by category
  */
@@ -303,6 +697,9 @@ export function getDemoCategories(): string[] {
  * Convert demo item to Visible Shell inventory item format
  */
 export function convertDemoItemToRVPFormat(demoItem: DemoItem) {
+  // Get category mapping for this clover category
+  const categoryMapping = CLOVER_CATEGORY_MAPPING[demoItem.category];
+
   return {
     sku: demoItem.sku,
     name: demoItem.name,
@@ -310,15 +707,18 @@ export function convertDemoItemToRVPFormat(demoItem: DemoItem) {
     brand: 'Demo Brand', // Required field
     description: demoItem.description || '',
     price: demoItem.price / 100, // Convert cents to dollars for price field
-    priceCents: demoItem.price,
+    price_cents: demoItem.price,
     currency: 'USD',
     stock: demoItem.stock,
     availability: demoItem.stock > 0 ? availability_status.in_stock : availability_status.out_of_stock,
     source: product_source.CLOVER_DEMO,
+    // Proper category assignment following platform standards
+    category_path: categoryMapping ? categoryMapping.path : [demoItem.category],
     metadata: {
       cloverItemId: demoItem.id,
       cloverCategory: demoItem.category,
-      isDemoData: true
+      isDemoData: true,
+      googleCategoryId: categoryMapping?.googleCategoryId
     }
   };
 }

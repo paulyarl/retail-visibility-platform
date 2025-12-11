@@ -122,24 +122,25 @@ model clover_demo_snapshots_list {
 }
 
 model clover_integrations_list {
-  id                         String                       @id
-  tenant_id                  String
-  mode                       String                       @default("demo")
-  status                     String                       @default("active")
-  access_token               String?
-  refresh_token              String?
-  token_expires_at           DateTime?
-  merchant_id                String?
-  demo_enabled_at            DateTime?
-  demo_last_active_at        DateTime?
-  production_enabled_at      DateTime?
-  last_sync_at               DateTime?
-  last_sync_status           String?
-  created_at                 DateTime                     @default(now())
-  updated_at                 DateTime
-  clover_demo_snapshots_list clover_demo_snapshots_list[]
-  clover_item_mappings_list  clover_item_mappings_list[]
-  clover_sync_logs_list      clover_sync_logs_list[]
+  id                            String                          @id
+  tenant_id                     String
+  mode                          String                          @default("demo")
+  status                        String                          @default("active")
+  access_token                  String?
+  refresh_token                 String?
+  token_expires_at              DateTime?
+  merchant_id                   String?
+  demo_enabled_at               DateTime?
+  demo_last_active_at           DateTime?
+  production_enabled_at         DateTime?
+  last_sync_at                  DateTime?
+  last_sync_status              String?
+  created_at                    DateTime                        @default(now())
+  updated_at                    DateTime
+  clover_demo_snapshots_list    clover_demo_snapshots_list[]
+  clover_item_mappings_list     clover_item_mappings_list[]
+  clover_category_mappings_list clover_category_mappings_list[]
+  clover_sync_logs_list         clover_sync_logs_list[]
 }
 
 model clover_item_mappings_list {
@@ -157,6 +158,28 @@ model clover_item_mappings_list {
   created_at               DateTime                 @default(now())
   updated_at               DateTime
   clover_integrations_list clover_integrations_list @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+}
+
+model clover_category_mappings_list {
+  id                       String                   @id
+  integration_id           String
+  clover_category_id       String
+  clover_category_name     String
+  clover_parent_id         String?
+  rvp_category_id          String?
+  rvp_category_name        String?
+  sync_direction           String                   @default("bidirectional")
+  mapping_status           String                   @default("pending")
+  conflict_reason          String?
+  last_synced_at           DateTime?
+  last_sync_status         String?
+  created_at               DateTime                 @default(now())
+  updated_at               DateTime
+  clover_integrations_list clover_integrations_list @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+
+  @@index([integration_id, clover_category_id])
+  @@index([integration_id, rvp_category_id])
+  @@index([mapping_status])
 }
 
 model clover_sync_logs_list {

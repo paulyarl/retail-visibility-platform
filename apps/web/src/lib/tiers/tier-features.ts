@@ -24,6 +24,7 @@ export const TIER_FEATURES = {
     'basic_categories',
     'category_quick_start',      // Generate starter categories (Starter+)
     'image_finder',              // Find stock photos for products (Starter+)
+    'clover_pos',                // Clover POS integration (Starter+)
   ],
   professional: [
     // ⚠️ CRITICAL REVENUE-PROTECTING FEATURES
@@ -38,6 +39,7 @@ export const TIER_FEATURES = {
     'privacy_mode',
     'custom_marketing_copy',
     'priority_support',
+    'square_pos',                // Square POS integration (Pro+)
   ],
   enterprise: [
     'unlimited_skus',
@@ -122,6 +124,7 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   enhanced_seo: 'starter',
   category_quick_start: 'starter',
   image_finder: 'starter',
+  clover_pos: 'starter',
   
   // Professional tier features (CRITICAL)
   quick_start_wizard: 'professional',
@@ -130,6 +133,7 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   custom_branding: 'professional',
   qr_codes_1024: 'professional',
   image_gallery_5: 'professional',
+  square_pos: 'professional',
   
   // Enterprise tier features
   white_label: 'enterprise',
@@ -232,6 +236,8 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
   
   // Integrations
   'custom_integrations': 'Custom Integrations',
+  'clover_pos': 'Clover POS Integration',
+  'square_pos': 'Square POS Integration',
   
   // Multi-location
   'multi_location_5': '5 Locations',

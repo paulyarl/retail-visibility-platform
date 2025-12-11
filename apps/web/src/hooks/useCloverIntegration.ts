@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { CloverStatus } from '@/components/clover';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CloverIntegrationData {
   enabled: boolean;
@@ -38,6 +39,7 @@ interface UseCloverIntegrationResult {
 }
 
 export function useCloverIntegration(tenantId: string): UseCloverIntegrationResult {
+  const { getAccessToken } = useAuth();
   const [data, setData] = useState<CloverIntegrationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,13 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
       setLoading(true);
       setError(null);
       
-      const res = await fetch(`/api/integrations/${tenantId}/clover/status`);
+      const token = getAccessToken();
+      const res = await fetch(`/api/integrations/${tenantId}/clover/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!res.ok) {
         throw new Error('Failed to fetch integration status');
@@ -83,9 +91,13 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
     try {
       setError(null);
       
+      const token = getAccessToken();
       const res = await fetch(`/api/integrations/${tenantId}/clover/demo/enable`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       
       if (!res.ok) {
@@ -122,9 +134,13 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
     try {
       setError(null);
       
+      const token = getAccessToken();
       const res = await fetch(`/api/integrations/${tenantId}/clover/demo/disable`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ keepItems: false })
       });
       
@@ -155,7 +171,13 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
       setError(null);
       
       // Fetch authorization URL
-      const res = await fetch(`/api/integrations/${tenantId}/clover/oauth/authorize`);
+      const token = getAccessToken();
+      const res = await fetch(`/api/integrations/${tenantId}/clover/oauth/authorize`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!res.ok) {
         const errorData = await res.json();
@@ -188,9 +210,13 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
     try {
       setError(null);
       
+      const token = getAccessToken();
       const res = await fetch(`/api/integrations/${tenantId}/clover/disconnect`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       
       if (!res.ok) {
@@ -217,9 +243,13 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
     try {
       setError(null);
       
+      const token = getAccessToken();
       const res = await fetch(`/api/integrations/${tenantId}/clover/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       
       if (!res.ok) {

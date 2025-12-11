@@ -138,16 +138,15 @@ import tierSystemRoutes from './routes/admin/tier-system';
 // import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 // import cloverRoutes from './routes/integrations/clover';
 // import emailTestRoutes from './routes/email-test';
-// Lazy import Square routes to avoid startup failures
-let squareRoutes: any = null;
-
-const getSquareRoutes = async () => {
-  if (!squareRoutes) {
-    const { default: routes } = await import('./square/square.routes');
-    squareRoutes = routes;
-  }
-  return squareRoutes;
-};
+// Legacy Square routes (lazy import) - replaced by /api/integrations routes
+// let squareRoutes: any = null;
+// const getSquareRoutes = async () => {
+//   if (!squareRoutes) {
+//     const { default: routes } = await import('./square/square.routes');
+//     squareRoutes = routes;
+//   }
+//   return squareRoutes;
+// };
 // Temporarily disable all route imports except essential ones
 // import dashboardRoutes from './routes/dashboard'; // FIXED VERSION
 // import dashboardConsolidatedRoutes from './routes/dashboard-consolidated';
@@ -2925,12 +2924,13 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     }
   }
 
-  // Fetch tenant category if category_path exists or if directory_category_id exists
+  // Fetch tenant category - prioritize directory_category_id, fallback to category_path slug lookup
   let tenantCategory = null;
-  if (it.category_path && it.category_path.length > 0) {
+  if (it.directory_category_id) {
+    // Primary lookup: by directory_category_id (most reliable)
     const category = await prisma.directory_category.findFirst({
       where: { 
-        slug: it.category_path[0],
+        id: it.directory_category_id,
         tenantId: it.tenant_id
       },
       select: {
@@ -2948,11 +2948,11 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
         googleCategoryId: category.googleCategoryId,
       };
     }
-  } else if (it.directory_category_id) {
-    // If no category_path but directory_category_id exists, fetch by ID
+  } else if (it.category_path && it.category_path.length > 0) {
+    // Fallback: try to find by slug from category_path
     const category = await prisma.directory_category.findFirst({
       where: { 
-        id: it.directory_category_id,
+        slug: it.category_path[0],
         tenantId: it.tenant_id
       },
       select: {
@@ -4589,6 +4589,13 @@ console.log('✅ Upgrade requests routes mounted at /api/upgrade-requests');
 /* ------------------------------ organization requests ------------------------------ */
 app.use('/api/organization-requests', organizationRequestRoutes);
 console.log('✅ Organization requests routes mounted at /api/organization-requests');
+
+/* ------------------------------ POS integrations ------------------------------ */
+import cloverRoutes from './routes/integrations/clover';
+import squareRoutes from './routes/integrations/square';
+app.use('/api/integrations', cloverRoutes);
+app.use('/api/integrations', squareRoutes);
+console.log('✅ POS integration routes mounted at /api/integrations (Clover, Square)');
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);

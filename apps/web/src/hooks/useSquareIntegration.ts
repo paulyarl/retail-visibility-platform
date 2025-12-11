@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SquareStatus } from '@/components/square';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SquareIntegrationData {
   enabled: boolean;
@@ -33,6 +34,7 @@ interface UseSquareIntegrationResult {
 }
 
 export function useSquareIntegration(tenantId: string): UseSquareIntegrationResult {
+  const { getAccessToken } = useAuth();
   const [data, setData] = useState<SquareIntegrationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,13 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
       setLoading(true);
       setError(null);
       
-      const res = await fetch(`/api/integrations/${tenantId}/square/status`);
+      const token = getAccessToken();
+      const res = await fetch(`/api/integrations/${tenantId}/square/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!res.ok) {
         throw new Error('Failed to fetch integration status');
@@ -77,7 +85,13 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
       setError(null);
       
       // Fetch authorization URL
-      const res = await fetch(`/api/integrations/${tenantId}/square/oauth/authorize`);
+      const token = getAccessToken();
+      const res = await fetch(`/api/integrations/${tenantId}/square/oauth/authorize`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!res.ok) {
         const errorData = await res.json();
@@ -110,9 +124,13 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
     try {
       setError(null);
       
+      const token = getAccessToken();
       const res = await fetch(`/api/integrations/${tenantId}/square/disconnect`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       
       if (!res.ok) {
@@ -139,9 +157,13 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
     try {
       setError(null);
       
+      const token = getAccessToken();
       const res = await fetch(`/api/integrations/${tenantId}/square/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       
       if (!res.ok) {
