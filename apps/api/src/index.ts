@@ -539,6 +539,92 @@ app.patch("/api/tenants/:id", authenticateToken, requireAdmin, validateTierAssig
   }
 });
 
+// POST /api/tenants/:id/geocode - Geocode tenant address and update coordinates
+app.post("/api/tenants/:id/geocode", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { basePrisma } = await import('./prisma');
+    
+    // Get tenant's address from directory_listings_list
+    const listingResult = await basePrisma.$queryRaw<any[]>`
+      SELECT address, city, state, zip_code, business_name
+      FROM directory_listings_list
+      WHERE tenant_id = ${id}
+      LIMIT 1
+    `;
+    
+    if (!listingResult || listingResult.length === 0) {
+      return res.status(404).json({ error: "tenant_not_found" });
+    }
+    
+    const listing = listingResult[0];
+    if (!listing.address || !listing.city || !listing.zip_code) {
+      return res.status(400).json({ error: "incomplete_address", message: "Address, city, and zip code are required for geocoding" });
+    }
+    
+    // Build full address string
+    const fullAddress = [
+      listing.address,
+      listing.city,
+      listing.state,
+      listing.zip_code,
+      'USA'
+    ].filter(Boolean).join(', ');
+    
+    console.log(`[POST /api/tenants/${id}/geocode] Geocoding address: ${fullAddress}`);
+    
+    // Call Google Geocoding API
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "geocoding_not_configured", message: "Google Maps API key not configured" });
+    }
+    
+    const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${apiKey}`;
+    const geocodeResponse = await fetch(geocodeUrl);
+    const geocodeData = await geocodeResponse.json();
+    
+    if (geocodeData.status !== 'OK' || !geocodeData.results || geocodeData.results.length === 0) {
+      console.error(`[POST /api/tenants/${id}/geocode] Geocoding failed:`, geocodeData.status);
+      return res.status(400).json({ error: "geocoding_failed", status: geocodeData.status });
+    }
+    
+    const location = geocodeData.results[0].geometry.location;
+    const latitude = location.lat;
+    const longitude = location.lng;
+    
+    console.log(`[POST /api/tenants/${id}/geocode] Got coordinates: ${latitude}, ${longitude}`);
+    
+    // Update both tables
+    await basePrisma.$executeRaw`
+      UPDATE "tenant_business_profiles_list" 
+      SET latitude = ${latitude}, 
+          longitude = ${longitude},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tenant_id = ${id}
+    `;
+    
+    await basePrisma.$executeRaw`
+      UPDATE "directory_listings_list" 
+      SET latitude = ${latitude}, 
+          longitude = ${longitude},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tenant_id = ${id}
+    `;
+    
+    console.log(`[POST /api/tenants/${id}/geocode] Updated coordinates for ${listing.business_name}`);
+    
+    res.json({
+      success: true,
+      coordinates: { latitude, longitude },
+      address: fullAddress,
+      tenant_id: id,
+    });
+  } catch (error: any) {
+    console.error('[POST /api/tenants/:id/geocode] Error:', error);
+    res.status(500).json({ error: "geocoding_error", message: error.message });
+  }
+});
+
 // PATCH /api/tenants/:id/coordinates - Update tenant coordinates (for auto-geocoding)
 const coordinatesSchema = z.object({
   latitude: z.number().min(-90).max(90),
