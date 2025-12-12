@@ -5,7 +5,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../prisma';
 import { 
   findMatchingProducts, 
   ScannedProductData,
@@ -17,7 +17,6 @@ import {
 import { generatePhotoId } from '../../lib/id-generator';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /**
  * POST /api/products/find-matches
@@ -212,17 +211,17 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     if (enrichmentOptions.useImages && scannedData.images && scannedData.images.length > 0) {
       // Delete existing photos if any
       await prisma.photo_assets.deleteMany({
-        where: { inventory_item_id: productId }
+        where: { inventoryItemId: productId }
       });
 
       // Add new photos
       const photoData = scannedData.images.map((url, index) => ({
         id:generatePhotoId(),
-        tenant_id: tenantId,
-        inventory_item_id: productId,
+        tenantId: tenantId,
+        inventoryItemId: productId,
         url,
         position: index,
-        content_type: 'image/jpeg', // Default, could be detected
+        contentType: 'image/jpeg', // Default, could be detected
         alt: `${updatedProduct.name} - Image ${index + 1}`
       }));
 

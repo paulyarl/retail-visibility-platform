@@ -25,7 +25,7 @@ router.post('/', async (req, res) => {
 
     const feedback = await prisma.outreach_feedback_list.create({
       data: {
-        id: generateQuickStart("feedback"),
+        id: generateQuickStart("fbid"),
         tenant_id: body.tenantId || null,
         user_id: body.userId || null,
         feedback: body.feedback as any,

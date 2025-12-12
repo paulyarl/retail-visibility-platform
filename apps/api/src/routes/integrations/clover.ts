@@ -24,12 +24,8 @@ import {
   calculateTokenExpiration,
   formatScopesForDisplay
 } from '../../services/clover-oauth';
-import { generateQuickStart } from '../../lib/id-generator';
-
-// Helper to generate category IDs
-function generateCategoryId(): string {
-  return `cat_${crypto.randomUUID().replace(/-/g, '').substring(0, 12)}`;
-}
+import { generateCloverCatId, generateCloverLogId } from '../../lib/id-generator';
+ 
 
 // Helper to create slug from category name
 function slugify(name: string): string {
@@ -130,7 +126,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
         // Create new tenant category
         const newCategory = await prisma.directory_category.create({
           data: {
-            id: generateCategoryId(),
+            id: generateCloverCatId(),
             tenantId: tenantId,
             name: categoryName,
             slug: slug,
@@ -541,7 +537,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
     // Create sync log for OAuth connection
     await prisma.tier_change_logs_list.create({
       data: {
-        id: generateQuickStart("clover"),
+        id: generateCloverCatId(),
         entity_type: 'clover_integration',
         entity_id: integration.id,
         action: 'oauth_connect',
@@ -645,7 +641,7 @@ router.post('/:tenantId/clover/demo/simulate', authenticateToken, async (req: Re
     // Create sync log for the simulation
     await prisma.clover_sync_logs_list.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateCloverLogId(),
         integration_id: integration.id,
         trace_id: event.id,
         operation: `simulation_${scenario}`,

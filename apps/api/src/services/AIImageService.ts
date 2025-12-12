@@ -409,14 +409,14 @@ commercial photography, clean and professional.`;
     const photoAsset = await prisma.photo_assets.create({
       data: {
         id: generateItemId(),
-        tenant_id: item.tenant_id,
-        inventory_item_id: inventoryItemId,
+        tenantId: item.tenant_id,
+        inventoryItemId: inventoryItemId,
         url: url,
-        public_url: url, // Store as public URL
+        publicUrl: url, // Store as public URL
         width: width,
         height: height,
         bytes: bytes,
-        content_type: 'image/jpeg',
+        contentType: 'image/jpeg',
         position: 0, // Primary image
         caption: 'AI-generated product image',
         alt: `Product image`,

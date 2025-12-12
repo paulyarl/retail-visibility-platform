@@ -1014,9 +1014,9 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
         console.log('[POST /tenant/profile] Update executed successfully');
       }
 
-      // Get updated profile
+      // Get updated profile (exclude geography column to avoid Prisma deserialization error)
       result = await basePrisma.$queryRaw`
-        SELECT * FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
+        SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
       `;
       console.log('[POST /tenant/profile] Retrieved updated profile');
     } else {
@@ -1077,7 +1077,7 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
       console.log('[POST /tenant/profile] Final insert values:', insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
-        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}`
+        basePrisma.$queryRaw`SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}`
       );
       console.log('[POST /tenant/profile] Created new profile');
     }
@@ -1111,9 +1111,10 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
     if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
 
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
+    // Exclude geography column to avoid Prisma deserialization error
     const { basePrisma } = await import('./prisma');
     const bpResults = await basePrisma.$queryRaw`
-      SELECT * FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
+      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
     `;
     const bp = (bpResults as any[])[0] || null;
     
@@ -1924,22 +1925,12 @@ app.post("/public/debug-query", async (req, res) => {
     
     console.log('[POST /public/debug-query] Running analysis query...');
     
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL not found');
-    }
-    
-    const cleanConnectionString = connectionString.split('?')[0];
-    const pool = new Pool({
-      connectionString: cleanConnectionString,
-      ssl: {
-        rejectUnauthorized: false,
-        checkServerIdentity: () => undefined
-      }
-    });
+    // Use shared connection pool to prevent connection exhaustion
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
     
     const result = await pool.query(query);
-    await pool.end();
+    // Don't close the shared pool
     
     console.log('[POST /public/debug-query] Query executed successfully');
     
@@ -1961,28 +1952,15 @@ app.post("/public/debug-query", async (req, res) => {
 // Public endpoint to refresh materialized views (no auth required for development)
 app.post("/public/refresh-materialized-views", async (req, res) => {
   try {
-    const { Pool } = await import('pg');
-    
     console.log('[POST /public/refresh-materialized-views] Refreshing storefront_category_counts...');
     
-    // Use direct connection string like other routes
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL not found');
-    }
-    
-    const cleanConnectionString = connectionString.split('?')[0];
-    const pool = new Pool({
-      connectionString: cleanConnectionString,
-      ssl: {
-        rejectUnauthorized: false,
-        checkServerIdentity: () => undefined
-      }
-    });
+    // Use shared connection pool to prevent connection exhaustion
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
     
     // Use non-concurrent refresh since concurrent is not available
     await pool.query('REFRESH MATERIALIZED VIEW storefront_category_counts');
-    await pool.end();
+    // Don't close the shared pool
     
     console.log('[POST /public/refresh-materialized-views] Materialized view refreshed successfully');
     
@@ -2113,9 +2091,9 @@ app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
         console.log(`[PATCH /tenant/profile] Update executed successfully`);
       }
 
-      // Get updated profile
+      // Get updated profile (exclude geography column to avoid Prisma deserialization error)
       result = await basePrisma.$queryRaw`
-        SELECT * FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
+        SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
       `;
       console.log(`[PATCH /tenant/profile] Retrieved updated profile:`, result);
     } else {
@@ -2165,7 +2143,7 @@ app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
       console.log(`[PATCH /tenant/profile] Insert values:`, insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
-        basePrisma.$queryRaw`SELECT * FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}`
+        basePrisma.$queryRaw`SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}`
       );
       console.log(`[PATCH /tenant/profile] Created new profile:`, result);
     }
@@ -2511,14 +2489,14 @@ const photoUploadHandler = async (req: any, res: any) => {
       const created = await prisma.photo_assets.create({
         data: {
           id: generatePhotoId(),
-          tenant_id: item.tenant_id,
-          inventory_item_id: item.id,
+          tenantId: item.tenant_id,
+          inventoryItemId: item.id,
           url,
           width: width ?? null,
           height: height ?? null,
           bytes: bytes ?? null,
-          content_type: contentType ?? null,
-          exif_removed: exifRemoved ?? true,
+          contentType: contentType ?? null,
+          exifRemoved: exifRemoved ?? true,
         },
       });
 
@@ -2562,12 +2540,12 @@ const photoUploadHandler = async (req: any, res: any) => {
       const created = await prisma.photo_assets.create({
         data: {
           id: generatePhotoId(),
-          tenant_id: item.tenant_id,
-          inventory_item_id: item.id,
+          tenantId: item.tenant_id,
+          inventoryItemId: item.id,
           url: publicUrl!,
-          content_type: f.mimetype,
+          contentType: f.mimetype,
           bytes: f.size,
-          exif_removed: true,
+          exifRemoved: true,
         },
       });
 
@@ -2627,12 +2605,12 @@ const photoUploadHandler = async (req: any, res: any) => {
       const created = await prisma.photo_assets.create({
         data: {
           id: generatePhotoId(),
-          tenant_id: item.tenant_id,
-          inventory_item_id: item.id,
+          tenantId: item.tenant_id,
+          inventoryItemId: item.id,
           url: publicUrl,
-          content_type: parsed.data.contentType,
+          contentType: parsed.data.contentType,
           bytes: buf.length,
-          exif_removed: true,
+          exifRemoved: true,
         },
       });
 

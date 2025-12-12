@@ -408,19 +408,19 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
 
           // Delete old photos and copy new ones
           await prisma.photo_assets.deleteMany({
-            where: { inventory_item_id: existing.id },
+            where: { inventoryItemId: existing.id },
           });
 
           if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
             await prisma.photo_assets.createMany({
               data: sourceItem.photo_assets.map((photo: any, index: number) => ({
-                id: generateQuickStart("photo_asset"),
-                tenant_id: tenantId,
-                inventory_item_id: updatedItem.id,
+                id: generateQuickStart("orgpid"),
+                tenantId: tenantId,
+                inventoryItemId: updatedItem.id,
                 url: photo.url,
                 width: photo.width,
                 height: photo.height,
-                content_type: photo.contentType,
+                contentType: photo.contentType,
                 bytes: photo.bytes,
                 position: photo.position !== undefined ? photo.position : index,
                 alt: photo.alt,
@@ -483,9 +483,9 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
         if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
           await prisma.photo_assets.createMany({
             data: sourceItem.photo_assets.map((photo: any, index: number) => ({
-              id: generateQuickStart("photo_asset"),
-              tenant_id: tenantId,
-              inventory_item_id: newItem.id,
+              id: generateQuickStart("orgpid"),
+              tenantId: tenantId,
+              inventoryItemId: newItem.id,
               url: photo.url,
               width: photo.width,
               height: photo.height,
@@ -675,9 +675,9 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
           if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
             await prisma.photo_assets.createMany({
               data: sourceItem.photo_assets.map((photo: any, index: number) => ({
-                id: generateQuickStart("photo_asset"),
-                tenant_id: tenantId,
-                inventory_item_id: newItem.id,
+                id: generateQuickStart("orgpid"),
+                tenantId: tenantId,
+                inventoryItemId: newItem.id,
                 url: photo.url,
                 width: photo.width,
                 height: photo.height,
@@ -918,8 +918,8 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
             await prisma.photo_assets.createMany({
               data: sourceItem.photo_assets.map((photo: any, index: number) => ({
                 id: generatePhotoId(),
-                tenant_id: targetTenant.id,
-                inventory_item_id: newItem.id,
+                tenantId: targetTenant.id,
+                inventoryItemId: newItem.id,
                 url: photo.url,
                 width: photo.width,
                 height: photo.height,

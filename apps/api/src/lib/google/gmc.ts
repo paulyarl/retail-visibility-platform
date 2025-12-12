@@ -253,7 +253,7 @@ export async function syncMerchantAccount(
     } else {
       await prisma.google_merchant_links_list.create({
         data: {
-          id: generateQuickStart("gmc_link"),
+          id: generateQuickStart("gmcid"),
           account_id: account_id,
           merchant_id: merchantId,
           merchant_name: merchantName,

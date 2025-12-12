@@ -98,7 +98,7 @@ router.post('/tenant/:tenantId/gbp/hours/mirror',
   // Enqueue sync job; runner loop will process it
   await prisma.sync_jobs.create({
     data: {
-      id: generateQuickStart("hours"),
+      id: generateQuickStart("hid"),
       tenant_id: tenantId,
       target: 'gbp_hours',
       status: 'queued',

@@ -1,57 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
+import { getDirectPool } from '../utils/db-pool';
 import { GBPCategorySyncService } from '../services/GBPCategorySync';
 
 const router = Router();
-
-// Database connection pool for directory queries
-let directPool: Pool | null = null;
-
-const getDirectPool = () => {
-  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
-                      process.env.VERCEL_ENV === 'production' ||
-                      process.env.NODE_ENV === 'production';
-
-  if (!directPool) {
-    let connectionString = isProduction
-      ? process.env.DIRECT_DATABASE_URL
-      : process.env.DATABASE_URL;
-
-    if (!connectionString) {
-      throw new Error('Database connection string not configured');
-    }
-
-    // In development, modify connection string to disable SSL
-    if (!isProduction) {
-      console.log('[GBP Pool] Development mode - modifying connection string for SSL');
-      // Remove any existing sslmode parameter and add sslmode=disable
-      if (connectionString.includes('sslmode=')) {
-        connectionString = connectionString.replace(/sslmode=[^&]+/, 'sslmode=disable');
-      } else {
-        const separator = connectionString.includes('?') ? '&' : '?';
-        connectionString += `${separator}sslmode=disable`;
-      }
-    }
-
-    const config: any = {
-      connectionString,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    };
-
-    // Also set SSL config object for development
-    if (!isProduction) {
-      config.ssl = {
-        rejectUnauthorized: false
-      };
-    }
-
-    directPool = new Pool(config);
-  }
-
-  return directPool;
-};
 
 /**
  * GET /api/gbp/categories

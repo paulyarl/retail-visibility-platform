@@ -35,7 +35,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
     if (!item) return res.status(404).json({ error: "item not found" });
 
     // Enforce 11-photo limit
-    const existingCount = await prisma.photo_assets.count({ where: { inventory_item_id: item.id } }); 
+    const existingCount = await prisma.photo_assets.count({ where: { inventoryItemId: item.id } }); 
     if (existingCount >= 11) {
       return res.status(400).json({ error: "maximum 11 photos per item" });
     }
@@ -127,7 +127,7 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
 
     // Find next available position (max + 1, or 0 if first)
     const maxPos = await prisma.photo_assets.findFirst({
-      where: { inventory_item_id: item.id },
+      where: { inventoryItemId: item.id },
       orderBy: { position: 'desc' },
       select: { position: true },
     });
@@ -135,15 +135,15 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
 
     const created = await prisma.photo_assets.create({
       data: {
-        id: generateQuickStart("photo"),
-        tenant_id: item.tenant_id,
-        inventory_item_id: item.id,
+        id: generateQuickStart("pid"),
+        tenantId: item.tenant_id,
+        inventoryItemId: item.id,
         url,
         width: width ?? null,
         height: height ?? null,
-        content_type: contentType ?? null,
+        contentType: contentType ?? null,
         bytes: bytes ?? null,
-        exif_removed: exifRemoved,
+        exifRemoved: exifRemoved,
         position: nextPosition,
         alt: alt ?? null,
         caption: caption ?? null,
@@ -168,7 +168,7 @@ r.get("/items/:id/photos", async (req, res) => {
   if (!item) return res.status(404).json({ error: "item not found" });
 
   const photos = await prisma.photo_assets.findMany({
-    where: { inventory_item_id: item.id },
+    where: { inventoryItemId: item.id },
     orderBy: { position: "asc" },
   });
   res.json(photos);
@@ -188,7 +188,7 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
 
     // Verify photo exists and belongs to this item
     const photo = await prisma.photo_assets.findUnique({ where: { id: photoId } });
-    if (!photo || photo.inventory_item_id !== itemId) {
+    if (!photo || photo.inventoryItemId !== itemId) {
       return res.status(404).json({ error: "photo not found" });
     }
 
@@ -196,7 +196,7 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
     if (position !== undefined && position !== photo.position) {
       // Find photo at target position (if any)
       const targetPhoto = await prisma.photo_assets.findFirst({
-        where: { inventory_item_id: itemId, position },
+        where: { inventoryItemId: itemId, position },
       });
 
       // Use sequential updates to avoid Prisma transaction tracing issues
@@ -285,7 +285,7 @@ r.put("/items/:id/photos/reorder", async (req, res) => {
     // Verify all photos belong to this item
     const photoIds = updates.map(u => u.id);
     const photos = await prisma.photo_assets.findMany({
-      where: { id: { in: photoIds }, inventory_item_id: itemId },
+      where: { id: { in: photoIds }, inventoryItemId: itemId },
     });
 
     if (photos.length !== photoIds.length) {
@@ -304,7 +304,7 @@ r.put("/items/:id/photos/reorder", async (req, res) => {
 
     // Update item image_url to primary (position 0)
     const primary = await prisma.photo_assets.findFirst({
-      where: { inventory_item_id: itemId, position: 0 },
+      where: { inventoryItemId: itemId, position: 0 },
     });
     if (primary) {
       await prisma.inventory_items.update({
@@ -331,7 +331,7 @@ r.delete("/items/:id/photos/:photoId", async (req, res) => {
 
     // Verify photo exists and belongs to this item
     const photo = await prisma.photo_assets.findUnique({ where: { id: photoId } });
-    if (!photo || photo.inventory_item_id !== itemId) {
+    if (!photo || photo.inventoryItemId !== itemId) {
       return res.status(404).json({ error: "photo not found" });
     }
 
@@ -355,7 +355,7 @@ r.delete("/items/:id/photos/:photoId", async (req, res) => {
 
     // Re-pack positions: get all remaining photos and reassign positions 0, 1, 2...
     const remaining = await prisma.photo_assets.findMany({
-      where: { inventory_item_id: itemId },
+      where: { inventoryItemId: itemId },
       orderBy: { position: "asc" },
     });
 

@@ -28,7 +28,7 @@ export async function audit(opts: {
     }
 
     const auditData: any = {
-      id: generateQuickStart("audit"),
+      id: generateQuickStart("auditid"),
       tenant_id: opts.tenantId,
       action: mappedAction, // Use mapped enum value instead of string
       actor_id: opts.actor || 'system', // Prisma model expects snake_case

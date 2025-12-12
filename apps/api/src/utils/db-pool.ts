@@ -14,45 +14,49 @@ let directPool: Pool | null = null;
  * @returns Pool instance for direct database queries
  */
 export const getDirectPool = (): Pool => {
+  // ALWAYS reuse the existing pool - creating new pools causes connection exhaustion
+  if (directPool) {
+    return directPool;
+  }
+
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
+
   const isProduction = process.env.RAILWAY_ENVIRONMENT || 
                       process.env.VERCEL_ENV === 'production' ||
                       process.env.NODE_ENV === 'production';
 
-  // In development, always create a new pool to ensure SSL config is applied
-  // In production, reuse the existing pool
-  if (!directPool || !isProduction) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL environment variable is not set');
-    }
+  console.log('[DB Pool] Creating singleton connection pool (production:', isProduction, ')');
 
-    console.log('[DB Pool] Creating new connection pool (is production?): '+isProduction);
-    //console.log('[DB Pool] Environment:', process.env.NODE_ENV);
-    //console.log('[DB Pool] Is Production:', isProduction);
+  // Check if we need SSL (cloud databases or production)
+  const needsSSL = connectionString.includes('supabase.com') || 
+                   connectionString.includes('supabase.co') || 
+                   connectionString.includes('railway.app') ||
+                   connectionString.includes('sslmode=require') ||
+                   isProduction;
 
-    // Check if we need SSL (cloud databases or production)
-    const needsSSL = connectionString.includes('supabase.co') || 
-                     connectionString.includes('railway.app') ||
-                     connectionString.includes('sslmode=require') ||
-                     isProduction;
+  // Parse connection string to preserve pgbouncer and other important params
+  // Only remove sslmode since we handle SSL separately via the ssl option
+  const url = new URL(connectionString);
+  url.searchParams.delete('sslmode'); // Remove sslmode, we set it via ssl option
+  const cleanConnectionString = url.toString();
 
-    // Remove sslmode parameter from connection string if present
-    const cleanConnectionString = connectionString.split('?')[0];
+  // Get connection limits from URL params or use defaults
+  const connectionLimit = parseInt(url.searchParams.get('connection_limit') || '5');
+  const poolTimeout = parseInt(url.searchParams.get('pool_timeout') || '10') * 1000; // Convert to ms
 
-    directPool = new Pool({
-      connectionString: cleanConnectionString,
-      ssl: needsSSL ? {
-        rejectUnauthorized: false,
-        // Disable SSL verification for development with cloud databases
-        checkServerIdentity: () => undefined
-      } : false,
-      max: 5,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    });
-
-    //console.log('[DB Pool] Pool created with SSL:', needsSSL ? 'enabled (no verification)' : 'disabled');
-  }
+  directPool = new Pool({
+    connectionString: cleanConnectionString,
+    ssl: needsSSL ? {
+      rejectUnauthorized: false,
+      checkServerIdentity: () => undefined
+    } : false,
+    max: connectionLimit,
+    idleTimeoutMillis: poolTimeout,
+    connectionTimeoutMillis: 10000,
+  });
 
   return directPool;
 };

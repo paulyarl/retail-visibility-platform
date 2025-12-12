@@ -529,7 +529,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
         // Create photo assets for each image in the gallery
         // First delete any existing photo assets for this item
         const deletedCount = await prisma.photo_assets.deleteMany({
-          where: { inventory_item_id: item!.id },
+          where: { inventoryItemId: item!.id },
         });
         if (deletedCount.count > 0) {
           console.log(`[commit] Deleted ${deletedCount.count} existing photo assets for restored item ${item!.id}`);
@@ -542,14 +542,14 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
             const photoAsset = await prisma.photo_assets.create({
               data: {
                 id: generatePhotoId(), // Generate unique photo ID
-                tenant_id: session.tenant_id,
-                inventory_item_id: item!.id,
+                tenantId: session.tenant_id,
+                inventoryItemId: item!.id,
                 url: imageUrl,
                 position: i,
                 alt: item!.name,
                 caption: null,
-                content_type: 'image/jpeg', // Assume JPEG for scanned images
-                exif_removed: true,
+                contentType: 'image/jpeg', // Assume JPEG for scanned images
+                exifRemoved: true,
               },
             });
             photoAssets.push(photoAsset);

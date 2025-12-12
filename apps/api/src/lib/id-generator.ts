@@ -14,7 +14,7 @@ import { customAlphabet } from 'nanoid';
  */
 export function generateTenantId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `t-${nanoid()}`;
+  return `tid-${nanoid()}`;
 }
 
 /**
@@ -24,7 +24,7 @@ export function generateTenantId(): string {
  */
 export function generateUserId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `user-${nanoid()}`;
+  return `uid-${nanoid()}`;
 }
 
 /**
@@ -32,9 +32,9 @@ export function generateUserId(): string {
  * Format: tenant-abc123 (13 chars vs 36 for UUID)
  * URL-safe, readable, unique
  */
-export function generateUserTenantId(userId: string = 'user',tenantId: string = 'tenant'): string {
+export function generateUserTenantId(userId: string = 'uid',tenantId: string = 'tid'): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
-  return `ut-${userId}-${tenantId}-${nanoid()}`;
+  return `utid-${userId}-${tenantId}-${nanoid()}`;
 }
 // id: `ut_${tenantId}_${user.id}`,
 /**
@@ -44,7 +44,7 @@ export function generateUserTenantId(userId: string = 'user',tenantId: string = 
  */
 export function generateItemId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `i-${nanoid()}`;
+  return `iid-${nanoid()}`;
 }
 
 /**
@@ -55,14 +55,14 @@ export function generateItemId(): string {
 export function generateQuickStartSku(index?: number): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
   const suffix = index !== undefined ? index.toString().padStart(3, '0') : nanoid();
-  return `qs-${suffix}`;
+  return `qsskuid-${suffix}`;
 }
 
 /**
  * Generates readable SKUs with optional prefix
  * Format: SKU-abc123 or CUSTOM-abc123
  */
-export function generateSku(prefix: string = 'SKU'): string {
+export function generateSku(prefix: string = 'skuid'): string {
   const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 8);
   return `${prefix}-${nanoid()}`;
 }
@@ -73,7 +73,7 @@ export function generateSku(prefix: string = 'SKU'): string {
  */
 export function generatePhotoId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `p-${nanoid()}`;
+  return `photoid-${nanoid()}`;
 }
 
 /**
@@ -82,7 +82,7 @@ export function generatePhotoId(): string {
  */
 export function generateSessionId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `s-${nanoid()}`;
+  return `sessionid-${nanoid()}`;
 }
 
 /**
@@ -91,7 +91,7 @@ export function generateSessionId(): string {
  */
 export function generateTierId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
-  return `tier-${nanoid()}`;
+  return `tierid-${nanoid()}`;
 }
 
 /**
@@ -100,7 +100,7 @@ export function generateTierId(): string {
  */
 export function generateFeatureId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
-  return `feat-${nanoid()}`;
+  return `featid-${nanoid()}`;
 }
 
 /**
@@ -109,16 +109,33 @@ export function generateFeatureId(): string {
  */
 export function generateQsCatId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `qscat-${nanoid()}`;
+  return `qscatid-${nanoid()}`;
 }
 
+/**
+ * Generates clover quick start category IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateCloverCatId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `ccatid-${nanoid()}`;
+}
+
+/**
+ * Generates clover logs IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateCloverLogId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `clogid-${nanoid()}`;
+}
 /**
  * Generates short directory category IDs
  * Format: sess-abc123 (12 chars)
  */
 export function generateDsCatId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `dircat-${nanoid()}`;
+  return `dircatid-${nanoid()}`;
 }
 
 /**

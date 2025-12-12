@@ -92,7 +92,7 @@ router.put('/:id', async (req, res) => {
     // Log the change
     await prisma.permission_audit_logs_list.create({
       data: {
-        id: generateQuickStart("audit"),
+        id: generateQuickStart("auditid"),
         tenantId: (req.user as any)?.tenantId || 'system',
         role: current.role,
         action: current.action,
@@ -154,7 +154,7 @@ router.post('/bulk-update', async (req, res) => {
 
       // Prepare audit log
       auditLogs.push({
-        id: generateQuickStart("audit"),
+        id: generateQuickStart("auditid"),
         tenantId: (req.user as any)?.tenantId || 'system',
         role: current.role,
         action: current.action,

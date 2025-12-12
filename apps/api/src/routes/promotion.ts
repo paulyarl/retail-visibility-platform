@@ -1,34 +1,10 @@
 import { Router } from 'express';
-import { Pool } from 'pg';
+import { getDirectPool } from '../utils/db-pool';
 
 const router = Router();
 
-// Create a connection pool
-// In development, we need to handle self-signed certificates
-const getPoolConfig = () => {
-  const config: any = {
-    connectionString: process.env.DATABASE_URL,
-  };
-
-  // Always disable SSL certificate verification for local development
-  // Check for production indicators (Railway, Vercel, etc.)
-  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
-                      process.env.VERCEL_ENV === 'production' ||
-                      process.env.NODE_ENV === 'production';
-
-  if (!isProduction) {
-    console.log('[Promotion Pool] Local development detected - disabling SSL verification');
-    config.ssl = {
-      rejectUnauthorized: false
-    };
-  } else {
-    console.log('[Promotion Pool] Production environment - SSL verification enabled');
-  }
-
-  return config;
-};
-
-const pool = new Pool(getPoolConfig());
+// Use shared connection pool
+const pool = getDirectPool();
 
 /**
  * GET /api/tenants/:tenantId/promotion/status

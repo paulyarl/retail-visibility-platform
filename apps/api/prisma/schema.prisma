@@ -8,7 +8,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model audit_log {
   id           String      @id
   tenant_id    String
@@ -111,6 +110,28 @@ model category_mirror_runs {
   @@index([tenant_id, strategy, started_at(sort: Desc)], map: "category_mirror_runs_tenant_id_strategy_started_at_sort_desc_")
 }
 
+model clover_category_mappings_list {
+  id                       String                   @id @db.VarChar(255)
+  integration_id           String                   @db.VarChar(255)
+  clover_category_id       String                   @db.VarChar(255)
+  clover_category_name     String                   @db.VarChar(255)
+  clover_parent_id         String?                  @db.VarChar(255)
+  rvp_category_id          String?                  @db.VarChar(255)
+  rvp_category_name        String?                  @db.VarChar(255)
+  sync_direction           String                   @default("bidirectional") @db.VarChar(50)
+  mapping_status           String                   @default("pending") @db.VarChar(50)
+  conflict_reason          String?
+  last_synced_at           DateTime?                @db.Timestamptz(6)
+  last_sync_status         String?                  @db.VarChar(50)
+  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                 @db.Timestamptz(6)
+  clover_integrations_list clover_integrations_list @relation(fields: [integration_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_clover_category_mappings_integration")
+
+  @@index([integration_id, clover_category_id], map: "idx_clover_cat_map_integration_clover")
+  @@index([integration_id, rvp_category_id], map: "idx_clover_cat_map_integration_rvp")
+  @@index([mapping_status], map: "idx_clover_cat_map_status")
+}
+
 model clover_demo_snapshots_list {
   id                       String                   @id
   integration_id           String
@@ -137,9 +158,9 @@ model clover_integrations_list {
   last_sync_status              String?
   created_at                    DateTime                        @default(now())
   updated_at                    DateTime
+  clover_category_mappings_list clover_category_mappings_list[]
   clover_demo_snapshots_list    clover_demo_snapshots_list[]
   clover_item_mappings_list     clover_item_mappings_list[]
-  clover_category_mappings_list clover_category_mappings_list[]
   clover_sync_logs_list         clover_sync_logs_list[]
 }
 
@@ -158,28 +179,6 @@ model clover_item_mappings_list {
   created_at               DateTime                 @default(now())
   updated_at               DateTime
   clover_integrations_list clover_integrations_list @relation(fields: [integration_id], references: [id], onDelete: Cascade)
-}
-
-model clover_category_mappings_list {
-  id                       String                   @id
-  integration_id           String
-  clover_category_id       String
-  clover_category_name     String
-  clover_parent_id         String?
-  rvp_category_id          String?
-  rvp_category_name        String?
-  sync_direction           String                   @default("bidirectional")
-  mapping_status           String                   @default("pending")
-  conflict_reason          String?
-  last_synced_at           DateTime?
-  last_sync_status         String?
-  created_at               DateTime                 @default(now())
-  updated_at               DateTime
-  clover_integrations_list clover_integrations_list @relation(fields: [integration_id], references: [id], onDelete: Cascade)
-
-  @@index([integration_id, clover_category_id])
-  @@index([integration_id, rvp_category_id])
-  @@index([mapping_status])
 }
 
 model clover_sync_logs_list {
@@ -201,15 +200,15 @@ model clover_sync_logs_list {
 
 model directory_category {
   id               String   @id
-  tenantId         String   @map("tenantId")
+  tenantId         String
   name             String
   slug             String
-  parentId         String?  @map("parentId")
-  googleCategoryId String?  @map("googleCategoryId")
-  isActive         Boolean  @default(true) @map("isActive")
-  sortOrder        Int      @default(0) @map("sortOrder")
-  createdAt        DateTime @default(now()) @map("createdAt")
-  updatedAt        DateTime @updatedAt @map("updatedAt")
+  parentId         String?
+  googleCategoryId String?
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime
 }
 
 model directory_category_mv_refresh_log {
@@ -242,7 +241,6 @@ model directory_featured_listings_list {
   @@index([tenant_id, featured_until])
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model directory_listing_categories {
   listing_id  String
   category_id String
@@ -287,7 +285,6 @@ model directory_listings_list {
   @@index([is_published], map: "idx_directory_listings_is_published")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model directory_mv_refresh_log {
   id                   Int       @id @default(autoincrement())
   view_name            String
@@ -363,8 +360,6 @@ model gbp_categories_list {
   tenant_business_profiles_list tenant_business_profiles_list[]
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model gbp_category_mappings {
   gbp_category_id           String    @id
   gbp_category_name         String
@@ -400,7 +395,6 @@ model gbp_insights_daily_list {
   @@unique([location_id, date])
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model gbp_listing_categories {
   listing_id      String
   gbp_category_id String
@@ -483,7 +477,6 @@ model google_oauth_tokens_list {
   google_oauth_accounts_list google_oauth_accounts_list @relation(fields: [account_id], references: [id], onDelete: Cascade)
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model google_taxonomy_list {
   id            String   @id
   category_id   String   @unique
@@ -574,7 +567,6 @@ model invitations {
   @@index([tenant_id])
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model location_status_logs {
   id             Int             @id @default(autoincrement())
   tenant_id      String          @db.VarChar(255)
@@ -589,10 +581,8 @@ model location_status_logs {
 
   @@index([created_at(sort: Desc)], map: "idx_location_status_logs_created_at")
   @@index([tenant_id], map: "idx_location_status_logs_tenant_id")
-  @@ignore
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model manual_migrations {
   id             Int       @id @default(autoincrement())
   migration_name String    @unique
@@ -690,32 +680,30 @@ model permission_matrix_list {
 }
 
 model photo_assets {
-  id                String          @id
-  tenant_id         String          @map("tenantId")
-  inventory_item_id String          @map("inventoryItemId")
-  url               String
-  width             Int?
-  height            Int?
-  content_type      String?         @map("contentType")
-  bytes             Int?
-  exif_removed      Boolean         @default(false) @map("exifRemoved")
-  captured_at       DateTime?       @map("capturedAt") @db.Timestamptz(6)
-  created_at        DateTime        @default(now()) @map("createdAt") @db.Timestamptz(6)
-  public_url        String?         @map("publicUrl")
-  signed_url        String?         @map("signedUrl")
-  position          Int             @default(0)
-  alt               String?
-  caption           String?
-  inventory_items   inventory_items @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade)
-  tenants           tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  id              String          @id
+  tenantId        String
+  inventoryItemId String
+  url             String
+  width           Int?
+  height          Int?
+  contentType     String?
+  bytes           Int?
+  exifRemoved     Boolean         @default(false)
+  capturedAt      DateTime?       @db.Timestamptz(6)
+  createdAt       DateTime        @default(now()) @db.Timestamptz(6)
+  publicUrl       String?
+  signedUrl       String?
+  position        Int             @default(0)
+  alt             String?
+  caption         String?
+  inventory_items inventory_items @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  tenants         tenants         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([inventory_item_id, position], map: "photo_assets_inventory_item_id_position_unique")
-  @@index([inventory_item_id], map: "idx_photo_assets_inventory_item_id")
-  @@index([tenant_id], map: "idx_photo_assets_tenant_id")
+  @@unique([inventoryItemId, position], map: "photo_assets_inventory_item_id_position_unique")
+  @@index([inventoryItemId], map: "idx_photo_assets_inventory_item_id")
+  @@index([tenantId], map: "idx_photo_assets_tenant_id")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model platform_categories {
   id                 String    @id @default(dbgenerated("('cat_'::text || gen_random_uuid())"))
   name               String
@@ -779,6 +767,39 @@ model product_performances {
 
   @@unique([item_id, date], map: "product_performance_item_id_date_unique")
   @@index([tenant_id, date(sort: Desc)], map: "product_performance_tenant_id_date_sort_desc_idx")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model quick_start_product_cache {
+  id                   String    @id
+  business_type        String
+  category_name        String
+  google_category_id   String?
+  product_name         String
+  price_cents          Int
+  brand                String?
+  description          String?
+  sku_pattern          String?
+  generation_source    String    @default("ai")
+  usage_count          Int       @default(0)
+  quality_score        Float?    @default(0.0) @db.Real
+  created_at           DateTime  @default(now()) @db.Timestamp(6)
+  last_used_at         DateTime? @db.Timestamp(6)
+  image_url            String?
+  thumbnail_url        String?
+  image_width          Int?
+  image_height         Int?
+  image_bytes          Int?
+  enhanced_description String?
+  features             Json?
+  specifications       Json?
+  has_image            Boolean?  @default(false)
+  image_quality        String?
+
+  @@unique([business_type, category_name, product_name], map: "unique_product_per_scenario")
+  @@index([quality_score(sort: Desc)], map: "idx_qspc_quality")
+  @@index([business_type, category_name], map: "idx_qspc_scenario")
+  @@index([usage_count(sort: Desc)], map: "idx_qspc_usage")
 }
 
 model review_helpful_votes {
@@ -896,6 +917,15 @@ model sku_billing_policy_overrides_list {
   updatedAt            DateTime @default(now()) @db.Timestamptz(6)
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
+}
+
 model square_integrations_list {
   id               String    @id
   tenant_id        String
@@ -962,7 +992,6 @@ model store_rating_summary {
   updated_at              DateTime? @default(now()) @db.Timestamp(6)
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model store_reviews {
   id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id         String
@@ -1032,14 +1061,14 @@ model sync_jobs {
 }
 
 model tenant_business_profiles_list {
-  tenant_id                  String               @id @unique
+  tenant_id                  String                    @id @unique
   business_name              String
   address_line1              String
   address_line2              String?
   city                       String
   state                      String?
   postal_code                String
-  country_code               String               @db.Char(2)
+  country_code               String                    @db.Char(2)
   phone_number               String?
   email                      String?
   website                    String?
@@ -1052,16 +1081,18 @@ model tenant_business_profiles_list {
   seo_tags                   Json?
   latitude                   Decimal?
   longitude                  Decimal?
-  display_map                Boolean              @default(false)
-  map_privacy_mode           String               @default("precise")
+  display_map                Boolean                   @default(false)
+  map_privacy_mode           String                    @default("precise")
   gbp_category_id            String?
   gbp_category_name          String?
   gbp_category_last_mirrored DateTime?
   gbp_category_sync_status   String?
   updated_at                 DateTime
-  gbp_categories_list        gbp_categories_list? @relation(fields: [gbp_category_id], references: [id])
-  tenants                    tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  geolocation                Unsupported("geography")?
+  gbp_categories_list        gbp_categories_list?      @relation(fields: [gbp_category_id], references: [id])
+  tenants                    tenants                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
+  @@index([geolocation], map: "idx_tenant_business_profiles_geolocation", type: Gist)
   @@index([gbp_category_id])
 }
 
@@ -1092,8 +1123,6 @@ model tenant_feature_overrides_list {
   @@unique([tenant_id, feature])
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tenant_gbp_categories {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id       String    @db.VarChar(50)
@@ -1152,7 +1181,7 @@ model tenants {
   google_oauth_accounts_list       google_oauth_accounts_list[]
   inventory_items                  inventory_items[]
   invitations                      invitations[]
-  location_status_logs             location_status_logs[] @ignore
+  location_status_logs             location_status_logs[]
   photo_assets                     photo_assets[]
   product_performances             product_performances[]
   scan_results_list                scan_results_list[]
@@ -1225,7 +1254,6 @@ model upgrade_requests {
   updated_at     DateTime
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model user_behavior_simple {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id          String?   @db.Uuid
@@ -1299,41 +1327,6 @@ model users {
   invitations                      invitations[]
   user_sessions_list               user_sessions_list[]
   user_tenants                     user_tenants[]
-}
-
-/// Quick Start Product Caches
-/// Stores AI-generated products for reuse across tenants
-model quick_start_product_caches {
-  id                   String    @id
-  business_type        String
-  category_name        String
-  google_category_id   String?
-  product_name         String
-  price_cents          Int
-  brand                String?
-  description          String?
-  sku_pattern          String?
-  generation_source    String    @default("ai")
-  usage_count          Int       @default(0)
-  quality_score        Float?    @default(0.0) @db.Real
-  created_at           DateTime  @default(now()) @db.Timestamp(6)
-  last_used_at         DateTime? @db.Timestamp(6)
-  image_url            String?
-  thumbnail_url        String?
-  image_width          Int?
-  image_height         Int?
-  image_bytes          Int?
-  enhanced_description String?
-  features             Json?
-  specifications       Json?
-  has_image            Boolean?  @default(false)
-  image_quality        String?
-
-  @@unique([business_type, category_name, product_name], name: "unique_product_per_scenario", map: "unique_product_per_scenario")
-  @@index([business_type, category_name], map: "idx_qspc_scenario")
-  @@index([quality_score(sort: Desc)], map: "idx_qspc_quality")
-  @@index([usage_count(sort: Desc)], map: "idx_qspc_usage")
-  @@map("quick_start_product_cache")
 }
 
 enum action {

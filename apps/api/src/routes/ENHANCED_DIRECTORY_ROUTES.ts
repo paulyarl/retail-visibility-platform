@@ -3,59 +3,10 @@
 // ============================================================================
 
 import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
+import { getDirectPool } from '../utils/db-pool';
 import { getCategoryCounts } from '../utils/category-counts';
 
 const router = Router();
-
-// Database connection pool (reuse from directory-v2)
-const getPoolConfig = () => {
-  let connectionString = process.env.DATABASE_URL;
-  
-  if (!connectionString) {
-    throw new Error('DATABASE_URL is not set');
-  }
-  
-  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
-                      process.env.VERCEL_ENV === 'production' ||
-                      process.env.NODE_ENV === 'production';
-
-  if (!isProduction) {
-    if (connectionString.includes('sslmode=')) {
-      connectionString = connectionString.replace(/sslmode=[^&]+/, 'sslmode=disable');
-    } else {
-      connectionString += '&sslmode=disable';
-    }
-  }
-
-  const config: any = {
-    connectionString,
-    min: 1,
-    max: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  };
-
-  if (!isProduction) {
-    config.ssl = {
-      rejectUnauthorized: false
-    };
-  }
-
-  return config;
-};
-
-const getDirectPool = () => {
-  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
-                      process.env.VERCEL_ENV === 'production' ||
-                      process.env.NODE_ENV === 'production';
-
-  if (!isProduction) {
-    return new Pool(getPoolConfig());
-  }
-
-  return new Pool(getPoolConfig());
-};
 
 /**
  * GET /api/directory/:slug/related

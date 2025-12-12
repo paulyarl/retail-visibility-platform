@@ -7,7 +7,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
+import { getDirectPool } from '../utils/db-pool';
 import { slugify } from '../utils/slug';
 
 const router = Router();
@@ -46,60 +46,6 @@ function calculateActivityScore(lastUpdated: string, firstAdded: string): number
   
   return Math.min(100, activityScore); // Cap at 100
 }
-
-// Reuse the pool configuration from directory-v2
-const getPoolConfig = () => {
-  let connectionString = process.env.DATABASE_URL;
-  
-  if (!connectionString) {
-    throw new Error('DATABASE_URL is not set');
-  }
-  
-  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
-                      process.env.VERCEL_ENV === 'production' ||
-                      process.env.NODE_ENV === 'production';
-
-  if (!isProduction) {
-    if (connectionString.includes('sslmode=')) {
-      connectionString = connectionString.replace(/sslmode=[^&]+/, 'sslmode=disable');
-    } else {
-      connectionString += '&sslmode=disable';
-    }
-  }
-
-  const config: any = {
-    connectionString,
-    min: 1,
-    max: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  };
-
-  if (!isProduction) {
-    config.ssl = {
-      rejectUnauthorized: false
-    };
-  }
-
-  return config;
-};
-
-let directPool: Pool | null = null;
-
-const getDirectPool = () => {
-  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
-                      process.env.VERCEL_ENV === 'production' ||
-                      process.env.NODE_ENV === 'production';
-
-  if (!isProduction) {
-    return new Pool(getPoolConfig());
-  }
-
-  if (!directPool) {
-    directPool = new Pool(getPoolConfig());
-  }
-  return directPool;
-};
 
 /**
  * GET /api/directory/mv/search

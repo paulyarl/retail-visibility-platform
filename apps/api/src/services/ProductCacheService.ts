@@ -181,7 +181,7 @@ export class ProductCacheService {
         whereClause.has_image = true;
       }
       
-      const products = await prisma.quick_start_product_caches.findMany({
+      const products = await prisma.quick_start_product_cache.findMany({
         where: whereClause,
         orderBy: [
           { usage_count: 'desc' },
@@ -200,7 +200,7 @@ export class ProductCacheService {
       }
       
       // Convert to CachedProduct format
-      return products.map(p => ({
+      return products.map((p: any) => ({
         id: p.id,
         businessType: p.business_type,
         categoryName: p.category_name,
@@ -296,9 +296,9 @@ export class ProductCacheService {
     
     for (const product of products) {
       try {
-        await prisma.quick_start_product_caches.upsert({
+        await prisma.quick_start_product_cache.upsert({
           where: {
-            unique_product_per_scenario: {
+            business_type_category_name_product_name: {
               business_type: businessType,
               category_name: categoryName,
               product_name: product.name
@@ -351,7 +351,7 @@ export class ProductCacheService {
     // Update usage count for cached products
     for (const id of productIds) {
       try {
-        await prisma.quick_start_product_caches.update({
+        await prisma.quick_start_product_cache.update({
           where: { id },
           data: {
             usage_count: { increment: 1 },
@@ -469,7 +469,7 @@ export class ProductCacheService {
         whereClause.category_name = categoryName;
       }
       
-      const cacheEntry = await prisma.quick_start_product_caches.findFirst({
+      const cacheEntry = await prisma.quick_start_product_cache.findFirst({
         where: whereClause
       });
       
@@ -479,7 +479,7 @@ export class ProductCacheService {
       }
       
       // Update with photo data
-      await prisma.quick_start_product_caches.update({
+      await prisma.quick_start_product_cache.update({
         where: { id: cacheEntry.id },
         data: {
           image_url: photoData.imageUrl,

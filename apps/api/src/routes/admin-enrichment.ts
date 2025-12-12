@@ -5,12 +5,12 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { canViewAllTenants } from '../utils/platform-admin';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /**
  * GET /api/admin/enrichment/analytics

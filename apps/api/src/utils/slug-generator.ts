@@ -9,9 +9,7 @@
  * 5. Numeric suffix as last resort (business-name-new-york-ny-usa-2)
  */
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../prisma';
 
 interface LocationInfo {
   city?: string;

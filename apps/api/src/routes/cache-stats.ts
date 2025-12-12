@@ -16,10 +16,10 @@ const router = Router();
 router.get('/cache/stats', authenticateToken, async (req, res) => {
   try {
     // Get total count
-    const totalProducts = await prisma.quick_start_product_caches.count();
+    const totalProducts = await prisma.quick_start_product_cache.count();
     
     // Get count by business type
-    const byBusinessType = await prisma.quick_start_product_caches.groupBy({
+    const byBusinessType = await prisma.quick_start_product_cache.groupBy({
       by: ['business_type'],
       _count: {
         _all: true
@@ -28,12 +28,12 @@ router.get('/cache/stats', authenticateToken, async (req, res) => {
     
     // Convert to object format
     const byBusinessTypeObj: Record<string, number> = {};
-    byBusinessType.forEach(item => {
+    byBusinessType.forEach((item: { business_type: string; _count: { _all: number } }) => {
       byBusinessTypeObj[item.business_type] = item._count._all;
     });
     
     // Get top products
-    const topProducts = await prisma.quick_start_product_caches.findMany({
+    const topProducts = await prisma.quick_start_product_cache.findMany({
       select: {
         product_name: true,
         business_type: true,
@@ -49,7 +49,7 @@ router.get('/cache/stats', authenticateToken, async (req, res) => {
     res.json({
       totalProducts,
       byBusinessType: byBusinessTypeObj,
-      topProducts: topProducts.map(p => ({
+      topProducts: topProducts.map((p: { product_name: string; business_type: string; usage_count: number; quality_score: number | null }) => ({
         name: p.product_name,
         businessType: p.business_type,
         usageCount: p.usage_count,

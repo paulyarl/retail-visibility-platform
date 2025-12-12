@@ -5,11 +5,9 @@
  * Extracted from CLI scripts for use in API endpoints.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../prisma';
 import { generateQuickStartProducts } from './quick-start';
 import { generateQuickStart, generateUserTenantId } from './id-generator';
-
-const prisma = new PrismaClient();
 
 // Chain size configurations
 const CHAIN_SIZES = {

@@ -147,7 +147,7 @@ router.post('/', async (req, res) => {
 
     const job = await prisma.feed_push_jobs_list.create({
       data: {
-        id: generateQuickStart("feed"), // Generate unique ID
+        id: generateQuickStart("fid"), // Generate unique ID
         tenant_id: body.tenantId,
         sku: body.sku,
         payload: body.payload as any || {},

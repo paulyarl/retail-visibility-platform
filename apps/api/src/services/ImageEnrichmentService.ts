@@ -212,14 +212,14 @@ export class ImageEnrichmentService {
       await prisma.photo_assets.create({
         data: {
           id:generatePhotoId(),
-          tenant_id:tenantId,
-          inventory_item_id: item_id,
+          tenantId:tenantId,
+          inventoryItemId: item_id,
           url: imageData.url,
           width: imageData.width ?? null,
           height: imageData.height ?? null,
-          content_type: imageData.contentType ?? null,
+          contentType: imageData.contentType ?? null,
           bytes: imageData.bytes ?? null,
-          exif_removed: true,
+          exifRemoved: true,
           position,
           alt: alt ?? null,
           caption: null,
@@ -257,7 +257,7 @@ export class ImageEnrichmentService {
 
     // Find the highest existing position to start from there
     const existingPositions = await prisma.photo_assets.findMany({
-      where: { inventory_item_id: item_id },
+      where: { inventoryItemId: item_id },
       select: { position: true },
       orderBy: { position: 'desc' },
       take: 1,

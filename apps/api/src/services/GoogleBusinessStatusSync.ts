@@ -5,9 +5,7 @@
  * Maps internal status to GBP openInfo.status values
  */
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../prisma';
 
 type LocationStatus = 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
 

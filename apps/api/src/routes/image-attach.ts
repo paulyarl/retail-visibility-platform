@@ -62,9 +62,9 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
     // Create photo record
     const photo = await prisma.photo_assets.create({
       data: {
-        id: generateQuickStart("photo"),
-        tenant_id: tenantId,
-        inventory_item_id: itemId,
+        id: generateQuickStart("pid"),
+        tenantId: tenantId,
+        inventoryItemId: itemId,
         url: `/uploads/items/${filename}`,
         position: 0, // Set as primary photo
         alt: photographer ? `Photo by ${photographer} on ${source}` : item.name,

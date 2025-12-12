@@ -29,7 +29,7 @@ export const categoryService = {
   async createTenantCategory(tenantId: string, input: Required<Pick<UpdateCategoryInput, 'name' | 'slug'>> & Partial<UpdateCategoryInput>) {
     const category = await prisma.directory_category.create({
       data: {
-        id: generateQuickStart("tc"),
+        id: generateQuickStart("dircid"),
         tenantId: tenantId,
         name: input.name,
         slug: input.slug,

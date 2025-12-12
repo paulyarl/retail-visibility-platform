@@ -4,9 +4,7 @@
  * Phase 2: Backend Implementation
  */
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../prisma';
 
 export interface CreateIntegrationData {
   tenantId: string;

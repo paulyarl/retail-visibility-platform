@@ -4,71 +4,9 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
+import { getDirectPool } from '../utils/db-pool';
 
 const router = Router();
-
-// Create a direct database connection pool that bypasses Prisma's retry logic
-// In development, we need to handle self-signed certificates
-const getPoolConfig = () => {
-  // Modify connection string to use prefer instead of require for local development
-  let connectionString = process.env.DATABASE_URL;
-  
-  if (!connectionString) {
-    throw new Error('DATABASE_URL is not set');
-  }
-  
-  // Always disable SSL certificate verification for local development
-  // Check for production indicators (Railway, Vercel, etc.)
-  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
-                      process.env.VERCEL_ENV === 'production' ||
-                      process.env.NODE_ENV === 'production';
-
-  if (!isProduction) {
-    // Disable SSL for local development
-    if (connectionString.includes('sslmode=')) {
-      connectionString = connectionString.replace(/sslmode=[^&]+/, 'sslmode=disable');
-    } else {
-      connectionString += '&sslmode=disable';
-    }
-  }
-
-  const config: any = {
-    connectionString,
-    min: 1,
-    max: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  };
-
-  if (!isProduction) {
-    config.ssl = {
-      rejectUnauthorized: false
-    };
-  }
-
-  return config;
-};
-
-// Create pool on-demand to ensure SSL config is applied
-let directPool: Pool | null = null;
-
-const getDirectPool = () => {
-  // Always create a new pool in development to ensure SSL config is applied
-  const isProduction = process.env.RAILWAY_ENVIRONMENT || 
-                      process.env.VERCEL_ENV === 'production' ||
-                      process.env.NODE_ENV === 'production';
-
-  if (!isProduction) {
-    // console.log('[Directory Pool] Creating fresh pool for development');
-    return new Pool(getPoolConfig());
-  }
-
-  if (!directPool) {
-    directPool = new Pool(getPoolConfig());
-  }
-  return directPool;
-};
 
 /**
  * GET /api/directory/stores
