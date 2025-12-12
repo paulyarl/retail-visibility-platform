@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
+import { api } from '@/lib/api';
 
 interface DirectoryListing {
   id: string;
@@ -44,7 +45,8 @@ export default function DirectoryMap({
 
   // Auto-geocode stores without coordinates
   const handleAutoGeocode = async (store: DirectoryListing) => {
-    if (!store.address || !store.city || !store.zipCode || !store.country) {
+    // Only require address, city, and zipCode - country defaults to US
+    if (!store.address || !store.city || !store.zipCode) {
       console.log('[DirectoryMap] Store missing required address fields for geocoding:', store.businessName);
       return null;
     }
@@ -57,18 +59,14 @@ export default function DirectoryMap({
         city: store.city,
         state: store.state,
         postal_code: store.zipCode,
-        country_code: store.country,
+        country_code: store.country || 'US', // Default to US if not specified
       });
 
       if (coordinates) {
         console.log('[DirectoryMap] Got coordinates for', store.businessName, ':', coordinates);
         
         // Update the store coordinates via API
-        const response = await fetch(`/api/tenants/${store.id}/coordinates`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(coordinates),
-        });
+        const response = await api.patch(`/api/tenants/${store.id}/coordinates`, coordinates);
 
         if (response.ok) {
           console.log('[DirectoryMap] Successfully updated coordinates for', store.businessName);
@@ -92,8 +90,9 @@ export default function DirectoryMap({
       if (listingsWithoutCoords.length === 0) return;
       
       // Find stores that have complete address info but no coordinates
+      // Country is optional - defaults to US
       const storesWithCompleteAddress = listingsWithoutCoords.filter(store => 
-        store.address && store.city && store.zipCode && store.country
+        store.address && store.city && store.zipCode
       );
 
       if (storesWithCompleteAddress.length === 0) return;
