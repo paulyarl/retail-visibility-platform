@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api';
 import { ArrowLeft, Zap, ExternalLink, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 
 // Types
@@ -49,10 +50,7 @@ export default function SquareIntegrationPage() {
   // Fetch status
   const fetchStatus = useCallback(async () => {
     try {
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/square/status`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get(`/api/integrations/${tenantId}/square/status`);
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
@@ -60,7 +58,7 @@ export default function SquareIntegrationPage() {
     } catch (err) {
       console.error('Failed to fetch status:', err);
     }
-  }, [tenantId, getAccessToken]);
+  }, [tenantId]);
 
   // Initial load
   useEffect(() => {
@@ -81,10 +79,7 @@ export default function SquareIntegrationPage() {
     try {
       setActionLoading(true);
       setError(null);
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/square/oauth/authorize`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get(`/api/integrations/${tenantId}/square/oauth/authorize`);
       const data = await res.json();
       
       if (data.error === 'not_implemented') {
@@ -104,11 +99,7 @@ export default function SquareIntegrationPage() {
     if (!confirm('Are you sure you want to disconnect Square? This will stop syncing your inventory.')) return;
     try {
       setActionLoading(true);
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/square/disconnect`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.post(`/api/integrations/${tenantId}/square/disconnect`);
       const data = await res.json();
       
       if (data.error === 'not_implemented') {
@@ -127,11 +118,7 @@ export default function SquareIntegrationPage() {
   const handleSync = async () => {
     try {
       setActionLoading(true);
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/square/sync`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.post(`/api/integrations/${tenantId}/square/sync`);
       const data = await res.json();
       
       if (data.error === 'not_implemented') {

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api';
 import { ArrowLeft, Play, CheckCircle, XCircle, AlertTriangle, RefreshCw, Zap, Package, DollarSign, Trash2, AlertOctagon, Layers, FolderPlus, FolderEdit, FolderSync, FolderX } from 'lucide-react';
 
 // Types
@@ -124,10 +125,7 @@ export default function CloverIntegrationPage() {
   // Fetch status
   const fetchStatus = useCallback(async () => {
     try {
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/clover/status`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get(`/api/integrations/${tenantId}/clover/status`);
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
@@ -135,15 +133,12 @@ export default function CloverIntegrationPage() {
     } catch (err) {
       console.error('Failed to fetch status:', err);
     }
-  }, [tenantId, getAccessToken]);
+  }, [tenantId]);
 
   // Fetch scenarios
   const fetchScenarios = useCallback(async () => {
     try {
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/clover/demo/scenarios`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get(`/api/integrations/${tenantId}/clover/demo/scenarios`);
       if (res.ok) {
         const data = await res.json();
         setScenarios(data.scenarios || []);
@@ -151,19 +146,16 @@ export default function CloverIntegrationPage() {
     } catch (err) {
       console.error('Failed to fetch scenarios:', err);
     }
-  }, [tenantId, getAccessToken]);
+  }, [tenantId]);
 
   // Fetch mappings (works for both demo and production)
   const fetchMappings = useCallback(async () => {
     try {
-      const token = getAccessToken();
       // Use demo endpoint for demo mode, regular endpoint for production
       const endpoint = status?.mode === 'demo' 
         ? `/api/integrations/${tenantId}/clover/demo/mappings`
         : `/api/integrations/${tenantId}/clover/mappings`;
-      const res = await fetch(endpoint, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get(endpoint);
       if (res.ok) {
         const data = await res.json();
         setMappings(data.mappings || []);
@@ -171,19 +163,16 @@ export default function CloverIntegrationPage() {
     } catch (err) {
       console.error('Failed to fetch mappings:', err);
     }
-  }, [tenantId, getAccessToken, status?.mode]);
+  }, [tenantId, status?.mode]);
 
   // Fetch sync history (works for both demo and production)
   const fetchSyncHistory = useCallback(async () => {
     try {
-      const token = getAccessToken();
       // Use demo endpoint for demo mode, regular endpoint for production
       const endpoint = status?.mode === 'demo'
         ? `/api/integrations/${tenantId}/clover/demo/sync-history`
         : `/api/integrations/${tenantId}/clover/sync-history`;
-      const res = await fetch(endpoint, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get(endpoint);
       if (res.ok) {
         const data = await res.json();
         setSyncLogs(data.syncLogs || []);
@@ -191,15 +180,12 @@ export default function CloverIntegrationPage() {
     } catch (err) {
       console.error('Failed to fetch sync history:', err);
     }
-  }, [tenantId, getAccessToken, status?.mode]);
+  }, [tenantId, status?.mode]);
 
   // Fetch category mappings
   const fetchCategoryMappings = useCallback(async () => {
     try {
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/clover/category-mappings`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get(`/api/integrations/${tenantId}/clover/category-mappings`);
       if (res.ok) {
         const data = await res.json();
         setCategoryMappings(data.categoryMappings || []);
@@ -207,7 +193,7 @@ export default function CloverIntegrationPage() {
     } catch (err) {
       console.error('Failed to fetch category mappings:', err);
     }
-  }, [tenantId, getAccessToken]);
+  }, [tenantId]);
 
   // Initial load
   useEffect(() => {
@@ -238,11 +224,7 @@ export default function CloverIntegrationPage() {
     try {
       setActionLoading(true);
       setError(null);
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/clover/demo/enable`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-      });
+      const res = await api.post(`/api/integrations/${tenantId}/clover/demo/enable`);
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || 'Failed to enable demo mode');
@@ -262,12 +244,7 @@ export default function CloverIntegrationPage() {
     if (!confirm('Are you sure? This will remove all demo items.')) return;
     try {
       setActionLoading(true);
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/clover/demo/disable`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keepItems: false })
-      });
+      const res = await api.post(`/api/integrations/${tenantId}/clover/demo/disable`, { keepItems: false });
       if (!res.ok) throw new Error('Failed to disable demo mode');
       alert('Demo mode disabled.');
       await fetchStatus();
@@ -283,10 +260,7 @@ export default function CloverIntegrationPage() {
     try {
       setActionLoading(true);
       setError(null);
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/clover/oauth/authorize`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get(`/api/integrations/${tenantId}/clover/oauth/authorize`);
       const data = await res.json();
       
       if (data.authorizationUrl) {
@@ -305,11 +279,7 @@ export default function CloverIntegrationPage() {
   const handleSync = async () => {
     try {
       setActionLoading(true);
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/clover/sync`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.post(`/api/integrations/${tenantId}/clover/sync`);
       if (!res.ok) throw new Error('Failed to start sync');
       const data = await res.json();
       alert(`Sync started! ${data.message || ''}`);
@@ -326,11 +296,7 @@ export default function CloverIntegrationPage() {
     if (!confirm('Are you sure you want to disconnect Clover? This will stop syncing your inventory.')) return;
     try {
       setActionLoading(true);
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/clover/disconnect`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.post(`/api/integrations/${tenantId}/clover/disconnect`);
       if (!res.ok) throw new Error('Failed to disconnect');
       alert('Clover disconnected.');
       await fetchStatus();
@@ -345,12 +311,7 @@ export default function CloverIntegrationPage() {
   const handleTriggerSimulation = async (scenario: string) => {
     try {
       setActionLoading(true);
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/clover/demo/simulate`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario })
-      });
+      const res = await api.post(`/api/integrations/${tenantId}/clover/demo/simulate`, { scenario });
       if (!res.ok) throw new Error('Failed to start simulation');
       const data = await res.json();
       setActiveSimulation(data.event);
@@ -366,11 +327,7 @@ export default function CloverIntegrationPage() {
     if (!activeSimulation) return;
     try {
       setActionLoading(true);
-      const token = getAccessToken();
-      const res = await fetch(`/api/integrations/${tenantId}/clover/demo/simulate/${activeSimulation.id}/execute`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.post(`/api/integrations/${tenantId}/clover/demo/simulate/${activeSimulation.id}/execute`);
       if (!res.ok) throw new Error('Failed to execute simulation');
       const data = await res.json();
       setActiveSimulation(data.event);
@@ -387,11 +344,7 @@ export default function CloverIntegrationPage() {
   const handleCancelSimulation = async () => {
     if (!activeSimulation) return;
     try {
-      const token = getAccessToken();
-      await fetch(`/api/integrations/${tenantId}/clover/demo/simulate/${activeSimulation.id}/cancel`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      await api.post(`/api/integrations/${tenantId}/clover/demo/simulate/${activeSimulation.id}/cancel`);
       setActiveSimulation(null);
     } catch (err: any) {
       setError(err.message);
@@ -402,16 +355,11 @@ export default function CloverIntegrationPage() {
   const handleResolveConflict = async (mappingId: string, resolution: 'use_clover' | 'use_rvp') => {
     try {
       setActionLoading(true);
-      const token = getAccessToken();
       // Use demo endpoint for demo mode, regular endpoint for production
       const endpoint = status?.mode === 'demo'
         ? `/api/integrations/${tenantId}/clover/demo/mappings/${mappingId}/resolve`
         : `/api/integrations/${tenantId}/clover/mappings/${mappingId}/resolve`;
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resolution })
-      });
+      const res = await api.post(endpoint, { resolution });
       if (!res.ok) throw new Error('Failed to resolve conflict');
       await fetchMappings();
       await fetchStatus();
