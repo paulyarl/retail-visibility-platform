@@ -564,11 +564,20 @@ app.patch("/api/tenants/:id/coordinates", async (req, res) => {
       WHERE tenant_id = ${id}
     `;
 
+    // Also update directory_listings_list so coordinates appear in directory/map immediately
+    await basePrisma.$executeRaw`
+      UPDATE "directory_listings_list" 
+      SET latitude = ${parsed.data.latitude}, 
+          longitude = ${parsed.data.longitude},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tenant_id = ${id}
+    `;
+
     const tenant = await prisma.tenants.findUnique({
       where: { id },
     });
 
-    console.log(`[PATCH /api/tenants/${id}/coordinates] Updated coordinates for ${tenant?.name || 'unknown'}:`, parsed.data);
+    console.log(`[PATCH /api/tenants/${id}/coordinates] Updated coordinates for ${tenant?.name || 'unknown'} in business_profiles and directory_listings:`, parsed.data);
 
     res.json({
       success: true,
