@@ -85,7 +85,9 @@ export function useTenantItems(options: UseTenantItemsOptions): UseTenantItemsRe
         q: search || undefined,
         status: status === "all" ? undefined : (status as ItemFilters["status"]),
         visibility: visibility === "all" ? undefined : (visibility as ItemFilters["visibility"]),
-        category: category || undefined,
+        // Use categoryFilter for assigned/unassigned, or categoryId for specific category
+        categoryFilter: (category === 'assigned' || category === 'unassigned') ? category : undefined,
+        categoryId: (category && category !== 'assigned' && category !== 'unassigned') ? category : undefined,
       };
 
       const { items, pagination } = await itemsDataService.fetchItems(tenantId, filters, {

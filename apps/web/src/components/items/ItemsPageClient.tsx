@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Button, Input, Modal, ModalFooter, ConfirmDialog } from "@/components/ui";
 import { useTenantItems } from "@/hooks/useTenantItems";
 import { useItemsViewMode } from "@/hooks/useItemsViewMode";
@@ -18,6 +18,7 @@ import BulkUploadModal from "@/components/items/BulkUploadModal";
 import QuickStartEmptyState from "@/components/items/QuickStartEmptyState";
 import ItemsGuide from "@/components/items/ItemsGuide";
 import { itemsDataService, Item } from "@/services/itemsDataService";
+import { apiRequest } from "@/lib/api";
 
 interface ItemsPageClientProps {
   tenantId: string;
@@ -35,9 +36,11 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     status,
     visibility,
     search,
+    category,
     setStatus,
     setVisibility,
     setSearch,
+    setCategory,
     setPage,
     setPageSize,
     refresh,
@@ -97,6 +100,53 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [visibilityDropdownOpen, setVisibilityDropdownOpen] = useState(false);
   
+  // Category dropdown state
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const [allTenantCategories, setAllTenantCategories] = useState<Array<{id: string, name: string}>>([]);
+  
+  // Fetch ALL tenant categories once (not affected by filters)
+  // Also build from items as fallback
+  const categoriesFromItems = useRef<Map<string, string>>(new Map());
+  
+  useEffect(() => {
+    const fetchAllCategories = async () => {
+      try {
+        const response = await apiRequest(`/api/tenant/${tenantId}/categories`);
+        if (response.ok) {
+          const data = await response.json();
+          const categories = data.data || data.categories || data || [];
+          if (categories.length > 0) {
+            setAllTenantCategories(categories.map((c: any) => ({ id: c.id, name: c.name })).sort((a: any, b: any) => a.name.localeCompare(b.name)));
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('[ItemsPageClient] Failed to fetch categories:', error);
+      }
+      // Fallback: use categories collected from items
+      if (categoriesFromItems.current.size > 0) {
+        const cats = Array.from(categoriesFromItems.current.entries()).map(([id, name]) => ({ id, name }));
+        setAllTenantCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    };
+    if (tenantId) fetchAllCategories();
+  }, [tenantId]);
+  
+  // Collect categories from items as they load (builds up over time)
+  useEffect(() => {
+    items.forEach(item => {
+      if (item.tenantCategory?.id && item.tenantCategory?.name) {
+        categoriesFromItems.current.set(item.tenantCategory.id, item.tenantCategory.name);
+      }
+    });
+    // If API didn't return categories, use collected ones
+    if (allTenantCategories.length === 0 && categoriesFromItems.current.size > 0) {
+      const cats = Array.from(categoriesFromItems.current.entries()).map(([id, name]) => ({ id, name }));
+      setAllTenantCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
+    }
+  }, [items, allTenantCategories.length]);
+  
   // Click outside handlers for dropdowns
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const visibilityDropdownRef = useRef<HTMLDivElement>(null);
@@ -108,6 +158,9 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       }
       if (visibilityDropdownRef.current && !visibilityDropdownRef.current.contains(event.target as Node)) {
         setVisibilityDropdownOpen(false);
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setCategoryDropdownOpen(false);
       }
     };
     
@@ -464,7 +517,77 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
           </Button>
         </div>
 
-        {/* Simple View Mode Toggle (preview-only) */}
+        {/* Category Filter Row */}
+        <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+          <span>Category:</span>
+          <Button
+            size="sm"
+            variant={category === null ? "primary" : "ghost"}
+            onClick={() => setCategory(null)}
+          >
+            All
+          </Button>
+          <Button
+            size="sm"
+            variant={category === "assigned" ? "primary" : "ghost"}
+            onClick={() => setCategory("assigned")}
+          >
+            Has Category
+          </Button>
+          <Button
+            size="sm"
+            variant={category === "unassigned" ? "primary" : "ghost"}
+            onClick={() => setCategory("unassigned")}
+          >
+            No Category
+          </Button>
+          
+          {/* Category Dropdown */}
+          <div className="relative" ref={categoryDropdownRef}>
+            <Button
+              size="sm"
+              variant={category && category !== 'assigned' && category !== 'unassigned' ? "primary" : "secondary"}
+              onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
+              className="min-w-[140px] justify-between"
+            >
+              <span className="truncate">
+                {category && category !== 'assigned' && category !== 'unassigned' 
+                  ? allTenantCategories.find((c) => c.id === category)?.name || 'Select...'
+                  : 'Select Category'}
+              </span>
+              <svg className="w-3 h-3 ml-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </Button>
+            {categoryDropdownOpen && (
+              <div className="absolute left-0 top-full mt-2 w-56 max-h-64 overflow-y-auto bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-xl z-50">
+                {allTenantCategories.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-neutral-500">No categories found</div>
+                ) : (
+                  allTenantCategories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setCategory(cat.id);
+                        setCategoryDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-neutral-50 dark:hover:bg-neutral-700 flex items-center gap-2 ${
+                        category === cat.id ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' : 'text-neutral-700 dark:text-neutral-300'
+                      }`}
+                    >
+                      <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      <span className="truncate">{cat.name}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* View Mode Toggle */}
         <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
           <span>View:</span>
           <Button
@@ -761,6 +884,40 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                     Propagate
+                  </Button>
+                  
+                  {/* Trash */}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setConfirmDialog({
+                        isOpen: true,
+                        title: "Move to Trash",
+                        message: `Are you sure you want to move ${selectedItems.size} item(s) to trash? You can restore them later from the trash bin.`,
+                        variant: "warning",
+                        onConfirm: async () => {
+                          try {
+                            const itemIds = Array.from(selectedItems);
+                            console.log('[Bulk Trash] Moving items to trash:', itemIds);
+                            await Promise.all(itemIds.map(id => updateItem(id, { itemStatus: 'trashed' })));
+                            console.log('[Bulk Trash] Successfully moved items to trash');
+                            clearSelection();
+                            refresh();
+                            alert(`✅ Successfully moved ${itemIds.length} item(s) to trash`);
+                          } catch (error) {
+                            console.error('[Bulk Trash] Error moving items to trash:', error);
+                            alert(`❌ Error moving items to trash: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                          }
+                        },
+                      });
+                    }}
+                    className="font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Trash
                   </Button>
                 </div>
                   )}

@@ -1,7 +1,7 @@
 "use client";
 
 interface SyncStatusIndicatorProps {
-  itemStatus?: 'active' | 'inactive' | 'syncing' | 'archived' | 'draft';
+  itemStatus?: 'active' | 'inactive' | 'syncing' | 'archived' | 'draft' | 'trashed';
   visibility?: 'public' | 'private';
   tenantCategoryId?: string | null;
   showDetails?: boolean;
@@ -17,6 +17,7 @@ export default function SyncStatusIndicator({
   const isArchived = itemStatus === 'archived';
   const isInactive = itemStatus === 'inactive';
   const isDraft = itemStatus === 'draft';
+  const isTrashed = itemStatus === 'trashed';
   const isPublic = visibility === 'public';
   const hasCategory = !!tenantCategoryId; // Has tenant category assigned
   
@@ -24,6 +25,7 @@ export default function SyncStatusIndicator({
   
   // Determine blocking reasons with actionable instructions
   const blockingReasons: string[] = [];
+  if (isTrashed) blockingReasons.push('Item is Trashed (restore from trash to sync)');
   if (isDraft) blockingReasons.push('Item is Draft (click Draft to activate)');
   if (isArchived) blockingReasons.push('Item is Archived (click Archived to restore)');
   if (isInactive) blockingReasons.push('Item is Inactive (click Inactive to activate)');
@@ -47,7 +49,7 @@ export default function SyncStatusIndicator({
   }
 
   // Not syncing - show visual indicators for blockers
-  const isIntentionalBlock = isDraft || isArchived || isInactive || !isPublic;
+  const isIntentionalBlock = isDraft || isArchived || isInactive || isTrashed || !isPublic;
   const colorClass = isIntentionalBlock 
     ? 'text-red-600 dark:text-red-500' 
     : 'text-amber-600 dark:text-amber-500';

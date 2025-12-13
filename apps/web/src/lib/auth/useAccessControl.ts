@@ -2,10 +2,13 @@
  * React Hook for Access Control
  * 
  * Provides easy-to-use hooks for checking user permissions in React components
+ * 
+ * OPTIMIZED: Uses AuthContext user data instead of fetching /auth/me independently
  */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import {
   UserData,
@@ -54,55 +57,59 @@ export function useAccessControl(
   options: AccessControlOptions = {},
   fetchOrganization: boolean = false
 ): UseAccessControlResult {
-  const [user, setUser] = useState<UserData | null>(null);
+  // Use AuthContext instead of fetching /auth/me independently
+  const { user: authUser, isLoading: authLoading } = useAuth();
+  
   const [tenantData, setTenantData] = useState<TenantData | null>(null);
   const [organizationData, setOrganizationData] = useState<OrganizationData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [tenantLoading, setTenantLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  // Convert AuthContext user to UserData format
+  const user = useMemo((): UserData | null => {
+    if (!authUser) return null;
+    return authUser as unknown as UserData;
+  }, [authUser]);
+
+  const fetchTenantData = useCallback(async () => {
+    if (!tenantId || !user) return;
+    
     try {
-      setLoading(true);
+      setTenantLoading(true);
       setError(null);
 
-      // Fetch user data
-      const userRes = await api.get(`${API_BASE_URL}/auth/me`);
-      if (!userRes.ok) throw new Error('Failed to fetch user data');
-      const response = await userRes.json();
-      // API returns { user: {...} }, extract the user object
-      const userData = response.user || response;
-      setUser(userData);
-
       // Fetch tenant data if tenantId provided
-      if (tenantId) {
-        const tenantRes = await api.get(`${API_BASE_URL}/api/tenants/${tenantId}`);
-        if (tenantRes.ok) {
-          const tenant = await tenantRes.json();
-          setTenantData(tenant);
+      const tenantRes = await api.get(`${API_BASE_URL}/api/tenants/${tenantId}`);
+      if (tenantRes.ok) {
+        const tenant = await tenantRes.json();
+        setTenantData(tenant);
 
-          // Fetch organization data if needed
-          if (fetchOrganization && tenant.organizationId) {
-            const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenant.organizationId}`);
-            if (orgRes.ok) {
-              const org = await orgRes.json();
-              setOrganizationData(org);
-            }
+        // Fetch organization data if needed
+        if (fetchOrganization && tenant.organizationId) {
+          const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenant.organizationId}`);
+          if (orgRes.ok) {
+            const org = await orgRes.json();
+            setOrganizationData(org);
           }
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-      setUser(null);
+      setError(err instanceof Error ? err.message : 'Failed to load tenant data');
       setTenantData(null);
       setOrganizationData(null);
     } finally {
-      setLoading(false);
+      setTenantLoading(false);
     }
-  };
+  }, [tenantId, user, fetchOrganization]);
 
   useEffect(() => {
-    fetchData();
-  }, [tenantId, fetchOrganization]);
+    if (user && tenantId) {
+      fetchTenantData();
+    }
+  }, [user, tenantId, fetchTenantData]);
+
+  // Combined loading state
+  const loading = authLoading || tenantLoading;
 
   if (!user) {
     return {
@@ -117,7 +124,7 @@ export function useAccessControl(
       isOrgAdmin: false,
       isOrgMember: false,
       tenantRole: null,
-      refetch: fetchData,
+      refetch: fetchTenantData,
     };
   }
 
@@ -147,7 +154,7 @@ export function useAccessControl(
     isOrgAdmin: orgAdmin,
     isOrgMember: orgMember,
     tenantRole: role,
-    refetch: fetchData,
+    refetch: fetchTenantData,
   };
 }
 

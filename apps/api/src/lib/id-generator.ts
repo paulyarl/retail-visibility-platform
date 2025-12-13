@@ -49,7 +49,7 @@ export function generateUserTenantId(userId: string = 'uid',tenantId: string = '
  */
 export function generateCategoryMirrorId(catId: string,tenantId: string = 'tid'): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
-  return `ctid-${tenantId}-${catId}-${nanoid()}`;
+  return `cmid-${tenantId}-${catId}-${nanoid()}`;
 }
 // id: `ut_${tenantId}_${user.id}`,
 /**
@@ -59,7 +59,7 @@ export function generateCategoryMirrorId(catId: string,tenantId: string = 'tid')
  */
 export function generateItemId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `iid-${nanoid()}`;
+  return `sid-${nanoid()}`;
 }
 // id: `ciid_${tenantId}_${user.id}`,
 /**
@@ -69,7 +69,7 @@ export function generateItemId(): string {
  */
 export function generateCloverItemId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `ciid-${nanoid()}`;
+  return `csid-${nanoid()}`;
 }
 // id: `cigid_${tenantId}_${user.id}`,
 /**
@@ -90,7 +90,7 @@ export function generateCloverIntegrationId(): string {
  */
 export function generateCloverItemMappingsId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `cmid-${nanoid()}`;
+  return `csmid-${nanoid()}`;
 }
 
 
@@ -102,16 +102,7 @@ export function generateCloverItemMappingsId(): string {
 export function generateQuickStartSku(index?: number): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
   const suffix = index !== undefined ? index.toString().padStart(3, '0') : nanoid();
-  return `qsskuid-${suffix}`;
-}
-
-/**
- * Generates readable SKUs with optional prefix
- * Format: SKU-abc123 or CUSTOM-abc123
- */
-export function generateSku(prefix: string = 'skuid'): string {
-  const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 8);
-  return `${prefix}-${nanoid()}`;
+  return `qsid-${suffix}`;
 }
 
 /**
@@ -174,7 +165,7 @@ export function generateFeatureId(): string {
  */
 export function generateQsCatId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `qscatid-${nanoid()}`;
+  return `qsctid-${nanoid()}`;
 }
 
 /**
@@ -192,15 +183,15 @@ export function generateDcCatId(): string {
  */
 export function generateCloverCatId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `ccatid-${nanoid()}`;
+  return `ccid-${nanoid()}`;
 }
 /**
- * Generates clover outh change log IDs
+ * Generates clover OAuth change log IDs
  * Format: sess-abc123 (12 chars)
  */
-export function generateCloverOathChangeLogId(): string {
+export function generateCloverOauthChangeLogId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `outhclid-${nanoid()}`;
+  return `ocid-${nanoid()}`;
 }
 
 /**
@@ -209,7 +200,7 @@ export function generateCloverOathChangeLogId(): string {
  */
 export function generateCloverSyncLogId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `csynclid-${nanoid()}`;
+  return `csid-${nanoid()}`;
 }
 
 /**
@@ -218,7 +209,7 @@ export function generateCloverSyncLogId(): string {
  */
 export function generateGbpHoursSyncLogId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `bhsyncid-${nanoid()}`;
+  return `bhsid-${nanoid()}`;
 }
 
 /**
@@ -236,7 +227,7 @@ export function generateSpecialHoursId(tenantId: string = 'shid'): string {
  */
 export function generateFeedPushJobId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `fpjid-${nanoid()}`;
+  return `fpid-${nanoid()}`;
 }
 
 /**
@@ -245,7 +236,7 @@ export function generateFeedPushJobId(): string {
  */
 export function generateProductCatId(tenantId?: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `icatid-${tenantId}-${nanoid()}`;
+  return `scid-${tenantId}-${nanoid()}`;
 }
 
 /**

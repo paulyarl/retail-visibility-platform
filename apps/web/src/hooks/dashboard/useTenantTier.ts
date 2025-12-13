@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { 
   resolveTier, 
@@ -56,13 +57,39 @@ export interface UseTenantTierReturn {
  * Resolves effective tier from organization and tenant levels
  */
 export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
+  // Use AuthContext instead of fetching /auth/me independently
+  const { user: authUser, isLoading: authLoading } = useAuth();
+  
   const [tier, setTier] = useState<ResolvedTier | null>(null);
   const [usage, setUsage] = useState<TenantUsage | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [tierLoading, setTierLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [canSupport, setCanSupport] = useState(false);
-  const [userRole, setUserRole] = useState<UserTenantRole | null>(null);
-  const [userData, setUserData] = useState<any>(null);
+  
+  // Derive user-related state from AuthContext
+  const { canSupport, userRole, userData } = useMemo(() => {
+    if (!authUser) {
+      return { canSupport: false, userRole: null as UserTenantRole | null, userData: null };
+    }
+    
+    const hasSupportAccess = canBypassTierRestrictions(authUser);
+    const isPlatformViewer = authUser.role === 'PLATFORM_VIEWER';
+    
+    let role: UserTenantRole | null = null;
+    if (hasSupportAccess) {
+      role = 'OWNER'; // Platform admins bypass
+    } else if (tenantId && authUser.tenants) {
+      const userTenant = authUser.tenants.find((t: any) => t.id === tenantId);
+      if (userTenant) {
+        role = userTenant.role as UserTenantRole;
+      } else if (isPlatformViewer) {
+        role = 'VIEWER';
+      }
+    } else if (isPlatformViewer) {
+      role = 'VIEWER';
+    }
+    
+    return { canSupport: hasSupportAccess, userRole: role, userData: authUser };
+  }, [authUser, tenantId]);
 
   // Helper function to map API tier response to TierInfo format
   const mapApiTierToTierInfo = (apiTier: any): TierInfo => {
@@ -92,47 +119,16 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
   };
 
   const fetchTierData = async () => {
-    if (!tenantId) {
-      setLoading(false);
+    if (!tenantId || !authUser) {
+      setTierLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      setTierLoading(true);
       setError(null);
 
-      // Check user's platform role and tenant role
-      const userResponse = await api.get('/api/auth/me');
-      if (userResponse.ok) {
-        const userDataResponse = await userResponse.json();
-        setUserData(userDataResponse.user);  // Store for emergency bypass
-        
-        // Level 0: Platform bypass using centralized utility
-        const hasSupportAccess = canBypassTierRestrictions(userDataResponse.user);
-        setCanSupport(hasSupportAccess);
-        
-        // Platform viewer gets read-only access to all tenants
-        const isPlatformViewer = userDataResponse.user?.role === 'PLATFORM_VIEWER';
-        
-        // Get user's role on this specific tenant
-        // Platform admins bypass role checks, so skip this call
-        if (!hasSupportAccess && userDataResponse.user?.id && tenantId) {
-          // Find the user's role for this tenant from the already-loaded user data
-          const userTenant = userDataResponse.user.tenants?.find((t: any) => t.id === tenantId);
-          if (userTenant) {
-            setUserRole(userTenant.role as UserTenantRole);
-          } else if (isPlatformViewer) {
-            // Platform viewers act as VIEWER role on any tenant
-            setUserRole('VIEWER');
-          }
-        } else if (isPlatformViewer) {
-          // Platform viewers act as VIEWER role on any tenant
-          setUserRole('VIEWER');
-        }
-        
-        // Platform admins and support bypass tier checks, but still fetch tier data for display
-        // The bypass happens in canAccess() and checkFeature() functions
-      }
+      // User data is now from AuthContext - no need to fetch /auth/me
 
       // Fetch tenant and organization tier data in parallel (Next.js API routes)
       const [tenantResponse, usageResponse] = await Promise.all([
@@ -183,14 +179,16 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
       setError(errorMessage);
       console.error('[useTenantTier] Error:', err);
     } finally {
-      setLoading(false);
+      setTierLoading(false);
     }
   };
 
-  // Auto-fetch when tenantId changes
+  // Auto-fetch when tenantId or authUser changes
   useEffect(() => {
-    fetchTierData();
-  }, [tenantId]);
+    if (authUser) {
+      fetchTierData();
+    }
+  }, [tenantId, authUser]);
 
   // EMERGENCY: Feature name mapping to fix frontend/backend conflicts
   const EMERGENCY_FEATURE_MAPPING: Record<string, string> = {
@@ -435,6 +433,9 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
       colorClass: tierBadge.colorClass
     };
   };
+
+  // Combined loading state
+  const loading = authLoading || tierLoading;
 
   return {
     tier,

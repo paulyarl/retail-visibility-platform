@@ -9,8 +9,8 @@ export interface Item {
   manufacturer?: string;
   price: number;
   stock: number;
-  status: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing';
-  itemStatus?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing'; // Backend field name
+  status: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed';
+  itemStatus?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed'; // Backend field name
   visibility: 'public' | 'private';
   categoryPath?: string[];
   tenantCategoryId?: string | null;
@@ -31,7 +31,9 @@ export interface ItemFilters {
   q?: string;
   status?: 'all' | 'active' | 'inactive' | 'syncing';
   visibility?: 'all' | 'public' | 'private';
-  category?: string;
+  category?: string; // Legacy: directory category slug
+  categoryId?: string; // Filter by specific tenant category ID
+  categoryFilter?: 'all' | 'assigned' | 'unassigned'; // Filter by category assignment status
 }
 
 export interface PaginationParams {
@@ -65,6 +67,7 @@ export interface CreateItemData {
 export class ItemsDataService {
   /**
    * Fetch items with filters and pagination
+   * Category filtering is now done server-side via categoryFilter param
    */
   async fetchItems(
     tenantId: string,
@@ -80,6 +83,12 @@ export class ItemsDataService {
       if (filters.q) params.append('q', filters.q);
       if (filters.status && filters.status !== 'all') params.append('status', filters.status);
       if (filters.visibility && filters.visibility !== 'all') params.append('visibility', filters.visibility);
+      
+      // Category filters - now server-side
+      if (filters.categoryId) params.append('categoryId', filters.categoryId);
+      if (filters.categoryFilter && filters.categoryFilter !== 'all') {
+        params.append('categoryFilter', filters.categoryFilter);
+      }
 
       // Add tenant identifier (snake_case as expected by backend)
       params.append('tenant_id', tenantId);
@@ -102,34 +111,35 @@ export class ItemsDataService {
       });
 
       // Handle both paginated and non-paginated responses
+      let items: Item[];
+      let paginationResult: ItemsResponse['pagination'];
+      
       if (data.items && data.pagination) {
-        return {
-          items: data.items.map(normalizeItem),
-          pagination: data.pagination,
-        };
+        items = data.items.map(normalizeItem);
+        paginationResult = data.pagination;
       } else if (Array.isArray(data)) {
-        return {
-          items: data.map(normalizeItem),
-          pagination: {
-            page: 1,
-            limit: data.length,
-            totalItems: data.length,
-            totalPages: 1,
-            hasMore: false,
-          },
+        items = data.map(normalizeItem);
+        paginationResult = {
+          page: 1,
+          limit: data.length,
+          totalItems: data.length,
+          totalPages: 1,
+          hasMore: false,
         };
       } else {
-        return {
-          items: [],
-          pagination: {
-            page: 1,
-            limit: 25,
-            totalItems: 0,
-            totalPages: 0,
-            hasMore: false,
-          },
+        items = [];
+        paginationResult = {
+          page: 1,
+          limit: 25,
+          totalItems: 0,
+          totalPages: 0,
+          hasMore: false,
         };
       }
+      
+      // Category filtering is now done server-side via categoryFilter param
+      
+      return { items, pagination: paginationResult };
     } catch (error) {
       // Error will be caught and displayed in UI
       throw error;
@@ -237,15 +247,28 @@ export class ItemsDataService {
 
   /**
    * Apply client-side category filter
-   * (Used until API supports category filtering)
+   * An item "has category" if ANY category field is set:
+   * - tenantCategoryId (assigned tenant category)
+   * - tenantCategory (category object)
+   * - categoryPath (enrichment data)
+   * - metadata.googleCategoryId (Google category from enrichment)
    */
   applyCategoryFilter(items: Item[], categoryFilter: string): Item[] {
     if (categoryFilter === 'all') return items;
+    
+    const hasCategory = (item: Item): boolean => {
+      if (item.tenantCategoryId) return true;
+      if (item.tenantCategory?.id) return true;
+      if (item.categoryPath && item.categoryPath.length > 0) return true;
+      if (item.metadata?.googleCategoryId) return true;
+      return false;
+    };
+    
     if (categoryFilter === 'assigned') {
-      return items.filter(item => item.categoryPath && item.categoryPath.length > 0);
+      return items.filter(hasCategory);
     }
     if (categoryFilter === 'unassigned') {
-      return items.filter(item => !item.categoryPath || item.categoryPath.length === 0);
+      return items.filter(item => !hasCategory(item));
     }
     return items;
   }

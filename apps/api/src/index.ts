@@ -2767,14 +2767,18 @@ const listQuery = z.object({
   page: z.string().optional(), // Page number (1-indexed)
   limit: z.string().optional(), // Items per page
   search: z.string().optional(), // Search by SKU or name
+  q: z.string().optional(), // Alias for search
   status: z.enum(['all', 'active', 'inactive', 'syncing', 'trashed']).optional(), // Filter by status
   visibility: z.enum(['all', 'public', 'private']).optional(), // Filter by visibility
-  category: z.string().optional(), // Filter by category slug
+  category: z.string().optional(), // Filter by category slug (legacy)
+  categoryId: z.string().optional(), // Filter by tenant category ID
+  categoryFilter: z.enum(['all', 'assigned', 'unassigned']).optional(), // Filter by category assignment status
   sortBy: z.enum(['name', 'sku', 'price', 'stock', 'updated_at', 'created_at']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
 }).transform((data) => ({
   ...data,
   tenant_id: data.tenant_id || data.tenantId, // Accept both snake_case and camelCase
+  search: data.search || data.q, // Accept both search and q
 }));
 
 app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateToken, async (req, res) => {
@@ -2848,11 +2852,27 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
       }
     }
     
-    // Apply category filter
+    // Apply category filter (legacy - by directory category slug)
     if (parsed.data.category) {
       where.directoryCategory = {
         slug: parsed.data.category,
       };
+    }
+    
+    // Apply tenant category filter (by specific category ID)
+    if (parsed.data.categoryId) {
+      where.directory_category_id = parsed.data.categoryId;
+    }
+    
+    // Apply category assignment filter (assigned/unassigned)
+    if (parsed.data.categoryFilter && parsed.data.categoryFilter !== 'all') {
+      if (parsed.data.categoryFilter === 'assigned') {
+        // Has category assigned
+        where.directory_category_id = { not: null };
+      } else if (parsed.data.categoryFilter === 'unassigned') {
+        // No category assigned
+        where.directory_category_id = null;
+      }
     }
     
     // Apply visibility filter

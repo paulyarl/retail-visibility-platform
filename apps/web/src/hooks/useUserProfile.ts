@@ -55,83 +55,40 @@ export function useUserProfile(): UseUserProfileReturn {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
-
-  const fetchProfile = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // If no user in auth context, wait for auth to load
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      // Try to fetch from dedicated profile endpoint
-      const response = await api.get('/api/user/profile');
-
-      if (!response.ok) {
-        // Fallback to auth user data if endpoint doesn't exist yet
-        if (response.status === 404 && user) {
-          console.log('[useUserProfile] Using fallback auth data (profile endpoint not implemented yet)');
-          const fallbackProfile = createFallbackProfile(user);
-          setProfile(fallbackProfile);
-          setLoading(false);
-          return;
-        }
-        throw new Error('Failed to load user profile');
-      }
-
-      const data = await response.json();
-
-      // Map role to display info
-      const roleInfo = getRoleInfo(data.role, data.isPlatformAdmin, data.isOrgAdmin);
-
-      const profileData: UserProfileData = {
-        id: data.id,
-        name: data.name || data.email,
-        email: data.email,
-        role: roleInfo,
-        
-        isPlatformAdmin: data.isPlatformAdmin || false,
-        
-        organizationId: data.organizationId,
-        organizationName: data.organizationName,
-        isOrgAdmin: data.isOrgAdmin || false,
-        
-        tenantsCount: data.tenantsCount || 0,
-        locationsServed: data.locationsServed || 0,
-        primaryTenantId: data.primaryTenantId,
-        primaryTenantName: data.primaryTenantName,
-        
-        canManageOrganization: data.canManageOrganization || false,
-        canManageTenants: data.canManageTenants || false,
-        canManageUsers: data.canManageUsers || false,
-        
-        lastActive: data.lastActive ? new Date(data.lastActive) : undefined,
-        memberSince: new Date(data.memberSince || data.createdAt)
-      };
-
-      setProfile(profileData);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load profile';
-      setError(errorMessage);
-      console.error('[useUserProfile] Error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { user, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    // Wait for auth to finish loading
+    if (authLoading) {
+      return;
+    }
+
+    // If no user after auth loaded, we're not authenticated
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    // Use AuthContext user data directly - no need for separate API call
+    // The /api/user/profile endpoint doesn't exist, so just use fallback
+    const fallbackProfile = createFallbackProfile(user);
+    setProfile(fallbackProfile);
+    setLoading(false);
+  }, [user, authLoading]);
+
+  // Refresh function - just re-derives from auth user
+  const refresh = async () => {
+    if (user) {
+      const fallbackProfile = createFallbackProfile(user);
+      setProfile(fallbackProfile);
+    }
+  };
 
   return {
     profile,
     loading,
     error,
-    refresh: fetchProfile
+    refresh
   };
 }
 

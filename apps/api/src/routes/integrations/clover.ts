@@ -24,7 +24,7 @@ import {
   calculateTokenExpiration,
   formatScopesForDisplay
 } from '../../services/clover-oauth';
-import { generateCloverCatId, generateCloverIntegrationId, generateCloverItemId, generateCloverItemMappingsId, generateCloverOathChangeLogId, generateCloverSyncLogId } from '../../lib/id-generator';
+import { generateCloverCatId, generateCloverIntegrationId, generateCloverItemId, generateCloverItemMappingsId, generateCloverOauthChangeLogId, generateCloverSyncLogId } from '../../lib/id-generator';
  
 
 // Helper to create slug from category name
@@ -537,7 +537,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
     // Create sync log for OAuth connection
     await prisma.tier_change_logs_list.create({
       data: {
-        id: generateCloverOathChangeLogId(),
+        id: generateCloverOauthChangeLogId(),
         entity_type: 'clover_integration',
         entity_id: integration.id,
         action: 'oauth_connect',
