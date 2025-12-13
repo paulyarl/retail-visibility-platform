@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { categoryMirrorSuccess, categoryMirrorFail, categoryMirrorDurationMs, categoryOutOfSyncDetected } from '../metrics';
 import { prisma } from '../prisma';
 import { gbpClient } from '../clients/gbp';
+import { generateCategoryMirrorId } from '../lib/id-generator';
 
 export type MirrorStrategy = 'platform_to_gbp' | 'gbp_to_platform';
 
@@ -38,7 +39,7 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
   try {
     const run = await prisma.category_mirror_runs.create({
       data: {
-        id: randomUUID(),
+        id: generateCategoryMirrorId("pending",payload.tenant_id??'all'),
         tenant_id: payload.tenant_id ?? null,
         strategy: payload.strategy,
         dry_run: !!(payload as any).dry_run,
@@ -61,7 +62,8 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
         try {
           await prisma.category_mirror_runs.create({
             data: {
-              id: randomUUID(),
+              //id: randomUUID(),
+              id: generateCategoryMirrorId("cooldown",payload.tenant_id ?? 'all'),
               tenant_id: payload.tenant_id ?? null,
               strategy: payload.strategy,
               dry_run: dryRun,
@@ -123,8 +125,8 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
           });
         } else {
           await prisma.category_mirror_runs.create({
-            data: {
-              id: randomUUID(),
+            data: {              
+              id: generateCategoryMirrorId("update",payload.tenant_id ?? 'all'),
               tenant_id: payload.tenant_id ?? null,
               strategy: payload.strategy,
               dry_run: dryRun,
@@ -159,7 +161,7 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
     } else {
       await prisma.category_mirror_runs.create({
         data: {
-          id: randomUUID(),
+          id: generateCategoryMirrorId("failed",payload.tenant_id ?? 'all'),
           tenant_id: payload.tenant_id ?? null,
           strategy: payload.strategy,
           dry_run: !!(payload as any).dry_run,

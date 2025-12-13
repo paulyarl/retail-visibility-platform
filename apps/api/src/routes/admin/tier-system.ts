@@ -12,7 +12,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
-import { generateFeatureId, generateTierId } from '../../lib/id-generator';
+import { generateFeatureId, generateTierChangeId, generateTierId } from '../../lib/id-generator';
 
 const router = Router();
 
@@ -99,7 +99,8 @@ async function logTierChange(params: {
   try {
     await prisma.tier_change_logs_list.create({
       data: {
-        id: crypto.randomUUID(),
+        //id: crypto.randomUUID(),
+        id: generateTierChangeId(),
         entity_type: params.entityType,
         entity_id: params.entityId,
         action: params.action,
@@ -291,7 +292,7 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
         tier_features_list: features
           ? {
               create: features.map(f => ({
-                id: crypto.randomUUID(),
+                id: generateFeatureId(),
                 feature_key: f.featureKey,
                 feature_name: f.featureName,
                 is_enabled: true,

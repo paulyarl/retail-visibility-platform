@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
-import { generateQuickStart } from '../lib/id-generator';
+import { generateAuditId, generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -92,7 +92,7 @@ router.put('/:id', async (req, res) => {
     // Log the change
     await prisma.permission_audit_logs_list.create({
       data: {
-        id: generateQuickStart("auditid"),
+        id: generateAuditId(),
         tenantId: (req.user as any)?.tenantId || 'system',
         role: current.role,
         action: current.action,

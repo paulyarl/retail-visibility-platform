@@ -596,7 +596,7 @@ export class BarcodeEnrichmentService {
     try {
       await prisma.barcode_lookup_log.create({
         data: {
-          id: generateSessionId(), // Generate ID for new records
+          id: generateSessionId(tenantId), // Generate ID for new records
           tenant_id: tenantId, // Correct field name
           barcode,
           provider: provider || 'unknown',

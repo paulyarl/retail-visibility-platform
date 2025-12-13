@@ -24,7 +24,7 @@ import {
   calculateTokenExpiration,
   formatScopesForDisplay
 } from '../../services/clover-oauth';
-import { generateCloverCatId, generateCloverLogId } from '../../lib/id-generator';
+import { generateCloverCatId, generateCloverIntegrationId, generateCloverItemId, generateCloverItemMappingsId, generateCloverOathChangeLogId, generateCloverSyncLogId } from '../../lib/id-generator';
  
 
 // Helper to create slug from category name
@@ -89,8 +89,8 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
 
     // Create new integration in demo mode
     integration = await prisma.clover_integrations_list.create({
-      data: {
-        id: crypto.randomUUID(),
+      data: { 
+        id: generateCloverIntegrationId(),
         tenant_id: tenantId,
         mode: 'demo',
         status: 'active',
@@ -174,8 +174,8 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
 
         // Create inventory item
         const createdItem = await prisma.inventory_items.create({
-          data: {
-            id: crypto.randomUUID(),
+          data: { 
+            id: generateCloverItemId(),
             tenant_id: tenantId,
             ...rvpItem,
             directory_category_id: directoryCategoryId,
@@ -185,8 +185,8 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
 
         // Create mapping
         await prisma.clover_item_mappings_list.create({
-          data: {
-            id: crypto.randomUUID(),
+          data: { 
+            id: generateCloverItemMappingsId(),
             integration_id: integration.id,
             clover_item_id: demoItem.id,
             clover_item_name: demoItem.name,
@@ -210,8 +210,8 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
 
     // Create sync log
     await prisma.clover_sync_logs_list.create({
-      data: {
-        id: crypto.randomUUID(),
+      data: { 
+        id: generateCloverSyncLogId(),
         integration_id: integration.id,
         trace_id: `demo_import_${Date.now()}`,
         operation: 'import',
@@ -520,7 +520,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
       // Create new integration in production mode
       integration = await prisma.clover_integrations_list.create({
         data: {
-          id: crypto.randomUUID(),
+          id: generateCloverIntegrationId(),
           tenant_id: tenantId,
           mode: 'production',
           status: 'active',
@@ -537,7 +537,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
     // Create sync log for OAuth connection
     await prisma.tier_change_logs_list.create({
       data: {
-        id: generateCloverCatId(),
+        id: generateCloverOathChangeLogId(),
         entity_type: 'clover_integration',
         entity_id: integration.id,
         action: 'oauth_connect',
@@ -641,7 +641,7 @@ router.post('/:tenantId/clover/demo/simulate', authenticateToken, async (req: Re
     // Create sync log for the simulation
     await prisma.clover_sync_logs_list.create({
       data: {
-        id: generateCloverLogId(),
+        id: generateCloverSyncLogId(),
         integration_id: integration.id,
         trace_id: event.id,
         operation: `simulation_${scenario}`,
@@ -782,8 +782,8 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
         // Create new item from simulation
         const newItemData = event.changes[0].newValue;
         const newItem = await prisma.inventory_items.create({
-          data: {
-            id: crypto.randomUUID(),
+          data: { 
+            id: generateCloverItemId(),
             tenant_id: tenantId,
             sku: newItemData.sku,
             name: newItemData.name,
@@ -801,8 +801,8 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
         
         // Create mapping
         await prisma.clover_item_mappings_list.create({
-          data: {
-            id: crypto.randomUUID(),
+          data: { 
+            id: generateCloverItemMappingsId(),
             integration_id: integration.id,
             clover_item_id: event.affectedItems[0],
             clover_item_name: newItemData.name,
@@ -1268,7 +1268,8 @@ router.post('/:tenantId/clover/sync', authenticateToken, async (req: Request, re
     const useRealApi = integration.mode === 'production' && integration.access_token && !useMockData;
 
     // Create sync log entry
-    const syncLogId = crypto.randomUUID();
+    //const syncLogId = crypto.randomUUID();
+    const syncLogId = generateCloverSyncLogId();
     const startTime = Date.now();
     
     await prisma.clover_sync_logs_list.create({
@@ -1329,8 +1330,8 @@ router.post('/:tenantId/clover/sync', authenticateToken, async (req: Request, re
             if (!rvpCategory) {
               // Create new RVP category
               rvpCategory = await prisma.directory_category.create({
-                data: {
-                  id: `cat_${crypto.randomUUID().replace(/-/g, '').substring(0, 12)}`,
+                data: { 
+                  id: generateCloverCatId(),
                   tenantId: tenantId,
                   name: cloverCat.name,
                   slug: slug,
@@ -1360,8 +1361,8 @@ router.post('/:tenantId/clover/sync', authenticateToken, async (req: Request, re
               });
             } else {
               await prisma.clover_category_mappings_list.create({
-                data: {
-                  id: crypto.randomUUID(),
+                data: { 
+                  id: generateCloverItemMappingsId(),
                   integration_id: integration.id,
                   clover_category_id: cloverCat.id,
                   clover_category_name: cloverCat.name,
@@ -1436,8 +1437,8 @@ router.post('/:tenantId/clover/sync', authenticateToken, async (req: Request, re
         } else if (importNew) {
           // Create new RVP item
           const newItem = await prisma.inventory_items.create({
-            data: {
-              id: crypto.randomUUID(),
+            data: { 
+              id: generateCloverItemId(),
               tenant_id: tenantId,
               sku: cloverItem.sku,
               name: cloverItem.name,
@@ -1465,8 +1466,8 @@ router.post('/:tenantId/clover/sync', authenticateToken, async (req: Request, re
             });
           } else {
             await prisma.clover_item_mappings_list.create({
-              data: {
-                id: crypto.randomUUID(),
+              data: { 
+                id: generateCloverItemMappingsId(),
                 integration_id: integration.id,
                 clover_item_id: cloverItem.id,
                 clover_item_name: cloverItem.name,

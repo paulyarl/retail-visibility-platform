@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { categoryService } from '../services/CategoryService';
-import { generateDsCatId } from '../lib/id-generator';
+import { generateProductCatId } from '../lib/id-generator';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -273,8 +273,8 @@ router.post('/categories/quick-start', authenticateToken, requireAdmin, async (r
         
         const created = await prisma.directory_category.create({
           data: {
-            id: generateQsCatId(),
-            tenantId: 'platform',
+            id: generateProductCatId('platform'),
+            tenantId: 'pltf',
             name: categoryName,
             slug: categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
             googleCategoryId,
@@ -368,8 +368,8 @@ router.post('/categories/bulk-import', authenticateToken, requireAdmin, async (r
         // Create category
         const created = await prisma.directory_category.create({
           data: {
-            id: generateQsCatId(),
-            tenantId: 'platform',
+            id: generateProductCatId('platform'),
+            tenantId: 'pltf',
             name: category.name,
             slug: category.slug,
             updatedAt: new Date(),

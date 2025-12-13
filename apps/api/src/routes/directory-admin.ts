@@ -7,6 +7,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { z } from 'zod';
+import { generateDirectoryFeaturedId, generateProductCatId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -228,7 +229,7 @@ router.post('/feature/:tenantId', authenticateToken, requireAdmin, async (req: R
     // Create featured listing record
     const featured = await prisma.directory_featured_listings_list.create({
       data: {
-        id: require('crypto').randomUUID(),
+        id: generateDirectoryFeaturedId(tenantId),
         tenant_id: tenantId,
         featured_from: new Date(),
         featured_until: featuredUntil,

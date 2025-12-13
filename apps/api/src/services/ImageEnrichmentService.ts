@@ -211,7 +211,7 @@ export class ImageEnrichmentService {
     try {
       await prisma.photo_assets.create({
         data: {
-          id:generatePhotoId(),
+          id:generatePhotoId(tenantId,item_id),
           tenantId:tenantId,
           inventoryItemId: item_id,
           url: imageData.url,

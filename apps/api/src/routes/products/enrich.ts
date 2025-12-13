@@ -216,7 +216,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
 
       // Add new photos
       const photoData = scannedData.images.map((url, index) => ({
-        id:generatePhotoId(),
+        id:generatePhotoId(tenantId,productId),
         tenantId: tenantId,
         inventoryItemId: productId,
         url,

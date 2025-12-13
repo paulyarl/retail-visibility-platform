@@ -2583,7 +2583,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 
       const created = await prisma.photo_assets.create({
         data: {
-          id: generatePhotoId(),
+          id: generatePhotoId(item.tenant_id,item.id),
           tenantId: item.tenant_id,
           inventoryItemId: item.id,
           url,
@@ -2634,7 +2634,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 
       const created = await prisma.photo_assets.create({
         data: {
-          id: generatePhotoId(),
+          id: generatePhotoId(item.tenant_id,item.id),
           tenantId: item.tenant_id,
           inventoryItemId: item.id,
           url: publicUrl!,
@@ -2699,7 +2699,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 
       const created = await prisma.photo_assets.create({
         data: {
-          id: generatePhotoId(),
+          id: generatePhotoId(item.tenant_id,item.id),
           tenantId: item.tenant_id,
           inventoryItemId: item.id,
           url: publicUrl,
@@ -4167,7 +4167,7 @@ app.put("/admin/email-config", async (req, res) => {
 /* ------------------------------ ROUTE MOUNTING ------------------------------ */
 // Use modular route mounting for better isolation and debugging
 import { mountMinimalRoutes, mountAllRoutes } from './routes';
-import { generateItemId, generatePhotoId, generateQuickStart, generateTenantId, generateUserTenantId } from './lib/id-generator';
+import { generateItemId, generatePhotoId, generateTenantId, generateUserTenantId } from './lib/id-generator';
 
 // For debugging: mount only minimal routes
 // mountMinimalRoutes(app);

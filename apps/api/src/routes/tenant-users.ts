@@ -8,6 +8,7 @@ import { requireTenantAdmin } from '../middleware/permissions';
 import { user_tenant_role } from '@prisma/client';
 import { isPlatformAdmin, isPlatformUser } from '../utils/platform-admin';
 import { getTenantLimitConfig, canCreateTenant } from '../config/tenant-limits';
+import { generateUserTenantId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -113,7 +114,8 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     // Add user to tenant
     const userTenant = await prisma.user_tenants.create({
       data: {
-        id: `ut_${tenantId}_${user.id}`,
+        //id: `ut_${tenantId}_${user.id}`,
+        id: generateUserTenantId(user.id,tenantId),
         users: {
           connect: {
             id: user.id

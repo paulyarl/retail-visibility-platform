@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { prisma } from '../prisma'
 import { requireFlag } from '../middleware/flags'
-import { generateQuickStart } from '../lib/id-generator'
+import { generateGbpHoursSyncLogId, generateQuickStart } from '../lib/id-generator'
 
 const router = Router()
 
@@ -98,7 +98,7 @@ router.post('/tenant/:tenantId/gbp/hours/mirror',
   // Enqueue sync job; runner loop will process it
   await prisma.sync_jobs.create({
     data: {
-      id: generateQuickStart("hid"),
+      id: generateGbpHoursSyncLogId(),
       tenant_id: tenantId,
       target: 'gbp_hours',
       status: 'queued',

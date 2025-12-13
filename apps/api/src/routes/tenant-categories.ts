@@ -8,7 +8,7 @@ import { getCategoryById } from '../lib/google/taxonomy';
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 import { authenticateToken, requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
-import { generateQsCatId, generateQuickStart, generateUserTenantId } from '../lib/id-generator';
+import { generateProductCatId, generateQsCatId, generateQuickStart, generateSpecialHoursId, generateUserTenantId } from '../lib/id-generator';
 import { getDirectPool } from '../utils/db-pool';
 
 console.log('🔥 TENANT CATEGORIES ROUTES MODULE LOADED');
@@ -936,9 +936,8 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
             
             // Create mode - create new category
             await prisma.directory_category.create({
-              data: {
-                /** id: `cat_${location.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, */
-                id: generateQsCatId(),
+              data: { 
+                id: generateProductCatId(location.id),
                 tenantId: location.id,
                 name: heroCategory.name,
                 slug: heroCategory.slug,
@@ -1248,7 +1247,8 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
             } else {
               await prisma.business_hours_special_list.create({
                 data: {
-                  tenant_id: location.id,
+                  id: generateSpecialHoursId(location.id),
+                  tenantId: location.id,
                   date: specialHour.date,
                   isClosed: specialHour.isClosed,
                   open: specialHour.open,

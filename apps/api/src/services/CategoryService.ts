@@ -1,7 +1,7 @@
 import { prisma } from '../prisma'
 import { audit } from '../audit'
 import { triggerRevalidate } from '../utils/revalidate'
-import { generateQuickStart } from '../lib/id-generator'
+import { generateProductCatId, generateQuickStart } from '../lib/id-generator'
 
 export type UpdateCategoryInput = Partial<{
   name: string
@@ -29,7 +29,7 @@ export const categoryService = {
   async createTenantCategory(tenantId: string, input: Required<Pick<UpdateCategoryInput, 'name' | 'slug'>> & Partial<UpdateCategoryInput>) {
     const category = await prisma.directory_category.create({
       data: {
-        id: generateQuickStart("dircid"),
+        id: generateProductCatId(tenantId),
         tenantId: tenantId,
         name: input.name,
         slug: input.slug,

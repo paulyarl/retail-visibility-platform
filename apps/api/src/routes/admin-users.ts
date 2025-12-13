@@ -12,7 +12,7 @@ import { prisma } from '../prisma';
 import { audit } from '../audit';
 import { user_role, user_tenant_role } from '@prisma/client';
 import { requirePlatformAdmin, requirePlatformUser } from '../middleware/auth';
-import { generateQuickStart, generateUserTenantId } from '../lib/id-generator';
+import { generateQuickStart, generateUserId, generateUserTenantId } from '../lib/id-generator';
 //import { UserRole } from '../utils/location-status';
 
 const router = Router();
@@ -213,7 +213,7 @@ router.post('/users', requirePlatformAdmin, async (req: Request, res: Response) 
     // Create user (snake_case Prisma fields)
     const user = await prisma.users.create({
       data: {
-        id: generateQuickStart("uid"),
+        id: generateUserId(),
         email,
         password_hash: hashedPassword,
         first_name: first_name,
@@ -581,7 +581,7 @@ router.post('/users/create', requirePlatformUser, async (req: Request, res: Resp
       // Create the user
       const newUser = await tx.users.create({
         data: {
-          id: generateQuickStart("uid"),
+          id: generateUserId(),
           email: email.toLowerCase(),
           password_hash,
           first_name,
@@ -1222,7 +1222,7 @@ router.post('/invitations/:token/accept', async (req: Request, res: Response) =>
 
       user = await prisma.users.create({
         data: {
-          id: generateQuickStart("uid"),
+          id: generateUserId(),
           email: invitation.email.toLowerCase(),
           password_hash: password_hash,
           first_name: first_name,
@@ -1265,7 +1265,7 @@ router.post('/invitations/:token/accept', async (req: Request, res: Response) =>
       // Create tenant assignment
       await tx.user_tenants.create({
         data: {
-          id: generateQuickStart("utid"),
+          id: generateUserTenantId(user.id,invitation.tenant_id),
           user_id: user.id,
           tenant_id: invitation.tenant_id,
           role: invitation.role,

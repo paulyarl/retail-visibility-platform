@@ -12,7 +12,7 @@
 import sharp from 'sharp';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
-import { generateItemId } from '../lib/id-generator';
+import { generateItemId, generatePhotoId } from '../lib/id-generator';
 
 // Import the new Google GenAI for Imagen 3
 let GoogleGenAI: any = null;
@@ -408,7 +408,7 @@ commercial photography, clean and professional.`;
     
     const photoAsset = await prisma.photo_assets.create({
       data: {
-        id: generateItemId(),
+        id: generatePhotoId(item.tenant_id,inventoryItemId),
         tenantId: item.tenant_id,
         inventoryItemId: inventoryItemId,
         url: url,

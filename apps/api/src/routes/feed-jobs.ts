@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { Flags } from '../config';
-import { generateQuickStart } from '../lib/id-generator';
+import { generateFeedPushJobId, generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -147,7 +147,7 @@ router.post('/', async (req, res) => {
 
     const job = await prisma.feed_push_jobs_list.create({
       data: {
-        id: generateQuickStart("fid"), // Generate unique ID
+        id: generateFeedPushJobId(), // Generate unique ID
         tenant_id: body.tenantId,
         sku: body.sku,
         payload: body.payload as any || {},

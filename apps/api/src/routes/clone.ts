@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { requireWritableSubscription } from '../middleware/tier-access';
-import { generateItemId, generateQsCatId, generateQuickStartSku } from '../lib/id-generator';
+import { generateItemId, generateProductCatId, generateQsCatId, generateQuickStartSku } from '../lib/id-generator';
 
 const router = Router();
 
@@ -254,7 +254,7 @@ router.post('/category', authenticateToken, requireWritableSubscription, async (
     // Create the cloned category
     const clonedCategory = await prisma.directory_category.create({
       data: {
-        id: generateQsCatId(),
+        id: generateProductCatId(tenantId),
         tenantId: tenantId,
         name: newName,
         slug,

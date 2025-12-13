@@ -4,7 +4,7 @@ import { prisma } from '../prisma';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
-import { generateQuickStart } from '../lib/id-generator';
+import { generatePhotoId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -62,7 +62,7 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
     // Create photo record
     const photo = await prisma.photo_assets.create({
       data: {
-        id: generateQuickStart("pid"),
+        id: generatePhotoId(tenantId,itemId),
         tenantId: tenantId,
         inventoryItemId: itemId,
         url: `/uploads/items/${filename}`,

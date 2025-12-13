@@ -6,7 +6,7 @@ import { validateOrganizationTier, validateOrganizationLimits, validateOrganizat
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
-import { generateItemId, generatePhotoId, generateQuickStart } from '../lib/id-generator';
+import { generateItemId, generateOrganizationId, generatePhotoId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -152,7 +152,7 @@ router.post('/', requirePlatformAdmin, validateOrganizationTier, validateOrganiz
 
     const organization = await prisma.organizations_list.create({
       data: {
-        id: generateQuickStart("org"),
+        id: generateOrganizationId(ownerId),
         name: parsed.data.name,
         owner_id: ownerId,
         subscription_tier: parsed.data.subscriptionTier,
@@ -414,7 +414,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
           if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
             await prisma.photo_assets.createMany({
               data: sourceItem.photo_assets.map((photo: any, index: number) => ({
-                id: generateQuickStart("orgpid"),
+                id: generatePhotoId(tenantId,updatedItem.id),
                 tenantId: tenantId,
                 inventoryItemId: updatedItem.id,
                 url: photo.url,
@@ -483,7 +483,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
         if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
           await prisma.photo_assets.createMany({
             data: sourceItem.photo_assets.map((photo: any, index: number) => ({
-              id: generateQuickStart("orgpid"),
+              id: generatePhotoId(tenantId,newItem.id),
               tenantId: tenantId,
               inventoryItemId: newItem.id,
               url: photo.url,
@@ -636,6 +636,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
           // Create the item for this tenant
           const newItem = await prisma.inventory_items.create({
             data: {
+              id: generateItemId(),
               tenant_id: tenantId,
               sku: sourceItem.sku,
               name: sourceItem.name,
@@ -675,7 +676,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
           if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
             await prisma.photo_assets.createMany({
               data: sourceItem.photo_assets.map((photo: any, index: number) => ({
-                id: generateQuickStart("orgpid"),
+                 id: generatePhotoId(tenantId,newItem.id),
                 tenantId: tenantId,
                 inventoryItemId: newItem.id,
                 url: photo.url,
@@ -917,7 +918,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
           if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
             await prisma.photo_assets.createMany({
               data: sourceItem.photo_assets.map((photo: any, index: number) => ({
-                id: generatePhotoId(),
+                id: generatePhotoId(targetTenant.id,newItem.id),
                 tenantId: targetTenant.id,
                 inventoryItemId: newItem.id,
                 url: photo.url,

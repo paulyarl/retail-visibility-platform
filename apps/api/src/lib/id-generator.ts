@@ -42,10 +42,57 @@ export function generateUserTenantId(userId: string = 'uid',tenantId: string = '
  * Format: item-xyz789 (12 chars)
  * URL-safe, readable, unique
  */
+/**
+ * Generates short category mirror IDs
+ * Format: tenant-abc123 (13 chars vs 36 for UUID)
+ * URL-safe, readable, unique
+ */
+export function generateCategoryMirrorId(catId: string,tenantId: string = 'tid'): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
+  return `ctid-${tenantId}-${catId}-${nanoid()}`;
+}
+// id: `ut_${tenantId}_${user.id}`,
+/**
+ * Generates short item/SKU IDs
+ * Format: item-xyz789 (12 chars)
+ * URL-safe, readable, unique
+ */
 export function generateItemId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `iid-${nanoid()}`;
 }
+// id: `ciid_${tenantId}_${user.id}`,
+/**
+ * Generates clover item/SKU IDs
+ * Format: item-xyz789 (12 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCloverItemId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ciid-${nanoid()}`;
+}
+// id: `cigid_${tenantId}_${user.id}`,
+/**
+ * Generates clover integration IDs
+ * Format: item-xyz789 (12 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCloverIntegrationId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `cigid-${nanoid()}`;
+}
+
+// id: `cimid_${tenantId}_${user.id}`,
+/**
+ * Generates clover item/SKU mappings IDs
+ * Format: item-xyz789 (12 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCloverItemMappingsId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `cmid-${nanoid()}`;
+}
+
 
 /**
  * Generates short SKUs for quick-start items
@@ -71,18 +118,27 @@ export function generateSku(prefix: string = 'skuid'): string {
  * Generates short photo asset IDs
  * Format: photo-abc123 (13 chars)
  */
-export function generatePhotoId(): string {
-  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `photoid-${nanoid()}`;
+export function generatePhotoId(tenantId?: string,itemId?: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `pid-${tenantId}-${itemId}-${nanoid()}`;
 }
 
 /**
  * Generates short session IDs
  * Format: sess-abc123 (12 chars)
  */
-export function generateSessionId(): string {
+export function generateSessionId(tenantId?: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `sessionid-${nanoid()}`;
+  return `sid-${tenantId}-${nanoid()}`;
+}
+
+/**
+ * Generates short audit logs IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateAuditId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `alid-${nanoid()}`;
 }
 
 /**
@@ -91,7 +147,16 @@ export function generateSessionId(): string {
  */
 export function generateTierId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
-  return `tierid-${nanoid()}`;
+  return `tid-${nanoid()}`;
+}
+
+/**
+ * Generates short tier change IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateTierChangeId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
+  return `tcid-${nanoid()}`;
 }
 
 /**
@@ -100,7 +165,7 @@ export function generateTierId(): string {
  */
 export function generateFeatureId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
-  return `featid-${nanoid()}`;
+  return `tfid-${nanoid()}`;
 }
 
 /**
@@ -113,6 +178,15 @@ export function generateQsCatId(): string {
 }
 
 /**
+ * Generates short directory category IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateDcCatId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `dccatid-${nanoid()}`;
+}
+
+/**
  * Generates clover quick start category IDs
  * Format: sess-abc123 (12 chars)
  */
@@ -120,29 +194,83 @@ export function generateCloverCatId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
   return `ccatid-${nanoid()}`;
 }
-
 /**
- * Generates clover logs IDs
+ * Generates clover outh change log IDs
  * Format: sess-abc123 (12 chars)
  */
-export function generateCloverLogId(): string {
+export function generateCloverOathChangeLogId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `clogid-${nanoid()}`;
+  return `outhclid-${nanoid()}`;
 }
+
+/**
+ * Generates clover sync logs IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateCloverSyncLogId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `csynclid-${nanoid()}`;
+}
+
+/**
+ * Generates gbp sync job IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateGbpHoursSyncLogId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `bhsyncid-${nanoid()}`;
+}
+
+/**
+ * Generates gbp sync job IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateSpecialHoursId(tenantId: string = 'shid'): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `shid-${tenantId}-${nanoid()}`;
+}
+
+/**
+ * Generates gbp sync job IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateFeedPushJobId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `fpjid-${nanoid()}`;
+}
+
 /**
  * Generates short directory category IDs
  * Format: sess-abc123 (12 chars)
  */
-export function generateDsCatId(): string {
+export function generateProductCatId(tenantId?: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `dircatid-${nanoid()}`;
+  return `icatid-${tenantId}-${nanoid()}`;
+}
+
+/**
+ * Generates directory featured IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateDirectoryFeaturedId(tenantId: string = 'tid'): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `dfid-${tenantId}-${nanoid()}`;
+}
+
+/**
+ * Generates organization IDs
+ * Format: sess-abc123 (12 chars)
+ */
+export function generateOrganizationId(ownerId: string = 'oid'): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `oid-${ownerId}-${nanoid()}`;
 }
 
 /**
  * Generates short quick start with optional prefix
  * Format: SKU-abc123 or CUSTOM-abc123
  */
-export function generateQuickStart(prefix: string = 'QS'): string {
+export function generateQuickStart(prefix: string = 'qsid'): string {
   const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 8);
   return `${prefix}-${nanoid()}`;
 }

@@ -541,7 +541,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
           try {
             const photoAsset = await prisma.photo_assets.create({
               data: {
-                id: generatePhotoId(), // Generate unique photo ID
+                id: generatePhotoId(session.tenant_id,item!.id), // Generate unique photo ID
                 tenantId: session.tenant_id,
                 inventoryItemId: item!.id,
                 url: imageUrl,

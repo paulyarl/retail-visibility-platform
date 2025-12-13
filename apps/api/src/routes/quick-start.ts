@@ -14,7 +14,7 @@ import { isPlatformAdmin, isPlatformUser, canViewAllTenants, canPerformSupportAc
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
 import { requireTierFeature, requireWritableSubscription } from '../middleware/tier-access';
-import { generateQsCatId, generateQuickStart } from '../lib/id-generator';
+import { generateProductCatId, generateQsCatId, generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -736,7 +736,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
 
         return prisma.directory_category.create({
           data: {
-            id: generateQsCatId(),
+            id: generateProductCatId(tenantId),
             tenantId,
             name: categoryName, // Use the hierarchical or template name
             slug: categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),

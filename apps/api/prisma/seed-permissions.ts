@@ -82,7 +82,7 @@ async function seedPermissions() {
   // Create permissions using createMany with skipDuplicates
   await db.permission_matrix_list.createMany({
     data: permissions.map((p, index) => ({
-      id: generateQuickStart(`perm_${index}`),
+      id: generateQuickStart(`pmid_${index}`),
       role: p.role,
       action: p.action,
       allowed: p.allowed,
