@@ -3514,113 +3514,125 @@ app.post("/items/sync-availability", authenticateToken, async (req, res) => {
 
 app.get('/api/google/taxonomy/browse', async (req, res) => {
   try {
-    const { level = '1' } = req.query;
-    const targetLevel = parseInt(level as string, 10);
+    const { parent } = req.query;
+    const parentPath = parent ? decodeURIComponent(parent as string) : null;
 
-    // Get top-level categories (those without parentId or with specific parent)
-    // Instead of relying on level field, get categories that represent top-level groupings
-    const categories = await prisma.google_taxonomy_list.findMany({
-      where: {
-        is_active: true,
-        OR: [
-          { parent_id: null },
-          { parent_id: { equals: '' } }
-        ]
-      },
-      orderBy: { category_path: 'asc' },
-      take: 20 // Limit for performance
-    });
+    // Try database first, fall back to JSON file
+    const dbCount = await prisma.google_taxonomy_list.count();
+    const useDatabase = dbCount > 0;
+    
+    let categories: any[] = [];
 
-    // For now, return some test categories if database is empty
-    let finalCategories: any[] = categories;
-    if (categories.length === 0) {
-      console.log('No categories found in database, using fallback test categories');
-      finalCategories = [
-        {
-          categoryId: "8",
-          category_path: "Food, Beverages & Tobacco",
-          level: 1,
-          parentId: null,
-          isActive: true
-        },
-        {
-          categoryId: "7", 
-          category_path: "Electronics", 
-          level: 1,
-          parentId: null,
-          isActive: true
-        },
-        {
-          categoryId: "499685",
-          category_path: "Food, Beverages & Tobacco > Food Items",
-          level: 2,
-          parentId: "8",
-          isActive: true
-        },
-        {
-          categoryId: "499686",
-          category_path: "Food, Beverages & Tobacco > Beverages", 
-          level: 2,
-          parentId: "8",
-          isActive: true
-        },
-        {
-          categoryId: "499776",
-          category_path: "Food, Beverages & Tobacco > Beverages > Coffee",
-          level: 3,
-          parentId: "499686",
-          isActive: true
-        },
-        {
-          categoryId: "499777",
-          category_path: "Food, Beverages & Tobacco > Beverages > Tea & Infusions",
-          level: 3,
-          parentId: "499686", 
-          isActive: true
-        }
-      ];
+    if (useDatabase) {
+      if (!parentPath) {
+        // Get top-level categories (level 1)
+        categories = await prisma.google_taxonomy_list.findMany({
+          where: {
+            is_active: true,
+            level: 1
+          },
+          orderBy: { category_path: 'asc' },
+          take: 50
+        });
+      } else {
+        // Get direct children of the specified parent path
+        const parentDepth = parentPath.split(' > ').length;
+        
+        categories = await prisma.google_taxonomy_list.findMany({
+          where: {
+            is_active: true,
+            category_path: {
+              startsWith: parentPath + ' > '
+            }
+          },
+          orderBy: { category_path: 'asc' }
+        });
+
+        // Filter to only direct children (one level deeper)
+        categories = categories.filter(cat => {
+          const catDepth = cat.category_path.split(' > ').length;
+          return catDepth === parentDepth + 1;
+        });
+      }
+    } else {
+      // Fallback to JSON file
+      const taxonomyData = require('./lib/google/taxonomy-data.json');
+      const allCategories = taxonomyData.categories || [];
+      
+      if (!parentPath) {
+        // Get top-level categories (path length = 1)
+        categories = allCategories
+          .filter((cat: any) => cat.path.length === 1)
+          .map((cat: any) => ({
+            category_id: cat.id,
+            category_path: cat.fullPath,
+            level: 1
+          }));
+      } else {
+        // Get direct children
+        const parentDepth = parentPath.split(' > ').length;
+        categories = allCategories
+          .filter((cat: any) => {
+            return cat.fullPath.startsWith(parentPath + ' > ') && 
+                   cat.path.length === parentDepth + 1;
+          })
+          .map((cat: any) => ({
+            category_id: cat.id,
+            category_path: cat.fullPath,
+            level: cat.path.length
+          }));
+      }
+      
+      console.log(`[Taxonomy Browse] Using JSON fallback, found ${categories.length} categories for path: ${parentPath || 'root'}`);
     }
 
-    // For each top-level category, get some children
-    const categoriesWithChildren = await Promise.all(
-      finalCategories.map(async (cat: any) => {
-        let children: any[] = [];
-        
-        // If using fallback categories, get children from the hardcoded list
-        if (categories.length === 0) {
-          children = finalCategories.filter(c => c.parentId === cat.categoryId);
-        } else {
-          // Get children from database
-          children = await prisma.google_taxonomy_list.findMany({
+    // For each category, check if it has children
+    let categoriesWithChildInfo: any[];
+    
+    if (useDatabase) {
+      categoriesWithChildInfo = await Promise.all(
+        categories.map(async (cat: any) => {
+          const childCount = await prisma.google_taxonomy_list.count({
             where: {
               is_active: true,
               category_path: {
                 startsWith: cat.category_path + ' > '
               }
-            },
-            orderBy: { category_path: 'asc' },
-            take: 10 // Limit children for UI performance
+            }
           });
-        }
+
+          return {
+            id: cat.category_id,
+            name: cat.category_path.split(' > ').pop() || cat.category_path,
+            path: cat.category_path.split(' > '),
+            fullPath: cat.category_path,
+            hasChildren: childCount > 0
+          };
+        })
+      );
+    } else {
+      // Use JSON data for child count
+      const taxonomyData = require('./lib/google/taxonomy-data.json');
+      const allCategories = taxonomyData.categories || [];
+      
+      categoriesWithChildInfo = categories.map((cat: any) => {
+        const hasChildren = allCategories.some((c: any) => 
+          c.fullPath.startsWith(cat.category_path + ' > ')
+        );
 
         return {
-          id: cat.categoryId,
+          id: cat.category_id,
           name: cat.category_path.split(' > ').pop() || cat.category_path,
           path: cat.category_path.split(' > '),
           fullPath: cat.category_path,
-          children: children.map(child => ({
-            id: child.categoryId,
-            name: child.category_path.split(' > ').pop() || child.category_path,
-            path: child.category_path.split(' > '),
-            fullPath: child.category_path
-          }))
+          hasChildren
         };
-      })
-    );
+      });
+    }
 
     res.json({
       success: true,
-      categories: categoriesWithChildren,
+      categories: categoriesWithChildInfo,
     });
   } catch (error) {
     console.error('[Google Taxonomy Browse] Error:', error);
@@ -3630,7 +3642,7 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
 
 app.get('/api/google/taxonomy/search', async (req, res) => {
   try {
-    const { q: query, limit = '10' } = req.query;
+    const { q: query, limit = '20' } = req.query;
 
     // Disable caching for search results
     res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -3641,8 +3653,11 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
       return res.status(400).json({ error: 'Query parameter required' });
     }
 
+    const searchQuery = query.trim().toLowerCase();
+    const maxResults = parseInt(limit as string, 10);
+
     // Search real Google taxonomy data from database
-    // Use case-insensitive search with mode: 'insensitive' for better UX
+    // Fetch more results than needed so we can sort by relevance
     const categories = await prisma.google_taxonomy_list.findMany({
       where: {
         is_active: true,
@@ -3651,16 +3666,61 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
           { category_id: { contains: query, mode: 'insensitive' } }
         ]
       },
-      take: parseInt(limit as string, 10),
+      take: maxResults * 5, // Fetch extra for relevance sorting
       orderBy: { category_path: 'asc' }
     });
 
-    const results = categories.map(cat => ({
-      id: cat.category_id,
-      name: cat.category_path.split(' > ').pop() || cat.category_path,
-      path: cat.category_path.split(' > '),
-      fullPath: cat.category_path
-    }));
+    // Score and sort results by relevance
+    const scoredResults = categories.map(cat => {
+      const path = cat.category_path;
+      const leafName = path.split(' > ').pop()?.toLowerCase() || '';
+      const pathLower = path.toLowerCase();
+      
+      let score = 0;
+      
+      // Exact leaf name match (highest priority)
+      if (leafName === searchQuery) {
+        score += 1000;
+      }
+      // Leaf name starts with query
+      else if (leafName.startsWith(searchQuery)) {
+        score += 500;
+      }
+      // Leaf name contains query as whole word
+      else if (new RegExp(`\\b${searchQuery}\\b`, 'i').test(leafName)) {
+        score += 300;
+      }
+      // Leaf name contains query
+      else if (leafName.includes(searchQuery)) {
+        score += 100;
+      }
+      
+      // Bonus for shorter paths (more specific categories)
+      const depth = path.split(' > ').length;
+      score += Math.max(0, 50 - depth * 5);
+      
+      // Bonus if query appears in path (for context)
+      if (pathLower.includes(searchQuery) && !leafName.includes(searchQuery)) {
+        score += 20;
+      }
+      
+      return {
+        id: cat.category_id,
+        name: path.split(' > ').pop() || path,
+        path: path.split(' > '),
+        fullPath: path,
+        score
+      };
+    });
+
+    // Sort by score descending, then by path alphabetically
+    scoredResults.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.fullPath.localeCompare(b.fullPath);
+    });
+
+    // Take top results and remove score from output
+    const results = scoredResults.slice(0, maxResults).map(({ score, ...rest }) => rest);
 
     res.json({
       success: true,

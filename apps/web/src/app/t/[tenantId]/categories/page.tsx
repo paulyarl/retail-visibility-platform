@@ -145,6 +145,12 @@ export default function CategoriesPage() {
   const [taxResults, setTaxResults] = useState<Array<{ id: string; name: string; path: string[] }>>([])
   const [taxLoading, setTaxLoading] = useState(false)
   const [showTaxResults, setShowTaxResults] = useState(false)
+  
+  // Taxonomy browse state
+  const [taxBrowseMode, setTaxBrowseMode] = useState(false)
+  const [taxBrowsePath, setTaxBrowsePath] = useState<string[]>([])
+  const [taxBrowseCategories, setTaxBrowseCategories] = useState<Array<{ id: string; name: string; path: string[]; hasChildren?: boolean }>>([])
+  const [taxBrowseLoading, setTaxBrowseLoading] = useState(false)
 
   // Propagation state
   const [propagating, setPropagating] = useState(false)
@@ -161,6 +167,12 @@ export default function CategoriesPage() {
   // Guide collapse state
   const [isGuideExpanded, setIsGuideExpanded] = useState(false)
   const [isQuickStartExpanded, setIsQuickStartExpanded] = useState(false)
+
+  // Quick Start modal state
+  const [showQuickStartModal, setShowQuickStartModal] = useState(false)
+  const [quickStartType, setQuickStartType] = useState<'grocery' | 'fashion' | 'electronics' | 'general'>('general')
+  const [quickStartCount, setQuickStartCount] = useState(15)
+  const [quickStartLoading, setQuickStartLoading] = useState(false)
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -481,7 +493,7 @@ export default function CategoriesPage() {
     const t = setTimeout(async () => {
       try {
         setTaxLoading(true)
-        const res = await api.get(`${API_BASE_URL}/api/categories/search?q=${encodeURIComponent(taxQuery)}&limit=8`)
+        const res = await api.get(`${API_BASE_URL}/api/categories/search?q=${encodeURIComponent(taxQuery)}&limit=20`)
         if (res.ok) {
           const data = await res.json()
           if (active) setTaxResults(data.results || [])
@@ -492,6 +504,90 @@ export default function CategoriesPage() {
     }, 300)
     return () => { active = false; clearTimeout(t) }
   }, [taxQuery])
+
+  // Load taxonomy browse categories for a specific parent path
+  async function loadTaxBrowseCategories(parentPath?: string) {
+    try {
+      setTaxBrowseLoading(true)
+      const url = parentPath 
+        ? `${API_BASE_URL}/api/google/taxonomy/browse?parent=${encodeURIComponent(parentPath)}`
+        : `${API_BASE_URL}/api/google/taxonomy/browse`
+      const res = await api.get(url)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success && data.categories) {
+          setTaxBrowseCategories(data.categories)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load taxonomy categories:', error)
+    } finally {
+      setTaxBrowseLoading(false)
+    }
+  }
+
+  // Navigate to a category path and load its children
+  async function navigateToPath(newPath: string[]) {
+    setTaxBrowsePath(newPath)
+    if (newPath.length === 0) {
+      await loadTaxBrowseCategories()
+    } else {
+      await loadTaxBrowseCategories(newPath.join(' > '))
+    }
+  }
+
+  // Quick Start handler
+  const handleQuickStart = async () => {
+    setQuickStartLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}/categories/quick-start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessType: quickStartType,
+          categoryCount: quickStartCount,
+        }),
+        credentials: 'include',
+      })
+      
+      if (res.ok) {
+        const data = await res.json()
+        
+        // Refresh categories and alignment status
+        try {
+          setLoading(true)
+          const catRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`)
+          if (catRes.ok) {
+            const catData = await catRes.json()
+            setCategories(catData.data || [])
+          }
+          
+          const statusRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
+          if (statusRes.ok) {
+            const statusData = await statusRes.json()
+            setAlignmentStatus(statusData.data)
+          }
+        } catch (error) {
+          console.error('Failed to refresh data:', error)
+        } finally {
+          setLoading(false)
+        }
+        
+        setShowQuickStartModal(false)
+        const createdCount = data.categoriesCreated || 0
+        const totalCount = data.data?.length || 0
+        showToast('success', `Successfully created ${createdCount} new categories! (${totalCount} total categories)`)
+      } else {
+        const data = await res.json()
+        showToast('error', `Failed to generate categories: ${data.message || data.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('[Quick Start] Error:', error)
+      showToast('error', 'Failed to generate categories. Please try again.')
+    } finally {
+      setQuickStartLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -606,12 +702,44 @@ export default function CategoriesPage() {
         
         {isGuideExpanded && (
           <div className="mt-4 pl-8">
-            <div className="space-y-3 text-sm text-blue-800">
+            <div className="space-y-4 text-sm">
+              {/* What are Product Categories */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 mb-2">💡 What are Product Categories?</h4>
+                <p className="text-blue-800">
+                  Product categories help organize your inventory and improve visibility in Google Business Profile and Google Merchant Center. 
+                  These are different from <strong>business categories</strong> (which define what type of business you are).
+                </p>
+              </div>
+
+              {/* Getting Started */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-semibold text-green-900 mb-2">🚀 Getting Started</h4>
+                <ul className="list-disc list-inside space-y-1 text-green-800">
+                  <li><strong>Quick Start:</strong> Get pre-selected categories for your business type (grocery, fashion, etc.)</li>
+                  <li><strong>Import from Google:</strong> Search and select from 6000+ Google taxonomy categories</li>
+                  <li><strong>Create Custom:</strong> Add your own categories for unique products</li>
+                </ul>
+              </div>
+
+              {/* Best Practices */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-semibold text-amber-900 mb-2">✅ Best Practices</h4>
+                <ul className="list-disc list-inside space-y-1 text-amber-800">
+                  <li>Start with <strong>Quick Start</strong> to get a solid foundation</li>
+                  <li>Use <strong>Google categories</strong> when possible for better SEO</li>
+                  <li>Keep category names <strong>clear and specific</strong></li>
+                  <li>Organize products into categories to improve customer browsing</li>
+                </ul>
+              </div>
+
+              {/* Why create categories */}
               <div>
                 <strong>💡 Why create categories?</strong>
-                <p>Organize your products and improve visibility in Google Business Profile and Google Merchant Center. Well-categorized products perform better in search results and shopping ads.</p>
+                <p className="mt-1">Organize your products and improve visibility in Google Business Profile and Google Merchant Center. Well-categorized products perform better in search results and shopping ads.</p>
               </div>
               
+              {/* Single Source of Truth */}
               <div className="bg-blue-100 rounded p-3">
                 <strong className="text-blue-900">🎯 Single Source of Truth</strong>
                 <p className="mt-1">Categories created here appear <strong>consistently everywhere</strong>:</p>
@@ -623,6 +751,7 @@ export default function CategoriesPage() {
                 </ul>
               </div>
 
+              {/* How it works */}
               <div>
                 <strong>🔄 How it works:</strong>
                 <ol className="list-decimal list-inside ml-2 space-y-1">
@@ -637,11 +766,36 @@ export default function CategoriesPage() {
                 </ol>
               </div>
 
+              {/* Important note */}
               <div className="bg-purple-50 border border-purple-200 rounded p-2">
                 <strong className="text-purple-900">ℹ️ Important:</strong>
                 <p className="mt-1">Products can <strong>only use categories you create here</strong>. They don't have direct access to Google's 6000+ categories. You control your category structure and optionally map to Google for sync purposes.</p>
               </div>
 
+              {/* Category Types Explained */}
+              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4">
+                <h4 className="font-semibold text-neutral-900 mb-2">🔍 Category Types Explained</h4>
+                <div className="space-y-3 text-neutral-700">
+                  <div>
+                    <strong className="text-blue-700">Product Categories</strong> (This Page):
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      <li>Organize products/services (e.g., "Hot Coffee", "Pastries")</li>
+                      <li>Unlimited categories</li>
+                      <li>Syncs to GBP for product visibility</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-purple-700">Business Categories</strong> (Different Page):
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      <li>Define business type (e.g., "Coffee Shop", "Restaurant")</li>
+                      <li>1 primary + ~9 additional max</li>
+                      <li>Managed at Settings → Google Business Profile</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Note about business category */}
               <div className="bg-blue-100 rounded p-2">
                 <strong>🔍 Note:</strong> These are <strong>product categories</strong> (unlimited). Your <strong>business category</strong> (e.g., "Coffee Shop") is managed separately at{' '}
                 <a href={`/t/${tenantId}/settings/gbp-category`} className="underline font-medium hover:text-blue-900">
@@ -775,6 +929,12 @@ export default function CategoriesPage() {
                 )}
               </button>
             )}
+            <button
+              onClick={() => setShowQuickStartModal(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
+            >
+              ⚡ Quick Start
+            </button>
             <button
               onClick={openCreate}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -1103,32 +1263,118 @@ export default function CategoriesPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Google Category</label>
                 <div className="space-y-3">
-                  {/* Search by name */}
-                  <div className="relative">
-                    <input
-                      placeholder="Search taxonomy by name (e.g. Electronics)"
-                      value={taxQuery}
-                      onChange={(e) => { setTaxQuery(e.target.value); setShowTaxResults(true) }}
-                      onFocus={() => setShowTaxResults(true)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    {showTaxResults && (taxResults.length > 0 || taxLoading) && (
-                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-auto">
-                        {taxLoading && <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>}
-                        {taxResults.map((r) => (
-                          <button
-                            key={r.id}
-                            type="button"
-                            onClick={() => { setFormGoogleId(r.id); setTaxQuery(r.path.join(' > ')); setShowTaxResults(false) }}
-                            className="w-full text-left px-3 py-2 hover:bg-gray-50"
-                          >
-                            <div className="text-sm font-medium text-gray-900">{r.name}</div>
-                            <div className="text-xs text-gray-600">{r.path.join(' > ')}</div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  {/* Mode toggle */}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTaxBrowseMode(false)}
+                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${!taxBrowseMode ? 'bg-blue-100 text-blue-700 border-2 border-blue-500' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'}`}
+                    >
+                      🔍 Search
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setTaxBrowseMode(true); if (taxBrowseCategories.length === 0) loadTaxBrowseCategories() }}
+                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${taxBrowseMode ? 'bg-blue-100 text-blue-700 border-2 border-blue-500' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'}`}
+                    >
+                      📂 Browse Tree
+                    </button>
                   </div>
+
+                  {!taxBrowseMode ? (
+                    <>
+                      {/* Search by name */}
+                      <div className="relative">
+                        <input
+                          placeholder="Search taxonomy by name (e.g. Electronics, Pizza)"
+                          value={taxQuery}
+                          onChange={(e) => { setTaxQuery(e.target.value); setShowTaxResults(true) }}
+                          onFocus={() => setShowTaxResults(true)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {showTaxResults && (taxResults.length > 0 || taxLoading) && (
+                          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-auto">
+                            {taxLoading && <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>}
+                            {taxResults.map((r) => (
+                              <button
+                                key={r.id}
+                                type="button"
+                                onClick={() => { setFormGoogleId(r.id); setTaxQuery(r.path.join(' > ')); setShowTaxResults(false) }}
+                                className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                              >
+                                <div className="text-sm font-medium text-gray-900">{r.name}</div>
+                                <div className="text-xs text-gray-600">{r.path.join(' > ')}</div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Browse tree */}
+                      <div className="border border-gray-200 rounded-md">
+                        {/* Breadcrumb */}
+                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-1 flex-wrap text-sm">
+                          <button
+                            type="button"
+                            onClick={() => navigateToPath([])}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Root
+                          </button>
+                          {taxBrowsePath.map((segment, idx) => (
+                            <span key={idx} className="flex items-center gap-1">
+                              <span className="text-gray-400">&gt;</span>
+                              <button
+                                type="button"
+                                onClick={() => navigateToPath(taxBrowsePath.slice(0, idx + 1))}
+                                className="text-blue-600 hover:text-blue-800"
+                              >
+                                {segment}
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        {/* Category list */}
+                        <div className="max-h-48 overflow-auto">
+                          {taxBrowseLoading ? (
+                            <div className="px-3 py-4 text-sm text-gray-500 text-center">Loading categories...</div>
+                          ) : taxBrowseCategories.length === 0 ? (
+                            <div className="px-3 py-4 text-sm text-gray-500 text-center">No subcategories</div>
+                          ) : (
+                            taxBrowseCategories.map((cat) => (
+                              <div key={cat.id} className="flex items-center border-b border-gray-100 last:border-0">
+                                <button
+                                  type="button"
+                                  onClick={() => { setFormGoogleId(cat.id); setTaxQuery(cat.path.join(' > ')) }}
+                                  className={`flex-1 text-left px-3 py-2 hover:bg-blue-50 ${formGoogleId === cat.id ? 'bg-blue-100' : ''}`}
+                                >
+                                  <div className="text-sm font-medium text-gray-900">{cat.name}</div>
+                                  <div className="text-xs text-gray-500 font-mono">{cat.id}</div>
+                                </button>
+                                {cat.hasChildren && (
+                                  <button
+                                    type="button"
+                                    onClick={() => navigateToPath([...taxBrowsePath, cat.name])}
+                                    className="px-3 py-2 text-blue-600 hover:bg-blue-50"
+                                    title="Browse subcategories"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        💡 Click a category to select it, or click the arrow to browse subcategories
+                      </p>
+                    </>
+                  )}
 
                   {/* OR divider */}
                   <div className="flex items-center gap-2">
@@ -1322,6 +1568,72 @@ export default function CategoriesPage() {
                 className="px-4 py-2 text-sm rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Propagate Categories
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Start Modal */}
+      {showQuickStartModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold">⚡ Quick Start: Generate Categories</h3>
+              <p className="text-sm text-gray-600 mt-1">Generate Google-aligned categories for your business type</p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Business Type
+                </label>
+                <select
+                  value={quickStartType}
+                  onChange={(e) => setQuickStartType(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="general">General Retail (20 categories)</option>
+                  <option value="grocery">Grocery Store (15 categories)</option>
+                  <option value="fashion">Fashion Retail (12 categories)</option>
+                  <option value="electronics">Electronics Store (10 categories)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Categories: {quickStartCount}
+                </label>
+                <input
+                  type="range"
+                  min="5"
+                  max="30"
+                  value={quickStartCount}
+                  onChange={(e) => setQuickStartCount(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowQuickStartModal(false)}
+                className="px-4 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleQuickStart}
+                disabled={quickStartLoading}
+                className="px-4 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {quickStartLoading && (
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {quickStartLoading ? 'Generating...' : 'Generate Categories'}
               </button>
             </div>
           </div>

@@ -26,13 +26,22 @@ export async function GET(req: NextRequest) {
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const headers = buildAuthHeaders(req);
     
-    const res = await fetch(`${base}/api/categories/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
+    // Call the Google taxonomy search endpoint
+    const res = await fetch(`${base}/api/google/taxonomy/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
       headers,
       cache: 'no-store',
     });
     
     const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    
+    // Transform response to expected format (results array)
+    const results = data.categories?.map((cat: any) => ({
+      id: cat.id,
+      name: cat.name,
+      path: cat.path || cat.fullPath?.split(' > ') || []
+    })) || [];
+    
+    return NextResponse.json({ results }, { status: res.status });
   } catch (e) {
     console.error('[API Proxy] GET /categories/search error:', e);
     return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
