@@ -8,7 +8,8 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
 import { 
-  getDemoItems, 
+  getDemoItems,
+  getDemoItem,
   convertDemoItemToRVPFormat,
   getAvailableScenarios,
   generateSimulationEvent,
@@ -721,7 +722,18 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
     }
 
     // Apply changes based on scenario
-    const results: any[] = [];
+    // Enhanced results with before/after values and item details
+    const results: {
+      itemId: string;
+      itemName: string;
+      sku: string;
+      field: string;
+      oldValue: any;
+      newValue: any;
+      action: 'updated' | 'created' | 'archived' | 'conflict' | 'failed';
+      formattedOld?: string;
+      formattedNew?: string;
+    }[] = [];
     
     switch (event.scenario) {
       case 'stock_update':
@@ -740,6 +752,11 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
           });
 
           if (mapping && mapping.rvp_item_id) {
+            // Get current item state before update
+            const currentItem = await prisma.inventory_items.findUnique({
+              where: { id: mapping.rvp_item_id }
+            });
+            
             // Update inventory item
             const updated = await prisma.inventory_items.update({
               where: { id: mapping.rvp_item_id },
@@ -748,7 +765,18 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
                 updated_at: new Date()
               }
             });
-            results.push({ itemId: mapping.rvp_item_id, field: 'stock', newValue: change.newValue });
+            
+            results.push({ 
+              itemId: mapping.rvp_item_id, 
+              itemName: currentItem?.name || mapping.clover_item_name || 'Unknown Item',
+              sku: currentItem?.sku || mapping.clover_sku || '',
+              field: 'stock', 
+              oldValue: currentItem?.stock ?? change.oldValue,
+              newValue: change.newValue,
+              action: 'updated',
+              formattedOld: `${currentItem?.stock ?? change.oldValue} units`,
+              formattedNew: `${change.newValue} units`
+            });
           }
         }
         break;
@@ -765,6 +793,11 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
           });
 
           if (mapping && mapping.rvp_item_id) {
+            // Get current item state before update
+            const currentItem = await prisma.inventory_items.findUnique({
+              where: { id: mapping.rvp_item_id }
+            });
+            
             const updated = await prisma.inventory_items.update({
               where: { id: mapping.rvp_item_id },
               data: {
@@ -773,14 +806,78 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
                 updated_at: new Date()
               }
             });
-            results.push({ itemId: mapping.rvp_item_id, field: 'price', newValue: change.newValue });
+            
+            results.push({ 
+              itemId: mapping.rvp_item_id, 
+              itemName: currentItem?.name || mapping.clover_item_name || 'Unknown Item',
+              sku: currentItem?.sku || mapping.clover_sku || '',
+              field: 'price', 
+              oldValue: currentItem?.price_cents ?? change.oldValue,
+              newValue: change.newValue,
+              action: 'updated',
+              formattedOld: `$${((currentItem?.price_cents ?? change.oldValue) / 100).toFixed(2)}`,
+              formattedNew: `$${(change.newValue / 100).toFixed(2)}`
+            });
           }
         }
         break;
 
       case 'new_item':
-        // Create new item from simulation
+        // Create new item from simulation with auto-categorization
+        // Uses same approach as demo startup - category comes from simulation data
         const newItemData = event.changes[0].newValue;
+        const categoryName = newItemData.category || 'Electronics';
+        
+        // Check if item with this SKU already exists for this tenant
+        const existingItem = await prisma.inventory_items.findFirst({
+          where: {
+            tenant_id: tenantId,
+            sku: newItemData.sku
+          }
+        });
+        
+        if (existingItem) {
+          // Item already exists - report as already synced
+          results.push({ 
+            itemId: existingItem.id, 
+            itemName: existingItem.name || newItemData.name,
+            sku: newItemData.sku,
+            field: 'item',
+            oldValue: null,
+            newValue: null,
+            action: 'updated',
+            formattedOld: '(already exists)',
+            formattedNew: `Item already in inventory - no changes needed`
+          });
+          break;
+        }
+        
+        // Find or create the category for this tenant (same as demo startup)
+        const slug = slugify(categoryName);
+        let existingCategory = await prisma.directory_category.findFirst({
+          where: {
+            tenantId: tenantId,
+            slug: slug
+          }
+        });
+        
+        if (!existingCategory) {
+          // Create the category (same as demo startup)
+          existingCategory = await prisma.directory_category.create({
+            data: {
+              id: generateCloverCatId(),
+              tenantId: tenantId,
+              name: categoryName,
+              slug: slug,
+              isActive: true,
+              updatedAt: new Date()
+            }
+          });
+          console.log(`[Clover Simulation] Created category: ${categoryName} (${existingCategory.id})`);
+        }
+        
+        const directoryCategoryId = existingCategory.id;
+        
         const newItem = await prisma.inventory_items.create({
           data: { 
             id: generateCloverItemId(),
@@ -795,6 +892,8 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
             brand: 'Demo Brand',
             currency: 'USD',
             availability: 'in_stock',
+            directory_category_id: directoryCategoryId,
+            category_path: [categoryName],
             updated_at: new Date()
           } as any
         });
@@ -816,7 +915,31 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
           } as any
         });
         
-        results.push({ itemId: newItem.id, action: 'created', item: newItem });
+        // Add result for item creation
+        results.push({ 
+          itemId: newItem.id, 
+          itemName: newItemData.name,
+          sku: newItemData.sku,
+          field: 'item',
+          oldValue: null,
+          newValue: newItemData,
+          action: 'created',
+          formattedOld: '(new item)',
+          formattedNew: `${newItemData.name} - $${(newItemData.price / 100).toFixed(2)} (${newItemData.stock} in stock)`
+        });
+        
+        // Add result for auto-categorization
+        results.push({ 
+          itemId: newItem.id, 
+          itemName: newItemData.name,
+          sku: newItemData.sku,
+          field: 'category',
+          oldValue: null,
+          newValue: categoryName,
+          action: 'updated',
+          formattedOld: '(uncategorized)',
+          formattedNew: `Auto-assigned to "${categoryName}"`
+        });
         break;
 
       case 'item_deleted':
@@ -829,6 +952,11 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
           });
 
           if (mapping && mapping.rvp_item_id) {
+            // Get current item state before archiving
+            const currentItem = await prisma.inventory_items.findUnique({
+              where: { id: mapping.rvp_item_id }
+            });
+            
             // Archive item instead of deleting
             await prisma.inventory_items.update({
               where: { id: mapping.rvp_item_id },
@@ -837,14 +965,26 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
                 updated_at: new Date()
               }
             });
-            results.push({ itemId: mapping.rvp_item_id, action: 'archived' });
+            
+            results.push({ 
+              itemId: mapping.rvp_item_id, 
+              itemName: currentItem?.name || mapping.clover_item_name || 'Unknown Item',
+              sku: currentItem?.sku || mapping.clover_sku || '',
+              field: 'status',
+              oldValue: 'active',
+              newValue: 'archived',
+              action: 'archived',
+              formattedOld: 'Active',
+              formattedNew: 'Archived (item deleted in Clover)'
+            });
           }
         }
         break;
 
       case 'conflict':
         // Mark mapping as conflict for user to resolve
-        for (const cloverItemId of event.affectedItems) {
+        for (let i = 0; i < event.affectedItems.length; i++) {
+          const cloverItemId = event.affectedItems[i];
           const mapping = await prisma.clover_item_mappings_list.findFirst({
             where: {
               integration_id: integration.id,
@@ -852,7 +992,18 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
             }
           });
 
+          // Get current item for details
+          let currentItem = null;
+          let itemName = 'Demo Item';
+          let itemSku = '';
+          
           if (mapping) {
+            currentItem = mapping.rvp_item_id 
+              ? await prisma.inventory_items.findUnique({ where: { id: mapping.rvp_item_id } })
+              : null;
+            itemName = currentItem?.name || mapping.clover_item_name || 'Unknown Item';
+            itemSku = currentItem?.sku || mapping.clover_sku || '';
+            
             await prisma.clover_item_mappings_list.update({
               where: { id: mapping.id },
               data: {
@@ -861,8 +1012,29 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
                 updated_at: new Date()
               }
             });
-            results.push({ mappingId: mapping.id, status: 'conflict', requiresResolution: true });
+          } else {
+            // No mapping found - use demo item data from the emulator
+            const demoItem = getDemoItem(cloverItemId);
+            if (demoItem) {
+              itemName = demoItem.name;
+              itemSku = demoItem.sku;
+            }
           }
+          
+          const change = event.changes[0]; // Price change from Clover
+          const rvpChange = event.changes[1]; // Price change from RVP
+          
+          results.push({ 
+            itemId: mapping?.rvp_item_id || cloverItemId,
+            itemName: itemName,
+            sku: itemSku,
+            field: 'price',
+            oldValue: change?.oldValue,
+            newValue: change?.newValue,
+            action: 'conflict',
+            formattedOld: `RVP: $${((rvpChange?.newValue || change?.oldValue) / 100).toFixed(2)}`,
+            formattedNew: `Clover: $${((change?.newValue || 0) / 100).toFixed(2)}`
+          });
         }
         event.status = 'conflict';
         break;
@@ -870,7 +1042,248 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
       case 'sync_failure':
         // Simulate failure - don't apply changes
         event.status = 'failed';
-        results.push({ error: 'simulated_failure', message: event.message });
+        for (const cloverItemId of event.affectedItems) {
+          const mapping = await prisma.clover_item_mappings_list.findFirst({
+            where: {
+              integration_id: integration.id,
+              clover_item_id: cloverItemId
+            }
+          });
+          
+          let failItemName = 'Unknown Item';
+          let failItemSku = '';
+          
+          if (mapping) {
+            const currentItem = mapping.rvp_item_id 
+              ? await prisma.inventory_items.findUnique({ where: { id: mapping.rvp_item_id } })
+              : null;
+            failItemName = currentItem?.name || mapping.clover_item_name || 'Unknown Item';
+            failItemSku = currentItem?.sku || mapping.clover_sku || '';
+          } else {
+            // No mapping found - use demo item data
+            const demoItem = getDemoItem(cloverItemId);
+            if (demoItem) {
+              failItemName = demoItem.name;
+              failItemSku = demoItem.sku;
+            }
+          }
+          
+          results.push({ 
+            itemId: mapping?.rvp_item_id || cloverItemId,
+            itemName: failItemName,
+            sku: failItemSku,
+            field: 'sync',
+            oldValue: null,
+            newValue: null,
+            action: 'failed',
+            formattedOld: 'Pending sync',
+            formattedNew: 'Sync failed - connection timeout'
+          });
+        }
+        break;
+
+      case 'new_category':
+        // Create new category from Clover
+        const newCatData = event.changes[0].newValue;
+        const newCatSlug = slugify(newCatData.name);
+        
+        // Check if category already exists
+        let newCategory = await prisma.directory_category.findFirst({
+          where: { tenantId, slug: newCatSlug }
+        });
+        
+        if (!newCategory) {
+          newCategory = await prisma.directory_category.create({
+            data: {
+              id: generateCloverCatId(),
+              tenantId,
+              name: newCatData.name,
+              slug: newCatSlug,
+              isActive: true,
+              updatedAt: new Date()
+            }
+          });
+          
+          results.push({
+            itemId: newCategory.id,
+            itemName: newCatData.name,
+            sku: '',
+            field: 'category',
+            oldValue: null,
+            newValue: newCatData.name,
+            action: 'created',
+            formattedOld: '(new category)',
+            formattedNew: `Category "${newCatData.name}" created`
+          });
+        } else {
+          results.push({
+            itemId: newCategory.id,
+            itemName: newCatData.name,
+            sku: '',
+            field: 'category',
+            oldValue: null,
+            newValue: null,
+            action: 'updated',
+            formattedOld: '(already exists)',
+            formattedNew: `Category "${newCatData.name}" already exists`
+          });
+        }
+        break;
+
+      case 'category_renamed':
+        // Rename category and show affected items
+        const renameChange = event.changes[0];
+        const oldCatName = renameChange.oldValue;
+        const newCatName = renameChange.newValue;
+        
+        // Find the category to rename
+        const catToRename = await prisma.directory_category.findFirst({
+          where: { tenantId, name: oldCatName }
+        });
+        
+        if (catToRename) {
+          await prisma.directory_category.update({
+            where: { id: catToRename.id },
+            data: {
+              name: newCatName,
+              slug: slugify(newCatName),
+              updatedAt: new Date()
+            }
+          });
+          
+          results.push({
+            itemId: catToRename.id,
+            itemName: oldCatName,
+            sku: '',
+            field: 'category_name',
+            oldValue: oldCatName,
+            newValue: newCatName,
+            action: 'updated',
+            formattedOld: oldCatName,
+            formattedNew: newCatName
+          });
+          
+          // Show affected items
+          const affectedItems = await prisma.inventory_items.findMany({
+            where: { tenant_id: tenantId, directory_category_id: catToRename.id },
+            take: 10
+          });
+          
+          for (const item of affectedItems) {
+            results.push({
+              itemId: item.id,
+              itemName: item.name || 'Unknown Item',
+              sku: item.sku || '',
+              field: 'category_path',
+              oldValue: oldCatName,
+              newValue: newCatName,
+              action: 'updated',
+              formattedOld: `In "${oldCatName}"`,
+              formattedNew: `Now in "${newCatName}"`
+            });
+          }
+        } else {
+          results.push({
+            itemId: '',
+            itemName: oldCatName,
+            sku: '',
+            field: 'category_name',
+            oldValue: oldCatName,
+            newValue: newCatName,
+            action: 'updated',
+            formattedOld: `"${oldCatName}" not found`,
+            formattedNew: `Would rename to "${newCatName}"`
+          });
+        }
+        break;
+
+      case 'category_items_moved':
+        // Move items between categories
+        const moveChange = event.changes[0];
+        const fromCatName = moveChange.oldValue;
+        const toCatName = moveChange.newValue;
+        
+        // Find destination category
+        let destCategory = await prisma.directory_category.findFirst({
+          where: { tenantId, name: toCatName }
+        });
+        
+        if (!destCategory) {
+          destCategory = await prisma.directory_category.create({
+            data: {
+              id: generateCloverCatId(),
+              tenantId,
+              name: toCatName,
+              slug: slugify(toCatName),
+              isActive: true,
+              updatedAt: new Date()
+            }
+          });
+        }
+        
+        // Move affected items
+        for (const cloverItemId of event.affectedItems) {
+          const mapping = await prisma.clover_item_mappings_list.findFirst({
+            where: { integration_id: integration.id, clover_item_id: cloverItemId }
+          });
+          
+          let movedItemName = 'Unknown Item';
+          let movedItemSku = '';
+          
+          if (mapping?.rvp_item_id) {
+            const item = await prisma.inventory_items.findUnique({ where: { id: mapping.rvp_item_id } });
+            if (item) {
+              movedItemName = item.name || 'Unknown Item';
+              movedItemSku = item.sku || '';
+              
+              await prisma.inventory_items.update({
+                where: { id: item.id },
+                data: {
+                  directory_category_id: destCategory.id,
+                  category_path: [toCatName],
+                  updated_at: new Date()
+                }
+              });
+            }
+          } else {
+            const demoItem = getDemoItem(cloverItemId);
+            if (demoItem) {
+              movedItemName = demoItem.name;
+              movedItemSku = demoItem.sku;
+            }
+          }
+          
+          results.push({
+            itemId: mapping?.rvp_item_id || cloverItemId,
+            itemName: movedItemName,
+            sku: movedItemSku,
+            field: 'category',
+            oldValue: fromCatName,
+            newValue: toCatName,
+            action: 'updated',
+            formattedOld: `In "${fromCatName}"`,
+            formattedNew: `Moved to "${toCatName}"`
+          });
+        }
+        break;
+
+      case 'category_conflict':
+        // Category name conflict between Clover and RVP
+        const cloverCatChange = event.changes[0];
+        const rvpCatChange = event.changes[1];
+        
+        results.push({
+          itemId: '',
+          itemName: cloverCatChange.oldValue,
+          sku: '',
+          field: 'category_name',
+          oldValue: cloverCatChange.oldValue,
+          newValue: cloverCatChange.newValue,
+          action: 'conflict',
+          formattedOld: `RVP: "${rvpCatChange?.newValue || cloverCatChange.oldValue}"`,
+          formattedNew: `Clover: "${cloverCatChange.newValue}"`
+        });
+        event.status = 'conflict';
         break;
     }
 
@@ -880,14 +1293,21 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
     }
     activeSimulations.set(eventId, event);
 
-    // Update sync log
+    // Update sync log with detailed results for history tab
+    // Using error_details (Json field) to store audit trail
     await prisma.clover_sync_logs_list.updateMany({
       where: { trace_id: eventId },
       data: {
         status: event.status,
-        items_succeeded: event.status === 'success' ? event.affectedItems.length : 0,
+        items_succeeded: event.status === 'success' ? results.length : 0,
         items_failed: event.status === 'failed' ? event.affectedItems.length : 0,
-        completed_at: new Date()
+        completed_at: new Date(),
+        error_details: {
+          scenario: event.scenario,
+          message: event.message,
+          resolution: event.resolution,
+          auditTrail: results
+        }
       }
     });
 

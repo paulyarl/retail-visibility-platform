@@ -390,7 +390,8 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
         name: 'Wireless Earbuds Pro',
         sku: 'AUDIO-EB-PRO',
         price: 9999,
-        stock: 20
+        stock: 20,
+        category: 'Electronics' // Same category format as demo items
       }}
     ],
     message: 'New product added to Clover inventory',
@@ -414,7 +415,7 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
     id: `sim_${Date.now()}_conflict`,
     scenario: 'conflict',
     timestamp: new Date(),
-    status: 'conflict',
+    status: 'pending', // Start as pending so Execute button is shown
     affectedItems: ['demo_item_011'],
     changes: [
       { field: 'price', oldValue: 1999, newValue: 2199 }, // Clover price
@@ -428,7 +429,7 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
     id: `sim_${Date.now()}_fail`,
     scenario: 'sync_failure',
     timestamp: new Date(),
-    status: 'failed',
+    status: 'pending', // Start as pending so Execute button is shown
     affectedItems: ['demo_item_007', 'demo_item_008'],
     changes: [],
     message: 'Sync failed: Connection timeout to Clover API',
@@ -501,7 +502,7 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
     id: `sim_${Date.now()}_catconf`,
     scenario: 'category_conflict',
     timestamp: new Date(),
-    status: 'conflict',
+    status: 'pending', // Start as pending so Execute button is shown
     affectedItems: [],
     changes: [
       { field: 'category_name', oldValue: 'Sports & Outdoors', newValue: 'Sports & Fitness' }, // Clover

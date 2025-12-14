@@ -40,6 +40,18 @@ interface SimulationEvent {
   resolution?: string;
 }
 
+interface SimulationResult {
+  itemId: string;
+  itemName: string;
+  sku: string;
+  field: string;
+  oldValue: any;
+  newValue: any;
+  action: 'updated' | 'created' | 'archived' | 'conflict' | 'failed';
+  formattedOld?: string;
+  formattedNew?: string;
+}
+
 interface ItemMapping {
   id: string;
   clover_item_id: string;
@@ -85,6 +97,12 @@ interface SyncLog {
   items_failed: number;
   started_at: string;
   completed_at?: string;
+  error_details?: {
+    scenario?: string;
+    message?: string;
+    resolution?: string;
+    auditTrail?: SimulationResult[];
+  };
 }
 
 // Scenario icons
@@ -114,6 +132,7 @@ export default function CloverIntegrationPage() {
   const [status, setStatus] = useState<CloverStatus | null>(null);
   const [scenarios, setScenarios] = useState<SimulationScenario[]>([]);
   const [activeSimulation, setActiveSimulation] = useState<SimulationEvent | null>(null);
+  const [simulationResults, setSimulationResults] = useState<SimulationResult[]>([]);
   const [mappings, setMappings] = useState<ItemMapping[]>([]);
   const [categoryMappings, setCategoryMappings] = useState<CategoryMapping[]>([]);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
@@ -311,6 +330,7 @@ export default function CloverIntegrationPage() {
   const handleTriggerSimulation = async (scenario: string) => {
     try {
       setActionLoading(true);
+      setSimulationResults([]); // Clear previous results
       const res = await api.post(`/api/integrations/${tenantId}/clover/demo/simulate`, { scenario });
       if (!res.ok) throw new Error('Failed to start simulation');
       const data = await res.json();
@@ -331,6 +351,7 @@ export default function CloverIntegrationPage() {
       if (!res.ok) throw new Error('Failed to execute simulation');
       const data = await res.json();
       setActiveSimulation(data.event);
+      setSimulationResults(data.results || []); // Capture detailed results
       await fetchStatus();
       await fetchMappings();
     } catch (err: any) {
@@ -346,6 +367,7 @@ export default function CloverIntegrationPage() {
     try {
       await api.post(`/api/integrations/${tenantId}/clover/demo/simulate/${activeSimulation.id}/cancel`);
       setActiveSimulation(null);
+      setSimulationResults([]); // Clear results on cancel
     } catch (err: any) {
       setError(err.message);
     }
@@ -637,9 +659,9 @@ export default function CloverIntegrationPage() {
                           </button>
                         </>
                       )}
-                      {(activeSimulation.status === 'success' || activeSimulation.status === 'failed') && (
+                      {(activeSimulation.status === 'success' || activeSimulation.status === 'failed' || activeSimulation.status === 'conflict') && (
                         <button
-                          onClick={() => setActiveSimulation(null)}
+                          onClick={() => { setActiveSimulation(null); setSimulationResults([]); }}
                           className="px-3 py-1.5 bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded text-sm"
                         >
                           Dismiss
@@ -647,6 +669,96 @@ export default function CloverIntegrationPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Detailed Results - Before/After View */}
+                  {simulationResults.length > 0 && (
+                    <div className="mt-4 border-t border-neutral-200 dark:border-neutral-700 pt-4">
+                      <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3 flex items-center gap-2">
+                        📋 Audit Trail - {simulationResults.length} Change{simulationResults.length !== 1 ? 's' : ''}
+                      </h4>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {simulationResults.map((result, idx) => (
+                          <div 
+                            key={idx} 
+                            className={`p-3 rounded-lg border ${
+                              result.action === 'updated' ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' :
+                              result.action === 'created' ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' :
+                              result.action === 'archived' ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800' :
+                              result.action === 'conflict' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
+                              'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium uppercase ${
+                                    result.action === 'updated' ? 'bg-blue-200 text-blue-800' :
+                                    result.action === 'created' ? 'bg-green-200 text-green-800' :
+                                    result.action === 'archived' ? 'bg-orange-200 text-orange-800' :
+                                    result.action === 'conflict' ? 'bg-amber-200 text-amber-800' :
+                                    'bg-red-200 text-red-800'
+                                  }`}>
+                                    {result.action}
+                                  </span>
+                                  <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
+                                    {result.field}
+                                  </span>
+                                </div>
+                                <p className="font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                                  {result.itemName}
+                                </p>
+                                {result.sku && (
+                                  <p className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
+                                    SKU: {result.sku}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-sm shrink-0">
+                                <div className="text-right">
+                                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-0.5">Before</div>
+                                  <div className="font-mono text-red-600 dark:text-red-400 line-through">
+                                    {result.formattedOld || String(result.oldValue ?? '—')}
+                                  </div>
+                                </div>
+                                <span className="text-neutral-400">→</span>
+                                <div className="text-left">
+                                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-0.5">After</div>
+                                  <div className="font-mono text-green-600 dark:text-green-400 font-semibold">
+                                    {result.formattedNew || String(result.newValue ?? '—')}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pending Changes Preview */}
+                  {activeSimulation.status === 'pending' && activeSimulation.changes.length > 0 && (
+                    <div className="mt-4 border-t border-neutral-200 dark:border-neutral-700 pt-4">
+                      <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3 flex items-center gap-2">
+                        🔍 Pending Changes Preview
+                      </h4>
+                      <div className="space-y-2">
+                        {activeSimulation.changes.map((change, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-2 bg-white dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700">
+                            <span className="text-xs font-mono text-neutral-500 dark:text-neutral-400 uppercase">
+                              {change.field}
+                            </span>
+                            <span className="text-sm text-red-600 dark:text-red-400 line-through">
+                              {typeof change.oldValue === 'object' ? JSON.stringify(change.oldValue) : String(change.oldValue ?? '(none)')}
+                            </span>
+                            <span className="text-neutral-400">→</span>
+                            <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                              {typeof change.newValue === 'object' ? JSON.stringify(change.newValue) : String(change.newValue)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -895,40 +1007,99 @@ export default function CloverIntegrationPage() {
               ) : (
                 <div className="space-y-3">
                   {syncLogs.map((log) => (
-                    <div
+                    <details
                       key={log.id}
-                      className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700"
+                      className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 group"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {log.status === 'success' ? (
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                          ) : log.status === 'failed' ? (
-                            <XCircle className="w-5 h-5 text-red-600" />
-                          ) : log.status === 'conflict' ? (
-                            <AlertTriangle className="w-5 h-5 text-amber-600" />
-                          ) : (
-                            <RefreshCw className="w-5 h-5 text-blue-600" />
-                          )}
-                          <div>
-                            <div className="font-medium text-neutral-900 dark:text-neutral-100">
-                              {log.operation.replace(/_/g, ' ')}
-                            </div>
-                            <div className="text-xs text-neutral-500">
-                              {new Date(log.started_at).toLocaleString()}
+                      <summary className="p-4 cursor-pointer list-none">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {log.status === 'success' ? (
+                              <CheckCircle className="w-5 h-5 text-green-600" />
+                            ) : log.status === 'failed' ? (
+                              <XCircle className="w-5 h-5 text-red-600" />
+                            ) : log.status === 'conflict' ? (
+                              <AlertTriangle className="w-5 h-5 text-amber-600" />
+                            ) : (
+                              <RefreshCw className="w-5 h-5 text-blue-600" />
+                            )}
+                            <div>
+                              <div className="font-medium text-neutral-900 dark:text-neutral-100">
+                                {log.operation.replace(/_/g, ' ')}
+                              </div>
+                              <div className="text-xs text-neutral-500">
+                                {new Date(log.started_at).toLocaleString()}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="text-right text-sm">
-                          <div className="text-neutral-600 dark:text-neutral-400">
-                            {log.items_succeeded}/{log.items_processed} succeeded
+                          <div className="flex items-center gap-4">
+                            <div className="text-right text-sm">
+                              <div className="text-neutral-600 dark:text-neutral-400">
+                                {log.items_succeeded}/{log.items_processed} succeeded
+                              </div>
+                              {log.items_failed > 0 && (
+                                <div className="text-red-600">{log.items_failed} failed</div>
+                              )}
+                            </div>
+                            {log.error_details?.auditTrail && log.error_details.auditTrail.length > 0 && (
+                              <span className="text-xs text-neutral-400 group-open:rotate-90 transition-transform">▶</span>
+                            )}
                           </div>
-                          {log.items_failed > 0 && (
-                            <div className="text-red-600">{log.items_failed} failed</div>
-                          )}
                         </div>
-                      </div>
-                    </div>
+                      </summary>
+                      
+                      {/* Detailed Audit Trail */}
+                      {log.error_details?.auditTrail && log.error_details.auditTrail.length > 0 && (
+                        <div className="px-4 pb-4 border-t border-neutral-200 dark:border-neutral-700 pt-3">
+                          {log.error_details.message && (
+                            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
+                              {log.error_details.message}
+                            </p>
+                          )}
+                          <div className="space-y-2">
+                            {log.error_details.auditTrail.map((result, idx) => (
+                              <div 
+                                key={idx} 
+                                className={`p-2 rounded border text-sm ${
+                                  result.action === 'updated' ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' :
+                                  result.action === 'created' ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' :
+                                  result.action === 'archived' ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800' :
+                                  result.action === 'conflict' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
+                                  'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium uppercase shrink-0 ${
+                                      result.action === 'updated' ? 'bg-blue-200 text-blue-800' :
+                                      result.action === 'created' ? 'bg-green-200 text-green-800' :
+                                      result.action === 'archived' ? 'bg-orange-200 text-orange-800' :
+                                      result.action === 'conflict' ? 'bg-amber-200 text-amber-800' :
+                                      'bg-red-200 text-red-800'
+                                    }`}>
+                                      {result.action}
+                                    </span>
+                                    <span className="font-medium truncate">{result.itemName}</span>
+                                    {result.sku && (
+                                      <span className="text-xs text-neutral-500 font-mono shrink-0">({result.sku})</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs shrink-0">
+                                    <span className="text-red-600 dark:text-red-400 line-through">
+                                      {result.formattedOld || String(result.oldValue ?? '—')}
+                                    </span>
+                                    <span className="text-neutral-400">→</span>
+                                    <span className="text-green-600 dark:text-green-400 font-medium">
+                                      {result.formattedNew || String(result.newValue ?? '—')}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </details>
                   ))}
                 </div>
               )}
