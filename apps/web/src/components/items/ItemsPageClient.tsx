@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button, Input, Modal, ModalFooter, ConfirmDialog } from "@/components/ui";
 import { useTenantItems } from "@/hooks/useTenantItems";
 import { useItemsViewMode } from "@/hooks/useItemsViewMode";
@@ -17,7 +17,7 @@ import CategoryAssignmentModal from "@/components/items/CategoryAssignmentModal"
 import BulkUploadModal from "@/components/items/BulkUploadModal";
 import QuickStartEmptyState from "@/components/items/QuickStartEmptyState";
 import ItemsGuide from "@/components/items/ItemsGuide";
-import { itemsDataService, Item } from "@/services/itemsDataService";
+import { Item } from "@/services/itemsDataService";
 import { apiRequest } from "@/lib/api";
 
 interface ItemsPageClientProps {
@@ -29,6 +29,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     items,
     loading,
     error,
+    stats,
     page,
     pageSize,
     totalItems,
@@ -47,7 +48,6 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   } = useTenantItems({ tenantId });
 
   const { viewMode, setViewMode } = useItemsViewMode();
-  const stats = useMemo(() => itemsDataService.calculateStats(items), [items]);
 
   const {
     showCreateModal,

@@ -60,11 +60,42 @@ export interface CreateItemData {
   description?: string;
 }
 
+export interface ItemStats {
+  total: number;
+  active: number;
+  inactive: number;
+  syncing: number;
+  public: number;
+  private: number;
+  lowStock: number;
+}
+
 /**
  * Service for handling items/inventory data operations
  * Centralizes all API calls and data transformations
  */
 export class ItemsDataService {
+  /**
+   * Fetch storewide aggregated stats for a tenant
+   * Returns counts regardless of pagination/filters
+   */
+  async fetchStats(tenantId: string): Promise<ItemStats> {
+    try {
+      const response = await api.get(`/api/items/stats?tenant_id=${tenantId}`);
+      
+      if (!response.ok) {
+        console.error('[fetchStats] API error:', response.status);
+        // Return default stats on error
+        return { total: 0, active: 0, inactive: 0, syncing: 0, public: 0, private: 0, lowStock: 0 };
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('[fetchStats] Error:', error);
+      return { total: 0, active: 0, inactive: 0, syncing: 0, public: 0, private: 0, lowStock: 0 };
+    }
+  }
+
   /**
    * Fetch items with filters and pagination
    * Category filtering is now done server-side via categoryFilter param

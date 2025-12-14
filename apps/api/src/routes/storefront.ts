@@ -39,9 +39,10 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     let paramIndex = 2;
     
     // When no specific category is selected, only show products that have categories
-    // This aligns with the category counts which only show categories with products
+    // Check both category_path array AND directory_category_id for backwards compatibility
+    // Note: array_length returns NULL for empty arrays, so we need COALESCE
     if (!category) {
-      conditions.push('(ii.category_path IS NOT NULL AND array_length(ii.category_path, 1) > 0)');
+      conditions.push('(COALESCE(array_length(ii.category_path, 1), 0) > 0 OR ii.directory_category_id IS NOT NULL)');
     }
     
     // Category filter - filter by tenant category slug
@@ -90,6 +91,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         custom_sections,
         landing_page_theme,
         ii.category_path,
+        ii.directory_category_id,
         CASE WHEN ii.image_url IS NOT NULL THEN true ELSE false END as has_image,
         CASE WHEN (ii.stock > 0 OR ii.quantity > 0) THEN true ELSE false END as in_stock,
         CASE WHEN array_length(ii.image_gallery, 1) > 0 THEN true ELSE false END as has_gallery,
@@ -120,24 +122,47 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       console.log(`[Storefront] Category: ${category}, Count: ${totalCount}, Returned: ${itemsResult.rows.length}`);
     }
     
-    // Fetch all unique category slugs from items' category_path arrays for this page
+    // Fetch categories by both slug (from category_path) and id (from directory_category_id)
     const categorySlugs = [...new Set(itemsResult.rows.flatMap((item: any) => item.category_path || []).filter(Boolean))];
-    const categories = categorySlugs.length > 0 
-      ? await getDirectPool().query(
-          `SELECT id, name, slug, "googleCategoryId" FROM directory_category WHERE slug = ANY($1) AND "tenantId" = $2 AND "isActive" = true`,
-          [categorySlugs, tenantId]
-        )
-      : { rows: [] };
+    const categoryIds = [...new Set(itemsResult.rows.map((item: any) => item.directory_category_id).filter(Boolean))];
     
-    // Create a category lookup map
-    const categoryMap = new Map(categories.rows.map((cat: any) => [cat.slug, cat]));
+    // Build category query to fetch by slug OR id
+    let categoriesResult = { rows: [] as any[] };
+    if (categorySlugs.length > 0 || categoryIds.length > 0) {
+      const categoryConditions: string[] = [];
+      const categoryParams: any[] = [tenantId];
+      let paramIdx = 2;
+      
+      if (categorySlugs.length > 0) {
+        categoryConditions.push(`slug = ANY($${paramIdx})`);
+        categoryParams.push(categorySlugs);
+        paramIdx++;
+      }
+      if (categoryIds.length > 0) {
+        categoryConditions.push(`id = ANY($${paramIdx})`);
+        categoryParams.push(categoryIds);
+        paramIdx++;
+      }
+      
+      categoriesResult = await getDirectPool().query(
+        `SELECT id, name, slug, "googleCategoryId" FROM directory_category WHERE "tenantId" = $1 AND "isActive" = true AND (${categoryConditions.join(' OR ')})`,
+        categoryParams
+      );
+    }
+    
+    // Create category lookup maps (by slug and by id)
+    const categoryBySlug = new Map(categoriesResult.rows.map((cat: any) => [cat.slug, cat]));
+    const categoryById = new Map(categoriesResult.rows.map((cat: any) => [cat.id, cat]));
     
     // Transform to camelCase for frontend compatibility
     const items = itemsResult.rows.map((row: any) => {
-      // Find tenant category from category_path (prefer the first one)
+      // Find tenant category - prefer category_path, fallback to directory_category_id
       let tenantCategory = null;
       if (row.category_path && row.category_path.length > 0) {
-        tenantCategory = categoryMap.get(row.category_path[0]) || null;
+        tenantCategory = categoryBySlug.get(row.category_path[0]) || null;
+      }
+      if (!tenantCategory && row.directory_category_id) {
+        tenantCategory = categoryById.get(row.directory_category_id) || null;
       }
       
       return {
@@ -211,7 +236,8 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'tenant_required' });
     }
     
-    // Query product category counts based on tenant categories from category_path
+    // Query product category counts - join on BOTH category_path array AND directory_category_id
+    // This handles products that use either method of category assignment
     const query = `
       SELECT
         dc.id as category_id,
@@ -225,7 +251,9 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
         MIN(ii.price_cents) as min_price_cents,
         MAX(ii.price_cents) as max_price_cents
       FROM directory_category dc
-      INNER JOIN inventory_items ii ON ii.category_path && ARRAY[dc.slug]
+      INNER JOIN inventory_items ii ON (
+        (ii.category_path && ARRAY[dc.slug]) OR (ii.directory_category_id = dc.id)
+      )
         AND ii.tenant_id = dc."tenantId"
         AND ii.item_status = 'active'
         AND ii.visibility = 'public'
@@ -236,14 +264,15 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       ORDER BY dc.name ASC
     `;
     
-    // Get uncategorized count - products with empty category_path
+    // Get uncategorized count - products with NO category assignment (neither category_path nor directory_category_id)
     const uncategorizedQuery = `
       SELECT COUNT(*) as count
       FROM inventory_items ii
       WHERE ii.tenant_id = $1
         AND ii.item_status = 'active'
         AND ii.visibility = 'public'
-        AND (ii.category_path IS NULL OR array_length(ii.category_path, 1) = 0)
+        AND (ii.category_path IS NULL OR COALESCE(array_length(ii.category_path, 1), 0) = 0)
+        AND ii.directory_category_id IS NULL
     `;
     
     const [categoriesResult, uncategorizedResult] = await Promise.all([

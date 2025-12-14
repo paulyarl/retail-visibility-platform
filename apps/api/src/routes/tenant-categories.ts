@@ -29,9 +29,20 @@ function hasAccessToTenant(req: Request, tenantId: string): boolean {
 async function refreshDirectoryMV(tenantId?: string) {
   try {
     const pool = getDirectPool();
-    // Use CONCURRENTLY to avoid blocking reads
-    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_products');
-    console.log(`[MV Refresh] Refreshed directory_category_products${tenantId ? ` for tenant ${tenantId}` : ''}`);
+    // Try CONCURRENTLY first (requires unique index, doesn't block reads)
+    try {
+      await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_products');
+      console.log(`[MV Refresh] Refreshed directory_category_products CONCURRENTLY${tenantId ? ` for tenant ${tenantId}` : ''}`);
+    } catch (concurrentError: any) {
+      // If concurrent refresh fails (missing unique index), fall back to blocking refresh
+      if (concurrentError?.code === '55000') {
+        console.warn('[MV Refresh] Concurrent refresh failed, falling back to blocking refresh');
+        await pool.query('REFRESH MATERIALIZED VIEW directory_category_products');
+        console.log(`[MV Refresh] Refreshed directory_category_products (blocking)${tenantId ? ` for tenant ${tenantId}` : ''}`);
+      } else {
+        throw concurrentError;
+      }
+    }
   } catch (error) {
     console.error('[MV Refresh] Failed to refresh materialized view:', error);
     // Don't throw error - this is non-critical

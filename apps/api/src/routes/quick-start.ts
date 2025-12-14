@@ -734,12 +734,38 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
           console.warn(`[Category Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
         }
 
+        // Generate slug from final category name
+        const slug = categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        
+        // Check if a category with this slug already exists (handles Clover demo duplicates)
+        const existingBySlug = await prisma.directory_category.findFirst({
+          where: { tenantId, slug }
+        });
+        
+        if (existingBySlug) {
+          console.log(`[Category Quick Start] Found existing category by slug "${slug}": ${existingBySlug.id} - updating with Google taxonomy if missing`);
+          
+          // Update existing category with Google taxonomy ID if it doesn't have one
+          if (!existingBySlug.googleCategoryId && googleCategoryId) {
+            await prisma.directory_category.update({
+              where: { id: existingBySlug.id },
+              data: { 
+                googleCategoryId,
+                updatedAt: new Date()
+              }
+            });
+            console.log(`[Category Quick Start] Updated existing category "${existingBySlug.name}" with Google taxonomy ID: ${googleCategoryId}`);
+          }
+          
+          return existingBySlug; // Return existing instead of creating duplicate
+        }
+
         return prisma.directory_category.create({
           data: {
             id: generateProductCatId(tenantId),
             tenantId,
             name: categoryName, // Use the hierarchical or template name
-            slug: categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            slug,
             googleCategoryId,
             sortOrder: index,
             isActive: true,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import CategorySelectorMulti, { CategoryOption } from '@/components/shared/CategorySelectorMulti';
+import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 import { api } from '@/lib/api';
 
 interface SelectedCategory {
@@ -32,34 +33,63 @@ export default function GBPCategorySelectorAdapter({
   onSecondaryChange,
   disabled = false,
 }: GBPCategorySelectorAdapterProps) {
-  const [popularCategories, setPopularCategories] = useState<CategoryOption[]>([]);
-  const [loadingPopular, setLoadingPopular] = useState(true);
+  // Use the same hook as DirectoryCategorySelectorAdapter for robust category list
+  const { categories: directoryCategories, loading: loadingDirectory } = useDirectoryCategories();
+  
+  // Also load GBP-specific popular categories for grouped dropdown
+  const [gbpCategories, setGbpCategories] = useState<CategoryOption[]>([]);
+  const [loadingGbp, setLoadingGbp] = useState(true);
 
-  // Load popular categories on mount
+  // Load GBP popular categories on mount
   useEffect(() => {
-    async function loadPopularCategories() {
+    async function loadGbpCategories() {
       try {
-        setLoadingPopular(true);
+        setLoadingGbp(true);
         const response = await api.get(`/api/gbp/categories/popular?tenantId=${encodeURIComponent(tenantId)}`);
         if (response.ok) {
           const data = await response.json();
           const items = (data.items || []) as GBPCategory[];
-          setPopularCategories(items.map(cat => ({
+          setGbpCategories(items.map(cat => ({
             id: cat.id,
             name: cat.name,
             path: cat.path,
           })));
         }
       } catch (error) {
-        console.error('[GBPCategorySelector] Failed to load popular categories:', error);
+        console.error('[GBPCategorySelector] Failed to load GBP categories:', error);
       } finally {
-        setLoadingPopular(false);
+        setLoadingGbp(false);
       }
     }
-    loadPopularCategories();
+    loadGbpCategories();
   }, [tenantId]);
 
-  // Group popular categories by type
+  // Merge directory categories with GBP categories for comprehensive list
+  const allCategories = useMemo(() => {
+    const categoryMap = new Map<string, CategoryOption>();
+    
+    // Add directory categories first (these are platform categories)
+    directoryCategories.forEach(cat => {
+      // Use slug as ID for consistency with directory
+      const id = `gcid:${cat.slug}`;
+      categoryMap.set(id, {
+        id,
+        name: cat.name,
+        slug: cat.slug,
+      });
+    });
+    
+    // Add GBP categories (may have different IDs)
+    gbpCategories.forEach(cat => {
+      if (!categoryMap.has(cat.id)) {
+        categoryMap.set(cat.id, cat);
+      }
+    });
+    
+    return Array.from(categoryMap.values());
+  }, [directoryCategories, gbpCategories]);
+
+  // Group categories by type for dropdown
   const categoryGroups = useMemo(() => {
     const groups: Record<string, CategoryOption[]> = {
       'Food & Beverage': [],
@@ -69,15 +99,15 @@ export default function GBPCategorySelectorAdapter({
       'Other': [],
     };
 
-    popularCategories.forEach(cat => {
+    allCategories.forEach(cat => {
       const name = cat.name.toLowerCase();
-      if (name.includes('grocery') || name.includes('convenience') || name.includes('supermarket') || name.includes('liquor') || name.includes('food')) {
+      if (name.includes('grocery') || name.includes('convenience') || name.includes('supermarket') || name.includes('liquor') || name.includes('food') || name.includes('bakery') || name.includes('butcher') || name.includes('produce') || name.includes('wine')) {
         groups['Food & Beverage'].push(cat);
-      } else if (name.includes('clothing') || name.includes('shoe') || name.includes('electronics') || name.includes('furniture') || name.includes('hardware')) {
+      } else if (name.includes('clothing') || name.includes('shoe') || name.includes('electronics') || name.includes('furniture') || name.includes('hardware') || name.includes('department') || name.includes('discount') || name.includes('variety') || name.includes('home goods')) {
         groups['General Retail'].push(cat);
       } else if (name.includes('pharmacy') || name.includes('beauty') || name.includes('cosmetics') || name.includes('health')) {
         groups['Health & Beauty'].push(cat);
-      } else if (name.includes('book') || name.includes('pet') || name.includes('toy') || name.includes('sporting') || name.includes('gift')) {
+      } else if (name.includes('book') || name.includes('pet') || name.includes('toy') || name.includes('sporting') || name.includes('gift') || name.includes('florist') || name.includes('jewelry')) {
         groups['Specialty Stores'].push(cat);
       } else {
         groups['Other'].push(cat);
@@ -85,25 +115,45 @@ export default function GBPCategorySelectorAdapter({
     });
 
     return groups;
-  }, [popularCategories]);
+  }, [allCategories]);
 
-  // Search function for GBP categories
+  // Search function for GBP categories - searches both local and API
   const handleSearch = async (query: string): Promise<CategoryOption[]> => {
+    const lowerQuery = query.toLowerCase();
+    
+    // First, filter local categories
+    const localResults = allCategories.filter(cat => 
+      cat.name.toLowerCase().includes(lowerQuery)
+    );
+    
+    // Then search API for additional results
     try {
-      const response = await api.get(`/api/gbp/categories?query=${encodeURIComponent(query)}&limit=10&tenantId=${encodeURIComponent(tenantId)}`);
+      const response = await api.get(`/api/gbp/categories?query=${encodeURIComponent(query)}&limit=20&tenantId=${encodeURIComponent(tenantId)}`);
       if (response.ok) {
         const data = await response.json();
         const items = (data.items || []) as GBPCategory[];
-        return items.map(cat => ({
+        const apiResults = items.map(cat => ({
           id: cat.id,
           name: cat.name,
           path: cat.path,
         }));
+        
+        // Merge results, avoiding duplicates
+        const resultMap = new Map<string, CategoryOption>();
+        localResults.forEach(cat => resultMap.set(cat.id, cat));
+        apiResults.forEach(cat => {
+          if (!resultMap.has(cat.id)) {
+            resultMap.set(cat.id, cat);
+          }
+        });
+        
+        return Array.from(resultMap.values()).slice(0, 20);
       }
     } catch (error) {
       console.error('[GBPCategorySelector] Search error:', error);
     }
-    return [];
+    
+    return localResults.slice(0, 20);
   };
 
   // Convert between CategoryOption and SelectedCategory
@@ -125,14 +175,16 @@ export default function GBPCategorySelectorAdapter({
     onSecondaryChange(categories.map(c => ({ id: c.id, name: c.name })));
   };
 
+  const isLoading = loadingDirectory || loadingGbp;
+
   return (
     <CategorySelectorMulti
       primary={primaryOption}
       secondary={secondaryOptions}
       onPrimaryChange={handlePrimaryChangeAdapter}
       onSecondaryChange={handleSecondaryChangeAdapter}
-      categories={popularCategories}
-      loading={loadingPopular}
+      categories={allCategories}
+      loading={isLoading}
       onSearch={handleSearch}
       searchPlaceholder="Search for your primary business category..."
       primaryLabel="Primary Category"

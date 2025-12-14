@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { itemsDataService, Item, ItemFilters } from "@/services/itemsDataService";
+import { itemsDataService, Item, ItemFilters, ItemStats } from "@/services/itemsDataService";
 
 // Keep status and visibility aligned with backend ItemFilters for now
 export type ItemStatusFilter = "all" | "active" | "inactive" | "syncing";
@@ -23,6 +23,9 @@ interface UseTenantItemsResult {
   items: Item[];
   loading: boolean;
   error: string | null;
+
+  // Storewide stats (not affected by filters/pagination)
+  stats: ItemStats;
 
   // Pagination
   page: number;
@@ -48,6 +51,16 @@ interface UseTenantItemsResult {
   refresh: () => Promise<void>;
 }
 
+const defaultStats: ItemStats = {
+  total: 0,
+  active: 0,
+  inactive: 0,
+  syncing: 0,
+  public: 0,
+  private: 0,
+  lowStock: 0,
+};
+
 export function useTenantItems(options: UseTenantItemsOptions): UseTenantItemsResult {
   const {
     tenantId,
@@ -63,6 +76,7 @@ export function useTenantItems(options: UseTenantItemsOptions): UseTenantItemsRe
   const [items, setItems] = useState<Item[]>(initialItems);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<ItemStats>(defaultStats);
 
   const [page, setPage] = useState(initialPage);
   const [pageSize, setPageSize] = useState(initialPageSize);
@@ -73,6 +87,17 @@ export function useTenantItems(options: UseTenantItemsOptions): UseTenantItemsRe
   const [visibility, setVisibility] = useState<ItemVisibilityFilter>(initialVisibility);
   const [search, setSearch] = useState(initialSearch);
   const [category, setCategory] = useState<string | null>(initialCategory);
+
+  // Fetch storewide stats (independent of filters)
+  const fetchStats = useCallback(async () => {
+    if (!tenantId) return;
+    try {
+      const statsData = await itemsDataService.fetchStats(tenantId);
+      setStats(statsData);
+    } catch (err) {
+      console.error("[useTenantItems] fetchStats failed:", err);
+    }
+  }, [tenantId]);
 
   const fetchItems = useCallback(async () => {
     if (!tenantId) return;
@@ -109,12 +134,18 @@ export function useTenantItems(options: UseTenantItemsOptions): UseTenantItemsRe
   }, [tenantId, search, status, visibility, category, page, pageSize]);
 
   const refresh = useCallback(async () => {
-    await fetchItems();
-  }, [fetchItems]);
+    await Promise.all([fetchItems(), fetchStats()]);
+  }, [fetchItems, fetchStats]);
 
+  // Fetch items when filters change
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  // Fetch stats on mount and when tenant changes
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   const handleSetPageSize = (size: number) => {
     setPageSize(size);
@@ -125,6 +156,7 @@ export function useTenantItems(options: UseTenantItemsOptions): UseTenantItemsRe
     items,
     loading,
     error,
+    stats,
     page,
     pageSize,
     totalItems,

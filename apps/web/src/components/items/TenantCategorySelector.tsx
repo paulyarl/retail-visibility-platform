@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { apiRequest, API_BASE_URL } from '@/lib/api';
+import { api, apiRequest, API_BASE_URL } from '@/lib/api';
 import GoogleTaxonomySuggestions from '@/components/scan/GoogleTaxonomySuggestions';
 
 interface TenantCategory {
@@ -40,6 +40,18 @@ export default function TenantCategorySelector({
   const [googleIdQuery, setGoogleIdQuery] = useState('');
   const [googleIdLoading, setGoogleIdLoading] = useState(false);
   const [googleIdPath, setGoogleIdPath] = useState<string | null>(null);
+
+  // Taxonomy search state (matching Categories page)
+  const [taxQuery, setTaxQuery] = useState('');
+  const [taxResults, setTaxResults] = useState<Array<{ id: string; name: string; path: string[] }>>([]);
+  const [taxLoading, setTaxLoading] = useState(false);
+  const [showTaxResults, setShowTaxResults] = useState(false);
+  
+  // Taxonomy browse state
+  const [taxBrowseMode, setTaxBrowseMode] = useState(false);
+  const [taxBrowsePath, setTaxBrowsePath] = useState<string[]>([]);
+  const [taxBrowseCategories, setTaxBrowseCategories] = useState<Array<{ id: string; name: string; path: string[]; hasChildren?: boolean }>>([]);
+  const [taxBrowseLoading, setTaxBrowseLoading] = useState(false);
 
   // Handle Google ID lookup
   const handleGoogleIdLookup = async () => {
@@ -146,6 +158,62 @@ export default function TenantCategorySelector({
     setLocalSelectedId(selectedCategoryId || '');
   }, [selectedCategoryId]);
 
+  // Debounced taxonomy search (matching Categories page)
+  useEffect(() => {
+    if (!taxQuery || taxQuery.trim().length < 2) { setTaxResults([]); return; }
+    let active = true;
+    const t = setTimeout(async () => {
+      try {
+        setTaxLoading(true);
+        const res = await api.get(`${API_BASE_URL}/api/categories/search?q=${encodeURIComponent(taxQuery)}&limit=20`);
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setTaxResults(data.results || []);
+        }
+      } finally {
+        setTaxLoading(false);
+      }
+    }, 300);
+    return () => { active = false; clearTimeout(t); };
+  }, [taxQuery]);
+
+  // Load taxonomy browse categories for a specific parent path
+  async function loadTaxBrowseCategories(parentPath?: string) {
+    try {
+      setTaxBrowseLoading(true);
+      const url = parentPath 
+        ? `${API_BASE_URL}/api/google/taxonomy/browse?parent=${encodeURIComponent(parentPath)}`
+        : `${API_BASE_URL}/api/google/taxonomy/browse`;
+      const res = await api.get(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.categories) {
+          setTaxBrowseCategories(data.categories);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load taxonomy categories:', error);
+    } finally {
+      setTaxBrowseLoading(false);
+    }
+  }
+
+  // Navigate to a category path and load its children
+  async function navigateToPath(newPath: string[]) {
+    setTaxBrowsePath(newPath);
+    if (newPath.length === 0) {
+      await loadTaxBrowseCategories();
+    } else {
+      await loadTaxBrowseCategories(newPath.join(' > '));
+    }
+  }
+
+  // Handle selecting a taxonomy category (creates tenant category)
+  const handleTaxonomySelect = async (taxCat: { id: string; name: string; path: string[] }) => {
+    // Pass the Google taxonomy info to the parent - it will create the tenant category
+    onSelect(taxCat.id, taxCat.path.join(' > '), taxCat.id);
+  };
+
   // Filter categories based on search and mode
   const filteredCategories = googleTaxonomyMode 
     ? googleCategories.filter(cat => 
@@ -184,17 +252,140 @@ export default function TenantCategorySelector({
         />
       )}
 
-      {/* Google ID Lookup - always available */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+      {/* Google Taxonomy Search & Browse - matching Categories page */}
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <div className="flex items-center gap-2 mb-3">
           <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
           </svg>
           <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-            Enter Google Category ID
+            Find Google Category
           </span>
         </div>
-        <div className="space-y-3">
+
+        {/* Mode toggle */}
+        <div className="flex gap-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setTaxBrowseMode(false)}
+            className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${!taxBrowseMode ? 'bg-blue-100 text-blue-700 border-2 border-blue-500' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'}`}
+          >
+            🔍 Search
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTaxBrowseMode(true); if (taxBrowseCategories.length === 0) loadTaxBrowseCategories(); }}
+            className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${taxBrowseMode ? 'bg-blue-100 text-blue-700 border-2 border-blue-500' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'}`}
+          >
+            📂 Browse Tree
+          </button>
+        </div>
+
+        {!taxBrowseMode ? (
+          <>
+            {/* Search by name */}
+            <div className="relative">
+              <input
+                placeholder="Search taxonomy by name (e.g. Electronics, Pizza)"
+                value={taxQuery}
+                onChange={(e) => { setTaxQuery(e.target.value); setShowTaxResults(true); }}
+                onFocus={() => setShowTaxResults(true)}
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {showTaxResults && (taxResults.length > 0 || taxLoading) && (
+                <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-64 overflow-auto">
+                  {taxLoading && <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>}
+                  {taxResults.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => handleTaxonomySelect(r)}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{r.name}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">{r.path.join(' > ')}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Browse tree */}
+            <div className="border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
+              {/* Breadcrumb */}
+              <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center gap-1 flex-wrap text-sm">
+                <button
+                  type="button"
+                  onClick={() => navigateToPath([])}
+                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                >
+                  Root
+                </button>
+                {taxBrowsePath.map((segment, idx) => (
+                  <span key={idx} className="flex items-center gap-1">
+                    <span className="text-gray-400">&gt;</span>
+                    <button
+                      type="button"
+                      onClick={() => navigateToPath(taxBrowsePath.slice(0, idx + 1))}
+                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      {segment}
+                    </button>
+                  </span>
+                ))}
+              </div>
+              {/* Category list */}
+              <div className="max-h-48 overflow-auto">
+                {taxBrowseLoading ? (
+                  <div className="px-3 py-4 text-sm text-gray-500 text-center">Loading categories...</div>
+                ) : taxBrowseCategories.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-gray-500 text-center">No subcategories</div>
+                ) : (
+                  taxBrowseCategories.map((cat) => (
+                    <div key={cat.id} className="flex items-center border-b border-gray-100 dark:border-gray-700 last:border-0">
+                      <button
+                        type="button"
+                        onClick={() => handleTaxonomySelect(cat)}
+                        className={`flex-1 text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 ${localSelectedId === cat.id ? 'bg-blue-100 dark:bg-blue-900/50' : ''}`}
+                      >
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{cat.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{cat.id}</div>
+                      </button>
+                      {cat.hasChildren && (
+                        <button
+                          type="button"
+                          onClick={() => navigateToPath([...taxBrowsePath, cat.name])}
+                          className="px-3 py-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                          title="Browse subcategories"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              💡 Click a category to select it, or click the arrow to browse subcategories
+            </p>
+          </>
+        )}
+
+        {/* OR divider */}
+        <div className="flex items-center gap-2 my-3">
+          <div className="flex-1 border-t border-gray-300 dark:border-gray-600"></div>
+          <span className="text-xs text-gray-500 font-medium">OR</span>
+          <div className="flex-1 border-t border-gray-300 dark:border-gray-600"></div>
+        </div>
+
+        {/* Direct ID input */}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Enter Google Category ID directly</label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -208,47 +399,17 @@ export default function TenantCategorySelector({
               type="button"
               onClick={handleGoogleIdLookup}
               disabled={googleIdLoading || !googleIdQuery.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
             >
-              {googleIdLoading ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Looking up...
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Lookup
-                </>
-              )}
+              {googleIdLoading ? 'Looking up...' : 'Lookup'}
             </button>
           </div>
           {googleIdPath && (
-            <div className="text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md p-3">
+            <div className="text-sm mt-2">
               {googleIdPath.startsWith('Category') || googleIdPath === 'Lookup failed' ? (
-                <div className="text-red-600 dark:text-red-400 flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {googleIdPath}
-                </div>
+                <span className="text-red-600 dark:text-red-400">{googleIdPath}</span>
               ) : (
-                <div className="text-green-600 dark:text-green-400 flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <div>
-                    <div className="font-medium">Found: {googleIdPath}</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                      Switched to Google taxonomy view. Select a category below.
-                    </div>
-                  </div>
-                </div>
+                <span className="text-green-600 dark:text-green-400">✓ Found: {googleIdPath}</span>
               )}
             </div>
           )}

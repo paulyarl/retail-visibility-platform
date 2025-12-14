@@ -281,10 +281,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   // Get primary GBP category from tenant metadata (always available regardless of directory publish status)
   const primaryGBPCategory = tenant.metadata?.gbp_categories?.primary || tenant.metadata?.gbpCategories?.primary;
   
-  // Calculate total products - sum of all product category counts
-  const totalAllProducts = productCategories.length > 0
-    ? productCategories.reduce((sum: number, cat: any) => sum + (Number(cat.count) || 0), 0)  // Sum all product category counts (convert to number)
-    : total || 0;  // Fallback to API total
+  // Calculate total products - use API total as the authoritative count
+  // This includes both categorized and uncategorized products
+  const totalAllProducts = total || 0;
   
   // Get tier features for footer
   const tier = tenant.subscriptionTier || 'trial';

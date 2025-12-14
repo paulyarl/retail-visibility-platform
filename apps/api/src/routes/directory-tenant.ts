@@ -187,9 +187,10 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
 
     console.log('[PATCH /tenants/:id/directory/listing] Upsert completed successfully. Updated record:', JSON.stringify(updated, null, 2));
     
+    const pool = getDirectPool();
+    
     // Sync categories to directory_listing_categories table for materialized view
     if (parsed.data.primary_category || parsed.data.secondary_categories) {
-      const pool = getDirectPool();
       
       // Delete existing category associations
       await pool.query(
@@ -227,6 +228,40 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
       }
       
       console.log('[PATCH /tenants/:id/directory/listing] Synced categories to directory_listing_categories');
+    }
+    
+    // Also update directory_listings_list if the listing is published
+    // This ensures the public directory page reflects the changes immediately
+    await pool.query(`
+      UPDATE directory_listings_list
+      SET 
+        primary_category = $2,
+        secondary_categories = $3,
+        description = $4,
+        updated_at = NOW()
+      WHERE tenant_id = $1 AND is_published = true
+    `, [
+      tenantId,
+      parsed.data.primary_category || null,
+      parsed.data.secondary_categories || null,
+      parsed.data.seo_description || null
+    ]);
+    console.log('[PATCH /tenants/:id/directory/listing] Updated directory_listings_list');
+    
+    // Refresh materialized view to reflect category changes in directory
+    try {
+      await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_products');
+      console.log('[PATCH /tenants/:id/directory/listing] Refreshed directory_category_products MV');
+    } catch (mvError: any) {
+      // If concurrent refresh fails, try non-concurrent
+      if (mvError?.code === '55000') {
+        console.warn('[PATCH /tenants/:id/directory/listing] Concurrent MV refresh failed, trying blocking refresh');
+        await pool.query('REFRESH MATERIALIZED VIEW directory_category_products');
+        console.log('[PATCH /tenants/:id/directory/listing] Refreshed directory_category_products MV (blocking)');
+      } else {
+        console.error('[PATCH /tenants/:id/directory/listing] MV refresh failed:', mvError);
+        // Don't fail the request for MV refresh errors
+      }
     }
     
     return res.json(updated);

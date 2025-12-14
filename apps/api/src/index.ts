@@ -2781,6 +2781,68 @@ const listQuery = z.object({
   search: data.search || data.q, // Accept both search and q
 }));
 
+/**
+ * GET /api/items/stats - Get aggregated item statistics for a tenant
+ * Returns storewide counts regardless of pagination/filters
+ */
+app.get(["/api/items/stats", "/api/inventory/stats"], authenticateToken, async (req, res) => {
+  const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
+  
+  if (!tenant_id) {
+    return res.status(400).json({ error: "tenant_id_required" });
+  }
+
+  const isAdmin = isPlatformAdmin(req.user);
+  let hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenant_id) ?? false);
+
+  if (!hasAccess && req.user?.userId && tenant_id) {
+    try {
+      const userTenant = await prisma.user_tenants.findUnique({
+        where: {
+          user_id_tenant_id: {
+            user_id: req.user.userId,
+            tenant_id,
+          },
+        },
+        select: { id: true },
+      });
+      hasAccess = !!userTenant;
+    } catch (e) {
+      console.error('[GET /api/items/stats] Error checking tenant membership:', e);
+    }
+  }
+
+  if (!hasAccess) {
+    return res.status(403).json({ error: 'tenant_access_denied' });
+  }
+
+  try {
+    // Get aggregated counts for all non-trashed items
+    const [total, active, inactive, syncing, publicCount, privateCount, lowStock] = await Promise.all([
+      prisma.inventory_items.count({ where: { tenant_id, item_status: { not: 'trashed' } } }),
+      prisma.inventory_items.count({ where: { tenant_id, item_status: 'active' } }),
+      prisma.inventory_items.count({ where: { tenant_id, item_status: 'inactive' } }),
+      prisma.inventory_items.count({ where: { tenant_id, item_status: 'active', visibility: 'public' } }), // syncing = active + public
+      prisma.inventory_items.count({ where: { tenant_id, item_status: { not: 'trashed' }, visibility: 'public' } }),
+      prisma.inventory_items.count({ where: { tenant_id, item_status: { not: 'trashed' }, visibility: 'private' } }),
+      prisma.inventory_items.count({ where: { tenant_id, item_status: { not: 'trashed' }, stock: { lt: 10 } } }),
+    ]);
+
+    return res.json({
+      total,
+      active,
+      inactive,
+      syncing,
+      public: publicCount,
+      private: privateCount,
+      lowStock,
+    });
+  } catch (error) {
+    console.error('[GET /api/items/stats] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_stats' });
+  }
+});
+
 app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateToken, async (req, res) => {
   const parsed = listQuery.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: "invalid_query_params", details: parsed.error.flatten() });
