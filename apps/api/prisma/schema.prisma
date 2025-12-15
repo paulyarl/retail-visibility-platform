@@ -1192,6 +1192,12 @@ model tenants {
   tenant_feature_overrides_list    tenant_feature_overrides_list[]
   organizations_list               organizations_list?                @relation(fields: [organization_id], references: [id])
   user_tenants                     user_tenants[]
+  gbp_posts                        gbp_posts[]
+  gbp_reviews                      gbp_reviews[]
+  gbp_media                        gbp_media[]
+  gbp_attributes                   gbp_attributes[]
+  gbp_sync_tracking                gbp_sync_tracking[]
+  gbp_sync_history                 gbp_sync_history[]
 
   @@index([directory_visible], map: "idx_tenant_directory_visible")
   @@index([google_sync_enabled, google_last_sync], map: "idx_tenant_google_sync")
@@ -1458,4 +1464,145 @@ enum user_tenant_role {
   SUPPORT
   MEMBER
   VIEWER
+}
+
+// ============================================================================
+// GBP Advanced Features Tables (Phase 4)
+// ============================================================================
+
+model gbp_posts {
+  id                   String    @id
+  tenant_id            String
+  google_post_id       String?
+  summary              String
+  topic_type           String    @default("standard")
+  call_to_action_type  String?
+  call_to_action_url   String?
+  media_url            String?
+  event_title          String?
+  event_start_date     DateTime? @db.Timestamptz(6)
+  event_end_date       DateTime? @db.Timestamptz(6)
+  offer_coupon_code    String?
+  offer_redeem_url     String?
+  offer_terms          String?
+  state                String    @default("live")
+  google_create_time   DateTime? @db.Timestamptz(6)
+  google_update_time   DateTime? @db.Timestamptz(6)
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @updatedAt @db.Timestamptz(6)
+  tenants              tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id], map: "idx_gbp_posts_tenant_id")
+  @@index([google_post_id], map: "idx_gbp_posts_google_post_id")
+  @@index([topic_type], map: "idx_gbp_posts_topic_type")
+}
+
+model gbp_reviews {
+  id                   String    @id
+  tenant_id            String
+  google_review_id     String?   @unique
+  reviewer_name        String?
+  reviewer_photo_url   String?
+  star_rating          String?
+  comment              String?
+  review_reply         String?
+  reply_update_time    DateTime? @db.Timestamptz(6)
+  google_create_time   DateTime? @db.Timestamptz(6)
+  google_update_time   DateTime? @db.Timestamptz(6)
+  is_replied           Boolean   @default(false)
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @updatedAt @db.Timestamptz(6)
+  tenants              tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id], map: "idx_gbp_reviews_tenant_id")
+  @@index([star_rating], map: "idx_gbp_reviews_star_rating")
+  @@index([is_replied], map: "idx_gbp_reviews_is_replied")
+}
+
+model gbp_media {
+  id                   String    @id
+  tenant_id            String
+  google_media_id      String?
+  media_format         String    @default("photo")
+  category             String    @default("additional")
+  source_url           String?
+  google_url           String?
+  description          String?
+  is_active            Boolean   @default(true)
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @updatedAt @db.Timestamptz(6)
+  tenants              tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id], map: "idx_gbp_media_tenant_id")
+  @@index([category], map: "idx_gbp_media_category")
+  @@index([is_active], map: "idx_gbp_media_is_active")
+}
+
+model gbp_attributes {
+  id                   String    @id
+  tenant_id            String
+  attribute_id         String
+  value_type           String?
+  value_bool           Boolean?
+  value_enum           String?
+  value_url            String?
+  is_synced            Boolean   @default(false)
+  synced_at            DateTime? @db.Timestamptz(6)
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @updatedAt @db.Timestamptz(6)
+  tenants              tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, attribute_id], map: "uq_gbp_attributes_tenant_attribute")
+  @@index([tenant_id], map: "idx_gbp_attributes_tenant_id")
+  @@index([is_synced], map: "idx_gbp_attributes_is_synced")
+}
+
+// ============================================================================
+// GBP Sync Tracking Foundation (Bidirectional Sync)
+// ============================================================================
+
+model gbp_sync_tracking {
+  id                      String    @id
+  tenant_id               String
+  field_category          String    // 'business_info', 'hours', 'status', 'categories', 'attributes'
+  field_name              String    // 'business_name', 'phone_number', 'address', etc.
+  local_value_hash        String?   // Hash of local value for comparison
+  google_value_hash       String?   // Hash of Google value for comparison
+  local_updated_at        DateTime? @db.Timestamptz(6)
+  google_updated_at       DateTime? @db.Timestamptz(6)
+  last_sync_at            DateTime? @db.Timestamptz(6)
+  last_sync_direction     String?   // 'push', 'pull'
+  sync_status             String    @default("unknown") // 'synced', 'pending_push', 'pending_pull', 'conflict', 'unknown'
+  conflict_detected_at    DateTime? @db.Timestamptz(6)
+  conflict_resolution     String?   // 'local_wins', 'google_wins', 'manual'
+  created_at              DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime  @updatedAt @db.Timestamptz(6)
+  tenants                 tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, field_category, field_name], map: "uq_gbp_sync_tracking_tenant_field")
+  @@index([tenant_id], map: "idx_gbp_sync_tracking_tenant_id")
+  @@index([sync_status], map: "idx_gbp_sync_tracking_status")
+  @@index([field_category], map: "idx_gbp_sync_tracking_category")
+}
+
+model gbp_sync_history {
+  id                   String    @id
+  tenant_id            String
+  field_category       String
+  field_name           String?
+  sync_direction       String    // 'push', 'pull', 'compare'
+  sync_status          String    // 'success', 'failed', 'partial', 'skipped'
+  local_value_before   String?   @db.Text
+  google_value_before  String?   @db.Text
+  value_after          String?   @db.Text
+  error_message        String?
+  error_code           String?
+  initiated_by         String?   // 'user', 'system', 'webhook', 'scheduled'
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  tenants              tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id], map: "idx_gbp_sync_history_tenant_id")
+  @@index([created_at(sort: Desc)], map: "idx_gbp_sync_history_created_at")
+  @@index([field_category], map: "idx_gbp_sync_history_category")
+  @@index([sync_status], map: "idx_gbp_sync_history_status")
 }

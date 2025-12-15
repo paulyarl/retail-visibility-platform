@@ -18,6 +18,16 @@ router.get('/tenant/:tenantId/business-hours',
   res.json({ success: true, data: { timezone, periods } })
 })
 
+// Alias: GET /api/business-hours/:tenantId (for frontend compatibility)
+router.get('/business-hours/:tenantId',
+  async (req, res) => {
+  const { tenantId } = req.params
+  const row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } })
+  const timezone = row?.timezone || 'America/New_York'
+  const periods: any[] = (row?.periods as any) || []
+  res.json({ success: true, data: { timezone, periods } })
+})
+
 // PUT /api/tenant/:tenantId/business-hours
 router.put('/tenant/:tenantId/business-hours',
   async (req, res) => {

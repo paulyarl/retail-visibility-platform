@@ -24,7 +24,7 @@
     "test:watch": "vitest --watch"
   },
   "license": "ISC",
-  "packageManager": "pnpm@10.20.0",
+  "packageManager": "pnpm@10.26.0",
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@prisma/client": "^6.18.0",

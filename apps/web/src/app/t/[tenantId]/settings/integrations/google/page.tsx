@@ -15,7 +15,8 @@ import {
   ShoppingBag,
   Link as LinkIcon,
   Unlink,
-  Lock
+  Lock,
+  Star
 } from 'lucide-react';
 
 interface SetupStep {
@@ -45,6 +46,12 @@ interface GBPStatus {
   message: string;
 }
 
+interface MerchantAccount {
+  id: string;
+  name: string;
+  displayName: string;
+}
+
 export default function GoogleIntegrationsPage() {
   const params = useParams();
   const tenantId = params?.tenantId as string;
@@ -61,6 +68,10 @@ export default function GoogleIntegrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [connectingGBP, setConnectingGBP] = useState(false);
+  const [merchants, setMerchants] = useState<MerchantAccount[]>([]);
+  const [loadingMerchants, setLoadingMerchants] = useState(false);
+  const [linkingMerchant, setLinkingMerchant] = useState(false);
+  const [showMerchantSelector, setShowMerchantSelector] = useState(false);
 
   async function fetchSetupStatus() {
     try {
@@ -85,6 +96,45 @@ export default function GoogleIntegrationsPage() {
       setGbpStatus(data?.data || null);
     } catch (err) {
       console.error('Failed to fetch GBP status:', err);
+    }
+  }
+
+  async function fetchMerchants() {
+    try {
+      setLoadingMerchants(true);
+      const res = await api.get(`${API_BASE_URL}/api/google/oauth/merchants?tenantId=${tenantId}`);
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to fetch merchants');
+      }
+      const data = await res.json();
+      setMerchants(data?.data?.merchants || []);
+      setShowMerchantSelector(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch merchant accounts');
+    } finally {
+      setLoadingMerchants(false);
+    }
+  }
+
+  async function handleLinkMerchant(merchant: MerchantAccount) {
+    try {
+      setLinkingMerchant(true);
+      const res = await api.post(`${API_BASE_URL}/api/google/oauth/link-merchant`, {
+        tenantId,
+        merchantId: merchant.id,
+        merchantName: merchant.name
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to link merchant');
+      }
+      setShowMerchantSelector(false);
+      await fetchSetupStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to link merchant account');
+    } finally {
+      setLinkingMerchant(false);
     }
   }
 
@@ -222,12 +272,39 @@ export default function GoogleIntegrationsPage() {
           <span>/</span>
           <span className="text-neutral-900 dark:text-neutral-100">Google</span>
         </div>
-        <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
-          Google Integrations
-        </h1>
-        <p className="text-neutral-600 dark:text-neutral-400">
-          Connect Google Merchant Center to sync your products to Google Shopping and free listings
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+              Google Integrations
+            </h1>
+            <p className="text-neutral-600 dark:text-neutral-400">
+              Connect Google Merchant Center to sync your products to Google Shopping and free listings
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/t/${tenantId}/settings/integrations/google/sync-status`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-medium rounded-lg transition-colors text-sm"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Sync Status
+            </Link>
+            <Link
+              href={`/t/${tenantId}/settings/integrations/google/advanced`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-medium rounded-lg transition-colors text-sm"
+            >
+              <Star className="w-4 h-4" />
+              Advanced
+            </Link>
+            <Link
+              href={`/t/${tenantId}/settings/integrations/google/guide`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300 font-medium rounded-lg transition-colors text-sm"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Setup Guide
+            </Link>
+          </div>
+        </div>
       </div>
 
       {/* Error Alert */}
@@ -362,18 +439,34 @@ export default function GoogleIntegrationsPage() {
               </>
             ) : (
               <>
-                <button
-                  onClick={handleConnectGoogle}
-                  disabled={connecting}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {connecting ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <LinkIcon className="w-4 h-4" />
-                  )}
-                  {connecting ? 'Connecting...' : 'Continue Setup'}
-                </button>
+                {/* If Google account connected but no merchant link, show Link Merchant button */}
+                {setupStatus?.hasGoogleAccount && !setupStatus?.hasMerchantLink ? (
+                  <button
+                    onClick={fetchMerchants}
+                    disabled={loadingMerchants}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {loadingMerchants ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <LinkIcon className="w-4 h-4" />
+                    )}
+                    {loadingMerchants ? 'Loading...' : 'Link Merchant Center'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleConnectGoogle}
+                    disabled={connecting}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {connecting ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <LinkIcon className="w-4 h-4" />
+                    )}
+                    {connecting ? 'Connecting...' : 'Continue Setup'}
+                  </button>
+                )}
                 <button
                   onClick={fetchSetupStatus}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300 font-medium rounded-lg transition-colors"
@@ -384,6 +477,62 @@ export default function GoogleIntegrationsPage() {
               </>
             )}
           </div>
+
+          {/* Merchant Account Selector */}
+          {showMerchantSelector && (
+            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                Select Merchant Center Account
+              </h3>
+              {merchants.length === 0 ? (
+                <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                  <p className="mb-2">No Merchant Center accounts found.</p>
+                  <p>Make sure you have created a Google Merchant Center account at{' '}
+                    <a 
+                      href="https://merchants.google.com/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      merchants.google.com
+                    </a>
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {merchants.map((merchant) => (
+                    <button
+                      key={merchant.id}
+                      onClick={() => handleLinkMerchant(merchant)}
+                      disabled={linkingMerchant}
+                      className="w-full flex items-center justify-between p-3 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors disabled:opacity-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <ShoppingBag className="w-5 h-5 text-neutral-500" />
+                        <div className="text-left">
+                          <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                            {merchant.displayName}
+                          </p>
+                          <p className="text-xs text-neutral-500">ID: {merchant.id}</p>
+                        </div>
+                      </div>
+                      {linkingMerchant ? (
+                        <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                      ) : (
+                        <LinkIcon className="w-4 h-4 text-blue-600" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setShowMerchantSelector(false)}
+                className="mt-3 text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -454,10 +603,30 @@ export default function GoogleIntegrationsPage() {
                   Refresh Status
                 </button>
                 <Link
+                  href={`/t/${tenantId}/settings/integrations/google/sync-status`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Sync Status →
+                </Link>
+                <Link
                   href={`/t/${tenantId}/settings/hours`}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
                 >
                   Manage Hours →
+                </Link>
+                <Link
+                  href={`/t/${tenantId}/settings/gbp-category`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  GBP Categories →
+                </Link>
+                <Link
+                  href={`/t/${tenantId}/settings/integrations/google/advanced`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  <Star className="w-4 h-4" />
+                  Advanced →
                 </Link>
                 <button
                   onClick={handleDisconnectGBP}

@@ -47,6 +47,54 @@ async function getGoogleCategoryIdForItem(
 }
 
 /**
+ * Pre-fetch all categories for a tenant and build lookup maps.
+ * This eliminates N+1 queries when validating many items.
+ */
+async function buildCategoryLookupMaps(tenantId: string): Promise<{
+  byId: Map<string, string | null>,
+  bySlug: Map<string, string | null>
+}> {
+  const categories = await prisma.directory_category.findMany({
+    where: { tenantId, isActive: true },
+    select: { id: true, slug: true, googleCategoryId: true }
+  })
+  
+  const byId = new Map<string, string | null>()
+  const bySlug = new Map<string, string | null>()
+  
+  for (const cat of categories) {
+    byId.set(cat.id, cat.googleCategoryId)
+    if (cat.slug) bySlug.set(cat.slug, cat.googleCategoryId)
+  }
+  
+  return { byId, bySlug }
+}
+
+/**
+ * Fast lookup using pre-built maps (no database queries)
+ */
+function getGoogleCategoryIdFromMaps(
+  directoryCategoryId: string | null,
+  categoryPath: string[] | null,
+  maps: { byId: Map<string, string | null>, bySlug: Map<string, string | null> }
+): string | null {
+  // Method 1: Direct directory_category_id (preferred)
+  if (directoryCategoryId && maps.byId.has(directoryCategoryId)) {
+    return maps.byId.get(directoryCategoryId) || null
+  }
+  
+  // Method 2: Fallback to category_path slug matching
+  if (Array.isArray(categoryPath) && categoryPath.length > 0) {
+    const slug = categoryPath[categoryPath.length - 1]
+    if (maps.bySlug.has(slug)) {
+      return maps.bySlug.get(slug) || null
+    }
+  }
+  
+  return null
+}
+
+/**
  * Check if an item has any category assignment (either method)
  */
 function hasCategory(directoryCategoryId: string | null, categoryPath: string[] | null): boolean {
@@ -59,7 +107,12 @@ router.post('/:tenantId/feed/precheck', async (req, res) => {
   try {
     const tenantId = req.params.tenantId
     const limit = Math.min(parseInt(String(req.query.limit || '1000')), 5000)
-    const items = await prisma.inventory_items.findMany({ where: { tenant_id: tenantId }, take: isNaN(limit) ? 1000 : limit })
+    
+    // Batch fetch: items and categories in parallel (2 queries total instead of N+1)
+    const [items, categoryMaps] = await Promise.all([
+      prisma.inventory_items.findMany({ where: { tenant_id: tenantId }, take: isNaN(limit) ? 1000 : limit }),
+      buildCategoryLookupMaps(tenantId)
+    ])
 
     const missingCategory = [] as any[]
     const unmapped = [] as any[]
@@ -73,7 +126,8 @@ router.post('/:tenantId/feed/precheck', async (req, res) => {
         missingCategory.push({ id: it.id, sku, reason: 'missing_category' })
         continue
       }
-      const gId = await getGoogleCategoryIdForItem(tenantId, directoryCategoryId, categoryPath)
+      // Use in-memory lookup instead of database query
+      const gId = getGoogleCategoryIdFromMaps(directoryCategoryId, categoryPath, categoryMaps)
       if (!gId) {
         unmapped.push({ id: it.id, sku, categoryPath, directoryCategoryId, reason: 'unmapped_category' })
       }
@@ -88,7 +142,12 @@ router.post('/:tenantId/feed/precheck', async (req, res) => {
 router.get('/:tenantId/feed/validate', async (req, res) => {
   try {
     const tenantId = req.params.tenantId
-    const items = await prisma.inventory_items.findMany({ where: { tenant_id: tenantId } })
+    
+    // Batch fetch: items and categories in parallel (2 queries total instead of N+1)
+    const [items, categoryMaps] = await Promise.all([
+      prisma.inventory_items.findMany({ where: { tenant_id: tenantId } }),
+      buildCategoryLookupMaps(tenantId)
+    ])
 
     const errors: any[] = []
     const warnings: any[] = []
@@ -109,7 +168,8 @@ router.get('/:tenantId/feed/validate', async (req, res) => {
       if (!hasCategory(directoryCategoryId, categoryPath)) {
         errors.push({ ...itemInfo, field: 'categoryPath', message: 'category_required' })
       } else {
-        const gId = await getGoogleCategoryIdForItem(tenantId, directoryCategoryId, categoryPath)
+        // Use in-memory lookup instead of database query
+        const gId = getGoogleCategoryIdFromMaps(directoryCategoryId, categoryPath, categoryMaps)
         if (!gId) errors.push({ ...itemInfo, field: 'googleCategoryId', message: 'category_unmapped' })
       }
 
@@ -156,13 +216,18 @@ router.post('/:tenantId/feed/serialize', async (req, res) => {
     if (!opts.includeInactive) where.item_status = 'active'
     const take = opts.limit ?? 1000
 
-    const items = await prisma.inventory_items.findMany({ where, take })
+    // Batch fetch: items and categories in parallel (2 queries total instead of N+1)
+    const [items, categoryMaps] = await Promise.all([
+      prisma.inventory_items.findMany({ where, take }),
+      buildCategoryLookupMaps(tenantId)
+    ])
 
     const output = [] as any[]
     for (const it of items) {
       const directoryCategoryId = (it as any).directory_category_id as string | null
       const categoryPath = (it as any).category_path as string[] | null
-      const googleCategoryId = await getGoogleCategoryIdForItem(tenantId, directoryCategoryId, categoryPath)
+      // Use in-memory lookup instead of database query
+      const googleCategoryId = getGoogleCategoryIdFromMaps(directoryCategoryId, categoryPath, categoryMaps)
       output.push({
         id: it.id,
         offerId: normalizeSku((it as any).sku) || it.id,

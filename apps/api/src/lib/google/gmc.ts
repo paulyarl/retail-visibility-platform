@@ -10,9 +10,10 @@ import { decryptToken, refreshAccessToken, encryptToken } from './oauth';
 import { prisma } from '../../prisma';
 import { generateQuickStart } from '../id-generator';
 
-// Merchant API v1beta (replaces deprecated Content API v2.1)
-const GMC_API_BASE = 'https://merchantapi.googleapis.com';
-const MERCHANT_API_VERSION = 'v1beta';
+// Content API for Shopping v2.1 (stable, widely used)
+const GMC_API_BASE = 'https://shoppingcontent.googleapis.com';
+const CONTENT_API_VERSION = 'v2.1';
+const MERCHANT_API_VERSION = 'v2.1';
 
 /**
  * Get valid access token (refresh if expired)
@@ -67,8 +68,8 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
 }
 
 /**
- * List merchant accounts
- * Uses Merchant API accounts.list endpoint
+ * List merchant accounts using Content API authinfo endpoint
+ * This returns all merchant accounts the authenticated user has access to
  */
 export async function listMerchantAccounts(account_id: string): Promise<any[]> {
   try {
@@ -77,8 +78,8 @@ export async function listMerchantAccounts(account_id: string): Promise<any[]> {
       throw new Error('No valid access token');
     }
 
-    // Merchant API uses accounts.list instead of authinfo
-    const response = await fetch(`${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts`, {
+    // Content API authinfo endpoint returns all accounts the user has access to
+    const response = await fetch(`${GMC_API_BASE}/content/${CONTENT_API_VERSION}/accounts/authinfo`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -92,7 +93,17 @@ export async function listMerchantAccounts(account_id: string): Promise<any[]> {
     }
 
     const data = await response.json();
-    return data.accounts || [];
+    console.log('[GMC] authinfo response:', JSON.stringify(data, null, 2));
+    
+    // authinfo returns accountIdentifiers array with accountId
+    const accountIds = data.accountIdentifiers || [];
+    
+    // Return formatted accounts
+    return accountIds.map((acc: any) => ({
+      accountId: acc.aggregatorId || acc.merchantId,
+      name: `Merchant ${acc.aggregatorId || acc.merchantId}`,
+      accountName: `Merchant Account ${acc.aggregatorId || acc.merchantId}`,
+    }));
   } catch (error) {
     console.error('[GMC] Error listing merchant accounts:', error);
     return [];

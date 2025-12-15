@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import BusinessProfileCard from '@/components/settings/BusinessProfileCard';
+import GBPLocationCard from '@/components/settings/GBPLocationCard';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
 import { api } from '@/lib/api';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
@@ -190,6 +191,9 @@ export default function TenantBusinessProfilePage() {
           onUpdate={handleUpdate}
           tenantName={tenantName}
         />
+        
+        {/* GBP Location Linking */}
+        <GBPLocationCard tenantId={tenantId} />
       </div>
     </div>
   );

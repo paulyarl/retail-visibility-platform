@@ -23,8 +23,8 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/content', // Google Merchant API (replaces deprecated Content API)
   'https://www.googleapis.com/auth/business.manage', // Google Business Profile
   'openid',
-  'email',
-  'profile',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
 ];
 
 /**

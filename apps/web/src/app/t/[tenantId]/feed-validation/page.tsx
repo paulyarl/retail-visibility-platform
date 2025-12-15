@@ -196,9 +196,12 @@ export default function FeedValidationPage() {
 
   useEffect(() => {
     if (tenantId) {
-      fetchValidation()
-      fetchCoverage() // Gated by FF_FEED_COVERAGE on backend
-      fetchSetupStatus() // Check Google Merchant setup status
+      // Fetch all data in parallel for faster initial load
+      Promise.all([
+        fetchValidation(),
+        fetchCoverage(), // Gated by FF_FEED_COVERAGE on backend
+        fetchSetupStatus() // Check Google Merchant setup status
+      ])
     }
   }, [tenantId])
 

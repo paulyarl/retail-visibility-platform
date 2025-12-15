@@ -137,6 +137,7 @@ import tierManagementRoutes from './routes/admin/tier-management';
 import tierSystemRoutes from './routes/admin/tier-system';
 // import testGbpRoutes from './routes/test-gbp';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
+import googleMerchantOAuthRoutes from './routes/google-merchant-oauth';
 // import cloverRoutes from './routes/integrations/clover';
 // import emailTestRoutes from './routes/email-test';
 // Legacy Square routes (lazy import) - replaced by /api/integrations routes
@@ -4823,7 +4824,12 @@ console.log('✅ POS integration routes mounted at /api/integrations (Clover, Sq
 
 /* ------------------------------ Google Business Profile OAuth ------------------------------ */
 app.use('/api', googleBusinessOAuthRoutes);
-console.log('✅ Google Business Profile OAuth routes mounted at /api/google/business');
+app.use('/auth', googleBusinessOAuthRoutes);  // Also mount at /auth for callback (matches GOOGLE_BUSINESS_REDIRECT_URI)
+console.log('✅ Google Business Profile OAuth routes mounted at /api/google/business and /auth/google/business');
+
+/* ------------------------------ Google Merchant Center OAuth ------------------------------ */
+app.use('/api', googleMerchantOAuthRoutes);
+console.log('✅ Google Merchant Center OAuth routes mounted at /api/google/oauth');
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
