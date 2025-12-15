@@ -225,6 +225,33 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: 
             </span>
           </div>
 
+          {/* Product Identifiers */}
+          {(product.upc || product.gtin || product.mpn) && (
+            <div className="mb-6 p-4 bg-neutral-50 rounded-lg">
+              <h3 className="text-sm font-semibold text-neutral-700 mb-2">Product Identifiers</h3>
+              <dl className="grid grid-cols-2 gap-2 text-sm">
+                {product.upc && (
+                  <>
+                    <dt className="text-neutral-500">UPC</dt>
+                    <dd className="text-neutral-900 font-mono">{product.upc}</dd>
+                  </>
+                )}
+                {product.gtin && (
+                  <>
+                    <dt className="text-neutral-500">GTIN</dt>
+                    <dd className="text-neutral-900 font-mono">{product.gtin}</dd>
+                  </>
+                )}
+                {product.mpn && (
+                  <>
+                    <dt className="text-neutral-500">MPN</dt>
+                    <dd className="text-neutral-900 font-mono">{product.mpn}</dd>
+                  </>
+                )}
+              </dl>
+            </div>
+          )}
+
           {/* Custom CTA */}
           {features.customCta && product.customCta && (
             <div className="mb-6">
@@ -463,7 +490,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: 
         )}
 
         {/* Product Gallery */}
-        {gallery && gallery}
+        {gallery && <div key="product-gallery">{gallery}</div>}
 
         {/* Business Contact Info */}
         <div className="bg-white rounded-lg shadow-sm p-6">

@@ -5,6 +5,67 @@ import { prisma } from '../prisma';
 const router = Router();
 
 /**
+ * Get Google Business Profile connection status
+ * GET /google/business/status
+ */
+router.get('/google/business/status', async (req, res) => {
+  try {
+    const { tenantId } = req.query;
+
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_tenantId',
+        message: 'tenantId query parameter is required'
+      });
+    }
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        google_business_access_token: true,
+        google_business_refresh_token: true,
+        google_business_token_expiry: true,
+      }
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'tenant_not_found',
+        message: 'Tenant not found'
+      });
+    }
+
+    const isConnected = !!(tenant.google_business_access_token && tenant.google_business_refresh_token);
+    const isExpired = tenant.google_business_token_expiry 
+      ? new Date(tenant.google_business_token_expiry) < new Date() 
+      : false;
+
+    res.json({
+      success: true,
+      data: {
+        isConnected,
+        isExpired,
+        hasAccessToken: !!tenant.google_business_access_token,
+        hasRefreshToken: !!tenant.google_business_refresh_token,
+        tokenExpiry: tenant.google_business_token_expiry,
+        message: isConnected 
+          ? (isExpired ? 'Connected but token expired - will auto-refresh' : 'Connected to Google Business Profile')
+          : 'Not connected to Google Business Profile'
+      }
+    });
+  } catch (error) {
+    console.error('[Google Business OAuth] Error checking status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'status_check_failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
  * Initiate Google Business Profile OAuth flow
  * GET /google/business
  */

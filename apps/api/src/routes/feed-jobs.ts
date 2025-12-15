@@ -6,9 +6,95 @@ import { generateFeedPushJobId, generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
+/**
+ * GET /api/feed-jobs/setup-status/:tenantId
+ * Check if tenant has Google Merchant Center connected and ready for feed push
+ */
+router.get('/setup-status/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    // Check for Google OAuth account linked to this tenant
+    const googleAccount = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+      include: {
+        google_merchant_links_list: {
+          where: { is_active: true },
+          take: 1,
+        },
+        google_oauth_tokens_list: true,
+      },
+    });
+
+    // Check tenant's direct Google Business tokens (alternative connection method)
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        google_business_access_token: true,
+        google_business_refresh_token: true,
+      },
+    });
+
+    const hasGoogleAccount = !!googleAccount;
+    const hasOAuthTokens = !!googleAccount?.google_oauth_tokens_list;
+    const hasMerchantLink = (googleAccount?.google_merchant_links_list?.length || 0) > 0;
+    const hasDirectBusinessTokens = !!(tenant?.google_business_access_token && tenant?.google_business_refresh_token);
+
+    // Determine overall readiness
+    const isReady = hasOAuthTokens && hasMerchantLink;
+
+    // Build setup steps with status
+    const setupSteps = [
+      {
+        id: 'google_account',
+        label: 'Connect Google Account',
+        description: 'Sign in with your Google account to authorize access',
+        completed: hasGoogleAccount || hasDirectBusinessTokens,
+        action: '/settings/integrations',
+      },
+      {
+        id: 'merchant_center',
+        label: 'Link Merchant Center',
+        description: 'Select your Google Merchant Center account',
+        completed: hasMerchantLink,
+        action: '/settings/integrations',
+        requires: 'google_account',
+      },
+      {
+        id: 'oauth_tokens',
+        label: 'Authorization Active',
+        description: 'OAuth tokens are valid and not expired',
+        completed: hasOAuthTokens || hasDirectBusinessTokens,
+        action: '/settings/integrations',
+        requires: 'google_account',
+      },
+    ];
+
+    res.json({
+      success: true,
+      data: {
+        isReady,
+        hasGoogleAccount: hasGoogleAccount || hasDirectBusinessTokens,
+        hasMerchantLink,
+        hasOAuthTokens: hasOAuthTokens || hasDirectBusinessTokens,
+        setupSteps,
+        message: isReady 
+          ? 'Ready to push feeds to Google Merchant Center'
+          : 'Complete the setup steps below to enable feed push',
+      },
+    });
+  } catch (error) {
+    console.error('[Feed Jobs] Error checking setup status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check setup status',
+    });
+  }
+});
+
 // Validation schemas
 const createFeedJobSchema = z.object({
-  tenantId: z.string().cuid(),
+  tenantId: z.string().min(1, 'Tenant ID is required'),
   sku: z.string().optional(),
   payload: z.record(z.string(), z.any()).optional(),
 });

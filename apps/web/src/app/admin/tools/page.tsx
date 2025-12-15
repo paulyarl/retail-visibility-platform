@@ -103,6 +103,15 @@ export default function AdminToolsPage() {
       color: 'from-cyan-500 to-blue-600',
       stats: 'Real-time analytics',
     },
+    {
+      id: 'cached-products',
+      href: '/admin/tools/cached-products',
+      icon: Package,
+      title: 'Cached Products Manager',
+      description: 'Manage Quick Start product cache - view, edit, and delete cached products',
+      color: 'from-purple-500 to-pink-600',
+      stats: 'Product Cache',
+    },
   ];
 
   const categories = [

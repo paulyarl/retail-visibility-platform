@@ -3,11 +3,12 @@
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { Card, CardContent, Badge, Button } from '@/components/ui';
+import { Card, CardContent, Badge, Button, Modal, ModalFooter } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import SyncStatusIndicator from '@/components/items/SyncStatusIndicator';
 import { QRCodeModal } from '@/components/items/QRCodeModal';
 import EditItemModal from '@/components/items/EditItemModal';
+import ItemPhotoGallery from '@/components/items/ItemPhotoGallery';
 import { Item as ItemType } from '@/services/itemsDataService';
 
 interface ItemDetailPageProps {
@@ -102,6 +103,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPhotoGallery, setShowPhotoGallery] = useState(false);
 
   useEffect(() => {
     loadItemData();
@@ -342,13 +344,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                // Scroll to photos section
-                const photosSection = document.querySelector('[data-section="photos"]');
-                if (photosSection) {
-                  photosSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-              }}
+              onClick={() => setShowPhotoGallery(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors font-medium shadow-sm"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -873,6 +869,27 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         item={item}
         onSave={handleSaveItem}
       />
+
+      {/* Photo Gallery Modal */}
+      {showPhotoGallery && item && (
+        <Modal
+          isOpen={showPhotoGallery}
+          onClose={() => setShowPhotoGallery(false)}
+          title={`Photos - ${item.name}`}
+          size="xl"
+        >
+          <ItemPhotoGallery
+            item={{ id: item.id, sku: item.sku, name: item.name }}
+            tenantId={tenantId}
+            onUpdate={loadItemData}
+          />
+          <ModalFooter>
+            <Button variant="ghost" onClick={() => setShowPhotoGallery(false)}>
+              Close
+            </Button>
+          </ModalFooter>
+        </Modal>
+      )}
     </div>
   );
 }

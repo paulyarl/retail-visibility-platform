@@ -9,7 +9,8 @@ export async function GET(
   try {
     const { tenantId, id } = await params;
 
-    const url = `${API_URL}/api/v1/tenants/${tenantId}/categories/${id}`;
+    // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
+    const url = `${API_URL}/api/tenant/${tenantId}/categories/${id}`;
 
     // Forward Authorization header from request
     const authHeader = request.headers.get('authorization');
@@ -46,7 +47,8 @@ export async function PATCH(
     const { tenantId, id } = await params;
     const body = await request.json();
 
-    const url = `${API_URL}/api/v1/tenants/${tenantId}/categories/${id}`;
+    // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
+    const url = `${API_URL}/api/tenant/${tenantId}/categories/${id}`;
 
     // Forward Authorization header from request
     const authHeader = request.headers.get('authorization');
@@ -83,7 +85,8 @@ export async function DELETE(
   try {
     const { tenantId, id } = await params;
 
-    const url = `${API_URL}/api/v1/tenants/${tenantId}/categories/${id}`;
+    // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
+    const url = `${API_URL}/api/tenant/${tenantId}/categories/${id}`;
 
     // Forward Authorization header from request
     const authHeader = request.headers.get('authorization');
@@ -124,7 +127,8 @@ export async function PUT(
     const { tenantId, id } = await params;
     const body = await request.json();
 
-    const url = `${API_URL}/api/v1/tenants/${tenantId}/categories/${id}`;
+    // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
+    const url = `${API_URL}/api/tenant/${tenantId}/categories/${id}`;
 
     // Forward Authorization header from request
     const authHeader = request.headers.get('authorization');

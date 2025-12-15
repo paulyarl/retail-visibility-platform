@@ -12,7 +12,8 @@ export async function GET(
     // Forward query parameters
     const searchParams = request.nextUrl.searchParams;
     const queryString = searchParams.toString();
-    const url = `${API_URL}/api/v1/tenants/${tenantId}/categories${queryString ? `?${queryString}` : ''}`;
+    // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
+    const url = `${API_URL}/api/tenant/${tenantId}/categories${queryString ? `?${queryString}` : ''}`;
 
     // Forward Authorization header from request
     const authHeader = request.headers.get('authorization');
@@ -49,7 +50,8 @@ export async function POST(
     const { tenantId } = await params;
     const body = await request.json();
 
-    const url = `${API_URL}/api/v1/tenants/${tenantId}/categories`;
+    // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
+    const url = `${API_URL}/api/tenant/${tenantId}/categories`;
 
     // Forward Authorization header from request
     const authHeader = request.headers.get('authorization');

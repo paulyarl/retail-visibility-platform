@@ -48,6 +48,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [manufacturer, setManufacturer] = useState('');
+  const [mpn, setMpn] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
   const [description, setDescription] = useState('');
@@ -86,6 +87,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setName(item.name || '');
       setBrand(item.brand || '');
       setManufacturer(item.manufacturer || '');
+      setMpn((item as any).mpn || '');
       setPrice(item.price ? item.price.toFixed(2) : '');
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
@@ -169,6 +171,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         name: name.trim(),
         brand: brand.trim() || undefined,
         manufacturer: manufacturer.trim() || undefined,
+        mpn: mpn.trim() || undefined,
         price: price ? parseFloat(price) : undefined,
         stock: stock ? parseInt(stock) : undefined,
         description: description.trim() || undefined,
@@ -322,6 +325,20 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           />
           <p className="text-xs text-neutral-500 mt-1">
             Supplier or manufacturer name (optional)
+          </p>
+        </div>
+
+        {/* MPN Field */}
+        <div>
+          <Input
+            label="MPN (Manufacturer Part Number)"
+            value={mpn}
+            onChange={(e) => setMpn(e.target.value)}
+            placeholder="e.g., A2056, MK-2024-BLK"
+            disabled={saving}
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            Manufacturer's unique part number (optional, helps with Google visibility)
           </p>
         </div>
 

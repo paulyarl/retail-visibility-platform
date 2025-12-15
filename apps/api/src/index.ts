@@ -131,11 +131,12 @@ import productLikesRoutes from './routes/product-likes';
 import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
 import adminEnrichmentRoutes from './routes/admin-enrichment';
+import cachedProductsRoutes from './routes/cached-products';
 import featureOverridesRoutes from './routes/admin/feature-overrides';
 import tierManagementRoutes from './routes/admin/tier-management';
 import tierSystemRoutes from './routes/admin/tier-system';
 // import testGbpRoutes from './routes/test-gbp';
-// import googleBusinessOAuthRoutes from './routes/google-business-oauth';
+import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 // import cloverRoutes from './routes/integrations/clover';
 // import emailTestRoutes from './routes/email-test';
 // Legacy Square routes (lazy import) - replaced by /api/integrations routes
@@ -185,7 +186,7 @@ app.use(cors({
   origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/ ,/www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
   credentials: true,
   methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
-  allowedHeaders: ['content-type','authorization','x-csrf-token','x-tenant-id'],
+  allowedHeaders: ['content-type','authorization','x-csrf-token','x-tenant-id','x-no-retry'],
 }));
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -3159,6 +3160,9 @@ const baseItemSchema = z.object({
   price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
   currency: z.string().length(3).optional(),
   availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
+  // Product identifiers for Google Merchant
+  gtin: z.string().nullable().optional(),
+  mpn: z.string().nullable().optional(),
   // Item status and visibility
   item_status: z.enum(['active', 'inactive', 'archived', 'trashed']).optional(),
   itemStatus: z.enum(['active', 'inactive', 'archived', 'trashed']).optional(), // Accept camelCase from frontend
@@ -4729,6 +4733,10 @@ console.log('✅ Admin tier system routes mounted at /api/admin/tier-system');
 app.use('/api/admin/scan-metrics', scanMetricsRoutes);
 console.log('✅ Admin scan metrics routes mounted at /api/admin/scan-metrics');
 
+/* ------------------------------ admin cached products ------------------------------ */
+app.use('/api/admin/cached-products', cachedProductsRoutes);
+console.log('✅ Admin cached products routes mounted at /api/admin/cached-products');
+
 /* ------------------------------ directory ------------------------------ */
 /* ------------------------------ directory optimized ------------------------------ */
 app.use('/api/directory-optimized', directoryOptimizedRoutes);
@@ -4775,13 +4783,14 @@ console.log('✅ GBP routes mounted (Google Business Profile category search)');
 app.use('/api/tenants', tenantsRoutes);
 console.log('✅ Tenants routes mounted at /api/tenants');
 
+/* ------------------------------ feed validation ------------------------------ */
+// NOTE: Must be mounted BEFORE tenantCategoriesRoutes to avoid /:tenantId/categories/:id matching /coverage
+app.use('/api/tenant', authenticateToken, feedValidationRoutes);
+console.log('✅ Feed validation routes mounted at /api/tenant');
+
 /* ------------------------------ tenant categories (GBP) ------------------------------ */
 app.use('/api/tenant', authenticateToken, tenantCategoriesRoutes);
 console.log('✅ Tenant categories routes mounted at /api/tenant');
-
-/* ------------------------------ feed validation ------------------------------ */
-app.use('/api/tenant', authenticateToken, feedValidationRoutes);
-console.log('✅ Feed validation routes mounted at /api/tenant');
 
 /* ------------------------------ photos ------------------------------ */
 app.use('/api/items', photosRouter);
@@ -4811,6 +4820,10 @@ import squareRoutes from './routes/integrations/square';
 app.use('/api/integrations', cloverRoutes);
 app.use('/api/integrations', squareRoutes);
 console.log('✅ POS integration routes mounted at /api/integrations (Clover, Square)');
+
+/* ------------------------------ Google Business Profile OAuth ------------------------------ */
+app.use('/api', googleBusinessOAuthRoutes);
+console.log('✅ Google Business Profile OAuth routes mounted at /api/google/business');
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
