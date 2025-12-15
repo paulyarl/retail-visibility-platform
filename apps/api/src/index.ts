@@ -3160,8 +3160,8 @@ const baseItemSchema = z.object({
   currency: z.string().length(3).optional(),
   availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
   // Item status and visibility
-  item_status: z.enum(['active', 'inactive', 'archived']).optional(),
-  itemStatus: z.enum(['active', 'inactive', 'archived']).optional(), // Accept camelCase from frontend
+  item_status: z.enum(['active', 'inactive', 'archived', 'trashed']).optional(),
+  itemStatus: z.enum(['active', 'inactive', 'archived', 'trashed']).optional(), // Accept camelCase from frontend
   status: z.string().optional(), // Legacy field, ignore
   visibility: z.enum(['public', 'private']).optional(),
   // Category path for Google Shopping
