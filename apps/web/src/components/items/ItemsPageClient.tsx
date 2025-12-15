@@ -438,7 +438,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Inventory</h1>

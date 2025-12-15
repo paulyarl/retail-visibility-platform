@@ -253,7 +253,7 @@ export default function GeneralSidebar({
           >
             <svg
               className={cn(
-                'w-5 h-5 transition-transform text-gray-600 dark:text-gray-300',
+                'w-5 h-5 transition-transform text-gray-600 dark:text-gray-800',
                 isCollapsed ? 'rotate-180' : ''
               )}
               fill="none"
@@ -317,7 +317,7 @@ export default function GeneralSidebar({
       {!isMobile && !isCollapsed && (
         <div className="m-3 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md">
           <div className="text-xs uppercase text-gray-500 dark:text-gray-400 tracking-wide mb-2">Recommended</div>
-          <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1 list-disc pl-5">
+          <ul className="text-sm text-gray-700 dark:text-gray-800 space-y-1 list-disc pl-5">
             <li>Finish onboarding for your next tenant</li>
             <li>Review Feed Validation report</li>
             <li>Complete business profile</li>

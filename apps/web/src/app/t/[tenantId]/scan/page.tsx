@@ -210,7 +210,7 @@ export default function TenantScanPage() {
             <div className="space-y-4">
               {/* Device Selection */}
               <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-700 mb-3">
                   Scanning Method
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -228,7 +228,7 @@ export default function TenantScanPage() {
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                       </svg>
-                      <p className="font-medium text-neutral-900 dark:text-white">USB Scanner</p>
+                      <p className="font-medium text-neutral-900 dark:text-black">USB Scanner</p>
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Fast and reliable
                       </p>
@@ -256,7 +256,7 @@ export default function TenantScanPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      <p className="font-medium text-neutral-900 dark:text-white">Camera</p>
+                      <p className="font-medium text-neutral-900 dark:text-black">Camera</p>
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Use device camera
                       </p>
@@ -282,7 +282,7 @@ export default function TenantScanPage() {
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      <p className="font-medium text-neutral-900 dark:text-white">Manual Entry</p>
+                      <p className="font-medium text-neutral-900 dark:text-black">Manual Entry</p>
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Type barcodes
                       </p>
@@ -427,7 +427,7 @@ export default function TenantScanPage() {
                             {session.deviceType}
                           </span>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-neutral-700 dark:text-neutral-300">
+                        <div className="flex items-center gap-4 text-sm text-neutral-700 dark:text-neutral-700">
                           <span>{session.scannedCount} scanned</span>
                           <span>{session.committedCount} committed</span>
                           {session.duplicateCount > 0 && (
@@ -465,7 +465,7 @@ export default function TenantScanPage() {
                     <button
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
-                      className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -480,7 +480,7 @@ export default function TenantScanPage() {
                     <button
                       onClick={() => setCurrentPage(p => Math.min(Math.ceil(sessions.length / sessionsPerPage), p + 1))}
                       disabled={currentPage >= Math.ceil(sessions.length / sessionsPerPage)}
-                      className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       Next
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

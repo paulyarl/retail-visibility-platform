@@ -63,7 +63,7 @@ export default function ItemsList({
       {items.map((item) => (
         <Card 
           key={item.id} 
-          className="border-2 border-neutral-200 dark:border-neutral-700 rounded-xl shadow-md hover:shadow-xl hover:border-primary-300 dark:hover:border-primary-600 transition-all duration-200 bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-800 dark:to-neutral-900"
+          className="border-2 border-neutral-200 dark:border-neutral-700 rounded-xl shadow-md hover:shadow-xl hover:border-primary-300 dark:hover:border-primary-600 transition-all duration-200 bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-100 dark:to-neutral-200"
         >
           <CardContent className="p-3 sm:p-4 md:p-5">
             {/* Row 1: Main Info */}
@@ -112,7 +112,7 @@ export default function ItemsList({
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <h3 
-                      className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white mb-0.5 sm:mb-1 truncate cursor-pointer hover:text-primary-600 transition-colors"
+                      className="text-base sm:text-lg font-bold text-neutral-900 mb-0.5 sm:mb-1 truncate cursor-pointer hover:text-primary-600 transition-colors"
                       onClick={() => tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank')}
                       title="View item details"
                     >
@@ -120,18 +120,18 @@ export default function ItemsList({
                     </h3>
                     <p className="text-xs sm:text-sm text-neutral-500 font-mono">{item.sku}</p>
                     {item.description && (
-                      <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mt-1 line-clamp-2">
+                      <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-800 mt-1 line-clamp-2">
                         {item.description}
                       </p>
                     )}
                     {item.tenantCategory && (
-                      <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-md border border-blue-200 dark:border-blue-800 mt-1">
+                      <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-700 text-xs font-medium rounded-md border border-blue-200 dark:border-blue-800 mt-1">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                         </svg>
                         <span>{item.tenantCategory.name}</span>
                         {item.tenantCategory.googleCategoryId && (
-                          <span className="text-blue-600 dark:text-blue-400 font-mono" title="Google Category ID">
+                          <span className="text-blue-600 dark:text-blue-900 font-mono" title="Google Category ID">
                             ({item.tenantCategory.googleCategoryId})
                           </span>
                         )}
@@ -163,7 +163,7 @@ export default function ItemsList({
                 <div className="flex items-center gap-6 mt-2">
                   <div>
                     <p className="text-xs text-neutral-500">Price</p>
-                    <p className="text-xl font-bold text-neutral-900 dark:text-white">
+                    <p className="text-xl font-bold text-neutral-900">
                       {item.price && item.price > 0 ? `$${item.price.toFixed(2)}` : ''}
                     </p>
                   </div>
@@ -193,7 +193,7 @@ export default function ItemsList({
             </div>
 
             {/* Row 2: Actions - Core sync actions first, then additional, then blocking */}
-            <div className="flex flex-wrap gap-2 pt-4 mt-1 border-t-2 border-gradient-to-r from-neutral-200 via-neutral-300 to-neutral-200 dark:from-neutral-700 dark:via-neutral-600 dark:to-neutral-700">
+            <div className="flex flex-wrap gap-2 pt-4 mt-1 border-t-2 dark:border-neutral-800 border-gradient-to-r from-neutral-200 via-neutral-300 to-neutral-200 dark:from-neutral-700 dark:via-neutral-600 dark:to-neutral-700">
               {/* CORE SYNC ACTIONS - Edit, Photos, Category */}
               <Button 
                 size="sm" 

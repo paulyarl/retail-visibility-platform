@@ -287,7 +287,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4" />
@@ -300,7 +300,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   if (error || !item) {
     return (
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
             <p className="text-red-800 font-medium">{error || 'Item not found'}</p>
@@ -320,7 +320,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const displayPhotos = photos.length > 0 ? photos : (item.imageUrl ? [{ id: 'primary', url: item.imageUrl, position: 0 }] : []);
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
       <PageHeader
         title={item.name}
         description={`SKU: ${item.sku}`}

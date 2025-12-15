@@ -99,17 +99,17 @@ export default function SyncStatusIndicator({
       {showDetails && blockingReasons.length > 0 && (
         <div className="hidden sm:flex items-center gap-1.5 ml-2">
           {isDraft && (
-            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/10 text-blue-700 dark:text-blue-300">
               Draft
             </span>
           )}
           {isArchived && (
-            <span className="text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+            <span className="text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/10 text-amber-700 dark:text-amber-300">
               Archived
             </span>
           )}
           {isInactive && (
-            <span className="text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-900/30 text-neutral-700 dark:text-neutral-300">
+            <span className="text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-900/10 text-neutral-700 dark:text-neutral-300">
               Inactive
             </span>
           )}

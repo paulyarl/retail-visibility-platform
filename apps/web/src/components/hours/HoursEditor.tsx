@@ -207,9 +207,9 @@ export default function HoursEditor({ apiBase, tenantId, timezone: externalTimez
           const hasDuplicate = periods.filter((other, j) => i !== j && p.day === other.day).length > 0;
           
           return (
-            <div key={i} className={`flex gap-2 items-center flex-wrap p-2 rounded-lg ${isInvalid || hasOverlap ? 'bg-red-50 border border-red-200' : hasDuplicate ? 'bg-amber-50 border border-amber-200' : ''}`}>
+            <div key={i} className={`flex gap-2 items-center flex-wrap p-2 rounded-lg dark:bg-neutral-600 ${isInvalid || hasOverlap ? 'bg-red-50 border border-red-200' : hasDuplicate ? 'bg-amber-50 border border-amber-200' : ''}`}>
               <select 
-                className="border border-gray-300 px-3 py-2 rounded-lg w-40 font-medium" 
+                className="border border-gray-300 px-3 py-2 rounded-lg w-40 font-medium dark:text-neutral-500 dark:bg-neutral-400" 
                 value={p.day} 
                 onChange={(e) => update(i, "day", e.target.value)}
               >

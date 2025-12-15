@@ -387,7 +387,7 @@ export default function ItemsClient({
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900" suppressHydrationWarning>
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800" suppressHydrationWarning>
       <PageHeader
         title="Inventory"
         description="Manage what's on your shelf and make it visible online"

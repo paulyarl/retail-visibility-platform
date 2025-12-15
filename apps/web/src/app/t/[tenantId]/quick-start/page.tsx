@@ -196,7 +196,7 @@ export default function QuickStartPage() {
   // Show blocked state if there's an error from eligibility check
   if (error && !loading && !success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800">
         <div className="max-w-2xl mx-auto px-4 py-12">
           <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border-2 border-red-200 dark:border-red-800">
@@ -270,7 +270,7 @@ export default function QuickStartPage() {
   // Show success state
   if (success && result) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800">
         <div className="max-w-2xl mx-auto px-4 py-12">
           <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
@@ -362,7 +362,7 @@ export default function QuickStartPage() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: sliderStyles }} />
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800">
         <div className="max-w-4xl mx-auto px-4 py-12">
           <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
         {/* Page Header */}

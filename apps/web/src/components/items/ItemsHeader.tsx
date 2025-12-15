@@ -36,11 +36,11 @@ export default function ItemsHeader({
       {/* Quick Stats Dashboard with Icons */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {/* Total Products */}
-        <div className="bg-white dark:bg-neutral-800 p-4 rounded-lg border border-neutral-200 dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-100 p-4 rounded-lg border border-neutral-200 dark:border-neutral-700">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">Total Products</p>
-              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{stats.total}</p>
+              <p className="text-2xl font-bold text-neutral-900 ">{stats.total}</p>
             </div>
             <div className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center">
               <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -51,11 +51,11 @@ export default function ItemsHeader({
         </div>
 
         {/* Active */}
-        <div className="bg-white dark:bg-neutral-800 p-4 rounded-lg border border-neutral-200 dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-100 p-4 rounded-lg border border-neutral-200 dark:border-neutral-700">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">Active</p>
-              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{stats.active}</p>
+              <p className="text-2xl font-bold text-neutral-900 ">{stats.active}</p>
             </div>
             <div className="h-12 w-12 bg-info rounded-lg flex items-center justify-center">
               <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -66,11 +66,11 @@ export default function ItemsHeader({
         </div>
 
         {/* Inactive */}
-        <div className={`p-4 rounded-lg border ${stats.inactive > 0 ? 'bg-neutral-50 border-neutral-300' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
+        <div className={`p-4 rounded-lg border ${stats.inactive > 0 ? 'bg-neutral-50 border-neutral-300' : 'bg-white dark:bg-neutral-100 border-neutral-200 dark:border-neutral-700 '}`}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">Inactive</p>
-              <p className={`text-2xl font-bold ${stats.inactive > 0 ? 'text-neutral-700' : 'text-neutral-900 dark:text-white'}`}>
+              <p className={`text-2xl font-bold ${stats.inactive > 0 ? 'text-neutral-700' : 'text-neutral-900 '}`}>
                 {stats.inactive}
               </p>
             </div>
@@ -83,11 +83,11 @@ export default function ItemsHeader({
         </div>
 
         {/* Public */}
-        <div className="bg-white dark:bg-neutral-800 p-4 rounded-lg border border-neutral-200 dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-100 p-4 rounded-lg border border-neutral-200 dark:border-neutral-700">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">Public</p>
-              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{stats.public}</p>
+              <p className="text-2xl font-bold text-neutral-900 ">{stats.public}</p>
             </div>
             <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -99,11 +99,11 @@ export default function ItemsHeader({
         </div>
 
         {/* Low Stock */}
-        <div className={`p-4 rounded-lg border ${stats.lowStock > 0 ? 'bg-warning-50 border-warning-200' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
+        <div className={`p-4 rounded-lg border ${stats.lowStock > 0 ? 'bg-warning-50 border-warning-200' : 'bg-white dark:bg-neutral-100 border-neutral-200 dark:border-neutral-700'}`}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">Low Stock</p>
-              <p className={`text-2xl font-bold ${stats.lowStock > 0 ? 'text-warning' : 'text-neutral-900 dark:text-white'}`}>
+              <p className={`text-2xl font-bold ${stats.lowStock > 0 ? 'text-warning' : 'text-neutral-900 '}`}>
                 {stats.lowStock}
               </p>
             </div>

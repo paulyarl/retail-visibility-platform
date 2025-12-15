@@ -617,7 +617,7 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-8 max-w-7xl mx-auto dark:text-neutral-800">
       {/* Context Badges */}
       <ContextBadges 
         tenant={{ id: tenantId, name: '' }}
@@ -648,7 +648,7 @@ export default function CategoriesPage() {
       {/* Alignment Status Card */}
       {alignmentStatus && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Alignment Status</h2>
+          <h2 className="text-lg font-semibold mb-4 dark:text-neutral-700">Alignment Status</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <p className="text-sm text-gray-600">Total Categories</p>
