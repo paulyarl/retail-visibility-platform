@@ -130,14 +130,19 @@ export default function DirectoryClient() {
   
   // Persist view mode in localStorage - start with default to avoid hydration mismatch
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+  const [pageSize, setPageSize] = useState(24);
   const [isClient, setIsClient] = useState(false);
 
-  // Load saved view mode after hydration
+  // Load saved view mode and page size after hydration
   useEffect(() => {
     setIsClient(true);
-    const saved = localStorage.getItem('directory-view-mode');
-    if (saved && ['grid', 'list', 'map'].includes(saved)) {
-      setViewMode(saved as 'grid' | 'list' | 'map');
+    const savedView = localStorage.getItem('directory-view-mode');
+    if (savedView && ['grid', 'list', 'map'].includes(savedView)) {
+      setViewMode(savedView as 'grid' | 'list' | 'map');
+    }
+    const savedPageSize = localStorage.getItem('directory-page-size');
+    if (savedPageSize && [12, 24, 48, 96].includes(Number(savedPageSize))) {
+      setPageSize(Number(savedPageSize));
     }
   }, []);
 
@@ -145,6 +150,17 @@ export default function DirectoryClient() {
   const handleViewModeChange = (mode: 'grid' | 'list' | 'map') => {
     setViewMode(mode);
     localStorage.setItem('directory-view-mode', mode);
+  };
+
+  // Handle page size change
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    localStorage.setItem('directory-page-size', size.toString());
+    // Update URL with new page size and reset to page 1
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('limit', size.toString());
+    params.set('page', '1');
+    window.location.href = `/directory?${params.toString()}`;
   };
   
   // NEW: User location for proximity-based scoring
@@ -319,22 +335,6 @@ export default function DirectoryClient() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        {/* Product Category Browser - Show when no search is active */}
-        {!searchParams.get('q') && !searchParams.get('category') && categories.length > 0 && (
-          <DirectoryCategoryBrowser 
-            categories={categories}
-            className="mb-8"
-          />
-        )}
-
-        {/* Store Type Browser - Show when no search is active */}
-        {!searchParams.get('q') && !searchParams.get('category') && storeTypes.length > 0 && (
-          <DirectoryStoreTypeBrowser 
-            storeTypes={storeTypes}
-            className="mb-8"
-          />
-        )}
-
         {/* Error State */}
         {error && (
           <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -342,12 +342,32 @@ export default function DirectoryClient() {
           </div>
         )}
 
-        {/* Results Header with View Toggle */}
+        {/* Results Header with View Toggle and Page Size */}
         {!loading && data && data.listings.length > 0 && (
           <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
-            <p className="text-neutral-600 dark:text-neutral-400">
-              Showing {((currentPage - 1) * 24) + 1}-{Math.min(currentPage * 24, totalItems)} of {totalItems.toLocaleString()} stores
-            </p>
+            <div className="flex items-center gap-4">
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalItems)} of {totalItems.toLocaleString()} stores
+              </p>
+              
+              {/* Page Size Dropdown */}
+              <div className="flex items-center gap-2">
+                <label htmlFor="pageSize" className="text-sm text-neutral-500 dark:text-neutral-400">
+                  Show:
+                </label>
+                <select
+                  id="pageSize"
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="px-2 py-1 text-sm border border-neutral-200 dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                  <option value={96}>96</option>
+                </select>
+              </div>
+            </div>
             
             {/* View Toggle */}
             <div className="flex items-center gap-2 bg-white dark:bg-neutral-800 rounded-lg p-1 border border-neutral-200 dark:border-neutral-700">
@@ -424,15 +444,32 @@ export default function DirectoryClient() {
             <Pagination
               currentPage={currentPage}
               totalItems={totalItems}
-              pageSize={24}
+              pageSize={pageSize}
               onPageChange={(page) => {
                 const params = new URLSearchParams(searchParams.toString());
                 params.set('page', page.toString());
                 window.location.href = `/directory?${params.toString()}`;
               }}
-              onPageSizeChange={() => {}} // Directory uses fixed page size
+              onPageSizeChange={handlePageSizeChange}
             />
           </div>
+        )}
+
+        {/* Browse Sections - Show immediately when collapsed (no search active) */}
+        {!searchParams.get('q') && !searchParams.get('category') && (
+          <>
+            {/* Product Category Browser - Show immediately, data loads in background */}
+            <DirectoryCategoryBrowser 
+              categories={categories}
+              className="mt-12"
+            />
+
+            {/* Store Type Browser - Show immediately, data loads in background */}
+            <DirectoryStoreTypeBrowser 
+              storeTypes={storeTypes}
+              className="mt-8"
+            />
+          </>
         )}
 
         {/* Directory Home Recommendations */}

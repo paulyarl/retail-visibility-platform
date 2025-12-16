@@ -34,15 +34,37 @@ export default function BusinessHoursDisplay({ businessHours, className = '' }: 
         <Clock className="w-4 h-4 text-gray-500" />
         Business Hours
       </h3>
-      <div className="space-y-1">
+      <div className="space-y-0">
         {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
           const dayHours = businessHours[day];
+          const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
           return (
-            <div key={day} className="flex justify-between text-sm">
-              <span className="font-medium text-gray-700">{day}</span>
-              <span className="text-gray-600">
-                {dayHours ? `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}` : 'Closed'}
-              </span>
+            <div 
+              key={day} 
+              className={`flex items-start justify-between py-2.5 px-3 border-b border-gray-100 last:border-b-0 ${
+                isToday ? 'bg-blue-50' : ''
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`text-sm font-medium ${isToday ? 'text-blue-700' : 'text-gray-800'}`}>
+                  {day}
+                </span>
+                {isToday && <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">Today</span>}
+              </div>
+              <div className={`text-right text-xs ${
+                isToday 
+                  ? 'text-blue-600' 
+                  : dayHours ? 'text-gray-500' : 'text-gray-400'
+              }`}>
+                {dayHours ? (
+                  <div className="flex flex-col">
+                    <span>{formatTime(dayHours.open)}</span>
+                    <span>{formatTime(dayHours.close)}</span>
+                  </div>
+                ) : (
+                  <span>Closed</span>
+                )}
+              </div>
             </div>
           );
         })}

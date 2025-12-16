@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Filter, SlidersHorizontal, X, MapPin, Navigation } from 'lucide-react';
+import { Filter, SlidersHorizontal, X, MapPin, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface DirectoryFiltersProps {
@@ -15,6 +15,7 @@ export default function DirectoryFilters({ categories, storeTypes = [], location
   const searchParams = useSearchParams();
   
   const [showFilters, setShowFilters] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false); // Desktop collapse state
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [selectedStoreType, setSelectedStoreType] = useState(searchParams.get('storeType') || '');
   const [selectedLocation, setSelectedLocation] = useState(searchParams.get('city') || '');
@@ -102,7 +103,41 @@ export default function DirectoryFilters({ categories, storeTypes = [], location
 
   return (
     <div className="bg-white border-b sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        {/* Collapsible Header - Desktop */}
+        <div className="hidden lg:flex items-center justify-between">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            <span className="font-medium">Filters</span>
+            {activeFilters > 0 && (
+              <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                {activeFilters}
+              </span>
+            )}
+            {isExpanded ? (
+              <ChevronUp className="w-4 h-4 ml-1" />
+            ) : (
+              <ChevronDown className="w-4 h-4 ml-1" />
+            )}
+          </button>
+          
+          {/* Quick filter summary when collapsed */}
+          {!isExpanded && activeFilters > 0 && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span>{activeFilters} {activeFilters === 1 ? 'filter' : 'filters'} active</span>
+              <button
+                onClick={clearFilters}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Mobile Filter Toggle */}
         <div className="flex items-center gap-4 lg:hidden">
           <button
@@ -119,8 +154,8 @@ export default function DirectoryFilters({ categories, storeTypes = [], location
           </button>
         </div>
 
-        {/* Desktop Filters - Always Visible */}
-        <div className={`${showFilters ? 'block' : 'hidden'} lg:block mt-4 lg:mt-0`}>
+        {/* Desktop Filters - Collapsible */}
+        <div className={`${showFilters ? 'block' : 'hidden'} ${isExpanded ? 'lg:block' : 'lg:hidden'} mt-4`}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Search */}
             <div>

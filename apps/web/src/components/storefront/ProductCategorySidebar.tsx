@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -16,12 +18,27 @@ interface ProductCategorySidebarProps {
   tenantId: string;
   categories: Category[];
   totalProducts: number;
+  collapseThreshold?: number; // Number of categories before collapsing into dropdown
 }
 
-export default function ProductCategorySidebar({ tenantId, categories, totalProducts }: ProductCategorySidebarProps) {
+const DEFAULT_COLLAPSE_THRESHOLD = 10;
+
+export default function ProductCategorySidebar({ 
+  tenantId, 
+  categories, 
+  totalProducts,
+  collapseThreshold = DEFAULT_COLLAPSE_THRESHOLD 
+}: ProductCategorySidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentCategory = searchParams.get('category');
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const shouldCollapse = categories.length > collapseThreshold;
+  const visibleCategories = shouldCollapse && !isExpanded 
+    ? categories.slice(0, collapseThreshold) 
+    : categories;
+  const hiddenCount = categories.length - collapseThreshold;
 
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
@@ -55,7 +72,7 @@ export default function ProductCategorySidebar({ tenantId, categories, totalProd
         </Link>
 
         {/* Product Category List */}
-        {categories.map((category) => (
+        {visibleCategories.map((category) => (
           <Link
             key={category.id}
             href={`/tenant/${tenantId}?category=${category.slug}`}
@@ -65,8 +82,8 @@ export default function ProductCategorySidebar({ tenantId, categories, totalProd
                 : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
             }`}
           >
-            <span>{category.name}</span>
-            <span className={`text-sm ${
+            <span className="truncate">{category.name}</span>
+            <span className={`text-sm flex-shrink-0 ml-2 ${
               currentCategory === category.slug
                 ? 'text-primary-600 dark:text-primary-400'
                 : 'text-neutral-500 dark:text-neutral-400'
@@ -75,6 +92,26 @@ export default function ProductCategorySidebar({ tenantId, categories, totalProd
             </span>
           </Link>
         ))}
+
+        {/* Show More/Less Button */}
+        {shouldCollapse && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center justify-center w-full px-3 py-2 mt-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="w-4 h-4 mr-1" />
+                Show Less
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-4 h-4 mr-1" />
+                Show {hiddenCount} More
+              </>
+            )}
+          </button>
+        )}
       </nav>
 
       {/* Empty State */}

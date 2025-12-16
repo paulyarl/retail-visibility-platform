@@ -134,34 +134,70 @@ class StoreTypeDirectoryService {
         return this.getFallbackStoreTypes();
       }
 
-      return result.rows.map(row => ({
-        id: row.gbp_category_id,
-        name: row.gbp_category_name,
-        displayName: row.gbp_category_display_name,
-        slug: slugify(row.gbp_category_name),
-        storeCount: parseInt(row.store_count),
-        store_count: parseInt(row.store_count), // Compatibility
-        primaryStoreCount: parseInt(row.primary_store_count || '0'),
-        primary_store_count: parseInt(row.primary_store_count || '0'), // Compatibility
-        secondaryStoreCount: parseInt(row.secondary_store_count || '0'),
-        secondary_store_count: parseInt(row.secondary_store_count || '0'), // Compatibility
-        totalProducts: parseInt(row.total_products || '0'),
-        total_products: parseInt(row.total_products || '0'), // Compatibility
-        avgRating: parseFloat(row.avg_rating || '0'),
-        avg_rating: parseFloat(row.avg_rating || '0'), // Compatibility
-        uniqueLocations: parseInt(row.unique_locations || '0'),
-        unique_locations: parseInt(row.unique_locations || '0'), // Compatibility
-        cities: row.cities || [],
-        states: row.states || [],
-        featuredStoreCount: parseInt(row.featured_store_count || '0'),
-        featured_store_count: parseInt(row.featured_store_count || '0'), // Compatibility
-        syncedStoreCount: parseInt(row.synced_store_count || '0'),
-        synced_store_count: parseInt(row.synced_store_count || '0'), // Compatibility
-        firstStoreAdded: row.first_store_added,
-        first_store_added: row.first_store_added, // Compatibility
-        lastStoreUpdated: row.last_store_updated,
-        last_store_updated: row.last_store_updated, // Compatibility
-      }));
+      // Merge duplicates by slug (same category can appear as both primary and secondary)
+      const mergedBySlug = new Map<string, any>();
+      
+      for (const row of result.rows) {
+        const slug = slugify(row.gbp_category_name);
+        const existing = mergedBySlug.get(slug);
+        
+        if (existing) {
+          // Merge counts - primary and secondary are mutually exclusive per row
+          existing.storeCount += parseInt(row.store_count);
+          existing.primaryStoreCount += parseInt(row.primary_store_count || '0');
+          existing.secondaryStoreCount += parseInt(row.secondary_store_count || '0');
+          existing.totalProducts += parseInt(row.total_products || '0');
+          existing.uniqueLocations = Math.max(existing.uniqueLocations, parseInt(row.unique_locations || '0'));
+          existing.featuredStoreCount += parseInt(row.featured_store_count || '0');
+          existing.syncedStoreCount += parseInt(row.synced_store_count || '0');
+          // Merge arrays (dedupe)
+          existing.cities = [...new Set([...existing.cities, ...(row.cities || [])])];
+          existing.states = [...new Set([...existing.states, ...(row.states || [])])];
+          // Use earliest/latest dates
+          if (row.first_store_added && (!existing.firstStoreAdded || row.first_store_added < existing.firstStoreAdded)) {
+            existing.firstStoreAdded = row.first_store_added;
+          }
+          if (row.last_store_updated && (!existing.lastStoreUpdated || row.last_store_updated > existing.lastStoreUpdated)) {
+            existing.lastStoreUpdated = row.last_store_updated;
+          }
+        } else {
+          mergedBySlug.set(slug, {
+            id: row.gbp_category_id,
+            name: row.gbp_category_name,
+            displayName: row.gbp_category_display_name,
+            slug,
+            storeCount: parseInt(row.store_count),
+            primaryStoreCount: parseInt(row.primary_store_count || '0'),
+            secondaryStoreCount: parseInt(row.secondary_store_count || '0'),
+            totalProducts: parseInt(row.total_products || '0'),
+            avgRating: parseFloat(row.avg_rating || '0'),
+            uniqueLocations: parseInt(row.unique_locations || '0'),
+            cities: row.cities || [],
+            states: row.states || [],
+            featuredStoreCount: parseInt(row.featured_store_count || '0'),
+            syncedStoreCount: parseInt(row.synced_store_count || '0'),
+            firstStoreAdded: row.first_store_added,
+            lastStoreUpdated: row.last_store_updated,
+          });
+        }
+      }
+
+      // Convert to array and add compatibility fields, sort by store count
+      return Array.from(mergedBySlug.values())
+        .map(item => ({
+          ...item,
+          store_count: item.storeCount,
+          primary_store_count: item.primaryStoreCount,
+          secondary_store_count: item.secondaryStoreCount,
+          total_products: item.totalProducts,
+          avg_rating: item.avgRating,
+          unique_locations: item.uniqueLocations,
+          featured_store_count: item.featuredStoreCount,
+          synced_store_count: item.syncedStoreCount,
+          first_store_added: item.firstStoreAdded,
+          last_store_updated: item.lastStoreUpdated,
+        }))
+        .sort((a, b) => b.storeCount - a.storeCount);
     } catch (error) {
       console.error('[StoreTypeService] Error fetching store types:', error);
       return [];

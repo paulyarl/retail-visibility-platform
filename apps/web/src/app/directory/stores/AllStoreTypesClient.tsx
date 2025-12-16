@@ -144,9 +144,9 @@ export default function AllStoreTypesClient() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredStoreTypes.map((type) => (
+              {filteredStoreTypes.map((type, index) => (
                 <Link
-                  key={type.slug}
+                  key={`${type.slug}-${index}`}
                   href={`/directory/stores/${type.slug}`}
                   className="group"
                 >

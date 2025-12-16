@@ -782,9 +782,10 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                       </svg>
                       Business Hours
                     </h4>
-                    <div className="space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+                    <div className="space-y-0">
                       {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
                         const dayHours = businessHours[day];
+                        const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
                         const formatTime = (time24: string): string => {
                           if (!time24) return "";
                           const [h, m] = time24.split(":").map(Number);
@@ -793,11 +794,32 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                           return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
                         };
                         return (
-                          <div key={day} className="flex justify-between">
-                            <span className="font-medium">{day}</span>
-                            <span>
-                              {dayHours ? `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}` : 'Closed'}
-                            </span>
+                          <div 
+                            key={day} 
+                            className={`flex items-start justify-between py-2.5 px-3 border-b border-neutral-100 dark:border-neutral-700 last:border-b-0 ${
+                              isToday ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-medium ${isToday ? 'text-blue-700 dark:text-blue-400' : 'text-neutral-800 dark:text-neutral-200'}`}>
+                                {day}
+                              </span>
+                              {isToday && <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded">Today</span>}
+                            </div>
+                            <div className={`text-right text-xs ${
+                              isToday 
+                                ? 'text-blue-600 dark:text-blue-400' 
+                                : dayHours ? 'text-neutral-500 dark:text-neutral-400' : 'text-neutral-400 dark:text-neutral-500'
+                            }`}>
+                              {dayHours ? (
+                                <div className="flex flex-col">
+                                  <span>{formatTime(dayHours.open)}</span>
+                                  <span>{formatTime(dayHours.close)}</span>
+                                </div>
+                              ) : (
+                                <span>Closed</span>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
