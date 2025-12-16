@@ -2,9 +2,35 @@
  * Authenticated API client
  * Automatically includes JWT token in requests
  * Works with both Next.js API routes (/api/*) and direct backend calls
+ * Includes request deduplication for GET requests
  */
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL;
+
+/**
+ * Request deduplication cache
+ * Prevents duplicate GET requests within a short time window
+ */
+interface CachedRequest {
+  promise: Promise<Response>;
+  timestamp: number;
+}
+
+const requestCache = new Map<string, CachedRequest>();
+const CACHE_TTL_MS = 2000; // 2 second deduplication window
+
+function getCacheKey(url: string, token: string | null): string {
+  return `${url}:${token || 'anonymous'}`;
+}
+
+function cleanExpiredCache(): void {
+  const now = Date.now();
+  for (const [key, cached] of requestCache.entries()) {
+    if (now - cached.timestamp > CACHE_TTL_MS) {
+      requestCache.delete(key);
+    }
+  }
+}
 
 /**
  * Get access token from localStorage or cookies
@@ -35,11 +61,12 @@ function getCookie(name: string): string | null {
  * Make an authenticated API request with centralized auth handling.
  * - Injects bearer token from localStorage
  * - On 401: clears token and redirects to /login?next=
+ * - Deduplicates identical GET requests within 2 second window
  * Supports both relative URLs (/api/tenants) and absolute URLs (http://...)
  */
 export async function apiRequest(
   endpoint: string,
-  options: RequestInit & { skipAuthRedirect?: boolean } = {}
+  options: RequestInit & { skipAuthRedirect?: boolean; skipCache?: boolean } = {}
 ): Promise<Response> {
   const token = getAccessToken();
   const tenantId = getLastTenantId();
@@ -47,6 +74,8 @@ export async function apiRequest(
   
   const method = (options.method || 'GET').toString().toUpperCase();
   const isWrite = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+  const isGet = method === 'GET';
+  
   // Start with any provided headers, but avoid adding headers that trigger CORS preflight unnecessarily
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
@@ -77,7 +106,36 @@ export async function apiRequest(
     ? `${API_BASE_URL}${endpoint}`
     : endpoint;
   
-  console.log('[API] Endpoint:', endpoint, 'API_BASE_URL:', API_BASE_URL, 'Generated URL:', url);
+  // Request deduplication for GET requests
+  // Skip cache for write operations or if explicitly disabled
+  if (isGet && !options.skipCache) {
+    cleanExpiredCache();
+    const cacheKey = getCacheKey(url, token);
+    const cached = requestCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      // Return cloned response from cache (Response can only be read once)
+      return cached.promise.then(resp => resp.clone());
+    }
+    
+    // Create the request promise and cache it
+    const requestPromise = executeRequest(url, options, headers, token);
+    requestCache.set(cacheKey, { promise: requestPromise, timestamp: Date.now() });
+    return requestPromise.then(resp => resp.clone());
+  }
+  
+  return executeRequest(url, options, headers, token);
+}
+
+/**
+ * Execute the actual fetch request with retry logic
+ */
+async function executeRequest(
+  url: string,
+  options: RequestInit & { skipAuthRedirect?: boolean },
+  headers: Record<string, string>,
+  token: string | null
+): Promise<Response> {
 
   // Simple retry/backoff for 429/5xx (max 2 retries), but skip if x-no-retry header is set
   const shouldRetry = !headers['x-no-retry'];

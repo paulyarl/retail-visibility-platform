@@ -173,6 +173,21 @@ export default function SubscriptionUsageBadge({
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {/* Tenant Context */}
+          <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-gray-900 dark:text-white truncate">{usage.tenantName}</p>
+              {usage.gbpPrimaryCategory && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{usage.gbpPrimaryCategory}</p>
+              )}
+            </div>
+          </div>
+
           {/* Current Plan */}
           <div className="p-6 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800">
             <div className="flex items-start justify-between mb-4">

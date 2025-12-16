@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { api, API_BASE_URL as API_URL } from '@/lib/api';
 
 // User type
 export interface User {
@@ -33,7 +34,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+const API_BASE_URL = API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
 // Token management
 const TOKEN_KEY = 'access_token';
@@ -85,12 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        credentials: 'include',
-      });
+      // Use centralized api client for deduplication
+      const response = await api.get(`${API_BASE_URL}/auth/me`);
 
       if (response.ok) {
         const data = await response.json();

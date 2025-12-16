@@ -56,6 +56,27 @@ export default function TenantLimitBadge({
   // Full variant
   const isPlatformUser = status.tier.startsWith('platform_');
   
+  // Format tier name for display
+  const formatTierName = (tier: string) => {
+    return tier.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+  
+  // Get tier badge color
+  const getTierBadgeColor = (tier: string) => {
+    if (tier.startsWith('platform_')) return 'bg-purple-100 text-purple-700';
+    switch (tier) {
+      case 'organization': return 'bg-blue-100 text-blue-700';
+      case 'enterprise': return 'bg-indigo-100 text-indigo-700';
+      case 'professional': return 'bg-green-100 text-green-700';
+      case 'starter': return 'bg-amber-100 text-amber-700';
+      case 'google_only': return 'bg-gray-100 text-gray-700';
+      case 'trial': return 'bg-orange-100 text-orange-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+  
   return (
     <div className={`border rounded-lg p-4 shadow-sm ${
       isPlatformUser 
@@ -67,15 +88,15 @@ export default function TenantLimitBadge({
           <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
             <MapPin className="w-4 h-4" />
             Locations
-            {isPlatformUser && (
-              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                Platform
-              </span>
-            )}
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {status.tierDisplayName || `${status.tier} tier`}
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTierBadgeColor(status.tier)}`}>
+              {formatTierName(status.tier)}
+            </span>
+            <span className="text-xs text-gray-500">
+              {status.tierDisplayName || `${status.limit === 'unlimited' ? 'Unlimited' : status.limit} locations`}
+            </span>
+          </div>
         </div>
         
         <div className="text-right">

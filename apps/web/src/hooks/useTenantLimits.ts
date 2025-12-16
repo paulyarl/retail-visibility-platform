@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { API_BASE_URL } from '@/lib/api';
+import { api } from '@/lib/api';
 
 export interface TenantLimitStatus {
   current: number;
@@ -18,6 +18,7 @@ export interface TenantLimitStatus {
     id: string;
     name: string;
     tier: string;
+    status: string;
   }>;
 }
 
@@ -44,18 +45,7 @@ export function useTenantLimits() {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        setError('Not authenticated');
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/tenant-limits/status`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await api.get('/api/tenant-limits/status');
 
       if (!response.ok) {
         throw new Error('Failed to fetch tenant limit status');
@@ -108,7 +98,7 @@ export function useTierInfo() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_BASE_URL}/api/tenant-limits/tiers`);
+      const response = await api.get('/api/tenant-limits/tiers');
 
       if (!response.ok) {
         throw new Error('Failed to fetch tier information');

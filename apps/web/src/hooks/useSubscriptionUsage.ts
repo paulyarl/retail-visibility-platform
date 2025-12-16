@@ -15,6 +15,7 @@ export interface SubscriptionUsage {
   // Tenant info
   tenantId: string;
   tenantName: string;
+  gbpPrimaryCategory?: string; // Google Business Profile primary category name
   
   // Subscription details
   tier: SubscriptionTier;
@@ -110,8 +111,8 @@ export function useSubscriptionUsage(tenantIdProp?: string) {
           locationTierDisplayName = limitsData.tierDisplayName || '';
         }
 
-        // Get tier info
-        const tier = (tenantData.subscriptionTier || 'starter') as SubscriptionTier;
+        // Get tier info (handle both camelCase and snake_case from API)
+        const tier = (tenantData.subscriptionTier || tenantData.subscription_tier || 'starter') as SubscriptionTier;
         const tierInfo = TIER_LIMITS[tier];
         const skuLimit = tierInfo.maxSkus;
         const skuIsUnlimited = skuLimit === Infinity;
@@ -178,9 +179,13 @@ export function useSubscriptionUsage(tenantIdProp?: string) {
           trialEndsAt: tenantData.trialEndsAt,
         });
 
+        // Extract GBP primary category from metadata
+        const gbpPrimaryCategory = tenantData.metadata?.gbp_categories?.primary?.name || null;
+
         setUsage({
           tenantId,
           tenantName: tenantData.name,
+          gbpPrimaryCategory,
           tier,
           tierName: tierInfo.name,
           tierPrice: tierInfo.price,

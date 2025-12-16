@@ -7,12 +7,51 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { Shield, User, Building2, Crown } from 'lucide-react';
 import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
+import { useTenantLimits } from '@/hooks/useTenantLimits';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 
 export default function AccountPage() {
   const { user } = useAuth();
+  const { status: tenantLimitStatus } = useTenantLimits();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // Helper to get tenant details from tenant-limits API
+  const getTenantDetails = (tenantId: string) => {
+    if (!tenantLimitStatus?.tenants) return null;
+    return tenantLimitStatus.tenants.find((t: any) => t.id === tenantId);
+  };
+
+  // Format tier name for display
+  const formatTierName = (tier: string) => {
+    return tier.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  // Get tier badge color
+  const getTierBadgeColor = (tier: string) => {
+    switch (tier) {
+      case 'organization': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'enterprise': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
+      case 'professional': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+      case 'starter': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+      case 'google_only': return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+      case 'trial': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+    }
+  };
+
+  // Get status badge color
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+      case 'inactive': return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+      case 'suspended': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+      case 'trial': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+    }
+  };
 
   // Paginate tenants
   const paginatedTenants = useMemo(() => {
@@ -265,25 +304,40 @@ export default function AccountPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {paginatedTenants.map((tenant) => (
-                  <div
-                    key={tenant.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                        <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                {paginatedTenants.map((tenant) => {
+                  const tenantDetails = getTenantDetails(tenant.id);
+                  return (
+                    <div
+                      key={tenant.id}
+                      className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                          <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white">{tenant.name}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 font-mono">{tenant.id}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">{tenant.name}</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 font-mono">{tenant.id}</p>
+                      <div className="flex items-center gap-2">
+                        {tenantDetails && (
+                          <>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTierBadgeColor(tenantDetails.tier)}`}>
+                              {formatTierName(tenantDetails.tier)}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${getStatusBadgeColor(tenantDetails.status)}`}>
+                              {tenantDetails.status}
+                            </span>
+                          </>
+                        )}
+                        <Badge className={getRoleBadgeColor(tenant.role)}>
+                          {tenant.role}
+                        </Badge>
                       </div>
                     </div>
-                    <Badge className={getRoleBadgeColor(tenant.role)}>
-                      {tenant.role}
-                    </Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               
               {/* Pagination */}
