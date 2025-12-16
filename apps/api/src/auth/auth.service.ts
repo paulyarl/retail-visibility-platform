@@ -259,14 +259,19 @@ export class AuthService {
       throw new Error('User not found');
     }
 
-    // Get user tenants separately to avoid relation issues
-    let userTenants: { tenant_id: string; role: any }[] = [];
+    // Get user tenants with tenant names
+    let userTenants: { tenant_id: string; role: any; tenants: { name: string } }[] = [];
     try {
       userTenants = await prisma.user_tenants.findMany({
         where: { user_id: userId },
         select: {
           tenant_id: true,
           role: true,
+          tenants: {
+            select: {
+              name: true,
+            },
+          },
         },
       });
     } catch (tenantError) {
@@ -282,8 +287,9 @@ export class AuthService {
       email_verified: user.email_verified,
       last_login: user.last_login,
       created_at: user.created_at,
-      tenants: userTenants.map((ut: { tenant_id: string; role: any }) => ({
+      tenants: userTenants.map((ut) => ({
         id: ut.tenant_id,
+        name: ut.tenants?.name || ut.tenant_id,
         role: ut.role,
       })),
     };

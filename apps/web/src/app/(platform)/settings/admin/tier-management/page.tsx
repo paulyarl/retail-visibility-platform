@@ -546,29 +546,20 @@ export default function TierManagementPage() {
                     <option value="">Select a tier...</option>
                     {tiers && (
                       <>
-                        {/* Individual Tiers */}
-                        <optgroup label="Individual Plans">
-                          {(tiers.individual || []).map((tier) => (
-                            <option key={tier.id} value={tier.id}>
-                              {tier.displayName} (${tier.price}/mo)
-                              {tier.maxSkus && ` • ${tier.maxSkus.toLocaleString()} SKUs`}
-                              {tier.maxLocations && ` • ${tier.maxLocations} locations`}
-                            </option>
-                          ))}
-                        </optgroup>
-                        {/* Organization Tiers */}
-                        <optgroup label="Organization Plans">
-                          {(tiers.organization || []).map((tier) => (
-                            <option key={tier.id} value={tier.id}>
-                              {tier.displayName} (${tier.price}/mo)
-                              {tier.maxSkus && ` • ${tier.maxSkus.toLocaleString()} SKUs`}
-                              {tier.maxLocations && ` • ${tier.maxLocations} locations`}
-                            </option>
-                          ))}
-                        </optgroup>
+                        {/* Individual Tiers Only - Chain tiers are managed in Organizations page */}
+                        {(tiers.individual || []).map((tier) => (
+                          <option key={tier.id} value={tier.id}>
+                            {tier.displayName} (${tier.price}/mo)
+                            {tier.maxSkus && ` • ${tier.maxSkus.toLocaleString()} SKUs`}
+                            {tier.maxLocations && ` • ${tier.maxLocations} locations`}
+                          </option>
+                        ))}
                       </>
                     )}
                   </select>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                    For chain/organization tiers, use the <a href="/admin/organizations" className="text-primary-600 hover:underline">Organizations</a> page.
+                  </p>
                 </div>
 
                 <div>

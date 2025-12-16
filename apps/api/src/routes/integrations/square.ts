@@ -30,8 +30,10 @@ router.get('/:tenantId/square/status', authenticateToken, async (req: Request, r
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.user_tenants.some((ut: any) => ut.user_id === user.id);
-    if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
+    const userId = user.userId || user.user_id || user.id;
+    const hasAccess = tenant.user_tenants.some((ut: any) => ut.user_id === userId);
+    const isPlatformUser = ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'PLATFORM_VIEWER'].includes(user.role);
+    if (!hasAccess && !isPlatformUser) {
       return res.status(403).json({ error: 'access_denied' });
     }
 

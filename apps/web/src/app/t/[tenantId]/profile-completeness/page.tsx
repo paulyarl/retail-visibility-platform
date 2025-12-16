@@ -8,6 +8,22 @@ import { API_BASE_URL } from '@/lib/api'
 interface CompletenessData {
   score: number
   grade: string
+  fields: {
+    businessName: boolean
+    addressLine1: boolean
+    city: boolean
+    postalCode: boolean
+    countryCode: boolean
+    phoneNumber: boolean
+    email: boolean
+    website: boolean
+    geocode: boolean
+    businessDescription: boolean
+    businessHours: boolean
+    logo: boolean
+    socialLinks: boolean
+    seoTags: boolean
+  }
 }
 
 export default function ProfileCompletenessPage() {
@@ -47,44 +63,29 @@ export default function ProfileCompletenessPage() {
         const profileData = await res.json()
         
         // Calculate completeness score based on available fields
-        let score = 0
-        const totalFields = 13
+        const totalFields = 14
         
-        // Business name (required)
-        if (profileData.business_name) score += 1
+        // Track individual field completion
+        const fields = {
+          businessName: !!profileData.business_name,
+          addressLine1: !!profileData.address_line1,
+          city: !!profileData.city,
+          postalCode: !!profileData.postal_code,
+          countryCode: !!profileData.country_code,
+          phoneNumber: !!profileData.phone_number,
+          email: !!profileData.email,
+          website: !!(profileData.website && profileData.website.startsWith('https://')),
+          geocode: !!(profileData.latitude !== null && profileData.latitude !== undefined && 
+                     profileData.longitude !== null && profileData.longitude !== undefined),
+          businessDescription: !!profileData.business_description,
+          businessHours: !!(profileData.hours && profileData.hours.timezone),
+          logo: !!profileData.logo_url,
+          socialLinks: !!(profileData.social_links && Object.keys(profileData.social_links).length > 0),
+          seoTags: !!(profileData.seo_tags && profileData.seo_tags.length > 0),
+        }
         
-        // Address fields
-        if (profileData.address_line1) score += 1
-        if (profileData.city) score += 1
-        if (profileData.postal_code) score += 1
-        if (profileData.country_code) score += 1
-        
-        // Contact info
-        if (profileData.phone_number) score += 1
-        if (profileData.email) score += 1
-        
-        // Website (HTTPS validation)
-        if (profileData.website && profileData.website.startsWith('https://')) score += 1
-        
-        // Geocoding (lat/lng) - check for coordinates in profile data
-        if ((profileData.latitude !== null && profileData.latitude !== undefined) || 
-            (profileData.longitude !== null && profileData.longitude !== undefined)) score += 1
-        
-        // Business description
-        if (profileData.business_description) score += 1
-        
-        // Business hours - count if timezone is set (timezone indicates hours are configured)
-        if (profileData.hours && profileData.hours.timezone) score += 1
-        
-        // Logo
-        if (profileData.logo_url) score += 1
-        
-        // Social links
-        if (profileData.social_links && Object.keys(profileData.social_links).length > 0) score += 1
-        
-        // SEO tags (bonus)
-        if (profileData.seo_tags && profileData.seo_tags.length > 0) score += 1
-        
+        // Count completed fields
+        const score = Object.values(fields).filter(Boolean).length
         const completenessScore = Math.round((score / totalFields) * 100)
         
         // Determine grade
@@ -95,7 +96,8 @@ export default function ProfileCompletenessPage() {
         
         const completenessData = {
           score: completenessScore,
-          grade: grade
+          grade: grade,
+          fields: fields
         }
         
         setCompleteness(completenessData)
@@ -250,19 +252,20 @@ export default function ProfileCompletenessPage() {
         </div>
         <div className="p-6">
           <div className="space-y-4">
-            <ChecklistItem label="Business Name" weight="Critical" completed={score > 0} />
-            <ChecklistItem label="Address" weight="Critical" completed={score > 0} />
-            <ChecklistItem label="City & Postal Code" weight="Critical" completed={score > 0} />
-            <ChecklistItem label="Country" weight="Critical" completed={score > 0} />
-            <ChecklistItem label="Phone Number" weight="Important" completed={score >= 60} />
-            <ChecklistItem label="Email" weight="Important" completed={score >= 60} />
-            <ChecklistItem label="Website (HTTPS)" weight="Important" completed={score >= 70} />
-            <ChecklistItem label="Geocode (Lat/Lng)" weight="Important" completed={score >= 75} />
-            <ChecklistItem label="Business Description" weight="Important" completed={score >= 80} />
-            <ChecklistItem label="Logo" weight="Optional" completed={score >= 85} />
-            <ChecklistItem label="Business Hours" weight="Optional" completed={score >= 90} />
-            <ChecklistItem label="Social Links" weight="Optional" completed={score >= 95} />
-            <ChecklistItem label="SEO Tags" weight="Optional" completed={score >= 99} />
+            <ChecklistItem label="Business Name" weight="Critical" completed={completeness?.fields?.businessName ?? false} />
+            <ChecklistItem label="Address" weight="Critical" completed={completeness?.fields?.addressLine1 ?? false} />
+            <ChecklistItem label="City" weight="Critical" completed={completeness?.fields?.city ?? false} />
+            <ChecklistItem label="Postal Code" weight="Critical" completed={completeness?.fields?.postalCode ?? false} />
+            <ChecklistItem label="Country" weight="Critical" completed={completeness?.fields?.countryCode ?? false} />
+            <ChecklistItem label="Phone Number" weight="Important" completed={completeness?.fields?.phoneNumber ?? false} />
+            <ChecklistItem label="Email" weight="Important" completed={completeness?.fields?.email ?? false} />
+            <ChecklistItem label="Website (HTTPS)" weight="Important" completed={completeness?.fields?.website ?? false} />
+            <ChecklistItem label="Geocode (Lat/Lng)" weight="Important" completed={completeness?.fields?.geocode ?? false} />
+            <ChecklistItem label="Business Description" weight="Important" completed={completeness?.fields?.businessDescription ?? false} />
+            <ChecklistItem label="Logo" weight="Optional" completed={completeness?.fields?.logo ?? false} />
+            <ChecklistItem label="Business Hours" weight="Optional" completed={completeness?.fields?.businessHours ?? false} />
+            <ChecklistItem label="Social Links" weight="Optional" completed={completeness?.fields?.socialLinks ?? false} />
+            <ChecklistItem label="SEO Tags" weight="Optional" completed={completeness?.fields?.seoTags ?? false} />
           </div>
         </div>
       </div>

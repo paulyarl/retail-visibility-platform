@@ -55,8 +55,10 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.user_tenants.some((ut: any) => ut.user_id === user.id);
-    if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
+    const userId = user.userId || user.id;
+    const hasAccess = tenant.user_tenants.some((ut: any) => ut.user_id === userId);
+    const isPlatformUser = user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT' || user.role === 'ADMIN';
+    if (!hasAccess && !isPlatformUser) {
       return res.status(403).json({ error: 'access_denied' });
     }
 
@@ -262,8 +264,10 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, async (req: Req
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.user_tenants.some((ut: any) => ut.userId === user.id);
-    if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
+    const userId = user.userId || user.id;
+    const hasAccess = tenant.user_tenants.some((ut: any) => ut.user_id === userId);
+    const isPlatformUser = user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT' || user.role === 'ADMIN';
+    if (!hasAccess && !isPlatformUser) {
       return res.status(403).json({ error: 'access_denied' });
     }
 
@@ -284,12 +288,34 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, async (req: Req
     }
 
     let deletedItemsCount = 0;
+    let keptItemsCount = 0;
 
-    // Delete demo items unless user wants to keep them
-    if (!keepItems) {
-      // Note: itemMappings relation not available, would need separate query
-      // For now, skip deletion logic
-      console.log('[Clover Demo Disable] Skipping item deletion - relation not available');
+    // Get all item mappings for this integration
+    const itemMappings = await prisma.clover_item_mappings_list.findMany({
+      where: { integration_id: integration.id },
+      select: { rvp_item_id: true }
+    });
+
+    const rvpItemIds = itemMappings
+      .map(m => m.rvp_item_id)
+      .filter((id): id is string => id !== null);
+
+    if (!keepItems && rvpItemIds.length > 0) {
+      // Delete demo items from inventory
+      // First delete associated photo_assets
+      await prisma.photo_assets.deleteMany({
+        where: { inventoryItemId: { in: rvpItemIds } }
+      });
+
+      // Then delete the inventory items
+      const deleteResult = await prisma.inventory_items.deleteMany({
+        where: { id: { in: rvpItemIds } }
+      });
+      deletedItemsCount = deleteResult.count;
+      console.log(`[Clover Demo Disable] Deleted ${deletedItemsCount} demo items for tenant ${tenantId}`);
+    } else {
+      keptItemsCount = rvpItemIds.length;
+      console.log(`[Clover Demo Disable] Kept ${keptItemsCount} demo items for tenant ${tenantId}`);
     }
 
     // Delete integration (cascades to mappings, logs, snapshots)
@@ -300,7 +326,7 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, async (req: Req
     return res.json({
       message: 'Demo mode disabled successfully',
       itemsDeleted: deletedItemsCount,
-      itemsKept: keepItems ? 0 : 0 // Relations not available
+      itemsKept: keptItemsCount
     });
 
   } catch (error: any) {
@@ -331,8 +357,10 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.user_tenants.some((ut: any) => ut.userId === user.id);
-    if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
+    const userId = user.userId || user.id;
+    const hasAccess = tenant.user_tenants.some((ut: any) => ut.user_id === userId);
+    const isPlatformUser = user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT' || user.role === 'ADMIN';
+    if (!hasAccess && !isPlatformUser) {
       return res.status(403).json({ error: 'access_denied' });
     }
 
@@ -416,8 +444,10 @@ router.get('/:tenantId/clover/oauth/authorize', authenticateToken, async (req: R
     }
 
     // Check if user has access to this tenant
-    const hasAccess = tenant.user_tenants.some((ut: any) => ut.user_id === user.id);
-    if (!hasAccess && user.role !== 'PLATFORM_ADMIN') {
+    const userId = user.userId || user.id;
+    const hasAccess = tenant.user_tenants.some((ut: any) => ut.user_id === userId);
+    const isPlatformUser = user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT' || user.role === 'ADMIN';
+    if (!hasAccess && !isPlatformUser) {
       return res.status(403).json({ error: 'access_denied' });
     }
 

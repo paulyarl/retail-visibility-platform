@@ -6,7 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { canViewAllTenants } from '../utils/platform-admin';
 import { getLocationStatusInfo } from '../utils/location-status';
 
@@ -14,37 +14,86 @@ const router = Router();
 
 /**
  * GET /api/tenants
- * List all tenants (for quick-start and admin purposes)
+ * List tenants - platform users see all, regular users see their own
  */
 router.get('/', authenticateToken, async (req: Request, res: Response) => {
   try {
-    if (!canViewAllTenants(req.user as any)) {
-      return res.status(403).json({ success: false, error: 'platform_access_required' });
-    }
+    const user = req.user as any;
+    const userId = user?.userId || user?.user_id || user?.id;
+    const isPlatformUser = canViewAllTenants(user);
 
-    const tenants = await prisma.tenants.findMany({
-      select: {
-        id: true,
-        name: true,
-        organization_id: true,
-        subscription_tier: true,
-        subscription_status: true,
-        created_at: true,
-        _count: {
-          select: {
-            inventory_items: true,
-            user_tenants: true,
+    let tenants;
+    
+    if (isPlatformUser) {
+      // Platform users see all tenants
+      tenants = await prisma.tenants.findMany({
+        select: {
+          id: true,
+          name: true,
+          organization_id: true,
+          subscription_tier: true,
+          subscription_status: true,
+          location_status: true,
+          created_at: true,
+          organizations_list: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          _count: {
+            select: {
+              inventory_items: true,
+              user_tenants: true,
+            },
           },
         },
-      },
-      orderBy: { created_at: 'desc' },
-    });
+        orderBy: { created_at: 'desc' },
+      });
+    } else {
+      // Regular users see only their own tenants via user_tenants
+      const userTenants = await prisma.user_tenants.findMany({
+        where: { user_id: userId },
+        include: {
+          tenants: {
+            select: {
+              id: true,
+              name: true,
+              organization_id: true,
+              subscription_tier: true,
+              subscription_status: true,
+              location_status: true,
+              created_at: true,
+              organizations_list: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              _count: {
+                select: {
+                  inventory_items: true,
+                  user_tenants: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      tenants = userTenants.map(ut => ut.tenants);
+    }
 
     // Transform for frontend compatibility
-    const transformedTenants = tenants.map(tenant => ({
+    const transformedTenants = tenants.map((tenant: any) => ({
       id: tenant.id,
       name: tenant.name,
       organizationId: tenant.organization_id,
+      locationStatus: tenant.location_status || 'active',
+      createdAt: tenant.created_at,
+      organization: tenant.organizations_list ? {
+        id: tenant.organizations_list.id,
+        name: tenant.organizations_list.name,
+      } : null,
     }));
 
     res.json(transformedTenants);
@@ -62,7 +111,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
  * GET /api/tenants/:id
  * Get details for a specific tenant
  */
-router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 

@@ -18,7 +18,7 @@ export default function QuickStartLayout({ children }: { children: React.ReactNo
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch tenant tier
+    // Fetch tenant tier using the tier endpoint which resolves effective tier (including org tier)
     const fetchTier = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -29,14 +29,16 @@ export default function QuickStartLayout({ children }: { children: React.ReactNo
           headers['Authorization'] = `Bearer ${token}`;
         }
         
-        const res = await fetch(`${apiUrl}/api/tenants/${tenantId}`, {
+        // Use /tier endpoint which properly resolves effective tier from org + tenant
+        const res = await fetch(`${apiUrl}/api/tenants/${tenantId}/tier`, {
           headers,
           credentials: 'include',
         });
         
         if (res.ok) {
           const data = await res.json();
-          setTier(data.subscriptionTier || 'trial');
+          // Use effective tier which considers organization tier for chains
+          setTier(data.tier || data.subscriptionTier || 'trial');
         }
       } catch (err) {
         console.error('Failed to fetch tenant tier:', err);

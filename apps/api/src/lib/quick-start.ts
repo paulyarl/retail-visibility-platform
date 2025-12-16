@@ -5,7 +5,7 @@
  * Used by both CLI seeding script and Quick Start API endpoint.
  */
 
-import { generateItemId, generateQuickStartSku } from './id-generator';
+import { generateItemId, generateQuickStartSku, generateQuickStart } from './id-generator';
 import { suggestCategories, getCategoryById } from './google/taxonomy';
 import { productCacheService } from '../services/ProductCacheService';
 import { z } from 'zod';
@@ -994,6 +994,27 @@ export async function generateQuickStartProducts(
               updated_at: new Date(),
             }
           });
+          
+          // If item has a cached photo, also create a photo_assets record for proper gallery management
+          if (created.image_url) {
+            try {
+              const photoId = generateQuickStart("pha");
+              await prismaClient.photo_assets.create({
+                data: {
+                  id: photoId,
+                  tenantId: tenant_id,
+                  inventoryItemId: created.id,
+                  url: created.image_url,
+                  position: 0,
+                  exifRemoved: false,
+                },
+              });
+              console.log(`[Quick Start] ✓ Created photo_assets record for cached photo: ${created.name}`);
+            } catch (photoError: any) {
+              console.error(`[Quick Start] Failed to create photo_assets for ${created.name}:`, photoError.message);
+            }
+          }
+          
           // Add back the tracking field for photo generation
           (created as any)._categoryName = _categoryName;
           createdItems.push(created);
@@ -1059,7 +1080,24 @@ export async function generateQuickStartProducts(
                     select: { id: true, name: true, image_url: true }
                   });
                   
-                  console.log(`[Quick Start] ✓ Item updated with image_url:`, updated);
+                  // Also create a photo_assets record for proper gallery management
+                  const photoId = generateQuickStart("pha");
+                  await prismaClient.photo_assets.create({
+                    data: {
+                      id: photoId,
+                      tenantId: tenant_id,
+                      inventoryItemId: item.id,
+                      url: image.url,
+                      width: image.width || null,
+                      height: image.height || null,
+                      bytes: image.bytes || null,
+                      contentType: 'image/png',
+                      position: 0,
+                      exifRemoved: false,
+                    },
+                  });
+                  
+                  console.log(`[Quick Start] ✓ Item updated with image_url and photo_assets record:`, updated);
                   
                   const upgradeMsg = (item as any)._isUpgrade ? ' (upgraded existing)' : '';
                   

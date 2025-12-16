@@ -56,10 +56,20 @@ async function loadTiers(): Promise<Map<string, TierWithFeatures>> {
     },
   });
 
-  // Build cache map
+  // Build cache map - map tier_features_list to features
   const cache = new Map<string, TierWithFeatures>();
   for (const tier of tiers) {
-    cache.set(tier.tier_key, tier as unknown as TierWithFeatures);
+    const tierWithFeatures: TierWithFeatures = {
+      ...tier,
+      features: (tier.tier_features_list || []).map(f => ({
+        id: f.id,
+        feature_key: f.feature_key,
+        feature_name: f.feature_name || f.feature_key,
+        is_enabled: f.is_enabled,
+        is_inherited: f.is_inherited || false,
+      })),
+    };
+    cache.set(tier.tier_key, tierWithFeatures);
   }
 
   tierCache = cache;
@@ -91,8 +101,9 @@ export async function checkTierFeatureAccess(tierKey: string, featureKey: string
   const tier = await getTierByKey(tierKey);
   if (!tier) return false;
 
-  // Check if feature exists in tier's features
-  return tier.features.some(f => f.feature_key === featureKey && f.is_enabled);
+  // Check if feature exists in tier's features (handle undefined features array)
+  const features = tier.features || [];
+  return features.some(f => f.feature_key === featureKey && f.is_enabled);
 }
 
 /**
@@ -102,7 +113,8 @@ export async function getTierFeatures(tierKey: string): Promise<string[]> {
   const tier = await getTierByKey(tierKey);
   if (!tier) return [];
 
-  return tier.features
+  const features = tier.features || [];
+  return features
     .filter(f => f.is_enabled)
     .map(f => f.feature_key);
 }
@@ -183,17 +195,24 @@ export function clearTierCache(): void {
 
 /**
  * Check if tenant has access to a feature (including overrides)
+ * Now considers organization tier for chain tenants
  */
 export async function checkTenantFeatureAccess(
   tenantId: string,
   featureKey: string
 ): Promise<{ hasAccess: boolean; source: 'tier' | 'override' | 'none'; override?: any }> {
   try {
-    // Get tenant with tier and overrides
+    // Get tenant with tier, organization tier, and overrides
     const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: { 
         subscription_tier: true,
+        organization_id: true,
+        organizations_list: {
+          select: {
+            subscription_tier: true,
+          },
+        },
         tenant_feature_overrides_list: {
           where: {
             feature: featureKey,
@@ -207,12 +226,17 @@ export async function checkTenantFeatureAccess(
     });
 
     if (!tenant) {
+      console.log(`[checkTenantFeatureAccess] Tenant ${tenantId} not found`);
       return { hasAccess: false, source: 'none' };
     }
+
+    console.log(`[checkTenantFeatureAccess] Tenant: ${tenantId}, Feature: ${featureKey}`);
+    console.log(`[checkTenantFeatureAccess] Tenant tier: ${tenant.subscription_tier}, Org tier: ${tenant.organizations_list?.subscription_tier}`);
 
     // 1. Check for active override first (highest priority)
     const override = tenant.tenant_feature_overrides_list[0];
     if (override) {
+      console.log(`[checkTenantFeatureAccess] Override found: granted=${override.granted}`);
       return {
         hasAccess: override.granted,
         source: 'override',
@@ -226,8 +250,25 @@ export async function checkTenantFeatureAccess(
     }
 
     // 2. Fall back to tier-based access
-    const tierKey = tenant.subscription_tier || 'starter';
-    const tierAccess = await checkTierFeatureAccess(tierKey, featureKey);
+    // Check BOTH org tier and tenant tier - grant access if EITHER has the feature
+    // This handles cases where tenant has a higher tier than org, or vice versa
+    const orgTier = tenant.organizations_list?.subscription_tier;
+    const tenantTier = tenant.subscription_tier || 'starter';
+    
+    console.log(`[checkTenantFeatureAccess] Org tier: ${orgTier}, Tenant tier: ${tenantTier}`);
+    
+    // Check org tier first if it exists
+    let tierAccess = false;
+    if (orgTier) {
+      tierAccess = await checkTierFeatureAccess(orgTier, featureKey);
+      console.log(`[checkTenantFeatureAccess] Org tier (${orgTier}) access: ${tierAccess}`);
+    }
+    
+    // If org tier doesn't grant access, check tenant tier
+    if (!tierAccess) {
+      tierAccess = await checkTierFeatureAccess(tenantTier, featureKey);
+      console.log(`[checkTenantFeatureAccess] Tenant tier (${tenantTier}) access: ${tierAccess}`);
+    }
 
     return {
       hasAccess: tierAccess,

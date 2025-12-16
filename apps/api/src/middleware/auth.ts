@@ -301,12 +301,12 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
  */
 export function getTenantId(req: Request): string | null {
   return (
-    req.params.tenantId ||
-    req.params.id ||
-    (req.query.tenantId as string) ||
-    (req.query.tenant_id as string) ||
-    req.body.tenantId ||
-    req.body.tenant_id ||
+    req.params?.tenantId ||
+    req.params?.id ||
+    (req.query?.tenantId as string) ||
+    (req.query?.tenant_id as string) ||
+    req.body?.tenantId ||
+    req.body?.tenant_id ||
     (req.user?.tenantIds && req.user.tenantIds[0]) ||
     null
   );

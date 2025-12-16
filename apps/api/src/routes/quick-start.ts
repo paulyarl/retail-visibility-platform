@@ -22,7 +22,7 @@ const router = Router();
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 /**
- * Check rate limit for quick start
+ * Check rate limit for quick start (read-only, does not consume)
  * Limit: 1 quick start per tenant per 24 hours
  */
 function checkRateLimit(tenantId: string): { allowed: boolean; resetAt?: number } {
@@ -34,6 +34,17 @@ function checkRateLimit(tenantId: string): { allowed: boolean; resetAt?: number 
     return { allowed: false, resetAt: limit.resetAt };
   }
 
+  return { allowed: true };
+}
+
+/**
+ * Consume rate limit for quick start (call after successful quick start)
+ * Sets the 24-hour cooldown
+ */
+function consumeRateLimit(tenantId: string): void {
+  const now = Date.now();
+  const key = `quick-start:${tenantId}`;
+  
   // Set new rate limit (24 hours)
   const resetAt = now + 24 * 60 * 60 * 1000;
   rateLimitStore.set(key, { count: 1, resetAt });
@@ -44,8 +55,6 @@ function checkRateLimit(tenantId: string): { allowed: boolean; resetAt?: number 
       rateLimitStore.delete(k);
     }
   }
-
-  return { allowed: true };
 }
 
 /**
@@ -108,7 +117,7 @@ const quickStartSchema = z.object({
   imageModel: z.enum(['openai', 'google']).optional().default('openai'), // NEW: AI model for image generation
 });
 
-router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quick_start_wizard'), validateSKULimits, async (req, res) => {
+router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quick_start_wizard_full'), validateSKULimits, async (req, res) => {
   try {
     console.log('[Quick Start] POST request received');
     const { tenantId } = req.params;
@@ -260,6 +269,11 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     }, prisma);
 
     console.log(`[Quick Start] Success:`, result);
+
+    // Consume rate limit after successful quick start (only for non-support users)
+    if (!userCanPerformSupport) {
+      consumeRateLimit(tenantId);
+    }
 
     res.json({
       success: true,

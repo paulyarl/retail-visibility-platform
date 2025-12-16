@@ -17,6 +17,7 @@ type Item = {
   id: string;
   sku: string;
   name: string;
+  imageUrl?: string;
 };
 
 interface ItemPhotoGalleryProps {
@@ -39,7 +40,20 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
       setLoading(true);
       const res = await api.get(`/api/items/${item.id}/photos`);
       const data = await res.json();
-      setPhotos(Array.isArray(data) ? data : []);
+      const photoAssets = Array.isArray(data) ? data : [];
+      
+      // If no photos in photo_assets but item has imageUrl, show it as a legacy photo
+      if (photoAssets.length === 0 && item.imageUrl) {
+        setPhotos([{
+          id: 'legacy-image',
+          url: item.imageUrl,
+          position: 0,
+          alt: null,
+          caption: 'Legacy image (stored on item, not in photo gallery)',
+        }]);
+      } else {
+        setPhotos(photoAssets);
+      }
     } catch (e) {
       console.error("Failed to load photos:", e);
     } finally {
@@ -120,6 +134,25 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
     } catch (err) {
       console.error("Failed to delete:", err);
       setError("Failed to delete photo");
+    }
+  };
+
+  const handleMigrateLegacy = async () => {
+    try {
+      setUploading(true);
+      setError(null);
+      const res = await api.post(`/api/items/${item.id}/photos/migrate-legacy`, {});
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Migration failed");
+      }
+      await loadPhotos();
+      onUpdate?.();
+    } catch (err: any) {
+      console.error("Failed to migrate legacy image:", err);
+      setError(err.message || "Failed to migrate legacy image");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -225,30 +258,46 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
               )}
 
               {/* Actions Overlay */}
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                {photo.position !== 0 && (
-                  <button
-                    onClick={() => handleSetPrimary(photo.id)}
-                    className="bg-white text-neutral-900 px-2 py-1 rounded text-xs font-medium hover:bg-neutral-100"
-                    title="Set as primary"
-                  >
-                    Set Primary
-                  </button>
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                {photo.id === 'legacy-image' ? (
+                  <div className="bg-white text-neutral-700 px-3 py-2 rounded text-xs font-medium text-center max-w-[90%]">
+                    <p className="font-semibold">Legacy Image</p>
+                    <p className="mt-1 text-neutral-500 mb-2">This image is stored on the item, not in the gallery</p>
+                    <button
+                      onClick={handleMigrateLegacy}
+                      disabled={uploading}
+                      className="bg-primary-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-primary-700 disabled:opacity-50"
+                    >
+                      {uploading ? "Migrating..." : "Migrate to Gallery"}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {photo.position !== 0 && (
+                      <button
+                        onClick={() => handleSetPrimary(photo.id)}
+                        className="bg-white text-neutral-900 px-2 py-1 rounded text-xs font-medium hover:bg-neutral-100"
+                        title="Set as primary"
+                      >
+                        Set Primary
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleEditStart(photo)}
+                      className="bg-white text-neutral-900 px-2 py-1 rounded text-xs font-medium hover:bg-neutral-100"
+                      title="Edit alt/caption"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(photo.id)}
+                      className="bg-red-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-red-700"
+                      title="Delete"
+                    >
+                      Delete
+                    </button>
+                  </>
                 )}
-                <button
-                  onClick={() => handleEditStart(photo)}
-                  className="bg-white text-neutral-900 px-2 py-1 rounded text-xs font-medium hover:bg-neutral-100"
-                  title="Edit alt/caption"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(photo.id)}
-                  className="bg-red-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-red-700"
-                  title="Delete"
-                >
-                  Delete
-                </button>
               </div>
 
               {/* Edit Modal (inline) */}

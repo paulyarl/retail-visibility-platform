@@ -356,6 +356,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               {group.cards.map((card) => (
                 <ProtectedCard
                   key={card.title}
+                  tenantId={tenantId}
                   accessOptions={card.accessOptions}
                   fetchOrganization={card.fetchOrganization}
                 >

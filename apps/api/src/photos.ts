@@ -174,6 +174,46 @@ r.get("/items/:id/photos", async (req, res) => {
   res.json(photos);
 });
 
+/**
+ * POST /items/:id/photos/migrate-legacy
+ * Migrates a legacy imageUrl to the photo_assets table so it can be managed.
+ * This creates a photo_asset record from the item's existing imageUrl.
+ */
+r.post("/items/:id/photos/migrate-legacy", async (req, res) => {
+  try {
+    const itemId = req.params.id;
+
+    // Verify item exists and has an imageUrl
+    const item = await prisma.inventory_items.findUnique({ where: { id: itemId } });
+    if (!item) return res.status(404).json({ error: "item not found" });
+    if (!item.image_url) return res.status(400).json({ error: "item has no legacy image to migrate" });
+
+    // Check if there are already photos in photo_assets
+    const existingCount = await prisma.photo_assets.count({ where: { inventoryItemId: item.id } });
+    if (existingCount > 0) {
+      return res.status(400).json({ error: "item already has photos in gallery, cannot migrate legacy image" });
+    }
+
+    // Create photo_asset from the legacy imageUrl
+    const photoId = generateQuickStart("pha");
+    const created = await prisma.photo_assets.create({
+      data: {
+        id: photoId,
+        tenantId: item.tenant_id,
+        inventoryItemId: item.id,
+        url: item.image_url,
+        position: 0,
+        exifRemoved: false,
+      },
+    });
+
+    return res.status(201).json(created);
+  } catch (e: any) {
+    console.error("migrate legacy photo error", e);
+    return res.status(500).json({ error: e?.message || "migration failed" });
+  }
+});
+
 /** PUT /items/:id/photos/:photoId — update alt, caption, or position */
 r.put("/items/:id/photos/:photoId", async (req, res) => {
   try {

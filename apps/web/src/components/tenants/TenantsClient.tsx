@@ -652,6 +652,14 @@ function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRena
                     <div className="inline-block px-3 py-1.5 bg-primary-100 dark:bg-primary-900/30 rounded-lg mb-1 group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 transition-colors">
                       <p className="font-bold text-primary-900 dark:text-primary-100 text-base">{tenant.name}</p>
                     </div>
+                    {tenant.organization && (
+                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                        <span>{tenant.organization.name}</span>
+                      </div>
+                    )}
                     {tenant.locationStatus && tenant.locationStatus !== 'active' && (
                       <div
                         onClick={(e) => {

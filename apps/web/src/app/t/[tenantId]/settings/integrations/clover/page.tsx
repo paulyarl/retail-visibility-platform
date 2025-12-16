@@ -260,12 +260,33 @@ export default function CloverIntegrationPage() {
 
   // Disable demo mode
   const handleDisableDemo = async () => {
-    if (!confirm('Are you sure? This will remove all demo items.')) return;
+    // Ask user if they want to remove demo items
+    const removeItems = confirm(
+      'Do you want to REMOVE all demo items from your inventory?\n\n' +
+      '• Click OK to remove demo items\n' +
+      '• Click Cancel to keep demo items in your inventory'
+    );
+    
+    // Confirm the action
+    const confirmAction = confirm(
+      removeItems 
+        ? 'Confirm: Demo mode will be disabled and all demo items will be DELETED from your inventory.'
+        : 'Confirm: Demo mode will be disabled but demo items will be KEPT in your inventory.'
+    );
+    
+    if (!confirmAction) return;
+    
     try {
       setActionLoading(true);
-      const res = await api.post(`/api/integrations/${tenantId}/clover/demo/disable`, { keepItems: false });
+      const res = await api.post(`/api/integrations/${tenantId}/clover/demo/disable`, { keepItems: !removeItems });
       if (!res.ok) throw new Error('Failed to disable demo mode');
-      alert('Demo mode disabled.');
+      const data = await res.json();
+      
+      if (removeItems) {
+        alert(`Demo mode disabled. ${data.itemsDeleted || 0} demo items removed from inventory.`);
+      } else {
+        alert(`Demo mode disabled. ${data.itemsKept || 0} demo items kept in your inventory.`);
+      }
       await fetchStatus();
     } catch (err: any) {
       setError(err.message);

@@ -189,9 +189,18 @@ router.put('/:id', requirePlatformAdmin, validateOrganizationTier, validateOrgan
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
+    // Transform camelCase input to snake_case for Prisma
+    const updateData: any = {};
+    if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
+    if (parsed.data.maxLocations !== undefined) updateData.max_locations = parsed.data.maxLocations;
+    if (parsed.data.maxTotalSKUs !== undefined) updateData.max_total_skus = parsed.data.maxTotalSKUs;
+    if (parsed.data.subscriptionTier !== undefined) updateData.subscription_tier = parsed.data.subscriptionTier;
+    if (parsed.data.subscriptionStatus !== undefined) updateData.subscription_status = parsed.data.subscriptionStatus;
+    updateData.updated_at = new Date();
+
     const organization = await prisma.organizations_list.update({
       where: { id: req.params.id },
-      data: parsed.data,
+      data: updateData,
     });
 
     res.json(organization);

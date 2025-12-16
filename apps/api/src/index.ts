@@ -249,9 +249,9 @@ app.get("/api/tenants", authenticateToken, async (req, res) => {
     
     // Build where clause
     const baseWhere = isPlatformUser(req.user) ? {} : {
-      userTenants: {
+      user_tenants: {
         some: {
-          userId: req.user?.userId
+          user_id: req.user?.userId
         }
       }
     };
@@ -282,7 +282,21 @@ app.get("/api/tenants", authenticateToken, async (req, res) => {
         }
       }
     });
-    res.json(tenants);
+    
+    // Transform for frontend compatibility - convert organizations_list to organization
+    const transformedTenants = tenants.map(tenant => ({
+      id: tenant.id,
+      name: tenant.name,
+      organizationId: tenant.organization_id,
+      locationStatus: tenant.location_status || 'active',
+      createdAt: tenant.created_at,
+      organization: tenant.organizations_list ? {
+        id: tenant.organizations_list.id,
+        name: tenant.organizations_list.name,
+      } : null,
+    }));
+    
+    res.json(transformedTenants);
   } catch (_e) {
     res.status(500).json({ error: "failed_to_list_tenants" });
   }
@@ -1605,6 +1619,9 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
       business_description: bp?.business_description || md.business_description || null,
       hours: hoursData || bp?.hours || md.hours || null,
       social_links: bp?.social_links || md.social_links || null,
+      seo_tags: bp?.seo_tags || md.seo_tags || null,
+      latitude: bp?.latitude || md.latitude || null,
+      longitude: bp?.longitude || md.longitude || null,
       metadata: tenant.metadata || null, // Include metadata for GBP categories
     };
     return res.json(profile);
@@ -2795,7 +2812,16 @@ app.get(["/api/items/stats", "/api/inventory/stats"], authenticateToken, async (
   }
 
   const isAdmin = isPlatformAdmin(req.user);
-  let hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenant_id) ?? false);
+  const inJwtTenants = req.user?.tenantIds?.includes(tenant_id) ?? false;
+  let hasAccess = isAdmin || inJwtTenants;
+
+  console.log('[GET /api/items/stats] Access check:', {
+    userId: req.user?.userId,
+    tenant_id,
+    isAdmin,
+    inJwtTenants,
+    jwtTenantIds: req.user?.tenantIds,
+  });
 
   if (!hasAccess && req.user?.userId && tenant_id) {
     try {
@@ -2809,6 +2835,7 @@ app.get(["/api/items/stats", "/api/inventory/stats"], authenticateToken, async (
         select: { id: true },
       });
       hasAccess = !!userTenant;
+      console.log('[GET /api/items/stats] DB lookup result:', { userTenant, hasAccess });
     } catch (e) {
       console.error('[GET /api/items/stats] Error checking tenant membership:', e);
     }

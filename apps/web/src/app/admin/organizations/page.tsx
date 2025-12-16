@@ -65,6 +65,15 @@ export default function AdminOrganizationsPage() {
   const [newOrgMaxSKUs, setNewOrgMaxSKUs] = useState('2500');
   const [creating, setCreating] = useState(false);
 
+  // Edit organization tier state
+  const [showEditTierModal, setShowEditTierModal] = useState(false);
+  const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
+  const [editTier, setEditTier] = useState('chain_starter');
+  const [editMaxLocations, setEditMaxLocations] = useState('5');
+  const [editMaxSKUs, setEditMaxSKUs] = useState('2500');
+  const [editReason, setEditReason] = useState('');
+  const [updating, setUpdating] = useState(false);
+
   useEffect(() => {
     loadOrganizations();
     loadAvailableTenants();
@@ -74,7 +83,22 @@ export default function AdminOrganizationsPage() {
     try {
       const res = await api.get('/api/organizations');
       const data = await res.json();
-      setOrganizations(Array.isArray(data) ? data : []);
+      // Transform snake_case API response to camelCase for frontend
+      const transformed = (Array.isArray(data) ? data : []).map((org: any) => ({
+        id: org.id,
+        name: org.name,
+        maxLocations: org.max_locations ?? org.maxLocations ?? 5,
+        maxTotalSKUs: org.max_total_skus ?? org.maxTotalSKUs ?? 2500,
+        subscriptionTier: org.subscription_tier ?? org.subscriptionTier ?? 'chain_starter',
+        subscriptionStatus: org.subscription_status ?? org.subscriptionStatus ?? 'active',
+        tenants: (org.tenants || []).map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          _count: { items: t._count?.inventory_items ?? t._count?.items ?? 0 },
+        })),
+        stats: org.stats || { totalLocations: 0, totalSKUs: 0, utilizationPercent: 0 },
+      }));
+      setOrganizations(transformed);
     } catch (error) {
       console.error('Failed to load organizations:', error);
     } finally {
@@ -131,6 +155,48 @@ export default function AdminOrganizationsPage() {
       }
     } catch (error) {
       console.error('Failed to remove tenant:', error);
+    }
+  };
+
+  const openEditTierModal = (org: Organization) => {
+    setEditingOrg(org);
+    setEditTier(org.subscriptionTier);
+    setEditMaxLocations(org.maxLocations.toString());
+    setEditMaxSKUs(org.maxTotalSKUs.toString());
+    setEditReason('');
+    setShowEditTierModal(true);
+  };
+
+  const handleUpdateOrganizationTier = async () => {
+    if (!editingOrg || !editReason.trim()) {
+      alert('Please provide a reason for the tier change');
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const res = await api.put(`/api/organizations/${editingOrg.id}`, {
+        subscriptionTier: editTier,
+        maxLocations: parseInt(editMaxLocations) || 5,
+        maxTotalSKUs: parseInt(editMaxSKUs) || 2500,
+        reason: editReason.trim(),
+      });
+
+      if (res.ok) {
+        await loadOrganizations();
+        setShowEditTierModal(false);
+        setEditingOrg(null);
+        setEditReason('');
+        alert('Organization tier updated successfully!');
+      } else {
+        const error = await res.json();
+        alert(`Failed to update organization: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Failed to update organization:', error);
+      alert('Failed to update organization. Please try again.');
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -293,6 +359,13 @@ export default function AdminOrganizationsPage() {
                     onClick={() => openManageModal(org)}
                   >
                     Manage Locations
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => openEditTierModal(org)}
+                  >
+                    Edit Tier
                   </Button>
                 </div>
               </CardContent>
@@ -534,6 +607,131 @@ export default function AdminOrganizationsPage() {
             disabled={creating || !newOrgName.trim()}
           >
             {creating ? 'Creating...' : 'Create Organization'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit Organization Tier Modal */}
+      <Modal
+        isOpen={showEditTierModal}
+        onClose={() => {
+          if (!updating) {
+            setShowEditTierModal(false);
+            setEditingOrg(null);
+            setEditReason('');
+          }
+        }}
+        title="Edit Organization Tier"
+        description={editingOrg ? `Update subscription tier for ${editingOrg.name}` : ''}
+      >
+        {editingOrg && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-800">
+                <strong>Current:</strong> {ORGANIZATION_TIER_LIMITS[editingOrg.subscriptionTier as keyof typeof ORGANIZATION_TIER_LIMITS]?.displayName || editingOrg.subscriptionTier}
+                <br />
+                <strong>Locations:</strong> {editingOrg.stats.totalLocations} / {editingOrg.maxLocations}
+                <br />
+                <strong>SKUs:</strong> {editingOrg.stats.totalSKUs} / {editingOrg.maxTotalSKUs}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Subscription Tier *
+              </label>
+              <select
+                value={editTier}
+                onChange={(e) => {
+                  const tier = e.target.value as keyof typeof ORGANIZATION_TIER_LIMITS;
+                  setEditTier(tier);
+                  // Auto-populate limits based on tier
+                  const limits = ORGANIZATION_TIER_LIMITS[tier];
+                  if (limits) {
+                    setEditMaxLocations(limits.maxLocations.toString());
+                    setEditMaxSKUs(limits.maxTotalSKUs.toString());
+                  }
+                }}
+                disabled={updating}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="chain_starter">
+                  Chain Starter - {ORGANIZATION_TIER_LIMITS.chain_starter.price}
+                </option>
+                <option value="chain_professional">
+                  Chain Professional - {ORGANIZATION_TIER_LIMITS.chain_professional.price}
+                </option>
+                <option value="chain_enterprise">
+                  Chain Enterprise - {ORGANIZATION_TIER_LIMITS.chain_enterprise.price}
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Max Locations
+              </label>
+              <Input
+                type="number"
+                value={editMaxLocations}
+                onChange={(e) => setEditMaxLocations(e.target.value)}
+                disabled={updating}
+                min="1"
+              />
+              <p className="text-xs text-neutral-500 mt-1">
+                Auto-populated based on tier. Customize if needed.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Max Total SKUs
+              </label>
+              <Input
+                type="number"
+                value={editMaxSKUs}
+                onChange={(e) => setEditMaxSKUs(e.target.value)}
+                disabled={updating}
+                min="1"
+              />
+              <p className="text-xs text-neutral-500 mt-1">
+                Auto-populated based on tier. Customize if needed.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Reason for Change * (Required for audit trail)
+              </label>
+              <textarea
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                placeholder="e.g., Customer upgraded to Chain Professional via sales call"
+                rows={3}
+                disabled={updating}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+        )}
+        <ModalFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setShowEditTierModal(false);
+              setEditingOrg(null);
+              setEditReason('');
+            }}
+            disabled={updating}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleUpdateOrganizationTier}
+            disabled={updating || !editReason.trim()}
+          >
+            {updating ? 'Updating...' : 'Update Tier'}
           </Button>
         </ModalFooter>
       </Modal>

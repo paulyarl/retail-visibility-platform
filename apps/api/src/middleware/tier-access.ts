@@ -126,6 +126,7 @@ const TIER_HIERARCHY: Record<string, string[]> = {
 const FEATURE_TIER_MAP: Record<string, string> = {
   // Professional tier features (CRITICAL)
   quick_start_wizard: 'professional',
+  quick_start_wizard_full: 'professional', // Database uses this key
   barcode_scan: 'professional',
   gbp_integration: 'professional',
   custom_branding: 'professional',
