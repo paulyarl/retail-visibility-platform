@@ -278,8 +278,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   // Find primary store category for header badge
   const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary);
   
-  // Get primary GBP category from tenant metadata (always available regardless of directory publish status)
+  // Get GBP categories from tenant metadata (always available regardless of directory publish status)
   const primaryGBPCategory = tenant.metadata?.gbp_categories?.primary || tenant.metadata?.gbpCategories?.primary;
+  const secondaryGBPCategories = tenant.metadata?.gbp_categories?.secondary || tenant.metadata?.gbpCategories?.secondary || [];
   
   // Calculate total products - use API total as the authoritative count
   // This includes both categorized and uncategorized products
@@ -384,17 +385,64 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
               </div>
             )}
             <div>
-              <div className="flex items-center gap-3 mb-3">
-                <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">
-                  {businessName}
-                </h1>
-              </div>
+              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">
+                {businessName}
+              </h1>
               
-              {/* Store Type Categories Pane */}
-              {(storeCategories && storeCategories.length > 0) || primaryGBPCategory ? (
-                <div className="inline-flex flex-wrap gap-2 p-3 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-700/50">
-                  {/* Show store categories if available */}
-                  {storeCategories && storeCategories.length > 0 &&
+              {/* GBP Categories - Clean badges below store name */}
+              {(primaryGBPCategory || (storeCategories && storeCategories.length > 0)) && (
+                <div className="flex flex-wrap items-center gap-2 mt-3">
+                  {/* Primary GBP Category */}
+                  {primaryGBPCategory && (
+                    <Link
+                      href={`/directory/stores/${primaryGBPCategory.id?.replace('gcid:', '').replace(/_/g, '-') || primaryGBPCategory.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                      title={`Browse all ${primaryGBPCategory.name} stores`}
+                    >
+                      <span className="text-base">
+                        {primaryGBPCategory.name === 'Grocery store' && '🏪'}
+                        {primaryGBPCategory.name === 'Electronics store' && '🛍️'}
+                        {primaryGBPCategory.name === 'Shoe store' && '👟'}
+                        {primaryGBPCategory.name === 'Supermarket' && '🛒'}
+                        {primaryGBPCategory.name === 'Clothing store' && '👕'}
+                        {primaryGBPCategory.name === 'Hardware store' && '🔧'}
+                        {primaryGBPCategory.name === 'Restaurant' && '🍽️'}
+                        {primaryGBPCategory.name === 'Pharmacy' && '💊'}
+                        {primaryGBPCategory.name === 'Bookstore' && '📚'}
+                        {primaryGBPCategory.name === 'Pet store' && '🐕'}
+                        {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(primaryGBPCategory.name) && '🏢'}
+                      </span>
+                      <span>{primaryGBPCategory.name}</span>
+                    </Link>
+                  )}
+                  
+                  {/* Secondary GBP Categories */}
+                  {secondaryGBPCategories && secondaryGBPCategories.length > 0 && secondaryGBPCategories.map((category: any, index: number) => (
+                    <Link
+                      key={category.id || index}
+                      href={`/directory/stores/${category.id?.replace('gcid:', '').replace(/_/g, '-') || category.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      title={`Browse all ${category.name} stores`}
+                    >
+                      <span className="text-base">
+                        {category.name === 'Grocery store' && '🏪'}
+                        {category.name === 'Electronics store' && '🛍️'}
+                        {category.name === 'Shoe store' && '👟'}
+                        {category.name === 'Supermarket' && '🛒'}
+                        {category.name === 'Clothing store' && '👕'}
+                        {category.name === 'Hardware store' && '🔧'}
+                        {category.name === 'Restaurant' && '🍽️'}
+                        {category.name === 'Pharmacy' && '💊'}
+                        {category.name === 'Bookstore' && '📚'}
+                        {category.name === 'Pet store' && '🐕'}
+                        {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(category.name) && '🏢'}
+                      </span>
+                      <span>{category.name}</span>
+                    </Link>
+                  ))}
+                  
+                  {/* Fallback: Show store categories if no GBP categories */}
+                  {!primaryGBPCategory && storeCategories && storeCategories.length > 0 &&
                     storeCategories
                       .sort((a: Category, b: Category) => {
                         if (a.is_primary && !b.is_primary) return -1;
@@ -405,12 +453,12 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                         <Link
                           key={category.id}
                           href={getCategoryUrl(category, "/directory/stores")}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:shadow-md hover:scale-105 ${
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                             category.is_primary
-                              ? 'bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600 hover:border-blue-400 dark:hover:border-blue-500'
-                              : 'bg-white/60 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600 hover:border-neutral-300 dark:hover:border-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
                           }`}
-                          title={`View all ${category.name} stores in the directory`}
+                          title={`Browse all ${category.name} stores`}
                         >
                           <span className="text-base">
                             {category.name === 'Grocery store' && '🏪'}
@@ -426,52 +474,10 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                             {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(category.name) && '🏢'}
                           </span>
                           <span>{category.name}</span>
-                          {category.is_primary && (
-                            <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-full">
-                              Primary
-                            </span>
-                          )}
                         </Link>
                       ))}
-                  
-                  {/* Show GBP category as fallback when no store categories */}
-                  {!storeCategories?.length && primaryGBPCategory && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-white dark:bg-neutral-800 text-blue-700 dark:text-blue-300 shadow-sm border border-blue-300 dark:border-blue-600">
-                      <span className="text-base">
-                        {primaryGBPCategory.name === 'Grocery store' && '🏪'}
-                        {primaryGBPCategory.name === 'Electronics store' && '🛍️'}
-                        {primaryGBPCategory.name === 'Shoe store' && '👟'}
-                        {primaryGBPCategory.name === 'Supermarket' && '🛒'}
-                        {primaryGBPCategory.name === 'Clothing store' && '👕'}
-                        {primaryGBPCategory.name === 'Hardware store' && '🔧'}
-                        {primaryGBPCategory.name === 'Restaurant' && '🍽️'}
-                        {primaryGBPCategory.name === 'Pharmacy' && '💊'}
-                        {primaryGBPCategory.name === 'Bookstore' && '📚'}
-                        {primaryGBPCategory.name === 'Pet store' && '🐕'}
-                        {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(primaryGBPCategory.name) && '🏢'}
-                      </span>
-                      <span>{primaryGBPCategory.name}</span>
-                      <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-full">
-                        Primary
-                      </span>
-                    </div>
-                  )}
-                  
-                  {/* View in Directory Badge */}
-                  {directoryPublished && tenantSlug && (
-                    <Link
-                      href={`/directory/${tenantSlug}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:shadow-md hover:scale-105 bg-green-600 hover:bg-green-700 text-white border border-green-700"
-                      title="View this store in the directory"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      <span>View in Directory</span>
-                    </Link>
-                  )}
                 </div>
-              ) : null}
+              )}
               
               {storeStatus && (
                 <p className="text-neutral-600 dark:text-neutral-400 mt-3 flex items-center gap-2">
@@ -618,9 +624,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
             {/* Product Display with Grid/List Toggle */}
             <ProductDisplay products={products} tenantId={id} />
 
-            {/* Storefront Recommendations */}
-            <StorefrontRecommendations tenantId={id} />
-
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-12">
@@ -670,6 +673,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                 )}
               </div>
             )}
+
+            {/* Storefront Recommendations - After Pagination */}
+            <StorefrontRecommendations tenantId={id} />
           </>
         )}
           </div>

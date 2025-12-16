@@ -58,11 +58,11 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
     return rating > 0 ? rating.toFixed(1) : 'New';
   };
 
-  // Handle directory page navigation
+  // Handle directory page navigation - use tenantId for consistent URLs
   const handleDirectoryPageClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    router.push(`/directory/${listing.slug}`);
+    router.push(`/directory/${listing.tenantId}`);
   };
 
   // Handle publish to directory action (placeholder for future implementation)
@@ -194,7 +194,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
                   onClick={handleDirectoryPageClick}
                   className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-medium"
                 >
-                  View Directory Page
+                  View Directory Page →
                 </Button>
               ) : (
                 <Tooltip content="This store hasn't been published to the public directory yet. Click to discover other stores in the directory.">

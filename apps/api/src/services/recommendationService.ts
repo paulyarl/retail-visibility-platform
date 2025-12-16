@@ -618,3 +618,165 @@ export async function getStoresInUserFavoriteCategories(
     return { recommendations: [], algorithm: 'user_favorite_categories_enhanced', generatedAt: new Date() };
   }
 }
+
+/**
+ * Fallback: Get similar stores in the same category as this store
+ * Uses GBP categories (primary and secondary) for better matching
+ */
+export async function getSimilarStoresInCategory(
+  storeId: string,
+  limit: number = 3
+): Promise<RecommendationResponse> {
+  const pool = getDirectPool();
+  
+  try {
+    // Get stores that share GBP categories with this store
+    // Primary category matches score higher (10 pts) than secondary (5 pts)
+    const query = `
+      WITH source_store AS (
+        SELECT city, state FROM directory_listings_list WHERE tenant_id = $1
+      ),
+      source_primary_category AS (
+        -- Source store's primary GBP category
+        SELECT gbp.gbp_category_id as category_id
+        FROM tenant_business_profiles_list gbp
+        WHERE gbp.tenant_id = $1
+          AND gbp.gbp_category_id IS NOT NULL
+      ),
+      source_secondary_categories AS (
+        -- Source store's secondary GBP categories
+        SELECT tgc.gbp_category_id as category_id
+        FROM tenant_gbp_categories tgc
+        WHERE tgc.tenant_id = $1
+      ),
+      matching_tenants AS (
+        -- Primary-to-Primary match (highest score: 10)
+        SELECT 
+          gbp.tenant_id,
+          10 as match_score,
+          'primary_match' as match_type
+        FROM tenant_business_profiles_list gbp
+        JOIN source_primary_category spc ON gbp.gbp_category_id = spc.category_id
+        WHERE gbp.tenant_id != $1
+        
+        UNION ALL
+        
+        -- Primary-to-Secondary match (medium score: 7)
+        SELECT 
+          tgc.tenant_id,
+          7 as match_score,
+          'primary_to_secondary' as match_type
+        FROM tenant_gbp_categories tgc
+        JOIN source_primary_category spc ON tgc.gbp_category_id = spc.category_id
+        WHERE tgc.tenant_id != $1
+        
+        UNION ALL
+        
+        -- Secondary-to-Primary match (medium score: 7)
+        SELECT 
+          gbp.tenant_id,
+          7 as match_score,
+          'secondary_to_primary' as match_type
+        FROM tenant_business_profiles_list gbp
+        JOIN source_secondary_categories ssc ON gbp.gbp_category_id = ssc.category_id
+        WHERE gbp.tenant_id != $1
+        
+        UNION ALL
+        
+        -- Secondary-to-Secondary match (lower score: 5)
+        SELECT 
+          tgc.tenant_id,
+          5 as match_score,
+          'secondary_match' as match_type
+        FROM tenant_gbp_categories tgc
+        JOIN source_secondary_categories ssc ON tgc.gbp_category_id = ssc.category_id
+        WHERE tgc.tenant_id != $1
+      ),
+      aggregated_scores AS (
+        -- Sum up all category match scores per tenant
+        SELECT 
+          tenant_id,
+          SUM(match_score) as total_category_score,
+          MAX(match_score) as best_match_score,
+          COUNT(*) as category_overlap_count
+        FROM matching_tenants
+        GROUP BY tenant_id
+      )
+      SELECT
+        dcl.tenant_id,
+        dcl.business_name,
+        dcl.slug,
+        dcl.address,
+        dcl.city,
+        dcl.state,
+        dcl.rating_avg,
+        dcl.rating_count,
+        agg.total_category_score,
+        agg.best_match_score,
+        agg.category_overlap_count,
+        CASE WHEN dcl.city = ss.city AND dcl.state = ss.state THEN 5 ELSE 0 END as location_score,
+        (agg.total_category_score + CASE WHEN dcl.city = ss.city AND dcl.state = ss.state THEN 5 ELSE 0 END) as combined_score
+      FROM aggregated_scores agg
+      JOIN directory_listings_list dcl ON dcl.tenant_id = agg.tenant_id
+      CROSS JOIN source_store ss
+      WHERE dcl.is_published = true
+      ORDER BY 
+        combined_score DESC,
+        agg.category_overlap_count DESC,
+        dcl.rating_avg DESC NULLS LAST,
+        dcl.rating_count DESC NULLS LAST
+      LIMIT $2
+    `;
+    
+    // Debug: Check if source store has categories
+    const debugQuery = `
+      SELECT 
+        (SELECT gbp_category_id FROM tenant_business_profiles_list WHERE tenant_id = $1) as primary_cat,
+        (SELECT COUNT(*) FROM tenant_gbp_categories WHERE tenant_id = $1) as secondary_count
+    `;
+    const debugResult = await pool.query(debugQuery, [storeId]);
+    console.log('[getSimilarStoresInCategory] Store categories:', debugResult.rows[0]);
+    
+    const result = await pool.query(query, [storeId, limit]);
+    console.log('[getSimilarStoresInCategory] Query returned:', result.rows.length, 'rows');
+    
+    const recommendations: Recommendation[] = result.rows.map((row: any) => {
+      const totalScore = row.total_category_score + row.location_score + (row.rating_avg || 0);
+      const inSameArea = row.location_score > 0;
+      const matchStrength = row.best_match_score >= 10 ? 'strong' : row.best_match_score >= 7 ? 'good' : 'related';
+      
+      let reason = '';
+      if (matchStrength === 'strong') {
+        reason = `Same category${inSameArea ? ' in your area' : ''}`;
+      } else if (matchStrength === 'good') {
+        reason = `Related category${inSameArea ? ' nearby' : ''}`;
+      } else {
+        reason = `Similar store${inSameArea ? ' nearby' : ''}`;
+      }
+      if (row.rating_avg) {
+        reason += ` (${row.rating_avg.toFixed(1)}⭐)`;
+      }
+      
+      return {
+        tenantId: row.tenant_id,
+        businessName: row.business_name,
+        slug: row.slug,
+        score: totalScore,
+        reason,
+        address: row.address,
+        city: row.city,
+        state: row.state
+      };
+    });
+
+    return {
+      recommendations,
+      algorithm: 'similar_category',
+      generatedAt: new Date()
+    };
+
+  } catch (error) {
+    console.error('Error in getSimilarStoresInCategory:', error);
+    return { recommendations: [], algorithm: 'similar_category', generatedAt: new Date() };
+  }
+}

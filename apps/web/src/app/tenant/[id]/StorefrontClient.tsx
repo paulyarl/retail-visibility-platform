@@ -14,7 +14,12 @@ export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const response = await fetch(`${apiUrl}/api/recommendations/for-storefront/${tenantId}`);
         const data = await response.json();
-        setRecommendations(data.recommendations || []);
+        // API returns nested structure: { recommendations: [{ type, title, recommendations: [...stores] }] }
+        // Flatten to get the actual store recommendations
+        const allStores = (data.recommendations || []).flatMap(
+          (group: any) => group.recommendations || []
+        );
+        setRecommendations(allStores);
       } catch (error) {
         console.error('Error fetching storefront recommendations:', error);
       } finally {
@@ -37,7 +42,7 @@ export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {recommendations.map((rec, index) => (
           <Link
-            key={rec.tenantId}
+            key={`${rec.tenantId}-${index}`}
             href={`/directory/${rec.slug}`}
             className="block p-6 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-green-500 dark:hover:border-green-400 transition-all hover:shadow-lg"
           >

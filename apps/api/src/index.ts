@@ -4829,6 +4829,10 @@ import storeReviewsRoutes from './routes/store-reviews';
 app.use('/api', storeReviewsRoutes);
 console.log('✅ Store reviews routes mounted at /api');
 
+/* ------------------------------ product likes ------------------------------ */
+app.use('/api/products', productLikesRoutes);
+console.log('✅ Product likes routes mounted at /api/products');
+
 /* ------------------------------ clone (products & categories) ------------------------------ */
 import cloneRoutes from './routes/clone';
 app.use('/api/clone', cloneRoutes);

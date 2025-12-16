@@ -1,18 +1,34 @@
 "use client";
 
+import Link from 'next/link';
+import { BookOpen } from 'lucide-react';
 import ProductActions from './ProductActions';
 
 interface StorefrontActionsProps {
   tenantId: string;
   businessName: string;
   tenantSlug?: string;
-  directoryPublished?: boolean; // Add directory publish status
+  directoryPublished?: boolean;
 }
 
 export default function StorefrontActions({ tenantId, businessName, tenantSlug, directoryPublished }: StorefrontActionsProps) {
   return (
-    <div className="flex items-center justify-end gap-4">
-      {/* Product Actions (Print & Share only - Directory link moved to header badges) */}
+    <div className="flex items-center justify-between gap-4">
+      {/* View in Directory Button - Left side */}
+      <div className="flex items-center gap-2">
+        {directoryPublished && tenantSlug && (
+          <Link
+            href={`/directory/${tenantSlug}`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors"
+            title="View this store's full directory listing"
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>View in Directory</span>
+          </Link>
+        )}
+      </div>
+      
+      {/* Product Actions (Print & Share) - Right side */}
       <ProductActions
         product={{
           id: `storefront-${tenantId}`,

@@ -45,7 +45,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
 
   const fetchLikeStatus = async () => {
     try {
-      const response = await api.get(`api/products/${product.id}/likes`);
+      const response = await api.get(`/api/products/${product.id}/likes`);
       if (response.ok) {
         const data = await response.json();
         setLiked(data.userLiked);
@@ -109,7 +109,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
     setLoading(true);
     try {
       const method = liked ? 'DELETE' : 'POST';
-      const endpoint = `api/products/${product.id}/like`;
+      const endpoint = `/api/products/${product.id}/like`;
       
       let response;
       if (method === 'POST') {

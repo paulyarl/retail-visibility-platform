@@ -10,7 +10,8 @@ import {
   getTrendingNearby,
   trackUserBehavior,
   getProductsViewedBySameUsers,
-  getStoresInUserFavoriteCategories
+  getStoresInUserFavoriteCategories,
+  getSimilarStoresInCategory
 } from '../services/recommendationService';
 
 const router = Router();
@@ -342,6 +343,19 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           type: 'trending_nearby',
           title: 'Trending Nearby',
           ...trendingNearby
+        });
+      }
+    }
+
+    // 4. FALLBACK: Similar stores in same category (always available)
+    // Only add if we don't have enough recommendations from behavior data
+    if (recommendations.length === 0) {
+      const similarStores = await getSimilarStoresInCategory(tenantId, 5);
+      if (similarStores.recommendations.length > 0) {
+        recommendations.push({
+          type: 'similar_stores',
+          title: 'Similar Stores',
+          ...similarStores
         });
       }
     }

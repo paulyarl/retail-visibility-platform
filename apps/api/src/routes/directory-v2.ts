@@ -382,7 +382,7 @@ router.get('/:identifier', async (req: Request, res: Response) => {
 
 /**
  * GET /api/directory/:slug/related
- * Get related stores based on category, location, and rating
+ * Get related stores based on GBP categories (primary and secondary) with weighted scoring
  */
 router.get('/:slug/related', async (req: Request, res: Response) => {
   try {
@@ -391,8 +391,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
 
     // First, get the current listing
     const currentListing = await getDirectPool().query(
-      `SELECT * FROM directory_listings_list WHERE slug = $1 AND is_published = true
-         AND (business_hours IS NULL OR business_hours::text != 'null') LIMIT 1`,
+      `SELECT tenant_id, city, state FROM directory_listings_list WHERE slug = $1 AND is_published = true LIMIT 1`,
       [slug]
     );
 
@@ -402,37 +401,82 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
 
     const current = currentListing.rows[0];
 
-    // Find related stores using MV categories
-    // Get the current store's MV categories
-    const currentCategoriesQuery = `
-      SELECT DISTINCT category_slug as slug
-      FROM directory_category_products
-      WHERE tenant_id = $1
-        AND is_published = true
-    `;
-    const currentCategoriesResult = await getDirectPool().query(currentCategoriesQuery, [current.tenant_id]);
-    const currentCategorySlugs = currentCategoriesResult.rows.map((row: any) => row.slug);
-
-    // Find related stores using MV categories
+    // Find related stores using GBP categories with weighted scoring
+    // Primary-to-Primary: 10 pts, Primary-to-Secondary: 7 pts, Secondary-to-Secondary: 5 pts
     const relatedQuery = `
-      SELECT DISTINCT ON (dcl.tenant_id)
+      WITH source_primary_category AS (
+        SELECT gbp.gbp_category_id as category_id
+        FROM tenant_business_profiles_list gbp
+        WHERE gbp.tenant_id = $1
+          AND gbp.gbp_category_id IS NOT NULL
+      ),
+      source_secondary_categories AS (
+        SELECT tgc.gbp_category_id as category_id
+        FROM tenant_gbp_categories tgc
+        WHERE tgc.tenant_id = $1
+      ),
+      matching_tenants AS (
+        -- Primary-to-Primary match (highest score: 10)
+        SELECT gbp.tenant_id, 10 as match_score
+        FROM tenant_business_profiles_list gbp
+        JOIN source_primary_category spc ON gbp.gbp_category_id = spc.category_id
+        WHERE gbp.tenant_id != $1
+        
+        UNION ALL
+        
+        -- Primary-to-Secondary match (medium score: 7)
+        SELECT tgc.tenant_id, 7 as match_score
+        FROM tenant_gbp_categories tgc
+        JOIN source_primary_category spc ON tgc.gbp_category_id = spc.category_id
+        WHERE tgc.tenant_id != $1
+        
+        UNION ALL
+        
+        -- Secondary-to-Primary match (medium score: 7)
+        SELECT gbp.tenant_id, 7 as match_score
+        FROM tenant_business_profiles_list gbp
+        JOIN source_secondary_categories ssc ON gbp.gbp_category_id = ssc.category_id
+        WHERE gbp.tenant_id != $1
+        
+        UNION ALL
+        
+        -- Secondary-to-Secondary match (lower score: 5)
+        SELECT tgc.tenant_id, 5 as match_score
+        FROM tenant_gbp_categories tgc
+        JOIN source_secondary_categories ssc ON tgc.gbp_category_id = ssc.category_id
+        WHERE tgc.tenant_id != $1
+      ),
+      aggregated_scores AS (
+        SELECT 
+          tenant_id,
+          SUM(match_score) as total_category_score,
+          MAX(match_score) as best_match_score,
+          COUNT(*) as category_overlap_count
+        FROM matching_tenants
+        GROUP BY tenant_id
+      )
+      SELECT
         dcl.*,
-        COUNT(dcp.category_slug) FILTER (WHERE dcp.category_slug = ANY($1)) as category_matches
-      FROM directory_listings_list dcl
-      INNER JOIN directory_category_products dcp ON dcp.tenant_id = dcl.tenant_id
-      WHERE dcl.slug != $2
-        AND dcl.is_published = true
-        AND (dcl.business_hours IS NULL OR dcl.business_hours::text != 'null')
-        AND dcp.is_published = true
-        AND dcp.category_slug = ANY($1)
-      GROUP BY dcl.tenant_id, dcl.id, dcl.business_name, dcl.slug, dcl.address, dcl.city, dcl.state, dcl.zip_code, dcl.phone, dcl.email, dcl.website, dcl.latitude, dcl.longitude, dcl.primary_category, dcl.secondary_categories, dcl.logo_url, dcl.description, dcl.rating_avg, dcl.rating_count, dcl.product_count, dcl.is_featured, dcl.subscription_tier, dcl.use_custom_website, dcl.is_published, dcl.business_hours, dcl.created_at, dcl.updated_at
-      ORDER BY dcl.tenant_id, category_matches DESC, dcl.rating_avg DESC, dcl.product_count DESC
-      LIMIT $3
+        agg.total_category_score,
+        agg.best_match_score,
+        agg.category_overlap_count,
+        CASE WHEN dcl.city = $2 AND dcl.state = $3 THEN 5 ELSE 0 END as location_score,
+        (agg.total_category_score + CASE WHEN dcl.city = $2 AND dcl.state = $3 THEN 5 ELSE 0 END) as combined_score
+      FROM aggregated_scores agg
+      JOIN directory_listings_list dcl ON dcl.tenant_id = agg.tenant_id
+      WHERE dcl.is_published = true
+      ORDER BY 
+        combined_score DESC,
+        agg.category_overlap_count DESC,
+        dcl.rating_avg DESC NULLS LAST,
+        dcl.rating_count DESC NULLS LAST
+      LIMIT $4
     `;
 
     const related = await getDirectPool().query(relatedQuery, [
-      currentCategorySlugs,
-      slug,
+      current.tenant_id,
+      current.city,
+      current.state,
       limit,
     ]);
 
@@ -463,6 +507,8 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       isPublished: row.is_published || true,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      matchScore: row.combined_score,
+      matchType: row.best_match_score >= 10 ? 'primary' : row.best_match_score >= 7 ? 'related' : 'similar',
     }));
 
     return res.json({

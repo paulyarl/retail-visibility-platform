@@ -53,7 +53,28 @@ export default function RelatedStores({
         }
 
         const data = await res.json();
-        setStores(data.related || []);
+        // Map API response to expected format (snake_case to camelCase)
+        const mappedStores = (data.related || []).map((store: any) => ({
+          id: store.id,
+          tenantId: store.tenantId,
+          businessName: store.business_name || store.businessName,
+          slug: store.slug,
+          address: store.address,
+          city: store.city,
+          state: store.state,
+          phone: store.phone,
+          logoUrl: store.logoUrl || store.logo_url,
+          primaryCategory: store.primaryCategory || store.primary_category,
+          ratingAvg: store.ratingAvg || store.rating_avg || 0,
+          ratingCount: store.ratingCount || store.rating_count || 0,
+          productCount: store.productCount || store.product_count || 0,
+          isFeatured: store.isFeatured || store.is_featured || false,
+          subscriptionTier: store.subscriptionTier || store.subscription_tier || 'trial',
+          useCustomWebsite: store.useCustomWebsite || store.use_custom_website || false,
+          website: store.website,
+          directoryPublished: store.isPublished !== false, // Published stores from related API are in directory
+        }));
+        setStores(mappedStores);
       } catch (err) {
         console.error('Error fetching related stores:', err);
         setError('Failed to load related stores');

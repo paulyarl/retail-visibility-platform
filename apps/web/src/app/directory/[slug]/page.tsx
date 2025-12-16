@@ -611,41 +611,80 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                     />
                   )}
                   <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                    <h1 className="text-3xl font-bold text-gray-900">
                       {listing.business_name}
                     </h1>
                 
-                    {/* GBP Categories */}
+                    {/* GBP Categories - Clean badges below store name */}
                     {listing.categories && listing.categories.length > 0 && (
-                      <GBPCategoryBadges 
-                        categories={listing.categories}
-                        basePath="/directory/stores"
-                        size="md"
-                        className="mb-4"
-                      />
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        {listing.categories
+                          .sort((a: any, b: any) => {
+                            if (a.isPrimary && !b.isPrimary) return -1;
+                            if (!a.isPrimary && b.isPrimary) return 1;
+                            return a.name.localeCompare(b.name);
+                          })
+                          .map((category: any, index: number) => (
+                            <Link
+                              key={category.id || index}
+                              href={`/directory/stores/${category.slug}`}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                category.isPrimary
+                                  ? 'bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200'
+                                  : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                              }`}
+                              title={`Browse all ${category.name} stores`}
+                            >
+                              <span className="text-base">
+                                {category.name === 'Grocery store' && '🏪'}
+                                {category.name === 'Electronics store' && '🛍️'}
+                                {category.name === 'Shoe store' && '👟'}
+                                {category.name === 'Supermarket' && '🛒'}
+                                {category.name === 'Clothing store' && '👕'}
+                                {category.name === 'Hardware store' && '🔧'}
+                                {category.name === 'Restaurant' && '🍽️'}
+                                {category.name === 'Pharmacy' && '💊'}
+                                {category.name === 'Bookstore' && '📚'}
+                                {category.name === 'Pet store' && '🐕'}
+                                {category.name === 'Specialty food store' && '🍱'}
+                                {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store', 'Specialty food store'].includes(category.name) && '🏢'}
+                              </span>
+                              <span>{category.name}</span>
+                            </Link>
+                          ))}
+                      </div>
                     )}
                 
                     {listing.product_count > 0 && (
-                      <p className="text-gray-600">
+                      <p className="text-gray-600 mt-3">
                         {listing.product_count} products available
                       </p>
                     )}
                   </div>
                 </div>
 
-                {/* Action Buttons - Enclosed Pane */}
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center">
-                    <DirectoryActions 
-                      listing={{
-                        business_name: listing.business_name,
-                        slug: listing.slug,
-                        tenantId: listing.tenant_id,
-                        id: listing.id
-                      }}
-                      currentUrl={currentUrl}
-                    />
-                  </div>
+                {/* Action Buttons - Clean inline layout */}
+                <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+                  {/* Visit Storefront - Left side */}
+                  <Link
+                    href={`/tenant/${listing.tenant_id}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                    title="Browse products on the storefront"
+                  >
+                    <Globe className="w-4 h-4" />
+                    <span>Visit Storefront</span>
+                  </Link>
+                  
+                  {/* Share/Print Actions - Right side */}
+                  <DirectoryActions 
+                    listing={{
+                      business_name: listing.business_name,
+                      slug: listing.slug,
+                      tenantId: listing.tenant_id,
+                      id: listing.id
+                    }}
+                    currentUrl={currentUrl}
+                  />
                 </div>
               </div>
 

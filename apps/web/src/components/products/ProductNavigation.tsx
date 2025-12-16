@@ -10,21 +10,28 @@ interface ProductNavigationProps {
 }
 
 export function ProductNavigation({ tenantId, directorySlug }: ProductNavigationProps) {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   
-  // Only show for authenticated users
-  if (!isAuthenticated) return null;
+  // Check if user belongs to this item's tenant
+  const userBelongsToTenant = user?.tenants?.some(
+    (t: { id: string }) => t.id === tenantId
+  );
+  
+  // Only show inventory link for users who belong to this tenant
+  // Storefront and directory links are public
   
   return (
     <div className="mb-4 flex flex-wrap gap-2">
-      <Link href={`/items?tenantId=${tenantId}`}>
-        <Button variant="ghost" size="sm">
-          <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Inventory
-        </Button>
-      </Link>
+      {userBelongsToTenant && (
+        <Link href={`/items?tenantId=${tenantId}`}>
+          <Button variant="ghost" size="sm">
+            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Inventory
+          </Button>
+        </Link>
+      )}
       
       <Link href={`/tenant/${tenantId}`}>
         <Button variant="ghost" size="sm">
