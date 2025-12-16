@@ -314,7 +314,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
     );
   }
 
-  const currentTier = tenant.subscriptionTier || 'trial';
+  const currentTier = tenant.subscriptionTier || (tenant as any).subscription_tier || 'trial';
   const isChainTier = currentTier.startsWith('chain_');
   const tierInfo = getTierInfo(currentTier);
   
