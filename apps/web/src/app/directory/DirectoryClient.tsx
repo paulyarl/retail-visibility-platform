@@ -14,6 +14,50 @@ import { Pagination } from '@/components/ui';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
 
+// Cache configuration for directory data
+const CACHE_CONFIG = {
+  categories: { 
+    key: 'directory-categories', 
+    ttl: 24 * 60 * 60 * 1000 // 24 hours
+  },
+  storeTypes: { 
+    key: 'directory-store-types', 
+    ttl: 24 * 60 * 60 * 1000 // 24 hours
+  }
+};
+
+// Cache utility functions with TTL support
+function getCachedData(key: string): any | null {
+  try {
+    const cached = localStorage.getItem(key);
+    if (!cached) return null;
+    
+    const { data, timestamp } = JSON.parse(cached);
+    const config = Object.values(CACHE_CONFIG).find(c => c.key === key);
+    
+    if (!config || Date.now() - timestamp > config.ttl) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.warn('Error reading cache:', error);
+    return null;
+  }
+}
+
+function setCachedData(key: string, data: any): void {
+  try {
+    localStorage.setItem(key, JSON.stringify({
+      data,
+      timestamp: Date.now()
+    }));
+  } catch (error) {
+    console.warn('Error writing cache:', error);
+  }
+}
+
 // NEW: Location detection utility
 async function getUserLocation(): Promise<{
   latitude: number;
@@ -127,6 +171,7 @@ export default function DirectoryClient() {
     storeCount: number;
   }>>([]);
   const [locations, setLocations] = useState<Array<{ city: string; state: string; count: number }>>([]);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number; city: string; state: string } | null>(null);
   
   // Persist view mode in localStorage - start with default to avoid hydration mismatch
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
@@ -156,57 +201,72 @@ export default function DirectoryClient() {
   const handlePageSizeChange = (size: number) => {
     setPageSize(size);
     localStorage.setItem('directory-page-size', size.toString());
-    // Update URL with new page size and reset to page 1
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('limit', size.toString());
-    params.set('page', '1');
-    window.location.href = `/directory?${params.toString()}`;
+    // Fetch categories (locations endpoint disabled for now)
   };
-  
-  // NEW: User location for proximity-based scoring
-  const [userLocation, setUserLocation] = useState<{
-    latitude: number;
-    longitude: number;
-    city: string;
-    state: string;
-  } | null>(null);
 
-  // Fetch categories (locations endpoint disabled for now)
   useEffect(() => {
     const fetchFilters = async () => {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
       try {
-        // NEW: Get user location for proximity scoring
-        const location = await getUserLocation();
-        setUserLocation(location);
+        // Start location detection asynchronously (non-blocking)
+        getUserLocation().then((location) => {
+          setUserLocation(location);
+        }).catch((error) => {
+          console.warn('Location detection failed:', error);
+          setUserLocation(null);
+        });
         
-        // Fetch directory listing categories (store types) with counts
-        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories-optimized/counts-by-name`);
-        if (categoriesRes.ok) {
-          const categoriesData = await categoriesRes.json();
-          const counts = categoriesData.counts || {};
+        // Try cache first for categories
+        let categories = getCachedData(CACHE_CONFIG.categories.key);
+        
+        if (!categories) {
+          // Fetch directory listing categories (store types) with counts
+          const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories-optimized/counts-by-name`);
           
-          // Convert counts map to category array format expected by the component
-          const categoryArray = Object.entries(counts).map(([name, count]) => ({
-            id: name.toLowerCase().replace(/\s+/g, '-'),
-            name: name,
-            slug: name.toLowerCase().replace(/\s+/g, '-'),
-            googleCategoryId: null,
-            storeCount: count as number,
-            productCount: 0, // Not relevant for directory categories
-          }));
+          if (categoriesRes.ok) {
+            const categoriesData = await categoriesRes.json();
+            const counts = categoriesData.counts || {};
+            
+            // Convert counts map to category array format expected by the component
+            categories = Object.entries(counts).map(([name, count]) => ({
+              id: name.toLowerCase().replace(/\s+/g, '-'),
+              name: name,
+              slug: name.toLowerCase().replace(/\s+/g, '-'),
+              googleCategoryId: null,
+              storeCount: count as number,
+              productCount: 0, // Not relevant for directory categories
+            }));
+            
+            // Cache the fresh data
+            setCachedData(CACHE_CONFIG.categories.key, categories);
+          } else {
+            console.error('Failed to fetch categories from server');
+          }
+        }
+        
+        setCategories(categories || []);
+
+        // Try cache first for store types
+        let storeTypes = getCachedData(CACHE_CONFIG.storeTypes.key);
+        
+        if (!storeTypes) {
+          // Fetch store types
+          const storeTypesRes = await fetch(`${apiBaseUrl}/api/directory/store-types`);
           
-          setCategories(categoryArray);
+          if (storeTypesRes.ok) {
+            const typesData = await storeTypesRes.json();
+            storeTypes = typesData.data?.storeTypes || [];
+            
+            // Cache the fresh data
+            setCachedData(CACHE_CONFIG.storeTypes.key, storeTypes);
+          } else {
+            console.error('Failed to fetch store types from server');
+          }
         }
-
-        // Fetch store types
-        const storeTypesRes = await fetch(`${apiBaseUrl}/api/directory/store-types`);
-        if (storeTypesRes.ok) {
-          const typesData = await storeTypesRes.json();
-          setStoreTypes(typesData.data?.storeTypes || []);
-        }
-
+        
+        setStoreTypes(storeTypes || []);
+        
         // Locations endpoint is disabled (old directory system)
         // TODO: Re-enable when directory_listings table is available
         // const locationsRes = await fetch(`${apiBaseUrl}/api/directory/locations`);
@@ -231,10 +291,10 @@ export default function DirectoryClient() {
       try {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const params = new URLSearchParams(searchParams.toString());
-        
+
         // Use materialized view endpoint for faster queries
         const response = await fetch(`${apiBaseUrl}/api/directory/mv/search?${params.toString()}`);
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           console.error('Directory API error:', response.status, errorText);
@@ -242,7 +302,7 @@ export default function DirectoryClient() {
         }
 
         const result = await response.json();
-        
+
         // Deduplicate listings by tenant_id (MV returns one row per category)
         // Keep the first occurrence of each store
         if (result.listings) {
@@ -261,7 +321,7 @@ export default function DirectoryClient() {
             result.pagination.returnedCount = result.listings.length;
           }
         }
-        
+
         setData(result);
       } catch (err: any) {
         console.error('Error fetching directory:', err);
@@ -273,6 +333,13 @@ export default function DirectoryClient() {
 
     fetchListings();
   }, [searchParams]);
+
+  // Mark component render completion (minimal logging only)
+  useEffect(() => {
+    if (!loading && data) {
+      console.log('Directory loaded:', data.listings?.length || 0, 'stores');
+    }
+  }, [loading, data]);
 
   const currentPage = data?.pagination.page || 1;
   const totalPages = data?.pagination.totalPages || 1;

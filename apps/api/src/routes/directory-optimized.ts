@@ -409,8 +409,8 @@ router.get('/search', async (req: Request, res: Response) => {
     let params: any[] = [];
     let paramIndex = 1;
     
-    // Full-text search
-    whereClause += ` AND to_tsvector('english', category_name || ' ' || tenant_name || ' ' || COALESCE(city, '') || ' ' || COALESCE(state, '') || ' ' || COALESCE(address, '')) @@ to_tsvector('english', $${paramIndex++})`;
+    // Keep efficient full-text search (uses GIN index)
+    whereClause += ` AND to_tsvector('english', category_name || ' ' || tenant_name || ' ' || COALESCE(listing_city, '') || ' ' || COALESCE(listing_state, '') || ' ' || COALESCE(address, '')) @@ to_tsvector('english', $${paramIndex++})`;
     params.push(query);
     
     if (category) {
@@ -452,7 +452,7 @@ router.get('/search', async (req: Request, res: Response) => {
       whereClause += ` AND is_featured = true`;
     }
     
-    // Search query using materialized view
+    // Full-text search query using GIN index (much faster than ts_rank)
     const searchQuery = `
       SELECT 
         tenant_id,
@@ -473,14 +473,10 @@ router.get('/search', async (req: Request, res: Response) => {
         avg_price_dollars,
         recently_updated_products,
         address,
-        zip_code,
-        ts_rank(
-          to_tsvector('english', category_name || ' ' || tenant_name || ' ' || COALESCE(city, '') || ' ' || COALESCE(state, '') || ' ' || COALESCE(address, '')),
-          to_tsvector('english', $1)
-        ) as search_rank
+        zip_code
       FROM directory_category_products
       WHERE ${whereClause}
-      ORDER BY search_rank DESC, quality_score DESC, actual_product_count DESC
+      ORDER BY actual_product_count DESC, quality_score DESC, rating_avg DESC
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
     `;
     
