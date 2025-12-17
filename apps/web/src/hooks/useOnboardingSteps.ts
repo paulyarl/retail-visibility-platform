@@ -30,12 +30,18 @@ export function useOnboardingSteps({
 
   // Save progress to localStorage when step or data changes
   useEffect(() => {
-    if (!forced && Object.keys(businessData).length > 0) {
-      onboardingStorageService.save(tenantId, {
-        currentStep,
-        businessData,
-      });
-    }
+    const saveProgress = async () => {
+      if (!forced && Object.keys(businessData).length > 0) {
+        await onboardingStorageService.save(tenantId, {
+          currentStep,
+          businessData,
+        });
+      }
+    };
+
+    saveProgress().catch((error) => {
+      console.error('[useOnboardingSteps] Failed to save progress:', error);
+    });
   }, [currentStep, businessData, tenantId, forced]);
 
   const goNext = () => {

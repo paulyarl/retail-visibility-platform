@@ -65,7 +65,6 @@ export function useSubscriptionUsage(tenantIdProp?: string) {
 
         // Get tenant ID from prop or localStorage
         const tenantId = tenantIdProp || 
-          localStorage.getItem('current_tenant_id') || 
           localStorage.getItem('tenantId');
 
         if (!tenantId) {

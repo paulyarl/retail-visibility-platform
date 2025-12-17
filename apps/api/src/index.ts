@@ -130,10 +130,8 @@ import tenantsRoutes from './routes/tenants';
 import productLikesRoutes from './routes/product-likes';
 import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
-import adminEnrichmentRoutes from './routes/admin-enrichment';
 import cachedProductsRoutes from './routes/cached-products';
 import featureOverridesRoutes from './routes/admin/feature-overrides';
-import tierManagementRoutes from './routes/admin/tier-management';
 import tierSystemRoutes from './routes/admin/tier-system';
 // import testGbpRoutes from './routes/test-gbp';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
@@ -288,6 +286,8 @@ app.get("/api/tenants", authenticateToken, async (req, res) => {
       id: tenant.id,
       name: tenant.name,
       organizationId: tenant.organization_id,
+      subscriptionTier: tenant.subscription_tier,
+      subscriptionStatus: tenant.subscription_status,
       locationStatus: tenant.location_status || 'active',
       createdAt: tenant.created_at,
       organization: tenant.organizations_list ? {
@@ -4750,12 +4750,18 @@ app.use('/api/permissions', permissionRoutes);
 console.log('✅ Permissions routes mounted at /api/permissions');
 
 /* ------------------------------ admin enrichment ------------------------------ */
-app.use('/api/admin/enrichment', adminEnrichmentRoutes);
+import adminEnrichmentRoutes from './routes/admin-enrichment';
+app.use('/api/admin/enrichment', authenticateToken, requireAdmin, adminEnrichmentRoutes);
 console.log('✅ Admin enrichment routes mounted at /api/admin/enrichment');
 
 /* ------------------------------ admin tier system ------------------------------ */
 app.use('/api/admin/tier-system', authenticateToken, requireAdmin, tierSystemRoutes);
 console.log('✅ Admin tier system routes mounted at /api/admin/tier-system');
+
+/* ------------------------------ admin tier management ------------------------------ */
+import tierManagementRoutes from './routes/admin/tier-management';
+app.use('/api/admin/tiers', authenticateToken, tierManagementRoutes);
+console.log('✅ Admin tier management routes mounted at /api/admin/tiers');
 
 /* ------------------------------ admin scan metrics ------------------------------ */
 app.use('/api/admin/scan-metrics', scanMetricsRoutes);

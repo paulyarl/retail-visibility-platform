@@ -22,8 +22,8 @@ export default function TenantCard({ tenant, tiers }: TenantCardProps) {
             </div>
           )}
           {tenant.organization && (
-            <div className="text-xs text-neutral-500 mt-1">
-              Org: {tenant.organization.name}
+            <div className="inline-block px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded text-xs font-medium mt-1">
+              {tenant.organization.name}
             </div>
           )}
         </div>

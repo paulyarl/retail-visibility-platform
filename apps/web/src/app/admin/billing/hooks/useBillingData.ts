@@ -37,10 +37,10 @@ export function useBillingData(): UseBillingDataResult {
           const transformedTenants = tenantsArray.map((tenant: any) => ({
             id: tenant.id,
             name: tenant.name,
-            subscriptionTier: tenant.subscription_tier,
-            organization: tenant.organizations_list ? {
-              id: tenant.organizations_list.id,
-              name: tenant.organizations_list.name,
+            subscriptionTier: tenant.subscriptionTier,
+            organization: tenant.organization ? {
+              id: tenant.organization.id,
+              name: tenant.organization.name,
             } : null,
             metadata: tenant.metadata,
           }));

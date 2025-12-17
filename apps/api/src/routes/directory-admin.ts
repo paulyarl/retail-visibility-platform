@@ -106,7 +106,12 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
           ...listing,
           qualityScore,
           itemCount,
-          business_name: profile?.business_name || listing.tenants?.name || 'Unknown Business',
+          businessName: profile?.business_name || listing.tenants?.name || 'Unknown Business',
+          tenant: listing.tenants ? {
+            id: listing.tenants.id,
+            name: listing.tenants.name,
+            subscriptionTier: listing.tenants.subscription_tier,
+          } : null,
         };
       })
     );

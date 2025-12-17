@@ -22,7 +22,7 @@ export default function DirectoryListingsTable({
     if (selectedIds.length === listings.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(listings.map(l => l.tenantId));
+      setSelectedIds(listings.map(l => l.tenant_id));
     }
   };
 
@@ -71,7 +71,7 @@ export default function DirectoryListingsTable({
       {/* Mobile View */}
       <div className="md:hidden">
         {listings.map((listing) => (
-          <div key={listing.tenantId} className="border-b border-gray-200 dark:border-gray-700 p-4">
+          <div key={listing.tenant_id} className="border-b border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1">
                 <h3 className="font-medium text-gray-900 dark:text-white">
@@ -82,8 +82,8 @@ export default function DirectoryListingsTable({
                 </p>
               </div>
               <DirectoryStatusBadge
-                isPublished={listing.isPublished}
-                isFeatured={listing.isFeatured}
+                isPublished={listing.is_published}
+                isFeatured={listing.is_featured}
               />
             </div>
             
@@ -97,23 +97,23 @@ export default function DirectoryListingsTable({
             </div>
 
             <div className="flex gap-2">
-              {listing.isFeatured ? (
+              {listing.is_featured ? (
                 <button
-                  onClick={() => onUnfeature(listing.tenantId)}
+                  onClick={() => onUnfeature(listing.tenant_id)}
                   className="flex-1 px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
                 >
                   Unfeature
                 </button>
               ) : (
                 <button
-                  onClick={() => onFeature(listing.tenantId)}
+                  onClick={() => onFeature(listing.tenant_id)}
                   className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                   Feature
                 </button>
               )}
               <Link
-                href={`/t/${listing.tenantId}/settings/directory`}
+                href={`/t/${listing.tenant_id}/settings/directory`}
                 className="flex-1 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-center"
               >
                 View
@@ -161,12 +161,12 @@ export default function DirectoryListingsTable({
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {listings.map((listing) => (
-              <tr key={listing.tenantId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+              <tr key={listing.tenant_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                 <td className="px-6 py-4">
                   <input
                     type="checkbox"
-                    checked={selectedIds.includes(listing.tenantId)}
-                    onChange={() => handleSelectOne(listing.tenantId)}
+                    checked={selectedIds.includes(listing.tenant_id)}
+                    onChange={() => handleSelectOne(listing.tenant_id)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
                 </td>
@@ -180,8 +180,8 @@ export default function DirectoryListingsTable({
                 </td>
                 <td className="px-6 py-4">
                   <DirectoryStatusBadge
-                    isPublished={listing.isPublished}
-                    isFeatured={listing.isFeatured}
+                    isPublished={listing.is_published}
+                    isFeatured={listing.is_featured}
                   />
                 </td>
                 <td className="px-6 py-4">
@@ -201,23 +201,23 @@ export default function DirectoryListingsTable({
                   {listing.primaryCategory || '-'}
                 </td>
                 <td className="px-6 py-4 text-right text-sm font-medium space-x-2">
-                  {listing.isFeatured ? (
+                  {listing.is_featured ? (
                     <button
-                      onClick={() => onUnfeature(listing.tenantId)}
+                      onClick={() => onUnfeature(listing.tenant_id)}
                       className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
                     >
                       Unfeature
                     </button>
                   ) : (
                     <button
-                      onClick={() => onFeature(listing.tenantId)}
+                      onClick={() => onFeature(listing.tenant_id)}
                       className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
                     >
                       Feature
                     </button>
                   )}
                   <Link
-                    href={`/t/${listing.tenantId}/settings/directory`}
+                    href={`/t/${listing.tenant_id}/settings/directory`}
                     className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200"
                   >
                     View

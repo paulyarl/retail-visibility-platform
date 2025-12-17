@@ -39,7 +39,7 @@ export default function TenantBusinessProfilePage() {
       const apiData = await onboardingDataService.fetchTenantData(tenantId);
       
       // Load from localStorage (any saved progress)
-      const savedProgress = onboardingStorageService.load(tenantId);
+      const savedProgress = await onboardingStorageService.load(tenantId);
       const localData = savedProgress?.businessData || {};
       
       // Merge: API data as base, localStorage overrides

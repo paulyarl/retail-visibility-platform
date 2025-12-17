@@ -50,6 +50,7 @@ export default function EnrichmentDashboardPage() {
   const [sourceFilter, setSourceFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -65,13 +66,19 @@ export default function EnrichmentDashboardPage() {
 
   const loadAnalytics = async () => {
     try {
-      const response = await apiRequest('api/admin/enrichment/analytics');
+      // Add cache-busting timestamp
+      const response = await apiRequest(`/api/admin/enrichment/analytics?_t=${Date.now()}`);
       const data = await response.json();
+      console.log('[Enrichment] Analytics response:', data);
       if (data.success) {
+        console.log('[Enrichment] Popular products:', data.analytics?.popularProducts);
         setAnalytics(data.analytics);
+      } else {
+        setError(data.error || 'Failed to load analytics');
       }
     } catch (error) {
       console.error('Failed to load analytics:', error);
+      setError('Failed to load analytics');
     } finally {
       setLoading(false);
     }
@@ -83,13 +90,16 @@ export default function EnrichmentDashboardPage() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '20',
+        _t: Date.now().toString(), // Cache-busting
         ...(searchQuery && { query: searchQuery }),
         ...(sourceFilter && { source: sourceFilter }),
       });
 
-      const response = await apiRequest(`api/admin/enrichment/search?${params}`);
+      const response = await apiRequest(`/api/admin/enrichment/search?${params}`);
       const data = await response.json();
+      console.log('[Enrichment] Search response:', data);
       if (data.success) {
+        console.log('[Enrichment] Products:', data.products);
         setProducts(data.products);
         setTotalPages(data.pagination.totalPages);
       }
@@ -107,7 +117,7 @@ export default function EnrichmentDashboardPage() {
 
   const viewProductDetails = async (barcode: string) => {
     try {
-      const response = await apiRequest(`api/admin/enrichment/${barcode}`);
+      const response = await apiRequest(`/api/admin/enrichment/${barcode}`);
       const data = await response.json();
       if (data.success) {
         setSelectedProduct(data.product);
@@ -121,6 +131,18 @@ export default function EnrichmentDashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <RefreshCw className="w-8 h-8 animate-spin text-primary-600" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 dark:text-gray-400">{error}</p>
+        </div>
       </div>
     );
   }
@@ -152,7 +174,7 @@ export default function EnrichmentDashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <Database className="w-8 h-8 text-blue-600" />
               <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                {analytics?.totalProducts.toLocaleString()}
+                {(analytics?.totalProducts || 0).toLocaleString()}
               </span>
             </div>
             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Products</h3>
@@ -286,7 +308,7 @@ export default function EnrichmentDashboardPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="font-bold text-gray-900 dark:text-white">{product.fetchCount.toLocaleString()}</div>
+                  <div className="font-bold text-gray-900 dark:text-white">{(product.fetchCount || 0).toLocaleString()}</div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">scans</div>
                 </div>
               </div>
@@ -370,7 +392,7 @@ export default function EnrichmentDashboardPage() {
                             {product.source}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{product.fetchCount}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{product.fetchCount || product.fetch_count || 0}</td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() => viewProductDetails(product.barcode)}

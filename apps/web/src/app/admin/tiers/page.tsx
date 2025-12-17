@@ -89,15 +89,15 @@ export default function AdminTiersPage() {
       const transformedTenants = tenantsArray.map((tenant: any) => ({
         id: tenant.id,
         name: tenant.name,
-        subscriptionTier: tenant.subscription_tier,
-        subscriptionStatus: tenant.subscription_status,
-        trialEndsAt: tenant.trial_ends_at,
-        subscriptionEndsAt: tenant.subscription_ends_at,
-        createdAt: tenant.created_at,
+        subscriptionTier: tenant.subscriptionTier,
+        subscriptionStatus: tenant.subscriptionStatus,
+        trialEndsAt: tenant.trialEndsAt,
+        subscriptionEndsAt: tenant.subscriptionEndsAt,
+        createdAt: tenant.createdAt,
         metadata: tenant.metadata,
-        organization: tenant.organizations_list ? {
-          id: tenant.organizations_list.id,
-          name: tenant.organizations_list.name,
+        organization: tenant.organization ? {
+          id: tenant.organization.id,
+          name: tenant.organization.name,
         } : null,
       }));
       
@@ -115,9 +115,11 @@ export default function AdminTiersPage() {
       setError(null);
       setSuccess(null);
 
-      const res = await api.patch(`/api/tenants/${tenantId}`, {
+      // Call the correct admin tier management endpoint
+      const res = await api.patch(`/api/admin/tiers/tenants/${tenantId}`, {
         subscriptionTier: tier,
         subscriptionStatus: status,
+        reason: 'Updated via admin tiers page',
       });
 
       if (!res.ok) {

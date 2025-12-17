@@ -81,6 +81,16 @@ export function getTenantNavigationUrl(options: TenantNavigationOptions): string
     if (path.startsWith('/settings')) {
       // Map platform settings to tenant settings
       const settingsPath = path.replace('/settings', '');
+      
+      // Some platform settings don't have tenant equivalents
+      // Redirect to tenant dashboard instead of creating invalid routes
+      const tenantSettingsRoutes = ['/admin', '/appearance', '/branding', '/contact', '/directory', '/gbp-category', '/hours', '/integrations', '/language', '/location-status', '/offerings', '/organization', '/promotion', '/propagation', '/subscription', '/tenant', '/users', '/account'];
+      
+      if (settingsPath === '' || settingsPath === '/' || !tenantSettingsRoutes.some(route => settingsPath.startsWith(route))) {
+        // Default to tenant dashboard for settings pages without tenant equivalents
+        return `/t/${encodeURIComponent(tenantId)}/dashboard`;
+      }
+      
       return `/t/${encodeURIComponent(tenantId)}/settings${settingsPath}`;
     }
     
@@ -110,7 +120,6 @@ export async function navigateToTenant(
   // Update localStorage
   if (typeof window !== 'undefined') {
     localStorage.setItem('tenantId', tenantId);
-    localStorage.setItem('lastTenantId', tenantId);
   }
 
   // Check onboarding if not skipped

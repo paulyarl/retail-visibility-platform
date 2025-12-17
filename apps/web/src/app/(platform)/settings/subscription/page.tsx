@@ -50,7 +50,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   const [showHistory, setShowHistory] = useState(false);
   
   // Get tenant ID for capacity data
-  const tenantId = propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('current_tenant_id') || localStorage.getItem('tenantId') : null);
+  const tenantId = propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
   
   // Use centralized subscription usage hook
   const { usage: capacityData } = useSubscriptionUsage(tenantId || undefined);
@@ -65,7 +65,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
         }
         
         // Get tenant ID from prop first, then fall back to localStorage
-        const tenantId = propTenantId || localStorage.getItem('current_tenant_id') || localStorage.getItem('tenantId');
+        const tenantId = propTenantId || localStorage.getItem('tenantId');
         
         // Platform users viewing without tenant context - show catalog view
         if (isPlatformUser(user) && !tenantId) {

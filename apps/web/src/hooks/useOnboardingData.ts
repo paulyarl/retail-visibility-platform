@@ -42,7 +42,7 @@ export function useOnboardingData({
         const apiData = await onboardingDataService.fetchTenantData(tenantId);
 
         // Load from localStorage (unless forced)
-        const savedProgress = !forced ? onboardingStorageService.load(tenantId) : null;
+        const savedProgress = !forced ? await onboardingStorageService.load(tenantId) : null;
         const localData = savedProgress?.businessData || {};
         const savedStep = savedProgress?.currentStep || initialStep;
 

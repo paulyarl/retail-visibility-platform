@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 
 export interface AdminDirectoryListing {
   id: string;
-  tenantId: string;
-  isPublished: boolean;
-  isFeatured: boolean;
+  tenant_id: string;
+  is_published: boolean;
+  is_featured: boolean;
   primaryCategory?: string;
   secondaryCategories?: string[];
   slug?: string;

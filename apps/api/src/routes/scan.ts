@@ -952,7 +952,14 @@ router.get('/admin/enrichment/analytics', authenticateToken, async (req: Request
       success: true,
       analytics: {
         totalCached,
-        popularProducts,
+        totalProducts: totalCached, // Alias for frontend compatibility
+        popularProducts: popularProducts.map(p => ({
+          barcode: p.barcode,
+          name: p.name || 'Unknown',
+          brand: p.brand || 'Unknown',
+          fetchCount: p.fetch_count || 0,
+          source: p.source || 'unknown',
+        })),
         dataQuality: {
           withNutrition,
           withImages,
@@ -1022,7 +1029,18 @@ router.get('/admin/enrichment/search', authenticateToken, async (req: Request, r
 
     return res.json({
       success: true,
-      products,
+      products: products.map(p => ({
+        id: p.id,
+        barcode: p.barcode,
+        name: p.name || 'Unknown',
+        brand: p.brand || 'Unknown',
+        description: p.description,
+        imageThumbnailUrl: p.image_thumbnail_url || p.image_url,
+        source: p.source || 'unknown',
+        fetchCount: p.fetch_count || 0,
+        lastFetchedAt: p.last_fetched_at,
+        createdAt: p.created_at,
+      })),
       pagination: {
         total,
         page: parseInt(page as string),

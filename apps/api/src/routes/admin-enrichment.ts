@@ -17,146 +17,117 @@ const router = Router();
  * 
  * Returns enrichment analytics for the admin dashboard
  */
-router.get('/analytics', authenticateToken, async (req: Request, res: Response) => {
+router.get('/analytics', async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
     }
 
-    const totalProducts = await prisma.inventory_items.count();
-
-    // Get products with nutrition data
-    const productsWithNutrition = await prisma.inventory_items.count({
-      where: {
-        metadata: {
-          path: ['nutritionData'],
-          not: Prisma.JsonNull
-        }
-      }
-    });
-
-    // Get products with images
-    const productsWithImages = await prisma.inventory_items.count({
-      where: {
-        image_url: {
-          not: null
-        }
-      }
-    });
-
-    // Get products with environmental data (if applicable)
-    const productsWithEnvironmental = await prisma.inventory_items.count({
-      where: {
-        // Assuming environmental data might be stored in metadata
-        metadata: {
-          path: ['environmental'],
-          not: Prisma.JsonNull
-        }
-      }
-    });
-
-    // Calculate percentages
-    const nutritionPercentage = totalProducts > 0 
-      ? ((productsWithNutrition / totalProducts) * 100).toFixed(1)
-      : '0.0';
+    // Get total cached products from barcode_enrichment table
+    const totalCached = await prisma.barcode_enrichment.count();
     
-    const imagesPercentage = totalProducts > 0 
-      ? ((productsWithImages / totalProducts) * 100).toFixed(1)
-      : '0.0';
-    
-    const environmentalPercentage = totalProducts > 0 
-      ? ((productsWithEnvironmental / totalProducts) * 100).toFixed(1)
-      : '0.0';
-
-    // Get source breakdown (if products have source info in metadata)
-    const sourceBreakdown = await prisma.inventory_items.groupBy({
-      by: ['tenant_id'],
-      _count: {
-        id: true
-      },
-      orderBy: {
-        _count: {
-          id: 'desc'
-        }
-      },
-      take: 5
-    });
-
-    // Get tenant names for source breakdown
-    const tenantIds = sourceBreakdown.map(item => item.tenant_id);
-    const tenants = await prisma.tenants.findMany({
-      where: {
-        id: {
-          in: tenantIds
-        }
-      },
+    // Get most popular products (top 10 by fetch count)
+    const popularProducts = await prisma.barcode_enrichment.findMany({
+      orderBy: { fetch_count: 'desc' },
+      take: 10,
       select: {
-        id: true,
-        name: true
-      }
-    });
-
-    const sourceData = sourceBreakdown.map(item => {
-      const tenant = tenants.find(t => t.id === item.tenant_id);
-      return {
-        source: tenant?.name || 'Unknown',
-        count: item._count?.id || 0,
-        percentage: totalProducts > 0 
-          ? (((item._count?.id || 0) / totalProducts) * 100).toFixed(1)
-          : '0.0'
-      };
-    });
-
-    // Get recent additions (products created in last 7 days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    const recentAdditions = await prisma.inventory_items.count({
-      where: {
-        created_at: {
-          gte: sevenDaysAgo
-        }
-      }
-    });
-
-    // Get popular products with enrichment data
-    const popularProducts = await prisma.inventory_items.findMany({
-      take: 5,
-      orderBy: {
-        created_at: 'desc'
-      },
-      select: {
-        id: true,
+        barcode: true,
         name: true,
-        sku: true,
-        tenant_id: true,
-        image_url: true,
-        created_at: true,
         brand: true,
-        source: true
-      }
+        fetch_count: true,
+        source: true,
+        last_fetched_at: true,
+      },
     });
 
     // Transform to expected format
     const transformedPopularProducts = popularProducts.map(product => ({
-      barcode: product.sku || 'N/A',
-      name: product.name,
+      barcode: product.barcode,
+      name: product.name || 'Unknown',
       brand: product.brand || 'Unknown',
-      fetchCount: Math.floor(Math.random() * 100) + 1, // Mock fetch count
-      source: product.source || 'Manual'
+      fetchCount: product.fetch_count || 0,
+      source: product.source || 'unknown'
     }));
 
-    // Calculate estimated savings (mock calculation)
-    const estimatedCostSavings = `$${(totalProducts * 0.25).toFixed(2)}`;
-    const apiCallsSaved = totalProducts * 10; // Assume 10 API calls per product saved
+    // Get data quality metrics
+    const withNutrition = await prisma.barcode_enrichment.count({
+      where: {
+        metadata: {
+          path: ['nutrition', 'per_100g'],
+          not: Prisma.JsonNull,
+        },
+      },
+    });
+
+    const withImages = await prisma.barcode_enrichment.count({
+      where: {
+        OR: [
+          { image_url: { not: null } },
+          { image_thumbnail_url: { not: null } },
+        ],
+      },
+    });
+
+    const withEnvironmental = await prisma.barcode_enrichment.count({
+      where: {
+        metadata: {
+          path: ['environmental'],
+          not: Prisma.JsonNull,
+        },
+      },
+    });
+
+    // Calculate percentages
+    const nutritionPercentage = totalCached > 0 
+      ? ((withNutrition / totalCached) * 100).toFixed(1)
+      : '0.0';
+    
+    const imagesPercentage = totalCached > 0 
+      ? ((withImages / totalCached) * 100).toFixed(1)
+      : '0.0';
+    
+    const environmentalPercentage = totalCached > 0 
+      ? ((withEnvironmental / totalCached) * 100).toFixed(1)
+      : '0.0';
+
+    // Get source breakdown
+    const sourceBreakdown = await prisma.barcode_enrichment.groupBy({
+      by: ['source'],
+      _count: true,
+    });
+
+    const sourceData = sourceBreakdown.map(item => ({
+      source: item.source || 'unknown',
+      count: item._count || 0,
+      percentage: totalCached > 0 
+        ? (((item._count || 0) / totalCached) * 100).toFixed(1)
+        : '0.0'
+    }));
+
+    // Get recent additions (last 24 hours)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentAdditions = await prisma.barcode_enrichment.count({
+      where: {
+        created_at: { gte: oneDayAgo },
+      },
+    });
+
+    // Calculate total API calls saved (sum of fetchCount - 1 for each product)
+    const totalFetchCount = await prisma.barcode_enrichment.aggregate({
+      _sum: { fetch_count: true },
+    });
+    const apiCallsSaved = Math.max(0, (totalFetchCount._sum.fetch_count || 0) - totalCached);
+
+    // Calculate estimated savings
+    const estimatedCostSavings = (apiCallsSaved * 0.01).toFixed(2);
 
     const analytics = {
-      totalProducts: totalProducts,
+      totalProducts: totalCached,
       popularProducts: transformedPopularProducts,
       dataQuality: {
-        withNutrition: productsWithNutrition,
-        withImages: productsWithImages,
-        withEnvironmental: productsWithEnvironmental,
+        withNutrition,
+        withImages,
+        withEnvironmental,
         nutritionPercentage,
         imagesPercentage,
         environmentalPercentage
@@ -168,6 +139,12 @@ router.get('/analytics', authenticateToken, async (req: Request, res: Response) 
     };
 
     console.log('[Admin Enrichment] Analytics loaded successfully');
+    console.log('[Admin Enrichment] Popular products sample:', transformedPopularProducts[0]);
+    
+    // Prevent caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    
     res.json({
       success: true,
       analytics
@@ -186,7 +163,7 @@ router.get('/analytics', authenticateToken, async (req: Request, res: Response) 
  * 
  * Search for enriched products with pagination and filtering
  */
-router.get('/search', authenticateToken, async (req: Request, res: Response) => {
+router.get('/search', async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -204,7 +181,7 @@ router.get('/search', authenticateToken, async (req: Request, res: Response) => 
 
     console.log(`[Admin Enrichment] Searching products - page: ${pageNum}, limit: ${limitNum}`);
 
-    // Build where clause
+    // Build where clause for barcode_enrichment table
     const where: any = {};
 
     if (query && typeof query === 'string') {
@@ -216,13 +193,13 @@ router.get('/search', authenticateToken, async (req: Request, res: Response) => 
           }
         },
         {
-          sku: {
+          barcode: {
             contains: query,
             mode: 'insensitive'
           }
         },
         {
-          description: {
+          brand: {
             contains: query,
             mode: 'insensitive'
           }
@@ -231,54 +208,30 @@ router.get('/search', authenticateToken, async (req: Request, res: Response) => 
     }
 
     if (source && typeof source === 'string') {
-      // Filter by tenant name
-      const tenants = await prisma.tenants.findMany({
-        where: {
-          name: {
-            contains: source,
-            mode: 'insensitive'
-          }
-        },
-        select: {
-          id: true
-        }
-      });
-      
-      if (tenants.length > 0) {
-        where.tenantId = {
-          in: tenants.map(t => t.id)
-        };
-      }
+      where.source = source;
     }
 
-    // Get total count
-    const total = await prisma.inventory_items.count({ where });
+    // Get total count from barcode_enrichment
+    const total = await prisma.barcode_enrichment.count({ where });
 
-    // Get products
-    const products = await prisma.inventory_items.findMany({
+    // Get products from barcode_enrichment
+    const products = await prisma.barcode_enrichment.findMany({
       where,
       select: {
         id: true,
+        barcode: true,
         name: true,
-        sku: true,
         brand: true,
         source: true,
-        description: true,
-        price_cents: true,
+        fetch_count: true,
         image_url: true,
-        tenant_id: true,
+        image_thumbnail_url: true,
         created_at: true,
-        updated_at: true,
+        last_fetched_at: true,
         metadata: true,
-        tenants: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
       },
       orderBy: {
-        created_at: 'desc'
+        fetch_count: 'desc'
       },
       skip,
       take: limitNum
@@ -287,27 +240,29 @@ router.get('/search', authenticateToken, async (req: Request, res: Response) => 
     // Transform data to match frontend expectations
     const transformedProducts = products.map(product => ({
       id: product.id,
-      barcode: product.sku || 'N/A',
-      name: product.name,
+      barcode: product.barcode,
+      name: product.name || 'Unknown',
       brand: product.brand || 'Unknown',
-      source: product.source || 'Manual',
-      fetchCount: Math.floor(Math.random() * 100) + 1, // Mock fetch count
-      imageThumbnailUrl: product.image_url,
-      description: product.description,
-      price: product.price_cents ? product.price_cents / 100 : null,
-      tenant: product.tenants.name,
-      tenantId: product.tenant_id,
+      source: product.source || 'unknown',
+      fetchCount: product.fetch_count || 0,
+      imageThumbnailUrl: product.image_thumbnail_url || product.image_url,
       createdAt: product.created_at,
-      updatedAt: product.updated_at,
-      hasNutrition: product.metadata && typeof product.metadata === 'object' ? !!(product.metadata as any).nutritionData : false,
-      hasImage: !!product.image_url,
+      lastFetchedAt: product.last_fetched_at,
+      hasNutrition: product.metadata && typeof product.metadata === 'object' ? !!(product.metadata as any).nutrition : false,
+      hasImage: !!(product.image_url || product.image_thumbnail_url),
       hasEnvironmental: product.metadata && typeof product.metadata === 'object' ? !!(product.metadata as any).environmental : false,
-      enrichmentScore: calculateEnrichmentScore(product)
     }));
 
     const totalPages = Math.ceil(total / limitNum);
 
     console.log(`[Admin Enrichment] Found ${total} products, returning ${transformedProducts.length}`);
+    if (transformedProducts.length > 0) {
+      console.log('[Admin Enrichment] First product sample:', transformedProducts[0]);
+    }
+
+    // Prevent caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
 
     res.json({
       success: true,
@@ -333,9 +288,9 @@ router.get('/search', authenticateToken, async (req: Request, res: Response) => 
 /**
  * GET /api/admin/enrichment/:barcode
  * 
- * Get detailed information for a specific product by barcode/SKU
+ * Get detailed information for a specific product by barcode
  */
-router.get('/:barcode', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:barcode', async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -343,17 +298,9 @@ router.get('/:barcode', authenticateToken, async (req: Request, res: Response) =
 
     const { barcode } = req.params;
 
-    const product = await prisma.inventory_items.findFirst({
+    const product = await prisma.barcode_enrichment.findUnique({
       where: {
-        sku: barcode
-      },
-      include: {
-        tenants: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
+        barcode: barcode
       }
     });
 
@@ -367,22 +314,19 @@ router.get('/:barcode', authenticateToken, async (req: Request, res: Response) =
     // Transform product data to match frontend expectations
     const transformedProduct = {
       id: product.id,
-      barcode: product.sku || 'N/A',
-      name: product.name,
+      barcode: product.barcode,
+      name: product.name || 'Unknown',
       brand: product.brand || 'Unknown',
-      source: product.source || 'Manual',
-      description: product.description,
-      price: product.price_cents ? product.price_cents / 100 : null,
+      source: product.source || 'unknown',
       imageUrl: product.image_url,
-      tenant: product.tenants.name,
-      tenantId: product.tenant_id,
+      imageThumbnailUrl: product.image_thumbnail_url,
+      fetchCount: product.fetch_count || 0,
       createdAt: product.created_at,
-      updatedAt: product.updated_at,
+      lastFetchedAt: product.last_fetched_at,
       metadata: product.metadata,
-      hasNutrition: product.metadata && typeof product.metadata === 'object' ? !!(product.metadata as any).nutritionData : false,
-      hasImage: !!product.image_url,
+      hasNutrition: product.metadata && typeof product.metadata === 'object' ? !!(product.metadata as any).nutrition : false,
+      hasImage: !!(product.image_url || product.image_thumbnail_url),
       hasEnvironmental: product.metadata && typeof product.metadata === 'object' ? !!(product.metadata as any).environmental : false,
-      enrichmentScore: calculateEnrichmentScore(product)
     };
 
     res.json({
@@ -397,23 +341,5 @@ router.get('/:barcode', authenticateToken, async (req: Request, res: Response) =
     });
   }
 });
-
-/**
- * Helper function to calculate enrichment score
- */
-function calculateEnrichmentScore(product: any): number {
-  let score = 0;
-  
-  // Base fields
-  if (product.name) score += 10;
-  if (product.description) score += 10;
-  if (product.priceCents) score += 10;
-  if (product.imageUrl) score += 20;
-  if (product.metadata && typeof product.metadata === 'object' && (product.metadata as any).nutritionData) score += 25;
-  if (product.metadata && typeof product.metadata === 'object' && (product.metadata as any).environmental) score += 15;
-  if (product.sku) score += 10;
-  
-  return Math.min(score, 100);
-}
 
 export default router;

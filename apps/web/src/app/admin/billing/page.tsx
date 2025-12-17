@@ -127,7 +127,7 @@ export default function AdminBillingPage() {
             ) : (
               <div className="space-y-3">
                 {paginatedTenants.map((tenant) => (
-                  <TenantCard key={tenant.id} tenant={tenant} tiers={tiers} />
+                  <TenantCard key={`${tenant.id}-${tiers.length}`} tenant={tenant} tiers={tiers} />
                 ))}
               </div>
             )}

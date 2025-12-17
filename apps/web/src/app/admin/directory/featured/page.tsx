@@ -93,7 +93,7 @@ export default function AdminFeaturedDirectoryPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Link
-                      href={`/t/${listing.tenantId}/settings/directory`}
+                      href={`/t/${listing.tenant_id}/settings/directory`}
                       className="px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-700"
                     >
                       View Details

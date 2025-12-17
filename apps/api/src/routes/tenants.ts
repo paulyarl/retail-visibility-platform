@@ -6,7 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
-import { authenticateToken, checkTenantAccess } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess, requirePlatformAdmin } from '../middleware/auth';
 import { canViewAllTenants } from '../utils/platform-admin';
 import { getLocationStatusInfo } from '../utils/location-status';
 
@@ -88,6 +88,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       id: tenant.id,
       name: tenant.name,
       organizationId: tenant.organization_id,
+      subscriptionTier: tenant.subscription_tier,
       locationStatus: tenant.location_status || 'active',
       createdAt: tenant.created_at,
       organization: tenant.organizations_list ? {
@@ -103,6 +104,84 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       success: false,
       error: 'internal_error',
       message: 'Failed to fetch tenants list',
+    });
+  }
+});
+
+/**
+ * PATCH /api/tenants/:id
+ * Update tenant subscription tier and status
+ */
+router.patch('/:id', authenticateToken, requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { subscriptionTier, subscriptionStatus } = req.body;
+
+    console.log('[PATCH /api/tenants/:id] Starting update for tenant:', id);
+    console.log('[PATCH /api/tenants/:id] Request body:', { subscriptionTier, subscriptionStatus });
+
+    // Validate input
+    if (!subscriptionTier && !subscriptionStatus) {
+      console.log('[PATCH /api/tenants/:id] Validation failed: no fields to update');
+      return res.status(400).json({
+        success: false,
+        error: 'bad_request',
+        message: 'Must provide subscriptionTier or subscriptionStatus to update'
+      });
+    }
+
+    // Build update data
+    const updateData: any = {};
+    if (subscriptionTier) {
+      updateData.subscription_tier = subscriptionTier;
+      console.log('[PATCH /api/tenants/:id] Updating subscription_tier to:', subscriptionTier);
+    }
+    if (subscriptionStatus) {
+      updateData.subscription_status = subscriptionStatus;
+      console.log('[PATCH /api/tenants/:id] Updating subscription_status to:', subscriptionStatus);
+    }
+
+    console.log('[PATCH /api/tenants/:id] Final updateData:', updateData);
+
+    // Update tenant
+    console.log('[PATCH /api/tenants/:id] Executing database update...');
+    const updatedTenant = await prisma.tenants.update({
+      where: { id },
+      data: updateData,
+    });
+
+    console.log('[PATCH /api/tenants/:id] Database update successful. Updated tenant:', {
+      id: updatedTenant.id,
+      name: updatedTenant.name,
+      subscription_tier: updatedTenant.subscription_tier,
+      subscription_status: updatedTenant.subscription_status,
+    });
+
+    // Transform response for frontend compatibility
+    const transformedTenant = {
+      id: updatedTenant.id,
+      name: updatedTenant.name,
+      organizationId: updatedTenant.organization_id,
+      subscriptionTier: updatedTenant.subscription_tier,
+      subscriptionStatus: updatedTenant.subscription_status,
+      locationStatus: updatedTenant.location_status,
+      createdAt: updatedTenant.created_at,
+    };
+
+    console.log('[PATCH /api/tenants/:id] Returning transformed response:', transformedTenant);
+
+    res.json(transformedTenant);
+  } catch (error: any) {
+    console.error('[PATCH /api/tenants/:id] Error updating tenant:', error);
+    console.error('[PATCH /api/tenants/:id] Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to update tenant',
     });
   }
 });
