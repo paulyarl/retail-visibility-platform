@@ -80,8 +80,10 @@ export default function TenantSwitcher() {
       return;
     }
 
-    // Use centralized navigation utility
+    // Use centralized navigation utility with preserveCurrentPage: false
+    // This ensures dropdown switching always goes to dashboard, not last remembered path
     await navigateToTenant(tenantId, {
+      preserveCurrentPage: false, // Always go to dashboard when switching via dropdown
       navigate: (url) => {
         window.location.href = url;
       }

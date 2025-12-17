@@ -14,9 +14,11 @@ export default function TenantSwitcher({ currentTenantId, tenants }: { currentTe
     const tid = e.target.value
     setValue(tid)
     
-    // Use centralized navigation utility
+    // Use centralized navigation utility with preserveCurrentPage: false
+    // This ensures dropdown switching always goes to dashboard, not last remembered path
     await navigateToTenant(tid, {
       skipOnboarding: true, // Skip onboarding check when already in tenant context
+      preserveCurrentPage: false, // Always go to dashboard when switching via dropdown
       navigate: (url) => router.push(url)
     })
   }

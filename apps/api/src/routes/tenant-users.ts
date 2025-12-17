@@ -23,7 +23,7 @@ router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    // Get all users in this tenant
+    // Get all users in this tenant from user_tenants table
     const userTenants = await prisma.user_tenants.findMany({
       where: { tenant_id:tenantId },
       include: {
@@ -42,6 +42,51 @@ router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
       orderBy: { created_at: 'desc' },
     });
 
+    // Also check if there's a platform admin who owns this tenant (via created_by field)
+    // This handles cases where platform admins own tenants but don't have explicit user_tenants entries
+    let additionalUsers = [];
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        created_by: true,
+        created_at: true,
+      },
+    });
+
+    // If there's a created_by user, fetch their details and check if they're a platform admin
+    if (tenant?.created_by) {
+      const creator = await prisma.users.findUnique({
+        where: { id: tenant.created_by },
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          role: true,
+          is_active: true,
+          last_login: true,
+        },
+      });
+
+      if (creator) {
+        const isPlatformAdmin = creator.role === 'PLATFORM_ADMIN' || creator.role === 'ADMIN';
+        const alreadyInList = userTenants.some(ut => ut.users.id === creator.id);
+
+        if (isPlatformAdmin && !alreadyInList) {
+          additionalUsers.push({
+            id: creator.id,
+            email: creator.email,
+            name: `${creator.first_name || ''} ${creator.last_name || ''}`.trim() || creator.email,
+            platformRole: creator.role,
+            tenantRole: user_tenant_role.OWNER, // Use enum value instead of string
+            isActive: creator.is_active,
+            lastLogin: creator.last_login ? creator.last_login.toISOString() : 'Never',
+            addedAt: tenant.created_at?.toISOString() || new Date().toISOString(),
+          });
+        }
+      }
+    }
+
     // Transform data for frontend
     const users = userTenants.map(ut => ({
       id: ut.users.id,
@@ -54,7 +99,17 @@ router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
       addedAt: ut.created_at.toISOString(),
     }));
 
-    res.json(users);
+    // Add any additional users (like platform admin owners)
+    users.push(...additionalUsers);
+
+    res.json({
+      success: true,
+      users,
+      data: users, // Generic data field for compatibility
+      items: users, // Items field for compatibility
+      results: users, // Results field for compatibility
+      total: users.length
+    });
   } catch (error) {
     console.error('[GET /tenants/:tenantId/user] Error:', error);
     res.status(500).json({ error: 'failed_to_fetch_tenant_user' });

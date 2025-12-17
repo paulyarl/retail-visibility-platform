@@ -10,6 +10,7 @@ import { api } from './api';
 export interface TenantNavigationOptions {
   tenantId: string;
   currentPath?: string;
+  preserveCurrentPage?: boolean; // New option to control page preservation
   skipOnboarding?: boolean;
 }
 
@@ -54,11 +55,16 @@ export async function checkTenantOnboarding(tenantId: string): Promise<Onboardin
 
 /**
  * Get the target URL when switching to a tenant
- * Context-aware: preserves current page when possible
+ * Context-aware: preserves current page when possible (unless preserveCurrentPage is false)
  */
 export function getTenantNavigationUrl(options: TenantNavigationOptions): string {
-  const { tenantId, currentPath } = options;
+  const { tenantId, currentPath, preserveCurrentPage = true } = options;
   const path = currentPath || (typeof window !== 'undefined' ? window.location.pathname : '/');
+  
+  // If preserveCurrentPage is false, always go to dashboard
+  if (!preserveCurrentPage) {
+    return `/t/${encodeURIComponent(tenantId)}/dashboard`;
+  }
   
   // If already on a tenant page, replace the tenant ID (always, regardless of feature flags)
   if (path.startsWith('/t/')) {
@@ -112,10 +118,11 @@ export async function navigateToTenant(
   options: {
     skipOnboarding?: boolean;
     currentPath?: string;
+    preserveCurrentPage?: boolean; // New option
     navigate: (url: string) => void;
   }
 ): Promise<void> {
-  const { skipOnboarding = false, currentPath, navigate } = options;
+  const { skipOnboarding = false, currentPath, preserveCurrentPage = true, navigate } = options;
   
   // Update localStorage
   if (typeof window !== 'undefined') {
@@ -132,7 +139,7 @@ export async function navigateToTenant(
   }
 
   // Get context-aware navigation URL
-  const targetUrl = getTenantNavigationUrl({ tenantId, currentPath });
+  const targetUrl = getTenantNavigationUrl({ tenantId, currentPath, preserveCurrentPage });
   
   console.log('[TenantNavigation] Navigating to:', targetUrl);
   navigate(targetUrl);
@@ -142,6 +149,6 @@ export async function navigateToTenant(
  * Simple synchronous version for client-side navigation
  * Use when you don't need onboarding checks
  */
-export function getQuickTenantUrl(tenantId: string, currentPath?: string): string {
-  return getTenantNavigationUrl({ tenantId, currentPath });
+export function getQuickTenantUrl(tenantId: string, currentPath?: string, preserveCurrentPage: boolean = true): string {
+  return getTenantNavigationUrl({ tenantId, currentPath, preserveCurrentPage });
 }

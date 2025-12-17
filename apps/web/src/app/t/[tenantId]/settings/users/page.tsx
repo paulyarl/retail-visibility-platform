@@ -12,11 +12,12 @@ import { Spinner } from '@/components/ui';
 interface TenantUser {
   id: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
-  role: string;
-  createdAt: string;
-  lastLogin?: string;
+  name: string;
+  platformRole: string;
+  tenantRole: string;
+  isActive: boolean;
+  lastLogin: string;
+  addedAt: string;
 }
 
 export default function TenantUsersPage() {
@@ -212,14 +213,12 @@ export default function TenantUsersPage() {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                             <span className="text-white font-semibold">
-                              {(user.firstName?.[0] || user.email[0]).toUpperCase()}
+                              {(user.name?.[0] || user.email[0]).toUpperCase()}
                             </span>
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {user.firstName && user.lastName 
-                                ? `${user.firstName} ${user.lastName}`
-                                : user.firstName || user.lastName || 'Unnamed User'}
+                              {user.name || 'Unnamed User'}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
                               {user.email}
@@ -229,7 +228,7 @@ export default function TenantUsersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                          {user.role}
+                          {user.tenantRole}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
