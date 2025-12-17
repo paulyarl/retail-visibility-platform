@@ -31,6 +31,7 @@ interface OrganizationData {
     tenantId: string;
     tenantName: string;
     skuCount: number;
+    metadata?: any;
   }>;
 }
 
@@ -269,8 +270,8 @@ export default function OrganizationPage() {
     }
   };
 
-  // Access control checks
-  if (accessLoading || loading) {
+  // Simplified access control - allow owners and platform admins direct access
+  if (accessLoading) {
     return (
       <div className="container mx-auto p-6 flex items-center justify-center min-h-screen">
         <Spinner size="lg" />
@@ -278,7 +279,12 @@ export default function OrganizationPage() {
     );
   }
 
-  if (!hasAccess) {
+  // Allow access for platform admins and tenant owners
+  // TODO: Refine this to proper organization membership checking
+  const allowedRoles = ['PLATFORM_ADMIN', 'OWNER', 'TENANT_OWNER'];
+  const userCanAccess = allowedRoles.includes(tenantRole || '') || hasAccess;
+
+  if (!userCanAccess) {
     return (
       <AccessDenied
         pageTitle="Organization Dashboard"

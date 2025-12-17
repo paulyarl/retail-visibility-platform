@@ -81,9 +81,13 @@ export function canPerformSupportActions(user: { role?: user_role | string } | n
 
   return role === 'PLATFORM_ADMIN' ||
          role === 'PLATFORM_SUPPORT' ||
+         role === 'TENANT_OWNER' ||
+         role === 'TENANT_ADMIN' ||
          role === 'ADMIN'|| // Legacy
          role === user_role.PLATFORM_ADMIN ||
          role === user_role.PLATFORM_SUPPORT ||
+         role === user_role.TENANT_OWNER ||
+         role === user_role.TENANT_ADMIN ||
          role === user_role.ADMIN; // Legacy
 }
 

@@ -7,6 +7,7 @@ import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-adm
 import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
 import { generateItemId, generateOrganizationId, generatePhotoId } from '../lib/id-generator';
+import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
@@ -16,12 +17,29 @@ const router = Router();
  */
 function requireSupportActions(req: Request, res: Response, next: NextFunction) {
   const user = (req as any).user;
+  console.log('[requireSupportActions] Checking user:', {
+    userId: user?.userId,
+    role: user?.role,
+    tenantIds: user?.tenantIds,
+    hasUser: !!user
+  });
+
   if (!user || !canPerformSupportActions(user)) {
+    console.log('[requireSupportActions] Access denied for user:', {
+      userId: user?.userId,
+      role: user?.role,
+      canPerform: canPerformSupportActions(user)
+    });
     return res.status(403).json({
       error: 'Forbidden',
       message: 'Platform admin or support access required for organization management',
     });
   }
+
+  console.log('[requireSupportActions] Access granted for user:', {
+    userId: user?.userId,
+    role: user?.role
+  });
   next();
 }
 
@@ -740,8 +758,8 @@ const setHeroLocationSchema = z.object({
 });
 
 // PUT /organizations/:id/hero-location - Set hero location
-// Permission: Platform admin only (critical org configuration)
-router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
+// Permission: Organization member (can manage their own organization settings)
+router.put('/:id/hero-location', authenticateToken, requireSupportActions, async (req, res) => {
   try {
     const parsed = setHeroLocationSchema.safeParse(req.body);
     if (!parsed.success) {

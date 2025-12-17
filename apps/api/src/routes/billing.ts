@@ -168,6 +168,7 @@ router.get('/organization/billing/counters', requireAuth, async (req, res) => {
           select: {
             id: true,
             name: true,
+            metadata: true,
             _count: {
               select: {
                 inventory_items: true,
@@ -189,6 +190,7 @@ router.get('/organization/billing/counters', requireAuth, async (req, res) => {
       tenantId: t.id,
       tenantName: t.name,
       skuCount: t._count.inventory_items,
+      metadata: t.metadata,
     }));
 
     // Calculate status

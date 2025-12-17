@@ -66,7 +66,7 @@ import {
 // v3.5 imports - temporarily disabled
 // import auditRoutes from './routes/audit';
 // import policyRoutes from './routes/policy';
-// import billingRoutes from './routes/billing';
+import billingRoutes from './routes/billing';
 // import subscriptionRoutes from './routes/subscriptions';
 // import categoryRoutes from './routes/categories';
 import photosRouter from './photos';
@@ -97,7 +97,7 @@ import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 // All route imports temporarily disabled for isolation
 // import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
-// import organizationRoutes from './routes/organizations';
+import organizationRoutes from './routes/organizations';
 import organizationRequestRoutes from './routes/organization-requests';
 import upgradeRequestsRoutes from './routes/upgrade-requests';
 import permissionRoutes from './routes/permissions';
@@ -4852,6 +4852,10 @@ console.log('✅ Upgrade requests routes mounted at /api/upgrade-requests');
 app.use('/api/organization-requests', organizationRequestRoutes);
 console.log('✅ Organization requests routes mounted at /api/organization-requests');
 
+/* ------------------------------ organizations ------------------------------ */
+app.use('/organizations', organizationRoutes);
+console.log('✅ Organizations routes mounted at /organizations');
+
 /* ------------------------------ POS integrations ------------------------------ */
 import cloverRoutes from './routes/integrations/clover';
 import squareRoutes from './routes/integrations/square';
@@ -4867,6 +4871,12 @@ console.log('✅ Google Business Profile OAuth routes mounted at /api/google/bus
 /* ------------------------------ Google Merchant Center OAuth ------------------------------ */
 app.use('/api', googleMerchantOAuthRoutes);
 console.log('✅ Google Merchant Center OAuth routes mounted at /api/google/oauth');
+
+/* ------------------------------ billing ------------------------------ */
+console.log('🔄 Billing routes imported successfully');
+
+app.use('/api', billingRoutes);
+console.log('✅ Billing routes mounted at /api');
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);

@@ -6,6 +6,7 @@ import { useTenantItems } from "@/hooks/useTenantItems";
 import { useItemsViewMode } from "@/hooks/useItemsViewMode";
 import { useItemsModals } from "@/hooks/useItemsModals";
 import { useItemsActions } from "@/hooks/useItemsActions";
+import { useAccessControl, AccessPresets } from "@/lib/auth/useAccessControl";
 import ItemsHeader from "@/components/items/ItemsHeader";
 import ItemsPagination from "@/components/items/ItemsPagination";
 import ItemsGrid from "@/components/items/ItemsGrid";
@@ -15,6 +16,7 @@ import { QRCodeModal } from "@/components/items/QRCodeModal";
 import ItemPhotoGallery from "@/components/items/ItemPhotoGallery";
 import CategoryAssignmentModal from "@/components/items/CategoryAssignmentModal";
 import BulkUploadModal from "@/components/items/BulkUploadModal";
+import PropagateItemModal from "@/components/items/PropagateItemModal";
 import QuickStartEmptyState from "@/components/items/QuickStartEmptyState";
 import ItemsGuide from "@/components/items/ItemsGuide";
 import { Item } from "@/services/itemsDataService";
@@ -95,6 +97,24 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
   // Bulk selection state
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [showQuickStart, setShowQuickStart] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const locationsPerPage = 5;
+
+  // Organization access control for propagation
+  const {
+    hasAccess: hasOrganizationAccess,
+    organizationData,
+    loading: orgAccessLoading,
+  } = useAccessControl(
+    tenantId,
+    AccessPresets.ORGANIZATION_MEMBER,
+    true // Fetch organization data to check membership
+  );
+
+  const [propagateItem, setPropagateItem] = useState<Item | null>(null);
+  const [showPropagateModal, setShowPropagateModal] = useState(false);
+
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkActionsExpanded, setBulkActionsExpanded] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -418,6 +438,16 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       console.error('[ItemsPageClient] Clone failed:', error);
       alert(error instanceof Error ? error.message : 'Failed to clone product');
     }
+  };
+
+  const handlePropagate = async (item: Item) => {
+    if (!hasOrganizationAccess || !organizationData) {
+      alert('Propagation is only available for organization members with multiple locations.');
+      return;
+    }
+
+    setPropagateItem(item);
+    setShowPropagateModal(true);
   };
 
   const handleStockUpdate = async (itemId: string, newStock: number) => {
@@ -957,7 +987,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 onPhotos={openPhotoGallery}
                 onCategory={openCategoryModal}
                 onClone={handleClone}
-                onPropagate={undefined}
+                onPropagate={hasOrganizationAccess ? handlePropagate : undefined}
                 onVisibilityToggle={handleVisibilityToggle}
                 onStatusToggle={handleStatusToggle}
                 onStockUpdate={handleStockUpdate}
@@ -975,7 +1005,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 onPhotos={openPhotoGallery}
                 onCategory={openCategoryModal}
                 onClone={handleClone}
-                onPropagate={undefined}
+                onPropagate={hasOrganizationAccess ? handlePropagate : undefined}
                 onVisibilityToggle={handleVisibilityToggle}
                 onStatusToggle={handleStatusToggle}
                 onStockUpdate={handleStockUpdate}
@@ -1082,6 +1112,21 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
         <BulkUploadModal
           tenantId={tenantId}
           onClose={closeBulkUpload}
+          onSuccess={refresh}
+        />
+      )}
+
+      {showPropagateModal && propagateItem && organizationData && (
+        <PropagateItemModal
+          isOpen={showPropagateModal}
+          onClose={() => {
+            setShowPropagateModal(false);
+            setPropagateItem(null);
+          }}
+          itemId={propagateItem.id}
+          itemName={propagateItem.name}
+          currentTenantId={tenantId}
+          organizationId={organizationData.id}
           onSuccess={refresh}
         />
       )}

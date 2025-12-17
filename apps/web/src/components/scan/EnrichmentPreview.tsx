@@ -408,7 +408,7 @@ export default function EnrichmentPreview({
                     // If it's a Google taxonomy selection, create a new tenant category
                     if (googleCategoryPath) {
                       try {
-                        const categoryName = enrichment?.name || 'Unknown';
+                        const categoryName = googleCategoryPath.split(' > ').pop() || 'Unknown';
                         console.log('[EnrichmentPreview] Creating category from Google taxonomy:', {
                           googleCategoryPath,
                           googleTaxonomyId,
