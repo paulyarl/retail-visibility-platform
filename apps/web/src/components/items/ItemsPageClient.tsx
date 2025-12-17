@@ -441,11 +441,24 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   };
 
   const handlePropagate = async (item: Item) => {
+    console.log('[handlePropagate] Called with item:', item.name, {
+      hasOrganizationAccess,
+      orgAccessLoading,
+      organizationData: !!organizationData,
+      tenantId,
+    });
+
     if (!hasOrganizationAccess || !organizationData) {
+      console.log('[handlePropagate] Access denied:', {
+        hasOrganizationAccess,
+        organizationData: !!organizationData,
+        orgAccessLoading,
+      });
       alert('Propagation is only available for organization members with multiple locations.');
       return;
     }
 
+    console.log('[handlePropagate] Opening modal for item:', item.name);
     setPropagateItem(item);
     setShowPropagateModal(true);
   };
@@ -987,7 +1000,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 onPhotos={openPhotoGallery}
                 onCategory={openCategoryModal}
                 onClone={handleClone}
-                onPropagate={hasOrganizationAccess ? handlePropagate : undefined}
+                onPropagate={hasOrganizationAccess && organizationData && organizationData.tenants.length > 1 ? handlePropagate : undefined}
                 onVisibilityToggle={handleVisibilityToggle}
                 onStatusToggle={handleStatusToggle}
                 onStockUpdate={handleStockUpdate}
@@ -1005,7 +1018,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 onPhotos={openPhotoGallery}
                 onCategory={openCategoryModal}
                 onClone={handleClone}
-                onPropagate={hasOrganizationAccess ? handlePropagate : undefined}
+                onPropagate={hasOrganizationAccess && organizationData && organizationData.tenants.length > 1 ? handlePropagate : undefined}
                 onVisibilityToggle={handleVisibilityToggle}
                 onStatusToggle={handleStatusToggle}
                 onStockUpdate={handleStockUpdate}

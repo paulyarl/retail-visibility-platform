@@ -8,6 +8,7 @@ import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
 import { generateItemId, generateOrganizationId, generatePhotoId } from '../lib/id-generator';
 import { authenticateToken } from '../middleware/auth';
+import { user_tenant_role } from '@prisma/client';
 
 const router = Router();
 
@@ -60,7 +61,7 @@ function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
 
 // GET /organizations - List all organizations
 // Permission: Platform support (view-only operation)
-router.get('/', requireSupportActions, async (req, res) => {
+router.get('/', authenticateToken, requireSupportActions, async (req, res) => {
   try {
     const organizations = await prisma.organizations_list.findMany({
       include: {
@@ -105,11 +106,46 @@ router.get('/', requireSupportActions, async (req, res) => {
 });
 
 // GET /organizations/:id - Get single organization
-// Permission: Platform support (view-only operation)
-router.get('/:id', requireSupportActions, async (req, res) => {
+// Permission: Organization members can read their own organization data
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
+    const user = (req as any).user;
+    const organizationId = req.params.id;
+
+    // Verify user is a member of this organization
+    const userTenants = await prisma.tenants.findMany({
+      where: {
+        organization_id: organizationId,
+        user_tenants: {
+          some: {
+            user_id: user.userId,
+            role: {
+              in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+            }
+          }
+        }
+      },
+      select: { id: true }
+    });
+
+    // Also check if user created any tenants in this organization
+    const userCreatedTenants = await prisma.tenants.findMany({
+      where: {
+        organization_id: organizationId,
+        created_by: user.userId
+      },
+      select: { id: true }
+    });
+
+    if (userTenants.length === 0 && userCreatedTenants.length === 0 && !isPlatformAdmin(user)) {
+      return res.status(403).json({ 
+        error: 'Forbidden', 
+        message: 'You must be a member of this organization to view its data' 
+      });
+    }
+
     const organization = await prisma.organizations_list.findUnique({
-      where: { id: req.params.id },
+      where: { id: organizationId },
       include: {
         tenants: {
           select: {

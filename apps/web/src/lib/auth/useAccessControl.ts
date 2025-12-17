@@ -85,13 +85,49 @@ export function useAccessControl(
         setTenantData(tenant);
 
         // Fetch organization data if needed
-        if (fetchOrganization && tenant.organizationId) {
-          const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenant.organizationId}`);
-          if (orgRes.ok) {
-            const org = await orgRes.json();
-            setOrganizationData(org);
+        if (fetchOrganization) {
+          if (tenant.organizationId) {
+            const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenant.organizationId}`);
+            if (orgRes.ok) {
+              const org = await orgRes.json();
+              setOrganizationData(org);
+            } else {
+              setOrganizationData(null);
+            }
+          } else {
+            // Try to find organization by searching organizations that contain this tenant
+            try {
+              const orgsRes = await api.get(`${API_BASE_URL}/organizations`);
+              if (orgsRes.ok) {
+                const organizations = await orgsRes.json();
+                // Find the organization that contains this tenant
+                const matchingOrg = organizations.find((org: any) =>
+                  org.tenants?.some((t: any) => t.id === tenantId)
+                );
+
+                if (matchingOrg) {
+                  // Now fetch the full organization data
+                  const fullOrgRes = await api.get(`${API_BASE_URL}/organizations/${matchingOrg.id}`);
+                  if (fullOrgRes.ok) {
+                    const org = await fullOrgRes.json();
+                    setOrganizationData(org);
+                  } else {
+                    setOrganizationData(null);
+                  }
+                } else {
+                  setOrganizationData(null);
+                }
+              } else {
+                setOrganizationData(null);
+              }
+            } catch (error) {
+              setOrganizationData(null);
+            }
           }
         }
+      } else {
+        setTenantData(null);
+        setOrganizationData(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load tenant data');

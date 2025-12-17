@@ -234,8 +234,8 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       locationStatus: tenant.location_status,
       statusInfo: getLocationStatusInfo(tenant.location_status as any),
       stats: {
-        productCount: tenant._count.inventory_items,
-        userCount: tenant._count.user_tenants,
+        productCount: (tenant as any)._count.inventory_items,
+        userCount: (tenant as any)._count.user_tenants,
       },
     };
 

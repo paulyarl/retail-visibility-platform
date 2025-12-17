@@ -598,7 +598,7 @@ export const AccessPresets = {
 
   /** Organization member (owner/admin of any location), or platform support */
   ORGANIZATION_MEMBER: {
-    requireOrganization: true,
+    requireOrganization: false, // Don't require tenant to have organizationId since we fetch org data separately
     customCheck: (user, context) => {
       // Platform support/admin can view organization data
       if (user.role === 'PLATFORM_ADMIN' || 
@@ -611,13 +611,13 @@ export const AccessPresets = {
         return user.tenants?.some(t => 
           context.organizationData!.tenants.some(orgTenant => 
             (t.tenantId === orgTenant.id || t.id === orgTenant.id) &&
-            (t.role === 'OWNER' ||t.role === 'TENANT_OWNER' ||t.role === 'TENANT_ADMIN' ||t.role === 'TENANT_MANAGER' || t.role === 'ADMIN')
+            (t.role === 'OWNER' || t.role === 'TENANT_OWNER' || t.role === 'TENANT_ADMIN' || t.role === 'TENANT_MANAGER' || t.role === 'ADMIN')
           )
         ) || false;
       }
       return false;
     },
-    allowPlatformAdminOverride: false,
+    allowPlatformAdminOverride: true,
   } as AccessControlOptions,
 
   /** Hero location admin (must be hero + owner/admin), or platform admin */
