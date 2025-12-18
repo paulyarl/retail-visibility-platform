@@ -3,11 +3,118 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, ModalFooter, Input, Pagination } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { QuickStartCategoryModal } from '@/components/quick-start';
+import { CategoryEditModal, type CategoryFormData } from '@/components/categories';
 
 interface Category {
   id: string;
   name: string;
   createdAt?: string;
+  googleCategoryId?: string;
+  google_category_id?: string;
+  slug?: string;
+  description?: string;
+  icon_emoji?: string;
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
+// Component to display Google category ID with lookup utility
+function GoogleCategoryPath({ googleCategoryId }: { googleCategoryId: string }) {
+  const [showLookup, setShowLookup] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(googleCategoryId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <div className="flex items-center gap-1.5 text-neutral-600">
+        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+        </svg>
+        <span className="font-medium text-green-700">Google ID:</span>
+        <button
+          onClick={handleCopy}
+          className="font-mono text-neutral-700 hover:text-green-700 hover:underline transition-colors"
+          title="Click to copy ID"
+        >
+          {googleCategoryId}
+        </button>
+        {copied && (
+          <span className="text-green-600 font-medium">✓ Copied</span>
+        )}
+      </div>
+      <button
+        onClick={() => setShowLookup(!showLookup)}
+        className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
+        title="Lookup category path"
+      >
+        {showLookup ? 'Hide path' : 'Show path'}
+      </button>
+      {showLookup && (
+        <GoogleCategoryLookup googleCategoryId={googleCategoryId} />
+      )}
+    </div>
+  );
+}
+
+// Separate component for the lookup that fetches from public endpoint
+function GoogleCategoryLookup({ googleCategoryId }: { googleCategoryId: string }) {
+  const [path, setPath] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchPath() {
+      try {
+        // Use the public Google taxonomy endpoint (no auth required)
+        const res = await fetch(`${API_BASE_URL}/public/google-taxonomy/${googleCategoryId}`);
+        if (res.ok) {
+          const data = await res.json();
+          // data.path is an array like ["Food", "Bakery", "Bread"]
+          if (data.path) {
+            const pathString = Array.isArray(data.path) ? data.path.join(' > ') : data.path;
+            setPath(pathString);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch Google category path:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPath();
+  }, [googleCategoryId]);
+
+  if (loading) {
+    return (
+      <span className="text-neutral-500 italic">Loading...</span>
+    );
+  }
+
+  if (!path) {
+    return (
+      <span className="text-orange-600">Path not found</span>
+    );
+  }
+
+  return (
+    <span className="text-neutral-700 italic">→ {path}</span>
+  );
+}
+
+interface Tenant {
+  id: string;
+  name: string;
+  organizationId?: string;
+}
+
+interface Organization {
+  id: string;
+  name: string;
 }
 
 export default function AdminCategoriesPage() {
@@ -17,7 +124,6 @@ export default function AdminCategoriesPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [categoryName, setCategoryName] = useState('');
   const [dryRun, setDryRun] = useState(true);
   const [mirrorLoading, setMirrorLoading] = useState(false);
   const [tenantIdInput, setTenantIdInput] = useState('');
@@ -38,9 +144,13 @@ export default function AdminCategoriesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [showQuickStartModal, setShowQuickStartModal] = useState(false);
-  const [quickStartType, setQuickStartType] = useState<'grocery' | 'fashion' | 'electronics' | 'general'>('general');
-  const [quickStartCount, setQuickStartCount] = useState(15);
-  const [quickStartLoading, setQuickStartLoading] = useState(false);
+  
+  // Tenant and Organization lists for dropdowns
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [loadingTenants, setLoadingTenants] = useState(false);
+  const [loadingOrgs, setLoadingOrgs] = useState(false);
+  
   const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
   const apiUrl = (path: string) => `${API_BASE}${path}`;
   
@@ -58,7 +168,43 @@ export default function AdminCategoriesPage() {
 
   useEffect(() => {
     loadCategories();
+    loadTenantsAndOrgs();
   }, []);
+  
+  // Load tenants and organizations for dropdowns
+  const loadTenantsAndOrgs = async () => {
+    const token = localStorage.getItem('access_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    
+    // Load tenants
+    setLoadingTenants(true);
+    try {
+      const res = await fetch(apiUrl('/api/tenants'), { headers, credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setTenants(Array.isArray(data) ? data : (data.data || []));
+      }
+    } catch (e) {
+      console.error('Failed to load tenants:', e);
+    } finally {
+      setLoadingTenants(false);
+    }
+    
+    // Load organizations
+    setLoadingOrgs(true);
+    try {
+      const res = await fetch(apiUrl('/organizations'), { headers, credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setOrganizations(Array.isArray(data) ? data : (data.data || []));
+      }
+    } catch (e) {
+      console.error('Failed to load organizations:', e);
+    } finally {
+      setLoadingOrgs(false);
+    }
+  };
 
   // Filter and paginate categories
   const filteredCategories = categories.filter(cat => {
@@ -134,58 +280,59 @@ export default function AdminCategoriesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantIdInput]);
 
-  const handleCreate = async () => {
-    if (!categoryName.trim()) return;
+  // Handler for CategoryEditModal - works for both create and edit
+  const handleSaveCategory = async (data: CategoryFormData) => {
+    const token = localStorage.getItem('access_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     
-    try {
-      // Generate slug from name
-      const slug = categoryName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      
-      const res = await fetch('/api/platform/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: categoryName, slug }),
-        credentials: 'include',
-      });
-      
-      if (res.ok) {
-        await loadCategories();
-        setShowCreateModal(false);
-        setCategoryName('');
-      } else {
-        const data = await res.json();
-        if (data.error === 'duplicate_slug') {
-          alert(`Category already exists: ${data.message || 'A category with this name already exists'}`);
-        } else {
-          alert(`Failed to create category: ${data.message || data.error || 'Unknown error'}`);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to create category:', error);
-      alert('Failed to create category. Please try again.');
-    }
-  };
-
-  const handleEdit = async () => {
-    if (!selectedCategory || !categoryName.trim()) return;
-    
-    try {
+    if (selectedCategory) {
+      // Edit existing category
       const res = await fetch(`/api/platform/categories/${selectedCategory.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: categoryName }),
+        headers,
+        body: JSON.stringify({
+          name: data.name,
+          slug: data.slug,
+          googleCategoryId: data.googleCategoryId,
+          description: data.description,
+          icon_emoji: data.iconEmoji,
+        }),
         credentials: 'include',
       });
       
-      if (res.ok) {
-        await loadCategories();
-        setShowEditModal(false);
-        setSelectedCategory(null);
-        setCategoryName('');
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to update category');
       }
-    } catch (error) {
-      console.error('Failed to update category:', error);
+    } else {
+      // Create new category
+      const res = await fetch('/api/platform/categories', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: data.name,
+          slug: data.slug,
+          googleCategoryId: data.googleCategoryId,
+          description: data.description,
+          icon_emoji: data.iconEmoji,
+        }),
+        credentials: 'include',
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        if (errorData.error === 'duplicate_slug') {
+          throw new Error(`Category already exists: ${errorData.message || 'A category with this name already exists'}`);
+        }
+        throw new Error(errorData.message || errorData.error || 'Failed to create category');
+      }
     }
+    
+    await loadCategories();
+    setShowEditModal(false);
+    setShowCreateModal(false);
+    setSelectedCategory(null);
   };
 
   const handleDelete = async () => {
@@ -251,7 +398,6 @@ export default function AdminCategoriesPage() {
 
   const openEditModal = (category: Category) => {
     setSelectedCategory(category);
-    setCategoryName(category.name);
     setShowEditModal(true);
   };
 
@@ -337,36 +483,28 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  const handleQuickStart = async () => {
-    setQuickStartLoading(true);
-    try {
-      // Use platform tenant ID for platform-level categories
-      const res = await fetch('/api/platform/categories/quick-start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          businessType: quickStartType,
-          categoryCount: quickStartCount,
-        }),
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        console.log('[Quick Start] Response:', data);
-        await loadCategories();
-        setShowQuickStartModal(false);
-        const createdCount = data.categoriesCreated || 0;
-        const totalCount = data.data?.length || 0;
-        alert(`Successfully created ${createdCount} new categories! (${totalCount} total platform categories)`);
-      } else {
-        const data = await res.json();
-        alert(`Failed to generate categories: ${data.message || data.error || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('[Quick Start] Error:', error);
-      alert('Failed to generate categories. Please try again.');
-    } finally {
-      setQuickStartLoading(false);
+  // Quick Start handler - used by shared QuickStartCategoryModal
+  const handleQuickStart = async (businessType: string, categoryCount: number) => {
+    // Use platform tenant ID for platform-level categories
+    const res = await fetch('/api/platform/categories/quick-start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        businessType,
+        categoryCount,
+      }),
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      console.log('[Quick Start] Response:', data);
+      await loadCategories();
+      const createdCount = data.categoriesCreated || 0;
+      const totalCount = data.data?.length || 0;
+      alert(`Successfully created ${createdCount} new categories! (${totalCount} total platform categories)`);
+    } else {
+      const data = await res.json();
+      throw new Error(data.message || data.error || 'Unknown error');
     }
   };
 
@@ -440,23 +578,59 @@ export default function AdminCategoriesPage() {
 
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
               {scope === 'organization' && (
-                <div className="w-full sm:w-64">
-                  <Input
-                    label="Organization ID"
-                    placeholder="org_..."
+                <div className="w-full sm:w-80">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Organization</label>
+                  <select
                     value={organizationIdInput}
                     onChange={(e) => setOrganizationIdInput(e.target.value)}
-                  />
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                  >
+                    <option value="">Select an organization...</option>
+                    {loadingOrgs ? (
+                      <option disabled>Loading...</option>
+                    ) : (
+                      organizations.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name} ({org.id})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <div className="mt-1">
+                    <Input
+                      placeholder="Or type organization ID manually..."
+                      value={organizationIdInput}
+                      onChange={(e) => setOrganizationIdInput(e.target.value)}
+                    />
+                  </div>
                 </div>
               )}
               {scope === 'tenant' && (
-                <div className="w-full sm:w-64">
-                  <Input
-                    label="Tenant ID"
-                    placeholder="tenant_..."
+                <div className="w-full sm:w-80">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Tenant</label>
+                  <select
                     value={tenantIdInput}
                     onChange={(e) => setTenantIdInput(e.target.value)}
-                  />
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                  >
+                    <option value="">Select a tenant...</option>
+                    {loadingTenants ? (
+                      <option disabled>Loading...</option>
+                    ) : (
+                      tenants.map((tenant) => (
+                        <option key={tenant.id} value={tenant.id}>
+                          {tenant.name} ({tenant.id})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <div className="mt-1">
+                    <Input
+                      placeholder="Or type tenant ID manually..."
+                      value={tenantIdInput}
+                      onChange={(e) => setTenantIdInput(e.target.value)}
+                    />
+                  </div>
                 </div>
               )}
               {scope === 'platform' && (
@@ -602,6 +776,11 @@ export default function AdminCategoriesPage() {
                         <h3 className="font-bold text-primary-900 dark:text-primary-100">{category.name}</h3>
                       </div>
                       <p className="text-sm text-neutral-600 dark:text-neutral-400">ID: {category.id}</p>
+                      {(category.googleCategoryId || category.google_category_id) && (
+                        <div className="mt-1">
+                          <GoogleCategoryPath googleCategoryId={category.googleCategoryId || category.google_category_id || ''} />
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -722,151 +901,26 @@ export default function AdminCategoriesPage() {
         </Card>
       </div>
 
-      {/* Create Modal */}
-      <Modal
-        isOpen={showCreateModal}
+      {/* Create/Edit Modal - Using shared CategoryEditModal */}
+      <CategoryEditModal
+        isOpen={showCreateModal || showEditModal}
         onClose={() => {
           setShowCreateModal(false);
-          setCategoryName('');
-        }}
-        title="Create Category"
-        description="Add a new product category"
-      >
-        <div className="space-y-4">
-          <Input
-            label="Category Name"
-            placeholder="Enter category name"
-            value={categoryName}
-            onChange={(e) => setCategoryName(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleCreate()}
-          />
-        </div>
-        <ModalFooter>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setShowCreateModal(false);
-              setCategoryName('');
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleCreate}
-            disabled={!categoryName.trim()}
-          >
-            Create Category
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Edit Modal */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => {
           setShowEditModal(false);
           setSelectedCategory(null);
-          setCategoryName('');
         }}
-        title="Edit Category"
-        description={selectedCategory ? `Update ${selectedCategory.name}` : ''}
-      >
-        <div className="space-y-4">
-          <Input
-            label="Category Name"
-            placeholder="Enter category name"
-            value={categoryName}
-            onChange={(e) => setCategoryName(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleEdit()}
-          />
-        </div>
-        <ModalFooter>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setShowEditModal(false);
-              setSelectedCategory(null);
-              setCategoryName('');
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleEdit}
-            disabled={!categoryName.trim()}
-          >
-            Save Changes
-          </Button>
-        </ModalFooter>
-      </Modal>
+        onSave={handleSaveCategory}
+        category={selectedCategory}
+        isCreate={showCreateModal}
+        apiBaseUrl=""
+      />
 
-      {/* Quick Start Modal */}
-      <Modal
+      {/* Quick Start Modal - Using shared component */}
+      <QuickStartCategoryModal
         isOpen={showQuickStartModal}
         onClose={() => setShowQuickStartModal(false)}
-        title="⚡ Quick Start: Generate Categories"
-        description="Generate Google-aligned categories for your business type"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Business Type
-            </label>
-            <select
-              value={quickStartType}
-              onChange={(e) => setQuickStartType(e.target.value as any)}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="general">General Retail (20 categories)</option>
-              <option value="grocery">Grocery Store (15 categories)</option>
-              <option value="fashion">Fashion Retail (12 categories)</option>
-              <option value="electronics">Electronics Store (10 categories)</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Number of Categories: {quickStartCount}
-            </label>
-            <input
-              type="range"
-              min="5"
-              max="30"
-              value={quickStartCount}
-              onChange={(e) => setQuickStartCount(parseInt(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
-            />
-            <div className="flex justify-between text-xs text-neutral-500 mt-1">
-              <span>5 min</span>
-              <span>30 max</span>
-            </div>
-          </div>
-          
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-800">
-              <strong>✓ Google-Aligned:</strong> Each category will be automatically mapped to Google's Product Taxonomy for optimal SEO and Google Business Profile sync.
-            </p>
-          </div>
-        </div>
-        <ModalFooter>
-          <Button
-            variant="ghost"
-            onClick={() => setShowQuickStartModal(false)}
-            disabled={quickStartLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleQuickStart}
-            disabled={quickStartLoading}
-          >
-            {quickStartLoading ? 'Generating...' : `Generate ${quickStartCount} Categories`}
-          </Button>
-        </ModalFooter>
-      </Modal>
+        onGenerate={handleQuickStart}
+      />
 
       {/* Import from Google Modal */}
       <Modal

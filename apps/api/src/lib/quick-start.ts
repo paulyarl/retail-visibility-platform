@@ -1080,10 +1080,24 @@ export async function generateQuickStartProducts(
                     select: { id: true, name: true, image_url: true }
                   });
                   
-                  // Also create a photo_assets record for proper gallery management
+                  // Also create/update a photo_assets record for proper gallery management
+                  // Use upsert to handle case where item already has a photo at position 0
                   const photoId = generateQuickStart("pha");
-                  await prismaClient.photo_assets.create({
-                    data: {
+                  await prismaClient.photo_assets.upsert({
+                    where: {
+                      inventoryItemId_position: {
+                        inventoryItemId: item.id,
+                        position: 0,
+                      },
+                    },
+                    update: {
+                      url: image.url,
+                      width: image.width || null,
+                      height: image.height || null,
+                      bytes: image.bytes || null,
+                      contentType: 'image/png',
+                    },
+                    create: {
                       id: photoId,
                       tenantId: tenant_id,
                       inventoryItemId: item.id,

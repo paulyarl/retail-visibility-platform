@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { api, API_BASE_URL } from '@/lib/api'
 import { Pagination } from '@/components/ui'
 import { ContextBadges } from '@/components/ContextBadges'
+import { QuickStartCategoryModal } from '@/components/quick-start'
+import { CategoryEditModal, type CategoryFormData } from '@/components/categories'
 
 interface Category {
   id: string
@@ -131,26 +133,10 @@ export default function CategoriesPage() {
   const [filterUnmapped, setFilterUnmapped] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Edit modal state
+  // Edit modal state (using shared CategoryEditModal)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selected, setSelected] = useState<Category | null>(null)
-  const [formName, setFormName] = useState('')
-  const [formSort, setFormSort] = useState<number>(0)
-  const [formGoogleId, setFormGoogleId] = useState<string>('')
-  const [saving, setSaving] = useState(false)
   const [isCreate, setIsCreate] = useState(false)
-
-  // Taxonomy search state
-  const [taxQuery, setTaxQuery] = useState('')
-  const [taxResults, setTaxResults] = useState<Array<{ id: string; name: string; path: string[] }>>([])
-  const [taxLoading, setTaxLoading] = useState(false)
-  const [showTaxResults, setShowTaxResults] = useState(false)
-  
-  // Taxonomy browse state
-  const [taxBrowseMode, setTaxBrowseMode] = useState(false)
-  const [taxBrowsePath, setTaxBrowsePath] = useState<string[]>([])
-  const [taxBrowseCategories, setTaxBrowseCategories] = useState<Array<{ id: string; name: string; path: string[]; hasChildren?: boolean }>>([])
-  const [taxBrowseLoading, setTaxBrowseLoading] = useState(false)
 
   // Propagation state
   const [propagating, setPropagating] = useState(false)
@@ -170,9 +156,9 @@ export default function CategoriesPage() {
 
   // Quick Start modal state
   const [showQuickStartModal, setShowQuickStartModal] = useState(false)
-  const [quickStartType, setQuickStartType] = useState<'grocery' | 'fashion' | 'electronics' | 'general'>('general')
-  const [quickStartCount, setQuickStartCount] = useState(15)
-  const [quickStartLoading, setQuickStartLoading] = useState(false)
+  
+  // Track newly created category IDs (from Quick Start) to show "New" badge
+  const [newCategoryIds, setNewCategoryIds] = useState<Set<string>>(new Set())
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -284,24 +270,66 @@ export default function CategoriesPage() {
 
   function openEdit(cat: Category) {
     setSelected(cat)
-    setFormName(cat.name)
-    setFormSort(cat.sortOrder)
-    setFormGoogleId(cat.googleCategoryId || '')
-    setTaxQuery('')
-    setTaxResults([])
     setIsCreate(false)
     setIsModalOpen(true)
   }
 
   function openCreate() {
     setSelected(null)
-    setFormName('')
-    setFormSort(0)
-    setFormGoogleId('')
-    setTaxQuery('')
-    setTaxResults([])
     setIsCreate(true)
     setIsModalOpen(true)
+  }
+  
+  // Handler for shared CategoryEditModal
+  async function handleSaveCategory(data: CategoryFormData) {
+    if (isCreate || !selected) {
+      // Create new category
+      const postRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`, { 
+        name: data.name, 
+        slug: data.slug || data.name.toLowerCase().replace(/\s+/g, '-'), 
+        sortOrder: data.sortOrder 
+      })
+      if (!postRes.ok) throw new Error('Failed to create category')
+      const created = await postRes.json()
+      
+      // Align if Google category provided
+      if (data.googleCategoryId) {
+        const alignRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${created.data.id}/align`, { 
+          googleCategoryId: data.googleCategoryId 
+        })
+        if (!alignRes.ok) throw new Error('Failed to align category')
+      }
+      showToast('success', 'Category created')
+    } else {
+      // Update existing category
+      const putRes = await api.put(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${selected.id}`, { 
+        name: data.name, 
+        sortOrder: data.sortOrder 
+      })
+      if (!putRes.ok) throw new Error('Failed to update category')
+
+      // Align if Google category changed
+      if (data.googleCategoryId && data.googleCategoryId !== (selected.googleCategoryId || '')) {
+        const alignRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${selected.id}/align`, { 
+          googleCategoryId: data.googleCategoryId 
+        })
+        if (!alignRes.ok) throw new Error('Failed to align category')
+      }
+      showToast('success', 'Changes saved')
+    }
+
+    // Refresh data
+    const [catRes, statusRes] = await Promise.all([
+      api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`),
+      api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
+    ])
+    const catData = await catRes.json()
+    const statusData = await statusRes.json()
+    setCategories(catData.data || [])
+    setAlignmentStatus(statusData.data)
+    
+    setIsModalOpen(false)
+    setSelected(null)
   }
 
   function openPropagateModal() {
@@ -341,53 +369,6 @@ export default function CategoriesPage() {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate categories')
     } finally {
       setPropagating(false)
-    }
-  }
-
-  async function saveEdit() {
-    try {
-      setSaving(true)
-      if (isCreate || !selected) {
-        // Create
-        const postRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`, { name: formName, slug: formName.toLowerCase().replace(/\s+/g, '-'), sortOrder: formSort })
-        if (!postRes.ok) throw new Error('Failed to create category')
-        const created = await postRes.json()
-        // Align if provided
-        if (formGoogleId) {
-          const alignRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${created.data.id}/align`, { googleCategoryId: formGoogleId })
-          if (!alignRes.ok) throw new Error('Failed to align category')
-        }
-        showToast('success', 'Category created')
-      } else {
-        // Update core fields
-        const putRes = await api.put(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${selected.id}`, { name: formName, sortOrder: formSort })
-        if (!putRes.ok) throw new Error('Failed to update category')
-
-        // Align if a googleCategoryId is provided
-        if (formGoogleId && formGoogleId !== (selected.googleCategoryId || '')) {
-          const alignRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${selected.id}/align`, { googleCategoryId: formGoogleId })
-          if (!alignRes.ok) throw new Error('Failed to align category')
-        }
-        showToast('success', 'Changes saved')
-      }
-
-      // Refresh data
-      const [catRes, statusRes] = await Promise.all([
-        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`),
-        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
-      ])
-      const catData = await catRes.json()
-      const statusData = await statusRes.json()
-      setCategories(catData.data || [])
-      setAlignmentStatus(statusData.data)
-
-      setIsModalOpen(false)
-      setSelected(null)
-    } catch (e: any) {
-      setError(e?.message || 'Failed to save changes')
-      showToast('error', e?.message || 'Failed to save changes')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -487,105 +468,60 @@ export default function CategoriesPage() {
   const somePageSelected = paginatedCategories.some(cat => selectedIds.has(cat.id)) && !allPageSelected
 
   // Debounced taxonomy search
-  useEffect(() => {
-    if (!taxQuery || taxQuery.trim().length < 2) { setTaxResults([]); return }
-    let active = true
-    const t = setTimeout(async () => {
-      try {
-        setTaxLoading(true)
-        const res = await api.get(`${API_BASE_URL}/api/categories/search?q=${encodeURIComponent(taxQuery)}&limit=20`)
-        if (res.ok) {
-          const data = await res.json()
-          if (active) setTaxResults(data.results || [])
-        }
-      } finally {
-        setTaxLoading(false)
-      }
-    }, 300)
-    return () => { active = false; clearTimeout(t) }
-  }, [taxQuery])
-
-  // Load taxonomy browse categories for a specific parent path
-  async function loadTaxBrowseCategories(parentPath?: string) {
-    try {
-      setTaxBrowseLoading(true)
-      const url = parentPath 
-        ? `${API_BASE_URL}/api/google/taxonomy/browse?parent=${encodeURIComponent(parentPath)}`
-        : `${API_BASE_URL}/api/google/taxonomy/browse`
-      const res = await api.get(url)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.success && data.categories) {
-          setTaxBrowseCategories(data.categories)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load taxonomy categories:', error)
-    } finally {
-      setTaxBrowseLoading(false)
-    }
-  }
-
-  // Navigate to a category path and load its children
-  async function navigateToPath(newPath: string[]) {
-    setTaxBrowsePath(newPath)
-    if (newPath.length === 0) {
-      await loadTaxBrowseCategories()
-    } else {
-      await loadTaxBrowseCategories(newPath.join(' > '))
-    }
-  }
-
-  // Quick Start handler
-  const handleQuickStart = async () => {
-    setQuickStartLoading(true)
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}/categories/quick-start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          businessType: quickStartType,
-          categoryCount: quickStartCount,
-        }),
-        credentials: 'include',
-      })
+  // Quick Start handler - used by shared QuickStartCategoryModal
+  const handleQuickStart = async (businessType: string, categoryCount: number) => {
+    // Get existing category IDs before quick start
+    const existingIds = new Set(categories.map(c => c.id))
+    
+    const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/quick-start`, {
+      businessType,
+      categoryCount,
+    })
+    
+    if (res.ok) {
+      const data = await res.json()
       
-      if (res.ok) {
-        const data = await res.json()
-        
-        // Refresh categories and alignment status
-        try {
-          setLoading(true)
-          const catRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`)
-          if (catRes.ok) {
-            const catData = await catRes.json()
-            setCategories(catData.data || [])
-          }
+      // Refresh categories and alignment status
+      try {
+        setLoading(true)
+        const catRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`)
+        if (catRes.ok) {
+          const catData = await catRes.json()
+          const newCategories = catData.data || []
+          setCategories(newCategories)
           
-          const statusRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
-          if (statusRes.ok) {
-            const statusData = await statusRes.json()
-            setAlignmentStatus(statusData.data)
+          // Track newly created category IDs (those not in existingIds)
+          const newIds = new Set<string>()
+          newCategories.forEach((cat: Category) => {
+            if (!existingIds.has(cat.id)) {
+              newIds.add(cat.id)
+            }
+          })
+          setNewCategoryIds(newIds)
+          
+          // Clear "New" badges after 30 seconds
+          if (newIds.size > 0) {
+            setTimeout(() => setNewCategoryIds(new Set()), 30000)
           }
-        } catch (error) {
-          console.error('Failed to refresh data:', error)
-        } finally {
-          setLoading(false)
         }
         
-        setShowQuickStartModal(false)
-        const createdCount = data.categoriesCreated || 0
-        const totalCount = data.data?.length || 0
-        showToast('success', `Successfully created ${createdCount} new categories! (${totalCount} total categories)`)
-      } else {
-        const data = await res.json()
-        showToast('error', `Failed to generate categories: ${data.message || data.error || 'Unknown error'}`)
+        const statusRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
+        if (statusRes.ok) {
+          const statusData = await statusRes.json()
+          setAlignmentStatus(statusData.data)
+        }
+      } catch (error) {
+        console.error('Failed to refresh data:', error)
+      } finally {
+        setLoading(false)
       }
-    } catch (error) {
-      console.error('[Quick Start] Error:', error)
-      showToast('error', 'Failed to generate categories. Please try again.')
-    } finally {
-      setQuickStartLoading(false)
+      
+      const createdCount = data.categoriesCreated || 0
+      const totalCount = data.data?.length || 0
+      showToast('success', `Successfully created ${createdCount} new categories! (${totalCount} total categories)`)
+    } else {
+      const data = await res.json()
+      throw new Error(data.message || data.error || 'Unknown error')
     }
   }
 
@@ -983,6 +919,11 @@ export default function CategoriesPage() {
                     <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
                       <h3 className="font-medium text-gray-900">{cat.name}</h3>
+                      {newCategoryIds.has(cat.id) && (
+                        <span className="inline-flex items-center gap-1 text-xs text-white bg-gradient-to-r from-blue-500 to-purple-500 px-2 py-1 rounded-full font-semibold animate-pulse shadow-sm">
+                          ✨ New
+                        </span>
+                      )}
                       {cat.googleCategoryId ? (
                         <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-1 rounded">
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -1234,195 +1175,24 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Edit Modal */}
-      {isModalOpen && (selected || isCreate) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{isCreate ? 'Create Category' : 'Edit Category'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
-                <input
-                  type="number"
-                  value={formSort}
-                  onChange={(e) => setFormSort(Number(e.target.value))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Google Category</label>
-                <div className="space-y-3">
-                  {/* Mode toggle */}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTaxBrowseMode(false)}
-                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${!taxBrowseMode ? 'bg-blue-100 text-blue-700 border-2 border-blue-500' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'}`}
-                    >
-                      🔍 Search
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setTaxBrowseMode(true); if (taxBrowseCategories.length === 0) loadTaxBrowseCategories() }}
-                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${taxBrowseMode ? 'bg-blue-100 text-blue-700 border-2 border-blue-500' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'}`}
-                    >
-                      📂 Browse Tree
-                    </button>
-                  </div>
-
-                  {!taxBrowseMode ? (
-                    <>
-                      {/* Search by name */}
-                      <div className="relative">
-                        <input
-                          placeholder="Search taxonomy by name (e.g. Electronics, Pizza)"
-                          value={taxQuery}
-                          onChange={(e) => { setTaxQuery(e.target.value); setShowTaxResults(true) }}
-                          onFocus={() => setShowTaxResults(true)}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        {showTaxResults && (taxResults.length > 0 || taxLoading) && (
-                          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-auto">
-                            {taxLoading && <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>}
-                            {taxResults.map((r) => (
-                              <button
-                                key={r.id}
-                                type="button"
-                                onClick={() => { setFormGoogleId(r.id); setTaxQuery(r.path.join(' > ')); setShowTaxResults(false) }}
-                                className="w-full text-left px-3 py-2 hover:bg-gray-50"
-                              >
-                                <div className="text-sm font-medium text-gray-900">{r.name}</div>
-                                <div className="text-xs text-gray-600">{r.path.join(' > ')}</div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Browse tree */}
-                      <div className="border border-gray-200 rounded-md">
-                        {/* Breadcrumb */}
-                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-1 flex-wrap text-sm">
-                          <button
-                            type="button"
-                            onClick={() => navigateToPath([])}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            Root
-                          </button>
-                          {taxBrowsePath.map((segment, idx) => (
-                            <span key={idx} className="flex items-center gap-1">
-                              <span className="text-gray-400">&gt;</span>
-                              <button
-                                type="button"
-                                onClick={() => navigateToPath(taxBrowsePath.slice(0, idx + 1))}
-                                className="text-blue-600 hover:text-blue-800"
-                              >
-                                {segment}
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                        {/* Category list */}
-                        <div className="max-h-48 overflow-auto">
-                          {taxBrowseLoading ? (
-                            <div className="px-3 py-4 text-sm text-gray-500 text-center">Loading categories...</div>
-                          ) : taxBrowseCategories.length === 0 ? (
-                            <div className="px-3 py-4 text-sm text-gray-500 text-center">No subcategories</div>
-                          ) : (
-                            taxBrowseCategories.map((cat) => (
-                              <div key={cat.id} className="flex items-center border-b border-gray-100 last:border-0">
-                                <button
-                                  type="button"
-                                  onClick={() => { setFormGoogleId(cat.id); setTaxQuery(cat.path.join(' > ')) }}
-                                  className={`flex-1 text-left px-3 py-2 hover:bg-blue-50 ${formGoogleId === cat.id ? 'bg-blue-100' : ''}`}
-                                >
-                                  <div className="text-sm font-medium text-gray-900">{cat.name}</div>
-                                  <div className="text-xs text-gray-500 font-mono">{cat.id}</div>
-                                </button>
-                                {cat.hasChildren && (
-                                  <button
-                                    type="button"
-                                    onClick={() => navigateToPath([...taxBrowsePath, cat.name])}
-                                    className="px-3 py-2 text-blue-600 hover:bg-blue-50"
-                                    title="Browse subcategories"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                  </button>
-                                )}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        💡 Click a category to select it, or click the arrow to browse subcategories
-                      </p>
-                    </>
-                  )}
-
-                  {/* OR divider */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 border-t border-gray-300"></div>
-                    <span className="text-xs text-gray-500 font-medium">OR</span>
-                    <div className="flex-1 border-t border-gray-300"></div>
-                  </div>
-
-                  {/* Direct ID input */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Enter Google Category ID directly</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 543543, 5904, 499989"
-                      value={formGoogleId}
-                      onChange={(e) => setFormGoogleId(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {formGoogleId ? (
-                        <>Selected ID: <span className="font-mono font-medium">{formGoogleId}</span></>
-                      ) : (
-                        'Paste a known Google category ID if you have one'
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveEdit}
-                className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                disabled={saving}
-              >
-                {saving ? 'Saving...' : 'Save changes'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Edit Modal - Using shared CategoryEditModal */}
+      <CategoryEditModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          setSelected(null)
+        }}
+        onSave={handleSaveCategory}
+        category={selected ? {
+          id: selected.id,
+          name: selected.name,
+          slug: selected.slug,
+          sortOrder: selected.sortOrder,
+          googleCategoryId: selected.googleCategoryId || undefined,
+        } : null}
+        isCreate={isCreate}
+        apiBaseUrl={API_BASE_URL}
+      />
 
       {/* Propagate Modal */}
       {showPropagateModal && organizationInfo && (
@@ -1574,71 +1344,12 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      {/* Quick Start Modal */}
-      {showQuickStartModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold">⚡ Quick Start: Generate Categories</h3>
-              <p className="text-sm text-gray-600 mt-1">Generate Google-aligned categories for your business type</p>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Business Type
-                </label>
-                <select
-                  value={quickStartType}
-                  onChange={(e) => setQuickStartType(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="general">General Retail (20 categories)</option>
-                  <option value="grocery">Grocery Store (15 categories)</option>
-                  <option value="fashion">Fashion Retail (12 categories)</option>
-                  <option value="electronics">Electronics Store (10 categories)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Number of Categories: {quickStartCount}
-                </label>
-                <input
-                  type="range"
-                  min="5"
-                  max="30"
-                  value={quickStartCount}
-                  onChange={(e) => setQuickStartCount(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setShowQuickStartModal(false)}
-                className="px-4 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleQuickStart}
-                disabled={quickStartLoading}
-                className="px-4 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {quickStartLoading && (
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                )}
-                {quickStartLoading ? 'Generating...' : 'Generate Categories'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Quick Start Modal - Using shared component */}
+      <QuickStartCategoryModal
+        isOpen={showQuickStartModal}
+        onClose={() => setShowQuickStartModal(false)}
+        onGenerate={handleQuickStart}
+      />
 
       {/* Toast */}
       {toast && (

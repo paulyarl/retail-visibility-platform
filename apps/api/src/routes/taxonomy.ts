@@ -5,20 +5,55 @@ import { GOOGLE_PRODUCT_TAXONOMY } from '../lib/google/taxonomy';
 const router = Router();
 
 /**
+ * GET /api/taxonomy/search?q=Electronics&limit=20
  * GET /api/taxonomy/search?branch=Food, Beverages & Tobacco > Food Items > Breakfast Foods&limit=500
- * Search Google taxonomy categories under a specific branch (public access)
+ * Search Google taxonomy categories by name (q) or under a specific branch (public access)
  */
 router.get('/search', async (req, res) => {
   try {
-    const { branch, limit = '100' } = req.query;
+    const { q, branch, limit = '100' } = req.query;
 
-    if (!branch || typeof branch !== 'string') {
-      return res.status(400).json({ success: false, error: 'branch parameter is required' });
+    // Support both 'q' (name search) and 'branch' (path search)
+    if (!q && !branch) {
+      return res.status(400).json({ success: false, error: 'q or branch parameter is required' });
     }
-
+    
     const limitNum = parseInt(limit as string, 10);
     if (isNaN(limitNum) || limitNum < 1 || limitNum > 1000) {
       return res.status(400).json({ success: false, error: 'limit must be between 1 and 1000' });
+    }
+    
+    // Name-based search (q parameter)
+    if (q && typeof q === 'string') {
+      const query = q.toLowerCase().trim();
+      console.log(`[GET /api/taxonomy/search] Name search: "${query}", limit: ${limitNum}`);
+      
+      const results = GOOGLE_PRODUCT_TAXONOMY
+        .filter(cat => {
+          const name = cat.path[cat.path.length - 1].toLowerCase();
+          const fullPath = cat.path.join(' > ').toLowerCase();
+          return name.includes(query) || fullPath.includes(query);
+        })
+        .slice(0, limitNum)
+        .map(cat => ({
+          id: cat.id,
+          name: cat.path[cat.path.length - 1],
+          path: cat.path,
+          level: cat.path.length
+        }));
+      
+      console.log(`[GET /api/taxonomy/search] Found ${results.length} results for "${query}"`);
+      
+      return res.json({
+        success: true,
+        results,
+        total: results.length
+      });
+    }
+
+    // Branch-based search (original behavior)
+    if (!branch || typeof branch !== 'string') {
+      return res.status(400).json({ success: false, error: 'branch parameter is required' });
     }
 
     // Parse branch path
@@ -147,6 +182,82 @@ router.get('/search', async (req, res) => {
   } catch (error) {
     console.error('[GET /api/taxonomy/search] Error:', error);
     res.status(500).json({ success: false, error: 'failed_to_search_taxonomy' });
+  }
+});
+
+/**
+ * GET /api/taxonomy/browse?path=Food, Beverages & Tobacco/Food Items
+ * Browse Google taxonomy categories at a specific path level
+ * Returns immediate children of the specified path
+ */
+router.get('/browse', async (req, res) => {
+  try {
+    const { path: pathParam } = req.query;
+    
+    // Parse path - empty means root level
+    const currentPath = pathParam && typeof pathParam === 'string' 
+      ? pathParam.split('/').map(s => s.trim()).filter(s => s.length > 0)
+      : [];
+    
+    console.log(`[GET /api/taxonomy/browse] Browsing path: ${currentPath.length > 0 ? currentPath.join(' > ') : 'ROOT'}`);
+    
+    // Find categories at the next level
+    const targetDepth = currentPath.length + 1;
+    
+    // Get unique categories at the target depth that match the current path
+    const categoriesMap = new Map<string, { id: string; name: string; path: string[]; hasChildren: boolean }>();
+    
+    for (const cat of GOOGLE_PRODUCT_TAXONOMY) {
+      // Check if this category is under the current path
+      if (currentPath.length > 0) {
+        const matches = currentPath.every((segment, idx) => cat.path[idx] === segment);
+        if (!matches) continue;
+      }
+      
+      // Check if this category is at the target depth
+      if (cat.path.length >= targetDepth) {
+        const categoryName = cat.path[targetDepth - 1];
+        const categoryPath = cat.path.slice(0, targetDepth);
+        const key = categoryPath.join(' > ');
+        
+        if (!categoriesMap.has(key)) {
+          // Check if this category has children
+          const hasChildren = GOOGLE_PRODUCT_TAXONOMY.some(c => 
+            c.path.length > targetDepth && 
+            categoryPath.every((segment, idx) => c.path[idx] === segment)
+          );
+          
+          // Find the exact category ID for this path
+          const exactCat = GOOGLE_PRODUCT_TAXONOMY.find(c => 
+            c.path.length === targetDepth && 
+            c.path.join(' > ') === key
+          );
+          
+          categoriesMap.set(key, {
+            id: exactCat?.id || `path-${key.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+            name: categoryName,
+            path: categoryPath,
+            hasChildren
+          });
+        }
+      }
+    }
+    
+    // Convert to array and sort alphabetically
+    const categories = Array.from(categoriesMap.values())
+      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    console.log(`[GET /api/taxonomy/browse] Found ${categories.length} categories at depth ${targetDepth}`);
+    
+    res.json({
+      success: true,
+      path: currentPath,
+      categories,
+      total: categories.length
+    });
+  } catch (error) {
+    console.error('[GET /api/taxonomy/browse] Error:', error);
+    res.status(500).json({ success: false, error: 'failed_to_browse_taxonomy' });
   }
 });
 

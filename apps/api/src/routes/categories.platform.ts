@@ -79,11 +79,44 @@ router.post('/categories', authenticateToken, requireAdmin, async (req: Request,
 router.patch('/categories/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const name = String(req.body?.name || '').trim();
-    if (!name) return res.status(400).json({ success: false, error: 'invalid_payload' });
-    const updated = await categoryService.updateDirectoryCategory('platform', id, { name });
+    const { prisma } = await import('../prisma');
+    
+    // Build update data from request body
+    // Note: directory_category only has: id, tenantId, parentId, name, slug, googleCategoryId, isActive, sortOrder, createdAt, updatedAt
+    const updateData: Record<string, any> = {};
+    
+    if (req.body?.name) {
+      updateData.name = String(req.body.name).trim();
+    }
+    if (req.body?.slug) {
+      updateData.slug = String(req.body.slug).trim();
+    }
+    if (req.body?.googleCategoryId !== undefined) {
+      updateData.googleCategoryId = req.body.googleCategoryId ? String(req.body.googleCategoryId).trim() : null;
+    }
+    if (req.body?.sortOrder !== undefined) {
+      updateData.sortOrder = parseInt(req.body.sortOrder, 10) || 0;
+    }
+    if (req.body?.isActive !== undefined) {
+      updateData.isActive = Boolean(req.body.isActive);
+    }
+    
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, error: 'no_fields_to_update' });
+    }
+    
+    // Update directly in database
+    const updated = await prisma.directory_category.update({
+      where: { id },
+      data: {
+        ...updateData,
+        updatedAt: new Date(),
+      },
+    });
+    
     return res.json({ success: true, data: updated });
   } catch (e: any) {
+    console.error('[PATCH /categories/:id] Error:', e);
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
   }
 });
@@ -274,7 +307,7 @@ router.post('/categories/quick-start', authenticateToken, requireAdmin, async (r
         const created = await prisma.directory_category.create({
           data: {
             id: generateProductCatId('platform'),
-            tenantId: 'pltf',
+            tenantId: 'platform',
             name: categoryName,
             slug: categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
             googleCategoryId,

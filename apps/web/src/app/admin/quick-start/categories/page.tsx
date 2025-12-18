@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button, Card, Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
 
-type BusinessType = 'grocery' | 'fashion' | 'electronics' | 'general';
+type BusinessType = 'grocery' | 'pharmacy' | 'fashion' | 'electronics' | 'home_garden' | 'health_beauty' | 'sports_outdoors' | 'toys_games' | 'automotive' | 'books_media' | 'pet_supplies' | 'office_supplies' | 'jewelry' | 'baby_kids' | 'arts_crafts' | 'hardware_tools' | 'furniture' | 'restaurant' | 'general';
 
 interface Tenant {
   id: string;
@@ -14,38 +14,25 @@ interface Tenant {
 }
 
 const businessTypes = [
-  {
-    id: 'grocery' as BusinessType,
-    name: 'Grocery Store',
-    icon: '🛒',
-    description: 'Fresh produce, dairy, meat, bakery, beverages',
-    categoryCount: 15,
-    examples: ['Fresh Produce', 'Dairy & Eggs', 'Meat & Seafood', 'Bakery', 'Beverages'],
-  },
-  {
-    id: 'fashion' as BusinessType,
-    name: 'Fashion Retail',
-    icon: '👗',
-    description: 'Clothing, shoes, accessories, jewelry',
-    categoryCount: 12,
-    examples: ['Women\'s Clothing', 'Men\'s Clothing', 'Shoes', 'Accessories', 'Jewelry'],
-  },
-  {
-    id: 'electronics' as BusinessType,
-    name: 'Electronics Store',
-    icon: '📱',
-    description: 'Phones, computers, audio, gaming, accessories',
-    categoryCount: 10,
-    examples: ['Mobile Phones', 'Computers', 'Audio', 'Gaming', 'Smart Home'],
-  },
-  {
-    id: 'general' as BusinessType,
-    name: 'General Retail',
-    icon: '🏪',
-    description: 'Mixed merchandise, variety store',
-    categoryCount: 20,
-    examples: ['Home & Garden', 'Health & Beauty', 'Sports', 'Toys', 'Books'],
-  },
+  { id: 'grocery' as BusinessType, name: 'Grocery Store', icon: '🛒', description: 'Fresh produce, dairy, meat, packaged goods', categoryCount: 15 },
+  { id: 'pharmacy' as BusinessType, name: 'Pharmacy', icon: '💊', description: 'Medications, health products, supplements', categoryCount: 15 },
+  { id: 'fashion' as BusinessType, name: 'Fashion Boutique', icon: '👗', description: 'Clothing, accessories, footwear', categoryCount: 12 },
+  { id: 'electronics' as BusinessType, name: 'Electronics Store', icon: '📱', description: 'Phones, computers, tech accessories', categoryCount: 10 },
+  { id: 'home_garden' as BusinessType, name: 'Home & Garden', icon: '🏡', description: 'Furniture, decor, outdoor supplies', categoryCount: 15 },
+  { id: 'health_beauty' as BusinessType, name: 'Health & Beauty', icon: '💄', description: 'Cosmetics, skincare, personal care', categoryCount: 15 },
+  { id: 'sports_outdoors' as BusinessType, name: 'Sports & Outdoors', icon: '⚽', description: 'Athletic gear, camping, fitness', categoryCount: 15 },
+  { id: 'toys_games' as BusinessType, name: 'Toys & Games', icon: '🎮', description: 'Children\'s toys, board games, puzzles', categoryCount: 12 },
+  { id: 'automotive' as BusinessType, name: 'Automotive', icon: '🚗', description: 'Car parts, accessories, maintenance', categoryCount: 12 },
+  { id: 'books_media' as BusinessType, name: 'Books & Media', icon: '📚', description: 'Books, music, movies, magazines', categoryCount: 12 },
+  { id: 'pet_supplies' as BusinessType, name: 'Pet Supplies', icon: '🐾', description: 'Pet food, toys, accessories', categoryCount: 12 },
+  { id: 'office_supplies' as BusinessType, name: 'Office Supplies', icon: '📎', description: 'Stationery, paper, office equipment', categoryCount: 12 },
+  { id: 'jewelry' as BusinessType, name: 'Jewelry', icon: '💎', description: 'Rings, necklaces, watches, accessories', categoryCount: 10 },
+  { id: 'baby_kids' as BusinessType, name: 'Baby & Kids', icon: '👶', description: 'Baby products, children\'s items', categoryCount: 15 },
+  { id: 'arts_crafts' as BusinessType, name: 'Arts & Crafts', icon: '🎨', description: 'Art supplies, craft materials, hobbies', categoryCount: 12 },
+  { id: 'hardware_tools' as BusinessType, name: 'Hardware & Tools', icon: '🔧', description: 'Power tools, hand tools, building materials', categoryCount: 15 },
+  { id: 'furniture' as BusinessType, name: 'Furniture', icon: '🛋️', description: 'Living room, bedroom, office furniture', categoryCount: 12 },
+  { id: 'restaurant' as BusinessType, name: 'Restaurant', icon: '🍽️', description: 'Prepared foods, menu items, beverages', categoryCount: 15 },
+  { id: 'general' as BusinessType, name: 'General Store', icon: '🏪', description: 'Mixed merchandise, variety store', categoryCount: 20 },
 ];
 
 export default function AdminCategoryQuickStartPage() {

@@ -61,32 +61,33 @@ export default function QuickStartPage() {
   const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
 
   // All 19 business type scenarios (aligned with backend)
+  // Max 25 products - Quick Start is for sample products to get tenants started, not a product factory
   const allScenarios: Scenario[] = [
-    { id: 'grocery', name: 'Grocery Store', categoryCount: 8, sampleProductCount: 50 },
-    { id: 'pharmacy', name: 'Pharmacy', categoryCount: 6, sampleProductCount: 45 },
-    { id: 'fashion', name: 'Fashion Boutique', categoryCount: 7, sampleProductCount: 40 },
-    { id: 'electronics', name: 'Electronics Store', categoryCount: 6, sampleProductCount: 35 },
-    { id: 'home_garden', name: 'Home & Garden', categoryCount: 6, sampleProductCount: 40 },
-    { id: 'health_beauty', name: 'Health & Beauty', categoryCount: 5, sampleProductCount: 35 },
-    { id: 'sports_outdoors', name: 'Sports & Outdoors', categoryCount: 5, sampleProductCount: 35 },
-    { id: 'toys_games', name: 'Toys & Games', categoryCount: 5, sampleProductCount: 30 },
-    { id: 'automotive', name: 'Automotive', categoryCount: 4, sampleProductCount: 30 },
-    { id: 'books_media', name: 'Books & Media', categoryCount: 5, sampleProductCount: 30 },
-    { id: 'pet_supplies', name: 'Pet Supplies', categoryCount: 4, sampleProductCount: 30 },
-    { id: 'office_supplies', name: 'Office Supplies', categoryCount: 5, sampleProductCount: 30 },
-    { id: 'jewelry', name: 'Jewelry', categoryCount: 4, sampleProductCount: 25 },
-    { id: 'baby_kids', name: 'Baby & Kids', categoryCount: 5, sampleProductCount: 35 },
-    { id: 'arts_crafts', name: 'Arts & Crafts', categoryCount: 4, sampleProductCount: 30 },
-    { id: 'hardware_tools', name: 'Hardware & Tools', categoryCount: 5, sampleProductCount: 35 },
-    { id: 'furniture', name: 'Furniture', categoryCount: 5, sampleProductCount: 30 },
-    { id: 'restaurant', name: 'Restaurant', categoryCount: 4, sampleProductCount: 40 },
-    { id: 'general', name: 'General Store', categoryCount: 6, sampleProductCount: 40 },
+    { id: 'grocery', name: 'Grocery Store', categoryCount: 8, sampleProductCount: 25 },
+    { id: 'pharmacy', name: 'Pharmacy', categoryCount: 6, sampleProductCount: 20 },
+    { id: 'fashion', name: 'Fashion Boutique', categoryCount: 7, sampleProductCount: 20 },
+    { id: 'electronics', name: 'Electronics Store', categoryCount: 6, sampleProductCount: 18 },
+    { id: 'home_garden', name: 'Home & Garden', categoryCount: 6, sampleProductCount: 20 },
+    { id: 'health_beauty', name: 'Health & Beauty', categoryCount: 5, sampleProductCount: 18 },
+    { id: 'sports_outdoors', name: 'Sports & Outdoors', categoryCount: 5, sampleProductCount: 18 },
+    { id: 'toys_games', name: 'Toys & Games', categoryCount: 5, sampleProductCount: 15 },
+    { id: 'automotive', name: 'Automotive', categoryCount: 4, sampleProductCount: 15 },
+    { id: 'books_media', name: 'Books & Media', categoryCount: 5, sampleProductCount: 15 },
+    { id: 'pet_supplies', name: 'Pet Supplies', categoryCount: 4, sampleProductCount: 15 },
+    { id: 'office_supplies', name: 'Office Supplies', categoryCount: 5, sampleProductCount: 15 },
+    { id: 'jewelry', name: 'Jewelry', categoryCount: 4, sampleProductCount: 12 },
+    { id: 'baby_kids', name: 'Baby & Kids', categoryCount: 5, sampleProductCount: 18 },
+    { id: 'arts_crafts', name: 'Arts & Crafts', categoryCount: 4, sampleProductCount: 15 },
+    { id: 'hardware_tools', name: 'Hardware & Tools', categoryCount: 5, sampleProductCount: 18 },
+    { id: 'furniture', name: 'Furniture', categoryCount: 5, sampleProductCount: 15 },
+    { id: 'restaurant', name: 'Restaurant', categoryCount: 4, sampleProductCount: 20 },
+    { id: 'general', name: 'General Store', categoryCount: 6, sampleProductCount: 20 },
   ];
 
   const [scenarios, setScenarios] = useState<Scenario[]>(allScenarios);
   const [eligibility, setEligibility] = useState<EligibilityResponse | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<string>('grocery');
-  const [productCount, setProductCount] = useState<number>(50);
+  const [productCount, setProductCount] = useState<number>(25);
   const [generateImages, setGenerateImages] = useState<boolean>(false);
   const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
   const [textModel, setTextModel] = useState<'openai' | 'google'>('openai');
@@ -567,7 +568,7 @@ export default function QuickStartPage() {
               <input
                 type="range"
                 min="5"
-                max="200"
+                max="25"
                 step="1"
                 value={productCount}
                 onChange={(e) => setProductCount(parseInt(e.target.value))}
@@ -575,8 +576,8 @@ export default function QuickStartPage() {
                 style={{
                   background: `linear-gradient(to right, 
                     rgb(59, 130, 246) 0%, 
-                    rgb(147, 51, 234) ${((productCount - 5) / 195) * 100}%, 
-                    rgb(229, 231, 235) ${((productCount - 5) / 195) * 100}%, 
+                    rgb(147, 51, 234) ${((productCount - 5) / 20) * 100}%, 
+                    rgb(229, 231, 235) ${((productCount - 5) / 20) * 100}%, 
                     rgb(229, 231, 235) 100%)`
                 }}
               />
@@ -584,14 +585,10 @@ export default function QuickStartPage() {
               {/* Slider Labels */}
               <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <span>5</span>
-                <span className="text-gray-400 dark:text-gray-500">|</span>
-                <span>50</span>
-                <span className="text-gray-400 dark:text-gray-500">|</span>
-                <span>100</span>
-                <span className="text-gray-400 dark:text-gray-500">|</span>
-                <span>150</span>
-                <span className="text-gray-400 dark:text-gray-500">|</span>
-                <span>200</span>
+                <span>10</span>
+                <span>15</span>
+                <span>20</span>
+                <span>25</span>
               </div>
             </div>
 
@@ -599,10 +596,10 @@ export default function QuickStartPage() {
             <div className="flex gap-2 mt-4">
               {[
                 { value: 5, label: 'Test' },
-                { value: 10, label: 'Tiny' },
-                { value: 25, label: 'Small' },
-                { value: 50, label: 'Medium' },
-                { value: 100, label: 'Large' },
+                { value: 10, label: 'Small' },
+                { value: 15, label: 'Medium' },
+                { value: 20, label: 'Large' },
+                { value: 25, label: 'Max' },
               ].map((preset) => (
                 <button
                   key={preset.value}
