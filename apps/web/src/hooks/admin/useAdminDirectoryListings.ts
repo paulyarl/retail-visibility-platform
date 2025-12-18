@@ -92,7 +92,16 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
       }
 
       const data = await response.json();
-      setListings(data.listings || []);
+      
+      // Transform snake_case fields to camelCase
+      const transformedListings = (data.listings || []).map((listing: any) => ({
+        ...listing,
+        primaryCategory: listing.primary_category,
+        secondaryCategories: listing.secondary_categories,
+        updatedAt: listing.updated_at,
+      }));
+      
+      setListings(transformedListings);
       setPagination(data.pagination || pagination);
     } catch (err) {
       console.error('Error fetching admin directory listings:', err);

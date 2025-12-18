@@ -33,7 +33,7 @@ export default function DeleteTestTenantModal({ onClose }: DeleteTestTenantModal
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
-      const response = await fetch(`${apiUrl}/tenants`, {
+      const response = await fetch(`${apiUrl}/api/tenants`, {
         headers: {
           ...(token && { Authorization: `Bearer ${token}` }),
         },

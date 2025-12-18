@@ -91,13 +91,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
-        setUser(data.user);
+
+        // Transform API response from snake_case to camelCase
+        const transformedUser = {
+          ...data.user,
+          firstName: data.user.first_name,
+          lastName: data.user.last_name,
+          emailVerified: data.user.email_verified,
+          // Remove snake_case fields
+          first_name: undefined,
+          last_name: undefined,
+          email_verified: undefined,
+        };
+
+        setUser(transformedUser);
         
         // Set current tenant if not set
-        if (!currentTenantId && data.user && data.user.tenants && data.user.tenants.length > 0) {
+        if (!currentTenantId && transformedUser && transformedUser.tenants && transformedUser.tenants.length > 0) {
           const savedTenantId = localStorage.getItem(TENANT_KEY);
-          const tenantExists = data.user.tenants.find((t: any) => t.id === savedTenantId);
-          setCurrentTenantId(tenantExists ? savedTenantId : data.user.tenants[0].id);
+          const tenantExists = transformedUser.tenants.find((t: any) => t.id === savedTenantId);
+          setCurrentTenantId(tenantExists ? savedTenantId : transformedUser.tenants[0].id);
         }
       } else if (response.status === 401) {
         // Token expired, try to refresh
@@ -178,14 +191,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       setTokens(data.accessToken, data.refreshToken);
-      setUser(data.user);
+
+      // Transform API response from snake_case to camelCase
+      const transformedUser = data.user ? {
+        ...data.user,
+        firstName: data.user.first_name,
+        lastName: data.user.last_name,
+        emailVerified: data.user.email_verified,
+        // Remove snake_case fields
+        first_name: undefined,
+        last_name: undefined,
+        email_verified: undefined,
+      } : null;
+
+      setUser(transformedUser);
       
       console.log('[AuthContext] Tokens saved to localStorage');
       
       // Set current tenant
-      if (data.user && data.user.tenants && data.user.tenants.length > 0) {
-        setCurrentTenantId(data.user.tenants[0].id);
-        localStorage.setItem(TENANT_KEY, data.user.tenants[0].id);
+      if (transformedUser && transformedUser.tenants && transformedUser.tenants.length > 0) {
+        setCurrentTenantId(transformedUser.tenants[0].id);
+        localStorage.setItem(TENANT_KEY, transformedUser.tenants[0].id);
       }
     } catch (error) {
       // Don't log to console - error will be caught and displayed in UI

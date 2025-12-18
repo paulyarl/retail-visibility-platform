@@ -26,7 +26,7 @@ interface User {
   tenantRoles?: Array<{
     tenantId: string;
     tenantName: string;
-    role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'; // Tenant-level roles
+    role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER' | 'PLATFORM_ADMIN'|'TENANT_ADMIN'; // Tenant-level roles
   }>;
 }
 
@@ -41,7 +41,7 @@ export default function UsersManagementPage() {
   const [invitePassword, setInvitePassword] = useState('');
   const [inviteFirstName, setInviteFirstName] = useState('');
   const [inviteLastName, setInviteLastName] = useState('');
-  const [inviteRole, setInviteRole] = useState<'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'TENANT_ADMIN' | 'USER'>('USER');
+  const [inviteRole, setInviteRole] = useState<'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'ADMIN' |'TENANT_ADMIN' | 'USER'>('USER');
   
   // Edit user state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -151,13 +151,16 @@ export default function UsersManagementPage() {
 
   const getAssignmentStatus = (user: User) => {
     // Only show assignment status for tenant owners
-    if (!user || user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT' || user.role === 'PLATFORM_VIEWER') {
-      return null;
-    }
-
-    const assignmentCount = user.tenantRoles?.length || 0;
     
+    /* console.log('[Admin Users] getAssignmentStatus User role: ', user.role);
+    if (!user || user.role === 'PLATFORM_SUPPORT' || user.role === 'PLATFORM_VIEWER') {
+      return null;
+    } */
+
+    const assignmentCount = user.tenantRoles?.length || user.tenants;
+    //console.log('[Admin Users] Assignment count: ', assignmentCount);
     if (assignmentCount === 0) {
+      
       return (
         <Badge variant="warning" className="text-xs">
           Unassigned
@@ -173,6 +176,7 @@ export default function UsersManagementPage() {
   };
 
   const getStatusBadge = (status: string) => {
+    //console.log('[Admin Users] getStatusBadge status badge: ', status);
     switch (status) {
       case 'active':
         return <Badge variant="success">Active</Badge>;
@@ -203,7 +207,7 @@ export default function UsersManagementPage() {
       // For tenant owners, we need to get their owned tenants first
       let targetTenantId = '';
       
-      if (user?.role === 'OWNER') {
+      if (user?.role === 'OWNER'||'PLATFORM_ADMIN'||'ADMIN'||'PLATFORM_SUPPORT') {
         // Get the first owned tenant (for simplicity)
         // In a real implementation, you might want to let them choose
         const tenantsResponse = await api.get('/api/admin/tenants');
@@ -812,7 +816,7 @@ export default function UsersManagementPage() {
             </label>
             <select 
               value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'TENANT_ADMIN' | 'USER')}
+              onChange={(e) => setInviteRole(e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER'| 'OWNER' | 'TENANT_ADMIN' | 'USER')}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
               <optgroup label="Platform Users">

@@ -241,14 +241,15 @@ export default function UpgradeRequestsPage() {
 
                       <div className="ml-4">
                         <Button
-                          variant="secondary"
+                          variant={request.status === 'complete' || request.status === 'denied' ? 'ghost' : 'secondary'}
                           size="sm"
+                          disabled={request.status === 'complete' || request.status === 'denied'}
                           onClick={() => {
                             setSelectedRequest(request);
                             setShowModal(true);
                           }}
                         >
-                          Process
+                          {request.status === 'complete' || request.status === 'denied' ? 'Processed' : 'Process'}
                         </Button>
                       </div>
                     </div>

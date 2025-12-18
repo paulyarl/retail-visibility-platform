@@ -18,29 +18,29 @@ const router = Router();
  */
 function requireSupportActions(req: Request, res: Response, next: NextFunction) {
   const user = (req as any).user;
-  console.log('[requireSupportActions] Checking user:', {
+  /* console.log('[requireSupportActions] Checking user:', {
     userId: user?.userId,
     role: user?.role,
     tenantIds: user?.tenantIds,
     hasUser: !!user
-  });
+  }); */
 
   if (!user || !canPerformSupportActions(user)) {
-    console.log('[requireSupportActions] Access denied for user:', {
+    /* console.log('[requireSupportActions] Access denied for user:', {
       userId: user?.userId,
       role: user?.role,
       canPerform: canPerformSupportActions(user)
-    });
+    }); */
     return res.status(403).json({
       error: 'Forbidden',
       message: 'Platform admin or support access required for organization management',
     });
   }
-
+/* 
   console.log('[requireSupportActions] Access granted for user:', {
     userId: user?.userId,
     role: user?.role
-  });
+  }); */
   next();
 }
 

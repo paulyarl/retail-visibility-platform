@@ -248,12 +248,23 @@ export function hasFeature(resolvedTier: ResolvedTier, featureId: string): boole
     const tierKey = resolvedTier?.effective?.id || 'starter';
     return checkTierFeature(tierKey, featureId);
   }
-  
+
   // Check both id and featureKey/feature_key for compatibility with backend
   // If enabled is undefined, treat as true (feature exists = enabled)
-  return resolvedTier.effective.features.some(
+  const hasApiFeature = resolvedTier.effective.features.some(
     f => (f.id === featureId || (f as any).featureKey === featureId || (f as any).feature_key === featureId) && (f.enabled !== false)
   );
+
+  // If API features include this feature, use that result
+  if (hasApiFeature) {
+    return true;
+  }
+
+  // API features exist but don't include this feature - check static tier features
+  // This handles cases where API doesn't include inherited features
+  const { checkTierFeature } = require('./tier-features');
+  const tierKey = resolvedTier?.effective?.id || 'starter';
+  return checkTierFeature(tierKey, featureId);
 }
 
 /**

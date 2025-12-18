@@ -235,72 +235,72 @@ const healthRoutes = (req: any, res: any) => {
 
 app.use('/health', healthRoutes);
 
-/* ------------------------------ TENANTS ------------------------------ */
-app.get("/api/tenants", authenticateToken, async (req, res) => {
-  try {
-    // Platform users (admin, support, viewer) see all tenants, regular users see only their tenants
-    const { isPlatformUser } = await import('./utils/platform-admin');
+// TENANTS - Now handled by tenantsRoutes below
+// app.get("/api/tenants", authenticateToken, async (req, res) => {
+//   try {
+//     // Platform users (admin, support, viewer) see all tenants, regular users see only their tenants
+//     const { isPlatformUser } = await import('./utils/platform-admin');
     
-    // Query parameters for filtering
-    const includeArchived = req.query.includeArchived === 'true';
-    const statusFilter = req.query.status as string;
+//     // Query parameters for filtering
+//     const includeArchived = req.query.includeArchived === 'true';
+//     const statusFilter = req.query.status as string;
     
-    // Build where clause
-    const baseWhere = isPlatformUser(req.user) ? {} : {
-      user_tenants: {
-        some: {
-          user_id: req.user?.userId
-        }
-      }
-    };
+//     // Build where clause
+//     const baseWhere = isPlatformUser(req.user) ? {} : {
+//       user_tenants: {
+//         some: {
+//           user_id: req.user?.userId
+//         }
+//       }
+//     };
     
-    // Add status filtering - include archived by default unless specifically excluded
-    let statusCondition: any = {};
-    if (statusFilter) {
-      // Specific status requested
-      statusCondition = { location_status: statusFilter };
-    } else if (includeArchived === false) {
-      // Explicitly exclude archived
-      statusCondition = { location_status: { not: 'archived' } };
-    }
-    // Default: include all statuses including archived
+//     // Add status filtering - include archived by default unless specifically excluded
+//     let statusCondition: any = {};
+//     if (statusFilter) {
+//       // Specific status requested
+//       statusCondition = { location_status: statusFilter };
+//     } else if (includeArchived === false) {
+//       // Explicitly exclude archived
+//       statusCondition = { location_status: { not: 'archived' } };
+//     }
+//     // Default: include all statuses including archived
     
-    const tenants = await prisma.tenants.findMany({ 
-      where: {
-        ...baseWhere,
-        ...statusCondition,
-      },
-      orderBy: { created_at: "desc" },
-      include: {
-        organizations_list: {
-          select: {
-            id: true,
-            name: true,
-          }
-        }
-      }
-    });
+//     const tenants = await prisma.tenants.findMany({ 
+//       where: {
+//         ...baseWhere,
+//         ...statusCondition,
+//       },
+//       orderBy: { created_at: "desc" },
+//       include: {
+//         organizations_list: {
+//           select: {
+//             id: true,
+//             name: true,
+//           }
+//         }
+//       }
+//     });
     
-    // Transform for frontend compatibility - convert organizations_list to organization
-    const transformedTenants = tenants.map(tenant => ({
-      id: tenant.id,
-      name: tenant.name,
-      organizationId: tenant.organization_id,
-      subscriptionTier: tenant.subscription_tier,
-      subscriptionStatus: tenant.subscription_status,
-      locationStatus: tenant.location_status || 'active',
-      createdAt: tenant.created_at,
-      organization: tenant.organizations_list ? {
-        id: tenant.organizations_list.id,
-        name: tenant.organizations_list.name,
-      } : null,
-    }));
+//     // Transform for frontend compatibility - convert organizations_list to organization
+//     const transformedTenants = tenants.map(tenant => ({
+//       id: tenant.id,
+//       name: tenant.name,
+//       organizationId: tenant.organization_id,
+//       subscriptionTier: tenant.subscription_tier,
+//       subscriptionStatus: tenant.subscription_status,
+//       locationStatus: tenant.location_status || 'active',
+//       createdAt: tenant.created_at,
+//       organization: tenant.organizations_list ? {
+//         id: tenant.organizations_list.id,
+//         name: tenant.organizations_list.name,
+//       } : null,
+//     }));
     
-    res.json(transformedTenants);
-  } catch (_e) {
-    res.status(500).json({ error: "failed_to_list_tenants" });
-  }
-});
+//     res.json(transformedTenants);
+//   } catch (_e) {
+//     res.status(500).json({ error: "failed_to_list_tenants" });
+//   }
+// });
 
 
 app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
@@ -4770,6 +4770,10 @@ console.log('✅ Admin scan metrics routes mounted at /api/admin/scan-metrics');
 /* ------------------------------ admin cached products ------------------------------ */
 app.use('/api/admin/cached-products', cachedProductsRoutes);
 console.log('✅ Admin cached products routes mounted at /api/admin/cached-products');
+
+/* ------------------------------ admin tools ------------------------------ */
+app.use('/api/admin/tools', authenticateToken, requireAdmin, adminToolsRoutes);
+console.log('✅ Admin tools routes mounted at /api/admin/tools');
 
 /* ------------------------------ directory ------------------------------ */
 /* ------------------------------ directory optimized ------------------------------ */

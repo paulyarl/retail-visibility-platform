@@ -11,6 +11,7 @@ import { isTrialStatus } from '@/lib/trial';
 interface Tenant {
   id: string;
   name: string;
+  organizationId?: string;
   createdAt?: string;
   userId?: string;
   subscriptionStatus?: string;
@@ -48,8 +49,14 @@ export default function AdminTenantsPage() {
         
         // Transform tenants with status
         const tenantsWithStatus = data.map((t: any) => {
-          // Determine status based on subscription_status (treat trial as active for this view)
-          const isActive = t.subscription_status === 'active' || isTrialStatus(t.subscription_status);
+          // Determine status based on subscription_status
+          // Consider active, trial, and tier-based statuses (starter, professional, enterprise) as active
+          const subscriptionStatus = t.subscriptionStatus;
+          console.log('[Tenant Subscription Status] Got status for tenant:',  subscriptionStatus);
+          const isActive = subscriptionStatus && 
+            (subscriptionStatus === 'active' || 
+             isTrialStatus(subscriptionStatus) || 
+             ['starter', 'professional', 'enterprise', 'chain_starter', 'chain_professional', 'chain_enterprise'].includes(subscriptionStatus));
           
           return {
             ...t,

@@ -28,8 +28,13 @@ export default function DeleteTestChainModal({ onClose }: DeleteTestChainModalPr
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      
       const res = await fetch(`${apiUrl}/api/admin/tools/test-chains/${organizationId}?confirm=true`, {
         method: 'DELETE',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
         credentials: 'include',
       });
 

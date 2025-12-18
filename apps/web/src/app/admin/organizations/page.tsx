@@ -69,6 +69,7 @@ export default function AdminOrganizationsPage() {
   const [showEditTierModal, setShowEditTierModal] = useState(false);
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
   const [editTier, setEditTier] = useState('chain_starter');
+  const [editStatus, setEditStatus] = useState('active');
   const [editMaxLocations, setEditMaxLocations] = useState('5');
   const [editMaxSKUs, setEditMaxSKUs] = useState('2500');
   const [editReason, setEditReason] = useState('');
@@ -161,6 +162,7 @@ export default function AdminOrganizationsPage() {
   const openEditTierModal = (org: Organization) => {
     setEditingOrg(org);
     setEditTier(org.subscriptionTier);
+    setEditStatus(org.subscriptionStatus);
     setEditMaxLocations(org.maxLocations.toString());
     setEditMaxSKUs(org.maxTotalSKUs.toString());
     setEditReason('');
@@ -177,6 +179,7 @@ export default function AdminOrganizationsPage() {
     try {
       const res = await api.put(`/api/organizations/${editingOrg.id}`, {
         subscriptionTier: editTier,
+        subscriptionStatus: editStatus,
         maxLocations: parseInt(editMaxLocations) || 5,
         maxTotalSKUs: parseInt(editMaxSKUs) || 2500,
         reason: editReason.trim(),
@@ -669,18 +672,20 @@ export default function AdminOrganizationsPage() {
 
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
-                Max Locations
+                Subscription Status
               </label>
-              <Input
-                type="number"
-                value={editMaxLocations}
-                onChange={(e) => setEditMaxLocations(e.target.value)}
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
                 disabled={updating}
-                min="1"
-              />
-              <p className="text-xs text-neutral-500 mt-1">
-                Auto-populated based on tier. Customize if needed.
-              </p>
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="trial">Trial</option>
+                <option value="active">Active</option>
+                <option value="past_due">Past Due</option>
+                <option value="canceled">Canceled</option>
+                <option value="expired">Expired</option>
+              </select>
             </div>
 
             <div>

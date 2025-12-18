@@ -25,10 +25,13 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      
       const res = await fetch(`${apiUrl}/api/admin/tools/test-chains`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
         credentials: 'include', // Send cookies for authentication
         body: JSON.stringify({
@@ -75,7 +78,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
                     Test Chain Created!
                   </h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {result.tenants.length} locations ready to use
+                    {result.tenants?.length || 0} locations ready to use
                   </p>
                 </div>
               </div>

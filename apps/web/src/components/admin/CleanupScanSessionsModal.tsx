@@ -43,7 +43,7 @@ export default function CleanupScanSessionsModal({ isOpen, onClose }: CleanupSca
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`${apiUrl}/tenants`, {
+      const response = await fetch(`${apiUrl}/api/tenants`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

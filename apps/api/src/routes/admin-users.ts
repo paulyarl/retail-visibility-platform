@@ -26,14 +26,14 @@ const router = Router();
 router.get('/users', requirePlatformUser, async (req: Request, res: Response) => {
   try {
     const requestingUser = (req as any).user;
-    console.log('[ADMIN USERS] Request received from user:', {
+    /* console.log('[ADMIN USERS] Request received from user:', {
       user_id: requestingUser?.userId,
       email: requestingUser?.email,
       role: requestingUser?.role,
       userAgent: req.headers['user-agent'],
       origin: req.headers.origin,
       referer: req.headers.referer
-    });
+    }); */
     let users;
 
     if (requestingUser.role === 'PLATFORM_ADMIN' || requestingUser.role === 'ADMIN') {
@@ -128,7 +128,7 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
       role: user.role,
       created_at: user.created_at,
       last_login: user.last_login,
-      lastLoginAt: user.last_login, // Alias for compatibility
+      lastActive: user.last_login, // Frontend expects lastActive
       tenantCount: user.user_tenants?.length || 0,
       tenant: user.user_tenants?.length || 0, // Alias for compatibility
       tenantRoles: user.user_tenants?.map((ut: any) => ({
@@ -137,13 +137,13 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
       })) || [],
     }));
 
-    console.log('[ADMIN USERS] Formatted users for response:', formattedUsers?.length || 0, 'users');
+    /* console.log('[ADMIN USERS] Formatted users for response:', formattedUsers?.length || 0, 'users');
     console.log('[ADMIN USERS] Sample user data:', formattedUsers[0] ? {
       id: formattedUsers[0].id,
       email: formattedUsers[0].email,
       role: formattedUsers[0].role,
       tenantCount: formattedUsers[0].tenant
-    } : 'No users found');
+    } : 'No users found'); */
 
     res.json({ 
       success: true, 

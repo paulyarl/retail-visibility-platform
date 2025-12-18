@@ -198,7 +198,17 @@ export default function DirectoryListingsTable({
                   {listing.itemCount}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                  {listing.primaryCategory || '-'}
+                  <div className="space-y-1">
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {listing.primaryCategory || '-'}
+                    </div>
+                    {listing.secondaryCategories && listing.secondaryCategories.length > 0 && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {listing.secondaryCategories.slice(0, 2).join(', ')}
+                        {listing.secondaryCategories.length > 2 && ` +${listing.secondaryCategories.length - 2} more`}
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-right text-sm font-medium space-x-2">
                   {listing.is_featured ? (

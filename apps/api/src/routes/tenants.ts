@@ -89,12 +89,17 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       name: tenant.name,
       organizationId: tenant.organization_id,
       subscriptionTier: tenant.subscription_tier,
-      locationStatus: tenant.location_status || 'active',
+      subscriptionStatus: tenant.subscription_status,
+      trialEndsAt: tenant.trial_ends_at,
+      subscriptionEndsAt: tenant.subscription_ends_at,
       createdAt: tenant.created_at,
       organization: tenant.organizations_list ? {
         id: tenant.organizations_list.id,
         name: tenant.organizations_list.name,
       } : null,
+      _count: {
+        items: tenant._count.inventory_items,
+      },
     }));
 
     res.json(transformedTenants);
