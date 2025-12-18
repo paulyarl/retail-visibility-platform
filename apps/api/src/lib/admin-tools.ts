@@ -6,31 +6,33 @@
  */
 
 import { prisma } from '../prisma';
-import { generateQuickStartProducts } from './quick-start';
+import { generateQuickStartProducts, QuickStartScenario } from './quick-start';
 import { generateQuickStart, generateUserTenantId } from './id-generator';
 
 // Chain size configurations
+// Aligned with Quick Start max of 25 products per location
 const CHAIN_SIZES = {
   small: {
     locations: 1,
-    skuRange: [200, 400],
+    skuRange: [20, 25],
   },
   medium: {
     locations: 3,
-    skuRange: [600, 1200],
+    skuRange: [20, 25],
   },
   large: {
     locations: 5,
-    skuRange: [1500, 2500],
+    skuRange: [20, 25],
   },
 };
 
 export interface CreateTestChainOptions {
   name: string;
   size: 'small' | 'medium' | 'large';
-  scenario: 'grocery' | 'fashion' | 'electronics' | 'general';
+  scenario: string; // Any of the 19 business types from BusinessTypeSelector
   seedProducts?: boolean;
   createAsDrafts?: boolean;
+  generateImages?: boolean;
 }
 
 export interface TestChainResult {
@@ -47,7 +49,7 @@ export interface TestChainResult {
  * Create a test organization with multiple tenant locations
  */
 export async function createTestChain(options: CreateTestChainOptions): Promise<TestChainResult> {
-  const { name, size, scenario, seedProducts = true, createAsDrafts = true } = options;
+  const { name, size, scenario, seedProducts = true, createAsDrafts = true, generateImages = false } = options;
   
   const config = CHAIN_SIZES[size];
   const orgId = `org_test_${Date.now()}`;
@@ -94,10 +96,11 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
     if (seedProducts) {
       const result = await generateQuickStartProducts({
         tenant_id: currentTenant.id,
-        scenario,
+        scenario: scenario as QuickStartScenario,
         productCount: skuCount,
         assignCategories: true,
         createAsDrafts,
+        generateImages,
       }, prisma);
       actualSkuCount = result.productsCreated;
     }
@@ -166,23 +169,29 @@ export async function deleteTestChain(organizationId: string): Promise<{
  */
 export async function createTestTenant(options: {
   name: string;
+  city?: string;
+  state?: string;
   subscriptionTier?: string;
   subscriptionStatus?: string;
   organizationId?: string;
   ownerId?: string;
-  scenario?: 'grocery' | 'fashion' | 'electronics' | 'general';
-  productCount?: number;
+  seedProducts?: boolean;
+  scenario?: string; // Any of the 19 business types
   createAsDrafts?: boolean;
+  generateImages?: boolean;
 }) {
   const {
     name,
+    city,
+    state,
     subscriptionTier = 'professional',
     subscriptionStatus = 'trial',
     organizationId,
     ownerId,
-    scenario = 'general',
-    productCount = 0,
+    seedProducts = true,
+    scenario = 'grocery',
     createAsDrafts = true,
+    generateImages = false,
   } = options;
 
   const tenantId = `tenant_test_${Date.now()}`;
@@ -212,15 +221,16 @@ export async function createTestTenant(options: {
     console.log(`[Admin Tools] Linked tenant ${tenant.id} to owner ${ownerId}`);
   }
 
-  // Seed products if requested
+  // Seed products if requested (default ~25 products)
   let result = null;
-  if (productCount > 0) {
+  if (seedProducts) {
     result = await generateQuickStartProducts({
       tenant_id: tenant.id,
-      scenario,
-      productCount,
+      scenario: scenario as QuickStartScenario,
+      productCount: 25, // Aligned with Quick Start max
       assignCategories: true,
       createAsDrafts,
+      generateImages,
     }, prisma);
   }
 

@@ -31,9 +31,10 @@ const router = Router();
 const createChainSchema = z.object({
   name: z.string().min(1),
   size: z.enum(['small', 'medium', 'large']),
-  scenario: z.enum(['grocery', 'fashion', 'electronics', 'general']),
+  scenario: z.string().optional().default('grocery'), // Any of the 19 business types
   seedProducts: z.boolean().optional().default(true),
   createAsDrafts: z.boolean().optional().default(true),
+  generateImages: z.boolean().optional().default(false),
 });
 
 router.post('/test-chains', async (req, res) => {
@@ -114,9 +115,10 @@ const createTenantSchema = z.object({
   subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional().default('trial'),
   organizationId: z.string().optional(), // Required for organization tier
   ownerId: z.string().optional(), // Link to user as owner
-  scenario: z.enum(['grocery', 'fashion', 'electronics', 'general']).optional().default('general'),
-  productCount: z.number().int().min(0).max(100).optional().default(0),
+  seedProducts: z.boolean().optional().default(true),
+  scenario: z.string().optional().default('grocery'), // Any of the 19 business types
   createAsDrafts: z.boolean().optional().default(true),
+  generateImages: z.boolean().optional().default(false),
 });
 
 router.post('/tenants', validateTierAssignment, validateSKULimits, async (req, res) => {

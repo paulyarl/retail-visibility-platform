@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Building2, Loader2, CheckCircle2, Copy } from 'lucide-react';
+import { BusinessTypeSelector, BUSINESS_TYPES } from '@/components/quick-start';
 
 interface CreateTestChainModalProps {
   onClose: () => void;
@@ -10,9 +11,10 @@ interface CreateTestChainModalProps {
 export default function CreateTestChainModal({ onClose }: CreateTestChainModalProps) {
   const [name, setName] = useState('Demo Retail Chain');
   const [size, setSize] = useState<'small' | 'medium' | 'large'>('medium');
-  const [scenario, setScenario] = useState<'grocery' | 'fashion' | 'electronics' | 'general'>('grocery');
+  const [scenario, setScenario] = useState<string>('grocery');
   const [seedProducts, setSeedProducts] = useState(true);
   const [createAsDrafts, setCreateAsDrafts] = useState(true);
+  const [generateImages, setGenerateImages] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +42,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
           scenario,
           seedProducts,
           createAsDrafts,
+          generateImages,
         }),
       });
 
@@ -240,27 +243,22 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
               ))}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {size === 'small' && '1 location, 200-400 SKUs'}
-              {size === 'medium' && '3 locations, 600-1200 SKUs'}
-              {size === 'large' && '5 locations, 1500-2500 SKUs'}
+              {size === 'small' && '1 location, ~25 SKUs'}
+              {size === 'medium' && '3 locations, ~75 SKUs total'}
+              {size === 'large' && '5 locations, ~125 SKUs total'}
             </p>
           </div>
 
-          {/* Scenario */}
+          {/* Scenario - Using shared BusinessTypeSelector with all 19 types */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Business Type
             </label>
-            <select
+            <BusinessTypeSelector
               value={scenario}
-              onChange={(e) => setScenario(e.target.value as any)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="grocery">Grocery Store</option>
-              <option value="fashion">Fashion Boutique</option>
-              <option value="electronics">Electronics Store</option>
-              <option value="general">General Store</option>
-            </select>
+              onChange={(typeId) => setScenario(typeId)}
+              variant="dropdown"
+            />
           </div>
 
           {/* Options */}
@@ -277,17 +275,30 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
               </span>
             </label>
             {seedProducts && (
-              <label className="flex items-center gap-2 ml-6">
-                <input
-                  type="checkbox"
-                  checked={createAsDrafts}
-                  onChange={(e) => setCreateAsDrafts(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Create as drafts (inactive)
-                </span>
-              </label>
+              <>
+                <label className="flex items-center gap-2 ml-6">
+                  <input
+                    type="checkbox"
+                    checked={createAsDrafts}
+                    onChange={(e) => setCreateAsDrafts(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Create as drafts (inactive)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 ml-6">
+                  <input
+                    type="checkbox"
+                    checked={generateImages}
+                    onChange={(e) => setGenerateImages(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Generate AI images
+                  </span>
+                </label>
+              </>
             )}
           </div>
 

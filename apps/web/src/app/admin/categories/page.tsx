@@ -160,9 +160,9 @@ export default function AdminCategoriesPage() {
     return match ? decodeURIComponent(match.split('=')[1] || '') : '';
   };
   
-  // Get auth token from cookie (access_token or ACCESS_TOKEN)
+  // Get auth token from localStorage or cookie
   const getAuthHeader = (): Record<string, string> => {
-    const token = getCookie('access_token') || getCookie('ACCESS_TOKEN');
+    const token = localStorage.getItem('access_token') || getCookie('access_token') || getCookie('ACCESS_TOKEN');
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, Plus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
+import { BusinessTypeSelector } from '@/components/quick-start';
 
 interface CreateTestTenantModalProps {
   onClose: () => void;
@@ -12,6 +13,10 @@ export default function CreateTestTenantModal({ onClose }: CreateTestTenantModal
   const [tenantName, setTenantName] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
+  const [seedProducts, setSeedProducts] = useState(true);
+  const [scenario, setScenario] = useState<string>('grocery');
+  const [createAsDrafts, setCreateAsDrafts] = useState(true);
+  const [generateImages, setGenerateImages] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +46,10 @@ export default function CreateTestTenantModal({ onClose }: CreateTestTenantModal
           name: tenantName,
           city: city || undefined,
           state: state || undefined,
+          seedProducts,
+          scenario,
+          createAsDrafts,
+          generateImages,
         }),
       });
 
@@ -195,12 +204,62 @@ export default function CreateTestTenantModal({ onClose }: CreateTestTenantModal
               />
             </div>
           </div>
-        </div>
 
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-800 dark:text-blue-200">
-            <strong>💡 Tip:</strong> After creating the tenant, you'll be able to use Quick Start to populate it with test products instantly.
-          </p>
+          {/* Business Type & Product Options */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Business Type
+            </label>
+            <BusinessTypeSelector
+              value={scenario}
+              onChange={(typeId) => setScenario(typeId)}
+              variant="dropdown"
+            />
+          </div>
+
+          {/* Product Options */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={seedProducts}
+                onChange={(e) => setSeedProducts(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                disabled={loading}
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Seed with products (~25 SKUs)
+              </span>
+            </label>
+            {seedProducts && (
+              <>
+                <label className="flex items-center gap-2 ml-6">
+                  <input
+                    type="checkbox"
+                    checked={createAsDrafts}
+                    onChange={(e) => setCreateAsDrafts(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    disabled={loading}
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Create as drafts (inactive)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 ml-6">
+                  <input
+                    type="checkbox"
+                    checked={generateImages}
+                    onChange={(e) => setGenerateImages(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    disabled={loading}
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Generate AI images
+                  </span>
+                </label>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-3">
