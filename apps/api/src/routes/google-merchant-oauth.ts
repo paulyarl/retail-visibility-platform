@@ -308,7 +308,7 @@ router.get('/google/oauth/merchants', async (req, res) => {
       success: true,
       data: {
         merchants: merchants.map((m: any) => ({
-          id: m.name?.replace('accounts/', '') || m.accountId,
+          id: String(m.accountId || m.merchantId || '').replace('accounts/', ''),
           name: m.accountName || m.name || 'Unnamed Account',
           displayName: m.accountName || m.name || 'Unnamed Account',
         })),

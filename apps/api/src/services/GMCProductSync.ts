@@ -289,10 +289,11 @@ export async function batchSyncProducts(
     }
 
     // Get items to sync
+    // Use visibility='public' for public items and exclude trashed items
     const whereClause: any = {
       tenant_id: tenantId,
-      is_public: true,
-      is_deleted: false,
+      visibility: 'public',
+      item_status: { not: 'trashed' },
     };
 
     if (itemIds && itemIds.length > 0) {
