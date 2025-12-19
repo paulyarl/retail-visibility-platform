@@ -37,18 +37,25 @@ export default function TenantBusinessProfilePage() {
     try {
       // Fetch from API (same as onboarding flow)
       const apiData = await onboardingDataService.fetchTenantData(tenantId);
-      
+
       // Load from localStorage (any saved progress)
-      const savedProgress = await onboardingStorageService.load(tenantId);
-      const localData = savedProgress?.businessData || {};
-      
+      let localData = {};
+      try {
+        const savedProgress = await onboardingStorageService.load(tenantId);
+        localData = savedProgress?.businessData || {};
+      } catch (storageError) {
+        // If localStorage is corrupted or decryption fails, log and continue with empty data
+        console.warn('[TenantSettings] Failed to load local onboarding data, using API data only:', storageError);
+        // The OnboardingStorageService.load() method already clears corrupted data, so we don't need to do it here
+      }
+
       // Merge: API data as base, localStorage overrides
       const merged = { ...apiData, ...localData };
-      
+
       // Sanitize and normalize
       const sanitized = onboardingDataService.sanitizeData(merged);
       const normalized = onboardingDataService.normalizeData(sanitized);
-      
+
       console.log('[TenantSettings] Onboarding data loaded:', normalized);
       return normalized;
     } catch (err) {

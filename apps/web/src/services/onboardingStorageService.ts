@@ -55,23 +55,45 @@ export class OnboardingStorageService {
    * Encrypt data using AES-GCM
    */
   private async encryptData(data: string, key: CryptoKey): Promise<string> {
-    const encoder = new TextEncoder();
-    const dataBuffer = encoder.encode(data);
-    const iv = window.crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV for GCM
+    try {
+      // Validate input data
+      if (!data || typeof data !== 'string') {
+        throw new Error('Invalid data to encrypt: data is null or not a string');
+      }
 
-    const encrypted = await window.crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      dataBuffer
-    );
+      // Generate a random 12-byte IV (Initialization Vector)
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
-    // Combine IV and encrypted data
-    const combined = new Uint8Array(iv.length + encrypted.byteLength);
-    combined.set(iv);
-    combined.set(new Uint8Array(encrypted), iv.length);
+      // Encode the data as UTF-8
+      const encoder = new TextEncoder();
+      const encodedData = encoder.encode(data);
 
-    // Return as base64
-    return btoa(String.fromCharCode(...combined));
+      // Encrypt the data
+      const encrypted = await window.crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        encodedData
+      );
+
+      // Combine IV and encrypted data
+      const combined = new Uint8Array(iv.length + encrypted.byteLength);
+      combined.set(iv);
+      combined.set(new Uint8Array(encrypted), iv.length);
+
+      // Convert to base64 and validate the result
+      const base64Result = btoa(String.fromCharCode(...combined));
+
+      // Double-check that we produced valid base64
+      const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+      if (!base64Regex.test(base64Result) || base64Result.length % 4 !== 0) {
+        throw new Error('Generated invalid base64 during encryption');
+      }
+
+      return base64Result;
+    } catch (error) {
+      console.error('[OnboardingStorageService] Encryption failed:', error);
+      throw new Error('Failed to encrypt onboarding data');
+    }
   }
 
   /**
@@ -79,6 +101,22 @@ export class OnboardingStorageService {
    */
   private async decryptData(encryptedData: string, key: CryptoKey): Promise<string> {
     try {
+      // Validate that the data is valid base64 before attempting to decode
+      if (!encryptedData || typeof encryptedData !== 'string') {
+        throw new Error('Invalid encrypted data: data is null or not a string');
+      }
+
+      // Check if the string looks like valid base64
+      const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+      if (!base64Regex.test(encryptedData)) {
+        throw new Error('Invalid encrypted data: not valid base64 format');
+      }
+
+      // Check if length is valid for base64 (should be multiple of 4)
+      if (encryptedData.length % 4 !== 0) {
+        throw new Error('Invalid encrypted data: base64 length not valid');
+      }
+
       const combined = new Uint8Array(
         atob(encryptedData).split('').map(c => c.charCodeAt(0))
       );
@@ -96,7 +134,7 @@ export class OnboardingStorageService {
       return decoder.decode(decrypted);
     } catch (error) {
       console.error('[OnboardingStorageService] Decryption failed:', error);
-      throw new Error('Failed to decrypt onboarding data');
+      throw new Error(`Failed to decrypt onboarding data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

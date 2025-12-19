@@ -295,3 +295,8 @@ form label {
   animation: fadeIn 0.5s ease-out forwards;
   opacity: 0;
 }
+
+/* Force consistent text colors */
+.dark .text-white { color: rgb(249 250 251) !important; }
+.dark .bg-white { background-color: rgb(31 41 55) !important; }
+.dark .text-gray-900 { color: rgb(249 250 251) !important; }

@@ -1,15 +1,16 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { requireTierFeature, requireWritableSubscription } from '../middleware/tier-access';
 import { prisma } from '../prisma';
+import { Prisma } from '@prisma/client';
 import { Flags } from '../config';
 import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import { audit } from '../audit';
 import { z } from 'zod';
-import { user_role, Prisma } from '@prisma/client';
 import { BarcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
 import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
 import { generateItemId, generateSessionId, generatePhotoId } from '../lib/id-generator';
+import { requireWritableSubscription } from '../middleware/tier-access';
+//import { requireWritableSubscription } from '../middleware/subscription';
 
 // Initialize enrichment service
 const barcodeEnrichmentService = new BarcodeEnrichmentService();

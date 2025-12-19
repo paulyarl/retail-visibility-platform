@@ -73,7 +73,7 @@ export default function VisibilityCards({
               <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-1">
                 Your Storefront
               </h3>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+              <p className="text-sm text-neutral-600 dark:text-neutral-200 mb-4">
                 Your branded online store where customers can browse and discover your products
               </p>
 
@@ -122,7 +122,7 @@ export default function VisibilityCards({
       </Card>
 
       {/* Directory Card */}
-      <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 hover:shadow-lg transition-shadow">
+      <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900 dark:to-pink-900 hover:shadow-lg transition-shadow">
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
             {/* Icon */}
@@ -137,7 +137,7 @@ export default function VisibilityCards({
               <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-1">
                 Directory Listing
               </h3>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+              <p className="text-sm text-neutral-600 dark:text-neutral-200 mb-4">
                 Get discovered by local shoppers searching for products in your area
               </p>
 

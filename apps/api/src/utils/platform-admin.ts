@@ -20,12 +20,15 @@ import { user_role } from '@prisma/client';
  */
 export function isPlatformAdmin(user: { role?: user_role | string } | null | undefined): boolean {
   const role = user?.role;
+  // console.log('[SCAN ALERT] Scan role= ',role);
   if (!role) return false;
 
   // Check for explicit PLATFORM_ADMIN role or legacy ADMIN role
   return role === 'PLATFORM_ADMIN' || 
   role === 'ADMIN' ||
+  role === 'PLATFORM_SUPPORT' ||
   role === user_role.PLATFORM_ADMIN ||
+  role === user_role.PLATFORM_SUPPORT ||
   role === user_role.ADMIN;
 }
 
@@ -82,11 +85,13 @@ export function canPerformSupportActions(user: { role?: user_role | string } | n
   return role === 'PLATFORM_ADMIN' ||
          role === 'PLATFORM_SUPPORT' ||
          role === 'TENANT_OWNER' ||
+         role === 'OWNER' ||
          role === 'TENANT_ADMIN' ||
          role === 'ADMIN'|| // Legacy
          role === user_role.PLATFORM_ADMIN ||
          role === user_role.PLATFORM_SUPPORT ||
          role === user_role.TENANT_OWNER ||
+         role === user_role.OWNER ||
          role === user_role.TENANT_ADMIN ||
          role === user_role.ADMIN; // Legacy
 }

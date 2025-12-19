@@ -100,7 +100,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-900 mb-1">
                     Organization ID
                   </div>
                   <div className="font-mono text-sm text-gray-900 dark:text-white">
@@ -152,8 +152,8 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
             </div>
 
             {/* Stats */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-4">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-900 mb-2">
                 Total Products Created
               </div>
               <div className="text-3xl font-bold text-green-600 dark:text-green-400">
@@ -209,7 +209,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-900 mb-2">
               Chain Name
             </label>
             <input
@@ -223,7 +223,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
 
           {/* Size */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-900 mb-2">
               Size
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -235,7 +235,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
                   className={`py-2 px-4 rounded-lg font-medium transition-colors ${
                     size === s
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-900 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
                   {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -251,7 +251,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
 
           {/* Scenario - Using shared BusinessTypeSelector with all 19 types */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-900 mb-2">
               Business Type
             </label>
             <BusinessTypeSelector
@@ -270,7 +270,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
                 onChange={(e) => setSeedProducts(e.target.checked)}
                 className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-gray-700 dark:text-gray-900">
                 Seed with products
               </span>
             </label>
@@ -283,7 +283,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
                     onChange={(e) => setCreateAsDrafts(e.target.checked)}
                     className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="text-sm text-gray-700 dark:text-gray-900">
                     Create as drafts (inactive)
                   </span>
                 </label>
@@ -294,7 +294,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
                     onChange={(e) => setGenerateImages(e.target.checked)}
                     className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="text-sm text-gray-700 dark:text-gray-900">
                     Generate AI images
                   </span>
                 </label>
@@ -307,7 +307,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-semibold py-3 px-6 rounded-lg transition-colors"
+              className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-900 font-semibold py-3 px-6 rounded-lg transition-colors"
             >
               Cancel
             </button>

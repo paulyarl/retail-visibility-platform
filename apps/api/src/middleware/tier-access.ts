@@ -295,12 +295,14 @@ export function requireTierFeature(feature: string) {
       const access = await checkTierAccessWithOverrides(String(tenantId), feature);
       
       if (!access.hasAccess) {
+        console.log('[TIER_CHECK: tier-access.ts : ',access);
         const tierString = tenant.subscription_tier || 'trial';
         const requiredTier = getRequiredTier(feature);
         const requiredTierDisplay = getTierDisplayName(requiredTier);
         const currentTierDisplay = getTierDisplayName(tierString);
         const requiredTierPrice = getTierPricing(requiredTier);
         const currentTierPrice = getTierPricing(tierString);
+        console.log('[TIER_CHECK: tier-access.ts :tierString ',tierString);
         
         return res.status(403).json({
           error: 'feature_not_available',
@@ -383,6 +385,7 @@ export function requireAnyTierFeature(features: string[]) {
       
       // Check if tenant has any of the features
       const tierString = tenant.subscription_tier || 'trial';
+        console.log('[TIER_CHECK: tier-access.ts :tierString ',tierString);
       const hasAnyAccess = features.some(feature => 
         checkTierAccess(tierString, feature)
       );
