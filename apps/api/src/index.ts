@@ -4897,9 +4897,18 @@ console.log(`   WEB_URL: ${process.env.WEB_URL || 'Not set'}\n`);
 if (process.env.NODE_ENV !== "test") {
   try {
     console.log('🔧 About to start server...');
-    const server = app.listen(port, '0.0.0.0', () => {
+    const server = app.listen(port, '0.0.0.0', async () => {
       console.log(`\n✅ API server running → http://localhost:${port}/health`);
       console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
+      
+      // Start GMC scheduled sync (every 6 hours)
+      try {
+        const { startGMCScheduledSync } = await import('./jobs/gmc-scheduled-sync');
+        startGMCScheduledSync();
+        console.log('🔄 GMC scheduled sync started (every 6 hours)');
+      } catch (err) {
+        console.error('⚠️ Failed to start GMC scheduled sync:', err);
+      }
     });
 
     // Handle server errors

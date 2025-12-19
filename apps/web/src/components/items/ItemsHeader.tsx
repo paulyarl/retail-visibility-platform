@@ -1,5 +1,7 @@
 import { Button, Badge } from '@/components/ui';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { useState, useEffect } from 'react';
+import { apiRequest } from '@/lib/api';
 
 interface ItemsHeaderProps {
   stats: {
@@ -30,6 +32,62 @@ export default function ItemsHeader({
   const { canAccess, getFeatureBadgeWithPermission } = useTenantTier(tenantId || '');
   const hasStorefront = canAccess('storefront', 'canView');
   const storefrontBadge = getFeatureBadgeWithPermission('storefront', 'canView', 'view storefront');
+  
+  // GMC sync state
+  const [gmcStatus, setGmcStatus] = useState<{ isReady: boolean; syncing: boolean; lastResult?: string } | null>(null);
+  const [syncingToGoogle, setSyncingToGoogle] = useState(false);
+
+  // Check GMC connection status on mount
+  useEffect(() => {
+    if (!tenantId) return;
+    const checkGmcStatus = async () => {
+      try {
+        const res = await apiRequest(`/api/google/merchant/sync-status?tenantId=${tenantId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setGmcStatus({
+            isReady: data.data?.hasGMCConnection && data.data?.hasMerchantLink,
+            syncing: false,
+          });
+        }
+      } catch (err) {
+        console.error('[ItemsHeader] Failed to check GMC status:', err);
+      }
+    };
+    checkGmcStatus();
+  }, [tenantId]);
+
+  // Handle sync to Google
+  const handleSyncToGoogle = async () => {
+    if (!tenantId || syncingToGoogle) return;
+    setSyncingToGoogle(true);
+    setGmcStatus(prev => prev ? { ...prev, syncing: true, lastResult: undefined } : null);
+    try {
+      const res = await apiRequest(`/api/google/merchant/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setGmcStatus(prev => prev ? { 
+          ...prev, 
+          syncing: false, 
+          lastResult: `✓ ${data.data?.synced || 0} products synced` 
+        } : null);
+      } else {
+        setGmcStatus(prev => prev ? { 
+          ...prev, 
+          syncing: false, 
+          lastResult: `✗ ${data.message || 'Sync failed'}` 
+        } : null);
+      }
+    } catch (err) {
+      setGmcStatus(prev => prev ? { ...prev, syncing: false, lastResult: '✗ Sync error' } : null);
+    } finally {
+      setSyncingToGoogle(false);
+    }
+  };
   
   return (
     <div className="mb-6" suppressHydrationWarning>
@@ -197,6 +255,36 @@ export default function ItemsHeader({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             Categories
+          </Button>
+        )}
+
+        {/* GOOGLE SYNC - Only show when GMC is connected */}
+        {tenantId && gmcStatus?.isReady && (
+          <Button 
+            onClick={handleSyncToGoogle}
+            variant="secondary"
+            disabled={syncingToGoogle}
+            className="bg-gradient-to-r from-red-500 to-yellow-500 hover:from-red-600 hover:to-yellow-600 text-white border-0"
+            title="Sync public products to Google Merchant Center for Google Shopping listings"
+          >
+            {syncingToGoogle ? (
+              <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+            )}
+            {syncingToGoogle ? 'Syncing...' : 'Sync to Google'}
+            {gmcStatus?.lastResult && (
+              <span className={`ml-2 text-xs ${gmcStatus.lastResult.startsWith('✓') ? 'text-green-200' : 'text-red-200'}`}>
+                {gmcStatus.lastResult}
+              </span>
+            )}
           </Button>
         )}
 
