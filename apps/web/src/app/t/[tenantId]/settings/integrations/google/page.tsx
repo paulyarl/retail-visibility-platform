@@ -102,9 +102,16 @@ export default function GoogleIntegrationsPage() {
   async function fetchMerchants() {
     try {
       setLoadingMerchants(true);
+      setError(null);
       const res = await api.get(`${API_BASE_URL}/api/google/oauth/merchants?tenantId=${tenantId}`);
       if (!res.ok) {
         const errData = await res.json();
+        // If no OAuth account, redirect to connect flow
+        if (errData.error === 'no_oauth_account' || res.status === 404) {
+          // Redirect to Google OAuth to connect account for Merchant Center
+          window.location.href = `${API_BASE_URL}/api/google/oauth/authorize?tenantId=${tenantId}`;
+          return;
+        }
         throw new Error(errData.message || 'Failed to fetch merchants');
       }
       const data = await res.json();

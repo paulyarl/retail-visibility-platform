@@ -710,6 +710,7 @@ model platform_categories {
   slug               String    @unique
   description        String?
   google_category_id String    @unique
+  gcid               String?   /// Google Business Profile category ID (e.g., gcid:coffee_shop)
   parent_id          String?
   level              Int?      @default(0)
   icon_emoji         String?
@@ -720,6 +721,7 @@ model platform_categories {
   updated_at         DateTime? @default(now()) @db.Timestamptz(6)
 
   @@index([google_category_id], map: "idx_platform_categories_google_id")
+  @@index([gcid], map: "idx_platform_categories_gcid")
   @@index([parent_id], map: "idx_platform_categories_parent")
   @@index([slug], map: "idx_platform_categories_slug")
   @@index([sort_order, name], map: "idx_platform_categories_sort")

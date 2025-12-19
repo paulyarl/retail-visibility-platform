@@ -93,37 +93,57 @@ export class GBPCategorySyncService {
    */
   private async getAccessToken(): Promise<string | null> {
     try {
-      // Check for platform-level Google Business OAuth integration
-      const oauthIntegration = await prisma.$queryRaw<any[]>`
-        SELECT access_token, refresh_token, expires_at, scopes
+      console.log('[GBPCategorySync] Looking for OAuth integration...');
+      
+      // Use direct pool to avoid Prisma ARRAY type issues
+      const pool = getDirectPool();
+      const result = await pool.query(`
+        SELECT access_token, refresh_token, "expiresAt"
         FROM oauth_integrations
         WHERE provider = 'google_business'
-          AND tenantId IS NULL
-          AND is_active = true
+          AND tenant_id IS NULL
+          AND "isActive" = true
         ORDER BY created_at DESC
         LIMIT 1
-      `;
+      `);
 
-      if (!oauthIntegration || oauthIntegration.length === 0) {
-        console.log('[GBPCategorySync] No Google Business OAuth integration found');
-        return null;
+      console.log('[GBPCategorySync] Query result:', result.rows?.length || 0, 'rows');
+
+      if (!result.rows || result.rows.length === 0) {
+        console.log('[GBPCategorySync] No Google Business OAuth integration found, trying google_oauth_tokens_list...');
+        // Fallback to google_oauth_tokens_list table
+        return this.getAnyValidAccessToken();
       }
 
-      const integration = oauthIntegration[0];
-      const tokens = JSON.parse(integration.access_token);
+      const integration = result.rows[0];
+      console.log('[GBPCategorySync] Found integration, expiresAt:', integration.expiresAt);
+      console.log('[GBPCategorySync] Has refresh_token:', !!integration.refresh_token);
+      console.log('[GBPCategorySync] access_token length:', integration.access_token?.length || 0);
+      
+      // access_token might be JSON string or plain token
+      let accessToken: string;
+      try {
+        const tokens = JSON.parse(integration.access_token);
+        accessToken = tokens.access_token;
+        console.log('[GBPCategorySync] Parsed JSON token, length:', accessToken?.length || 0);
+      } catch {
+        // Not JSON, use as-is
+        accessToken = integration.access_token;
+        console.log('[GBPCategorySync] Using raw token, length:', accessToken?.length || 0);
+      }
 
-      // Check if token is expired (use expires_at from database or calculate from expires_in)
+      // Check if token is expired
       const now = new Date();
-      const expiresAt = integration.expires_at ? new Date(integration.expires_at) : null;
+      const expiresAt = integration.expiresAt ? new Date(integration.expiresAt) : null;
+      console.log('[GBPCategorySync] Token expiry check - now:', now.toISOString(), 'expiresAt:', expiresAt?.toISOString());
       
       if (expiresAt && expiresAt <= now) {
         console.log('[GBPCategorySync] Token expired, attempting refresh...');
         
         // Try to refresh token if we have a refresh token
-        if (tokens.refresh_token || integration.refresh_token) {
+        if (integration.refresh_token) {
           try {
-            const refreshToken = tokens.refresh_token || integration.refresh_token;
-            const newAccessToken = await this.refreshAccessToken(refreshToken);
+            const newAccessToken = await this.refreshAccessToken(integration.refresh_token);
             return newAccessToken;
           } catch (refreshError) {
             console.error('[GBPCategorySync] Token refresh failed:', refreshError);
@@ -135,7 +155,8 @@ export class GBPCategorySyncService {
         return null;
       }
 
-      return tokens.access_token;
+      console.log('[GBPCategorySync] Returning valid access token');
+      return accessToken;
     } catch (error) {
       console.error('[GBPCategorySync] Failed to get access token:', error);
       return null;

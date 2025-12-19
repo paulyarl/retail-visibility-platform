@@ -13,6 +13,7 @@ import tierSystemRoutes from '../admin/tier-system';
 import taxonomyAdminRoutes from '../taxonomy-admin';
 import adminTenantsRoutes from '../admin/tenants';
 import platformCategoriesRoutes from '../admin/platform-categories';
+import gbpCategoriesSyncRoutes from '../admin/gbp-categories-sync';
 
 /**
  * Mount admin routes
@@ -23,6 +24,7 @@ export function mountAdminRoutes(app: Express) {
 
   // Specific admin routes - MUST be mounted BEFORE generic routes to prevent conflicts
   app.use('/api/admin/platform-categories', authenticateToken, requireAdmin, platformCategoriesRoutes);
+  app.use('/api/admin/gbp-categories', authenticateToken, requireAdmin, gbpCategoriesSyncRoutes);
   app.use('/api/admin/feature-overrides', authenticateToken, requireAdmin, featureOverridesRoutes);
   app.use('/api/admin/tier-management', authenticateToken, tierManagementRoutes);
   app.use('/api/admin/tier-system', authenticateToken, requireAdmin, tierSystemRoutes);
