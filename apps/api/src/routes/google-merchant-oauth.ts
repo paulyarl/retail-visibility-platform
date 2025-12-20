@@ -373,6 +373,18 @@ router.post('/google/oauth/link-merchant', async (req, res) => {
 
     const now = new Date();
 
+    // Ensure only one active merchant link per tenant
+    await prisma.google_merchant_links_list.updateMany({
+      where: {
+        is_active: true,
+        google_oauth_accounts_list: { tenant_id: tenantId },
+      },
+      data: {
+        is_active: false,
+        updated_at: now,
+      },
+    });
+
     if (existingLink) {
       // Update existing link
       await prisma.google_merchant_links_list.update({
@@ -450,6 +462,113 @@ router.get('/google/merchant/sync-status', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'get_status_failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * Update GMC sync settings (pickup-only intent, etc.)
+ * PATCH /google/merchant/settings
+ */
+router.patch('/google/merchant/settings', async (req, res) => {
+  try {
+    const { tenantId, pickupOnly, pickupMethod, pickupSla, fulfillmentMode } = req.body;
+
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_tenantId',
+        message: 'tenantId is required'
+      });
+    }
+
+    const allowedFulfillmentModes = new Set(['standard', 'shipping_and_pickup', 'pickup_only']);
+    if (fulfillmentMode && typeof fulfillmentMode === 'string' && !allowedFulfillmentModes.has(fulfillmentMode)) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_fulfillment_mode',
+        message: 'fulfillmentMode must be one of: standard, shipping_and_pickup, pickup_only'
+      });
+    }
+
+    // Validate pickup values if provided
+    const allowedPickupMethods = new Set(['buy', 'reserve', 'ship to store', 'not supported']);
+    const allowedPickupSlas = new Set(['same day', 'next day', '2-day', '3-day', '4-day', '5-day', '6-day', '7-day', 'multi-week']);
+
+    if (pickupMethod && typeof pickupMethod === 'string' && !allowedPickupMethods.has(pickupMethod)) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_pickup_method',
+        message: 'pickupMethod must be one of: buy, reserve, ship to store, not supported'
+      });
+    }
+
+    if (pickupSla && typeof pickupSla === 'string' && !allowedPickupSlas.has(pickupSla)) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_pickup_sla',
+        message: 'pickupSla must be one of: same day, next day, 2-day, 3-day, 4-day, 5-day, 6-day, 7-day, multi-week'
+      });
+    }
+
+    // Determine next mode (support legacy pickupOnly)
+    let nextMode: string | undefined;
+    if (typeof fulfillmentMode === 'string') {
+      nextMode = fulfillmentMode;
+    } else if (typeof pickupOnly === 'boolean') {
+      nextMode = pickupOnly ? 'pickup_only' : 'standard';
+    }
+
+    // Keep legacy pickup_only boolean aligned with the pickup_only mode only
+    const nextPickupOnly = nextMode ? (nextMode === 'pickup_only') : (typeof pickupOnly === 'boolean' ? pickupOnly : undefined);
+
+    // Find the tenant's OAuth account + active merchant link
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+      select: {
+        id: true,
+        google_merchant_links_list: {
+          where: { is_active: true },
+          take: 1,
+          select: { id: true }
+        }
+      }
+    });
+
+    const linkId = account?.google_merchant_links_list?.[0]?.id;
+    if (!linkId) {
+      return res.status(404).json({
+        success: false,
+        error: 'no_merchant_link',
+        message: 'No active Merchant Center link found for this tenant'
+      });
+    }
+
+    await prisma.google_merchant_links_list.update({
+      where: { id: linkId },
+      data: {
+        fulfillment_mode: nextMode,
+        pickup_only: typeof nextPickupOnly === 'boolean' ? nextPickupOnly : undefined,
+        pickup_method: typeof pickupMethod === 'string' ? pickupMethod : undefined,
+        pickup_sla: typeof pickupSla === 'string' ? pickupSla : undefined,
+        updated_at: new Date(),
+      }
+    });
+
+    const { getGMCSyncStatus } = await import('../services/GMCProductSync');
+    const status = await getGMCSyncStatus(tenantId);
+
+    return res.json({
+      success: true,
+      message: 'GMC settings updated',
+      data: status,
+    });
+  } catch (error) {
+    console.error('[GMC Settings] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'update_settings_failed',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }

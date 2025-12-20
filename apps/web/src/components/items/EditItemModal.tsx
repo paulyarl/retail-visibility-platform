@@ -48,6 +48,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [manufacturer, setManufacturer] = useState('');
+  const [condition, setCondition] = useState<'new' | 'used' | 'refurbished'>('new');
   const [mpn, setMpn] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
@@ -87,6 +88,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setName(item.name || '');
       setBrand(item.brand || '');
       setManufacturer(item.manufacturer || '');
+      setCondition(((item as any).condition === 'brand_new' ? 'new' : (item as any).condition) || 'new');
       setMpn((item as any).mpn || '');
       setPrice(item.price ? item.price.toFixed(2) : '');
       setStock(item.stock?.toString() || '');
@@ -166,11 +168,12 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       }
 
       const updatedItem = {
-        ...item,
+        ...(item || {}),
         sku: sku.trim(),
         name: name.trim(),
         brand: brand.trim() || undefined,
         manufacturer: manufacturer.trim() || undefined,
+        condition: condition,
         mpn: mpn.trim() || undefined,
         price: price ? parseFloat(price) : undefined,
         stock: stock ? parseInt(stock) : undefined,
@@ -325,6 +328,25 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           />
           <p className="text-xs text-neutral-500 mt-1">
             Supplier or manufacturer name (optional)
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+            Condition
+          </label>
+          <select
+            value={condition}
+            onChange={(e) => setCondition(e.target.value as any)}
+            disabled={saving}
+            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
+          >
+            <option value="new">New</option>
+            <option value="used">Used</option>
+            <option value="refurbished">Refurbished</option>
+          </select>
+          <p className="text-xs text-neutral-500 mt-1">
+            Used for your product pages and Google sync.
           </p>
         </div>
 

@@ -13,6 +13,7 @@ interface Product {
   title: string;
   brand: string;
   manufacturer?: string;
+  condition?: string;
   description?: string;
   price: number;
   currency: string;
@@ -181,6 +182,11 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: 
           <p className="text-sm text-neutral-600 mb-1">by {product.brand}</p>
           {product.manufacturer && (
             <p className="text-sm text-neutral-500 mb-1">Manufacturer: {product.manufacturer}</p>
+          )}
+          {product.condition && (
+            <p className="text-sm text-neutral-500 mb-1">
+              Condition: {product.condition === 'brand_new' ? 'New' : (product.condition === 'new' ? 'New' : product.condition === 'used' ? 'Used' : 'Refurbished')}
+            </p>
           )}
           {product.tenantCategory && (
             <div className="mt-2 mb-1">

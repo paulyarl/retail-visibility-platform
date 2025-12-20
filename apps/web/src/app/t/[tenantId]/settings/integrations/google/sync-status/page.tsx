@@ -70,6 +70,11 @@ export default function GBPSyncStatusPage() {
   const [gmcStatus, setGmcStatus] = useState<any>(null);
   const [syncingProducts, setSyncingProducts] = useState(false);
   const [gmcSyncResult, setGmcSyncResult] = useState<any>(null);
+  const [gmcFulfillmentMode, setGmcFulfillmentMode] = useState<'standard' | 'shipping_and_pickup' | 'pickup_only'>('standard');
+  const [gmcPickupMethod, setGmcPickupMethod] = useState<'buy' | 'reserve' | 'ship to store' | 'not supported'>('buy');
+  const [gmcPickupSla, setGmcPickupSla] = useState<'same day' | 'next day' | '2-day' | '3-day' | '4-day' | '5-day' | '6-day' | '7-day' | 'multi-week'>('same day');
+  const [savingGmcSettings, setSavingGmcSettings] = useState(false);
+  const [gmcSettingsResult, setGmcSettingsResult] = useState<any>(null);
 
   useEffect(() => {
     async function fetchSyncStatus() {
@@ -472,6 +477,11 @@ export default function GBPSyncStatusPage() {
         if (res.ok) {
           const data = await res.json();
           setGmcStatus(data.data);
+
+          // Initialize pickup settings
+          setGmcFulfillmentMode((data.data?.fulfillmentMode as any) || (data.data?.pickupOnly ? 'pickup_only' : 'standard'));
+          setGmcPickupMethod((data.data?.pickupMethod as any) || 'buy');
+          setGmcPickupSla((data.data?.pickupSla as any) || 'same day');
         }
       } catch (error) {
         console.error('Failed to fetch GMC status:', error);
@@ -481,6 +491,35 @@ export default function GBPSyncStatusPage() {
       fetchGMCStatus();
     }
   }, [tenantId, loading]);
+
+  async function saveGMCSettings(next: { fulfillmentMode: string; pickupMethod: string; pickupSla: string }) {
+    try {
+      if (!tenantId) return;
+      setSavingGmcSettings(true);
+      setGmcSettingsResult(null);
+
+      const res = await api.patch(`${API_BASE_URL}/api/google/merchant/settings`, {
+        tenantId,
+        fulfillmentMode: next.fulfillmentMode,
+        pickupMethod: next.pickupMethod,
+        pickupSla: next.pickupSla,
+      });
+
+      const data = await res.json();
+      setGmcSettingsResult(data);
+      if (res.ok && data?.success) {
+        setGmcStatus(data.data);
+        setGmcFulfillmentMode((data.data?.fulfillmentMode as any) || (data.data?.pickupOnly ? 'pickup_only' : 'standard'));
+        setGmcPickupMethod((data.data?.pickupMethod as any) || 'buy');
+        setGmcPickupSla((data.data?.pickupSla as any) || 'same day');
+      }
+    } catch (error) {
+      console.error('Failed to save GMC settings:', error);
+      setGmcSettingsResult({ success: false, message: 'Failed to save settings. Please try again.' });
+    } finally {
+      setSavingGmcSettings(false);
+    }
+  }
 
   // Sync products to GMC
   async function handleSyncProductsToGMC() {
@@ -967,6 +1006,194 @@ export default function GBPSyncStatusPage() {
                     {gmcStatus.hasMerchantLink ? `Merchant: ${gmcStatus.merchantName}` : 'No Merchant Linked'}
                   </span>
                 </div>
+              </div>
+
+              {/* GMC Settings */}
+              <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-neutral-900 dark:text-neutral-100">Fulfillment mode</p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Choose how you fulfill orders. This controls what attributes we send to Google for each product.
+                    </p>
+                    <p className="text-xs text-neutral-500 mt-2">
+                      Google Merchant Center settings may still be required.
+                      <a
+                        href="https://developers.google.com/shopping-content/reference/rest/v2.1/products"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-1 text-blue-600 hover:underline"
+                      >
+                        Learn more
+                      </a>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <label className={`p-3 rounded-lg border cursor-pointer ${
+                    gmcFulfillmentMode === 'standard'
+                      ? 'border-green-300 bg-green-50 dark:bg-green-900/20 dark:border-green-800'
+                      : 'border-neutral-200 bg-white dark:bg-neutral-800 dark:border-neutral-700'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        name="gmc_fulfillment_mode"
+                        checked={gmcFulfillmentMode === 'standard'}
+                        disabled={!gmcStatus.hasGMCConnection || !gmcStatus.hasMerchantLink || savingGmcSettings}
+                        onChange={() => {
+                          setGmcFulfillmentMode('standard');
+                          saveGMCSettings({
+                            fulfillmentMode: 'standard',
+                            pickupMethod: gmcPickupMethod,
+                            pickupSla: gmcPickupSla,
+                          });
+                        }}
+                        className="mt-1"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Standard (default)</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          We do not send <span className="font-mono">pickupMethod</span>/<span className="font-mono">pickupSla</span>. Shipping/pickup is handled by your Merchant Center configuration.
+                        </p>
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className={`p-3 rounded-lg border cursor-pointer ${
+                    gmcFulfillmentMode === 'shipping_and_pickup'
+                      ? 'border-blue-300 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800'
+                      : 'border-neutral-200 bg-white dark:bg-neutral-800 dark:border-neutral-700'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        name="gmc_fulfillment_mode"
+                        checked={gmcFulfillmentMode === 'shipping_and_pickup'}
+                        disabled={!gmcStatus.hasGMCConnection || !gmcStatus.hasMerchantLink || savingGmcSettings}
+                        onChange={() => {
+                          setGmcFulfillmentMode('shipping_and_pickup');
+                          saveGMCSettings({
+                            fulfillmentMode: 'shipping_and_pickup',
+                            pickupMethod: gmcPickupMethod,
+                            pickupSla: gmcPickupSla,
+                          });
+                        }}
+                        className="mt-1"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Shipping + Pickup</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          You offer both shipping and in-store pickup. We send <span className="font-mono">pickupMethod</span>/<span className="font-mono">pickupSla</span>.
+                        </p>
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className={`p-3 rounded-lg border cursor-pointer ${
+                    gmcFulfillmentMode === 'pickup_only'
+                      ? 'border-orange-300 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800'
+                      : 'border-neutral-200 bg-white dark:bg-neutral-800 dark:border-neutral-700'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        name="gmc_fulfillment_mode"
+                        checked={gmcFulfillmentMode === 'pickup_only'}
+                        disabled={!gmcStatus.hasGMCConnection || !gmcStatus.hasMerchantLink || savingGmcSettings}
+                        onChange={() => {
+                          setGmcFulfillmentMode('pickup_only');
+                          saveGMCSettings({
+                            fulfillmentMode: 'pickup_only',
+                            pickupMethod: gmcPickupMethod,
+                            pickupSla: gmcPickupSla,
+                          });
+                        }}
+                        className="mt-1"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Pickup-only (in-store)</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          You only offer in-store pickup. We send <span className="font-mono">pickupMethod</span>/<span className="font-mono">pickupSla</span>.
+                        </p>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-400 mb-1">
+                      Pickup Method
+                    </label>
+                    <select
+                      value={gmcPickupMethod}
+                      disabled={gmcFulfillmentMode === 'standard' || savingGmcSettings}
+                      onChange={(e) => {
+                        const next = e.target.value as any;
+                        setGmcPickupMethod(next);
+                        saveGMCSettings({
+                          fulfillmentMode: gmcFulfillmentMode,
+                          pickupMethod: next,
+                          pickupSla: gmcPickupSla,
+                        });
+                      }}
+                      className="w-full px-3 py-2 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm"
+                    >
+                      <option value="buy">buy</option>
+                      <option value="reserve">reserve</option>
+                      <option value="ship to store">ship to store</option>
+                      <option value="not supported">not supported</option>
+                    </select>
+                    {gmcFulfillmentMode === 'standard' && (
+                      <p className="text-xs text-neutral-500 mt-1">Select Shipping + Pickup or Pickup-only to apply these fields to products.</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-400 mb-1">
+                      Pickup SLA
+                    </label>
+                    <select
+                      value={gmcPickupSla}
+                      disabled={gmcFulfillmentMode === 'standard' || savingGmcSettings}
+                      onChange={(e) => {
+                        const next = e.target.value as any;
+                        setGmcPickupSla(next);
+                        saveGMCSettings({
+                          fulfillmentMode: gmcFulfillmentMode,
+                          pickupMethod: gmcPickupMethod,
+                          pickupSla: next,
+                        });
+                      }}
+                      className="w-full px-3 py-2 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm"
+                    >
+                      <option value="same day">same day</option>
+                      <option value="next day">next day</option>
+                      <option value="2-day">2-day</option>
+                      <option value="3-day">3-day</option>
+                      <option value="4-day">4-day</option>
+                      <option value="5-day">5-day</option>
+                      <option value="6-day">6-day</option>
+                      <option value="7-day">7-day</option>
+                      <option value="multi-week">multi-week</option>
+                    </select>
+                    {gmcFulfillmentMode === 'standard' && (
+                      <p className="text-xs text-neutral-500 mt-1">Select Shipping + Pickup or Pickup-only to apply these fields to products.</p>
+                    )}
+                  </div>
+                </div>
+
+                {gmcSettingsResult && (
+                  <div className={`mt-3 p-2 rounded text-sm ${
+                    gmcSettingsResult.success
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                  }`}>
+                  {savingGmcSettings ? 'Saving...' : (gmcSettingsResult.message || (gmcSettingsResult.success ? 'Saved.' : 'Failed to save.'))}
+                  </div>
+                )}
               </div>
 
               {/* Product Sync Stats */}

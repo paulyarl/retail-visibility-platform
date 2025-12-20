@@ -127,9 +127,19 @@ function convertToGoogleProduct(
   item: any,
   tenantId: string,
   websiteUrl: string,
+  options?: { fulfillmentMode?: string; pickupMethod?: string; pickupSla?: string },
   targetCountry: string = 'US',
   contentLanguage: string = 'en'
 ): any {
+  const normalizedCondition = (() => {
+    const c = item?.condition;
+    if (c === 'brand_new') return 'new';
+    if (c === 'refurbished') return 'refurbished';
+    if (c === 'used') return 'used';
+    if (c === 'new') return 'new';
+    return 'new';
+  })();
+
   const price = item.price_cents ? (item.price_cents / 100).toFixed(2) : '0.00';
   const availability = item.stock_quantity > 0 ? 'in stock' : 'out of stock';
   
@@ -152,12 +162,19 @@ function convertToGoogleProduct(
     targetCountry: targetCountry,
     channel: 'online',
     availability: availability,
-    condition: item.condition || 'new',
+    condition: normalizedCondition,
     price: {
       value: price,
       currency: 'USD',
     },
   };
+
+  // Pickup intent (in-store pickup scenarios)
+  const mode = options?.fulfillmentMode || 'standard';
+  if (mode === 'pickup_only' || mode === 'shipping_and_pickup') {
+    googleProduct.pickupMethod = options?.pickupMethod || 'buy';
+    googleProduct.pickupSla = options?.pickupSla || 'same day';
+  }
 
   // Add optional fields if present
   if (item.brand) googleProduct.brand = item.brand;
@@ -216,7 +233,26 @@ export async function syncProduct(
       select: { website: true }
     });
     const websiteUrl = businessProfile?.website || `https://visibleshelf.com/store/${tenantId}`;
-    const googleProduct = convertToGoogleProduct(item, tenantId, websiteUrl);
+
+    // Get merchant link settings (pickup-only, etc.)
+    const merchantLink = await prisma.google_merchant_links_list.findFirst({
+      where: {
+        is_active: true,
+        google_oauth_accounts_list: { tenant_id: tenantId },
+      },
+      select: {
+        fulfillment_mode: true,
+        pickup_only: true,
+        pickup_method: true,
+        pickup_sla: true,
+      },
+    });
+
+    const googleProduct = convertToGoogleProduct(item, tenantId, websiteUrl, {
+      fulfillmentMode: merchantLink?.fulfillment_mode || (merchantLink?.pickup_only ? 'pickup_only' : 'standard'),
+      pickupMethod: merchantLink?.pickup_method || undefined,
+      pickupSla: merchantLink?.pickup_sla || undefined,
+    });
 
     // Use Content API products.insert (upserts by offerId)
     const response = await fetch(
@@ -316,12 +352,32 @@ export async function batchSyncProducts(
     });
     const websiteUrl = businessProfile?.website || `https://visibleshelf.com/store/${tenantId}`;
 
+    // Get merchant link settings (pickup-only, etc.)
+    const merchantLink = await prisma.google_merchant_links_list.findFirst({
+      where: {
+        is_active: true,
+        google_oauth_accounts_list: { tenant_id: tenantId },
+      },
+      select: {
+        fulfillment_mode: true,
+        pickup_only: true,
+        pickup_method: true,
+        pickup_sla: true,
+      },
+    });
+
+    const merchantSettings = {
+      fulfillmentMode: merchantLink?.fulfillment_mode || (merchantLink?.pickup_only ? 'pickup_only' : 'standard'),
+      pickupMethod: merchantLink?.pickup_method || undefined,
+      pickupSla: merchantLink?.pickup_sla || undefined,
+    };
+
     // Build batch entries
     const batchEntries = items.map((item, index) => ({
       batchId: index + 1,
       merchantId: auth.merchantId,
       method: 'insert',
-      product: convertToGoogleProduct(item, tenantId, websiteUrl),
+      product: convertToGoogleProduct(item, tenantId, websiteUrl, merchantSettings),
     }));
 
     // Use Content API products.custombatch for batch operations
@@ -590,6 +646,10 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
   hasMerchantLink: boolean;
   merchantId: string | null;
   merchantName: string | null;
+  fulfillmentMode: string | null;
+  pickupOnly: boolean;
+  pickupMethod: string | null;
+  pickupSla: string | null;
   totalProducts: number;
   syncedProducts: number;
   pendingProducts: number;
@@ -631,6 +691,10 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
       hasMerchantLink: !!merchantLink,
       merchantId: merchantLink?.merchant_id || null,
       merchantName: merchantLink?.merchant_name || null,
+      fulfillmentMode: merchantLink?.fulfillment_mode || (merchantLink?.pickup_only ? 'pickup_only' : 'standard'),
+      pickupOnly: !!merchantLink?.pickup_only,
+      pickupMethod: merchantLink?.pickup_method || null,
+      pickupSla: merchantLink?.pickup_sla || null,
       totalProducts: total,
       syncedProducts: synced,
       pendingProducts: pending,
@@ -644,6 +708,10 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
       hasMerchantLink: false,
       merchantId: null,
       merchantName: null,
+      fulfillmentMode: null,
+      pickupOnly: false,
+      pickupMethod: null,
+      pickupSla: null,
       totalProducts: 0,
       syncedProducts: 0,
       pendingProducts: 0,

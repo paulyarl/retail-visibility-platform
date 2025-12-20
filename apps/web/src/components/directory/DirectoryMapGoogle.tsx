@@ -2,6 +2,47 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+// Google Maps type declarations
+declare global {
+  namespace google {
+    namespace maps {
+      class Map {
+        constructor(mapDiv: HTMLElement, opts?: any);
+        fitBounds(bounds: any): void;
+        getZoom(): number;
+        setZoom(zoom: number): void;
+        setCenter(center: any): void;
+      }
+      class Marker {
+        constructor(opts?: any);
+        setMap(map: Map | null): void;
+        setIcon(icon: any): void;
+        addListener(event: string, callback: () => void): void;
+      }
+      class Size {
+        constructor(width: number, height: number);
+      }
+      class Point {
+        constructor(x: number, y: number);
+      }
+      class LatLngBounds {
+        extend(point: any): void;
+      }
+      class InfoWindow {
+        setContent(content: string): void;
+        open(map: Map, marker: Marker): void;
+      }
+      namespace event {
+        function addListener(instance: any, event: string, callback: () => void): any;
+        function removeListener(listener: any): void;
+      }
+      namespace Animation {
+        const DROP: any;
+      }
+    }
+  }
+}
+
 interface DirectoryListing {
   id: string;
   businessName: string;
@@ -174,12 +215,41 @@ export default function DirectoryMapGoogle({
     validListings.forEach((listing) => {
       if (!listing.latitude || !listing.longitude || !mapRef.current) return;
 
-      const marker = new google.maps.Marker({
+      // Create custom marker with store logo
+      let markerOptions: any = {
         position: { lat: listing.latitude, lng: listing.longitude },
         map: mapRef.current,
         title: listing.businessName,
         animation: google.maps.Animation.DROP,
-      });
+      };
+
+      // Use store logo as marker icon if available
+      let marker: google.maps.Marker;
+      if (listing.logoUrl) {
+        // Set initial icon with logo URL - Google Maps will handle loading
+        markerOptions.icon = {
+          url: listing.logoUrl,
+          scaledSize: new google.maps.Size(40, 40),
+          origin: new google.maps.Point(0, 0),
+          anchor: new google.maps.Point(20, 40),
+        };
+      }
+
+      marker = new google.maps.Marker(markerOptions);
+
+      // Add error handling for logo loading after marker creation
+      if (listing.logoUrl) {
+        const img = new Image();
+        img.onload = () => {
+          // Logo loaded successfully - marker is already using it
+        };
+        img.onerror = () => {
+          // Logo failed to load, reset to default marker
+          console.warn(`[DirectoryMap] Logo failed to load for ${listing.businessName}: ${listing.logoUrl}`);
+          marker.setIcon(null); // Reset to default red marker
+        };
+        img.src = listing.logoUrl;
+      }
 
       // Create info window content
       const infoContent = `

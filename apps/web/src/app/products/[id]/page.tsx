@@ -170,6 +170,7 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
       tenantId: productData.tenantId || productData.tenant_id,
       tenantCategoryId: productData.tenantCategoryId || productData.directory_category_id || null,
       tenantCategory: productData.tenantCategory || null,
+      condition: productData.condition === 'brand_new' ? 'new' : productData.condition,
     };
 
     // Fetch tenant info and business profile using public endpoint
@@ -305,6 +306,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       priceCurrency: product.currency,
       price: product.price,
       availability: `https://schema.org/${product.availability === 'in_stock' ? 'InStock' : 'OutOfStock'}`,
+      itemCondition: `https://schema.org/${product.condition === 'used' ? 'UsedCondition' : product.condition === 'refurbished' ? 'RefurbishedCondition' : 'NewCondition'}`,
       seller: {
         '@type': 'Organization',
         name: businessName,

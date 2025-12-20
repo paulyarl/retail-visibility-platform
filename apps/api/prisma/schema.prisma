@@ -435,6 +435,10 @@ model google_merchant_links_list {
   merchant_id                String
   merchant_name              String?
   website_url                String?
+  fulfillment_mode           String                     @default("standard")
+  pickup_only                Boolean                    @default(false)
+  pickup_method              String                     @default("buy")
+  pickup_sla                 String                     @default("same day")
   is_active                  Boolean                    @default(true)
   last_sync_at               DateTime?                  @db.Timestamptz(6)
   sync_status                String?                    @default("pending")

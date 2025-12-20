@@ -47,10 +47,9 @@ export default function AdminTenantsPage() {
           return;
         }
         
-        // Transform tenants with status
-        const tenantsWithStatus = data.map((t: any) => {
+        // Transform tenants with status and fetch item counts
+        const tenantsWithStatus = await Promise.all(data.map(async (t: any) => {
           // Determine status based on subscription_status
-          // Consider active, trial, and tier-based statuses (starter, professional, enterprise) as active
           const subscriptionStatus = t.subscriptionStatus;
           console.log('[Tenant Subscription Status] Got status for tenant:',  subscriptionStatus);
           const isActive = subscriptionStatus && 
@@ -58,12 +57,24 @@ export default function AdminTenantsPage() {
              isTrialStatus(subscriptionStatus) || 
              ['starter', 'professional', 'enterprise', 'chain_starter', 'chain_professional', 'chain_enterprise'].includes(subscriptionStatus));
           
+          // Fetch item count for this tenant
+          let itemCount = 0;
+          try {
+            const statsRes = await api.get(`/api/items/stats?tenant_id=${t.id}`);
+            if (statsRes.ok) {
+              const stats = await statsRes.json();
+              itemCount = stats.total || 0;
+            }
+          } catch (error) {
+            console.warn(`[Admin Tenants] Failed to fetch item count for tenant ${t.id}:`, error);
+          }
+          
           return {
             ...t,
             status: isActive ? 'active' : 'inactive',
-            itemCount: 0, // TODO: Implement item count fetching when endpoint exists
+            itemCount,
           };
-        });
+        }));
         
         setTenants(tenantsWithStatus);
       } catch (e) {

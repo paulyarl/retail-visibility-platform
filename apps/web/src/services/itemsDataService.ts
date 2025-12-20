@@ -7,6 +7,7 @@ export interface Item {
   description?: string;
   brand?: string;
   manufacturer?: string;
+  condition?: 'new' | 'used' | 'refurbished';
   price: number;
   stock: number;
   status: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed';
@@ -139,6 +140,7 @@ export class ItemsDataService {
         ...item,
         status: item.itemStatus || item.item_status || item.status || 'active',
         itemStatus: item.itemStatus || item.item_status || item.status || 'active',
+        condition: item.condition === 'brand_new' ? 'new' : item.condition,
       });
 
       // Handle both paginated and non-paginated responses
@@ -199,6 +201,7 @@ export class ItemsDataService {
         ...result,
         status: result.itemStatus || result.item_status || result.status || 'active',
         itemStatus: result.itemStatus || result.item_status || result.status || 'active',
+        condition: result.condition === 'brand_new' ? 'new' : result.condition,
       };
     } catch (error) {
       // Error will be caught and displayed in UI
@@ -229,6 +232,7 @@ export class ItemsDataService {
         ...result,
         status: result.itemStatus || result.item_status || result.status || 'active',
         itemStatus: result.itemStatus || result.item_status || result.status || 'active',
+        condition: result.condition === 'brand_new' ? 'new' : result.condition,
       };
     } catch (error) {
       console.error('[updateItem] Error:', error);

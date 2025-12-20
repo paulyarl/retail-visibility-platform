@@ -10,6 +10,7 @@ import { QRCodeModal } from '@/components/items/QRCodeModal';
 import EditItemModal from '@/components/items/EditItemModal';
 import ItemPhotoGallery from '@/components/items/ItemPhotoGallery';
 import { Item as ItemType } from '@/services/itemsDataService';
+import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 
 interface ItemDetailPageProps {
   params: Promise<{
@@ -18,35 +19,7 @@ interface ItemDetailPageProps {
   }>;
 }
 
-interface Photo {
-  id: string;
-  url: string;
-  position: number;
-  alt?: string;
-  caption?: string;
-}
-
-interface Item {
-  id: string;
-  sku: string;
-  name: string;
-  description?: string;
-  price: number;
-  stock: number;
-  status: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing';
-  visibility: 'public' | 'private';
-  categoryPath?: string[];
-  tenantCategoryId?: string | null;
-  tenantCategory?: {
-    id: string;
-    name: string;
-    slug?: string;
-    googleCategoryId?: string | null;
-  };
-  imageUrl?: string;
-  brand?: string;
-  manufacturer?: string;
-  
+interface EnrichedItem extends ItemType {
   // Enriched barcode data
   upc?: string;
   gtin?: string;
@@ -87,16 +60,20 @@ interface Item {
   // Additional specs
   specifications?: Record<string, any>;
   environmentalInfo?: string[];
-  
-  metadata?: any;
-  createdAt?: string;
-  updatedAt?: string;
+}
+
+interface Photo {
+  id: string;
+  url: string;
+  position: number;
+  alt?: string;
+  caption?: string;
 }
 
 export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const { tenantId, itemId } = use(params);
   const router = useRouter();
-  const [item, setItem] = useState<Item | null>(null);
+  const [item, setItem] = useState<EnrichedItem | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +81,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [showQRModal, setShowQRModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPhotoGallery, setShowPhotoGallery] = useState(false);
+
+  // Get tenant tier for QR code features
+  const { tier, loading: tierLoading } = useTenantTier(tenantId);
 
   useEffect(() => {
     loadItemData();
@@ -262,6 +242,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         ...itemData,
         ...enrichedFields,
         status: itemData.itemStatus || itemData.item_status || itemData.status || 'active',
+        condition: itemData.condition === 'brand_new' ? 'new' : itemData.condition,
         tenantCategory: itemData.tenantCategory,
         tenantCategoryId: itemData.tenantCategoryId || itemData.directory_category_id,
       };
@@ -491,6 +472,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     <div>
                       <dt className="text-sm font-medium text-neutral-500">Manufacturer</dt>
                       <dd className="text-base text-neutral-900 dark:text-white">{item.manufacturer}</dd>
+                    </div>
+                  )}
+                  {item.condition && (
+                    <div>
+                      <dt className="text-sm font-medium text-neutral-500">Condition</dt>
+                      <dd className="text-base text-neutral-900 dark:text-white">
+                        {item.condition === 'new' ? 'New' : item.condition === 'used' ? 'Used' : 'Refurbished'}
+                      </dd>
                     </div>
                   )}
                   <div>
@@ -859,6 +848,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           productUrl={`${window.location.origin}/products/${item.id}`}
           productName={item.name}
           onClose={() => setShowQRModal(false)}
+          tier={tier?.effective.id || null}
         />
       )}
 
@@ -866,7 +856,28 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       <EditItemModal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
-        item={item}
+        item={item ? {
+          id: item.id,
+          sku: item.sku,
+          name: item.name,
+          description: item.description,
+          brand: item.brand,
+          manufacturer: item.manufacturer,
+          condition: item.condition,
+          price: item.price,
+          stock: item.stock,
+          status: item.status,
+          itemStatus: item.itemStatus,
+          visibility: item.visibility,
+          categoryPath: item.categoryPath,
+          tenantCategoryId: item.tenantCategoryId,
+          tenantCategory: item.tenantCategory,
+          imageUrl: item.imageUrl,
+          images: item.images,
+          metadata: item.metadata,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        } : null}
         onSave={handleSaveItem}
       />
 

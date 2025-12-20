@@ -5,6 +5,7 @@ import { Modal, ModalFooter, Button, Input, Select, Alert } from '@/components/u
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput, geocodeAddress } from '@/lib/validation/businessProfile';
 import { z } from 'zod';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
+import { api } from '@/lib/api';
 
 interface EditBusinessProfileModalProps {
   isOpen: boolean;
@@ -65,10 +66,10 @@ export default function EditBusinessProfileModal({
         contentType: result.contentType 
       });
 
-      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
+      const res = await api.post(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
+        tenant_id: tenantId, 
+        dataUrl: result.dataUrl, 
+        contentType: result.contentType 
       });
 
       const payload = await res.json();
@@ -125,10 +126,10 @@ export default function EditBusinessProfileModal({
         contentType: result.contentType 
       });
 
-      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
+      const res = await api.post(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
+        tenant_id: tenantId, 
+        dataUrl: result.dataUrl, 
+        contentType: result.contentType 
       });
 
       const payload = await res.json();

@@ -2296,7 +2296,7 @@ const logoDataUrlSchema = z.object({
   contentType: z.string().min(1),
 });
 
-app.post("/api/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) => {
+app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, res) => {
   try {
     const tenant_id = req.params.id;
     console.log(`[Logo Upload] Starting upload for tenant ${tenant_id}`, {
@@ -2416,6 +2416,18 @@ app.post("/api/tenant/:id/logo", logoUploadMulter.single("file"), async (req, re
         },
       },
     });
+
+    // Also update business profile logo_url for directory listings (if profile exists)
+    try {
+      await prisma.tenant_business_profiles_list.update({
+        where: { tenant_id },
+        data: { logo_url: publicUrl },
+      });
+    } catch (profileError: any) {
+      // Business profile doesn't exist yet, skip updating it
+      // It will be created with logo during directory publish
+      console.log(`[Logo Upload] Business profile not found for tenant ${tenant_id}, logo will be set during directory publish`);
+    }
 
     return res.status(200).json({ url: publicUrl, tenant: updatedTenant });
   } catch (e: any) {
@@ -3171,6 +3183,8 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   res.json(transformed);
 });
 
+const conditionSchema = z.enum(['new', 'brand_new', 'refurbished', 'used']).transform((v) => (v === 'new' ? 'brand_new' : v));
+
 const baseItemSchema = z.object({
   tenant_id: z.string().min(1).optional(),
   tenantId: z.string().min(1).optional(), // Accept camelCase from frontend
@@ -3188,6 +3202,7 @@ const baseItemSchema = z.object({
   price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
   currency: z.string().length(3).optional(),
   availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
+  condition: conditionSchema.optional(),
   // Product identifiers for Google Merchant
   gtin: z.string().nullable().optional(),
   mpn: z.string().nullable().optional(),
