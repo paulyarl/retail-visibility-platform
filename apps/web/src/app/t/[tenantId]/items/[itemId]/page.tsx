@@ -84,6 +84,15 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   // Get tenant tier for QR code features
   const { tier, loading: tierLoading } = useTenantTier(tenantId);
+  
+  // Debug logging
+  console.log('[QR Debug] Tenant ID:', tenantId);
+  console.log('[QR Debug] useTenantTier result:', { tier, tierLoading });
+  console.log('[QR Debug] Tenant tier:', tier);
+  console.log('[QR Debug] Tier effective:', tier?.effective);
+  console.log('[QR Debug] Tier id:', tier?.effective?.id);
+  console.log('[QR Debug] Final tier value passed:', tier?.effective?.id || null);
+  console.log('[QR Debug] Modal render condition:', { tierLoading, showQRModal, canRender: !tierLoading && showQRModal });
 
   useEffect(() => {
     loadItemData();
@@ -842,15 +851,18 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       </div>
 
       {/* QR Code Modal */}
-      {showQRModal && (
-        <QRCodeModal
-          isOpen={showQRModal}
-          productUrl={`${window.location.origin}/products/${item.id}`}
-          productName={item.name}
-          onClose={() => setShowQRModal(false)}
-          tier={tier?.effective.id || null}
-        />
-      )}
+      {showQRModal && (() => {
+        console.log('[QR Modal START] showQRModal:', showQRModal, 'tier:', tier, 'tierLoading:', tierLoading);
+        return (
+          <QRCodeModal
+            isOpen={showQRModal}
+            productUrl={`${window.location.origin}/products/${item.id}`}
+            productName={item.name}
+            onClose={() => setShowQRModal(false)}
+            tenantId={tenantId}
+          />
+        );
+      })()}
 
       {/* Edit Item Modal */}
       <EditItemModal

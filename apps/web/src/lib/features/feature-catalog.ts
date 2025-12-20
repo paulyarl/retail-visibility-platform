@@ -215,6 +215,17 @@ export const FEATURE_CATALOG: PlatformFeature[] = [
     category: 'integration',
     requiredTier: 'starter'
   },
+  {
+    id: 'qr_codes',
+    name: 'QR Code Generator',
+    tagline: 'Share products instantly',
+    description: "Generate QR codes for your products! Customers can scan to see details, prices, and availability right on their phone. Perfect for in-store displays, packaging, or sharing online.",
+    icon: 'inventory',
+    pillar: 'visibility',
+    category: 'inventory',
+    requiredTier: 'starter',
+    route: '/items'
+  },
 
   // PILLAR 3: Intelligence - Understand What's Working
   {

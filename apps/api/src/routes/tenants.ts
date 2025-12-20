@@ -10,6 +10,43 @@ import { authenticateToken, checkTenantAccess, requirePlatformAdmin } from '../m
 import { canViewAllTenants } from '../utils/platform-admin';
 import { getLocationStatusInfo } from '../utils/location-status';
 
+// Rate limiting store (simple in-memory for now, could be Redis in production)
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Rate limiting configuration
+const RATE_LIMITS = {
+  subdomainCheck: { maxRequests: 10, windowMs: 60 * 1000 }, // 10 checks per minute
+  subdomainCreate: { maxRequests: 3, windowMs: 60 * 60 * 1000 }, // 3 creations per hour per tenant
+  subdomainResolve: { maxRequests: 100, windowMs: 60 * 1000 }, // 100 resolutions per minute (for middleware)
+};
+
+/**
+ * Check rate limit for a given key and operation
+ */
+function checkRateLimit(key: string, operation: keyof typeof RATE_LIMITS): { allowed: boolean; remaining: number; resetTime: number } {
+  const config = RATE_LIMITS[operation];
+  const now = Date.now();
+  const storeKey = `${operation}:${key}`;
+
+  const record = rateLimitStore.get(storeKey);
+
+  if (!record || now > record.resetTime) {
+    // Reset or create new record
+    rateLimitStore.set(storeKey, {
+      count: 1,
+      resetTime: now + config.windowMs
+    });
+    return { allowed: true, remaining: config.maxRequests - 1, resetTime: now + config.windowMs };
+  }
+
+  if (record.count >= config.maxRequests) {
+    return { allowed: false, remaining: 0, resetTime: record.resetTime };
+  }
+
+  record.count++;
+  return { allowed: true, remaining: config.maxRequests - record.count, resetTime: record.resetTime };
+}
+
 const router = Router();
 
 /**
@@ -262,6 +299,230 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       success: false,
       error: 'internal_error',
       message: 'Failed to fetch tenant details',
+    });
+  }
+});
+
+/**
+ * PUT /api/tenants/:id/subdomain
+ * Set or update subdomain for a tenant
+ */
+router.put('/:id/subdomain', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { subdomain } = req.body;
+
+    // Rate limiting: 3 subdomain creations per hour per tenant
+    const rateLimitResult = checkRateLimit(id, 'subdomainCreate');
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'rate_limit_exceeded',
+        message: `Too many subdomain creations. Try again in ${Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000 / 60)} minutes.`,
+        retryAfter: rateLimitResult.resetTime
+      });
+    }
+
+    // Validate subdomain format
+    if (!subdomain || typeof subdomain !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'bad_request',
+        message: 'Subdomain is required and must be a string'
+      });
+    }
+
+    // Basic subdomain validation (lowercase, alphanumeric, hyphens only, 3-30 chars)
+    const subdomainRegex = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$|^[a-z0-9]$/;
+    if (!subdomainRegex.test(subdomain)) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_subdomain',
+        message: 'Subdomain must be 2-30 characters, contain only lowercase letters, numbers, and hyphens, and cannot start or end with a hyphen'
+      });
+    }
+
+    // Check if subdomain is already taken by another tenant
+    const existingTenant = await prisma.tenants.findFirst({
+      where: {
+        subdomain,
+        id: { not: id } // Exclude current tenant
+      }
+    });
+
+    if (existingTenant) {
+      return res.status(409).json({
+        success: false,
+        error: 'subdomain_taken',
+        message: 'This subdomain is already taken by another tenant'
+      });
+    }
+
+    // Update tenant with new subdomain
+    const updatedTenant = await prisma.tenants.update({
+      where: { id },
+      data: { subdomain },
+      select: {
+        id: true,
+        name: true,
+        subdomain: true,
+        created_at: true
+      }
+    });
+
+    console.log(`[TENANTS] Updated subdomain for tenant ${id}: ${subdomain}`);
+
+    res.json({
+      success: true,
+      tenant: {
+        id: updatedTenant.id,
+        name: updatedTenant.name,
+        subdomain: updatedTenant.subdomain,
+        createdAt: updatedTenant.created_at
+      }
+    });
+  } catch (error: any) {
+    console.error('[TENANTS] Error updating subdomain:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to update subdomain'
+    });
+  }
+});
+
+/**
+ * DELETE /api/tenants/:id/subdomain
+ * Remove subdomain from a tenant
+ */
+router.delete('/:id/subdomain', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Remove subdomain by setting it to null
+    const updatedTenant = await prisma.tenants.update({
+      where: { id },
+      data: { subdomain: null },
+      select: {
+        id: true,
+        name: true,
+        subdomain: true,
+        created_at: true
+      }
+    });
+
+    console.log(`[TENANTS] Removed subdomain for tenant ${id}`);
+
+    res.json({
+      success: true,
+      tenant: {
+        id: updatedTenant.id,
+        name: updatedTenant.name,
+        subdomain: updatedTenant.subdomain,
+        createdAt: updatedTenant.created_at
+      }
+    });
+  } catch (error: any) {
+    console.error('[TENANTS] Error removing subdomain:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to remove subdomain'
+    });
+  }
+});
+
+/**
+ * GET /api/tenants/check-subdomain/:subdomain
+ * Check if a subdomain is available
+ */
+router.get('/check-subdomain/:subdomain', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { subdomain } = req.params;
+    const user = req.user as any;
+    const userId = user?.userId || user?.user_id || user?.id;
+
+    // Rate limiting: 10 subdomain checks per minute per user
+    const rateLimitResult = checkRateLimit(userId || req.ip || 'anonymous', 'subdomainCheck');
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        available: false,
+        valid: false,
+        message: `Too many requests. Try again in ${Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)} seconds.`,
+        rateLimitExceeded: true
+      });
+    }
+
+    // Basic validation
+    const subdomainRegex = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$|^[a-z0-9]$/;
+    const isValid = subdomainRegex.test(subdomain);
+
+    if (!isValid) {
+      return res.json({
+        available: false,
+        valid: false,
+        message: 'Invalid subdomain format'
+      });
+    }
+
+    // Check if subdomain exists
+    const existingTenant = await prisma.tenants.findFirst({
+      where: { subdomain },
+      select: { id: true, name: true }
+    });
+
+    const available = !existingTenant;
+
+    res.json({
+      available,
+      valid: true,
+      subdomain,
+      message: available ? 'Subdomain is available' : 'Subdomain is already taken'
+    });
+  } catch (error: any) {
+    console.error('[TENANTS] Error checking subdomain availability:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to check subdomain availability'
+    });
+  }
+});
+
+/**
+ * GET /api/tenants/resolve-subdomain/:subdomain
+ * Resolve subdomain to tenant ID for storefront routing
+ */
+router.get('/resolve-subdomain/:subdomain', async (req: Request, res: Response) => {
+  try {
+    const { subdomain } = req.params;
+
+    // Find tenant by subdomain
+    const tenant = await prisma.tenants.findFirst({
+      where: { subdomain },
+      select: { id: true, name: true }
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'subdomain_not_found',
+        message: 'No tenant found for this subdomain'
+      });
+    }
+
+    res.json({
+      success: true,
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      subdomain
+    });
+  } catch (error: any) {
+    console.error('[TENANTS] Error resolving subdomain:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to resolve subdomain'
     });
   }
 });

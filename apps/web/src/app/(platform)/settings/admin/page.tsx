@@ -112,16 +112,16 @@ export default function AdminDashboardPage() {
           stats: 'Customize appearance',
         },
         {
-          title: 'Email Management',
-          description: 'Configure email addresses for different request types',
-          href: '/settings/admin/emails',
+          title: 'Subdomain Management',
+          description: 'Monitor subdomain usage, adoption rates, and manage rate limiting',
+          href: '/settings/admin/subdomain',
           icon: (
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
             </svg>
           ),
-          color: 'bg-pink-500',
-          stats: '8 categories',
+          color: 'bg-blue-500',
+          stats: 'Analytics & security',
           badge: 'NEW',
         },
       ],

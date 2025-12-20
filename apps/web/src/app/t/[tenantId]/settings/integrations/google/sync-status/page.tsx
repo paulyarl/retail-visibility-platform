@@ -1006,6 +1006,16 @@ export default function GBPSyncStatusPage() {
                     {gmcStatus.hasMerchantLink ? `Merchant: ${gmcStatus.merchantName}` : 'No Merchant Linked'}
                   </span>
                 </div>
+                <div className="flex items-center gap-2">
+                  {gmcStatus.hasSubdomain ? (
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  )}
+                  <span className={gmcStatus.hasSubdomain ? 'text-green-700 dark:text-green-300' : 'text-amber-600'}>
+                    {gmcStatus.hasSubdomain ? `Subdomain: ${gmcStatus.subdomain}` : 'No Subdomain Set'}
+                  </span>
+                </div>
               </div>
 
               {/* GMC Settings */}

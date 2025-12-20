@@ -1,18 +1,55 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui';
 import { QRCodeGenerator } from './QRCodeGenerator';
+import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import type { SubscriptionTier } from '@/lib/qr-tiers';
 
 interface QRCodeModalProps {
   isOpen: boolean;
-  onClose: () => void;
   productUrl: string;
   productName: string;
-  tier?: SubscriptionTier | string | null;
+  onClose: () => void;
+  tenantId: string;
 }
 
-export function QRCodeModal({ isOpen, onClose, productUrl, productName, tier }: QRCodeModalProps) {
+export function QRCodeModal(props: QRCodeModalProps) {
+  console.log('[QRCodeModal] Component called with arguments:', arguments);
+  console.log('[QRCodeModal] arguments[0]:', arguments[0]);
+  console.log('[QRCodeModal] Full props object:', props);
+  const { isOpen, onClose, productUrl, productName, tenantId } = props;
+  console.log('[QRCodeModal] Destructured:', { isOpen, onClose, productUrl, productName, tenantId });
+  
+  // TEMPORARY: Hardcode tenantId to test tier system
+  const actualTenantId = tenantId || 'tid-ej2um44f';
+  console.log('[QRCodeModal] Using tenantId:', actualTenantId);
+  
+  const { tier, loading: tierLoading } = useTenantTier(actualTenantId);
+  const tierId = tier?.effective?.id || null;
+  console.log('[QRCodeModal] Tier from hook:', tier, 'tierId:', tierId);
+  
+  // Get tenant logo for enterprise users
+  const [tenantLogo, setTenantLogo] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const fetchTenantLogo = async () => {
+      if (tierId === 'enterprise' || tierId === 'organization' || tierId === 'professional') {
+        try {
+          const response = await fetch(`/api/tenants/${actualTenantId}/profile`);
+          if (response.ok) {
+            const profile = await response.json();
+            setTenantLogo(profile.logo_url || null);
+          }
+        } catch (error) {
+          console.warn('Failed to fetch tenant logo:', error);
+        }
+      }
+    };
+    
+    fetchTenantLogo();
+  }, [actualTenantId, tierId]);
+  
   return (
     <Modal
       isOpen={isOpen}
@@ -30,7 +67,8 @@ export function QRCodeModal({ isOpen, onClose, productUrl, productName, tier }: 
           url={productUrl} 
           productName={productName}
           size={256}
-          tier={tier}
+          tenantId={actualTenantId}
+          logoUrl={tenantLogo || undefined}
         />
         
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">

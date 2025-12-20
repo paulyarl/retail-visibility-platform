@@ -1,10 +1,226 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { SafeImage } from '@/components/SafeImage';
 import ProductActions from '@/components/products/ProductActions';
+
+// Public QR Code Section Component
+function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl: string; productName: string; tenantId: string }) {
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [tenantLogo, setTenantLogo] = useState<string | null>(null);
+  
+  // Get tenant tier to determine if we should show logo
+  const [tenantTier, setTenantTier] = useState<string>('starter');
+  
+  useEffect(() => {
+    const fetchTenantInfo = async () => {
+      try {
+        const response = await fetch(`/api/tenants/${tenantId}/profile`);
+        if (response.ok) {
+          const profile = await response.json();
+          setTenantLogo(profile.logo_url || null);
+        }
+        
+        // Get tenant tier
+        const tierResponse = await fetch(`/api/tenants/${tenantId}/tier`);
+        if (tierResponse.ok) {
+          const tierData = await tierResponse.json();
+          setTenantTier(tierData.tier || 'starter');
+        }
+      } catch (error) {
+        console.warn('Failed to fetch tenant info:', error);
+      }
+    };
+    
+    fetchTenantInfo();
+  }, [tenantId]);
+
+  const overlayLogoOnQR = async (qrCanvas: HTMLCanvasElement, logoSrc: string): Promise<HTMLCanvasElement> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        // Set canvas size to match QR code
+        canvas.width = qrCanvas.width;
+        canvas.height = qrCanvas.height;
+
+        // Draw QR code first
+        ctx.drawImage(qrCanvas, 0, 0);
+
+        // Calculate logo size (should be 15-20% of QR code size for readability)
+        const logoSize = Math.floor(canvas.width * 0.18); // 18% of QR size
+        const logoX = (canvas.width - logoSize) / 2;
+        const logoY = (canvas.height - logoSize) / 2;
+
+        // Create circular mask for logo
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+
+        // Draw logo
+        ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
+        ctx.restore();
+
+        // Add white border around logo
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2 + 2, 0, Math.PI * 2);
+        ctx.stroke();
+
+        resolve(canvas);
+      };
+      img.onerror = () => reject(new Error('Failed to load logo image'));
+      img.src = logoSrc;
+    });
+  };
+
+  const generateQRCode = async () => {
+    if (qrImageUrl) return; // Already generated
+
+    setIsGenerating(true);
+    try {
+      // Import QRCode dynamically to avoid SSR issues
+      const QRCode = (await import('qrcode')).default;
+
+      // Generate base QR code
+      const qrCanvas = document.createElement('canvas');
+      const qrCtx = qrCanvas.getContext('2d');
+      if (!qrCtx) throw new Error('Could not get canvas context');
+
+      qrCanvas.width = 256;
+      qrCanvas.height = 256;
+
+      // Generate QR code with higher error correction if logo will be applied
+      const shouldApplyLogo = (tenantTier === 'professional' || tenantTier === 'enterprise' || tenantTier === 'organization') && tenantLogo;
+      
+      await QRCode.toCanvas(qrCanvas, productUrl, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+        errorCorrectionLevel: shouldApplyLogo ? 'H' : 'M',
+      });
+
+      let finalCanvas = qrCanvas;
+
+      // Overlay logo for Professional+ users if they have a logo
+      if (shouldApplyLogo) {
+        try {
+          finalCanvas = await overlayLogoOnQR(qrCanvas, tenantLogo!);
+        } catch (logoError) {
+          console.warn('Failed to overlay logo, using plain QR code:', logoError);
+          // Fall back to plain QR code if logo overlay fails
+        }
+      }
+
+      // Convert to data URL
+      const dataUrl = finalCanvas.toDataURL('image/png');
+      setQrImageUrl(dataUrl);
+    } catch (error) {
+      console.error('Failed to generate QR code:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const downloadQRCode = () => {
+    if (!qrImageUrl) return;
+
+    const link = document.createElement('a');
+    link.href = qrImageUrl;
+    link.download = `qr-${productName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Generate QR code on mount
+  useEffect(() => {
+    generateQRCode();
+  }, []);
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+      <div className="flex items-center gap-3 mb-4">
+        <svg className="w-6 h-6 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 12l4-4m4 4l-4-4m0 0h4.01M12 12v4" />
+        </svg>
+        <h2 className="text-xl font-semibold text-neutral-900">QR Code</h2>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center gap-6">
+        {/* QR Code Display */}
+        <div className="flex-shrink-0">
+          {qrImageUrl ? (
+            <div className="border-2 border-neutral-200 rounded-lg p-4 bg-white">
+              <img
+                src={qrImageUrl}
+                alt={`QR Code for ${productName}`}
+                className="w-48 h-48"
+              />
+            </div>
+          ) : (
+            <div className="w-48 h-48 border-2 border-neutral-200 rounded-lg p-4 bg-neutral-50 flex items-center justify-center">
+              {isGenerating ? (
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-600" />
+              ) : (
+                <svg className="w-12 h-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 12l4-4m4 4l-4-4m0 0h4.01M12 12v4" />
+                </svg>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 text-center sm:text-left">
+          <h3 className="text-lg font-medium text-neutral-900 mb-2">Scan to View Product</h3>
+          <p className="text-sm text-neutral-600 mb-4">
+            Use your phone's camera or QR scanner to instantly view this product on your mobile device.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={downloadQRCode}
+              disabled={!qrImageUrl || isGenerating}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download QR Code
+            </button>
+
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Print Page
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Product {
   id: string;
@@ -175,6 +391,15 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: 
           productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/products/${product.id}`}
           variant="product"
         />
+
+        {/* QR Code Section - Professional+ Tier */}
+        {features.qrCodes && (
+          <PublicQRCodeSection
+            productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/products/${product.id}`}
+            productName={product.name}
+            tenantId={product.tenantId}
+          />
+        )}
 
         {/* Product Info */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">

@@ -172,17 +172,17 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
         },
         {
-          title: 'Feature Flags',
-          description: 'Control per-tenant features',
+          title: 'Custom Subdomain',
+          description: 'Set up a custom subdomain for Google Shopping compliance',
           icon: (
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/admin/flags`,
-          color: 'bg-purple-500',
-          accessOptions: AccessPresets.PLATFORM_ADMIN_ONLY,
-          badge: 'Admin',
+          href: `/t/${tenantId}/settings/subdomain`,
+          color: 'bg-blue-600',
+          badge: 'GMC',
+          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
         },
       ],
     },

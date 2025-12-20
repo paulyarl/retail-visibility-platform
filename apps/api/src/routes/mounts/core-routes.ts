@@ -19,6 +19,7 @@ import platformSettingsRoutes from '../platform-settings';
 import platformStatsRoutes from '../platform-stats';
 import businessHoursRoutes from '../business-hours';
 import taxonomyRoutes from '../taxonomy';
+import analyticsRoutes from '../analytics';
 
 /**
  * Mount core business routes
@@ -47,6 +48,7 @@ export function mountCoreRoutes(app: Express) {
   app.use('/api/platform-stats', platformStatsRoutes);
   app.use('/api', businessHoursRoutes);
   app.use('/api/taxonomy', taxonomyRoutes);
+  app.use('/api/analytics', analyticsRoutes);
 
   console.log('✅ Core business routes mounted');
 }

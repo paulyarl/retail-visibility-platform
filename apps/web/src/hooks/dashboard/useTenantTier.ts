@@ -171,6 +171,9 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
 
       // Resolve effective tier using middleware
       const resolvedTier = resolveTier(organizationTier, tenantTier, isChain);
+      console.log('[useTenantTier] Resolved tier:', resolvedTier);
+      console.log('[useTenantTier] Effective tier:', resolvedTier?.effective);
+      console.log('[useTenantTier] Effective tier id:', resolvedTier?.effective?.id);
 
       setTier(resolvedTier);
       setUsage(usageData);

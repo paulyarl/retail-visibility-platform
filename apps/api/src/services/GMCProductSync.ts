@@ -227,12 +227,27 @@ export async function syncProduct(
       return { success: false, productId: itemId, offerId: item.sku || '', error: 'Item is not public' };
     }
 
-    // Get tenant business profile for website
+    // Get tenant business profile for website and subdomain
     const businessProfile = await prisma.tenant_business_profiles_list.findFirst({
       where: { tenant_id: tenantId },
       select: { website: true }
     });
-    const websiteUrl = businessProfile?.website || `https://visibleshelf.com/store/${tenantId}`;
+
+    // Get tenant subdomain for custom URL generation
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { subdomain: true }
+    });
+
+    // Build website URL with subdomain support
+    let websiteUrl: string;
+    if (tenant?.subdomain) {
+      // Use tenant subdomain: https://{subdomain}.visibleshelf.com
+      websiteUrl = `https://${tenant.subdomain}.visibleshelf.com`;
+    } else {
+      // Fallback to business profile website or default store URL
+      websiteUrl = businessProfile?.website || `https://visibleshelf.com/store/${tenantId}`;
+    }
 
     // Get merchant link settings (pickup-only, etc.)
     const merchantLink = await prisma.google_merchant_links_list.findFirst({
@@ -345,12 +360,27 @@ export async function batchSyncProducts(
       return { success: true, total: 0, synced: 0, failed: 0, results: [] };
     }
 
-    // Get tenant business profile for website
+    // Get tenant business profile for website and subdomain
     const businessProfile = await prisma.tenant_business_profiles_list.findFirst({
       where: { tenant_id: tenantId },
       select: { website: true }
     });
-    const websiteUrl = businessProfile?.website || `https://visibleshelf.com/store/${tenantId}`;
+
+    // Get tenant subdomain for custom URL generation
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { subdomain: true }
+    });
+
+    // Build website URL with subdomain support
+    let websiteUrl: string;
+    if (tenant?.subdomain) {
+      // Use tenant subdomain: https://{subdomain}.visibleshelf.com
+      websiteUrl = `https://${tenant.subdomain}.visibleshelf.com`;
+    } else {
+      // Fallback to business profile website or default store URL
+      websiteUrl = businessProfile?.website || `https://visibleshelf.com/store/${tenantId}`;
+    }
 
     // Get merchant link settings (pickup-only, etc.)
     const merchantLink = await prisma.google_merchant_links_list.findFirst({
@@ -644,6 +674,8 @@ export async function deleteProduct(
 export async function getGMCSyncStatus(tenantId: string): Promise<{
   hasGMCConnection: boolean;
   hasMerchantLink: boolean;
+  hasSubdomain: boolean;
+  subdomain: string | null;
   merchantId: string | null;
   merchantName: string | null;
   fulfillmentMode: string | null;
@@ -655,6 +687,34 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
   pendingProducts: number;
   errorProducts: number;
   lastSyncAt: Date | null;
+  // Domain validation warnings
+  domainValidation?: {
+    hasWebsiteConfigured: boolean;
+    websiteUrl: string | null;
+    willCauseMismatchedDomains: boolean;
+    complianceOptions: {
+      configureDomain: {
+        title: string;
+        description: string;
+        actionRequired: string;
+        difficulty: 'easy' | 'medium' | 'hard';
+      };
+      useSubdomain: {
+        title: string;
+        description: string;
+        actionRequired: string;
+        difficulty: 'easy' | 'medium' | 'hard';
+      };
+      customDomainHosting: {
+        title: string;
+        description: string;
+        actionRequired: string;
+        difficulty: 'easy' | 'medium' | 'hard';
+        pricing: string;
+        available: boolean;
+      };
+    };
+  };
 }> {
   try {
     const account = await prisma.google_oauth_accounts_list.findFirst({
@@ -669,6 +729,12 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
     });
 
     const merchantLink = account?.google_merchant_links_list[0];
+
+    // Get tenant subdomain for GMC compliance check
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { subdomain: true }
+    });
 
     // Get product sync stats using existing fields
     const [total, synced, pending, errors] = await Promise.all([
@@ -689,6 +755,8 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
     return {
       hasGMCConnection: !!account?.google_oauth_tokens_list,
       hasMerchantLink: !!merchantLink,
+      hasSubdomain: !!tenant?.subdomain,
+      subdomain: tenant?.subdomain || null,
       merchantId: merchantLink?.merchant_id || null,
       merchantName: merchantLink?.merchant_name || null,
       fulfillmentMode: merchantLink?.fulfillment_mode || (merchantLink?.pickup_only ? 'pickup_only' : 'standard'),
@@ -706,6 +774,8 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
     return {
       hasGMCConnection: false,
       hasMerchantLink: false,
+      hasSubdomain: false,
+      subdomain: null,
       merchantId: null,
       merchantName: null,
       fulfillmentMode: null,
@@ -720,3 +790,4 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
     };
   }
 }
+

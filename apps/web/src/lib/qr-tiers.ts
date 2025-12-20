@@ -55,8 +55,8 @@ export const QR_TIER_FEATURES: Record<SubscriptionTier, QRCodeFeatures> = {
   },
 };
 
-export function getQRFeatures(tier: SubscriptionTier | string | null | undefined): QRCodeFeatures {
-  const normalizedTier = (tier?.toLowerCase() || 'starter') as SubscriptionTier;
+export function getQRFeatures(tier_key: SubscriptionTier | string | null | undefined): QRCodeFeatures {
+  const normalizedTier = (tier_key?.toLowerCase() || 'starter') as SubscriptionTier;
   return QR_TIER_FEATURES[normalizedTier] || QR_TIER_FEATURES.starter;
 }
 

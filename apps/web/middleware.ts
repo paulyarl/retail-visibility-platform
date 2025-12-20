@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Flags (read at edge)
-const FF_TENANT_URLS = String(process.env.FF_TENANT_URLS || process.env.NEXT_PUBLIC_FF_TENANT_URLS || 'false').toLowerCase() === 'true';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+// Environment variables
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.com';
+const FF_TENANT_URLS = process.env.NEXT_PUBLIC_FF_TENANT_URLS === 'true';
+
+// Platform domains that support subdomains
+const PLATFORM_DOMAINS = ['visibleshelf.com', 'visibleshelf.store'];
+
+// Check if hostname is a platform subdomain
+function isPlatformSubdomain(hostname: string): { isSubdomain: boolean; subdomain: string; domain: string } | null {
+  for (const domain of PLATFORM_DOMAINS) {
+    if (hostname.endsWith(`.${domain}`) && hostname !== domain) {
+      const subdomain = hostname.replace(`.${domain}`, '');
+      return { isSubdomain: true, subdomain, domain };
+    }
+  }
+  return null;
+}
 
 function getCookie(req: NextRequest, name: string): string | undefined {
   try {
@@ -53,7 +67,55 @@ async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
 }
 
 export async function middleware(req: NextRequest) {
-  const { pathname, searchParams } = new URL(req.url);
+  const { pathname, hostname, searchParams } = new URL(req.url);
+
+  // Handle subdomain storefront routing
+  const subdomainInfo = isPlatformSubdomain(hostname);
+  if (subdomainInfo) {
+    const { subdomain, domain } = subdomainInfo;
+
+    // Skip subdomain routing for API routes and assets
+    if (pathname.startsWith('/api/') ||
+        pathname.startsWith('/_next/') ||
+        pathname.startsWith('/favicon') ||
+        pathname.includes('.')) {
+      return NextResponse.next();
+    }
+
+    try {
+      // Look up tenant by subdomain using resolve endpoint
+      const tenantResponse = await fetch(`${API_BASE_URL}/api/tenants/resolve-subdomain/${subdomain}`);
+
+      if (tenantResponse.ok) {
+        const subdomainData = await tenantResponse.json();
+        if (subdomainData.success && subdomainData.tenantId) {
+          // Subdomain exists, route to storefront
+          const tenantId = subdomainData.tenantId;
+
+          // Redirect to tenant storefront
+          const destUrl = new URL(`/t/${tenantId}${pathname}`, req.url);
+          // Preserve query params
+          const sourceUrl = new URL(req.url);
+          sourceUrl.searchParams.forEach((value, key) => {
+            destUrl.searchParams.set(key, value);
+          });
+
+          console.log(`[Middleware] Subdomain routing: ${hostname}${pathname} → /t/${tenantId}${pathname} (domain: ${domain})`);
+
+          const res = NextResponse.redirect(destUrl, { status: 302 });
+
+          // Set tenant context cookie
+          const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });
+          setCookie(res, 'tcx', tcx);
+
+          return res;
+        }
+      }
+    } catch (error) {
+      console.error('[Middleware] Error in subdomain routing:', error);
+      // Continue with normal routing if subdomain lookup fails
+    }
+  }
 
   // Protect /admin/* routes - require platform admin
   if (pathname.startsWith('/admin')) {

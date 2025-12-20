@@ -544,6 +544,7 @@ export default function ItemsClient({
           productUrl={`/tenant/${initialTenantId}/product/${qrItem.id}`}
           productName={qrItem.name}
           onClose={closeQRModal}
+          tenantId={initialTenantId}
         />
       )}
 

@@ -13,6 +13,9 @@ export interface LandingPageFeatures {
   customCta: boolean;
   socialLinks: boolean;
   
+  // QR Code features
+  qrCodes: boolean;
+  
   // Branding features
   showBusinessLogo: boolean; // Professional+ tier
   removePlatformBranding: boolean;
@@ -35,6 +38,7 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
     maxGalleryImages: 1,
     customCta: false,
     socialLinks: false,
+    qrCodes: false,
     showBusinessLogo: false,
     removePlatformBranding: false,
     customLogo: false,
@@ -52,6 +56,7 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
     maxGalleryImages: 1,
     customCta: false,
     socialLinks: false,
+    qrCodes: true, // Enable basic QR codes for all tiers
     showBusinessLogo: false,
     removePlatformBranding: false,
     customLogo: false,
@@ -69,6 +74,7 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
     maxGalleryImages: 5,
     customCta: true,
     socialLinks: true,
+    qrCodes: true,
     showBusinessLogo: true,
     removePlatformBranding: false,
     customLogo: false,
@@ -86,6 +92,7 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
     maxGalleryImages: 10,
     customCta: true,
     socialLinks: true,
+    qrCodes: true,
     showBusinessLogo: true,
     removePlatformBranding: true,
     customLogo: true,
@@ -103,6 +110,7 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
     maxGalleryImages: 10,
     customCta: true,
     socialLinks: true,
+    qrCodes: true,
     showBusinessLogo: true,
     removePlatformBranding: true,
     customLogo: true,

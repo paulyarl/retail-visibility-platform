@@ -52,6 +52,7 @@ export const TIER_FEATURES = {
     'dedicated_account_manager',
     'sla_guarantee',
     'custom_integrations',
+    'customDomains', // Custom domain hosting for GMC compliance
   ],
   organization: [
     // Organization-specific features (franchise model)

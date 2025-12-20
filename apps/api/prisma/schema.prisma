@@ -1175,6 +1175,7 @@ model tenants {
   reopening_date                   DateTime?
   closure_reason                   String?
   slug                             String?                            @unique
+  subdomain                        String?                            @unique
   google_sync_enabled              Boolean?                           @default(false)
   google_last_sync                 DateTime?                          @db.Timestamp(6)
   google_product_count             Int?                               @default(0)
