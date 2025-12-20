@@ -17,6 +17,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     const { slug } = req.params;
     const limit = Math.min(6, Number(req.query.limit) || 6);
 
+    console.log(`[DEBUG] Related stores API called for slug: ${slug}, limit: ${limit}`);
     console.log(`[Related Stores] Finding related stores for: ${slug}`);
 
     // First, get the current listing
@@ -27,19 +28,16 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     );
 
     if (currentListing.rows.length === 0) {
-      console.log(`[Related Stores] Listing not found: ${slug}`);
       return res.status(404).json({ error: 'listing_not_found' });
     }
 
     const current = currentListing.rows[0];
-    console.log(`[Related Stores] Found current listing: ${current.business_name}`);
 
     // Try MV approach first, fallback to direct query
     let relatedListings = [];
 
     try {
       // Try using the materialized view (faster)
-      console.log(`[Related Stores] Trying MV approach...`);
       const relatedQuery = `
         SELECT DISTINCT ON (dcl.id)
           dcl.*,
@@ -61,9 +59,10 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
             END
           ) as relevance_score
         FROM directory_category_listings dcl
+        INNER JOIN tenants t ON dcl.tenant_id = t.id
         WHERE dcl.slug != $5
+          AND t.location_status IN ('active', 'inactive', 'closed')
         ORDER BY dcl.id, relevance_score DESC, dcl.rating_avg DESC, dcl.product_count DESC
-        LIMIT $6
       `;
 
       const related = await getDirectPool().query(relatedQuery, [
@@ -72,70 +71,129 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
         current.state,
         current.rating_avg || 0,
         slug,
-        limit,
         current.secondary_categories || [],
       ]);
 
-      relatedListings = related.rows.map((row: any) => ({
-        id: row.id,
-        tenantId: row.tenant_id,
-        business_name: row.business_name,
-        slug: row.slug,
-        address: row.address,
-        city: row.city,
-        state: row.state,
-        zipCode: row.zip_code,
-        phone: row.phone,
-        email: row.email,
-        website: row.website,
-        latitude: row.latitude,
-        longitude: row.longitude,
-        primaryCategory: row.category_name,
-        secondaryCategories: [],
-        logoUrl: row.logo_url,
-        description: row.description,
-        ratingAvg: row.rating_avg || 0,
-        ratingCount: row.rating_count || 0,
-        productCount: row.product_count || 0,
-        isFeatured: row.is_featured || false,
-        subscription_tier: row.subscription_tier || 'trial',
-        useCustomWebsite: row.use_custom_website || false,
-        isPublished: row.is_published || true,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      }));
+      console.log(`[DEBUG] MV query returned ${related.rows.length} rows`);
+      
+      // Debug: Check if the problematic tenant is in the raw results
+      const problematicTenant = related.rows.find(row => row.tenant_id === 't-lwx9znk8');
+      if (problematicTenant) {
+        console.log('[DEBUG] Found problematic tenant t-lwx9znk8 in raw MV results:', {
+          tenant_id: problematicTenant.tenant_id,
+          relevance_score: problematicTenant.relevance_score,
+          is_published: problematicTenant.is_published,
+          location_status: problematicTenant.location_status,
+          tenant_location_status: problematicTenant.tenant_location_status
+        });
+      }
 
-      console.log(`[Related Stores] MV approach found ${relatedListings.length} related stores`);
+      relatedListings = related.rows
+        .filter(row => (row.relevance_score || 0) >= 1) // Only stores with at least score of 1
+        .slice(0, limit) // Limit to requested number
+        .map((row: any) => {
+          // Debug logging for the problematic tenant
+          if (row.tenant_id === 't-lwx9znk8') {
+            console.log('[DEBUG] Tenant t-lwx9znk8 found in MV results:', {
+              tenant_id: row.tenant_id,
+              relevance_score: row.relevance_score,
+              is_published: row.is_published,
+              location_status: row.location_status,
+              business_name: row.business_name
+            });
+          }
+          
+          return {
+          id: row.id,
+          tenantId: row.tenant_id,
+          business_name: row.business_name,
+          slug: row.slug,
+          address: row.address,
+          city: row.city,
+          state: row.state,
+          zipCode: row.zip_code,
+          phone: row.phone,
+          email: row.email,
+          website: row.website,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          primaryCategory: row.category_name,
+          secondaryCategories: [],
+          logoUrl: row.logo_url,
+          description: row.description,
+          ratingAvg: row.rating_avg || 0,
+          ratingCount: row.rating_count || 0,
+          productCount: row.product_count || 0,
+          isFeatured: row.is_featured || false,
+          subscription_tier: row.subscription_tier || 'trial',
+          useCustomWebsite: row.use_custom_website || false,
+          isPublished: row.is_published || true,
+          relevanceScore: row.relevance_score || 0,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        }});
+
+      console.log(`[Related Stores] MV approach found ${relatedListings.length} stores with score >= 1`);
 
     } catch (mvError) {
       console.log(`[Related Stores] MV approach failed, using fallback:`, mvError);
       
       // Fallback: Direct query without MV
       const fallbackQuery = `
-        SELECT *,
+        SELECT dll.*,
           (
             CASE
-              WHEN primary_category = $1 THEN 3
-              WHEN $1 = ANY(secondary_categories) THEN 2
-              ELSE 0
-            END +
-            CASE
-              WHEN city = $2 AND state = $3 THEN 2
-              WHEN state = $3 THEN 1
-              ELSE 0
-            END +
-            CASE
-              WHEN ABS(rating_avg - $4) < 0.5 THEN 1
+              WHEN dll.primary_category = $1 THEN 3  -- Exact primary match
+              WHEN dll.primary_category = ANY($6) THEN 2  -- Store primary in target secondary
+              WHEN $1 = ANY(dll.secondary_categories) THEN 2  -- Target primary in store secondary
+              WHEN $6 && dll.secondary_categories THEN 1  -- Any secondary category overlap
               ELSE 0
             END
+          ) as category_score,
+          (
+            CASE
+              WHEN dll.city = $2 AND dll.state = $3 THEN 2
+              WHEN dll.state = $3 THEN 1
+              ELSE 0
+            END
+          ) as location_score,
+          (
+            CASE
+              WHEN ABS(dll.rating_avg - $4) < 0.5 THEN 1
+              ELSE 0
+            END
+          ) as rating_score,
+          (
+            (
+              CASE
+                WHEN dll.primary_category = $1 THEN 3
+                WHEN dll.primary_category = ANY($6) THEN 2
+                WHEN $1 = ANY(dll.secondary_categories) THEN 2
+                WHEN $6 && dll.secondary_categories THEN 1
+                ELSE 0
+              END
+            ) * 2 + -- Category score weighted 2x
+            (
+              CASE
+                WHEN dll.city = $2 AND dll.state = $3 THEN 2
+                WHEN dll.state = $3 THEN 1
+                ELSE 0
+              END
+            ) + -- Location score 1x
+            (
+              CASE
+                WHEN ABS(dll.rating_avg - $4) < 0.5 THEN 1
+                ELSE 0
+              END
+            ) -- Rating score 1x
           ) as relevance_score
-        FROM directory_listings_list
-        WHERE slug != $5
-          AND is_published = true
-          AND (business_hours IS NULL OR business_hours::text != 'null')
-          AND tenant_id IN (SELECT id FROM tenants WHERE id IS NOT NULL)
-        ORDER BY relevance_score DESC, rating_avg DESC, product_count DESC
-        LIMIT $6
+        FROM directory_listings_list dll
+        INNER JOIN tenants t ON dll.tenant_id = t.id
+        WHERE dll.slug != $5
+          AND dll.is_published = true
+          AND t.location_status IN ('active', 'inactive', 'closed')
+          AND (dll.business_hours IS NULL OR dll.business_hours::text != 'null')
+        ORDER BY relevance_score DESC, dll.rating_avg DESC, dll.product_count DESC
       `;
 
       const fallbackResult = await getDirectPool().query(fallbackQuery, [
@@ -144,39 +202,187 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
         current.state,
         current.rating_avg || 0,
         slug,
-        limit,
+        current.secondary_categories || [],
       ]);
 
-      relatedListings = fallbackResult.rows.map((row: any) => ({
-        id: row.id,
-        tenantId: row.tenant_id,
-        business_name: row.business_name,
-        slug: row.slug,
-        address: row.address,
-        city: row.city,
-        state: row.state,
-        zipCode: row.zip_code,
-        phone: row.phone,
-        email: row.email,
-        website: row.website,
-        latitude: row.latitude,
-        longitude: row.longitude,
-        primaryCategory: row.primary_category,
-        secondaryCategories: row.secondary_categories || [],
-        logoUrl: row.logo_url,
-        description: row.description,
-        ratingAvg: row.rating_avg || 0,
-        ratingCount: row.rating_count || 0,
-        productCount: row.product_count || 0,
-        isFeatured: row.is_featured || false,
-        subscription_tier: row.subscription_tier || 'trial',
-        useCustomWebsite: row.use_custom_website || false,
-        isPublished: row.is_published || true,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      }));
+      console.log(`[DEBUG] Fallback query returned ${fallbackResult.rows.length} rows`);
+      
+      // Debug: Check if the problematic tenant is in the raw fallback results
+      const problematicTenantFallback = fallbackResult.rows.find(row => row.tenant_id === 't-lwx9znk8');
+      if (problematicTenantFallback) {
+        console.log('[DEBUG] Found problematic tenant t-lwx9znk8 in raw fallback results:', {
+          tenant_id: problematicTenantFallback.tenant_id,
+          relevance_score: problematicTenantFallback.relevance_score,
+          is_published: problematicTenantFallback.is_published,
+          location_status: problematicTenantFallback.location_status
+        });
+        
+        // Check the tenant status in database directly
+        try {
+          const tenantCheck = await getDirectPool().query(
+            'SELECT id, location_status, subscription_status FROM tenants WHERE id = $1',
+            ['t-lwx9znk8']
+          );
+          console.log('[DEBUG] Direct tenant lookup for t-lwx9znk8 (fallback):', tenantCheck.rows[0]);
+        } catch (tenantErr) {
+          console.log('[DEBUG] Error checking tenant status (fallback):', tenantErr);
+        }
+      }
 
-      console.log(`[Related Stores] Fallback approach found ${relatedListings.length} related stores`);
+      relatedListings = fallbackResult.rows
+        .filter(row => (row.relevance_score || 0) >= 1) // Only stores with at least score of 1
+        .slice(0, limit) // Limit to requested number
+        .map((row: any) => {
+          // Debug logging for the problematic tenant
+          if (row.tenant_id === 't-lwx9znk8') {
+            console.log('[DEBUG] Tenant t-lwx9znk8 found in fallback results:', {
+              tenant_id: row.tenant_id,
+              relevance_score: row.relevance_score,
+              is_published: row.is_published,
+              location_status: row.location_status,
+              business_name: row.business_name
+            });
+          }
+          
+          return {
+          id: row.id,
+          tenantId: row.tenant_id,
+          business_name: row.business_name,
+          slug: row.slug,
+          address: row.address,
+          city: row.city,
+          state: row.state,
+          zipCode: row.zip_code,
+          phone: row.phone,
+          email: row.email,
+          website: row.website,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          primaryCategory: row.primary_category,
+          secondaryCategories: row.secondary_categories || [],
+          logoUrl: row.logo_url,
+          description: row.description,
+          ratingAvg: row.rating_avg || 0,
+          ratingCount: row.rating_count || 0,
+          productCount: row.product_count || 0,
+          isFeatured: row.is_featured || false,
+          subscription_tier: row.subscription_tier || 'trial',
+          useCustomWebsite: row.use_custom_website || false,
+          isPublished: row.is_published || true,
+          relevanceScore: row.relevance_score || 0,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        }});
+
+      console.log(`[Related Stores] Fallback approach found ${relatedListings.length} stores with score >= 1`);
+    }
+
+    // Ensure at least 1 store is always shown
+    if (relatedListings.length === 0) {
+      console.log(`[Related Stores] No stores found with minimum score, trying fallback to show at least 1 store`);
+
+      // Fallback: Show featured stores in the same state (if any)
+      const fallbackFeaturedQuery = `
+        SELECT dll.*,
+          0.5 as relevance_score
+        FROM directory_listings_list dll
+        INNER JOIN tenants t ON dll.tenant_id = t.id
+        WHERE dll.slug != $1
+          AND dll.is_published = true
+          AND dll.location_status = 'active'
+          AND t.location_status IN ('active', 'inactive', 'closed')
+          AND dll.state = $2
+          AND dll.is_featured = true
+          AND (dll.business_hours IS NULL OR dll.business_hours::text != 'null')
+        ORDER BY dll.rating_avg DESC, dll.product_count DESC
+        LIMIT 3
+      `;
+
+      const fallbackResult = await getDirectPool().query(fallbackFeaturedQuery, [slug, current.state]);
+      if (fallbackResult.rows.length > 0) {
+        relatedListings = fallbackResult.rows.slice(0, limit).map((row: any) => ({
+          id: row.id,
+          tenantId: row.tenant_id,
+          business_name: row.business_name,
+          slug: row.slug,
+          address: row.address,
+          city: row.city,
+          state: row.state,
+          zipCode: row.zip_code,
+          phone: row.phone,
+          email: row.email,
+          website: row.website,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          primaryCategory: row.primary_category,
+          secondaryCategories: row.secondary_categories || [],
+          logoUrl: row.logo_url,
+          description: row.description,
+          ratingAvg: row.rating_avg || 0,
+          ratingCount: row.rating_count || 0,
+          productCount: row.product_count || 0,
+          isFeatured: row.is_featured || false,
+          subscription_tier: row.subscription_tier || 'trial',
+          useCustomWebsite: row.use_custom_website || false,
+          isPublished: row.is_published || true,
+          relevanceScore: row.relevance_score || 0,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        }));
+        console.log(`[Related Stores] Fallback found ${relatedListings.length} featured stores in same state`);
+      }
+
+      // If still no stores, show any active stores in the same state
+      if (relatedListings.length === 0) {
+        const finalFallbackQuery = `
+          SELECT dll.*,
+            0.1 as relevance_score
+          FROM directory_listings_list dll
+          INNER JOIN tenants t ON dll.tenant_id = t.id
+          WHERE dll.slug != $1
+            AND dll.is_published = true
+            AND dll.location_status = 'active'
+            AND t.location_status IN ('active', 'inactive', 'closed')
+            AND dll.state = $2
+            AND (dll.business_hours IS NULL OR dll.business_hours::text != 'null')
+          ORDER BY dll.rating_avg DESC, dll.product_count DESC
+          LIMIT 1
+        `;
+
+        const finalResult = await getDirectPool().query(finalFallbackQuery, [slug, current.state]);
+        if (finalResult.rows.length > 0) {
+          relatedListings = finalResult.rows.map((row: any) => ({
+            id: row.id,
+            tenantId: row.tenant_id,
+            business_name: row.business_name,
+            slug: row.slug,
+            address: row.address,
+            city: row.city,
+            state: row.state,
+            zipCode: row.zip_code,
+            phone: row.phone,
+            email: row.email,
+            website: row.website,
+            latitude: row.latitude,
+            longitude: row.longitude,
+            primaryCategory: row.primary_category,
+            secondaryCategories: row.secondary_categories || [],
+            logoUrl: row.logo_url,
+            description: row.description,
+            ratingAvg: row.rating_avg || 0,
+            ratingCount: row.rating_count || 0,
+            productCount: row.product_count || 0,
+            isFeatured: row.is_featured || false,
+            subscription_tier: row.subscription_tier || 'trial',
+            useCustomWebsite: row.use_custom_website || false,
+            isPublished: row.is_published || true,
+            relevanceScore: row.relevance_score || 0,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          }));
+          console.log(`[Related Stores] Final fallback found ${relatedListings.length} active stores in same state`);
+        }
+      }
     }
 
     return res.json({
@@ -194,10 +400,6 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /api/directory/categories/enhanced
- * Enhanced categories with 3-category support
- */
 router.get('/categories/enhanced', async (req: Request, res: Response) => {
   try {
     const { tenantId, categoryType } = req.query;

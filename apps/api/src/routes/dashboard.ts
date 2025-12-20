@@ -20,7 +20,7 @@ router.get('/api/test', async (req: Request, res: Response) => {
  * GET /api/dashboard
  * FIXED VERSION - Correctly uses tenantId from query params
  */
-router.get('/dashboard', authenticateToken, async (req: Request, res: Response) => {
+router.get('/', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.userId;
     

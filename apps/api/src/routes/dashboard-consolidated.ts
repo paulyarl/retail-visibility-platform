@@ -15,7 +15,7 @@ const router = Router();
  * 
  * This reduces 4 separate API calls to 1, preventing connection pool exhaustion
  */
-router.get('/dashboard/consolidated/:tenantId', authenticateToken, checkTenantAccess, async (req, res) => {
+router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     
