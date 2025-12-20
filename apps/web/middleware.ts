@@ -9,12 +9,20 @@ const PLATFORM_DOMAINS = ['visibleshelf.com', 'visibleshelf.store'];
 
 // Check if hostname is a platform subdomain
 function isPlatformSubdomain(hostname: string): { isSubdomain: boolean; subdomain: string; domain: string } | null {
+  // Check production domains
   for (const domain of PLATFORM_DOMAINS) {
     if (hostname.endsWith(`.${domain}`) && hostname !== domain) {
       const subdomain = hostname.replace(`.${domain}`, '');
       return { isSubdomain: true, subdomain, domain };
     }
   }
+
+  // Check localhost for development
+  if (hostname.endsWith('.localhost') && hostname !== 'localhost') {
+    const subdomain = hostname.replace('.localhost', '');
+    return { isSubdomain: true, subdomain, domain: 'localhost' };
+  }
+
   return null;
 }
 
@@ -92,7 +100,25 @@ export async function middleware(req: NextRequest) {
           // Subdomain exists, route to storefront
           const tenantId = subdomainData.tenantId;
 
-          // Redirect to tenant storefront
+          // For localhost development, use rewrite instead of redirect
+          if (domain === 'localhost') {
+            // Rewrite to tenant storefront path (keeps subdomain in URL)
+            const destPath = `/t/${tenantId}${pathname}`;
+            console.log(`[Middleware] Subdomain rewrite: ${hostname}${pathname} → ${destPath} (domain: ${domain})`);
+            
+            const url = req.nextUrl.clone();
+            url.pathname = destPath;
+            
+            const res = NextResponse.rewrite(url);
+            
+            // Set tenant context cookie
+            const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });
+            setCookie(res, 'tcx', tcx);
+            
+            return res;
+          }
+
+          // For production domains, redirect to tenant storefront
           const destUrl = new URL(`/t/${tenantId}${pathname}`, req.url);
           // Preserve query params
           const sourceUrl = new URL(req.url);
@@ -100,7 +126,7 @@ export async function middleware(req: NextRequest) {
             destUrl.searchParams.set(key, value);
           });
 
-          console.log(`[Middleware] Subdomain routing: ${hostname}${pathname} → /t/${tenantId}${pathname} (domain: ${domain})`);
+          console.log(`[Middleware] Subdomain routing: ${hostname}${pathname} → ${destUrl.toString()} (domain: ${domain})`);
 
           const res = NextResponse.redirect(destUrl, { status: 302 });
 
@@ -189,11 +215,14 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/admin/:path*',
-    '/items/:path*',
-    '/settings/:path*',
-    '/tenants/:path*',
-    '/t/:path*',
-    '/',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public files with extensions
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.).*)',
   ],
 };

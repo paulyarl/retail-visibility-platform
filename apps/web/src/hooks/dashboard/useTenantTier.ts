@@ -119,7 +119,7 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
   };
 
   const fetchTierData = async () => {
-    if (!tenantId || !authUser) {
+    if (!tenantId) {
       setTierLoading(false);
       return;
     }
@@ -130,11 +130,19 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
 
       // User data is now from AuthContext - no need to fetch /auth/me
 
+      // Use public tier endpoint if no auth, otherwise use authenticated endpoint
+      const tierEndpoint = authUser 
+        ? `/api/tenants/${tenantId}/tier`
+        : `/api/tenants/${tenantId}/tier/public`;
+
       // Fetch tenant and organization tier data in parallel (Next.js API routes)
-      const [tenantResponse, usageResponse] = await Promise.all([
-        api.get(`/api/tenants/${tenantId}/tier`),
-        api.get(`/api/tenants/${tenantId}/usage`)
-      ]);
+      // Skip usage endpoint if not authenticated (storefront doesn't need it)
+      const requests = [api.get(tierEndpoint)];
+      if (authUser) {
+        requests.push(api.get(`/api/tenants/${tenantId}/usage`));
+      }
+      
+      const [tenantResponse, usageResponse] = await Promise.all(requests);
 
       let organizationTier: TierInfo | null = null;
       let tenantTier: TierInfo | null = null;
@@ -149,7 +157,7 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
         isChain = tierData.isChain || false;
       }
 
-      // Process usage response
+      // Process usage response (only if authenticated)
       let usageData: TenantUsage = {
         products: 0,
         locations: 0,
@@ -158,7 +166,7 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
         storageGB: 0
       };
 
-      if (usageResponse.ok) {
+      if (usageResponse && usageResponse.ok) {
         const usage = await usageResponse.json();
         usageData = {
           products: usage.products || 0,
@@ -186,11 +194,9 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
     }
   };
 
-  // Auto-fetch when tenantId or authUser changes
+  // Auto-fetch when tenantId changes (works with or without auth)
   useEffect(() => {
-    if (authUser) {
-      fetchTierData();
-    }
+    fetchTierData();
   }, [tenantId, authUser]);
 
   // EMERGENCY: Feature name mapping to fix frontend/backend conflicts

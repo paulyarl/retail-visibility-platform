@@ -30,11 +30,10 @@ export function mountDashboardRoutes(app: Express) {
   console.log('📊 Mounting dashboard routes...');
 
   // Dashboard routes
-  app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
-  console.log('✅ Dashboard routes mounted');
+  app.use('/api/dashboard', dashboardRoutes);
+  console.log('✅ Dashboard route mounted');
   
-  // Consolidated dashboard endpoint (reduces 4 calls to 1)
-  app.use('/api', dashboardConsolidatedRoutes);
+  app.use('/api/dashboard', dashboardConsolidatedRoutes);
   console.log('✅ Consolidated dashboard route mounted');
   
   app.use('/api', promotionRoutes); // Promotion endpoints
@@ -43,7 +42,7 @@ export function mountDashboardRoutes(app: Express) {
   app.use('/api', businessHoursRoutes); // Business hours management
   console.log('✅ Business hours routes mounted');
   
-  app.use('/api', tenantTierRoutes); // Tenant tier and usage endpoints
+  // Note: tenantTierRoutes now mounted in core-routes.ts to ensure public endpoints work
   app.use('/api/tenant-limits', tenantLimitsRoutes); // Tenant creation limits
   console.log('✅ Tenant limits routes mounted');
 

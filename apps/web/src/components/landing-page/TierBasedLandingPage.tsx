@@ -11,6 +11,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [tenantLogo, setTenantLogo] = useState<string | null>(null);
+  const [isFetchingTierAndLogo, setIsFetchingTierAndLogo] = useState(true);
   
   // Get tenant tier to determine if we should show logo
   const [tenantTier, setTenantTier] = useState<string>('starter');
@@ -18,20 +19,47 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
   useEffect(() => {
     const fetchTenantInfo = async () => {
       try {
-        const response = await fetch(`/api/tenants/${tenantId}/profile`);
-        if (response.ok) {
-          const profile = await response.json();
-          setTenantLogo(profile.logo_url || null);
-        }
+        setIsFetchingTierAndLogo(true);
+        console.log('[QR Code] Fetching tier for tenant:', tenantId);
         
-        // Get tenant tier
-        const tierResponse = await fetch(`/api/tenants/${tenantId}/tier`);
+        // Use public tier endpoint (no auth required for public product page)
+        const tierResponse = await fetch(`/api/tenants/${tenantId}/tier/public`);
+        console.log('[QR Code] Tier response status:', tierResponse.status);
+        
         if (tierResponse.ok) {
           const tierData = await tierResponse.json();
-          setTenantTier(tierData.tier || 'starter');
+          console.log('[QR Code] Tier data received:', tierData);
+          
+          // Use tier_key for clean single-word tier name (e.g., "professional")
+          const effectiveTier = tierData.effective?.tier_key || tierData.tier || 'starter';
+          console.log('[QR Code] Effective tier:', effectiveTier);
+          setTenantTier(effectiveTier);
+          
+          // Get tenant profile for logo if professional or above
+          if (effectiveTier === 'professional' || effectiveTier === 'enterprise' || effectiveTier === 'organization') {
+            console.log('[QR Code] Fetching logo for professional+ tier');
+            const profileResponse = await fetch(`/public/tenant/${tenantId}/profile`);
+            console.log('[QR Code] Profile response status:', profileResponse.status);
+            
+            if (profileResponse.ok) {
+              const profile = await profileResponse.json();
+              console.log('[QR Code] Profile data:', profile);
+              console.log('[QR Code] Logo URL:', profile.logo_url);
+              setTenantLogo(profile.logo_url || null);
+            } else {
+              console.warn('[QR Code] Profile fetch failed:', profileResponse.status);
+            }
+          } else {
+            console.log('[QR Code] Tier not professional+, skipping logo fetch');
+          }
+        } else {
+          console.warn('[QR Code] Tier fetch failed:', tierResponse.status);
         }
       } catch (error) {
-        console.warn('Failed to fetch tenant info:', error);
+        console.error('[QR Code] Error fetching tenant info:', error);
+      } finally {
+        setIsFetchingTierAndLogo(false);
+        console.log('[QR Code] Tier and logo fetch complete');
       }
     };
     
@@ -57,10 +85,16 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
         // Draw QR code first
         ctx.drawImage(qrCanvas, 0, 0);
 
-        // Calculate logo size (should be 15-20% of QR code size for readability)
-        const logoSize = Math.floor(canvas.width * 0.18); // 18% of QR size
+        // Calculate logo size (25% for maximum visibility while maintaining scannability)
+        const logoSize = Math.floor(canvas.width * 0.25);
         const logoX = (canvas.width - logoSize) / 2;
         const logoY = (canvas.height - logoSize) / 2;
+
+        // Draw white circular background for logo (for better contrast)
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2 + 6, 0, Math.PI * 2);
+        ctx.fill();
 
         // Create circular mask for logo
         ctx.save();
@@ -69,15 +103,16 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
         ctx.closePath();
         ctx.clip();
 
-        // Draw logo
+        // Draw logo with full opacity
+        ctx.globalAlpha = 1.0;
         ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
         ctx.restore();
 
-        // Add white border around logo
+        // Add thicker white border around logo for definition
         ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 6;
         ctx.beginPath();
-        ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2 + 2, 0, Math.PI * 2);
+        ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2 + 3, 0, Math.PI * 2);
         ctx.stroke();
 
         resolve(canvas);
@@ -104,7 +139,13 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
       qrCanvas.height = 256;
 
       // Generate QR code with higher error correction if logo will be applied
-      const shouldApplyLogo = (tenantTier === 'professional' || tenantTier === 'enterprise' || tenantTier === 'organization') && tenantLogo;
+      const shouldApplyLogo = (
+        tenantTier === 'professional' || 
+        tenantTier === 'enterprise' || 
+        tenantTier === 'organization'
+      ) && tenantLogo;
+      
+      console.log('[QR Code] Should apply logo:', shouldApplyLogo, 'tenantTier:', tenantTier, 'tenantLogo:', tenantLogo);
       
       await QRCode.toCanvas(qrCanvas, productUrl, {
         width: 256,
@@ -149,10 +190,13 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
     document.body.removeChild(link);
   };
 
-  // Generate QR code on mount
+  // Generate QR code only after tier and logo fetch is complete
   useEffect(() => {
-    generateQRCode();
-  }, []);
+    if (!isFetchingTierAndLogo) {
+      console.log('[QR Code] Starting QR generation with tier:', tenantTier, 'logo:', tenantLogo);
+      generateQRCode();
+    }
+  }, [isFetchingTierAndLogo]); // Generate when fetch completes
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">

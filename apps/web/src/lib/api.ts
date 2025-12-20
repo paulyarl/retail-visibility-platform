@@ -5,7 +5,7 @@
  * Includes request deduplication for GET requests
  */
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL;
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || 'http://localhost:4000';
 
 /**
  * Request deduplication cache
@@ -37,13 +37,27 @@ function cleanExpiredCache(): void {
  */
 function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
-  
+
   // Try localStorage first (legacy)
   const localToken = localStorage.getItem('access_token');
-  if (localToken) return localToken;
-  
+  if (localToken) {
+    console.log('[API] Found token in localStorage access_token');
+    return localToken;
+  }
+
   // Fall back to cookie (current auth system)
-  return getCookie('auth_token');
+  const cookieToken = getCookie('auth_token');
+  if (cookieToken) {
+    console.log('[API] Found token in cookie auth_token');
+    return cookieToken;
+  }
+
+  // Debug: Check what auth-related data is actually stored
+  console.log('[API] No token found. Debug info:');
+  console.log('- localStorage keys:', Object.keys(localStorage).filter(k => k.includes('auth') || k.includes('token') || k.includes('access')));
+  console.log('- Cookies:', document.cookie);
+
+  return null;
 }
 
 function getLastTenantId(): string | null {
@@ -85,9 +99,12 @@ export async function apiRequest(
     headers['Content-Type'] = 'application/json';
   }
 
-  // Add Authorization header if token exists
+  // Add Authorization header if token exists (for ALL requests, not just writes)
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+    console.log('[API] Adding Authorization header to request:', endpoint);
+  } else {
+    console.log('[API] No token available for request:', endpoint);
   }
 
   // Attach tenant and CSRF headers on write operations

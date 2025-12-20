@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui';
 import { QRCodeGenerator } from './QRCodeGenerator';
-import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
-import type { SubscriptionTier } from '@/lib/qr-tiers';
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -15,40 +13,54 @@ interface QRCodeModalProps {
 }
 
 export function QRCodeModal(props: QRCodeModalProps) {
-  console.log('[QRCodeModal] Component called with arguments:', arguments);
-  console.log('[QRCodeModal] arguments[0]:', arguments[0]);
-  console.log('[QRCodeModal] Full props object:', props);
   const { isOpen, onClose, productUrl, productName, tenantId } = props;
-  console.log('[QRCodeModal] Destructured:', { isOpen, onClose, productUrl, productName, tenantId });
   
-  // TEMPORARY: Hardcode tenantId to test tier system
   const actualTenantId = tenantId || 'tid-ej2um44f';
-  console.log('[QRCodeModal] Using tenantId:', actualTenantId);
   
-  const { tier, loading: tierLoading } = useTenantTier(actualTenantId);
-  const tierId = tier?.effective?.id || null;
-  console.log('[QRCodeModal] Tier from hook:', tier, 'tierId:', tierId);
-  
-  // Get tenant logo for enterprise users
+  // Fetch tier data directly using public endpoint (no auth required)
+  const [tierId, setTierId] = useState<string | null>(null);
+  const [tierLoading, setTierLoading] = useState(true);
   const [tenantLogo, setTenantLogo] = useState<string | null>(null);
   
   useEffect(() => {
-    const fetchTenantLogo = async () => {
-      if (tierId === 'enterprise' || tierId === 'organization' || tierId === 'professional') {
-        try {
-          const response = await fetch(`/api/tenants/${actualTenantId}/profile`);
-          if (response.ok) {
-            const profile = await response.json();
-            setTenantLogo(profile.logo_url || null);
+    const fetchTierAndLogo = async () => {
+      try {
+        setTierLoading(true);
+        
+        // Use public tier endpoint (no auth required for storefront)
+        const tierResponse = await fetch(`/api/tenants/${actualTenantId}/tier/public`);
+        if (tierResponse.ok) {
+          const tierData = await tierResponse.json();
+          const effectiveTierId = tierData.effective?.id || tierData.tier;
+          setTierId(effectiveTierId);
+          
+          console.log('[QRCodeModal] Tier fetched:', effectiveTierId);
+          
+          // Fetch logo if professional or above
+          if (effectiveTierId === 'enterprise' || effectiveTierId === 'organization' || effectiveTierId === 'professional') {
+            try {
+              const profileResponse = await fetch(`/api/tenants/${actualTenantId}/profile`);
+              if (profileResponse.ok) {
+                const profile = await profileResponse.json();
+                setTenantLogo(profile.logo_url || null);
+                console.log('[QRCodeModal] Logo fetched:', profile.logo_url);
+              }
+            } catch (error) {
+              console.warn('Failed to fetch tenant logo:', error);
+            }
           }
-        } catch (error) {
-          console.warn('Failed to fetch tenant logo:', error);
         }
+      } catch (error) {
+        console.error('[QRCodeModal] Error fetching tier:', error);
+      } finally {
+        setTierLoading(false);
       }
     };
     
-    fetchTenantLogo();
-  }, [actualTenantId, tierId]);
+    if (isOpen && actualTenantId) {
+      fetchTierAndLogo();
+    }
+  }, [actualTenantId, isOpen]);
   
   return (
     <Modal

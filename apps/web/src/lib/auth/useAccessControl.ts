@@ -79,7 +79,8 @@ export function useAccessControl(
       setError(null);
 
       // Fetch tenant data if tenantId provided
-      const tenantRes = await api.get(`${API_BASE_URL}/api/tenants/${tenantId}`);
+      // Note: api.get already handles API_BASE_URL prefix for /api/* routes
+      const tenantRes = await api.get(`/api/tenants/${tenantId}`);
       if (tenantRes.ok) {
         const tenant = await tenantRes.json();
         setTenantData(tenant);
@@ -87,7 +88,7 @@ export function useAccessControl(
         // Fetch organization data if needed
         if (fetchOrganization) {
           if (tenant.organizationId) {
-            const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenant.organizationId}`);
+            const orgRes = await api.get(`/api/organizations/${tenant.organizationId}`);
             if (orgRes.ok) {
               const org = await orgRes.json();
               setOrganizationData(org);
@@ -97,7 +98,7 @@ export function useAccessControl(
           } else {
             // Try to find organization by searching organizations that contain this tenant
             try {
-              const orgsRes = await api.get(`${API_BASE_URL}/organizations`);
+              const orgsRes = await api.get(`/api/organizations`);
               if (orgsRes.ok) {
                 const organizations = await orgsRes.json();
                 // Find the organization that contains this tenant
@@ -107,7 +108,7 @@ export function useAccessControl(
 
                 if (matchingOrg) {
                   // Now fetch the full organization data
-                  const fullOrgRes = await api.get(`${API_BASE_URL}/organizations/${matchingOrg.id}`);
+                  const fullOrgRes = await api.get(`/api/organizations/${matchingOrg.id}`);
                   if (fullOrgRes.ok) {
                     const org = await fullOrgRes.json();
                     setOrganizationData(org);

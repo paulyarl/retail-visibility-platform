@@ -15,6 +15,11 @@ type SettingCard = {
   badge?: string;
   accessOptions?: any;
   fetchOrganization?: boolean;
+  secondaryLink?: {
+    label: string;
+    href: string;
+    icon?: string;
+  };
 };
 
 type SettingsGroup = {
@@ -183,6 +188,11 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-blue-600',
           badge: 'GMC',
           accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          secondaryLink: {
+            label: 'Verify Live',
+            href: `/t/${tenantId}/settings/subdomain/verify`,
+            icon: 'eye'
+          },
         },
       ],
     },
@@ -377,6 +387,23 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
                       </div>
                       <CardTitle className="mt-4">{card.title}</CardTitle>
                       <CardDescription>{card.description}</CardDescription>
+                      {card.secondaryLink && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(card.secondaryLink!.href);
+                            }}
+                            className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            {card.secondaryLink.label}
+                          </button>
+                        </div>
+                      )}
                     </CardHeader>
                   </AnimatedCard>
                 </ProtectedCard>

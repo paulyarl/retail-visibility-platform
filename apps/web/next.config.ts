@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
         source: '/api/admin/tier-system/:path*',
         destination: '/api/admin/tier-system/:path*', // Pass through to Next.js
       },
+      // Proxy public routes (no auth required)
+      {
+        source: '/public/:path*',
+        destination: 'http://localhost:4000/public/:path*',
+      },
       // Proxy all other API requests to the external API server
       {
         source: '/api/:path*',

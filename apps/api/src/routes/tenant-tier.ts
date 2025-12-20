@@ -6,6 +6,92 @@ import TierService from '../services/TierService';
 const router = Router();
 
 /**
+ * GET /tenants/:id/tier/public
+ * Get public tier information for a specific tenant (no auth required)
+ * Used by storefront for QR code features
+ */
+router.get('/tenants/:id/tier/public', async (req, res) => {
+  try {
+    const { id: tenantId } = req.params;
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        subscription_tier: true,
+        organization_id: true,
+        organizations_list: {
+          select: {
+            subscription_tier: true,
+            _count: {
+              select: { tenants: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    // Determine effective tier (org tier can override tenant tier for chains)
+    const effectiveTier = tenant.organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
+    const isChain = tenant.organizations_list ? tenant.organizations_list._count.tenants > 1 : false;
+
+    // Fetch tier details from database (with features) - with fallback
+    let tenantTierData = null;
+    let orgTierData = null;
+    
+    try {
+      if (tenant.subscription_tier) {
+        tenantTierData = await TierService.getTierByKey(tenant.subscription_tier);
+      }
+      if (tenant.organizations_list?.subscription_tier) {
+        orgTierData = await TierService.getTierByKey(tenant.organizations_list.subscription_tier);
+      }
+    } catch (error) {
+      console.warn('[Public Tier API] TierService failed, using fallback data:', error);
+    }
+    
+    // Fallback tier data if TierService fails
+    if (!tenantTierData && tenant.subscription_tier) {
+      tenantTierData = {
+        tierKey: tenant.subscription_tier,
+        id: tenant.subscription_tier,
+        name: tenant.subscription_tier,
+        displayName: tenant.subscription_tier.charAt(0).toUpperCase() + tenant.subscription_tier.slice(1),
+        features: [],
+        limits: {}
+      };
+    }
+    
+    if (!orgTierData && tenant.organizations_list?.subscription_tier) {
+      orgTierData = {
+        tierKey: tenant.organizations_list.subscription_tier,
+        id: tenant.organizations_list.subscription_tier,
+        name: tenant.organizations_list.subscription_tier,
+        displayName: tenant.organizations_list.subscription_tier.charAt(0).toUpperCase() + tenant.organizations_list.subscription_tier.slice(1),
+        features: [],
+        limits: {}
+      };
+    }
+
+    res.json({
+      tenantId: tenant.id,
+      tier: effectiveTier,
+      isChain,
+      organizationTier: orgTierData,
+      tenantTier: tenantTierData,
+      effective: orgTierData || tenantTierData,
+    });
+  } catch (error) {
+    console.error('[GET /tenants/:id/tier/public] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch tier information' });
+  }
+});
+
+/**
  * GET /tenants/:id/tier
  * Get tier information for a specific tenant
  */

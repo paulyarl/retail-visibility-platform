@@ -245,6 +245,7 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
         subscription_tier: true,
         subscription_status: true,
         location_status: true,
+        subdomain: true,
         created_at: true,
         _count: {
           select: {
@@ -442,6 +443,13 @@ router.get('/check-subdomain/:subdomain', authenticateToken, async (req: Request
     const user = req.user as any;
     const userId = user?.userId || user?.user_id || user?.id;
 
+    // Get the user's tenants to check if they own this subdomain
+    const userTenants = await prisma.user_tenants.findMany({
+      where: { user_id: userId },
+      select: { tenant_id: true }
+    });
+    const tenantIds = userTenants.map(ut => ut.tenant_id);
+
     // Rate limiting: 10 subdomain checks per minute per user
     const rateLimitResult = checkRateLimit(userId || req.ip || 'anonymous', 'subdomainCheck');
     if (!rateLimitResult.allowed) {
@@ -471,13 +479,38 @@ router.get('/check-subdomain/:subdomain', authenticateToken, async (req: Request
       select: { id: true, name: true }
     });
 
-    const available = !existingTenant;
+    // If no tenant has this subdomain, it's available
+    if (!existingTenant) {
+      return res.json({
+        available: true,
+        valid: true,
+        subdomain,
+        message: 'Subdomain is available',
+        ownedByCurrentUser: false
+      });
+    }
 
+    // If the existing tenant is owned by the current user, they can reuse it
+    const ownedByCurrentUser = tenantIds.includes(existingTenant.id);
+
+    if (ownedByCurrentUser) {
+      return res.json({
+        available: true,
+        valid: true,
+        subdomain,
+        message: 'This is your current subdomain',
+        ownedByCurrentUser: true,
+        tenantName: existingTenant.name
+      });
+    }
+
+    // Subdomain is taken by another tenant
     res.json({
-      available,
+      available: false,
       valid: true,
       subdomain,
-      message: available ? 'Subdomain is available' : 'Subdomain is already taken'
+      message: 'Subdomain is already taken by another tenant',
+      ownedByCurrentUser: false
     });
   } catch (error: any) {
     console.error('[TENANTS] Error checking subdomain availability:', error);
@@ -523,6 +556,72 @@ router.get('/resolve-subdomain/:subdomain', async (req: Request, res: Response) 
       success: false,
       error: 'internal_error',
       message: 'Failed to resolve subdomain'
+    });
+  }
+});
+
+/**
+ * GET /api/tenants/my-subdomains
+ * Get all subdomains for the current user's tenants
+ */
+router.get('/my-subdomains', async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const userId = user?.userId || user?.user_id || user?.id;
+
+    // Get all tenants for this user
+    const userTenants = await prisma.user_tenants.findMany({
+      where: { user_id: userId },
+      include: {
+        tenants: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+            created_at: true
+          }
+        }
+      }
+    });
+
+    // Filter tenants that have subdomains and format the response
+    const subdomains = userTenants
+      .filter(ut => ut.tenants.subdomain)
+      .map(ut => {
+        // Detect platform domain (similar to frontend logic)
+        let platformDomain = 'visibleshelf.com';
+        if (req.headers.host) {
+          const hostname = req.headers.host.split(':')[0]; // Remove port if present
+          if (hostname.endsWith('.visibleshelf.com')) {
+            platformDomain = 'visibleshelf.com';
+          } else if (hostname.endsWith('.visibleshelf.store')) {
+            platformDomain = 'visibleshelf.store';
+          } else if (hostname.endsWith('.localhost') || hostname === 'localhost') {
+            platformDomain = 'localhost';
+          }
+        }
+
+        return {
+          tenantId: ut.tenants.id,
+          tenantName: ut.tenants.name,
+          subdomain: ut.tenants.subdomain,
+          createdAt: ut.tenants.created_at,
+          url: `https://${ut.tenants.subdomain}.${platformDomain}`,
+          platformDomain
+        };
+      });
+
+    res.json({
+      success: true,
+      subdomains,
+      total: subdomains.length
+    });
+  } catch (error: any) {
+    console.error('[TENANTS] Error fetching user subdomains:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch subdomains'
     });
   }
 });

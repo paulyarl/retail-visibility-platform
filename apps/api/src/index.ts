@@ -303,6 +303,86 @@ app.use('/health', healthRoutes);
 // });
 
 
+// GET /api/tenants/my-subdomains - Get all subdomains for the current user's tenants
+// Query param: tenantId (optional) - scope to specific tenant
+app.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const userId = user?.userId || user?.user_id || user?.id;
+    const requestedTenantId = req.query.tenantId as string;
+
+    // Get all tenants for this user
+    const userTenants = await prisma.user_tenants.findMany({
+      where: { user_id: userId },
+      include: {
+        tenants: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+            created_at: true
+          }
+        }
+      }
+    });
+
+    let filteredUserTenants = userTenants;
+
+    // If tenantId is specified, filter to just that tenant
+    if (requestedTenantId) {
+      filteredUserTenants = userTenants.filter(ut => ut.tenants.id === requestedTenantId);
+    }
+
+    // Filter tenants that have subdomains and format the response
+    const subdomains = filteredUserTenants
+      .filter(ut => ut.tenants.subdomain)
+      .map(ut => {
+        // Detect platform domain (similar to frontend logic)
+        let platformDomain = 'visibleshelf.com';
+        let protocol = 'https';
+        let port = '';
+        
+        if (req.headers.host) {
+          const hostname = req.headers.host.split(':')[0]; // Remove port if present
+          if (hostname.endsWith('.visibleshelf.com')) {
+            platformDomain = 'visibleshelf.com';
+          } else if (hostname.endsWith('.visibleshelf.store')) {
+            platformDomain = 'visibleshelf.store';
+          } else if (hostname.endsWith('.localhost') || hostname === 'localhost') {
+            platformDomain = 'localhost';
+            protocol = 'http'; // Use HTTP for localhost
+            port = ':3000'; // Include port for localhost
+          }
+        }
+
+        return {
+          tenantId: ut.tenants.id,
+          tenantName: ut.tenants.name,
+          subdomain: ut.tenants.subdomain,
+          createdAt: ut.tenants.created_at,
+          url: `${protocol}://${ut.tenants.subdomain}.${platformDomain}${port}`,
+          platformDomain,
+          isCurrentTenant: requestedTenantId ? ut.tenants.id === requestedTenantId : false
+        };
+      });
+
+    res.json({
+      success: true,
+      subdomains,
+      total: subdomains.length,
+      scopedToTenant: !!requestedTenantId
+    });
+  } catch (error: any) {
+    console.error('[TENANTS] Error fetching user subdomains:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch subdomains'
+    });
+  }
+});
+
+
 app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     let tenant = await prisma.tenants.findUnique({ 

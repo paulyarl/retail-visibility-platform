@@ -20,6 +20,8 @@ import platformStatsRoutes from '../platform-stats';
 import businessHoursRoutes from '../business-hours';
 import taxonomyRoutes from '../taxonomy';
 import analyticsRoutes from '../analytics';
+import tenantsRoutes from '../tenants';
+import tenantTierRoutes from '../tenant-tier';
 
 /**
  * Mount core business routes
@@ -43,7 +45,13 @@ export function mountCoreRoutes(app: Express) {
   app.use('/upgrade-requests', upgradeRequestsRoutes);
   app.use('/permissions', permissionRoutes);
   app.use('/users', userRoutes);
-  app.use('/api/tenants', tenantUserRoutes);
+  
+  // IMPORTANT: Mount public tier routes BEFORE authenticated tenant routes
+  // This allows /api/tenants/:id/tier/public to work without auth
+  app.use('/api', tenantTierRoutes);
+  
+  app.use('/api/tenants', authenticateToken, tenantsRoutes);
+  app.use('/api/tenants', authenticateToken, tenantUserRoutes);
   app.use(platformSettingsRoutes);
   app.use('/api/platform-stats', platformStatsRoutes);
   app.use('/api', businessHoursRoutes);

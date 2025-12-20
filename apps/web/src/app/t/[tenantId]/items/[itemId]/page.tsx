@@ -82,18 +82,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPhotoGallery, setShowPhotoGallery] = useState(false);
 
-  // Get tenant tier for QR code features
-  const { tier, loading: tierLoading } = useTenantTier(tenantId);
-  
-  // Debug logging
-  console.log('[QR Debug] Tenant ID:', tenantId);
-  console.log('[QR Debug] useTenantTier result:', { tier, tierLoading });
-  console.log('[QR Debug] Tenant tier:', tier);
-  console.log('[QR Debug] Tier effective:', tier?.effective);
-  console.log('[QR Debug] Tier id:', tier?.effective?.id);
-  console.log('[QR Debug] Final tier value passed:', tier?.effective?.id || null);
-  console.log('[QR Debug] Modal render condition:', { tierLoading, showQRModal, canRender: !tierLoading && showQRModal });
-
   useEffect(() => {
     loadItemData();
   }, [itemId]);
@@ -817,21 +805,17 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     variant="primary"
                     onClick={() => window.open(`/products/${item.id}`, '_blank')}
                     className="w-full"
+                    disabled={item.status !== 'active' || item.visibility !== 'public'}
+                    title={
+                      item.status !== 'active' || item.visibility !== 'public'
+                        ? 'Item must be active and public to view public page'
+                        : 'View public page'
+                    }
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                     View Public Page
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowQRModal(true)}
-                    className="w-full"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                    </svg>
-                    Generate QR Code
                   </Button>
                   <Button
                     variant="ghost"
@@ -852,7 +836,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
       {/* QR Code Modal */}
       {showQRModal && (() => {
-        console.log('[QR Modal START] showQRModal:', showQRModal, 'tier:', tier, 'tierLoading:', tierLoading);
         return (
           <QRCodeModal
             isOpen={showQRModal}

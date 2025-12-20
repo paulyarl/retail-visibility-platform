@@ -3,7 +3,8 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api, API_BASE_URL } from '@/lib/api';
-import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
+import { useAuth } from '@/contexts/AuthContext';
+import { isPlatformUser, isTenantOwnerOrAdmin, getTenantRole } from '@/lib/auth/access-control';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -40,27 +41,86 @@ interface RateLimitConfig {
   subdomainResolve: { maxRequests: number; windowMs: number };
 }
 
+interface Tenant {
+  id: string;
+  name: string;
+  subscriptionTier?: string;
+  subscriptionStatus?: string;
+  _count?: {
+    inventory_items: number;
+    user_tenants: number;
+  };
+}
+
 export default function AdminSubdomainPage() {
   const params = useParams();
   const tenantId = params?.tenantId as string;
+  const { user } = useAuth();
 
-  const { hasAccess, loading: accessLoading } = useAccessControl(
-    tenantId,
-    AccessPresets.PLATFORM_ADMIN_ONLY
-  );
-
+  const [tenant, setTenant] = useState<Tenant | null>(null);
   const [stats, setStats] = useState<SubdomainStats | null>(null);
   const [rateLimits, setRateLimits] = useState<RateLimitConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingLimits, setUpdatingLimits] = useState(false);
   const [error, setError] = useState<string>('');
 
+  // Check if user has access to this tenant (same pattern as subscription page)
+  const hasAccess = user && (
+    isPlatformUser(user) || // Platform users have access to all tenants
+    isTenantOwnerOrAdmin(user, tenantId) // Tenant owners/admins have access
+  );
+
   useEffect(() => {
-    if (hasAccess) {
-      fetchSubdomainStats();
-      fetchRateLimits();
-    }
-  }, [hasAccess]);
+    const loadData = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      // Platform admins have access to all tenants - no need to fetch tenant data
+      if (isPlatformUser(user)) {
+        await fetchSubdomainStats();
+        await fetchRateLimits();
+        setLoading(false);
+        return;
+      }
+
+      // Store owners need tenant context and access check
+      if (!tenantId) {
+        setError('No tenant context found');
+        setLoading(false);
+        return;
+      }
+
+      // Check if user has access to this tenant
+      if (!hasAccess) {
+        setError('You do not have access to this tenant');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch tenant data for store owners (same pattern as subscription page)
+        const tenantRes = await api.get(`/api/tenants/${tenantId}`);
+        if (tenantRes.ok) {
+          const tenantData = await tenantRes.json();
+          setTenant(tenantData);
+        } else {
+          setError('Failed to load tenant information');
+        }
+
+        await fetchSubdomainStats();
+        await fetchRateLimits();
+      } catch (err) {
+        console.error('Failed to load tenant data:', err);
+        setError('Failed to load tenant information');
+      }
+
+      setLoading(false);
+    };
+
+    loadData();
+  }, [user, tenantId, hasAccess]);
 
   const fetchSubdomainStats = async () => {
     try {
@@ -106,7 +166,7 @@ export default function AdminSubdomainPage() {
     }
   };
 
-  if (accessLoading || loading) {
+  if (loading) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
         <div className="animate-pulse space-y-4">

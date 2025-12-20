@@ -32,6 +32,7 @@ router.get('/setup-status/:tenantId', async (req, res) => {
       select: {
         google_business_access_token: true,
         google_business_refresh_token: true,
+        subdomain: true,
       },
     });
 
@@ -39,6 +40,7 @@ router.get('/setup-status/:tenantId', async (req, res) => {
     const hasOAuthTokens = !!googleAccount?.google_oauth_tokens_list;
     const hasMerchantLink = (googleAccount?.google_merchant_links_list?.length || 0) > 0;
     const hasDirectBusinessTokens = !!(tenant?.google_business_access_token && tenant?.google_business_refresh_token);
+    const hasSubdomain = !!(tenant?.subdomain && tenant.subdomain.trim().length > 0);
 
     // Determine overall readiness
     const isReady = hasOAuthTokens && hasMerchantLink;
@@ -67,6 +69,14 @@ router.get('/setup-status/:tenantId', async (req, res) => {
         completed: hasOAuthTokens || hasDirectBusinessTokens,
         action: '/settings/integrations',
         requires: 'google_account',
+      },
+      {
+        id: 'subdomain',
+        label: 'Configure Subdomain',
+        description: 'Set up a custom subdomain for Google Merchant Center compliance',
+        completed: hasSubdomain,
+        action: '/settings/subdomain',
+        requires: 'oauth_tokens',
       },
     ];
 
