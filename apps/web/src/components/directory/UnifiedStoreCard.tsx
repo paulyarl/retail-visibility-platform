@@ -154,8 +154,8 @@ export function UnifiedStoreCard({
   if (viewMode === 'list') {
     return (
       <Link href={linkHref} className={`block ${className}`}>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
+        <Card className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
+          <CardContent className="p-4 dark:bg-gray-800">
             <div className="flex items-center space-x-4">
               {/* Logo */}
               <div className="flex-shrink-0">
@@ -168,7 +168,7 @@ export function UnifiedStoreCard({
                     className="rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
                     <Package className="w-6 h-6 text-gray-400" />
                   </div>
                 )}
@@ -178,11 +178,11 @@ export function UnifiedStoreCard({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:!text-white truncate">
                       {listing.businessName}
                     </h3>
 
-                    <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
+                    <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600 dark:text-gray-400">
                       <span className="flex items-center">
                         <MapPin className="w-4 h-4 mr-1" />
                         {formattedAddress || 'Address not available'}
@@ -194,7 +194,7 @@ export function UnifiedStoreCard({
                             {ratingAvg.toFixed(1)}
                           </span>
                           {ratingCount > 0 && (
-                            <span className="text-neutral-500">
+                            <span className="text-neutral-500 dark:text-neutral-400">
                               ({ratingCount})
                             </span>
                           )}
@@ -214,7 +214,7 @@ export function UnifiedStoreCard({
                         )}
                       </div>
 
-                      <div className="flex items-center space-x-3 text-sm text-gray-500">
+                      <div className="flex items-center space-x-3 text-sm text-gray-500 dark:text-gray-400">
                         {listing.productCount !== undefined && (
                           <span>{listing.productCount} products</span>
                         )}
@@ -239,8 +239,8 @@ export function UnifiedStoreCard({
   // Grid view
   return (
     <Link href={linkHref} className={`block ${className}`}>
-      <Card className="h-full hover:shadow-lg transition-all duration-200 group">
-        <CardContent className="p-6">
+      <Card className="h-full hover:shadow-lg transition-all duration-200 group dark:bg-gray-800 dark:border-gray-700">
+        <CardContent className="p-6 dark:bg-gray-800">
           {/* Header with logo and featured badge */}
           <div className="flex items-start justify-between mb-4">
             <div className="flex-shrink-0">
@@ -253,7 +253,7 @@ export function UnifiedStoreCard({
                   className="rounded-lg object-cover"
                 />
               ) : (
-                <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+                <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
                   <Package className="w-8 h-8 text-gray-400" />
                 </div>
               )}
@@ -267,7 +267,7 @@ export function UnifiedStoreCard({
           </div>
 
           {/* Business name */}
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+          <h3 className="text-lg font-semibold text-gray-900 dark:!text-white mb-2 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
             {listing.businessName}
           </h3>
 
