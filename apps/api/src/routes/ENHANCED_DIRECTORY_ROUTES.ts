@@ -37,43 +37,66 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     let relatedListings = [];
 
     try {
-      // Try using the materialized view (faster)
+      // Try using the correct materialized view with proper refresh triggers
       const relatedQuery = `
-        SELECT DISTINCT ON (dcl.id)
-          dcl.*,
-          dll.business_hours,
+        SELECT DISTINCT ON (dcp.category_id, dcp.tenant_id)
+          -- Use directory_category_products MV which has proper refresh triggers
+          dcp.tenant_id,
+          dcp.category_id,
+          dcp.category_name,
+          dcp.tenant_name as business_name,
+          dcp.tenant_slug as slug,
+          dcp.address,
+          dcp.listing_city as city,
+          dcp.listing_state as state,
+          dcp.latitude,
+          dcp.longitude,
+          dcp.rating_avg,
+          dcp.rating_count,
+          dcp.actual_product_count as product_count,  -- Use actual count from inventory_items
+          dcp.is_featured,
+          dcp.subscription_tier,
+          dcp.is_published as isPublished,
+          
+          -- Calculate relevance score based on category match, location, rating
           (
             CASE
-              WHEN dcl.is_primary = true AND dcl.category_name = $1 THEN 3
-              WHEN dcl.is_primary = false AND dcl.category_name = $1 THEN 2
-              WHEN dcl.category_name = ANY($6::text[]) THEN 2
+              WHEN dcp.category_name = $1 THEN 2  -- Direct category match
               ELSE 0
-            END +
-            CASE
-              WHEN dcl.city = $2 AND dcl.state = $3 THEN 2
-              WHEN dcl.state = $3 THEN 1
-              ELSE 0
-            END +
-            CASE
-              WHEN ABS(dcl.rating_avg - $4) < 0.5 THEN 1
-              ELSE 0
-            END
+            END * 2 +
+            (
+              CASE
+                WHEN dcp.listing_city = $2 AND dcp.listing_state = $3 THEN 2
+                WHEN dcp.listing_state = $3 THEN 1
+                ELSE 0
+              END
+            ) +
+            (
+              CASE
+                WHEN ABS(COALESCE(dcp.rating_avg, 0) - $4) < 0.5 THEN 1
+                ELSE 0
+              END
+            )
           ) as relevance_score
-        FROM directory_category_listings dcl
-        INNER JOIN tenants t ON dcl.tenant_id = t.id
-        LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
-        WHERE dcl.slug != $5
-          AND t.location_status IN ('active', 'inactive', 'closed')
-        ORDER BY dcl.id, relevance_score DESC, dcl.rating_avg DESC, dcl.product_count DESC
+          
+        FROM directory_category_products dcp
+        LEFT JOIN directory_category_listings dcl ON dcl.tenant_id = dcp.tenant_id AND dcl.is_primary = true
+        WHERE dcp.actual_product_count > 0  -- Only stores with actual products
+          AND dcp.is_published = true
+          AND dcp.directory_visible = true
+          AND dcp.tenant_id != $6  -- Use tenant_id for reliable exclusion
+          AND dcl.logo_url IS NOT NULL
+          AND dcl.logo_url != ''  -- Hard requirement: must have logo
+        ORDER BY dcp.category_id, dcp.tenant_id, relevance_score DESC, dcp.rating_avg DESC, dcp.actual_product_count DESC
       `;
 
       const related = await getDirectPool().query(relatedQuery, [
-        current.primary_category,
-        current.city,
-        current.state,
+        current.primary_category || '',
+        current.city || '',
+        current.state || '',
         current.rating_avg || 0,
-        slug,
-        current.secondary_categories || [],
+        slug || '',
+        current.tenant_id || '',  // Use current store's tenant_id for exclusion
       ]);
 
       console.log(`[DEBUG] MV query returned ${related.rows.length} rows`);
@@ -100,40 +123,40 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
               tenant_id: row.tenant_id,
               relevance_score: row.relevance_score,
               is_published: row.is_published,
-              location_status: row.location_status,
-              business_name: row.business_name
+              business_name: row.business_name,
+              actual_product_count: row.product_count
             });
           }
           
           return {
-          id: row.id,
+          id: `${row.tenant_id}-${row.category_id}`, // Composite ID
           tenantId: row.tenant_id,
           business_name: row.business_name,
           slug: row.slug,
           address: row.address,
           city: row.city,
           state: row.state,
-          zipCode: row.zip_code,
-          phone: row.phone,
-          email: row.email,
-          website: row.website,
+          zipCode: null,
+          phone: null, // Not in this MV
+          email: null, // Not in this MV
+          website: null, // Not in this MV
           latitude: row.latitude,
           longitude: row.longitude,
           primaryCategory: row.category_name,
           secondaryCategories: [],
-          logoUrl: row.logo_url,
-          description: row.description,
+          logoUrl: null, // Not in this MV
+          description: null, // Not in this MV
           ratingAvg: row.rating_avg || 0,
           ratingCount: row.rating_count || 0,
-          productCount: row.product_count || 0,
+          productCount: row.product_count || 0, // Now using actual count from inventory_items
           isFeatured: row.is_featured || false,
           subscription_tier: row.subscription_tier || 'trial',
-          useCustomWebsite: row.use_custom_website || false,
-          isPublished: row.is_published || true,
-          businessHours: row.business_hours,
+          useCustomWebsite: false, // Not in this MV
+          isPublished: row.ispublished || true,
+          businessHours: null, // Not in this MV
           relevanceScore: row.relevance_score || 0,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at,
+          createdAt: null, // Not in this MV
+          updatedAt: null, // Not in this MV
         }});
 
       console.log(`[Related Stores] MV approach found ${relatedListings.length} stores with score >= 1`);
@@ -141,62 +164,76 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     } catch (mvError) {
       console.log(`[Related Stores] MV approach failed, using fallback:`, mvError);
       
-      // Fallback: Direct query without MV
+      // Fallback: Direct query using actual product counts
       const fallbackQuery = `
-        SELECT dll.*,
+        SELECT DISTINCT
+          dll.tenant_id,
+          dll.business_name,
+          dll.slug,
+          dll.address,
+          dll.city,
+          dll.state,
+          dll.latitude,
+          dll.longitude,
+          dll.rating_avg,
+          dll.rating_count,
+          dll.is_featured,
+          dll.subscription_tier,
+          dll.is_published,
+          
+          -- Get logo from directory_category_listings MV where it exists
+          dcl.logo_url,
+          
+          -- Get actual product count from inventory_items
+          COALESCE((
+            SELECT COUNT(*)
+            FROM inventory_items ii
+            WHERE ii.tenant_id = dll.tenant_id
+              AND ii.item_status = 'active'
+              AND ii.visibility = 'public'
+          ), 0) as product_count,
+          
+          -- Calculate relevance score
           (
             CASE
-              WHEN dll.primary_category = $1 THEN 3  -- Exact primary match
-              WHEN dll.primary_category = ANY($6) THEN 2  -- Store primary in target secondary
-              WHEN $1 = ANY(dll.secondary_categories) THEN 2  -- Target primary in store secondary
-              WHEN $6 && dll.secondary_categories THEN 1  -- Any secondary category overlap
+              WHEN dll.primary_category = $1 THEN 3
+              WHEN dll.primary_category = ANY($6) THEN 2
+              WHEN $1 = ANY(dll.secondary_categories) THEN 2
+              WHEN $6 && dll.secondary_categories THEN 1
               ELSE 0
             END
-          ) as category_score,
+          ) * 2 + -- Category score weighted 2x
           (
             CASE
               WHEN dll.city = $2 AND dll.state = $3 THEN 2
               WHEN dll.state = $3 THEN 1
               ELSE 0
             END
-          ) as location_score,
+          ) + -- Location score 1x
           (
             CASE
               WHEN ABS(dll.rating_avg - $4) < 0.5 THEN 1
               ELSE 0
             END
-          ) as rating_score,
-          (
-            (
-              CASE
-                WHEN dll.primary_category = $1 THEN 3
-                WHEN dll.primary_category = ANY($6) THEN 2
-                WHEN $1 = ANY(dll.secondary_categories) THEN 2
-                WHEN $6 && dll.secondary_categories THEN 1
-                ELSE 0
-              END
-            ) * 2 + -- Category score weighted 2x
-            (
-              CASE
-                WHEN dll.city = $2 AND dll.state = $3 THEN 2
-                WHEN dll.state = $3 THEN 1
-                ELSE 0
-              END
-            ) + -- Location score 1x
-            (
-              CASE
-                WHEN ABS(dll.rating_avg - $4) < 0.5 THEN 1
-                ELSE 0
-              END
-            ) -- Rating score 1x
-          ) as relevance_score
+          ) as relevance_score -- Rating score 1x
+          
         FROM directory_listings_list dll
         INNER JOIN tenants t ON dll.tenant_id = t.id
-        WHERE dll.slug != $5
+        LEFT JOIN directory_category_listings dcl ON dcl.tenant_id = dll.tenant_id AND dcl.is_primary = true
+        WHERE dll.slug::text != $5::text
           AND dll.is_published = true
           AND t.location_status IN ('active', 'inactive', 'closed')
           AND (dll.business_hours IS NULL OR dll.business_hours::text != 'null')
-        ORDER BY relevance_score DESC, dll.rating_avg DESC, dll.product_count DESC
+          AND dcl.logo_url IS NOT NULL
+          AND dcl.logo_url != ''  -- Hard requirement: must have logo
+          AND (
+            SELECT COUNT(*)
+            FROM inventory_items ii
+            WHERE ii.tenant_id = dll.tenant_id
+              AND ii.item_status = 'active'
+              AND ii.visibility = 'public'
+          ) > 0 -- Only stores with actual products
+        ORDER BY relevance_score DESC, dll.rating_avg DESC, product_count DESC
       `;
 
       const fallbackResult = await getDirectPool().query(fallbackQuery, [

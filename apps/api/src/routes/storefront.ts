@@ -45,11 +45,27 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       conditions.push('(COALESCE(array_length(ii.category_path, 1), 0) > 0 OR ii.directory_category_id IS NOT NULL)');
     }
     
-    // Category filter - filter by tenant category slug
+    // Category filter - check BOTH category_path array AND directory_category_id
     if (category && typeof category === 'string') {
-      conditions.push(`$${paramIndex} = ANY(ii.category_path)`);
-      params.push(category);
-      paramIndex++;
+      // First get the category details to match by both slug and ID
+      const categoryQuery = `
+        SELECT id, slug FROM directory_category 
+        WHERE "tenantId" = $1 AND "isActive" = true AND slug = $2
+        LIMIT 1
+      `;
+      const categoryResult = await getDirectPool().query(categoryQuery, [tenantId, category]);
+      
+      if (categoryResult.rows.length > 0) {
+        const cat = categoryResult.rows[0];
+        conditions.push(`($${paramIndex} = ANY(ii.category_path) OR ii.directory_category_id = $${paramIndex + 1})`);
+        params.push(category, cat.id);
+        paramIndex += 2;
+      } else {
+        // Fallback: just check category_path if category not found
+        conditions.push(`$${paramIndex} = ANY(ii.category_path)`);
+        params.push(category);
+        paramIndex++;
+      }
     }
     
     // Search filter (name or SKU)

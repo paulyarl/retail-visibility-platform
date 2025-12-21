@@ -4,6 +4,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { getDirectPool } from '../utils/db-pool';
 import {
   getStoresViewedBySameUsers,
   getPopularStoresInCategory,
@@ -366,7 +367,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
     };
 
     try {
-      // Use directory_category_listings MV for recommendations
+      // Use directory_category_listings MV for recommendations but get REAL product counts
       const relatedQuery = `
         SELECT DISTINCT ON (dcl.tenant_id)
           dcl.tenant_id,
@@ -384,11 +385,20 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           dcl.is_primary,
           dcl.rating_avg,
           dcl.rating_count,
-          dcl.product_count,
           dcl.logo_url,
           dcl.is_featured,
           dll.business_hours,
           t.location_status as tenant_location_status,
+          
+          -- Get ACTUAL product count from inventory_items table
+          COALESCE((
+            SELECT COUNT(*)
+            FROM inventory_items ii
+            WHERE ii.tenant_id = dcl.tenant_id
+              AND ii.item_status = 'active'
+              AND ii.visibility = 'public'
+          ), 0) as actual_product_count,
+          
           (
             (
               CASE
@@ -419,7 +429,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           AND dcl.tenant_exists = true
           AND dcl.is_active_location = true
           AND dcl.is_directory_visible = true
-        ORDER BY dcl.tenant_id, relevance_score DESC, dcl.rating_avg DESC NULLS LAST, dcl.product_count DESC
+        ORDER BY dcl.tenant_id, relevance_score DESC, dcl.rating_avg DESC NULLS LAST, actual_product_count DESC
       `;
 
       const related = await getDirectPool().query(relatedQuery, [
@@ -458,7 +468,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           logoUrl: row.logo_url,
           ratingAvg: row.rating_avg || 0,
           ratingCount: row.rating_count || 0,
-          productCount: row.product_count || 0,
+          productCount: row.actual_product_count || 0, // Use actual count from inventory_items
           businessHours: row.business_hours,
           relevanceScore: row.relevance_score || 0,
           reason: getReasonText(
@@ -479,7 +489,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
     } catch (mvError) {
       console.log(`[Storefront Recommendations] MV approach failed, using fallback:`, mvError);
       
-      // Fallback: Same query structure as main query
+      // Fallback: Same query structure but using actual product counts
       const fallbackQuery = `
         SELECT DISTINCT ON (dcl.tenant_id)
           dcl.tenant_id,
@@ -492,9 +502,18 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           dcl.logo_url,
           dcl.rating_avg,
           dcl.rating_count,
-          dcl.product_count,
           dll.business_hours,
           t.location_status as tenant_location_status,
+          
+          -- Get ACTUAL product count from inventory_items table
+          COALESCE((
+            SELECT COUNT(*)
+            FROM inventory_items ii
+            WHERE ii.tenant_id = dcl.tenant_id
+              AND ii.item_status = 'active'
+              AND ii.visibility = 'public'
+          ), 0) as actual_product_count,
+          
           (
             (
               CASE
@@ -524,7 +543,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           AND dcl.tenant_exists = true
           AND dcl.is_active_location = true
           AND dcl.is_directory_visible = true
-        ORDER BY dcl.tenant_id, relevance_score DESC, dcl.rating_avg DESC NULLS LAST, dcl.product_count DESC
+        ORDER BY dcl.tenant_id, relevance_score DESC, dcl.rating_avg DESC NULLS LAST, actual_product_count DESC
       `;
 
       const fallbackResult = await getDirectPool().query(fallbackQuery, [
@@ -553,7 +572,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           logoUrl: row.logo_url,
           ratingAvg: row.rating_avg || 0,
           ratingCount: row.rating_count || 0,
-          productCount: row.product_count || 0,
+          productCount: row.actual_product_count || 0, // Use actual count from inventory_items
           businessHours: row.business_hours,
           relevanceScore: row.relevance_score || 0,
           reason: getReasonText(
@@ -778,4 +797,146 @@ router.get('/for-directory', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/recommendations/for-product-page/:productId
+ * Get recommended products for a product detail page
+ * Uses scoring algorithm based on category, brand, price, and tenant
+ */
+router.get('/for-product-page/:productId', async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const { limit = 6, userId } = req.query;
+    const limitNum = Math.min(Math.max(Number(limit), 1), 10);
+
+    console.log(`[Product Recommendations] Getting recommendations for product: ${productId}, limit: ${limitNum}`);
+
+    // First get the current product details
+    const currentProductQuery = `
+      SELECT ii.*,
+        ii.tenant_id,
+        ii.category_path,
+        ii.directory_category_id,
+        ii.price_cents,
+        ii.brand,
+        ii.item_status,
+        ii.visibility
+      FROM inventory_items ii
+      WHERE ii.id = $1 AND ii.item_status = 'active' AND ii.visibility = 'public'
+    `;
+
+    const currentProduct = await getDirectPool().query(currentProductQuery, [productId]);
+    if (currentProduct.rows.length === 0) {
+      return res.json({
+        recommendations: [],
+        productId,
+        generatedAt: new Date()
+      });
+    }
+
+    const product = currentProduct.rows[0];
+
+    // Build recommendation scoring query
+    const recommendationsQuery = `
+      SELECT DISTINCT ON (ii.id)
+        ii.id,
+        ii.name,
+        ii.title,
+        ii.price_cents,
+        ii.currency,
+        ii.image_url,
+        ii.brand,
+        ii.category_path,
+        ii.directory_category_id,
+        ii.tenant_id,
+
+        -- Calculate relevance score
+        (
+          -- Same category (highest priority)
+          CASE
+            WHEN ii.category_path && $1 THEN 4
+            WHEN ii.directory_category_id = $2 THEN 3
+            ELSE 0
+          END +
+
+          -- Same brand
+          CASE
+            WHEN LOWER(ii.brand) = LOWER($3) AND ii.brand IS NOT NULL THEN 2
+            ELSE 0
+          END +
+
+          -- Same tenant (other products from same store)
+          CASE
+            WHEN ii.tenant_id = $4 THEN 1
+            ELSE 0
+          END +
+
+          -- Similar price range (±25%)
+          CASE
+            WHEN ii.price_cents BETWEEN ($5 * 0.75) AND ($5 * 1.25) THEN 1
+            ELSE 0
+          END +
+
+          -- Image boost (prioritize products with photos)
+          CASE
+            WHEN ii.image_url IS NOT NULL AND ii.image_url != '' THEN 1.5
+            ELSE 0
+          END
+        ) as relevance_score
+
+      FROM inventory_items ii
+      WHERE ii.id != $6  -- Exclude current product
+        AND ii.item_status = 'active'
+        AND ii.visibility = 'public'
+        AND ii.tenant_id IS NOT NULL
+        AND ii.price_cents > 0
+        AND ii.image_url IS NOT NULL
+        AND ii.image_url != ''  -- Hard requirement: must have photo
+      ORDER BY ii.id, relevance_score DESC, ii.updated_at DESC
+      LIMIT $7
+    `;
+
+    const params = [
+      product.category_path || [],  // $1
+      product.directory_category_id, // $2
+      product.brand, // $3
+      product.tenant_id, // $4
+      product.price_cents, // $5
+      productId, // $6
+      limitNum // $7
+    ];
+
+    const recommendationsResult = await getDirectPool().query(recommendationsQuery, params);
+
+    // Format recommendations for frontend
+    const recommendations = recommendationsResult.rows
+      .filter((row: any) => (row.relevance_score || 0) > 0)
+      .slice(0, limitNum)
+      .map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        title: row.title || row.name,
+        price: row.price_cents ? row.price_cents / 100 : 0,
+        currency: row.currency || 'USD',
+        imageUrl: row.image_url,
+        brand: row.brand,
+        relevanceScore: row.relevance_score || 0,
+        tenantId: row.tenant_id
+      }));
+
+    console.log(`[Product Recommendations] Found ${recommendations.length} recommendations with score > 0`);
+
+    res.json({
+      recommendations,
+      productId,
+      generatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('Error getting product recommendations:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get product recommendations'
+    });
+  }
+});
 export default router;

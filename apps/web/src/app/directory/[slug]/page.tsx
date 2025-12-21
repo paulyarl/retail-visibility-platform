@@ -584,18 +584,6 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   </div>
                 </div>
               )}
-
-              {/* Business Hours - Moved from right sidebar for balance */}
-              {businessProfile?.hours && (
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                    Hours
-                  </h2>
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <BusinessHoursDisplay businessHours={businessProfile.hours} />
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Middle Column - Store Info */}
@@ -810,6 +798,18 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   )}
                 </div>
               </div>
+
+              {/* Business Hours - Moved from left sidebar for mobile UX */}
+              {businessProfile?.hours && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    Hours
+                  </h2>
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <BusinessHoursDisplay businessHours={businessProfile.hours} />
+                  </div>
+                </div>
+              )}
 
               {/* Map Location */}
               {listing.address && (

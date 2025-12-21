@@ -260,11 +260,14 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const businessName = tenant.metadata?.businessName || tenant.name;
   const totalPages = Math.ceil(total / limit);
 
+  // API base URL for additional calls
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+
   // Fetch directory publish status
   let directoryPublished = false;
   const tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
   try {
-    const directoryRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/directory/${tenantSlug}`, {
+    const directoryRes = await fetch(`${apiBaseUrl}/api/directory/${tenantSlug}`, {
       cache: 'no-store',
     });
     if (directoryRes.ok) {
@@ -283,9 +286,21 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const primaryGBPCategory = tenant.metadata?.gbp_categories?.primary || tenant.metadata?.gbpCategories?.primary;
   const secondaryGBPCategories = tenant.metadata?.gbp_categories?.secondary || tenant.metadata?.gbpCategories?.secondary || [];
   
-  // Calculate total products - use API total as the authoritative count
-  // This includes both categorized and uncategorized products
-  const totalAllProducts = total || 0;
+  // Fetch total product count for "All Products" (always unfiltered)
+  let totalAllProducts = 0;
+  try {
+    const totalProductsRes = await fetch(`${apiBaseUrl}/api/storefront/${id}/products?page=1&limit=1`, {
+      cache: 'no-store',
+    });
+    if (totalProductsRes.ok) {
+      const totalData = await totalProductsRes.json();
+      totalAllProducts = totalData.pagination?.totalItems || 0;
+    }
+  } catch (e) {
+    console.error('Failed to fetch total product count:', e);
+    // Fallback to current total if available
+    totalAllProducts = total || 0;
+  }
   
   // Get tier features for footer
   const tier = tenant.subscriptionTier || 'trial';
@@ -690,6 +705,233 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         </div>
       </div>
 
+      {/* Contact Information and Business Hours */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Contact Information */}
+        <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 md:border-b-0">
+          <div className="max-w-3xl">
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">
+              Contact Information
+            </h2>
+
+            {/* Contact Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Phone */}
+              {tenant.metadata?.phone && (
+                <div className="flex items-center gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                  <svg className="h-6 w-6 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900 dark:text-white">Phone</p>
+                    <a href={`tel:${tenant.metadata.phone}`} className="text-lg text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                      {tenant.metadata.phone}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Email */}
+              {tenant.metadata?.email && (
+                <div className="flex items-center gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                  <svg className="h-6 w-6 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900 dark:text-white">Email</p>
+                    <a
+                      href={`mailto:${tenant.metadata.email}`}
+                      className="text-lg text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                      suppressHydrationWarning={true}
+                    >
+                      {tenant.metadata.email}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Address */}
+              {tenant.metadata?.address && (
+                <div className="flex items-start gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700 md:col-span-2">
+                  <svg className="h-6 w-6 text-neutral-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900 dark:text-white">Address</p>
+                    <p className="text-lg text-neutral-700 dark:text-neutral-300">{tenant.metadata.address}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Business Description */}
+            {tenant.metadata?.business_description && (
+              <div className="mt-8 p-6 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
+                  <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  About This Business
+                </h3>
+                <div className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                  {(() => {
+                    const description = tenant.metadata.business_description || '';
+                    // Split by lines and process each line
+                    const lines = description.split('\n');
+                    return lines.map((line: string, index: number) => {
+                      // Check if line contains email pattern
+                      const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+                      // Check if line contains URL pattern
+                      const urlRegex = /\bhttps?:\/\/[^\s]+/g;
+
+                      let processedLine = line;
+
+                      // Replace emails with mailto links
+                      processedLine = processedLine.replace(emailRegex, (email: string) => {
+                        return `<a href="mailto:${email}" class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">${email}</a>`;
+                      });
+
+                      // Replace URLs with links
+                      processedLine = processedLine.replace(urlRegex, (url: string) => {
+                        return `<a href="${url}" class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">${url}</a>`;
+                      });
+
+                      return (
+                        <div key={index} dangerouslySetInnerHTML={{ __html: processedLine || '<br/>' }} />
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Business Hours */}
+        {businessHours && (
+          <div className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-700 md:border-b-0">
+            <div className="max-w-4xl">
+              <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">
+                Business Hours
+              </h2>
+              <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
+                    const dayHours = businessHours[day];
+                    const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
+                    const formatTime = (time24: string): string => {
+                      if (!time24) return "";
+                      const [h, m] = time24.split(":").map(Number);
+                      const period = h >= 12 ? "PM" : "AM";
+                      const hour12 = h % 12 || 12;
+                      return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+                    };
+                    return (
+                      <div
+                        key={day}
+                        className={`flex items-center justify-between p-3 rounded-lg border ${
+                          isToday
+                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                            : 'bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`font-medium ${isToday ? 'text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'}`}>
+                            {day}
+                          </span>
+                          {isToday && <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">Today</span>}
+                        </div>
+                        <div className={`text-right ${
+                          isToday
+                            ? 'text-blue-700 dark:text-blue-300'
+                            : dayHours ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-500 dark:text-neutral-400'
+                        }`}>
+                          {dayHours ? (
+                            <div className="text-sm">
+                              <div>{formatTime(dayHours.open)}</div>
+                              <div>{formatTime(dayHours.close)}</div>
+                            </div>
+                          ) : (
+                            <span className="text-sm">Closed</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Special Hours - Today & Upcoming */}
+                {(() => {
+                  const specialHours = getTodaySpecialHours(businessHours);
+                  if (specialHours.length === 0) return null;
+
+                  const todayHours = specialHours.filter(sh => sh.label === 'today');
+                  const upcomingHours = specialHours.filter(sh => sh.label === 'upcoming');
+
+                  const formatTime = (time24: string): string => {
+                    if (!time24) return "";
+                    const [h, m] = time24.split(":").map(Number);
+                    const period = h >= 12 ? "PM" : "AM";
+                    const hour12 = h % 12 || 12;
+                    return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+                  };
+
+                  const formatDate = (dateStr: string): string => {
+                    const date = new Date(dateStr + 'T00:00:00');
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  };
+
+                  return (
+                    <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
+                      <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
+                        <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                        Special Hours
+                      </h3>
+                      <div className="space-y-3">
+                        {/* Today's Special Hours */}
+                        {todayHours.map((sh, idx) => (
+                          <div key={`today-${sh.date}-${idx}`} className="flex flex-col gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <div className="flex justify-between items-start">
+                              <span className="font-medium text-amber-900 dark:text-amber-100">Today</span>
+                              <span className="text-amber-800 dark:text-amber-200">
+                                {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
+                              </span>
+                            </div>
+                            {sh.note && (
+                              <span className="text-sm text-amber-700 dark:text-amber-300 italic">{sh.note}</span>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Upcoming Special Hours */}
+                        {upcomingHours.map((sh, idx) => (
+                          <div key={`upcoming-${sh.date}-${idx}`} className="flex flex-col gap-2 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <div className="flex justify-between items-start">
+                              <span className="font-medium text-blue-900 dark:text-blue-100">
+                                {formatDate(sh.date)} {sh.daysAway && `(in ${sh.daysAway} day${sh.daysAway > 1 ? 's' : ''})`}
+                              </span>
+                              <span className="text-blue-800 dark:text-blue-200">
+                                {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
+                              </span>
+                            </div>
+                            {sh.note && (
+                              <span className="text-sm text-blue-700 dark:text-blue-300 italic">{sh.note}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Map Section - How to Get There */}
       {tenant.metadata?.address && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -703,204 +945,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
       {/* Tier-Based Footer */}
       <footer className="bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Business Info & Contact */}
-            <div>
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                {businessName}
-              </h3>
-              
-              {/* Contact Information */}
-              <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
-                  <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Contact Information
-                </h4>
-                <div className="space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
-                {/* Phone */}
-                {tenant.metadata?.phone && (
-                  <p className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    <a href={`tel:${tenant.metadata.phone}`} className="hover:underline">
-                      {tenant.metadata.phone}
-                    </a>
-                  </p>
-                )}
-
-                {/* Email */}
-                {tenant.metadata?.email && (
-                  <p className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <a 
-                      href={`mailto:${tenant.metadata.email}`} 
-                      className="hover:underline"
-                      suppressHydrationWarning={true}
-                    >
-                      {tenant.metadata.email}
-                    </a>
-                  </p>
-                )}
-
-                {/* Address - Required for NAP */}
-                {tenant.metadata?.address && (
-                  <p className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span>{tenant.metadata.address}</span>
-                  </p>
-                )}
-                </div>
-              </div>
-
-              {/* Business Description */}
-              {tenant.metadata?.business_description && (
-                <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700 mt-4">
-                  <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
-                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    About Us
-                  </h4>
-                  <div className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                    {tenant.metadata.business_description}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Business Hours - Own Column */}
-            {businessHours && (
-              <div>
-                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                  Hours
-                </h3>
-                <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                  <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
-                      <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Business Hours
-                    </h4>
-                    <div className="space-y-0">
-                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-                        const dayHours = businessHours[day];
-                        const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
-                        const formatTime = (time24: string): string => {
-                          if (!time24) return "";
-                          const [h, m] = time24.split(":").map(Number);
-                          const period = h >= 12 ? "PM" : "AM";
-                          const hour12 = h % 12 || 12;
-                          return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
-                        };
-                        return (
-                          <div 
-                            key={day} 
-                            className={`flex items-start justify-between py-2.5 px-3 border-b border-neutral-100 dark:border-neutral-700 last:border-b-0 ${
-                              isToday ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm font-medium ${isToday ? 'text-blue-700 dark:text-blue-400' : 'text-neutral-800 dark:text-neutral-200'}`}>
-                                {day}
-                              </span>
-                              {isToday && <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded">Today</span>}
-                            </div>
-                            <div className={`text-right text-xs ${
-                              isToday 
-                                ? 'text-blue-600 dark:text-blue-400' 
-                                : dayHours ? 'text-neutral-500 dark:text-neutral-400' : 'text-neutral-400 dark:text-neutral-500'
-                            }`}>
-                              {dayHours ? (
-                                <div className="flex flex-col">
-                                  <span>{formatTime(dayHours.open)}</span>
-                                  <span>{formatTime(dayHours.close)}</span>
-                                </div>
-                              ) : (
-                                <span>Closed</span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Special Hours - Today & Upcoming */}
-                    {(() => {
-                      const specialHours = getTodaySpecialHours(businessHours);
-                      if (specialHours.length === 0) return null;
-                      
-                      const todayHours = specialHours.filter(sh => sh.label === 'today');
-                      const upcomingHours = specialHours.filter(sh => sh.label === 'upcoming');
-                      
-                      const formatTime = (time24: string): string => {
-                        if (!time24) return "";
-                        const [h, m] = time24.split(":").map(Number);
-                        const period = h >= 12 ? "PM" : "AM";
-                        const hour12 = h % 12 || 12;
-                        return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
-                      };
-                      
-                      const formatDate = (dateStr: string): string => {
-                        const date = new Date(dateStr + 'T00:00:00');
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                      };
-                      
-                      return (
-                        <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
-                          <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
-                            <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                            </svg>
-                            Special Hours
-                          </h4>
-                          <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
-                            {/* Today's Special Hours */}
-                            {todayHours.map((sh, idx) => (
-                              <div key={`today-${sh.date}-${idx}`} className="flex flex-col gap-1 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
-                                <div className="flex justify-between items-start">
-                                  <span className="font-medium text-amber-900 dark:text-amber-100">Today</span>
-                                  <span className="text-amber-800 dark:text-amber-200">
-                                    {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
-                                  </span>
-                                </div>
-                                {sh.note && (
-                                  <span className="text-xs text-amber-700 dark:text-amber-300 italic">{sh.note}</span>
-                                )}
-                              </div>
-                            ))}
-                            
-                            {/* Upcoming Special Hours */}
-                            {upcomingHours.map((sh, idx) => (
-                              <div key={`upcoming-${sh.date}-${idx}`} className="flex flex-col gap-1 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                                <div className="flex justify-between items-start">
-                                  <span className="font-medium text-blue-900 dark:text-blue-100">
-                                    {formatDate(sh.date)} {sh.daysAway && `(in ${sh.daysAway} day${sh.daysAway > 1 ? 's' : ''})`}
-                                  </span>
-                                  <span className="text-blue-800 dark:text-blue-200">
-                                    {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
-                                  </span>
-                                </div>
-                                {sh.note && (
-                                  <span className="text-xs text-blue-700 dark:text-blue-300 italic">{sh.note}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                </div>
-              </div>
-            )}
-
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Quick Links */}
             <div>
               <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
@@ -951,7 +996,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                             title="Instagram"
                           >
                             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.162c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
                             </svg>
                           </a>
                         )}
@@ -986,7 +1031,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                   ) : null}
                 </div>
               </div>
-              
+
             </div>
 
             {/* Store Location Map */}

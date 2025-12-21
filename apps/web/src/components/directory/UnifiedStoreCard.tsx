@@ -303,18 +303,19 @@ export function UnifiedStoreCard({
 
           {/* Footer with reason badge and business hours status */}
           <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
-            {listing.reason ? (
-              <Badge variant="default" className="text-xs bg-green-50 dark:bg-green-900/20 text-green-600 border-green-200 dark:border-green-800">
-                {listing.reason}
-              </Badge>
-            ) : (
-              <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                <Package className="w-4 h-4 mr-1" />
-                <span>
-                  {listing.productCount !== undefined ? `${listing.productCount} products` : 'Products available'}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {listing.reason && (
+                <Badge variant="default" className="text-xs bg-green-50 dark:bg-green-900/20 text-green-600 border-green-200 dark:border-green-800">
+                  {listing.reason}
+                </Badge>
+              )}
+              {listing.productCount !== undefined && listing.productCount > 0 && (
+                <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                  <Package className="w-4 h-4 mr-1" />
+                  <span>{listing.productCount} products</span>
+                </div>
+              )}
+            </div>
 
             {hoursStatus && (
               <div 
