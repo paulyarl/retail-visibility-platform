@@ -256,13 +256,12 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
     // This handles products that use either method of category assignment
     const query = `
       SELECT
-        dc.id as category_id,
         dc.name as category_name,
         dc.slug as category_slug,
         dc."googleCategoryId" as google_category_id,
-        COUNT(ii.id) as count,
-        COUNT(ii.id) FILTER (WHERE ii.image_url IS NOT NULL) as products_with_images,
-        COUNT(ii.id) FILTER (WHERE ii.description IS NOT NULL OR ii.marketing_description IS NOT NULL) as products_with_descriptions,
+        COUNT(DISTINCT ii.id) as count,
+        COUNT(DISTINCT ii.id) FILTER (WHERE ii.image_url IS NOT NULL) as products_with_images,
+        COUNT(DISTINCT ii.id) FILTER (WHERE ii.description IS NOT NULL OR ii.marketing_description IS NOT NULL) as products_with_descriptions,
         AVG(ii.price_cents) as avg_price_cents,
         MIN(ii.price_cents) as min_price_cents,
         MAX(ii.price_cents) as max_price_cents
@@ -275,8 +274,8 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
         AND ii.visibility = 'public'
       WHERE dc."tenantId" = $1
         AND dc."isActive" = true
-      GROUP BY dc.id, dc.name, dc.slug, dc."googleCategoryId"
-      HAVING COUNT(ii.id) > 0
+      GROUP BY dc.name, dc.slug, dc."googleCategoryId"
+      HAVING COUNT(DISTINCT ii.id) > 0
       ORDER BY dc.name ASC
     `;
     
@@ -305,7 +304,7 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       
       if (!categoryMap.has(key)) {
         categoryMap.set(key, {
-          id: row.category_id,
+          id: row.category_slug, // Use slug as ID since names can be duplicate
           name: row.category_name,
           slug: row.category_slug,
           googleCategoryId: row.google_category_id,

@@ -11,6 +11,7 @@ import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
 import BusinessHoursDisplay from '@/components/shared/BusinessHoursDisplay';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import { computeStoreStatus } from '@/lib/hours-utils';
+import StoreDirectoryCategories from '@/components/directory/StoreDirectoryCategories';
 
 interface StoreDetailPageProps {
   params: {
@@ -451,6 +452,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   const [
     gbpCategoryCounts,
     directoryCategoryCountsMap,
+    storefrontCategories,
     businessProfile,
     featuredProducts,
     relatedProducts,
@@ -458,6 +460,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   ] = await Promise.all([
     getGbpCategoryCounts(),
     getDirectoryCategoryCountsMap(),
+    getStorefrontCategories(listing.tenant_id),
     getBusinessProfile(listing.tenant_id),
     getFeaturedProducts(listing.tenant_id, 6),
     primaryCategory ? getRelatedProducts(primaryCategory.slug, listing.tenant_id, 6) : Promise.resolve([]),
@@ -542,45 +545,42 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left Sidebar - Store Type Categories & Hours */}
+            {/* Left Sidebar - Store Product Categories & Hours */}
             <div className="lg:col-span-3 space-y-6">
-              {/* Directory Categories - Owner's Intentional Assignments */}
-              {storeDirectoryCategories.length > 0 && (
+              {/* Storefront Product Categories - Accurate product counts */}
+              {storefrontCategories.categories.length > 0 && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                    Store Categories
+                    Product Categories
                   </h2>
                   <p className="text-sm text-gray-600 mb-4">
-                    Business types this store is listed under
+                    Browse products by category
                   </p>
                   {/* Enclosed Style Container */}
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="space-y-2">
-                      {storeDirectoryCategories.map((category: any) => {
-                        const count = directoryCategoryCountsMap[category.name] || 0;
-                        return (
-                          <Link
-                            key={category.slug}
-                            href={`/directory/categories/${category.slug}`}
-                            className="flex items-center justify-between p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all"
-                          >
-                            <div className="flex items-center gap-2 flex-1">
-                              <span className="text-sm text-gray-700 font-medium">
-                                {category.name}
-                              </span>
-                              {category.isPrimary && (
-                                <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full font-medium">
-                                  Primary
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                              {count} stores
-                            </span>
-                          </Link>
-                        );
-                      })}
-                    </div>
+                    <nav className="space-y-1">
+                      {/* All Products */}
+                      <Link
+                        href={`/tenant/${listing.tenant_id}`}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all"
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-sm text-gray-700 font-medium">
+                            All Products
+                          </span>
+                        </div>
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                          {storefrontCategories.categories.reduce((sum: number, cat: any) => sum + (cat.count || 0), 0) + storefrontCategories.uncategorizedCount} products
+                        </span>
+                      </Link>
+
+                      {/* Individual Categories - with collapsing */}
+                      <StoreDirectoryCategories
+                        categories={storefrontCategories.categories}
+                        tenantId={listing.tenant_id}
+                        uncategorizedCount={storefrontCategories.uncategorizedCount}
+                      />
+                    </nav>
                   </div>
                 </div>
               )}
@@ -643,10 +643,15 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                       </div>
                     )}
                 
-                    {listing.product_count > 0 && (
-                      <p className="text-gray-600 mt-3">
-                        {listing.product_count} products available
-                      </p>
+                    {storefrontCategories.categories.length > 0 && (
+                      <div className="mt-4">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200">
+                          <svg className="w-4 h-4 mr-1.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          {storefrontCategories.categories.reduce((sum: number, cat: any) => sum + (cat.count || 0), 0) + storefrontCategories.uncategorizedCount} products available
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>

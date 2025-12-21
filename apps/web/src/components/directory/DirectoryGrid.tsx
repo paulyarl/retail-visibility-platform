@@ -28,6 +28,7 @@ interface DirectoryListing {
   isFeatured?: boolean;
   subscriptionTier?: string;
   directoryPublished?: boolean;
+  businessHours?: any; // Business hours for status indicator
 }
 
 interface Pagination {

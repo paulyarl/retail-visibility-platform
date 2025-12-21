@@ -40,7 +40,6 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       // Try using the correct materialized view with proper refresh triggers
       const relatedQuery = `
         SELECT DISTINCT ON (dcp.category_id, dcp.tenant_id)
-          -- Use directory_category_products MV which has proper refresh triggers
           dcp.tenant_id,
           dcp.category_id,
           dcp.category_name,
@@ -53,10 +52,11 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
           dcp.longitude,
           dcp.rating_avg,
           dcp.rating_count,
-          dcp.actual_product_count as product_count,  -- Use actual count from inventory_items
+          dcp.actual_product_count as product_count,
           dcp.is_featured,
           dcp.subscription_tier,
           dcp.is_published as isPublished,
+          dcp.quality_score,
           
           -- Calculate relevance score based on category match, location, rating
           (
@@ -153,7 +153,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
           subscription_tier: row.subscription_tier || 'trial',
           useCustomWebsite: false, // Not in this MV
           isPublished: row.ispublished || true,
-          businessHours: null, // Not in this MV
+          businessHours: row.business_hours,
           relevanceScore: row.relevance_score || 0,
           createdAt: null, // Not in this MV
           updatedAt: null, // Not in this MV

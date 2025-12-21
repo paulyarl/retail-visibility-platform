@@ -15,15 +15,12 @@ interface QRCodeGeneratorProps {
 }
 
 export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUrl }: QRCodeGeneratorProps) {
-  console.log('[QRCodeGenerator] Function called with props:', { url, productName, size, tenantId });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
   const { tier, loading: tierLoading, canAccess } = useTenantTier(tenantId);
   const tierId = tier?.effective?.id || null;
   const hasQRAccess = canAccess('qr_codes', 'canView');
-  
-  console.log('[QR Generator] Received tier:', tier, 'tierId:', tierId, 'hasQRAccess:', hasQRAccess);
   
   // Logo overlay function for enterprise tier
   const overlayLogoOnQR = async (qrCanvas: HTMLCanvasElement, logoSrc: string): Promise<HTMLCanvasElement> => {
@@ -80,6 +77,7 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
     switch (tier) {
       case 'enterprise':
       case 'organization':
+      case 'chain_enterprise': // Chain enterprise gets same features as individual enterprise
         return {
           enabled: true,
           maxResolution: 1024,
@@ -92,11 +90,12 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
           dynamicQR: true
         };
       case 'professional':
+      case 'chain_professional': // Chain professional gets same features as individual professional
         return {
           enabled: true,
           maxResolution: 1024,
           customColors: true,
-          customLogo: true, // Enable logo for professional tier
+          customLogo: true, // Enable logo for professional tier (both individual and chain)
           bulkDownload: true,
           analytics: false,
           printTemplates: true,
@@ -104,6 +103,7 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
           dynamicQR: false
         };
       case 'starter':
+      case 'chain_starter': // Chain starter gets same features as individual starter
       default:
         return {
           enabled: true,
@@ -120,9 +120,6 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
   };
   
   const features = getQRFeatures(tierId);
-  console.log('[QR Generator] Features:', features);
-  console.log('[QR Generator] Custom colors enabled:', features.customColors);
-  console.log('[QR Generator] Bulk download enabled:', features.bulkDownload);
 
   useEffect(() => {
     const generateQR = async () => {

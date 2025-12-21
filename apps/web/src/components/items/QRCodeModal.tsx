@@ -34,21 +34,20 @@ export function QRCodeModal(props: QRCodeModalProps) {
           const effectiveTierId = tierData.effective?.id || tierData.tier;
           setTierId(effectiveTierId);
           
-          console.log('[QRCodeModal] Tier fetched:', effectiveTierId);
-          
           // Fetch logo if professional or above
-          if (effectiveTierId === 'enterprise' || effectiveTierId === 'organization' || effectiveTierId === 'professional') {
+          if (effectiveTierId === 'enterprise' || effectiveTierId === 'organization' || effectiveTierId === 'chain_enterprise' || effectiveTierId === 'professional' || effectiveTierId === 'chain_professional') {
             try {
               const profileResponse = await fetch(`/api/tenants/${actualTenantId}/profile`);
               if (profileResponse.ok) {
                 const profile = await profileResponse.json();
                 setTenantLogo(profile.logo_url || null);
-                console.log('[QRCodeModal] Logo fetched:', profile.logo_url);
               }
             } catch (error) {
               console.warn('Failed to fetch tenant logo:', error);
             }
           }
+        } else {
+          console.error('[QRCodeModal] Error fetching tier:', tierResponse.status);
         }
       } catch (error) {
         console.error('[QRCodeModal] Error fetching tier:', error);

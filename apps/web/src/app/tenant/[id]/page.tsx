@@ -706,16 +706,17 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
       </div>
 
       {/* Contact Information and Business Hours */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 md:gap-8 xl:gap-4 2xl:gap-2">
         {/* Contact Information */}
-        <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 md:border-b-0">
-          <div className="max-w-3xl">
-            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">
+        <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 md:border-b-0 md:ml-auto md:max-w-md xl:max-w-lg 2xl:max-w-xl">
+          <div className="max-w-4xl">
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6 text-center">
               Contact Information
             </h2>
 
-            {/* Contact Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Contact Details Container - Match Business Hours Styling */}
+            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Phone */}
               {tenant.metadata?.phone && (
                 <div className="flex items-center gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
@@ -739,11 +740,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                   </svg>
                   <div>
                     <p className="text-sm font-medium text-neutral-900 dark:text-white">Email</p>
-                    <a
-                      href={`mailto:${tenant.metadata.email}`}
-                      className="text-lg text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                      suppressHydrationWarning={true}
-                    >
+                    <a href={`mailto:${tenant.metadata.email}`} className="text-lg text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 break-words">
                       {tenant.metadata.email}
                     </a>
                   </div>
@@ -763,6 +760,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
                   </div>
                 </div>
               )}
+            </div>
             </div>
 
             {/* Business Description */}
@@ -812,7 +810,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         {businessHours && (
           <div className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-700 md:border-b-0">
             <div className="max-w-4xl">
-              <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">
+              <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6 text-center">
                 Business Hours
               </h2>
               <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">

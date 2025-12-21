@@ -228,16 +228,16 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
   if (loading) {
     return (
       <div className={`animate-pulse ${className}`}>
-        <div className="h-4 bg-gray-200 rounded w-32"></div>
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
       </div>
     );
   }
 
   if (!summary || summary.rating_count === 0) {
     return (
-      <div className={`text-gray-500 ${className}`}>
+      <div className={`text-gray-500 dark:text-gray-400 ${className}`}>
         <div className="flex items-center gap-2">
-          <Star className="w-4 h-4 text-gray-300" />
+          <Star className="w-4 h-4 text-gray-300 dark:text-gray-600" />
           <span className="text-sm">No reviews yet</span>
           {showWriteReview && (
             isAuthenticated ? (
@@ -276,7 +276,7 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
           <div>
             <div className="text-3xl font-bold">{summary.rating_avg.toFixed(1)}</div>
             {renderStars(Math.round(summary.rating_avg), 'lg')}
-            <div className="text-sm text-gray-500 mt-1">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {summary.rating_count} reviews
             </div>
           </div>
@@ -299,7 +299,7 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
                       style={{ width: `${percentage}%` }}
                     />
                   </div>
-                  <div className="text-sm text-gray-500 w-8 text-right">
+                  <div className="text-sm text-gray-500 dark:text-gray-400 w-8 text-right">
                     {count}
                   </div>
                 </div>
@@ -329,7 +329,7 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
 
       {/* Verified Purchase Badge */}
       {summary.verified_purchase_count > 0 && (
-        <div className="flex items-center gap-2 text-sm text-green-600">
+        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
           <Shield className="w-4 h-4" />
           <span>{summary.verified_purchase_count} verified purchases</span>
         </div>
@@ -337,27 +337,27 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
 
       {/* Reviews List */}
       {showReviews && (
-        <div className="space-y-4 border-t pt-4">
-          <h3 className="font-semibold text-lg">Customer Reviews</h3>
+        <div className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+          <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Customer Reviews</h3>
           
           {reviews.length === 0 ? (
-            <p className="text-gray-500">No reviews yet.</p>
+            <p className="text-gray-500 dark:text-gray-400">No reviews yet.</p>
           ) : (
             <div className="space-y-4">
               {reviews.map((review) => (
-                <div key={review.id} className="border rounded-lg p-4">
+                <div key={review.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                        <User className="w-4 h-4 text-gray-500" />
+                      <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                       </div>
                       <div>
                         <div className="font-medium">{getUserName(review)}</div>
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                           {renderStars(review.rating, 'sm')}
                           <span>{formatDate(review.created_at)}</span>
                           {review.verified_purchase && (
-                            <div className="flex items-center gap-1 text-green-600">
+                            <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                               <Shield className="w-3 h-3" />
                               <span className="text-xs">Verified</span>
                             </div>
@@ -368,7 +368,7 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
                   </div>
                   
                   {review.review_text && (
-                    <p className="text-gray-700 mb-3">{review.review_text}</p>
+                    <p className="text-gray-700 dark:text-gray-300 mb-3">{review.review_text}</p>
                   )}
                   
                   <div className="flex items-center gap-4">
@@ -377,16 +377,16 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
                         onClick={() => handleHelpfulVote(review.id, true)}
                         className={`flex items-center gap-1 text-sm ${
                           review.user_vote === true
-                            ? 'text-blue-600'
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'text-blue-600 dark:text-blue-400'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                         }`}
                       >
                         <ThumbsUp className="w-3 h-3" />
                         Helpful ({review.helpful_count})
                       </button>
                     ) : (
-                      <span className="text-gray-400 text-sm">
-                        <a href="/login" className="text-blue-600 hover:text-blue-700">Login</a> to vote
+                      <span className="text-gray-400 dark:text-gray-500 text-sm">
+                        <a href="/login" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Login</a> to vote
                       </span>
                     )}
                   </div>

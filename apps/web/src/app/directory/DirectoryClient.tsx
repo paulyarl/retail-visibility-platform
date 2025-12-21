@@ -139,6 +139,7 @@ interface DirectoryListing {
   website?: string;
   distance?: number;
   isOpen?: boolean;
+  businessHours?: any; // Business hours for status indicator
 }
 
 interface DirectoryResponse {

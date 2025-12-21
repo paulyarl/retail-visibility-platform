@@ -1,9 +1,12 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent } from '@/components/ui/Card';
 import { MapPin, Star, Package, ExternalLink } from 'lucide-react';
+import { computeStoreStatus } from '@/lib/hours-utils';
 
 export interface DirectoryListing {
   id: string;
@@ -53,61 +56,6 @@ function parseTimeToMinutes(time: string): number | null {
   return h * 60 + m;
 }
 
-function computeStoreStatus(hours: any): { isOpen: boolean } | null {
-  if (!hours || typeof hours !== 'object') return null;
-  const now = new Date();
-  const locale = 'en-US';
-  const timeZone: string | undefined = typeof hours.timezone === 'string' ? hours.timezone : undefined;
-  const weekday = (d: Date) => d.toLocaleDateString(locale, { weekday: 'long', timeZone });
-  const todayName = weekday(now);
-  
-  // Check for special hours
-  const todayDate = now.toLocaleDateString('en-CA', { timeZone });
-  const specialHours = hours.special as any[] | undefined;
-  const todaySpecials = specialHours?.filter((sh: any) => sh.date === todayDate) || [];
-  
-  // If any special hour is marked as closed, the store is closed
-  const closedSpecial = todaySpecials.find((sh: any) => sh.isClosed);
-  if (closedSpecial) {
-    return { isOpen: false };
-  }
-  
-  const regularToday = (hours as any)[todayName];
-  
-  // Compute current time in target timezone
-  const fmt = new Intl.DateTimeFormat('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone });
-  const parts = fmt.formatToParts(now);
-  const hh = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
-  const mm = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
-  const currentMins = hh * 60 + mm;
-
-  const parseRange = (entry: any): { openM: number; closeM: number } | null => {
-    if (!entry) return null;
-    const openStr = entry.open || entry.start || entry.from;
-    const closeStr = entry.close || entry.end || entry.to;
-    const o = parseTimeToMinutes(openStr);
-    const c = parseTimeToMinutes(closeStr);
-    if (o == null || c == null) return null;
-    return { openM: o, closeM: c };
-  };
-
-  // Check regular hours
-  const regularRange = parseRange(regularToday);
-  if (regularRange && currentMins >= regularRange.openM && currentMins < regularRange.closeM) {
-    return { isOpen: true };
-  }
-  
-  // Check special hours
-  const specialRanges = todaySpecials.map(sp => parseRange(sp)).filter(r => r !== null);
-  for (const range of specialRanges) {
-    if (range && currentMins >= range.openM && currentMins < range.closeM) {
-      return { isOpen: true };
-    }
-  }
-  
-  return { isOpen: false };
-}
-
 export function UnifiedStoreCard({
   listing,
   viewMode,
@@ -115,14 +63,51 @@ export function UnifiedStoreCard({
   linkType = 'directory',
   className = ''
 }: UnifiedStoreCardProps) {
+  const [businessHours, setBusinessHours] = useState<any>(null); // Start with null to always fetch
+
+  // Debug logging for business hours
+  useEffect(() => {
+    console.log(`[UnifiedStoreCard] ${listing.businessName} - Initial businessHours from API:`, listing.businessHours);
+  }, [listing.businessName, listing.businessHours]);
+
+  // Always fetch fresh business hours from tenant profile API for accurate data
+  useEffect(() => {
+    if (listing.tenantId) {
+      console.log(`[UnifiedStoreCard] ${listing.businessName} - Fetching fresh business hours from tenant profile...`);
+      const fetchBusinessHours = async () => {
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+          const response = await fetch(`${apiUrl}/public/tenant/${listing.tenantId}/profile`);
+          
+          if (response.ok) {
+            const profile = await response.json();
+            console.log(`[UnifiedStoreCard] ${listing.businessName} - Fresh API response:`, profile.hours);
+            if (profile.hours) {
+              setBusinessHours(profile.hours);
+            }
+          } else {
+            console.log(`[UnifiedStoreCard] ${listing.businessName} - API fetch failed:`, response.status);
+          }
+        } catch (error) {
+          console.error(`[UnifiedStoreCard] ${listing.businessName} - Error fetching business hours:`, error);
+        }
+      };
+      
+      fetchBusinessHours();
+    }
+  }, [listing.tenantId, listing.businessName]);
+
+  // Compute business hours status
+  const hoursStatus = businessHours ? computeStoreStatus(businessHours) : null;
+  
+  useEffect(() => {
+    console.log(`[UnifiedStoreCard] ${listing.businessName} - Final hoursStatus:`, hoursStatus);
+  }, [listing.businessName, hoursStatus]);
 
   // Determine link destination based on linkType
   const linkHref = linkType === 'storefront' 
     ? `/tenant/${listing.tenantId}`
     : `/directory/${listing.slug || listing.tenantId}`;
-
-  // Compute business hours status
-  const hoursStatus = listing.businessHours ? computeStoreStatus(listing.businessHours) : null;
 
   // Prioritize category display: contextCategory → gbpPrimaryCategoryName → primaryCategory → category.name
   const displayCategory =
