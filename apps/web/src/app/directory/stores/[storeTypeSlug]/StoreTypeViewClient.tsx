@@ -188,6 +188,7 @@ export default function StoreTypeViewClient({
             isFeatured: store.isFeatured || false,
             subscriptionTier: store.subscriptionTier || 'trial',
             useCustomWebsite: store.useCustomWebsite || false,
+            businessHours: store.businessHours,
           })),
           pagination: {
             page: 1,

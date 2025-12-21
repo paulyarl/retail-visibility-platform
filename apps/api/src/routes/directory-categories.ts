@@ -20,7 +20,7 @@ router.get('/categories', async (req: Request, res: Response) => {
     const { lat, lng, radius } = req.query;
 
     // Query platform_categories directly to get ALL available categories
-    // Use directory_category_products for store/product counts since stats view is empty
+    // Use directory_category_products for store/product counts
     const result = await getDirectPool().query(`
       SELECT 
         pc.id,

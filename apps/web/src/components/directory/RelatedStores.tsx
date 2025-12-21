@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import StoreCard from './StoreCard';
+import { UnifiedStoreCard } from './UnifiedStoreCard';
 import { Skeleton } from '@/components/ui';
 
 interface RelatedStore {
@@ -22,6 +22,7 @@ interface RelatedStore {
   subscriptionTier: string;
   useCustomWebsite: boolean;
   website?: string;
+  businessHours?: any;
 }
 
 interface RelatedStoresProps {
@@ -72,6 +73,7 @@ export default function RelatedStores({
           subscriptionTier: store.subscriptionTier || store.subscription_tier || 'trial',
           useCustomWebsite: store.useCustomWebsite || store.use_custom_website || false,
           website: store.website,
+          businessHours: store.businessHours || store.business_hours,
           directoryPublished: store.isPublished !== false, // Published stores from related API are in directory
         }));
         setStores(mappedStores);
@@ -119,10 +121,11 @@ export default function RelatedStores({
           // Store grid
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stores.map((store, index) => (
-              <StoreCard
+              <UnifiedStoreCard
                 key={store.id}
                 listing={store}
-                index={index}
+                viewMode="grid"
+                linkType="directory"
               />
             ))}
           </div>

@@ -144,6 +144,8 @@ router.get('/search', async (req: Request, res: Response) => {
         dll.zip_code,
         dll.latitude,
         dll.longitude,
+        -- Business hours for status indicator
+        dll.business_hours,
         -- Directory publish status (always true since we're filtering)
         true as directory_published
       FROM directory_listings_list dll
@@ -218,6 +220,7 @@ router.get('/search', async (req: Request, res: Response) => {
       isFeatured: row.is_featured || false,
       subscriptionTier: row.subscription_tier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
+      businessHours: row.business_hours,
       directoryPublished: row.directory_published || false, // Add directory publish status
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -472,6 +475,8 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         dll.primary_category as gbp_primary_category_name,
         -- Get logo URL from tenants metadata
         (t.metadata->>'logo_url') as logo_url,
+        -- Business hours for status indicator
+        dll.business_hours,
         -- Directory publish status (always true since we're filtering)
         true as directory_published
       FROM directory_listings_list dll
@@ -539,6 +544,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
       isFeatured: row.is_featured || false,
       subscriptionTier: row.subscription_tier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
+      businessHours: row.business_hours,
       directoryPublished: row.directory_published || false, // Add directory publish status
       createdAt: row.created_at,
       updatedAt: row.updated_at,

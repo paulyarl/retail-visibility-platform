@@ -106,6 +106,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
         const businessProfile = await profileRes.json();
         tenant.metadata = {
           ...tenant.metadata,
+          ...businessProfile.metadata, // Preserve GBP categories and other metadata from profile
           businessName: businessProfile.business_name,
           phone: businessProfile.phone_number,
           email: businessProfile.email,

@@ -104,6 +104,7 @@ export default function DirectoryGrid({
             key={listing.id}
             listing={listing}
             viewMode="grid"
+            linkType="directory"
             contextCategory={categorySlug ? categorySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : undefined}
           />
         ))}

@@ -64,6 +64,7 @@ export default function DirectoryList({ listings, loading, contextCategory }: Di
           key={listing.id}
           listing={listing}
           viewMode="list"
+          linkType="directory"
           contextCategory={contextCategory}
         />
       ))}

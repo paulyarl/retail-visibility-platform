@@ -283,6 +283,8 @@ class StoreTypeDirectoryService {
           null as description,
           dsl.is_featured,
           t.subscription_tier,
+          -- Business hours for status indicator
+          dsl.business_hours,
           dsl.created_at,
           dsl.updated_at,
           dsl.is_published as directory_published
@@ -339,6 +341,7 @@ class StoreTypeDirectoryService {
         description: store.description,
         isFeatured: store.is_featured,
         subscriptionTier: store.subscription_tier,
+        businessHours: store.business_hours,
         directoryPublished: store.directory_published || false, // Add directory publish status
         createdAt: store.created_at,
         updatedAt: store.updated_at,

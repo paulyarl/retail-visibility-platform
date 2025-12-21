@@ -289,76 +289,403 @@ router.get('/for-product/:productId', async (req: Request, res: Response) => {
 
 /**
  * GET /api/recommendations/for-storefront/:tenantId
- * Get recommendations for storefront pages
+ * Get recommendations for storefront pages with enhanced filtering
+ * Uses same filtering logic as directory related stores (active stores, GBP scoring, category scoring)
  */
 router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { userId, lat, lng } = req.query;
+    const limit = 6; // Show up to 6 recommendations on storefront
 
-    const recommendations = [];
+    console.log(`[Storefront Recommendations] Getting enhanced recommendations for tenant: ${tenantId}`);
 
-    // 1. Stores like this (same user behavior pattern)
-    const storesLikeThis = await getStoresViewedBySameUsers(
-      tenantId,
-      userId as string,
-      3
+    // Import database utility
+    const { getDirectPool } = await import('../utils/db-pool');
+
+    // First, get the current store's directory listing for scoring
+    const currentListing = await getDirectPool().query(
+      `SELECT 
+         dcl.tenant_id,
+         dcl.business_name,
+         dcl.slug,
+         dcl.address,
+         dcl.city,
+         dcl.state,
+         dcl.zip_code,
+         dcl.category_id,
+         dcl.category_name,
+         dcl.category_slug,
+         dcl.google_category_id,
+         dcl.gbp_primary_category_name,
+         dcl.is_primary,
+         dcl.rating_avg,
+         dcl.rating_count,
+         dcl.product_count,
+         dcl.logo_url,
+         t.location_status as tenant_location_status
+       FROM directory_category_listings dcl
+       INNER JOIN tenants t ON dcl.tenant_id = t.id
+       WHERE dcl.tenant_id = $1 
+         AND dcl.is_primary = true
+       LIMIT 1`,
+      [tenantId]
     );
-    if (storesLikeThis.recommendations.length > 0) {
-      recommendations.push({
-        type: 'stores_like_this',
-        title: 'Stores Like This You Viewed',
-        ...storesLikeThis
+
+    if (currentListing.rows.length === 0) {
+      // If no directory listing, fall back to basic recommendations
+      console.log(`[Storefront Recommendations] No directory listing found, using basic fallback`);
+      const similarStores = await getSimilarStoresInCategory(tenantId, limit);
+      
+      return res.json({
+        recommendations: similarStores.recommendations.length > 0 ? [{
+          type: 'similar_stores',
+          title: 'You Might Also Like',
+          recommendations: similarStores.recommendations
+        }] : [],
+        tenantId,
+        generatedAt: new Date()
       });
     }
 
-    // 2. User favorite categories (if userId provided)
-    if (userId) {
-      const userFavorites = await getStoresInUserFavoriteCategories(
-        userId as string,
-        lat ? Number(lat) : undefined,
-        lng ? Number(lng) : undefined,
-        3
-      );
-      if (userFavorites.recommendations.length > 0) {
-        recommendations.push({
-          type: 'user_favorite_categories',
-          title: 'Based on Your Interests',
-          ...userFavorites
-        });
+    const current = currentListing.rows[0];
+    let relatedListings = [];
+
+    // Helper function to generate reason text
+    const getReasonText = (score: number, categoryMatch: boolean, targetCity: string, storeCity: string, targetState: string, storeState: string) => {
+      if (categoryMatch && storeCity === targetCity) {
+        return `Same category in ${storeCity}`;
+      } else if (categoryMatch) {
+        return `Same category`;
+      } else if (storeCity === targetCity) {
+        return `Nearby in ${storeCity}`;
+      } else if (storeState === targetState) {
+        return `In ${storeState}`;
+      }
+      return 'Similar store';
+    };
+
+    try {
+      // Use directory_category_listings MV for recommendations
+      const relatedQuery = `
+        SELECT DISTINCT ON (dcl.tenant_id)
+          dcl.tenant_id,
+          dcl.business_name,
+          dcl.slug,
+          dcl.address,
+          dcl.city,
+          dcl.state,
+          dcl.zip_code,
+          dcl.category_id,
+          dcl.category_name,
+          dcl.category_slug,
+          dcl.google_category_id,
+          dcl.gbp_primary_category_name,
+          dcl.is_primary,
+          dcl.rating_avg,
+          dcl.rating_count,
+          dcl.product_count,
+          dcl.logo_url,
+          dcl.is_featured,
+          dll.business_hours,
+          t.location_status as tenant_location_status,
+          (
+            (
+              CASE
+                WHEN LOWER(dcl.gbp_primary_category_name) = LOWER($7) THEN 4
+                WHEN dcl.google_category_id = $6 THEN 3
+                WHEN dcl.category_name = $1 THEN 2
+                ELSE 0
+              END
+            ) * 2 +
+            (
+              CASE
+                WHEN dcl.city = $2 AND dcl.state = $3 THEN 2
+                WHEN dcl.state = $3 THEN 1
+                ELSE 0
+              END
+            ) +
+            (
+              CASE
+                WHEN ABS(COALESCE(dcl.rating_avg, 0) - $4) < 0.5 THEN 1
+                ELSE 0
+              END
+            )
+          ) as relevance_score
+        FROM directory_category_listings dcl
+        INNER JOIN tenants t ON dcl.tenant_id = t.id
+        LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        WHERE dcl.tenant_id != $5
+          AND dcl.tenant_exists = true
+          AND dcl.is_active_location = true
+          AND dcl.is_directory_visible = true
+        ORDER BY dcl.tenant_id, relevance_score DESC, dcl.rating_avg DESC NULLS LAST, dcl.product_count DESC
+      `;
+
+      const related = await getDirectPool().query(relatedQuery, [
+        current.category_name,
+        current.city,
+        current.state,
+        current.rating_avg || 0,
+        tenantId,
+        current.google_category_id,
+        current.gbp_primary_category_name
+      ]);
+
+      console.log(`[Storefront Recommendations] MV query returned ${related.rows.length} rows`);
+      console.log(`[Storefront Recommendations] Current store - Platform Category: ${current.category_name}, GBP Category: ${current.gbp_primary_category_name}, City: ${current.city}, State: ${current.state}`);
+      
+      // Log all scores for debugging
+      related.rows.forEach((row: any, idx: number) => {
+        if (idx < 10) { // Only log first 10 to avoid spam
+          console.log(`[Storefront Recommendations] Store ${idx + 1}: ${row.business_name} - Platform: ${row.category_name}, GBP: ${row.gbp_primary_category_name}, City: ${row.city}, State: ${row.state}, Score: ${row.relevance_score}`);
+        }
+      });
+      
+      // Filter and map results
+      relatedListings = related.rows
+        .filter((row: any) => (row.relevance_score || 0) > 0)
+        .slice(0, limit)
+        .map((row: any) => ({
+          id: row.tenant_id,
+          tenantId: row.tenant_id,
+          businessName: row.business_name,
+          slug: row.slug,
+          address: row.address,
+          city: row.city,
+          state: row.state,
+          primaryCategory: row.category_name,
+          logoUrl: row.logo_url,
+          ratingAvg: row.rating_avg || 0,
+          ratingCount: row.rating_count || 0,
+          productCount: row.product_count || 0,
+          businessHours: row.business_hours,
+          relevanceScore: row.relevance_score || 0,
+          reason: getReasonText(
+            row.relevance_score, 
+            row.category_name === current.category_name || 
+            row.google_category_id === current.google_category_id ||
+            (row.gbp_primary_category_name && current.gbp_primary_category_name && 
+             row.gbp_primary_category_name.toLowerCase() === current.gbp_primary_category_name.toLowerCase()),
+            current.city, 
+            row.city, 
+            current.state, 
+            row.state
+          )
+        }));
+
+      console.log(`[Storefront Recommendations] Found ${relatedListings.length} stores with score > 0 (after filtering from ${related.rows.length} total)`);
+
+    } catch (mvError) {
+      console.log(`[Storefront Recommendations] MV approach failed, using fallback:`, mvError);
+      
+      // Fallback: Same query structure as main query
+      const fallbackQuery = `
+        SELECT DISTINCT ON (dcl.tenant_id)
+          dcl.tenant_id,
+          dcl.business_name,
+          dcl.slug,
+          dcl.address,
+          dcl.city,
+          dcl.state,
+          dcl.category_name,
+          dcl.logo_url,
+          dcl.rating_avg,
+          dcl.rating_count,
+          dcl.product_count,
+          dll.business_hours,
+          t.location_status as tenant_location_status,
+          (
+            (
+              CASE
+                WHEN dcl.category_name = $1 THEN 3
+                WHEN dcl.google_category_id = $6 THEN 2
+                ELSE 0
+              END
+            ) * 2 +
+            (
+              CASE
+                WHEN dcl.city = $2 AND dcl.state = $3 THEN 2
+                WHEN dcl.state = $3 THEN 1
+                ELSE 0
+              END
+            ) +
+            (
+              CASE
+                WHEN ABS(COALESCE(dcl.rating_avg, 0) - $4) < 0.5 THEN 1
+                ELSE 0
+              END
+            )
+          ) as relevance_score
+        FROM directory_category_listings dcl
+        INNER JOIN tenants t ON dcl.tenant_id = t.id
+        LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        WHERE dcl.tenant_id != $5
+          AND dcl.tenant_exists = true
+          AND dcl.is_active_location = true
+          AND dcl.is_directory_visible = true
+        ORDER BY dcl.tenant_id, relevance_score DESC, dcl.rating_avg DESC NULLS LAST, dcl.product_count DESC
+      `;
+
+      const fallbackResult = await getDirectPool().query(fallbackQuery, [
+        current.category_name,
+        current.city,
+        current.state,
+        current.rating_avg || 0,
+        tenantId,
+        current.google_category_id
+      ]);
+
+      console.log(`[Storefront Recommendations] Fallback query returned ${fallbackResult.rows.length} rows`);
+      
+      relatedListings = fallbackResult.rows
+        .filter((row: any) => (row.relevance_score || 0) >= 1)
+        .slice(0, limit)
+        .map((row: any) => ({
+          id: row.tenant_id,
+          tenantId: row.tenant_id,
+          businessName: row.business_name,
+          slug: row.slug,
+          address: row.address,
+          city: row.city,
+          state: row.state,
+          primaryCategory: row.category_name,
+          logoUrl: row.logo_url,
+          ratingAvg: row.rating_avg || 0,
+          ratingCount: row.rating_count || 0,
+          productCount: row.product_count || 0,
+          businessHours: row.business_hours,
+          relevanceScore: row.relevance_score || 0,
+          reason: getReasonText(
+            row.relevance_score, 
+            row.category_name === current.category_name || 
+            row.google_category_id === current.google_category_id ||
+            (row.gbp_primary_category_name && current.gbp_primary_category_name && 
+             row.gbp_primary_category_name.toLowerCase() === current.gbp_primary_category_name.toLowerCase()),
+            current.city, 
+            row.city, 
+            current.state, 
+            row.state
+          )
+        }));
+    }
+
+    // Ensure at least 1 store is always shown (fallback logic)
+    if (relatedListings.length === 0) {
+      console.log(`[Storefront Recommendations] No stores found with minimum score, trying fallback`);
+
+      // Fallback: Show featured stores in the same state
+      const fallbackFeaturedQuery = `
+        SELECT DISTINCT ON (dcl.tenant_id)
+          dcl.tenant_id,
+          dcl.business_name,
+          dcl.slug,
+          dcl.address,
+          dcl.city,
+          dcl.state,
+          dcl.category_name,
+          dcl.logo_url,
+          dcl.rating_avg,
+          dcl.rating_count,
+          dcl.product_count,
+          dll.business_hours,
+          t.location_status as tenant_location_status,
+          0.5 as relevance_score
+        FROM directory_category_listings dcl
+        INNER JOIN tenants t ON dcl.tenant_id = t.id
+        LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        WHERE dcl.tenant_id != $1
+          AND dcl.tenant_exists = true
+          AND dcl.is_active_location = true
+          AND dcl.is_directory_visible = true
+          AND dcl.state = $2
+          AND dcl.is_featured = true
+        ORDER BY dcl.tenant_id, dcl.rating_avg DESC NULLS LAST, dcl.product_count DESC
+        LIMIT 3
+      `;
+
+      const fallbackResult = await getDirectPool().query(fallbackFeaturedQuery, [tenantId, current.state]);
+      if (fallbackResult.rows.length > 0) {
+        relatedListings = fallbackResult.rows.slice(0, limit).map((row: any) => ({
+          id: row.tenant_id,
+          tenantId: row.tenant_id,
+          businessName: row.business_name,
+          slug: row.slug,
+          address: row.address,
+          city: row.city,
+          state: row.state,
+          primaryCategory: row.category_name,
+          logoUrl: row.logo_url,
+          ratingAvg: row.rating_avg || 0,
+          ratingCount: row.rating_count || 0,
+          productCount: row.product_count || 0,
+          businessHours: row.business_hours,
+          relevanceScore: row.relevance_score || 0,
+          reason: 'Featured in your area'
+        }));
+        console.log(`[Storefront Recommendations] Fallback found ${relatedListings.length} featured stores`);
+      }
+
+      // If still no stores, show any active stores in the same state
+      if (relatedListings.length === 0) {
+        const finalFallbackQuery = `
+          SELECT DISTINCT ON (dcl.tenant_id)
+            dcl.tenant_id,
+            dcl.business_name,
+            dcl.slug,
+            dcl.address,
+            dcl.city,
+            dcl.state,
+            dcl.category_name,
+            dcl.logo_url,
+            dcl.rating_avg,
+            dcl.rating_count,
+            dcl.product_count,
+            dll.business_hours,
+            t.location_status as tenant_location_status,
+            0.1 as relevance_score
+          FROM directory_category_listings dcl
+          INNER JOIN tenants t ON dcl.tenant_id = t.id
+          LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+          WHERE dcl.tenant_id != $1
+            AND dcl.tenant_exists = true
+            AND dcl.is_active_location = true
+            AND dcl.is_directory_visible = true
+            AND dcl.state = $2
+          ORDER BY dcl.tenant_id, dcl.rating_avg DESC NULLS LAST, dcl.product_count DESC
+          LIMIT 1
+        `;
+
+        const finalResult = await getDirectPool().query(finalFallbackQuery, [tenantId, current.state]);
+        if (finalResult.rows.length > 0) {
+          relatedListings = finalResult.rows.map((row: any) => ({
+            id: row.tenant_id,
+            tenantId: row.tenant_id,
+            businessName: row.business_name,
+            slug: row.slug,
+            address: row.address,
+            city: row.city,
+            state: row.state,
+            primaryCategory: row.category_name,
+            logoUrl: row.logo_url,
+            ratingAvg: row.rating_avg || 0,
+            ratingCount: row.rating_count || 0,
+            productCount: row.product_count || 0,
+            businessHours: row.business_hours,
+            relevanceScore: row.relevance_score || 0,
+            reason: 'Nearby store'
+          }));
+          console.log(`[Storefront Recommendations] Final fallback found ${relatedListings.length} stores`);
+        }
       }
     }
 
-    // 3. Trending nearby (if location provided)
-    if (lat && lng) {
-      const trendingNearby = await getTrendingNearby(
-        Number(lat),
-        Number(lng),
-        25,
-        7,
-        3
-      );
-      if (trendingNearby.recommendations.length > 0) {
-        recommendations.push({
-          type: 'trending_nearby',
-          title: 'Trending Nearby',
-          ...trendingNearby
-        });
-      }
-    }
-
-    // 4. FALLBACK: Similar stores in same category (always available)
-    // Only add if we don't have enough recommendations from behavior data
-    if (recommendations.length === 0) {
-      const similarStores = await getSimilarStoresInCategory(tenantId, 5);
-      if (similarStores.recommendations.length > 0) {
-        recommendations.push({
-          type: 'similar_stores',
-          title: 'Similar Stores',
-          ...similarStores
-        });
-      }
-    }
+    // Format response for storefront component
+    const recommendations = [{
+      type: 'enhanced_related',
+      title: 'You Might Also Like',
+      recommendations: relatedListings
+    }];
 
     res.json({
       recommendations,

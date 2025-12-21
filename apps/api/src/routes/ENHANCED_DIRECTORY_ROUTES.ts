@@ -41,11 +41,12 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
       const relatedQuery = `
         SELECT DISTINCT ON (dcl.id)
           dcl.*,
+          dll.business_hours,
           (
             CASE
               WHEN dcl.is_primary = true AND dcl.category_name = $1 THEN 3
               WHEN dcl.is_primary = false AND dcl.category_name = $1 THEN 2
-              WHEN dcl.category_name = ANY($7) THEN 2
+              WHEN dcl.category_name = ANY($6::text[]) THEN 2
               ELSE 0
             END +
             CASE
@@ -60,6 +61,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
           ) as relevance_score
         FROM directory_category_listings dcl
         INNER JOIN tenants t ON dcl.tenant_id = t.id
+        LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
         WHERE dcl.slug != $5
           AND t.location_status IN ('active', 'inactive', 'closed')
         ORDER BY dcl.id, relevance_score DESC, dcl.rating_avg DESC, dcl.product_count DESC
@@ -128,6 +130,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
           subscription_tier: row.subscription_tier || 'trial',
           useCustomWebsite: row.use_custom_website || false,
           isPublished: row.is_published || true,
+          businessHours: row.business_hours,
           relevanceScore: row.relevance_score || 0,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -269,6 +272,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
           subscription_tier: row.subscription_tier || 'trial',
           useCustomWebsite: row.use_custom_website || false,
           isPublished: row.is_published || true,
+          businessHours: row.business_hours,
           relevanceScore: row.relevance_score || 0,
           createdAt: row.created_at,
           updatedAt: row.updated_at,

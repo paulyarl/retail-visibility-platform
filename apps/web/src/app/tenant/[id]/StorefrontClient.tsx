@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { UnifiedStoreCard } from '@/components/directory/UnifiedStoreCard';
 
 // Storefront Recommendations Component
 export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
@@ -41,32 +41,27 @@ export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
       </h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {recommendations.map((rec, index) => (
-          <Link
+          <UnifiedStoreCard
             key={`${rec.tenantId}-${index}`}
-            href={`/directory/${rec.slug}`}
-            className="block p-6 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-green-500 dark:hover:border-green-400 transition-all hover:shadow-lg"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="font-semibold text-neutral-900 dark:text-white text-lg">
-                  {rec.businessName}
-                </h3>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  {rec.address}
-                </p>
-                <p className="text-sm text-neutral-500">
-                  {rec.city}, {rec.state}
-                  {rec.distance && ` • ${rec.distance} mi`}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-green-600 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">
-                {rec.reason}
-              </p>
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            </div>
-          </Link>
+            listing={{
+              id: rec.id || rec.tenantId,
+              tenantId: rec.tenantId,
+              businessName: rec.businessName,
+              slug: rec.slug,
+              address: rec.address,
+              city: rec.city,
+              state: rec.state,
+              primaryCategory: rec.primaryCategory,
+              logoUrl: rec.logoUrl,
+              ratingAvg: rec.ratingAvg,
+              ratingCount: rec.ratingCount,
+              productCount: rec.productCount,
+              businessHours: rec.businessHours,
+              reason: rec.reason
+            }}
+            viewMode="grid"
+            linkType="storefront"
+          />
         ))}
       </div>
     </div>
