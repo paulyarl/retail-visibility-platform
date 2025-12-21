@@ -35,23 +35,30 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
 
   // Detect platform domain for URL display
   const [platformDomain, setPlatformDomain] = useState<string>('visibleshelf.com');
+  const [platformUrl, setPlatformUrl] = useState<string>('visibleshelf.com');
 
   useEffect(() => {
     // Detect platform domain from current hostname
     const hostname = typeof window !== 'undefined' ? window.location.hostname : 'visibleshelf.com';
+    const port = typeof window !== 'undefined' ? window.location.port : '';
 
     // Check if hostname matches known platform domains
     if (hostname.endsWith('.visibleshelf.com')) {
       setPlatformDomain('visibleshelf.com');
+      setPlatformUrl('visibleshelf.com');
     } else if (hostname.endsWith('.visibleshelf.store')) {
       setPlatformDomain('visibleshelf.store');
+      setPlatformUrl('visibleshelf.store');
     } else if (hostname.endsWith('.localhost')) {
       setPlatformDomain('localhost');
+      setPlatformUrl(port ? `localhost:${port}` : 'localhost');
     } else if (hostname === 'localhost') {
       setPlatformDomain('localhost');
+      setPlatformUrl(port ? `localhost:${port}` : 'localhost');
     } else {
       // Fallback to production domain
       setPlatformDomain('visibleshelf.com');
+      setPlatformUrl('visibleshelf.com');
     }
 
     loadCurrentSubdomain();
@@ -186,30 +193,30 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
   };
 
   const getSubdomainUrl = (subdomain: string) => {
-    return `https://${subdomain}.${platformDomain}`;
+    return `https://${subdomain}.${platformUrl}`;
   };
 
   return (
-    <Card>
+    <Card className="dark:bg-gray-800 dark:border-gray-700">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
           <Info className="h-5 w-5" />
           Custom Subdomain
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-gray-600 dark:text-gray-300">
           Set up a custom subdomain for your Google Shopping listings. This helps with GMC domain compliance.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 dark:bg-gray-800">
         {/* Current Subdomain Display */}
         {currentSubdomain && (
           <div className="space-y-2">
-            <Label>Current Subdomain</Label>
+            <Label className="text-gray-900 dark:text-white">Current Subdomain</Label>
             <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <span className="font-medium text-green-800">{currentSubdomain}.{platformDomain}</span>
             </div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-300">
               Your products will be accessible at {getSubdomainUrl(currentSubdomain)}
             </p>
           </div>
@@ -217,7 +224,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
 
         {/* Subdomain Input */}
         <div className="space-y-2">
-          <Label htmlFor="subdomain">
+          <Label htmlFor="subdomain" className="text-gray-900 dark:text-white">
             {currentSubdomain ? 'Change Subdomain' : 'Set Subdomain'}
           </Label>
           <div className="flex gap-2">
@@ -246,7 +253,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
               )}
             </Button>
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Use only lowercase letters, numbers, and hyphens. Cannot start or end with a hyphen.
           </p>
         </div>
@@ -317,13 +324,13 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
         )}
 
         {/* Help Text */}
-        <div className="text-sm text-gray-600 space-y-2">
-          <p>
-            <strong>Why set a subdomain?</strong> Google Merchant Center requires product URLs to match your website domain for approval.
-            Using a subdomain ensures your products are accessible from {platformDomain} while maintaining GMC compliance.
+        <div className="text-sm text-gray-600 dark:text-gray-300 space-y-2">
+          <p className="text-gray-600 dark:text-gray-300">
+            <strong className="text-gray-900 dark:text-gray-200">Why set a subdomain?</strong> Google Merchant Center requires product URLs to match your website domain for approval.
+            Using a subdomain ensures your products are accessible from {platformUrl} while maintaining GMC compliance.
           </p>
-          <p>
-            <strong>URL format:</strong> Your products will be accessible at https://yoursubdomain.{platformDomain}/products/...
+          <p className="text-gray-600 dark:text-gray-300">
+            <strong className="text-gray-900 dark:text-gray-200">URL format:</strong> Your products will be accessible at https://yoursubdomain.{platformUrl}/products/...
           </p>
         </div>
 
@@ -334,7 +341,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
           </h3>
 
           {loadingSubdomains ? (
-            <div className="flex items-center gap-2 text-gray-500">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
               <RefreshCw className="w-4 h-4 animate-spin" />
               Loading subdomains...
             </div>

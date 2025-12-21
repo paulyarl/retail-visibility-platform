@@ -269,36 +269,36 @@ export default function GoogleIntegrationsPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-4xl mx-auto dark:bg-neutral-800">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-sm text-neutral-500 mb-2">
-          <Link href={`/t/${tenantId}/settings`} className="hover:text-neutral-700">Settings</Link>
+        <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400 mb-2">
+          <Link href={`/t/${tenantId}/settings`} className="hover:text-neutral-700 dark:hover:text-neutral-300">Settings</Link>
           <span>/</span>
-          <Link href={`/t/${tenantId}/settings/integrations`} className="hover:text-neutral-700">Integrations</Link>
+          <Link href={`/t/${tenantId}/settings/integrations`} className="hover:text-neutral-700 dark:hover:text-neutral-300">Integrations</Link>
           <span>/</span>
           <span className="text-neutral-900 dark:text-neutral-100">Google</span>
         </div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+            <h1 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
               Google Integrations
             </h1>
-            <p className="text-neutral-600 dark:text-neutral-400">
+            <p className="text-neutral-600 dark:text-gray-300">
               Connect Google Merchant Center to sync your products to Google Shopping and free listings
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Link
               href={`/t/${tenantId}/settings/integrations/google/sync-status`}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-medium rounded-lg transition-colors text-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-200 font-medium rounded-lg transition-colors text-sm"
             >
               <RefreshCw className="w-4 h-4" />
               Sync Status
             </Link>
             <Link
               href={`/t/${tenantId}/settings/integrations/google/advanced`}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-medium rounded-lg transition-colors text-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-200 font-medium rounded-lg transition-colors text-sm"
             >
               <Star className="w-4 h-4" />
               Advanced

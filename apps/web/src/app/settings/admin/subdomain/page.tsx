@@ -53,7 +53,34 @@ export default function AdminSubdomainPage() {
   // Check platform admin access
   const hasAccess = user && isPlatformAdmin(user);
 
+  // Detect platform domain for URL display
+  const [platformDomain, setPlatformDomain] = useState<string>('visibleshelf.com');
+  const [platformUrl, setPlatformUrl] = useState<string>('visibleshelf.com');
+
   useEffect(() => {
+    // Detect platform domain from current hostname
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'visibleshelf.com';
+    const port = typeof window !== 'undefined' ? window.location.port : '';
+
+    // Check if hostname matches known platform domains
+    if (hostname.endsWith('.visibleshelf.com')) {
+      setPlatformDomain('visibleshelf.com');
+      setPlatformUrl('visibleshelf.com');
+    } else if (hostname.endsWith('.visibleshelf.store')) {
+      setPlatformDomain('visibleshelf.store');
+      setPlatformUrl('visibleshelf.store');
+    } else if (hostname.endsWith('.localhost')) {
+      setPlatformDomain('localhost');
+      setPlatformUrl(port ? `localhost:${port}` : 'localhost');
+    } else if (hostname === 'localhost') {
+      setPlatformDomain('localhost');
+      setPlatformUrl(port ? `localhost:${port}` : 'localhost');
+    } else {
+      // Fallback to production domain
+      setPlatformDomain('visibleshelf.com');
+      setPlatformUrl('visibleshelf.com');
+    }
+
     if (hasAccess) {
       fetchSubdomainStats();
       fetchRateLimits();
@@ -154,53 +181,53 @@ export default function AdminSubdomainPage() {
       <div className="space-y-6">
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Tenants</CardTitle>
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 dark:bg-gray-800">
+              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Total Tenants</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalTenants || 0}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="dark:bg-gray-800">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.totalTenants || 0}</div>
+              <p className="text-xs text-muted-foreground dark:text-gray-400">
                 Registered tenants
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Subdomain Users</CardTitle>
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 dark:bg-gray-800">
+              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Subdomain Users</CardTitle>
               <Globe className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.tenantsWithSubdomains || 0}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="dark:bg-gray-800">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.tenantsWithSubdomains || 0}</div>
+              <p className="text-xs text-muted-foreground dark:text-gray-400">
                 With custom subdomains
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Adoption Rate</CardTitle>
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 dark:bg-gray-800">
+              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Adoption Rate</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.adoptionRate || 0}%</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="dark:bg-gray-800">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.adoptionRate || 0}%</div>
+              <p className="text-xs text-muted-foreground dark:text-gray-400">
                 Of total tenants
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recent Adoptions</CardTitle>
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 dark:bg-gray-800">
+              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Recent Adoptions</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.recentAdoptions || 0}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="dark:bg-gray-800">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.recentAdoptions || 0}</div>
+              <p className="text-xs text-muted-foreground dark:text-gray-400">
                 Last 30 days
               </p>
             </CardContent>
@@ -208,14 +235,14 @@ export default function AdminSubdomainPage() {
         </div>
 
         {/* Subdomain List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Subdomains</CardTitle>
-            <CardDescription>
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardHeader className="dark:bg-gray-800">
+            <CardTitle className="text-gray-900 dark:text-white">Active Subdomains</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-300">
               Tenants with configured subdomains
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="dark:bg-gray-800">
             {stats?.subdomainList && stats.subdomainList.length > 0 ? (
               <div className="space-y-2">
                 {stats.subdomainList.slice(0, 20).map((item) => (
@@ -223,8 +250,8 @@ export default function AdminSubdomainPage() {
                     <div className="flex items-center gap-3">
                       <CheckCircle className="h-4 w-4 text-green-600" />
                       <div>
-                        <p className="font-medium">{item.subdomain}.visibleshelf.com</p>
-                        <p className="text-sm text-neutral-500">Tenant: {item.tenantId}</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{item.subdomain}.{platformUrl}</p>
+                        <p className="text-sm text-neutral-500 dark:text-gray-400">Tenant: {item.tenantId}</p>
                       </div>
                     </div>
                     <Badge variant="default">
@@ -233,30 +260,30 @@ export default function AdminSubdomainPage() {
                   </div>
                 ))}
                 {stats.subdomainList.length > 20 && (
-                  <p className="text-sm text-neutral-500 mt-2">
+                  <p className="text-sm text-neutral-500 dark:text-gray-400 mt-2">
                     And {stats.subdomainList.length - 20} more subdomains...
                   </p>
                 )}
               </div>
             ) : (
-              <p className="text-neutral-500">No subdomains configured yet</p>
+              <p className="text-neutral-500 dark:text-gray-400">No subdomains configured yet</p>
             )}
           </CardContent>
         </Card>
 
         {/* Management Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Subdomain Management</CardTitle>
-            <CardDescription>
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardHeader className="dark:bg-gray-800">
+            <CardTitle className="text-gray-900 dark:text-white">Subdomain Management</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-300">
               Administrative controls for subdomain system
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 dark:bg-gray-800">
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div>
-                <h3 className="font-medium">Refresh Analytics</h3>
-                <p className="text-sm text-neutral-500">Update subdomain usage statistics</p>
+                <h3 className="font-medium text-gray-900 dark:text-white">Refresh Analytics</h3>
+                <p className="text-sm text-neutral-500 dark:text-gray-400">Update subdomain usage statistics</p>
               </div>
               <Button
                 onClick={fetchSubdomainStats}
@@ -271,23 +298,23 @@ export default function AdminSubdomainPage() {
 
             {/* Rate Limiting Configuration */}
             <div className="space-y-4">
-              <h3 className="font-medium">Rate Limiting</h3>
+              <h3 className="font-medium text-gray-900 dark:text-white">Rate Limiting</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium text-sm">Subdomain Checks</h4>
-                  <p className="text-sm text-neutral-500 mt-1">
+                <div className="p-4 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                  <h4 className="font-medium text-sm text-gray-900 dark:text-white">Subdomain Checks</h4>
+                  <p className="text-sm text-neutral-500 dark:text-gray-400 mt-1">
                     {rateLimits?.subdomainCheck.maxRequests} requests per {Math.floor(rateLimits?.subdomainCheck.windowMs! / 1000 / 60)} minutes
                   </p>
                 </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium text-sm">Subdomain Creation</h4>
-                  <p className="text-sm text-neutral-500 mt-1">
+                <div className="p-4 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                  <h4 className="font-medium text-sm text-gray-900 dark:text-white">Subdomain Creation</h4>
+                  <p className="text-sm text-neutral-500 dark:text-gray-400 mt-1">
                     {rateLimits?.subdomainCreate.maxRequests} requests per {Math.floor(rateLimits?.subdomainCreate.windowMs! / 1000 / 60 / 60)} hours
                   </p>
                 </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium text-sm">Subdomain Resolution</h4>
-                  <p className="text-sm text-neutral-500 mt-1">
+                <div className="p-4 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                  <h4 className="font-medium text-sm text-gray-900 dark:text-white">Subdomain Resolution</h4>
+                  <p className="text-sm text-neutral-500 dark:text-gray-400 mt-1">
                     {rateLimits?.subdomainResolve.maxRequests} requests per {Math.floor(rateLimits?.subdomainResolve.windowMs! / 1000 / 60)} minutes
                   </p>
                 </div>
