@@ -62,8 +62,8 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       setUploading(true);
       setError(null);
 
-      // Use HIGH compression for directory photos (many images, smaller file size)
-      const result = await uploadImage(file, ImageUploadPresets.product);
+      // Use MEDIUM compression for directory photos (fewer images, better quality)
+      const result = await uploadImage(file, ImageUploadPresets.directory);
       const dataUrl = result.dataUrl;
 
       const res = await api.post(`/api/directory/${listing.id}/photos`, {
@@ -110,8 +110,8 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       // Convert blob to File
       const file = new File([blob], 'photo.jpg', { type: blob.type || 'image/jpeg' });
 
-      // Use centralized image upload middleware
-      const result = await uploadImage(file, ImageUploadPresets.product);
+      // Use MEDIUM compression for directory photos (fewer images, better quality)
+      const result = await uploadImage(file, ImageUploadPresets.directory);
 
       const res = await api.post(`/api/directory/${listing.id}/photos`, {
         tenantId,

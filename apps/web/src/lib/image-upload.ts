@@ -469,6 +469,13 @@ export const ImageUploadPresets = {
     maxSizeMB: 5,
     allowedTypes: ['png', 'jpeg', 'svg', 'ico'] as ImageType[],
   },
+  
+  /** Directory photos - MEDIUM compression (fewer photos per listing, showcase quality) */
+  directory: {
+    compressionLevel: 'medium' as CompressionLevel,
+    maxSizeMB: 8,
+    allowedTypes: ['png', 'jpeg', 'webp'] as ImageType[],
+  },
 } as const;
 
 /**

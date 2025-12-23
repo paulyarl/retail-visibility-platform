@@ -9,6 +9,7 @@ import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductDisplay from '@/components/storefront/ProductDisplay';
 import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
+import ProductCategoriesCollapsible from '@/components/storefront/ProductCategoriesCollapsible';
 import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
 import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
@@ -535,30 +536,17 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         </div>
       )}
 
-      {/* Products Section with Sidebar */}
+      {/* Products Section */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Product Categories Sidebar - Desktop */}
+        <div>
+          {/* Product Categories - Collapsible */}
           {productCategories.length > 0 && (
-            <aside className="hidden lg:block lg:col-span-1 space-y-6">
-              <ProductCategorySidebar 
-                tenantId={id} 
-                categories={productCategories} 
-                totalProducts={totalAllProducts} 
-              />
-            </aside>
+            <ProductCategoriesCollapsible
+              tenantId={id}
+              categories={productCategories}
+              totalProducts={totalAllProducts}
+            />
           )}
-
-          {/* Main Content */}
-          <div className={productCategories.length > 0 ? "lg:col-span-3" : "lg:col-span-4"}>
-            {/* Mobile Category Dropdown */}
-            {productCategories.length > 0 && (
-              <CategoryMobileDropdown 
-                tenantId={id} 
-                categories={productCategories} 
-                totalProducts={totalAllProducts} 
-              />
-            )}
 
             {/* Header with Search and Category Context */}
             <div className="mb-8">
@@ -694,7 +682,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
             <StorefrontRecommendations tenantId={id} />
           </>
         )}
-          </div>
         </div>
       </main>
 

@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft } from 'lucide-react';
+import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
 import DirectoryActions from '@/components/directory/DirectoryActions';
@@ -13,6 +13,7 @@ import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import StoreDirectoryCategories from '@/components/directory/StoreDirectoryCategories';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
+import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 
 interface StoreDetailPageProps {
   params: {
@@ -546,49 +547,8 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left Sidebar - Store Product Categories & Hours */}
-            <div className="lg:col-span-3 space-y-6">
-              {/* Storefront Product Categories - Accurate product counts */}
-              {storefrontCategories.categories.length > 0 && (
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                    Product Categories
-                  </h2>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Browse products by category
-                  </p>
-                  {/* Enclosed Style Container */}
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <nav className="space-y-1">
-                      {/* All Products */}
-                      <Link
-                        href={`/tenant/${listing.tenant_id}`}
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all"
-                      >
-                        <div className="flex items-center gap-2 flex-1">
-                          <span className="text-sm text-gray-700 font-medium">
-                            All Products
-                          </span>
-                        </div>
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                          {storefrontCategories.categories.reduce((sum: number, cat: any) => sum + (cat.count || 0), 0) + storefrontCategories.uncategorizedCount} products
-                        </span>
-                      </Link>
-
-                      {/* Individual Categories - with collapsing */}
-                      <StoreDirectoryCategories
-                        categories={storefrontCategories.categories}
-                        tenantId={listing.tenant_id}
-                        uncategorizedCount={storefrontCategories.uncategorizedCount}
-                      />
-                    </nav>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Middle Column - Store Info */}
-            <div className="lg:col-span-6 space-y-6">
+            {/* Main Content Column */}
+            <div className="lg:col-span-9 space-y-6">
               {/* Store Header */}
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-start gap-6">
@@ -684,6 +644,15 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
               {/* Photo Gallery */}
               <DirectoryPhotoGalleryDisplay listing={listing} />
+
+              {/* Product Categories - Collapsible */}
+              {storefrontCategories.categories.length > 0 && (
+                <ProductCategoriesCollapsible
+                  categories={storefrontCategories.categories}
+                  tenantId={listing.tenant_id}
+                  uncategorizedCount={storefrontCategories.uncategorizedCount}
+                />
+              )}
 
               {/* Business Description - Full Width Pane */}
               {businessProfile?.business_description && (
