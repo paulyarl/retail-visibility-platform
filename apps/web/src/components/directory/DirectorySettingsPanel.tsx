@@ -5,6 +5,7 @@ import { useDirectoryListing } from '@/hooks/directory/useDirectoryListing';
 import DirectoryCategorySelectorAdapter from './DirectoryCategorySelectorAdapter';
 import DirectoryListingPreview from './DirectoryListingPreview';
 import DirectoryStatusBadge from './DirectoryStatusBadge';
+import DirectoryPhotoGallery from './DirectoryPhotoGallery';
 
 interface DirectorySettingsPanelProps {
   tenantId: string;
@@ -274,6 +275,26 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
               {seoKeywords.length}/10 keywords • Used for search optimization
             </p>
+          </div>
+
+          {/* Photo Gallery */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Photo Gallery
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Add up to 10 photos to showcase your business on the directory page
+            </p>
+            {listing && (
+              <DirectoryPhotoGallery
+                listing={listing}
+                tenantId={tenantId}
+                onUpdate={() => {
+                  // Refresh the listing preview when photos change
+                  // The useDirectoryListing hook should automatically refresh
+                }}
+              />
+            )}
           </div>
 
           {/* Actions */}

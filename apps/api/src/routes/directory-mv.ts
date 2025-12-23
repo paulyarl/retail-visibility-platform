@@ -473,8 +473,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         dll.updated_at,
         dll.updated_at as updated_at,
         dll.primary_category as gbp_primary_category_name,
-        -- Get logo URL from tenants metadata
-        (t.metadata->>'logo_url') as logo_url,
+        dll.logo_url as logo_url,
         -- Business hours for status indicator
         dll.business_hours,
         -- Directory publish status (always true since we're filtering)

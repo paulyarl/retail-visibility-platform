@@ -60,13 +60,13 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       }
 
       settings = await prisma.directory_settings_list.upsert({
-        where: { id: `dir_${tenantId}` },
+        where: { id: tenantId },
         update: {
           slug,
           updated_at: new Date(),
         },
         create: {
-          id: `dir_${tenantId}`,
+          id: tenantId,
           tenant_id: tenantId,
           slug,
           is_published: false,
@@ -175,7 +175,7 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
         updated_at: new Date(),
       },
       create: {
-        id: `dir_${tenantId}`,
+        id: tenantId,
         tenant_id: tenantId,
         seo_description: parsed.data.seo_description,
         seo_keywords: parsed.data.seo_keywords,
@@ -306,7 +306,7 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
       where: { tenant_id: tenantId },
       update: { is_published: true, updated_at: new Date() },
       create: { 
-        id: `dir_${tenantId}`,
+        id: tenantId,
         tenant_id: tenantId, 
         is_published: true,
         updated_at: new Date(),

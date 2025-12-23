@@ -70,6 +70,7 @@ import billingRoutes from './routes/billing';
 // import subscriptionRoutes from './routes/subscriptions';
 // import categoryRoutes from './routes/categories';
 import photosRouter from './photos';
+import directoryPhotosRouter from './routes/directory-photos';
 
 // v3.6.2-prep imports - temporarily disabled
 // import feedJobsRoutes from './routes/feed-jobs';
@@ -4928,6 +4929,10 @@ console.log('✅ Tenant categories routes mounted at /api/tenant');
 /* ------------------------------ photos ------------------------------ */
 app.use('/api/items', photosRouter);
 console.log('✅ Photos routes mounted at /api/items');
+
+/* ------------------------------ directory photos ------------------------------ */
+app.use('/api/directory', directoryPhotosRouter);
+console.log('✅ Directory photos routes mounted at /api/directory');
 
 /* ------------------------------ store reviews ------------------------------ */
 import storeReviewsRoutes from './routes/store-reviews';

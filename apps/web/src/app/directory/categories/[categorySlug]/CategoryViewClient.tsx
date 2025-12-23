@@ -305,11 +305,14 @@ export default function CategoryViewClient({
         )}
 
         {viewMode === 'map' && (
-          <DirectoryMapGoogle
-            listings={data?.listings || []} // Use the already-filtered listings
-            useMapEndpoint={false} // Don't use the endpoint to avoid data sync issues
-            filters={{}}
-          />
+          <>
+            {console.log('[CategoryViewClient] Map listings:', data?.listings?.slice(0, 3)?.map(l => ({ id: l.id, businessName: l.businessName, logoUrl: l.logoUrl })))}
+            <DirectoryMapGoogle
+              listings={data?.listings || []} // Use the already-filtered listings
+              useMapEndpoint={false} // Don't use the endpoint to avoid data sync issues
+              filters={{}}
+            />
+          </>
         )}
       </div>
     </div>

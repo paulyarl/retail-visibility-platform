@@ -12,6 +12,7 @@ import BusinessHoursDisplay from '@/components/shared/BusinessHoursDisplay';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import StoreDirectoryCategories from '@/components/directory/StoreDirectoryCategories';
+import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 
 interface StoreDetailPageProps {
   params: {
@@ -615,7 +616,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                           .map((category: any, index: number) => (
                             <Link
                               key={category.id || index}
-                              href={`/directory/stores/${category.slug}`}
+                              href={`/directory/categories/${category.slug}`}
                               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                                 category.isPrimary
                                   ? 'bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200'
@@ -680,6 +681,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   />
                 </div>
               </div>
+
+              {/* Photo Gallery */}
+              <DirectoryPhotoGalleryDisplay listing={listing} />
 
               {/* Business Description - Full Width Pane */}
               {businessProfile?.business_description && (

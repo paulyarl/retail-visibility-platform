@@ -7,8 +7,21 @@ import { PlatformSettingsProvider } from "@/contexts/PlatformSettingsContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import DynamicFavicon from "@/components/DynamicFavicon";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+  display: "swap",
+  fallback: ["system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+  preload: false, // Disable preload to avoid connection issues
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+  display: "swap",
+  fallback: ["Monaco", "Menlo", "Consolas", "Liberation Mono", "Courier New", "monospace"],
+  preload: false, // Disable preload to avoid connection issues
+});
 
 export const metadata: Metadata = {
   title: "Visible Shelf",

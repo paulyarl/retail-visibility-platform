@@ -281,8 +281,34 @@ model directory_listings_list {
   is_published         Boolean?  @default(true)
   created_at           DateTime? @default(now()) @db.Timestamptz(6)
   updated_at           DateTime? @default(now()) @db.Timestamptz(6)
+  directory_photos     directory_photos[]
 
   @@index([is_published], map: "idx_directory_listings_is_published")
+}
+
+model directory_photos {
+  id                 String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String                    @map("tenant_id")
+  listingId          String                    @map("listing_id")
+  url                String
+  width              Int?
+  height             Int?
+  contentType        String?                   @map("content_type")
+  bytes              Int?
+  exifRemoved        Boolean                   @default(false) @map("exif_removed")
+  capturedAt         DateTime?                 @db.Timestamptz(6) @map("captured_at")
+  createdAt          DateTime                  @default(now()) @db.Timestamptz(6) @map("created_at")
+  publicUrl          String?                   @map("public_url")
+  signedUrl          String?                   @map("signed_url")
+  position           Int                       @default(0)
+  alt                String?
+  caption            String?
+  directory_listings_list directory_listings_list @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  tenants            tenants                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, position], map: "directory_photos_listing_position_unique")
+  @@index([listingId], map: "idx_directory_photos_listing_id")
+  @@index([tenantId], map: "idx_directory_photos_tenant_id")
 }
 
 model directory_mv_refresh_log {
@@ -1185,6 +1211,7 @@ model tenants {
   category_mirror_runs             category_mirror_runs[]
   directory_featured_listings_list directory_featured_listings_list[]
   directory_settings_list          directory_settings_list?
+  directory_photos                 directory_photos[]
   google_oauth_accounts_list       google_oauth_accounts_list[]
   inventory_items                  inventory_items[]
   invitations                      invitations[]

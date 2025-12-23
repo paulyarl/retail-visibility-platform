@@ -7,9 +7,10 @@ interface DirectoryListProps {
   listings: DirectoryListing[];
   loading?: boolean;
   contextCategory?: string; // Override category display (e.g., for product category pages)
+  showLogo?: boolean; // Whether to display store logos
 }
 
-export default function DirectoryList({ listings, loading, contextCategory }: DirectoryListProps) {
+export default function DirectoryList({ listings, loading, contextCategory, showLogo = true }: DirectoryListProps) {
   // Loading state
   if (loading) {
     return (
@@ -17,7 +18,7 @@ export default function DirectoryList({ listings, loading, contextCategory }: Di
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 animate-pulse">
             <div className="flex gap-4">
-              <div className="w-24 h-24 bg-neutral-200 dark:bg-neutral-700 rounded-lg shrink-0" />
+              {showLogo && <div className="w-24 h-24 bg-neutral-200 dark:bg-neutral-700 rounded-lg shrink-0" />}
               <div className="flex-1 space-y-3">
                 <div className="h-5 bg-neutral-200 dark:bg-neutral-700 rounded w-1/3" />
                 <div className="h-4 bg-neutral-200 dark:bg-neutral-700 rounded w-1/4" />
@@ -66,6 +67,7 @@ export default function DirectoryList({ listings, loading, contextCategory }: Di
           viewMode="list"
           linkType="directory"
           contextCategory={contextCategory}
+          showLogo={showLogo}
         />
       ))}
     </div>

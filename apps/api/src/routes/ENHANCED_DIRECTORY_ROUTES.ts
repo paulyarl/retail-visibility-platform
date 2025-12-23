@@ -242,7 +242,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
         current.state,
         current.rating_avg || 0,
         slug,
-        current.secondary_categories || [],
+        current.secondary_categories && current.secondary_categories.length > 0 ? current.secondary_categories : null,
       ]);
 
       console.log(`[DEBUG] Fallback query returned ${fallbackResult.rows.length} rows`);

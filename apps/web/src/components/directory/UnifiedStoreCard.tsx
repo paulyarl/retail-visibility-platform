@@ -42,6 +42,7 @@ interface UnifiedStoreCardProps {
   viewMode: 'grid' | 'list';
   contextCategory?: string; // For category display prioritization
   linkType?: 'directory' | 'storefront'; // Determines link destination
+  showLogo?: boolean; // Whether to display store logos
   className?: string;
 }
 
@@ -61,19 +62,20 @@ export function UnifiedStoreCard({
   viewMode,
   contextCategory,
   linkType = 'directory',
+  showLogo = true,
   className = ''
 }: UnifiedStoreCardProps) {
   const [businessHours, setBusinessHours] = useState<any>(null); // Start with null to always fetch
 
   // Debug logging for business hours
   useEffect(() => {
-    console.log(`[UnifiedStoreCard] ${listing.businessName} - Initial businessHours from API:`, listing.businessHours);
+    // console.log(`[UnifiedStoreCard] ${listing.businessName} - Initial businessHours from API:`, listing.businessHours);
   }, [listing.businessName, listing.businessHours]);
 
   // Always fetch fresh business hours from tenant profile API for accurate data
   useEffect(() => {
     if (listing.tenantId) {
-      console.log(`[UnifiedStoreCard] ${listing.businessName} - Fetching fresh business hours from tenant profile...`);
+      // console.log(`[UnifiedStoreCard] ${listing.businessName} - Fetching fresh business hours from tenant profile...`);
       const fetchBusinessHours = async () => {
         try {
           const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -81,7 +83,7 @@ export function UnifiedStoreCard({
           
           if (response.ok) {
             const profile = await response.json();
-            console.log(`[UnifiedStoreCard] ${listing.businessName} - Fresh API response:`, profile.hours);
+            // console.log(`[UnifiedStoreCard] ${listing.businessName} - Fresh API response:`, profile.hours);
             if (profile.hours) {
               setBusinessHours(profile.hours);
             }
@@ -100,10 +102,10 @@ export function UnifiedStoreCard({
   // Compute business hours status
   const hoursStatus = businessHours ? computeStoreStatus(businessHours) : null;
   
-  useEffect(() => {
+  /* useEffect(() => {
     console.log(`[UnifiedStoreCard] ${listing.businessName} - Final hoursStatus:`, hoursStatus);
   }, [listing.businessName, hoursStatus]);
-
+ */
   // Determine link destination based on linkType
   const linkHref = linkType === 'storefront' 
     ? `/tenant/${listing.tenantId}`
@@ -142,22 +144,24 @@ export function UnifiedStoreCard({
         <Card className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
           <CardContent className="p-4 dark:bg-gray-800">
             <div className="flex items-center space-x-4">
-              {/* Logo */}
-              <div className="flex-shrink-0">
-                {listing.logoUrl ? (
-                  <Image
-                    src={listing.logoUrl}
-                    alt={listing.businessName}
-                    width={48}
-                    height={48}
-                    className="rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                    <Package className="w-6 h-6 text-gray-400" />
-                  </div>
-                )}
-              </div>
+              {/* Logo - conditionally shown */}
+              {showLogo && (
+                <div className="flex-shrink-0">
+                  {listing.logoUrl ? (
+                    <Image
+                      src={listing.logoUrl}
+                      alt={listing.businessName}
+                      width={48}
+                      height={48}
+                      className="rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                      <Package className="w-6 h-6 text-gray-400" />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Content */}
               <div className="flex-1 min-w-0">
@@ -228,21 +232,24 @@ export function UnifiedStoreCard({
         <CardContent className="p-6 dark:bg-gray-800">
           {/* Header with logo and featured badge */}
           <div className="flex items-start justify-between mb-4">
-            <div className="flex-shrink-0">
-              {listing.logoUrl ? (
-                <Image
-                  src={listing.logoUrl}
-                  alt={listing.businessName}
-                  width={64}
-                  height={64}
-                  className="rounded-lg object-cover"
-                />
-              ) : (
-                <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                  <Package className="w-8 h-8 text-gray-400" />
-                </div>
-              )}
-            </div>
+            {/* Logo - conditionally shown */}
+            {showLogo && (
+              <div className="flex-shrink-0">
+                {listing.logoUrl ? (
+                  <Image
+                    src={listing.logoUrl}
+                    alt={listing.businessName}
+                    width={64}
+                    height={64}
+                    className="rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                    <Package className="w-8 h-8 text-gray-400" />
+                  </div>
+                )}
+              </div>
+            )}
 
             {listing.isFeatured && (
               <Badge variant="default" className="bg-yellow-500 hover:bg-yellow-600">
