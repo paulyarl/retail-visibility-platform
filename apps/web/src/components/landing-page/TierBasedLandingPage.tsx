@@ -21,8 +21,10 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
       try {
         setIsFetchingTierAndLogo(true);
         
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        
         // Use public tier endpoint (no auth required for public product page)
-        const tierResponse = await fetch(`/api/tenants/${tenantId}/tier/public`);
+        const tierResponse = await fetch(`${apiUrl}/api/tenants/${tenantId}/tier/public`);
         if (tierResponse.ok) {
           const tierData = await tierResponse.json();
           
@@ -33,7 +35,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
           // Get tenant profile for logo if professional or above
           if (effectiveTier === 'professional' || effectiveTier === 'enterprise' || effectiveTier === 'organization' || effectiveTier === 'chain_professional' || effectiveTier === 'chain_enterprise') {
             try {
-              const profileResponse = await fetch(`/public/tenant/${tenantId}/profile`);
+              const profileResponse = await fetch(`${apiUrl}/public/tenant/${tenantId}/profile`);
               if (profileResponse.ok) {
                 const profile = await profileResponse.json();
                 setTenantLogo(profile.logo_url || null);
