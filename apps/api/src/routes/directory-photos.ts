@@ -32,8 +32,8 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
     // verify listing exists & get tenant
     console.log(`[Directory Photos] Looking for listing with slug: "${listingId}"`);
-    const listing = await prisma.directory_listings_list.findUnique({ where: { slug: listingId } });
-    console.log(`[Directory Photos] Found listing:`, listing ? { id: listing.id, slug: listing.slug, businessName: listing.business_name } : 'NOT FOUND');
+    const listing = await prisma.tenants.findUnique({ where: { slug: listingId } });
+    console.log(`[Directory Photos] Found listing:`, listing ? { id: listing.id, slug: listing.slug, name: listing.name } : 'NOT FOUND');
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
     // Enforce 10-photo limit
@@ -57,7 +57,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         return res.status(500).json({ error: "server is not configured for direct uploads (missing SUPABASE envs)" });
       }
       const f = req.file; // buffer + mimetype + originalname
-      const path = `directory/${listing.tenant_id}/${listing.slug || listing.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
+      const path = `directory/${listing.id}/${listing.slug || listing.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
 
       const { error, data } = await supabase.storage.from(StorageBuckets.TENANTS.name).upload(path, f.buffer, {
         cacheControl: "3600",
@@ -93,7 +93,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
         const ext = mimeType.split('/')[1] || 'jpg';
         const filename = `${Date.now()}.${ext}`;
-        const path = `directory/${listing.tenant_id}/${listing.slug || listing.id}/${filename}`;
+        const path = `directory/${listing.id}/${listing.slug || listing.id}/${filename}`;
 
         const { error: uploadError, data: uploadData } = await supabase.storage
           .from(StorageBuckets.TENANTS.name)
@@ -137,7 +137,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
     const created = await prisma.directory_photos.create({
       data: {
-        tenant_id: listing.tenant_id,
+        tenant_id: listing.id,
         listing_id: listingId,
         url,
         width: width ?? null,
@@ -160,7 +160,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
 /** GET /:listingId/photos — list photos for a directory listing, ordered by position */
 r.get("/:listingId/photos", async (req, res) => {
-  const listing = await prisma.directory_listings_list.findUnique({ where: { id: req.params.listingId } });
+  const listing = await prisma.tenants.findUnique({ where: { id: req.params.listingId } });
   if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
   const photos = await prisma.directory_photos.findMany({
@@ -177,7 +177,7 @@ r.put("/:listingId/photos/:photoId", async (req, res) => {
     const { alt, caption, position } = req.body || {};
 
     // Verify listing exists
-    const listing = await prisma.directory_listings_list.findUnique({ where: { id: listingId } });
+    const listing = await prisma.tenants.findUnique({ where: { id: listingId } });
     if (!listing) {
       return res.status(404).json({ error: "directory listing not found" });
     }
@@ -266,7 +266,7 @@ r.put("/:listingId/photos/reorder", async (req, res) => {
     }
 
     // Verify listing exists
-    const listing = await prisma.directory_listings_list.findUnique({ where: { id: listingId } });
+    const listing = await prisma.tenants.findUnique({ where: { id: listingId } });
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
     // Verify all photos belong to this listing
@@ -302,7 +302,7 @@ r.delete("/:listingId/photos/:photoId", async (req, res) => {
     const { listingId, photoId } = req.params;
 
     // Verify listing exists
-    const listing = await prisma.directory_listings_list.findUnique({ where: { id: listingId } });
+    const listing = await prisma.tenants.findUnique({ where: { id: listingId } });
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
     // Verify photo exists and belongs to this listing
