@@ -2853,7 +2853,8 @@ const photoUploadHandler = async (req: any, res: any) => {
 app.use('/api/directory', directoryPhotosRouter);
 
 // Mount directory routes (has catch-all :identifier route that would intercept /directory paths)
-app.use('/api', directoryRoutes);
+// Changed from /api to /api/directory to avoid conflicting with other API routes
+app.use('/api/directory', directoryRoutes);
 
 // Legacy photo upload handler removed - now handled by photos router
 // Old routes:
