@@ -1,32 +1,10 @@
 "use client";
 
-import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, AnimatedCard } from '@/components/ui';
-import PageHeader from '@/components/PageHeader';
-import { ProtectedCard } from '@/lib/auth/ProtectedCard';
-import { AccessPresets } from '@/lib/auth/useAccessControl';
-import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
-
-type SettingCard = {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  href: string;
-  color: string;
-  badge?: string;
-  accessOptions?: any;
-};
-
-type SettingsGroup = {
-  title: string;
-  description: string;
-  cards: SettingCard[];
-};
+import UnifiedSettings, { UnifiedSettingsConfig, transformToUnifiedConfig } from './UnifiedSettings';
 
 export default function PlatformSettings() {
-  const router = useRouter();
-
-  const settingsGroups: SettingsGroup[] = [
+  // Legacy settings groups - will be transformed to unified format
+  const legacySettingsGroups = [
     {
       title: 'Account & Preferences',
       description: 'Personalize your experience',
@@ -127,7 +105,7 @@ export default function PlatformSettings() {
           ),
           href: '/admin/users',
           color: 'bg-blue-500',
-          accessOptions: AccessPresets.PLATFORM_STAFF,
+          accessOptions: { roles: ['admin', 'platform_staff'] },
         },
         {
           title: 'Platform User Maintenance',
@@ -139,7 +117,7 @@ export default function PlatformSettings() {
           ),
           href: '/settings/admin/users',
           color: 'bg-orange-500',
-          accessOptions: AccessPresets.PLATFORM_STAFF,
+          accessOptions: { roles: ['admin', 'platform_staff'] },
         },
       ],
     },
@@ -158,7 +136,7 @@ export default function PlatformSettings() {
           ),
           href: '/settings/admin',
           color: 'bg-purple-500',
-          accessOptions: AccessPresets.PLATFORM_STAFF,
+          accessOptions: { roles: ['admin', 'platform_staff'] },
         },
       ],
     },
@@ -182,61 +160,11 @@ export default function PlatformSettings() {
     },
   ];
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <PageHeader
-        title="Platform Settings"
-        description="Manage platform-wide settings and administration"
-      />
+  const config: UnifiedSettingsConfig = transformToUnifiedConfig(legacySettingsGroups, {
+    title: 'Platform Settings',
+    description: 'Manage platform-wide settings and administration',
+    showLimits: true,
+  });
 
-      <div className="space-y-12">
-        {/* Tenant Limits Badge - Prominent Display */}
-        <div className="mb-8">
-          <TenantLimitBadge variant="full" showUpgrade={true} />
-        </div>
-
-        {settingsGroups.map((group) => (
-          <div key={group.title}>
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {group.title}
-              </h2>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                {group.description}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {group.cards.map((card) => (
-                <ProtectedCard
-                  key={card.title}
-                  accessOptions={card.accessOptions}
-                >
-                  <AnimatedCard
-                    onClick={() => router.push(card.href)}
-                    className="cursor-pointer h-full"
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className={`${card.color} p-3 rounded-lg text-white`}>
-                          {card.icon}
-                        </div>
-                        {card.badge && (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
-                            {card.badge}
-                          </span>
-                        )}
-                      </div>
-                      <CardTitle className="mt-4">{card.title}</CardTitle>
-                      <CardDescription>{card.description}</CardDescription>
-                    </CardHeader>
-                  </AnimatedCard>
-                </ProtectedCard>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <UnifiedSettings config={config} />;
 }

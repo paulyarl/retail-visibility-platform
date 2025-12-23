@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
+import { geocodeAddress, validateCoordinates } from '@/lib/geocoding';
 
 // Google Maps type declarations
 declare global {
@@ -91,6 +92,55 @@ export default function DirectoryMapGoogle({
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mapListings, setMapListings] = useState<DirectoryListing[]>(listings);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+
+  // Geocode listings missing coordinates
+  useEffect(() => {
+    const geocodeMissingCoordinates = async () => {
+      const listingsNeedingGeocoding = mapListings.filter(
+        listing => !listing.latitude || !listing.longitude
+      );
+
+      if (listingsNeedingGeocoding.length === 0) return;
+
+      setIsGeocoding(true);
+      console.log(`[DirectoryMap] Geocoding ${listingsNeedingGeocoding.length} addresses...`);
+
+      const updatedListings = [...mapListings];
+
+      for (const listing of listingsNeedingGeocoding) {
+        const geocodeResult = await geocodeAddress(
+          listing.address || '',
+          listing.city,
+          listing.state,
+          listing.zipCode
+        );
+
+        if (geocodeResult && validateCoordinates(geocodeResult.latitude, geocodeResult.longitude)) {
+          const index = updatedListings.findIndex(l => l.id === listing.id);
+          if (index !== -1) {
+            updatedListings[index] = {
+              ...updatedListings[index],
+              latitude: geocodeResult.latitude,
+              longitude: geocodeResult.longitude,
+            };
+            console.log(`[DirectoryMap] Geocoded "${listing.businessName}": ${geocodeResult.latitude}, ${geocodeResult.longitude}`);
+          }
+        } else {
+          console.warn(`[DirectoryMap] Failed to geocode "${listing.businessName}"`);
+        }
+
+        // Rate limiting: 10 requests per second
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      setMapListings(updatedListings);
+      setIsGeocoding(false);
+      console.log(`[DirectoryMap] Geocoding complete`);
+    };
+
+    geocodeMissingCoordinates();
+  }, [mapListings.length]); // Only run when listings first load
 
   // Fetch from map endpoint if enabled
   useEffect(() => {

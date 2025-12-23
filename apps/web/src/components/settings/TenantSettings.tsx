@@ -1,37 +1,10 @@
 "use client";
 
-import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, AnimatedCard } from '@/components/ui';
-import PageHeader from '@/components/PageHeader';
-import { ProtectedCard } from '@/lib/auth/ProtectedCard';
-import { AccessPresets } from '@/lib/auth/useAccessControl';
-
-type SettingCard = {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  href: string;
-  color: string;
-  badge?: string;
-  accessOptions?: any;
-  fetchOrganization?: boolean;
-  secondaryLink?: {
-    label: string;
-    href: string;
-    icon?: string;
-  };
-};
-
-type SettingsGroup = {
-  title: string;
-  description: string;
-  cards: SettingCard[];
-};
+import UnifiedSettings, { UnifiedSettingsConfig, transformToUnifiedConfig } from './UnifiedSettings';
 
 export default function TenantSettings({ tenantId }: { tenantId: string }) {
-  const router = useRouter();
-
-  const settingsGroups: SettingsGroup[] = [
+  // Legacy settings groups - will be transformed to unified format
+  const legacySettingsGroups = [
     {
       title: 'Account & Preferences',
       description: 'Personalize your experience',
@@ -98,7 +71,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/subscription`,
           color: 'bg-primary-500',
           badge: 'Manage',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
         },
       ],
     },
@@ -117,7 +90,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/organization`,
           color: 'bg-orange-500',
           badge: 'Chain',
-          accessOptions: AccessPresets.ORGANIZATION_MEMBER,
+          accessOptions: { orgMember: true },
           fetchOrganization: true,
         },
         {
@@ -131,7 +104,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/propagation`,
           color: 'bg-indigo-500',
           badge: 'Chain',
-          accessOptions: AccessPresets.CHAIN_PROPAGATION,
+          accessOptions: { chainPropagation: true },
           fetchOrganization: true,
         },
       ],
@@ -161,7 +134,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/settings/location-status`,
           color: 'bg-green-500',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
           badge: 'New',
         },
         {
@@ -174,7 +147,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/settings/branding`,
           color: 'bg-purple-500',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
         },
         {
           title: 'Custom Subdomain',
@@ -187,7 +160,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/subdomain`,
           color: 'bg-blue-600',
           badge: 'GMC',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
           secondaryLink: {
             label: 'Verify Live',
             href: `/t/${tenantId}/settings/subdomain/verify`,
@@ -210,7 +183,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/settings/users`,
           color: 'bg-cyan-500',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
         },
       ],
     },
@@ -229,7 +202,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/hours`,
           color: 'bg-green-500',
           badge: 'Auto-Sync',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
         },
         {
           title: 'Business Category',
@@ -242,7 +215,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/gbp-category`,
           color: 'bg-amber-500',
           badge: 'M3',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
         },
         {
           title: 'Product Categories',
@@ -254,7 +227,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/categories`,
           color: 'bg-indigo-500',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
         },
         {
           title: 'Directory Listing',
@@ -267,7 +240,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/directory`,
           color: 'bg-rose-500',
           badge: 'NEW',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
         },
       ],
     },
@@ -286,7 +259,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/integrations`,
           color: 'bg-green-500',
           badge: 'NEW',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
         },
       ],
     },
@@ -307,7 +280,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/settings/integrations/google`,
           color: 'bg-red-500',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
         },
         {
           title: 'Feed Validation',
@@ -319,7 +292,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/feed-validation`,
           color: 'bg-blue-500',
-          accessOptions: AccessPresets.SUPPORT_OR_TENANT_ADMIN,
+          accessOptions: { roles: ['admin', 'support'] },
         },
       ],
     },
@@ -332,7 +305,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           description: 'Get in touch with our team for help or questions',
           icon: (
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7a2 2 0 002 2z" />
             </svg>
           ),
           href: '/settings/contact',
@@ -343,75 +316,11 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
     },
   ];
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <PageHeader
-        title="Settings"
-        description="Manage your store settings and preferences"
-      />
+  const config: UnifiedSettingsConfig = transformToUnifiedConfig(legacySettingsGroups, {
+    title: 'Settings',
+    description: 'Manage your store settings and preferences',
+    tenantId,
+  });
 
-      <div className="space-y-12">
-        {settingsGroups.map((group) => (
-          <div key={group.title}>
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {group.title}
-              </h2>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                {group.description}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {group.cards.map((card) => (
-                <ProtectedCard
-                  key={card.title}
-                  tenantId={tenantId}
-                  accessOptions={card.accessOptions}
-                  fetchOrganization={card.fetchOrganization}
-                >
-                  <AnimatedCard
-                    onClick={() => router.push(card.href)}
-                    className="cursor-pointer h-full"
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className={`${card.color} p-3 rounded-lg text-white`}>
-                          {card.icon}
-                        </div>
-                        {card.badge && (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
-                            {card.badge}
-                          </span>
-                        )}
-                      </div>
-                      <CardTitle className="mt-4">{card.title}</CardTitle>
-                      <CardDescription>{card.description}</CardDescription>
-                      {card.secondaryLink && (
-                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(card.secondaryLink!.href);
-                            }}
-                            className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            {card.secondaryLink.label}
-                          </button>
-                        </div>
-                      )}
-                    </CardHeader>
-                  </AnimatedCard>
-                </ProtectedCard>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <UnifiedSettings config={config} />;
 }

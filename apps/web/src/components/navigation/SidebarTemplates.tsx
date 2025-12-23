@@ -1,8 +1,9 @@
 import React from 'react';
 import GeneralSidebar from '../GeneralSidebar';
+import NavigationStandards, { NavigationHelpers } from '@/lib/navigation/NavigationStandards';
 
 // NavItem type definition (copied from GeneralSidebar since it's not exported)
-type NavItem = { 
+type NavItem = {
   label: string
   href: string
   icon?: React.ReactNode
@@ -12,72 +13,153 @@ type NavItem = {
   }
   children?: NavItem[]
   accessLevel?: 'public' | 'user' | 'admin' | 'owner'
+  hierarchy?: number
 }
 
-// Icon components
-const DashboardIcon = () => (
-  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
-
-const InventoryIcon = () => (
-  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-  </svg>
-);
-
-const UsersIcon = () => (
-  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-  </svg>
-);
-
-const SettingsIcon = () => (
-  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
-
-const StoreIcon = () => (
-  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-  </svg>
-);
-
-const AnalyticsIcon = () => (
-  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-  </svg>
-);
+// Icon components - Use NavigationStandards for consistency
+const DashboardIcon = NavigationHelpers.getStandardIcon('ANALYTICS');
+const InventoryIcon = NavigationHelpers.getStandardIcon('STORE');
+const UsersIcon = NavigationHelpers.getStandardIcon('TEAM');
+const SettingsIcon = NavigationHelpers.getStandardIcon('SETTINGS');
+const StoreIcon = NavigationHelpers.getStandardIcon('STORE');
+const AnalyticsIcon = NavigationHelpers.getStandardIcon('ANALYTICS');
 
 // Tenant-scoped sidebar template
 export const TenantSidebarTemplate = () => {
-  const tenantNavItems: NavItem[] = [
+  const tenantNavItems: NavItem[] = NavigationHelpers.sortByHierarchy([
     {
       label: 'Dashboard',
       href: '/t/[tenantId]',
-      icon: <DashboardIcon />
+      icon: NavigationHelpers.getStandardIcon('DASHBOARD'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.DASHBOARD,
     },
     {
-      label: 'Inventory',
-      href: '/t/[tenantId]/items',
-      icon: <InventoryIcon />,
-      badge: {
-        text: '47',
-        variant: 'success'
-      }
+      label: 'Onboarding',
+      href: '/t/[tenantId]/onboarding',
+      icon: NavigationHelpers.getStandardIcon('HELP'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.DASHBOARD,
+    },
+    {
+      label: 'User Panel',
+      href: '/t/[tenantId]/account',
+      icon: NavigationHelpers.getStandardIcon('USER_PANEL'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.USER_PANEL,
+      children: [
+        {
+          label: 'Account',
+          href: '/t/[tenantId]/account'
+        },
+        {
+          label: 'Teams',
+          href: '/t/[tenantId]/teams',
+          children: [
+            {
+              label: 'Store Team',
+              href: '/t/[tenantId]/teams/store',
+              children: [
+                {
+                  label: 'Store Owner',
+                  href: '/t/[tenantId]/teams/store/owner'
+                },
+                {
+                  label: 'Store Member',
+                  href: '/t/[tenantId]/teams/store/member'
+                },
+                {
+                  label: 'Store Admin',
+                  href: '/t/[tenantId]/teams/store/admin'
+                }
+              ]
+            },
+            {
+              label: 'Platform Team',
+              href: '/t/[tenantId]/teams/platform',
+              children: [
+                {
+                  label: 'Platform Admin',
+                  href: '/t/[tenantId]/teams/platform/admin'
+                },
+                {
+                  label: 'Platform Support',
+                  href: '/t/[tenantId]/teams/platform/support'
+                },
+                {
+                  label: 'Platform Viewer',
+                  href: '/t/[tenantId]/teams/platform/viewer'
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      label: 'Store Center',
+      href: '/t/[tenantId]/store',
+      icon: NavigationHelpers.getStandardIcon('STORE_CENTER'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.STORE_CENTER,
+      children: [
+        {
+          label: 'Store Profile',
+          href: '/t/[tenantId]/store/profile'
+        },
+        {
+          label: 'Store Sync',
+          href: '/t/[tenantId]/store/sync'
+        },
+        {
+          label: 'Store Settings',
+          href: '/t/[tenantId]/store/settings'
+        },
+        {
+          label: 'Platform Centers',
+          href: '/t/[tenantId]/store/platforms'
+        },
+        {
+          label: 'Organization',
+          href: '/t/[tenantId]/store/organization'
+        },
+        {
+          label: 'Subscription',
+          href: '/t/[tenantId]/store/subscription'
+        }
+      ]
+    },
+    {
+      label: 'Inventory Center',
+      href: '/t/[tenantId]/inventory',
+      icon: NavigationHelpers.getStandardIcon('INVENTORY_CENTER'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.INVENTORY_MANAGEMENT,
+      children: [
+        {
+          label: 'Items',
+          href: '/t/[tenantId]/inventory/items',
+          badge: {
+            text: '47',
+            variant: 'success'
+          }
+        },
+        {
+          label: 'Barcode Scanner',
+          href: '/t/[tenantId]/inventory/scanner'
+        },
+        {
+          label: 'Quick Start',
+          href: '/t/[tenantId]/inventory/quick-start'
+        }
+      ]
     },
     {
       label: 'Storefront',
       href: '/t/[tenantId]/storefront',
-      icon: <StoreIcon />
+      icon: NavigationHelpers.getStandardIcon('STORE'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
     },
     {
       label: 'Categories',
       href: '/t/[tenantId]/categories',
-      icon: <AnalyticsIcon />,
+      icon: NavigationHelpers.getStandardIcon('ANALYTICS'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
       children: [
         {
           label: 'All Categories',
@@ -96,7 +178,8 @@ export const TenantSidebarTemplate = () => {
     {
       label: 'Settings',
       href: '/t/[tenantId]/settings',
-      icon: <SettingsIcon />,
+      icon: NavigationHelpers.getStandardIcon('SETTINGS'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.ADVANCED_FEATURES,
       children: [
         {
           label: 'General',
@@ -116,7 +199,7 @@ export const TenantSidebarTemplate = () => {
         }
       ]
     }
-  ];
+  ]);
 
   return (
     <GeneralSidebar
@@ -129,79 +212,94 @@ export const TenantSidebarTemplate = () => {
 
 // Admin-scoped sidebar template
 export const AdminSidebarTemplate = () => {
-  const adminNavItems: NavItem[] = [
+  const adminNavItems: NavItem[] = NavigationHelpers.sortByHierarchy([
     {
       label: 'Admin Dashboard',
-      href: '/settings/admin',
-      icon: <DashboardIcon />
+      href: '/admin',
+      icon: NavigationHelpers.getStandardIcon('ADMIN'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_ADMIN,
     },
     {
       label: 'User Management',
-      href: '/settings/admin/users',
-      icon: <UsersIcon />,
+      href: '/admin/users',
+      icon: NavigationHelpers.getStandardIcon('TEAM'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_USERS,
       children: [
         {
           label: 'All Users',
-          href: '/settings/admin/users'
+          href: '/admin/users'
         },
         {
           label: 'Invitations',
-          href: '/settings/admin/invitations'
+          href: '/admin/invitations'
         },
         {
           label: 'Permissions',
-          href: '/settings/admin/permissions'
+          href: '/admin/permissions'
         }
       ]
     },
     {
       label: 'Tenant Management',
-      href: '/settings/admin/tenants',
-      icon: <StoreIcon />,
+      href: '/admin/tenants',
+      icon: NavigationHelpers.getStandardIcon('STORE'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_USERS,
       children: [
         {
           label: 'All Tenants',
-          href: '/settings/admin/tenants'
+          href: '/admin/tenants'
         },
         {
           label: 'Tenant Limits',
-          href: '/settings/admin/limits'
+          href: '/admin/limits'
         },
         {
           label: 'Capacity Overview',
-          href: '/settings/admin/capacity'
+          href: '/admin/capacity'
         }
       ]
     },
     {
-      label: 'System Settings',
-      href: '/settings/admin/system',
-      icon: <SettingsIcon />,
+      label: 'Platform Settings',
+      href: '/admin/settings',
+      icon: NavigationHelpers.getStandardIcon('SETTINGS'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_SETTINGS,
       children: [
         {
-          label: 'Platform Settings',
-          href: '/settings/admin/system'
+          label: 'General Settings',
+          href: '/admin/settings'
         },
         {
           label: 'Feature Flags',
-          href: '/settings/admin/features'
+          href: '/admin/features'
         },
         {
-          label: 'Analytics',
-          href: '/settings/admin/analytics'
+          label: 'Integrations',
+          href: '/admin/integrations'
         }
       ]
     },
     {
-      label: 'Integrations',
-      href: '/settings/admin/integrations',
-      icon: <AnalyticsIcon />,
-      badge: {
-        text: 'NEW',
-        variant: 'warning'
-      }
+      label: 'Insights & Analytics',
+      href: '/insights',
+      icon: NavigationHelpers.getStandardIcon('ANALYTICS'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_INSIGHTS,
+      children: [
+        {
+          label: 'Analytics Dashboard',
+          href: '/insights/analytics'
+        },
+        {
+          label: 'Reports',
+          href: '/insights/reports'
+        },
+        {
+          label: 'Performance',
+          href: '/insights/performance'
+        }
+      ]
     }
-  ];
+  ]);
 
   return (
     <GeneralSidebar
@@ -214,16 +312,65 @@ export const AdminSidebarTemplate = () => {
 
 // Platform-scoped sidebar template
 export const PlatformSidebarTemplate = () => {
-  const platformNavItems: NavItem[] = [
+  const platformNavItems: NavItem[] = NavigationHelpers.sortByHierarchy([
     {
       label: 'Platform Dashboard',
       href: '/',
-      icon: <DashboardIcon />
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_DASHBOARD'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_DASHBOARD,
+      children: [
+        {
+          label: 'Overview',
+          href: '/'
+        },
+        {
+          label: 'Admin Controls',
+          href: '/admin',
+          accessLevel: 'admin',
+          children: [
+            {
+              label: 'User Management',
+              href: '/admin/users'
+            },
+            {
+              label: 'Tenant Management',
+              href: '/admin/tenants'
+            },
+            {
+              label: 'System Settings',
+              href: '/admin/system'
+            },
+            {
+              label: 'Feature Flags',
+              href: '/admin/features'
+            }
+          ]
+        },
+        {
+          label: 'Insights',
+          href: '/insights',
+          children: [
+            {
+              label: 'Analytics',
+              href: '/insights/analytics'
+            },
+            {
+              label: 'Reports',
+              href: '/insights/reports'
+            },
+            {
+              label: 'Performance',
+              href: '/insights/performance'
+            }
+          ]
+        }
+      ]
     },
     {
       label: 'Tenants',
       href: '/tenants',
-      icon: <StoreIcon />,
+      icon: NavigationHelpers.getStandardIcon('STORE'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
       badge: {
         text: '12',
         variant: 'default'
@@ -232,12 +379,14 @@ export const PlatformSidebarTemplate = () => {
     {
       label: 'Directory',
       href: '/directory',
-      icon: <AnalyticsIcon />
+      icon: NavigationHelpers.getStandardIcon('ANALYTICS'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
     },
     {
       label: 'Settings',
       href: '/settings',
-      icon: <SettingsIcon />,
+      icon: NavigationHelpers.getStandardIcon('SETTINGS'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.ADVANCED_FEATURES,
       children: [
         {
           label: 'Account',
@@ -262,7 +411,7 @@ export const PlatformSidebarTemplate = () => {
         }
       ]
     }
-  ];
+  ]);
 
   return (
     <GeneralSidebar
