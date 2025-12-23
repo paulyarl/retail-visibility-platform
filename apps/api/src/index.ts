@@ -2852,6 +2852,9 @@ const photoUploadHandler = async (req: any, res: any) => {
 // Mount photos router (handles all photo endpoints with position support)
 app.use('/api/directory', directoryPhotosRouter);
 
+// Mount directory routes (has catch-all :identifier route that would intercept /directory paths)
+app.use('/api', directoryRoutes);
+
 // Legacy photo upload handler removed - now handled by photos router
 // Old routes:
 // - POST /items/:id/photos -> now in photos.ts with position logic

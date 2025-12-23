@@ -11,8 +11,8 @@ const r = Router();
 
 // Helper function to resolve listing identifier (tenant ID or slug) to tenant record
 async function resolveListing(identifier: string) {
-  // Check if identifier is a tenant ID (starts with 't-') or slug
-  const isTenantId = identifier.startsWith('t-');
+  // Check if identifier is a tenant ID (starts with 'tid-') or slug
+  const isTenantId = identifier.startsWith('tid-');
 
   let whereCondition;
   if (isTenantId) {
@@ -173,17 +173,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 r.get("/:listingId/photos", async (req, res) => {
   const { listingId } = req.params;
 
-  // Check if listingId is a tenant ID (starts with 't-') or slug
-  const isTenantId = listingId.startsWith('t-');
-
-  let whereCondition;
-  if (isTenantId) {
-    whereCondition = { id: listingId };
-  } else {
-    whereCondition = { slug: listingId };
-  }
-
-  const listing = await prisma.tenants.findUnique({ where: whereCondition });
+  const listing = await resolveListing(listingId);
   if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
   const photos = await prisma.directory_photos.findMany({
