@@ -28,7 +28,8 @@ export default function DirectoryPhotoGalleryDisplay({ listing }: DirectoryPhoto
     const loadPhotos = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/directory/${listing.id}/photos`);
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const res = await fetch(`${apiUrl}/api/directory/${listing.id}/photos`);
         if (res.ok) {
           const data = await res.json();
           const photoAssets = Array.isArray(data) ? data : [];
