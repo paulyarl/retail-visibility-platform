@@ -7,6 +7,13 @@ import { generateQuickStart } from "../lib/id-generator";
 
 const prismaClient = prisma;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!
+);
+
 const r = Router();
 
 // Helper function to resolve listing identifier (tenant ID or slug) to tenant record
