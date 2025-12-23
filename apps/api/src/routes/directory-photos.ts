@@ -9,13 +9,24 @@ const prismaClient = prisma;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 const r = Router();
 
-// server-side supabase client (service role)
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase =
-  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    : null;
+// Helper function to resolve listing identifier (tenant ID or slug) to tenant record
+async function resolveListing(identifier: string) {
+  // Check if identifier is a tenant ID (starts with 't-') or slug
+  const isTenantId = identifier.startsWith('t-');
+
+  let whereCondition;
+  if (isTenantId) {
+    whereCondition = { id: identifier };
+  } else {
+    whereCondition = { slug: identifier };
+  }
+
+  console.log(`[resolveListing] Looking for ${isTenantId ? 'tenant ID' : 'slug'}: "${identifier}"`);
+  const listing = await prisma.tenants.findUnique({ where: whereCondition });
+  console.log(`[resolveListing] Found listing:`, listing ? { id: listing.id, slug: listing.slug, name: listing.name } : 'NOT FOUND');
+
+  return listing;
+}
 
 /**
  * POST /:listingId/photos
@@ -31,8 +42,8 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     const listingId = req.params.listingId;
 
     // verify listing exists & get tenant
-    console.log(`[Directory Photos] Looking for listing with slug: "${listingId}"`);
-    const listing = await prisma.tenants.findUnique({ where: { slug: listingId } });
+    console.log(`[Directory Photos] Looking for listing with identifier: "${listingId}"`);
+    const listing = await resolveListing(listingId);
     console.log(`[Directory Photos] Found listing:`, listing ? { id: listing.id, slug: listing.slug, name: listing.name } : 'NOT FOUND');
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
@@ -160,7 +171,19 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
 /** GET /:listingId/photos — list photos for a directory listing, ordered by position */
 r.get("/:listingId/photos", async (req, res) => {
-  const listing = await prisma.tenants.findUnique({ where: { id: req.params.listingId } });
+  const { listingId } = req.params;
+
+  // Check if listingId is a tenant ID (starts with 't-') or slug
+  const isTenantId = listingId.startsWith('t-');
+
+  let whereCondition;
+  if (isTenantId) {
+    whereCondition = { id: listingId };
+  } else {
+    whereCondition = { slug: listingId };
+  }
+
+  const listing = await prisma.tenants.findUnique({ where: whereCondition });
   if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
   const photos = await prisma.directory_photos.findMany({
@@ -177,7 +200,7 @@ r.put("/:listingId/photos/:photoId", async (req, res) => {
     const { alt, caption, position } = req.body || {};
 
     // Verify listing exists
-    const listing = await prisma.tenants.findUnique({ where: { id: listingId } });
+    const listing = await resolveListing(listingId);
     if (!listing) {
       return res.status(404).json({ error: "directory listing not found" });
     }
@@ -266,7 +289,7 @@ r.put("/:listingId/photos/reorder", async (req, res) => {
     }
 
     // Verify listing exists
-    const listing = await prisma.tenants.findUnique({ where: { id: listingId } });
+    const listing = await resolveListing(listingId);
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
     // Verify all photos belong to this listing
@@ -302,7 +325,7 @@ r.delete("/:listingId/photos/:photoId", async (req, res) => {
     const { listingId, photoId } = req.params;
 
     // Verify listing exists
-    const listing = await prisma.tenants.findUnique({ where: { id: listingId } });
+    const listing = await resolveListing(listingId);
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
     // Verify photo exists and belongs to this listing

@@ -2850,7 +2850,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 };
 
 // Mount photos router (handles all photo endpoints with position support)
-app.use('/api', photosRouter);
+app.use('/api/directory', directoryPhotosRouter);
 
 // Legacy photo upload handler removed - now handled by photos router
 // Old routes:
