@@ -31,7 +31,9 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     const listingId = req.params.listingId;
 
     // verify listing exists & get tenant
+    console.log(`[Directory Photos] Looking for listing with slug: "${listingId}"`);
     const listing = await prisma.directory_listings_list.findUnique({ where: { slug: listingId } });
+    console.log(`[Directory Photos] Found listing:`, listing ? { id: listing.id, slug: listing.slug, businessName: listing.business_name } : 'NOT FOUND');
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
     // Enforce 10-photo limit
