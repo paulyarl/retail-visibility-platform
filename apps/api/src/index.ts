@@ -5033,9 +5033,9 @@ console.log('✅ MFA routes mounted (two-factor authentication)');
 import authSessionsRoutes from './routes/auth-sessions';
 import securityAlertsRoutes from './routes/security-alerts';
 app.use('/api/auth', authSessionsRoutes);
-app.use('/api/user', securityAlertsRoutes);
+app.use('/api/security', securityAlertsRoutes);
 console.log('✅ Security sessions routes mounted at /api/auth/sessions');
-console.log('✅ Security alerts routes mounted at /api/user/security-alerts');
+console.log('✅ Security alerts routes mounted at /api/security/security-alerts');
 
 /* ------------------------------ clone (products & categories) ------------------------------ */
 import cloneRoutes from './routes/clone';

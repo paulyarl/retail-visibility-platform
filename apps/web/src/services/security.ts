@@ -46,7 +46,7 @@ export async function revokeAllSessions(): Promise<void> {
  * Get security alerts for the current user
  */
 export async function getSecurityAlerts(): Promise<SecurityAlert[]> {
-  const response = await api.get('/api/user/security-alerts');
+  const response = await api.get('/api/security/security-alerts');
 
   if (!response.ok) {
     throw new Error('Failed to fetch security alerts');
@@ -60,7 +60,7 @@ export async function getSecurityAlerts(): Promise<SecurityAlert[]> {
  * Mark a security alert as read
  */
 export async function markAlertAsRead(alertId: string): Promise<void> {
-  const response = await api.put(`/api/user/security-alerts/${alertId}/read`);
+  const response = await api.put(`/api/security/security-alerts/${alertId}/read`);
 
   if (!response.ok) {
     throw new Error('Failed to mark alert as read');
@@ -71,7 +71,7 @@ export async function markAlertAsRead(alertId: string): Promise<void> {
  * Dismiss a security alert
  */
 export async function dismissAlert(alertId: string): Promise<void> {
-  const response = await api.delete(`/api/user/security-alerts/${alertId}`);
+  const response = await api.delete(`/api/security/security-alerts/${alertId}`);
 
   if (!response.ok) {
     throw new Error('Failed to dismiss alert');
@@ -82,7 +82,7 @@ export async function dismissAlert(alertId: string): Promise<void> {
  * Get security alert preferences
  */
 export async function getAlertPreferences(): Promise<Record<string, boolean>> {
-  const response = await api.get('/api/user/security-alerts/preferences');
+  const response = await api.get('/api/security/security-alerts/preferences');
 
   if (!response.ok) {
     throw new Error('Failed to fetch alert preferences');
@@ -96,7 +96,7 @@ export async function getAlertPreferences(): Promise<Record<string, boolean>> {
  * Update security alert preferences
  */
 export async function updateAlertPreferences(preferences: Record<string, boolean>): Promise<void> {
-  const response = await api.put('/api/user/security-alerts/preferences', preferences);
+  const response = await api.put('/api/security/security-alerts/preferences', preferences);
 
   if (!response.ok) {
     throw new Error('Failed to update alert preferences');
