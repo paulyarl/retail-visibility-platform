@@ -33,6 +33,7 @@ export default function PageHeader({
   badge,
 }: PageHeaderProps) {
   const [mounted, setMounted] = useState(false);
+  const router = useRouter(); // Must be called before any conditional returns
 
   useEffect(() => {
     setMounted(true);
@@ -63,8 +64,6 @@ export default function PageHeader({
       </div>
     );
   }
-
-  const router = useRouter();
 
   return (
     <div className="bg-white border-b border-neutral-200">
