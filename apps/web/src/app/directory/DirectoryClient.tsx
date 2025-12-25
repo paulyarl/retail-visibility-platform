@@ -324,6 +324,7 @@ export default function DirectoryClient() {
             entityType: 'search',
             entityId: `near-me-${lat}-${lng}`,
             entityName: 'Near Me Search',
+            pageType: 'search_results',
             context: {
               searchType: 'location',
               latitude: parseFloat(lat),
@@ -337,6 +338,7 @@ export default function DirectoryClient() {
             entityType: 'search',
             entityId: `search-${search}`,
             entityName: search,
+            pageType: 'search_results',
             context: {
               searchType: 'text',
               query: search
