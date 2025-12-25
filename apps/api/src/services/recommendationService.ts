@@ -330,14 +330,17 @@ export async function trackUserBehavior({
   const pool = getDirectPool();
   
   try {
-    // Insert actual entity_id - MVs need this to join with stores
+    // For stores and products, entity_id is a UUID
+    // For categories and searches, entity_id is text (slug or search query)
+    const needsUuidCast = entityType === 'store' || entityType === 'product';
+    
     const query = `
       INSERT INTO user_behavior_simple (
         user_id, session_id, entity_type, entity_id, entity_name, context,
         location_lat, location_lng, referrer, user_agent, ip_address, 
         duration_seconds, page_type
       ) VALUES ($1, $2, $3::text, 
-        $4::uuid, 
+        ${needsUuidCast ? '$4::uuid' : '$4::text'}, 
         $5, $6, $7, $8, $9, $10, $11, $12, $13)
       ON CONFLICT DO NOTHING
     `;
