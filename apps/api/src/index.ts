@@ -813,11 +813,17 @@ app.patch("/api/tenants/:id/coordinates", async (req, res) => {
       WHERE tenant_id = ${id}
     `;
 
+    // Refresh directory_gbp_listings MV to pick up new coordinates
+    // This MV is used by recommendation MVs, so it needs to be current
+    await basePrisma.$executeRaw`
+      REFRESH MATERIALIZED VIEW CONCURRENTLY directory_gbp_listings
+    `;
+
     const tenant = await prisma.tenants.findUnique({
       where: { id },
     });
 
-    console.log(`[PATCH /api/tenants/${id}/coordinates] Updated coordinates for ${tenant?.name || 'unknown'} in business_profiles and directory_listings:`, parsed.data);
+    console.log(`[PATCH /api/tenants/${id}/coordinates] Updated coordinates for ${tenant?.name || 'unknown'} in business_profiles, directory_listings, and refreshed directory_gbp_listings MV:`, parsed.data);
 
     res.json({
       success: true,
