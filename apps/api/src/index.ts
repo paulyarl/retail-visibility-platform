@@ -191,9 +191,11 @@ import googleMerchantOAuthRoutes from './routes/google-merchant-oauth';
 
 const app = express();
 
-// Trust proxy - required for Railway/production deployment
-// This allows Express to trust X-Forwarded-* headers from the proxy
-app.set('trust proxy', true);
+// Trust proxy - only enable in production where there's an actual proxy (Railway, Vercel)
+// In development, there's no proxy so this should be false to avoid security warnings
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', true);
+}
 
 // Initialize Sentry for error tracking (only if DSN is provided)
 const sentryEnabled = process.env.SENTRY_DSN && process.env.SENTRY_DSN.trim() !== '';
