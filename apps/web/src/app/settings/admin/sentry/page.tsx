@@ -169,7 +169,7 @@ export default function SentryMonitoringPage() {
                     {error || 'Add SENTRY_API_TOKEN and SENTRY_ORG_SLUG to environment variables to enable live monitoring.'}
                   </p>
                 </div>
-                <Badge variant={error ? 'destructive' : 'warning'}>
+                <Badge variant={error ? 'error' : 'warning'}>
                   {error ? 'Error' : 'Setup Required'}
                 </Badge>
               </div>
@@ -251,7 +251,7 @@ export default function SentryMonitoringPage() {
                       <p className="font-medium text-sm">TypeError: Cannot read property</p>
                       <p className="text-xs text-neutral-500">Web App - 2 minutes ago</p>
                     </div>
-                    <Badge variant="destructive">High</Badge>
+                    <Badge variant="error">High</Badge>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
                     <div>
