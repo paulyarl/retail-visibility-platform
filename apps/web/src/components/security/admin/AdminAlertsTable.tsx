@@ -49,10 +49,10 @@ export function AdminAlertsTable({ alerts }: AdminAlertsTableProps) {
   };
 
   const getSeverityBadge = (severity: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-      critical: 'destructive',
-      warning: 'secondary',
-      info: 'default',
+    const variants: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
+      critical: 'error',
+      warning: 'warning',
+      info: 'info',
     };
     return (
       <Badge variant={variants[severity] || 'default'}>

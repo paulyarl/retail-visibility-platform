@@ -128,7 +128,7 @@ export function SecurityDashboard() {
             <Users className="h-4 w-4" />
             User Sessions
             {sessionStats && (
-              <Badge variant="secondary" className="ml-1">
+              <Badge variant="info" className="ml-1">
                 {sessionStats.activeSessions}
               </Badge>
             )}
@@ -137,7 +137,7 @@ export function SecurityDashboard() {
             <Bell className="h-4 w-4" />
             Security Alerts
             {alertStats && alertStats.unreadAlerts > 0 && (
-              <Badge variant="destructive" className="ml-1">
+              <Badge variant="error" className="ml-1">
                 {alertStats.unreadAlerts}
               </Badge>
             )}
