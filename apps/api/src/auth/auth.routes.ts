@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { threatDetectionService } from '../services/threat-detection';
 import { prisma } from '../prisma';
 import { z } from 'zod';
+import { trackSession, trackFailedLogin } from '../middleware/session-tracker';
 
 const router = Router();
 
@@ -95,6 +96,16 @@ router.post('/login', async (req: Request, res: Response) => {
       }
     }).catch(err => console.error('Failed to log successful login:', err));
     
+    // Track session for security monitoring
+    if (result.accessToken) {
+      trackSession({
+        userId: result.user.id,
+        token: result.accessToken,
+        ipAddress,
+        userAgent,
+      }).catch(err => console.error('Failed to track session:', err));
+    }
+    
     res.json({
       ...result,
     });
@@ -137,6 +148,11 @@ router.post('/login', async (req: Request, res: Response) => {
         // Record threat event for failed login
         await threatDetectionService.recordFailedLogin(ipAddress, userAgent, email);
         
+        // Track failed login for security alerts
+        const reason = error.message.includes('deactivated') ? 'account_deactivated' : 'invalid_password';
+        trackFailedLogin(email, ipAddress, userAgent, reason)
+          .catch(err => console.error('Failed to track failed login:', err));
+        
         return res.status(401).json({
           error: 'authentication_failed',
           message: error.message,
@@ -158,48 +174,7 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /api/auth/sessions
- * Get active sessions for authenticated user
- */
-router.get('/sessions', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user?.userId || (req as any).user?.user_id || (req as any).user?.id;
-    
-    if (!userId) {
-      console.error('[Sessions] No userId found in req.user:', req.user);
-      return res.status(401).json({
-        error: 'unauthorized',
-        message: 'User not authenticated',
-      });
-    }
-
-    // Mock data for now - replace with actual session service
-    const sessions = [
-      {
-        id: '1',
-        userId,
-        deviceName: 'Chrome on Windows',
-        ipAddress: req.ip || '127.0.0.1',
-        location: 'Unknown',
-        lastActive: new Date(),
-        createdAt: new Date(),
-        current: true,
-      }
-    ];
-
-    res.json({
-      success: true,
-      sessions,
-    });
-  } catch (error) {
-    console.error('[Sessions Error]', error);
-    res.status(500).json({
-      error: 'internal_error',
-      message: 'Failed to fetch sessions',
-    });
-  }
-});
+// Note: /sessions endpoint moved to auth-sessions.ts for full implementation
 
 /**
  * POST /api/auth/refresh
