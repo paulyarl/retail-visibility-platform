@@ -12,6 +12,7 @@ import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBr
 import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
 import { Pagination } from '@/components/ui';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import dynamic from 'next/dynamic';
 
 // Cache configuration for directory data
@@ -310,6 +311,38 @@ export default function DirectoryClient() {
       try {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const params = new URLSearchParams(searchParams.toString());
+
+        // Track directory browse behavior (Near Me search)
+        const lat = params.get('lat');
+        const lng = params.get('lng');
+        const sort = params.get('sort');
+        const search = params.get('search');
+        
+        if (lat && lng && sort === 'distance') {
+          // Track "Near Me" search
+          trackBehaviorClient({
+            entityType: 'search',
+            entityId: `near-me-${lat}-${lng}`,
+            entityName: 'Near Me Search',
+            context: {
+              searchType: 'location',
+              latitude: parseFloat(lat),
+              longitude: parseFloat(lng),
+              sort
+            }
+          });
+        } else if (search) {
+          // Track text search
+          trackBehaviorClient({
+            entityType: 'search',
+            entityId: `search-${search}`,
+            entityName: search,
+            context: {
+              searchType: 'text',
+              query: search
+            }
+          });
+        }
 
         // Use materialized view endpoint for faster queries
         const response = await fetch(`${apiBaseUrl}/api/directory/mv/search?${params.toString()}`);

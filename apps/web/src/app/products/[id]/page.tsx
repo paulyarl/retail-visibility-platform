@@ -5,6 +5,7 @@ import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLanding
 import { ProductNavigation } from '@/components/products/ProductNavigation';
 import { ProductRecommendations } from '@/components/products/ProductRecommendations';
 import { computeStoreStatus } from '@/lib/hours-utils';
+import { trackProductView } from '@/utils/behaviorTracking';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';
@@ -275,6 +276,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   const { product, tenant, storeStatus, directorySlug } = data;
   const businessName = tenant.metadata?.businessName || tenant.name;
+  
+  // Track product view for recommendations (fire and forget)
+  trackProductView(product.id, product.tenantId, product.tenantCategoryId || undefined).catch(err => 
+    console.error('Failed to track product view:', err)
+  );
 
   // Check if product is publicly accessible
   const isPubliclyAccessible = product.itemStatus === 'active' && product.visibility === 'public';

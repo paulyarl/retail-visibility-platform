@@ -21,6 +21,7 @@ import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 import { getCategoryUrl } from '@/utils/slug';
 import StorefrontMap from '@/components/storefront/StorefrontMap';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
+import { trackStorefrontView } from '@/utils/behaviorTracking';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -259,6 +260,21 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
+  
+  // Track storefront view for recommendations (fire and forget)
+  if (category && currentCategory) {
+    // Track category browse on storefront
+    import('@/utils/behaviorTracking').then(({ trackCategoryBrowse }) => {
+      trackCategoryBrowse(currentCategory.id || category, currentCategory.slug || category).catch(err => 
+        console.error('Failed to track category browse:', err)
+      );
+    });
+  } else {
+    // Track general storefront view
+    trackStorefrontView(id, storeCategories || []).catch(err => 
+      console.error('Failed to track storefront view:', err)
+    );
+  }
   const totalPages = Math.ceil(total / limit);
 
   // API base URL for additional calls
