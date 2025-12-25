@@ -101,7 +101,7 @@ export function useTenantTier(tenantId: string) {
   return useQuery({
     queryKey: ['tenant', tenantId, 'tier'],
     queryFn: async (): Promise<TenantTier> => {
-      const response = await fetch(`${API_BASE}/api/tenants/${tenantId}/tier`);
+      const response = await api.get(`/api/tenants/${tenantId}/tier`);
       if (!response.ok) {
         throw new Error(`Failed to fetch tenant tier: ${response.status}`);
       }
@@ -116,7 +116,7 @@ export function useTenantUsage(tenantId: string) {
   return useQuery({
     queryKey: ['tenant', tenantId, 'usage'],
     queryFn: async (): Promise<TenantUsage> => {
-      const response = await fetch(`${API_BASE}/api/tenants/${tenantId}/usage`);
+      const response = await api.get(`/api/tenants/${tenantId}/usage`);
       if (!response.ok) {
         throw new Error(`Failed to fetch tenant usage: ${response.status}`);
       }
@@ -131,7 +131,7 @@ export function useTenant(tenantId: string) {
   return useQuery({
     queryKey: ['tenant', tenantId],
     queryFn: async (): Promise<Tenant> => {
-      const response = await fetch(`${API_BASE}/api/tenants/${tenantId}`);
+      const response = await api.get(`/api/tenants/${tenantId}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch tenant: ${response.status}`);
       }
@@ -147,7 +147,7 @@ export function useTenantCategories(tenantId: string) {
   return useQuery({
     queryKey: ['tenant', tenantId, 'categories'],
     queryFn: async (): Promise<Category[]> => {
-      const response = await fetch(`${API_BASE}/api/tenant/${tenantId}/categories`);
+      const response = await api.get(`/api/tenant/${tenantId}/categories`);
       if (!response.ok) {
         throw new Error(`Failed to fetch tenant categories: ${response.status}`);
       }
@@ -175,8 +175,8 @@ export function useItems(tenantId?: string, filters?: Record<string, any>) {
         });
       }
 
-      const url = `${API_BASE}/api/items${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url);
+      const url = `/api/items${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await api.get(url);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch items: ${response.status}`);
@@ -192,8 +192,11 @@ export function useItemsStats(tenantId?: string) {
   return useQuery({
     queryKey: ['items', 'stats', tenantId].filter(Boolean),
     queryFn: async (): Promise<ItemsStats> => {
-      const params = tenantId ? `?tenantId=${tenantId}` : '';
-      const response = await fetch(`${API_BASE}/api/items/stats${params}`);
+      if (!tenantId) {
+        throw new Error('Tenant ID is required for items stats');
+      }
+      const params = `?tenantId=${tenantId}`;
+      const response = await api.get(`/api/items/stats${params}`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch items stats: ${response.status}`);
@@ -202,6 +205,7 @@ export function useItemsStats(tenantId?: string) {
     },
     staleTime: 1 * 60 * 1000, // 1 minute - stats update frequently
     gcTime: 5 * 60 * 1000, // 5 minutes cache
+    enabled: !!tenantId, // Only run when tenantId is available
   });
 }
 
