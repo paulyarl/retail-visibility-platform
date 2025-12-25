@@ -84,7 +84,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
         WHERE dcp.actual_product_count > 0  -- Only stores with actual products
           AND dcp.is_published = true
           AND dcp.directory_visible = true
-          AND dcp.tenant_id != $6  -- Use tenant_id for reliable exclusion
+          AND dcp.tenant_id != $5  -- Use tenant_id for reliable exclusion
           AND dcl.logo_url IS NOT NULL
           AND dcl.logo_url != ''  -- Hard requirement: must have logo
         ORDER BY dcp.category_id, dcp.tenant_id, relevance_score DESC, dcp.rating_avg DESC, dcp.actual_product_count DESC
@@ -95,7 +95,6 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
         current.city || '',
         current.state || '',
         current.rating_avg || 0,
-        slug || '',
         current.tenant_id || '',  // Use current store's tenant_id for exclusion
       ]);
 
