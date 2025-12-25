@@ -9,11 +9,14 @@ import { basePrisma } from '../prisma';
 
 const router = Router();
 
+console.log('[Security Alerts Router] Initializing security-alerts routes');
+
 /**
  * GET /api/user/security-alerts
  * Get all security alerts for the current user
  */
 router.get('/security-alerts', authenticateToken, async (req, res) => {
+  console.log('[GET /api/user/security-alerts] Route handler called');
   try {
     const userId = req.user?.user_id;
     if (!userId) {
