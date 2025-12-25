@@ -1432,7 +1432,7 @@ model user_behavior_simple {
   user_id          String?   @db.Uuid
   session_id       String?   @db.VarChar(255)
   entity_type      String    @db.VarChar(20)
-  entity_id        String    @db.Text
+  entity_id        String
   entity_name      String?   @db.VarChar(255)
   context          Json?
   timestamp        DateTime? @default(now()) @db.Timestamptz(6)
@@ -1496,67 +1496,130 @@ model users {
   is_active                        Boolean                            @default(true)
   created_at                       DateTime                           @default(now())
   updated_at                       DateTime
-  // MFA (Multi-Factor Authentication) fields
-  mfa_enabled                      Boolean                            @default(false)
-  mfa_secret                       String?                            // Encrypted TOTP secret
-  mfa_backup_codes                 String?                            // Encrypted backup codes (JSON array)
-  mfa_method                       mfa_method?                        @default(TOTP)
-  mfa_verified_at                  DateTime?                          // Last successful MFA verification
+  mfa_enabled                      Boolean?                           @default(false)
+  mfa_secret                       String?
+  mfa_backup_codes                 String[]
+  mfa_method                       String?                            @db.VarChar(50)
+  mfa_verified_at                  DateTime?                          @db.Timestamp(6)
+  consent_records                  consent_records[]
   directory_featured_listings_list directory_featured_listings_list[]
   invitations                      invitations[]
-  user_sessions_list               user_sessions_list[]
-  user_tenants                     user_tenants[]
-  consent_records                  consent_records[]
-  user_preferences                 user_preferences[]
-  security_threats                 security_threats[]
   login_attempts                   login_attempts[]
   security_audit_log               security_audit_log[]
+  security_threats                 security_threats[]
+  user_preferences                 user_preferences[]
+  user_sessions_list               user_sessions_list[]
+  user_tenants                     user_tenants[]
 }
 
 model consent_records {
-  id           String   @id @default(dbgenerated("gen_random_uuid()"))
-  user_id      String
-  consent_type String
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @db.VarChar
+  consent_type String   @db.VarChar
   consented    Boolean  @default(false)
-  ip_address   String?
-  user_agent   String?
-  source       String   @default("web")
-  created_at   DateTime @default(now())
-  updated_at   DateTime @default(now())
-  users        users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  ip_address   String?  @db.VarChar
+  user_agent   String?  @db.VarChar
+  source       String   @default("web") @db.VarChar
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+  users        users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_consent_records_user")
 
-  @@index([user_id, consent_type])
-  @@index([created_at])
+  @@index([created_at], map: "idx_consent_records_created_at")
+  @@index([user_id, consent_type], map: "idx_consent_records_user_type")
 }
 
 model user_preferences {
-  id         String   @id @default(dbgenerated("gen_random_uuid()"))
-  user_id    String
-  key        String
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.VarChar
+  key        String   @db.VarChar
   value      Json
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_preferences_user")
 
-  @@unique([user_id, key])
+  @@unique([user_id, key], map: "unique_user_preference")
+  @@index([user_id], map: "idx_user_preferences_user")
+}
+
+model security_threats {
+  id          String    @id @default(dbgenerated("('threat_'::text || (gen_random_uuid())::text)")) @db.VarChar(255)
+  user_id     String?   @db.VarChar(255)
+  type        String    @db.VarChar(50)
+  severity    String    @default("medium") @db.VarChar(20)
+  ip_address  String?   @db.VarChar(45)
+  user_agent  String?
+  description String?
+  metadata    Json?     @default("{}")
+  resolved    Boolean?  @default(false)
+  resolved_at DateTime?
+  resolved_by String?   @db.VarChar(255)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+  users       users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
   @@index([user_id])
+  @@index([ip_address])
+  @@index([type])
+  @@index([severity])
+  @@index([created_at])
+  @@index([resolved])
 }
 
-enum mfa_method {
-  TOTP        // Time-based One-Time Password (Google Authenticator, etc.)
-  SMS         // SMS-based verification
-  EMAIL       // Email-based verification
-  BACKUP_CODE // Backup recovery codes
+model login_attempts {
+  id             String   @id @default(dbgenerated("('attempt_'::text || (gen_random_uuid())::text)")) @db.VarChar(255)
+  user_id        String?  @db.VarChar(255)
+  email          String   @db.VarChar(255)
+  ip_address     String?  @db.VarChar(45)
+  user_agent     String?
+  success        Boolean
+  failure_reason String?  @db.VarChar(100)
+  metadata       Json?    @default("{}")
+  created_at     DateTime @default(now())
+  users          users?   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id])
+  @@index([email])
+  @@index([ip_address])
+  @@index([success])
+  @@index([created_at])
 }
 
-enum consent_type {
-  marketing
-  analytics
-  data_processing
-  data_sharing
-  cookies
-  profiling
-  third_party
+model security_audit_log {
+  id            String   @id @default(dbgenerated("('audit_'::text || (gen_random_uuid())::text)")) @db.VarChar(255)
+  user_id       String?  @db.VarChar(255)
+  action        String   @db.VarChar(100)
+  resource_type String?  @db.VarChar(50)
+  resource_id   String?  @db.VarChar(255)
+  ip_address    String?  @db.VarChar(45)
+  user_agent    String?
+  metadata      Json?    @default("{}")
+  created_at    DateTime @default(now())
+  users         users?   @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([user_id])
+  @@index([action])
+  @@index([created_at])
+  @@index([resource_type, resource_id], map: "security_audit_log_resource_idx")
+}
+
+model mv_refresh_throttle {
+  mv_name         String   @id
+  last_refresh_at DateTime @default(now()) @db.Timestamptz(6)
+  refresh_count   Int      @default(0)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model recommendations_mv_refresh_log {
+  id                   Int       @id @default(autoincrement())
+  mv_name              String
+  refresh_started_at   DateTime  @default(now()) @db.Timestamptz(6)
+  refresh_completed_at DateTime? @db.Timestamptz(6)
+  refresh_duration_ms  Int?
+  status               String    @default("running")
+  error_message        String?
+  rows_affected        Int?
+
+  @@index([mv_name, refresh_started_at(sort: Desc)], map: "idx_recommendations_mv_refresh_log_mv_name")
 }
 
 enum action {
@@ -1688,68 +1751,4 @@ enum user_tenant_role {
   SUPPORT
   MEMBER
   VIEWER
-}
-
-model security_threats {
-  id           String    @id @default(dbgenerated("('threat_' || gen_random_uuid()::text)"))
-  user_id      String?
-  type         String    // 'failed_login', 'suspicious_activity', 'rate_limit_exceeded', 'brute_force_attempt'
-  severity     String    @default("medium") // 'low', 'medium', 'high', 'critical'
-  ip_address   String?
-  user_agent   String?
-  description  String?
-  metadata     Json?     @default("{}")
-  resolved     Boolean   @default(false)
-  resolved_at  DateTime?
-  resolved_by  String?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @default(now())
-  
-  users        users?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
-
-  @@index([user_id])
-  @@index([ip_address])
-  @@index([type])
-  @@index([severity])
-  @@index([created_at])
-  @@index([resolved])
-}
-
-model login_attempts {
-  id              String   @id @default(dbgenerated("('attempt_' || gen_random_uuid()::text)"))
-  user_id         String?
-  email           String
-  ip_address      String?
-  user_agent      String?
-  success         Boolean
-  failure_reason  String?
-  metadata        Json?    @default("{}")
-  created_at      DateTime @default(now())
-  
-  users           users?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id])
-  @@index([email])
-  @@index([ip_address])
-  @@index([success])
-  @@index([created_at])
-}
-
-model security_audit_log {
-  id            String   @id @default(dbgenerated("('audit_' || gen_random_uuid()::text)"))
-  user_id       String?
-  action        String   // 'gdpr_export', 'account_deletion', 'consent_update', etc.
-  resource_type String?
-  resource_id   String?
-  ip_address    String?
-  user_agent    String?
-  metadata      Json?    @default("{}")
-  created_at    DateTime @default(now())
-  
-  users         users?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
-
-  @@index([user_id])
-  @@index([action])
-  @@index([created_at])
-  @@index([resource_type, resource_id])
 }
