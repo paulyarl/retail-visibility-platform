@@ -7,13 +7,27 @@
 
 export interface LoginSession {
   id: string;
-  device: string;
-  location: string;
+  device?: string;
+  deviceInfo?: {
+    type: string;
+    browser: string;
+    os: string;
+    browserVersion?: string;
+    osVersion?: string;
+    device?: string;
+  };
+  location: string | {
+    city: string;
+    region: string;
+    country: string;
+    coordinates?: any;
+  };
   ipAddress: string;
-  lastActive: Date;
+  lastActivity: string | Date; // API returns lastActivity, not lastActive
   isCurrent: boolean;
   userAgent: string;
-  createdAt: Date;
+  createdAt: string | Date;
+  expiresAt?: string | Date;
 }
 
 export interface SecurityAlert {

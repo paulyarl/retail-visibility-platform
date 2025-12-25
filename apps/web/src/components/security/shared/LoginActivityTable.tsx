@@ -41,13 +41,13 @@ export function LoginActivityTable({ sessions, onRevoke, onRevokeAll }: LoginAct
   const [showRevokeAllDialog, setShowRevokeAllDialog] = useState(false);
   const [revokingAll, setRevokingAll] = useState(false);
 
-  const getDeviceIcon = (device: string | undefined) => {
-    if (!device) return <Monitor className="h-4 w-4" />;
-    const deviceLower = device.toLowerCase();
-    if (deviceLower.includes('mobile') || deviceLower.includes('phone')) {
+  const getDeviceIcon = (deviceType: string | undefined) => {
+    if (!deviceType) return <Monitor className="h-4 w-4" />;
+    const typeLower = deviceType.toLowerCase();
+    if (typeLower.includes('mobile') || typeLower.includes('phone')) {
       return <Smartphone className="h-4 w-4" />;
     }
-    if (deviceLower.includes('tablet') || deviceLower.includes('ipad')) {
+    if (typeLower.includes('tablet') || typeLower.includes('ipad')) {
       return <Tablet className="h-4 w-4" />;
     }
     return <Monitor className="h-4 w-4" />;
@@ -119,9 +119,14 @@ export function LoginActivityTable({ sessions, onRevoke, onRevokeAll }: LoginAct
               <TableRow key={session.id}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    {getDeviceIcon(session.device)}
+                    {getDeviceIcon(session.deviceInfo?.type || session.device)}
                     <div>
-                      <div className="font-medium">{session.device}</div>
+                      <div className="font-medium">
+                        {session.deviceInfo 
+                          ? `${session.deviceInfo.browser} on ${session.deviceInfo.os}`
+                          : session.device || 'Unknown Device'
+                        }
+                      </div>
                       {session.isCurrent && (
                         <Badge variant="default" className="mt-1">
                           Current Session
@@ -130,14 +135,19 @@ export function LoginActivityTable({ sessions, onRevoke, onRevokeAll }: LoginAct
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>{session.location}</TableCell>
+                <TableCell>
+                  {typeof session.location === 'string' 
+                    ? session.location 
+                    : `${session.location.city}, ${session.location.country}`
+                  }
+                </TableCell>
                 <TableCell>
                   <code className="text-xs bg-muted px-2 py-1 rounded">
                     {session.ipAddress}
                   </code>
                 </TableCell>
                 <TableCell>
-                  {formatDistanceToNow(new Date(session.lastActive), { addSuffix: true })}
+                  {formatDistanceToNow(new Date(session.lastActivity), { addSuffix: true })}
                 </TableCell>
                 <TableCell className="text-right">
                   {!session.isCurrent && (
