@@ -22,35 +22,55 @@ router.get('/security-alerts', authenticateToken, async (req, res) => {
 
     const { limit = '50', offset = '0', unreadOnly = 'false' } = req.query;
 
-    // Build query with optional unread filter
-    const whereClause = unreadOnly === 'true' 
-      ? `WHERE user_id = ${userId} AND read = false AND dismissed = false`
-      : `WHERE user_id = ${userId} AND dismissed = false`;
-
-    const alerts = await basePrisma.$queryRaw<any[]>`
-      SELECT 
-        id,
-        type,
-        severity,
-        title,
-        message,
-        metadata,
-        read,
-        created_at as "createdAt",
-        read_at as "readAt"
-      FROM security_alerts
-      ${whereClause}
-      ORDER BY created_at DESC
-      LIMIT ${parseInt(limit as string)}
-      OFFSET ${parseInt(offset as string)}
-    `;
+    // Fetch alerts with proper parameterized query
+    const alerts = unreadOnly === 'true'
+      ? await basePrisma.$queryRaw<any[]>`
+          SELECT 
+            id,
+            type,
+            severity,
+            title,
+            message,
+            metadata,
+            read,
+            created_at as "createdAt",
+            read_at as "readAt"
+          FROM security_alerts
+          WHERE user_id = ${userId} AND read = false AND dismissed = false
+          ORDER BY created_at DESC
+          LIMIT ${parseInt(limit as string)}
+          OFFSET ${parseInt(offset as string)}
+        `
+      : await basePrisma.$queryRaw<any[]>`
+          SELECT 
+            id,
+            type,
+            severity,
+            title,
+            message,
+            metadata,
+            read,
+            created_at as "createdAt",
+            read_at as "readAt"
+          FROM security_alerts
+          WHERE user_id = ${userId} AND dismissed = false
+          ORDER BY created_at DESC
+          LIMIT ${parseInt(limit as string)}
+          OFFSET ${parseInt(offset as string)}
+        `;
 
     // Get total count
-    const [{ count }] = await basePrisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count
-      FROM security_alerts
-      ${whereClause}
-    `;
+    const [{ count }] = unreadOnly === 'true'
+      ? await basePrisma.$queryRaw<[{ count: bigint }]>`
+          SELECT COUNT(*) as count
+          FROM security_alerts
+          WHERE user_id = ${userId} AND read = false AND dismissed = false
+        `
+      : await basePrisma.$queryRaw<[{ count: bigint }]>`
+          SELECT COUNT(*) as count
+          FROM security_alerts
+          WHERE user_id = ${userId} AND dismissed = false
+        `;
 
     res.json({
       data: alerts.map(alert => ({
