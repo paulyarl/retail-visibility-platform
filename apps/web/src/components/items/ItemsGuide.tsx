@@ -5,6 +5,13 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function ItemsGuide() {
   const [isExpanded, setIsExpanded] = useState(false);
   const params = useParams();

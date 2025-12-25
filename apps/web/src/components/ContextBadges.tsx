@@ -51,6 +51,13 @@ interface ContextBadgesProps {
  * // Analytics page
  * <ContextBadges tenant={tenant} contextLabel="Analytics" showBorder />
  */
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export function ContextBadges({ 
   tenant, 
   showPlatformRole = false, 
@@ -104,6 +111,7 @@ export function ContextBadges({
  * @example
  * <ContextBadgesSection tenant={tenant} />
  */
+
 export function ContextBadgesSection(props: ContextBadgesProps) {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">

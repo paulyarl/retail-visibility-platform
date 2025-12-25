@@ -4,6 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import NavigationStandards, { NavigationHelpers } from '@/lib/navigation/NavigationStandards';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export interface ContextualBreadcrumbItem {
   label: string;
   href?: string;
@@ -17,6 +24,7 @@ interface ContextualBreadcrumbsProps {
   className?: string;
   tenantId?: string;
 }
+
 
 export function ContextualBreadcrumbs({
   customItems,
@@ -318,5 +326,6 @@ function getScopeFromPath(path: string): 'platform' | 'tenant' | 'admin' {
   if (path.includes('/t/')) return 'tenant';
   return 'platform';
 }
+
 
 export default ContextualBreadcrumbs;

@@ -10,6 +10,13 @@ interface SwisProductCardProps {
   badgesEnabled: boolean;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function SwisProductCard({ item, index, badgesEnabled }: SwisProductCardProps) {
   // Format price
   const formatPrice = (price: number, currency: string) => {

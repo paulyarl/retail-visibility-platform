@@ -26,6 +26,13 @@ function to24Hour(time12: string): string {
   return `${hour.toString().padStart(2, "0")}:${m}`;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function SpecialHoursCalendar({ apiBase, tenantId }: { apiBase: string; tenantId: string }) {
   const [overrides, setOverrides] = useState<Override[]>([]);
   const [saving, setSaving] = useState(false);

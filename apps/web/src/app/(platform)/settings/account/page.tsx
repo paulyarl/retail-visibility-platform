@@ -10,6 +10,12 @@ import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageB
 import { useTenantLimits } from '@/hooks/useTenantLimits';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AccountPage() {
   const { user } = useAuth();
   const { status: tenantLimitStatus } = useTenantLimits();

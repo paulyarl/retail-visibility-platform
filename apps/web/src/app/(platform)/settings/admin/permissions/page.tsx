@@ -32,6 +32,13 @@ const ACTION_CATEGORIES: Record<string, string[]> = {
   'Administration': ['admin_access_dashboard', 'admin_manage_settings'],
 };
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function PermissionsPage() {
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [grouped, setGrouped] = useState<GroupedPermissions>({});

@@ -28,6 +28,14 @@ interface Tier {
   features: TierFeature[];
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function TierMatrixPage() {
   console.log('TierMatrixPage component mounted');
   const { user, isPlatformAdmin, loading: accessLoading } = useAccessControl(null);

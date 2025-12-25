@@ -28,6 +28,13 @@ interface TenantDashboardProps {
  * Dynamically adapts to tenant's tier, organization context, and user role
  * Shows available features and upgrade opportunities
  */
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   const { user } = useAuth();
   

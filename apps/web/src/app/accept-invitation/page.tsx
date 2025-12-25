@@ -9,6 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { CheckCircle, XCircle, Clock, Mail, Building2, User, Shield } from 'lucide-react';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface InvitationData {
   id: string;
   email: string;

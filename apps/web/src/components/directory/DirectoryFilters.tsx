@@ -10,6 +10,13 @@ interface DirectoryFiltersProps {
   locations: Array<{ city: string; state: string; count: number }>;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function DirectoryFilters({ categories, storeTypes = [], locations }: DirectoryFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -348,5 +355,6 @@ export default function DirectoryFilters({ categories, storeTypes = [], location
     </div>
   );
 }
+
 
 export { DirectoryFilters };

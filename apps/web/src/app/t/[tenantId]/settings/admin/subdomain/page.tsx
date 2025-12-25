@@ -52,6 +52,14 @@ interface Tenant {
   };
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function AdminSubdomainPage() {
   const params = useParams();
   const tenantId = params?.tenantId as string;

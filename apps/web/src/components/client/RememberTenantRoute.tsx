@@ -3,6 +3,13 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function RememberTenantRoute({ tenantId }: { tenantId: string }) {
   const pathname = usePathname();
   useEffect(() => {

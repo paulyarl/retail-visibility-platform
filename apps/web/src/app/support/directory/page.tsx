@@ -4,6 +4,14 @@ import { useState } from 'react';
 import DirectoryTenantLookup from '@/components/support/directory/DirectoryTenantLookup';
 import DirectoryTroubleshootingGuide from '@/components/support/directory/DirectoryTroubleshootingGuide';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function SupportDirectoryPage() {
   const [activeTab, setActiveTab] = useState<'lookup' | 'troubleshooting'>('lookup');
 

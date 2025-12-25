@@ -14,6 +14,12 @@ import {
   type FeatureFlag 
 } from '@/lib/featureFlags';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function FeatureFlagsPage() {
   const [flags, setFlags] = useState(getAllFeatureFlags());
   const [success, setSuccess] = useState<string | null>(null);

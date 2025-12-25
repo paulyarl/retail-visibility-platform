@@ -4,6 +4,12 @@ import * as Sentry from "@sentry/nextjs";
 import Head from "next/head";
 import { useEffect, useState } from "react";
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 class SentryExampleFrontendError extends Error {
   constructor(message: string | undefined) {
     super(message);
@@ -17,11 +23,13 @@ export default function Page() {
 
   useEffect(() => {
     Sentry.logger.info("Sentry example page loaded");
-    async function checkConnectivity() {
-      const result = await Sentry.diagnoseSdkConnectivity();
-      setIsConnected(result !== "sentry-unreachable");
-    }
-    checkConnectivity();
+    // Note: diagnoseSdkConnectivity is not available in current SDK version
+    // Keeping connectivity check disabled for now
+    // async function checkConnectivity() {
+    //   const result = await Sentry.diagnoseSdkConnectivity();
+    //   setIsConnected(result !== "sentry-unreachable");
+    // }
+    // checkConnectivity();
   }, []);
 
   return (

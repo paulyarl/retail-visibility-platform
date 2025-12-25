@@ -19,16 +19,23 @@ const WEB_URL = process.env.WEB_URL || 'http://localhost:3000';
  * GET /google/oauth/status
  */
 router.get('/google/oauth/status', async (req, res) => {
+  const startTime = Date.now();
+  console.log(`[Google Merchant OAuth] Status check started for tenant: ${req.query.tenantId}`);
+
   try {
     const { tenantId } = req.query;
 
     if (!tenantId || typeof tenantId !== 'string') {
+      console.log(`[Google Merchant OAuth] Status check failed - missing tenantId (${Date.now() - startTime}ms)`);
       return res.status(400).json({
         success: false,
         error: 'missing_tenantId',
         message: 'tenantId query parameter is required'
       });
     }
+
+    console.log(`[Google Merchant OAuth] Checking OAuth account for tenant: ${tenantId}`);
+    const dbQueryStart = Date.now();
 
     // Check for OAuth account linked to this tenant
     const accountRecord = await prisma.google_oauth_accounts_list.findFirst({
@@ -44,11 +51,22 @@ router.get('/google/oauth/status', async (req, res) => {
       }
     });
 
+    const dbQueryTime = Date.now() - dbQueryStart;
+    console.log(`[Google Merchant OAuth] Database query completed in ${dbQueryTime}ms`);
+
+    const processingStart = Date.now();
+
     const isConnected = !!accountRecord?.google_oauth_tokens_list;
     const tokenRecord = accountRecord?.google_oauth_tokens_list;
     const isExpired = tokenRecord?.expires_at 
       ? new Date(tokenRecord.expires_at) < new Date() 
       : false;
+
+    const processingTime = Date.now() - processingStart;
+    console.log(`[Google Merchant OAuth] Data processing completed in ${processingTime}ms`);
+
+    const totalTime = Date.now() - startTime;
+    console.log(`[Google Merchant OAuth] Status check completed in ${totalTime}ms - DB: ${dbQueryTime}ms, Processing: ${processingTime}ms`);
 
     res.json({
       success: true,
@@ -66,7 +84,8 @@ router.get('/google/oauth/status', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Google Merchant OAuth] Error checking status:', error);
+    const errorTime = Date.now() - startTime;
+    console.error(`[Google Merchant OAuth] Error checking status after ${errorTime}ms:`, error);
     res.status(500).json({
       success: false,
       error: 'status_check_failed',

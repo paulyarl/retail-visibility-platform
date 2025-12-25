@@ -10,6 +10,13 @@ interface DirectoryListProps {
   showLogo?: boolean; // Whether to display store logos
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function DirectoryList({ listings, loading, contextCategory, showLogo = true }: DirectoryListProps) {
   // Loading state
   if (loading) {
@@ -73,5 +80,6 @@ export default function DirectoryList({ listings, loading, contextCategory, show
     </div>
   );
 }
+
 
 export { DirectoryList };

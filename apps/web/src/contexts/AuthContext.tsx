@@ -4,6 +4,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { api, API_BASE_URL as API_URL } from '@/lib/api';
 
 // User type
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export interface User {
   id: string;
   email: string;
@@ -40,6 +47,7 @@ const API_BASE_URL = API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://
 const TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const TENANT_KEY = 'current_tenant_id';
+
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -309,6 +317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 // Hook to use auth context
+
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

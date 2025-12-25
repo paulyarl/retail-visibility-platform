@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 interface PageHeaderProps {
   title: string;
@@ -15,6 +16,14 @@ interface PageHeaderProps {
   badge?: React.ReactNode;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function PageHeader({
   title,
   description,
@@ -23,6 +32,38 @@ export default function PageHeader({
   actions,
   badge,
 }: PageHeaderProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent SSR issues by only rendering client-side functionality after mount
+  if (!mounted) {
+    return (
+      <div className="bg-white border-b border-neutral-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* Icon placeholder */}
+              {icon && (
+                <div className="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 animate-pulse">
+                  <div className="w-6 h-6 bg-gray-200 rounded"></div>
+                </div>
+              )}
+
+              {/* Title placeholder */}
+              <div>
+                <div className="h-8 bg-gray-200 rounded w-48 animate-pulse mb-2"></div>
+                {description && <div className="h-4 bg-gray-100 rounded w-64 animate-pulse"></div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const router = useRouter();
 
   return (
@@ -52,7 +93,7 @@ export default function PageHeader({
                 )}
               </div>
               {description && (
-                <p className="text-neutral-600 mt-1">
+                <p className="text-lg text-neutral-600 mt-1">
                   {description}
                 </p>
               )}

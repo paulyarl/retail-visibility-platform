@@ -28,6 +28,7 @@ interface StorefrontMapProps {
   productCount?: number;
 }
 
+
 export default function StorefrontMap({ tenant, primaryCategory, productCount }: StorefrontMapProps) {
   if (!tenant.metadata?.address || !tenant.metadata?.latitude || !tenant.metadata?.longitude) {
     return null;

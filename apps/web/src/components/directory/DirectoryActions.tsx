@@ -14,6 +14,13 @@ interface DirectoryActionsProps {
   currentUrl: string;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function DirectoryActions({ listing, currentUrl }: DirectoryActionsProps) {
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [favorited, setFavorited] = useState(false);

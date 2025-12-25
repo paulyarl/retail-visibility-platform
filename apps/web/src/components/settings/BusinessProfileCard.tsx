@@ -13,6 +13,13 @@ interface BusinessProfileCardProps {
   tenantName?: string;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function BusinessProfileCard({ profile, loading, onUpdate, tenantName }: BusinessProfileCardProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 

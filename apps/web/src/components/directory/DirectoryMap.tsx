@@ -29,6 +29,13 @@ interface DirectoryMapProps {
   zoom?: number;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function DirectoryMap({ 
   listings, 
   center = [39.8283, -98.5795], // Center of USA
@@ -445,5 +452,6 @@ export default function DirectoryMap({
     </>
   );
 }
+
 
 export { DirectoryMap };

@@ -7,6 +7,14 @@ import PageHeader from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import ChangeLocationStatusModal from '@/components/tenant/ChangeLocationStatusModal';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 interface StatusInfo {
   status: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
   label: string;

@@ -7,6 +7,12 @@ import PublicFooter from '@/components/PublicFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 const faqs = [
   {
     category: 'About the Platform',

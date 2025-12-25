@@ -20,6 +20,13 @@ interface DirectoryPhotoGalleryProps {
   onUpdate?: () => void;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: DirectoryPhotoGalleryProps) {
   const [photos, setPhotos] = useState<DirectoryPhoto[]>([]);
   const [loading, setLoading] = useState(false);

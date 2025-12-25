@@ -5,6 +5,12 @@ import { api } from '@/lib/api';
 import { useAccessControl } from '@/lib/auth/useAccessControl';
 import { FEATURE_DISPLAY_NAMES } from '@/lib/tiers/tier-features';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface FeatureOverride {
   id: string;
   tenantId: string;

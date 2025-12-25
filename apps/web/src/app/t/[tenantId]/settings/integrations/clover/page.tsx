@@ -122,6 +122,14 @@ const scenarioIcons: Record<string, React.ReactNode> = {
   category_conflict: <FolderX className="w-5 h-5" />,
 };
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function CloverIntegrationPage() {
   const params = useParams();
   const router = useRouter();

@@ -51,6 +51,13 @@ interface TierDefinition {
   sortOrder?: number;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function TierManagementPage() {
   // Use centralized access control - platform admins only
   const {

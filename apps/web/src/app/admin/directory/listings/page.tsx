@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { useAdminDirectoryListings } from '@/hooks/admin/useAdminDirectoryListings';
 import DirectoryListingsTable from '@/components/admin/directory/DirectoryListingsTable';
 
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AdminDirectoryListingsPage() {
   const [filters, setFilters] = useState({
     status: undefined as 'published' | 'draft' | 'featured' | undefined,

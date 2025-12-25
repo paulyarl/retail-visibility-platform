@@ -3,6 +3,14 @@
 import Link from 'next/link';
 import { Sparkles, Zap, RefreshCw, Globe, Store, Package, ArrowRight, CheckCircle } from 'lucide-react';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function AboutDirectoryClient() {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">

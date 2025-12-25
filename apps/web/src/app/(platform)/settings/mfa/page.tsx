@@ -5,6 +5,10 @@
 
 import { MFASettings } from '@/components/security/mfa/MFASettings';
 
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Two-Factor Authentication',
   description: 'Manage your two-factor authentication settings and backup codes',

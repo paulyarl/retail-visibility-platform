@@ -28,6 +28,13 @@ interface ProductDisplayProps {
   tenantId: string;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function ProductDisplay({ products, tenantId }: ProductDisplayProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'gallery'>('grid'); // Default to grid for SSR
   const [mounted, setMounted] = useState(false);

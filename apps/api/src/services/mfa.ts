@@ -109,9 +109,9 @@ export class MFAService {
       // Generate backup codes
       const backupCodes = this.generateBackupCodes();
 
-      // Encrypt and store the secret and backup codes
+      // Encrypt the secret and each backup code individually
       const encryptedSecret = this.encrypt(secret.base32);
-      const encryptedBackupCodes = this.encrypt(JSON.stringify(backupCodes));
+      const encryptedBackupCodes: string[] = backupCodes.map(code => this.encrypt(code));
 
       // Update user with MFA data (but don't enable yet)
       await prisma.users.update({
@@ -240,25 +240,31 @@ export class MFAService {
       }
 
       // If TOTP failed, check backup codes
-      if (user.mfa_backup_codes) {
-        const decryptedBackupCodes = JSON.parse(this.decrypt(user.mfa_backup_codes));
-        const codeIndex = decryptedBackupCodes.indexOf(token);
+      if (user.mfa_backup_codes && Array.isArray(user.mfa_backup_codes)) {
+        // Find and decrypt the matching backup code
+        for (let i = 0; i < user.mfa_backup_codes.length; i++) {
+          try {
+            const decryptedCode = this.decrypt(user.mfa_backup_codes[i]);
+            if (decryptedCode === token) {
+              // Remove the used backup code from the array
+              const updatedEncryptedCodes = [...user.mfa_backup_codes];
+              updatedEncryptedCodes.splice(i, 1);
 
-        if (codeIndex !== -1) {
-          // Remove the used backup code
-          decryptedBackupCodes.splice(codeIndex, 1);
-          const updatedBackupCodes = this.encrypt(JSON.stringify(decryptedBackupCodes));
+              await prisma.users.update({
+                where: { id: userId },
+                data: {
+                  mfa_backup_codes: updatedEncryptedCodes.length > 0 ? updatedEncryptedCodes : [],
+                  mfa_verified_at: new Date()
+                }
+              });
 
-          await prisma.users.update({
-            where: { id: userId },
-            data: {
-              mfa_backup_codes: updatedBackupCodes,
-              mfa_verified_at: new Date()
+              logger.info('MFA backup code used', undefined, { userId });
+              return { success: true, message: 'Backup code accepted. Please set up MFA again.' };
             }
-          });
-
-          logger.info('MFA backup code used', undefined, { userId });
-          return { success: true, message: 'Backup code accepted. Please set up MFA again.' };
+          } catch (error) {
+            // Skip invalid encrypted codes
+            continue;
+          }
         }
       }
 
@@ -280,7 +286,7 @@ export class MFAService {
         data: {
           mfa_enabled: false,
           mfa_secret: null,
-          mfa_backup_codes: null,
+          mfa_backup_codes: [],
           mfa_method: null,
           mfa_verified_at: null
         }
@@ -319,18 +325,21 @@ export class MFAService {
       }
 
       let backupCodesRemaining = 0;
-      if (user.mfa_backup_codes) {
-        try {
-          const decryptedCodes = JSON.parse(this.decrypt(user.mfa_backup_codes));
-          backupCodesRemaining = decryptedCodes.length;
-        } catch (error) {
-          // If decryption fails, assume no backup codes
-          backupCodesRemaining = 0;
+      if (user.mfa_backup_codes && Array.isArray(user.mfa_backup_codes)) {
+        // Count how many backup codes can be successfully decrypted
+        for (const encryptedCode of user.mfa_backup_codes) {
+          try {
+            this.decrypt(encryptedCode);
+            backupCodesRemaining++;
+          } catch (error) {
+            // Skip invalid encrypted codes
+            continue;
+          }
         }
       }
 
       return {
-        enabled: user.mfa_enabled,
+        enabled: user.mfa_enabled ?? false, // Default to false if null
         method: user.mfa_method,
         verifiedAt: user.mfa_verified_at,
         backupCodesRemaining

@@ -2,6 +2,10 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import DirectoryOverviewClient from '@/components/admin/directory/DirectoryOverviewClient';
 
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default async function AdminDirectoryPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

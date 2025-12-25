@@ -7,6 +7,12 @@ import { TIER_LIMITS } from '@/lib/tiers';
 import { CHAIN_TIERS } from '@/lib/chain-tiers';
 import { api } from '@/lib/api';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface UpgradeRequest {
   id: string;
   tenant_id: string;

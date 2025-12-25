@@ -11,6 +11,14 @@ import { useParams } from 'next/navigation';
 import { TierGate } from '@/components/tier/TierGate';
 import { useEffect, useState } from 'react';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function QuickStartLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const tenantId = params.tenantId as string;

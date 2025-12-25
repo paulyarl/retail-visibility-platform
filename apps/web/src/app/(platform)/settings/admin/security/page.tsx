@@ -5,6 +5,12 @@
 
 import { SecurityDashboard } from '@/components/security/monitoring/SecurityDashboard';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Security Dashboard | Admin Settings',
   description: 'Monitor security threats, blocked IPs, and system health',

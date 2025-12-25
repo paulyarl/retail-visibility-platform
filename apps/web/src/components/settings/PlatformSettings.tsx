@@ -2,6 +2,12 @@
 
 import UnifiedSettings, { UnifiedSettingsConfig, transformToUnifiedConfig } from './UnifiedSettings';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function PlatformSettings() {
   // Legacy settings groups - will be transformed to unified format
   const legacySettingsGroups = [

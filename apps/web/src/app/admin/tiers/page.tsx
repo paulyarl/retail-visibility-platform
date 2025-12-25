@@ -6,6 +6,12 @@ import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Alert, Spinner
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 type Tenant = {
   id: string;
   name: string;

@@ -3,6 +3,13 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export interface ToastProps {
   id: string;
   message: string;
@@ -10,6 +17,7 @@ export interface ToastProps {
   duration?: number;
   onClose: (id: string) => void;
 }
+
 
 export function Toast({
   id,
@@ -77,6 +85,7 @@ export function Toast({
 }
 
 // Toast Container Component
+
 export function ToastContainer({ toasts, onClose }: { toasts: ToastProps[]; onClose: (id: string) => void }) {
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">

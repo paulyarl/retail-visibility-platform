@@ -3,6 +3,12 @@
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function CapacityOverviewPage() {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">

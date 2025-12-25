@@ -9,6 +9,10 @@ import BillingFilters from './components/BillingFilters';
 import TenantCard from './components/TenantCard';
 import BillingPagination from './components/BillingPagination';
 
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AdminBillingPage() {
   const [mounted, setMounted] = useState(false);
 

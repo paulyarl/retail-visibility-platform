@@ -13,6 +13,13 @@ interface ConfirmDialogProps {
   variant?: 'danger' | 'warning' | 'info';
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function ConfirmDialog({
   isOpen,
   onClose,

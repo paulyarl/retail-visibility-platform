@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Button, Card, Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface Tenant {
   id: string;
   name: string;

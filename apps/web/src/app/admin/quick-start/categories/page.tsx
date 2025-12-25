@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Button, Card, Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
 
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 type BusinessType = 'grocery' | 'pharmacy' | 'fashion' | 'electronics' | 'home_garden' | 'health_beauty' | 'sports_outdoors' | 'toys_games' | 'automotive' | 'books_media' | 'pet_supplies' | 'office_supplies' | 'jewelry' | 'baby_kids' | 'arts_crafts' | 'hardware_tools' | 'furniture' | 'restaurant' | 'general';
 
 interface Tenant {

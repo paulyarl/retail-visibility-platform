@@ -13,6 +13,14 @@ import { Spinner } from '@/components/ui';
 import { onboardingDataService } from '@/services/onboardingDataService';
 import { onboardingStorageService } from '@/services/onboardingStorageService';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function TenantBusinessProfilePage() {
   const params = useParams();
   const tenantId = params.tenantId as string;

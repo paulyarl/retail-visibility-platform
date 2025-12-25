@@ -12,6 +12,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui";
 import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { settings } = usePlatformSettings();
   const { user, logout } = useAuth();

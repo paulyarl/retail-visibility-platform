@@ -19,6 +19,12 @@ import { computeStoreStatus } from "@/lib/hours-utils";
 import SubscriptionUsageBadge from "@/components/subscription/SubscriptionUsageBadge";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function PlatformHomePage() {
   return <Home embedded />;
 }

@@ -5,6 +5,10 @@
 
 import { SecuritySettings } from '@/components/security/SecuritySettings';
 
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Security Settings',
   description: 'Manage your security settings, active sessions, and security alerts',

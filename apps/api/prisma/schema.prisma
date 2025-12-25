@@ -626,6 +626,7 @@ model google_oauth_accounts_list {
   google_oauth_tokens_list   google_oauth_tokens_list?
 
   @@unique([tenant_id, google_account_id])
+  @@index([tenant_id])
 }
 
 model google_oauth_tokens_list {

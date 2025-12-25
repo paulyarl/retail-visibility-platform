@@ -5,6 +5,10 @@ import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, ModalFo
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface Organization {
   id: string;
   name: string;

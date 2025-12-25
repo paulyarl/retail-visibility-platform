@@ -9,6 +9,12 @@ import Image from 'next/image';
 import FeaturesShowcase from '@/components/FeaturesShowcase';
 import ChainPropagationCallout from '@/components/ChainPropagationCallout';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 const features = [
   {
     icon: (

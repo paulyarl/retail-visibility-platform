@@ -8,6 +8,13 @@ interface HoursPreviewProps {
   tenantId: string;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
   const [status, setStatus] = useState<{ isOpen: boolean; label: string } | null>(null);
   const [specialHours, setSpecialHours] = useState<any[]>([]);

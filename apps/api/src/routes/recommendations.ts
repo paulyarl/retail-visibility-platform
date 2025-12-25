@@ -18,6 +18,117 @@ import {
 const router = Router();
 
 /**
+ * POST /api/recommendations/track-batch
+ * Track multiple user behavior events in batch (for client-side caching)
+ */
+router.post('/track-batch', async (req: Request, res: Response) => {
+  try {
+    const { events, batchMetadata } = req.body;
+
+    if (!Array.isArray(events) || events.length === 0) {
+      return res.status(400).json({
+        error: 'invalid_events',
+        message: 'Events array is required and must not be empty'
+      });
+    }
+
+    const results = [];
+    let successCount = 0;
+    let failureCount = 0;
+
+    // Log batch metadata for analytics dashboard
+    if (batchMetadata) {
+      console.log(`[TrackBatch] Processing batch - Size: ${batchMetadata.batchSize}, Priorities: ${JSON.stringify(batchMetadata.priorityBreakdown)}, Compression: ${batchMetadata.compressionUsed}`);
+    }
+
+    // Process each event in the batch
+    for (const event of events) {
+      try {
+        const {
+          userId,
+          sessionId,
+          entityType = 'store',
+          entityId,
+          locationLat,
+          locationLng,
+          referrer,
+          userAgent,
+          ipAddress,
+          timestamp,
+          pageType,
+          context,
+          priority
+        } = event;
+
+        if (!entityId) {
+          results.push({
+            entityId,
+            success: false,
+            error: 'entity_id_required'
+          });
+          failureCount++;
+          continue;
+        }
+
+        await trackUserBehavior({
+          userId,
+          sessionId,
+          entityType,
+          entityId,
+          locationLat,
+          locationLng,
+          referrer,
+          userAgent,
+          ipAddress,
+          pageType,
+          context
+        });
+
+        results.push({
+          entityId,
+          success: true,
+          priority
+        });
+        successCount++;
+      } catch (eventError) {
+        console.error(`[TrackBatch] Failed to process event for entity ${event.entityId}:`, eventError);
+        results.push({
+          entityId: event.entityId,
+          success: false,
+          error: eventError instanceof Error ? eventError.message : 'unknown_error'
+        });
+        failureCount++;
+      }
+    }
+
+    console.log(`[TrackBatch] Processed ${events.length} events: ${successCount} successful, ${failureCount} failed`);
+
+    // Include analytics metadata in response for dashboard adjustments
+    const responseData = {
+      success: failureCount === 0,
+      message: `Processed ${successCount} successful, ${failureCount} failed`,
+      data: {
+        total: events.length,
+        successful: successCount,
+        failed: failureCount,
+        results,
+        batchMetadata: batchMetadata || null,
+        processingTimestamp: new Date().toISOString()
+      }
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error('[TrackBatch] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'batch_processing_failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
  * POST /api/recommendations/track
  * Track user behavior for recommendations
  */

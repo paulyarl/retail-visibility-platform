@@ -6,6 +6,10 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { QuickStartCategoryModal } from '@/components/quick-start';
 import { CategoryEditModal, type CategoryFormData } from '@/components/categories';
 
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface Category {
   id: string;
   name: string;

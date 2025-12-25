@@ -20,6 +20,13 @@ interface TrashCapacity {
   isFull: boolean;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);

@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react';
 import { UnifiedStoreCard } from '@/components/directory/UnifiedStoreCard';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 // Storefront Recommendations Component
 export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
   const [recommendations, setRecommendations] = useState<any[]>([]);

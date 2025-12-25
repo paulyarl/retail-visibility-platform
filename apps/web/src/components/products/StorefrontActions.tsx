@@ -11,6 +11,13 @@ interface StorefrontActionsProps {
   directoryPublished?: boolean;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function StorefrontActions({ tenantId, businessName, tenantSlug, directoryPublished }: StorefrontActionsProps) {
   return (
     <div className="flex items-center justify-between gap-4">

@@ -25,6 +25,13 @@ interface RoleBadgeProps {
  * // Show tenant role
  * <RoleBadge tenantId="tenant-123" />
  */
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export function RoleBadge({ tenantId, showPlatformRole = false, className }: RoleBadgeProps) {
   const { user } = useAuth();
 
@@ -96,6 +103,7 @@ export function RoleBadge({ tenantId, showPlatformRole = false, className }: Rol
  * Shows what context the user is viewing the page in.
  * Similar to subscription status badges.
  */
+
 export function ViewingAsBadge({ tenantId, showPlatformRole = false }: RoleBadgeProps) {
   const { user } = useAuth();
 

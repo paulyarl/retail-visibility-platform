@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Spinner } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
@@ -8,6 +8,13 @@ import AccessDenied from '@/components/AccessDenied';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import { api } from '@/lib/api';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
+import { useOrganizationData } from '@/hooks/useApiQueries';
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
 
 interface OrganizationData {
   organizationId: string;
@@ -83,40 +90,19 @@ export default function OrganizationPage() {
   const locationsPerPage = 5;
 
   // Use organization data from access control hook or URL
+  const { data: organizationData, isLoading: orgLoading, error: orgError } = useOrganizationData(organizationId);
+
   useEffect(() => {
     if (orgDataFromHook) {
       // Use organization from hook (tenant-based)
       setOrganizationId(orgDataFromHook.id);
-      loadOrganizationData(orgDataFromHook.id);
     } else if (urlOrgId) {
       // Use organization from URL (direct access)
       setOrganizationId(urlOrgId);
-      loadOrganizationData(urlOrgId);
-    } else if (!accessLoading) {
-      setLoading(false);
-      setError('No organization found. Please provide an organizationId parameter or select a tenant that belongs to an organization.');
     }
-  }, [orgDataFromHook, urlOrgId, accessLoading]);
+  }, [orgDataFromHook, urlOrgId]);
 
-  const loadOrganizationData = async (orgId: string) => {
-    try {
-      setLoading(true);
-      // Use api utility which includes auth headers
-      const res = await api.get(`/api/organization/billing/counters?organizationId=${orgId}`);
-      
-      if (!res.ok) {
-        throw new Error('Failed to load organization data');
-      }
-
-      const data = await res.json();
-      setOrgData(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load organization');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const combinedLoading = accessLoading || orgLoading;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -155,8 +141,7 @@ export default function OrganizationPage() {
       const data = await res.json();
       alert(`✅ ${data.heroTenantName} is now set as the hero location!`);
       
-      // Reload organization data
-      await loadOrganizationData(organizationId);
+      // Reload organization data - React Query handles cache invalidation automatically
     } catch (err: any) {
       console.error('Failed to set hero location:', err);
       alert(`❌ Error: ${err.message}`);
@@ -260,8 +245,7 @@ export default function OrganizationPage() {
       const data = await res.json();
       setSyncResult(data);
       
-      // Reload organization data
-      await loadOrganizationData(organizationId);
+      // Reload organization data - React Query handles cache invalidation automatically
     } catch (err: any) {
       console.error('Failed to sync from hero:', err);
       alert(`❌ Error: ${err.message}`);

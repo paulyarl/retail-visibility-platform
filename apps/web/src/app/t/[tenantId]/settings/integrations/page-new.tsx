@@ -7,6 +7,14 @@ import { useSquareIntegration } from '@/hooks/useSquareIntegration';
 import { CloverConnectionCard } from '@/components/clover';
 import { SquareConnectionCard } from '@/components/square';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function IntegrationsPage() {
   const params = useParams();
   const tenantId = params?.tenantId as string;

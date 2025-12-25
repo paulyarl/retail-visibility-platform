@@ -5,6 +5,10 @@ import PageHeader from '@/components/PageHeader';
 import Link from 'next/link';
 import { useAdminDirectoryListings } from '@/hooks/admin/useAdminDirectoryListings';
 
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AdminFeaturedDirectoryPage() {
   const { listings, loading, error } = useAdminDirectoryListings({ status: 'featured' });
 

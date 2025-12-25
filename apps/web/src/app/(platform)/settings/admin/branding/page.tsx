@@ -11,6 +11,12 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 const brandingSchema = z.object({
   platformName: z.string().min(1, 'Platform name is required'),
   platformDescription: z.string().optional(),

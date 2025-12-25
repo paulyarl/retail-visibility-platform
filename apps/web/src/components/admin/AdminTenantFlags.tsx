@@ -21,6 +21,13 @@ type EffectiveRow = {
   tenantSources: { tenant_db: boolean; tenant_override?: boolean };
 };
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
   const [rows, setRows] = useState<FlagRow[]>([]);
   const [loading, setLoading] = useState(true);

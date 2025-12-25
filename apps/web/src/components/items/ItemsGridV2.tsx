@@ -28,6 +28,13 @@ type ItemsGridV2Props = {
   showPropagateButton?: boolean;
 };
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function ItemsGridV2({ 
   items, 
   onEdit, 

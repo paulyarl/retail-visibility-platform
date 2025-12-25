@@ -6,6 +6,13 @@ import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Skeleton, Aler
 import SwisProductCard from './SwisProductCard';
 import { useSwisPreview } from '@/hooks/useSwisPreview';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export interface SwisPreviewItem {
   sku: string;
   title: string;
@@ -27,6 +34,7 @@ interface SwisPreviewWidgetProps {
   onViewAll?: () => void;
   editable?: boolean;
 }
+
 
 export default function SwisPreviewWidget({
   tenantId,

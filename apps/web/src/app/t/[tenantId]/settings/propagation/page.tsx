@@ -27,6 +27,14 @@ type PropagationGroup = {
   sections: PropagationSection[];
 };
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function PropagationControlPanel() {
   const params = useParams();
   const tenantId = params.tenantId as string;

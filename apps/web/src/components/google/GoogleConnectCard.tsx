@@ -26,6 +26,13 @@ interface GoogleConnectCardProps {
   onDisconnect?: () => void;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function GoogleConnectCard({ tenantId, onConnect, onDisconnect }: GoogleConnectCardProps) {
   const [account, setAccount] = useState<GoogleAccount | null>(null);
   const [loading, setLoading] = useState(true);

@@ -7,6 +7,13 @@ import { isPlatformUser } from "@/lib/auth/access-control";
 
 type SettingsScope = "platform" | "tenant";
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function SettingsSwitcher() {
   const pathname = usePathname();
   const router = useRouter();

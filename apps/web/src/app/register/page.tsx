@@ -10,6 +10,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import PublicFooter from '@/components/PublicFooter';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function RegisterPage() {
   const { settings } = usePlatformSettings();
   const { register, isAuthenticated, isLoading } = useAuth();

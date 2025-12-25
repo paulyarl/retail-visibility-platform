@@ -3,6 +3,13 @@
 import React, { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api";
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function TimezonePicker({ tenantId, apiBase, onTimezoneChange }: { tenantId: string; apiBase: string; onTimezoneChange?: (timezone: string) => void }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

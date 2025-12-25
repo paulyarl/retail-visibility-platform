@@ -26,6 +26,13 @@ type AdminGroup = {
   sections: AdminSection[];
 };
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AdminDashboardPage() {
   // Use centralized access control - platform admins only
   const {

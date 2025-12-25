@@ -5,6 +5,13 @@ import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { Button, Input, Alert } from '@/components/ui';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AuthPanel() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);

@@ -5,6 +5,12 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/compo
 import PageHeader, { Icons } from '@/components/PageHeader';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface EmailCategory {
   id: string;
   name: string;
@@ -147,14 +153,14 @@ export default function AdminEmailsPage() {
           configs.forEach((config: { category: string; email: string }) => {
             emailMap[config.category] = config.email;
           });
-          
+
           // Fill in defaults for any missing categories
           EMAIL_CATEGORIES.forEach(cat => {
             if (!emailMap[cat.id]) {
               emailMap[cat.id] = cat.defaultEmail;
             }
           });
-          
+
           setEmails(emailMap);
         } else {
           // Initialize with defaults if API fails
@@ -174,7 +180,7 @@ export default function AdminEmailsPage() {
         setEmails(defaults);
       }
     };
-    
+
     loadEmails();
   }, []);
 
@@ -186,7 +192,7 @@ export default function AdminEmailsPage() {
   const handleSave = async (categoryId: string) => {
     try {
       const newEmails = { ...emails, [categoryId]: tempEmail };
-      
+
       // Save to database via API
       const response = await fetch('/api/admin/email-config', {
         method: 'PUT',
@@ -220,7 +226,7 @@ export default function AdminEmailsPage() {
     if (category) {
       try {
         const newEmails = { ...emails, [categoryId]: category.defaultEmail };
-        
+
         // Save to database via API
         const response = await fetch('/api/admin/email-config', {
           method: 'PUT',
@@ -288,7 +294,7 @@ export default function AdminEmailsPage() {
         />
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-          
+
           {/* Success Message */}
           {saved && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -307,12 +313,12 @@ export default function AdminEmailsPage() {
                 <div>
                   <h3 className="font-semibold text-neutral-900 mb-2">About Email Management</h3>
                   <p className="text-sm text-neutral-700 mb-2">
-                    Configure different email addresses for various types of requests. When tenants or visitors 
-                    submit requests through the platform, emails will be sent to the appropriate address based on 
+                    Configure different email addresses for various types of requests. When tenants or visitors
+                    submit requests through the platform, emails will be sent to the appropriate address based on
                     the request type.
                   </p>
                   <p className="text-sm text-neutral-700">
-                    <strong>Note:</strong> Email configurations are stored in the database and synchronized across 
+                    <strong>Note:</strong> Email configurations are stored in the database and synchronized across
                     all devices. Changes made here will be immediately available to all administrators.
                   </p>
                 </div>
@@ -460,7 +466,7 @@ export default function AdminEmailsPage() {
                         reader.onload = async (event: any) => {
                           try {
                             const config = JSON.parse(event.target.result);
-                            
+
                             // Convert to API format
                             const configs = Object.entries(config).map(([category, email]) => ({
                               category,

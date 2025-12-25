@@ -27,6 +27,13 @@ function to24Hour(time12: string): string {
   return `${hour.toString().padStart(2, "0")}:${m}`;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function HoursEditor({ apiBase, tenantId, timezone: externalTimezone }: { apiBase: string; tenantId: string; timezone?: string }) {
   const [timezone, setTimezone] = useState("America/New_York");
   const [periods, setPeriods] = useState<Period[]>([]);

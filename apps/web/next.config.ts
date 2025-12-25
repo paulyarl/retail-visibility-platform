@@ -8,9 +8,25 @@ const nextConfig: NextConfig = {
   // If you import from a local package (e.g. packages/shared), add it here:
   transpilePackages: ["@rvp/shared", "shared"].filter(Boolean),
 
+  // Disable all static optimization and prerendering
   experimental: {
     serverActions: { bodySizeLimit: "15mb" },
+    // Disable static optimization completely
+    disableOptimizedLoading: true,
   },
+
+  // Force all pages to be dynamic - remove static generation entirely
+  generateBuildId: async () => {
+    return 'build-' + Date.now()
+  },
+
+  // Prevent any static generation
+  trailingSlash: false,
+  poweredByHeader: false,
+
+  // Disable 404 page generation to avoid prerendering issues
+  generateEtags: false,
+  compress: false,
 
   // Suppress noisy Sentry/OpenTelemetry warnings in development
   webpack: (config, { isServer }) => {
@@ -121,6 +137,14 @@ const sentryWebpackPluginOptions = {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
 };
+
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 
 // Make sure adding Sentry options is the last code to run before exporting
 export default withSentryConfig(nextConfig, sentryWebpackPluginOptions);

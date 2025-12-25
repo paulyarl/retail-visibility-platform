@@ -3,6 +3,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export interface TenantLimitStatus {
@@ -32,43 +33,29 @@ export interface TierInfo {
 }
 
 export function useTenantLimits() {
-  const [status, setStatus] = useState<TenantLimitStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchLimitStatus();
-  }, []);
-
-  const fetchLimitStatus = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const { data: status, isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['tenant-limits', 'status'],
+    queryFn: async (): Promise<TenantLimitStatus> => {
       const response = await api.get('/api/tenant-limits/status');
 
       if (!response.ok) {
         throw new Error('Failed to fetch tenant limit status');
       }
 
-      const data = await response.json();
-      setStatus(data);
-    } catch (err) {
-      console.error('[useTenantLimits] Error:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - limits change infrequently
+    gcTime: 15 * 60 * 1000, // 15 minutes cache
+  });
 
   const refresh = () => {
-    fetchLimitStatus();
+    refetch();
   };
 
   return {
     status,
     loading,
-    error,
+    error: error instanceof Error ? error.message : null,
     refresh,
     
     // Computed values

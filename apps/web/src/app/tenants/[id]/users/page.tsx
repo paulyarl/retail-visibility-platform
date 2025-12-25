@@ -8,6 +8,13 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 type TenantUser = {
   id: string;
   email: string;

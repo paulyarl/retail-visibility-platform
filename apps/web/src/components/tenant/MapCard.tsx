@@ -3,6 +3,13 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Skeleton } from '@/components/ui';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export interface MapCardProps {
   businessName: string;
   addressLine1: string;
@@ -19,6 +26,7 @@ export interface MapCardProps {
   onToggleDisplay?: (enabled: boolean) => void;
   editable?: boolean;
 }
+
 
 export default function MapCard({
   businessName,

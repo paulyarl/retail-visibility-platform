@@ -5,6 +5,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badg
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface SyncLog {
   id: string;
   tenantId: string | null;

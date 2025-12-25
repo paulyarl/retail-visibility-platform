@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { 
@@ -60,36 +61,16 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
   // Use AuthContext instead of fetching /auth/me independently
   const { user: authUser, isLoading: authLoading } = useAuth();
   
-  const [tier, setTier] = useState<ResolvedTier | null>(null);
-  const [usage, setUsage] = useState<TenantUsage | null>(null);
-  const [tierLoading, setTierLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const userData = useMemo(() => authUser || null, [authUser]);
+  const userRole = useMemo(() => {
+    if (!userData || !tenantId) return null;
+    const userTenant = userData.tenants.find(t => t.id === tenantId);
+    return userTenant?.role || null;
+  }, [userData, tenantId]);
   
-  // Derive user-related state from AuthContext
-  const { canSupport, userRole, userData } = useMemo(() => {
-    if (!authUser) {
-      return { canSupport: false, userRole: null as UserTenantRole | null, userData: null };
-    }
-    
-    const hasSupportAccess = canBypassTierRestrictions(authUser);
-    const isPlatformViewer = authUser.role === 'PLATFORM_VIEWER';
-    
-    let role: UserTenantRole | null = null;
-    if (hasSupportAccess) {
-      role = 'OWNER'; // Platform admins bypass
-    } else if (tenantId && authUser.tenants) {
-      const userTenant = authUser.tenants.find((t: any) => t.id === tenantId);
-      if (userTenant) {
-        role = userTenant.role as UserTenantRole;
-      } else if (isPlatformViewer) {
-        role = 'VIEWER';
-      }
-    } else if (isPlatformViewer) {
-      role = 'VIEWER';
-    }
-    
-    return { canSupport: hasSupportAccess, userRole: role, userData: authUser };
-  }, [authUser, tenantId]);
+  const canSupport = useMemo(() => {
+    return canBypassTierRestrictions(userData) || canBypassRoleRestrictions(userData);
+  }, [userData]);
 
   // Helper function to map API tier response to TierInfo format
   const mapApiTierToTierInfo = (apiTier: any): TierInfo => {
@@ -118,86 +99,88 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
     }
   };
 
-  const fetchTierData = async () => {
-    if (!tenantId) {
-      setTierLoading(false);
-      return;
-    }
-
-    try {
-      setTierLoading(true);
-      setError(null);
-
-      // User data is now from AuthContext - no need to fetch /auth/me
+  // Use React Query for tier data fetching with caching
+  const { data: tierData, isLoading: tierLoading, error: tierError, refetch } = useQuery({
+    queryKey: ['tenant', tenantId, 'tier', !!authUser],
+    queryFn: async () => {
+      if (!tenantId) return null;
 
       // Use public tier endpoint if no auth, otherwise use authenticated endpoint
       const tierEndpoint = authUser 
         ? `/api/tenants/${tenantId}/tier`
         : `/api/tenants/${tenantId}/tier/public`;
 
-      // Fetch tenant and organization tier data in parallel (Next.js API routes)
-      // Skip usage endpoint if not authenticated (storefront doesn't need it)
-      const requests = [api.get(tierEndpoint)];
-      if (authUser) {
-        requests.push(api.get(`/api/tenants/${tenantId}/usage`));
-      }
+      // Fetch tenant and organization tier data
+      const tenantResponse = await api.get(tierEndpoint);
       
-      const [tenantResponse, usageResponse] = await Promise.all(requests);
+      if (!tenantResponse.ok) {
+        throw new Error(`Failed to fetch tenant tier: ${tenantResponse.status}`);
+      }
+
+      const tierData = await tenantResponse.json();
 
       let organizationTier: TierInfo | null = null;
       let tenantTier: TierInfo | null = null;
       let isChain = false;
 
       // Process tenant tier response
-      if (tenantResponse.ok) {
-        const tierData = await tenantResponse.json();
-        
-        organizationTier = tierData.organizationTier ? mapApiTierToTierInfo(tierData.organizationTier) : null;
-        tenantTier = tierData.tenantTier ? mapApiTierToTierInfo(tierData.tenantTier) : null;
-        isChain = tierData.isChain || false;
-      }
-
-      // Process usage response (only if authenticated)
-      let usageData: TenantUsage = {
-        products: 0,
-        locations: 0,
-        users: 0,
-        apiCalls: 0,
-        storageGB: 0
-      };
-
-      if (usageResponse && usageResponse.ok) {
-        const usage = await usageResponse.json();
-        usageData = {
-          products: usage.products || 0,
-          locations: usage.locations || 0,
-          users: usage.users || 0,
-          apiCalls: usage.apiCalls || 0,
-          storageGB: usage.storageGB || 0
-        };
-      }
+      organizationTier = tierData.organizationTier ? mapApiTierToTierInfo(tierData.organizationTier) : null;
+      tenantTier = tierData.tenantTier ? mapApiTierToTierInfo(tierData.tenantTier) : null;
+      isChain = tierData.isChain || false;
 
       // Resolve effective tier using middleware
       const resolvedTier = resolveTier(organizationTier, tenantTier, isChain);
-      console.log('[useTenantTier] Resolved tier:', resolvedTier);
-      console.log('[useTenantTier] Effective tier:', resolvedTier?.effective);
-      console.log('[useTenantTier] Effective tier id:', resolvedTier?.effective?.id);
 
-      setTier(resolvedTier);
-      setUsage(usageData);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load tier data';
-      setError(errorMessage);
-      console.error('[useTenantTier] Error:', err);
-    } finally {
-      setTierLoading(false);
-    }
-  };
+      return {
+        tier: resolvedTier,
+        isChain
+      };
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes - tier data changes infrequently
+    gcTime: 30 * 60 * 1000, // 30 minutes cache
+    enabled: !!tenantId, // Only run when tenantId is available
+  });
 
-  // Auto-fetch when tenantId changes (works with or without auth)
-  useEffect(() => {
-    fetchTierData();
-  }, [tenantId, authUser]);
+  // Use React Query for usage data fetching
+  const { data: usageData, isLoading: usageLoading, error: usageError } = useQuery({
+    queryKey: ['tenant', tenantId, 'usage'],
+    queryFn: async (): Promise<TenantUsage> => {
+      if (!tenantId) {
+        return {
+          products: 0,
+          locations: 0,
+          users: 0,
+          apiCalls: 0,
+          storageGB: 0
+        };
+      }
+
+      const usageResponse = await api.get(`/api/tenants/${tenantId}/usage`);
+      
+      if (!usageResponse.ok) {
+        throw new Error(`Failed to fetch tenant usage: ${usageResponse.status}`);
+      }
+
+      const usage = await usageResponse.json();
+      return {
+        products: usage.products || 0,
+        locations: usage.locations || 0,
+        users: usage.users || 0,
+        apiCalls: usage.apiCalls || 0,
+        storageGB: usage.storageGB || 0
+      };
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - usage updates more frequently
+    gcTime: 15 * 60 * 1000, // 15 minutes cache
+    enabled: !!tenantId && !!authUser, // Only run when authenticated and tenantId available
+  });
+
+  // Extract data from React Query results
+  const tier = tierData?.tier || null;
+  const usage = usageData || null;
+  const loading = authLoading || tierLoading || (authUser ? usageLoading : false);
+  const error = (tierError ? (tierError instanceof Error ? tierError.message : String(tierError)) : null) || 
+                (usageError ? (usageError instanceof Error ? usageError.message : String(usageError)) : null);
 
   // EMERGENCY: Feature name mapping to fix frontend/backend conflicts
   const EMERGENCY_FEATURE_MAPPING: Record<string, string> = {
@@ -444,14 +427,14 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
   };
 
   // Combined loading state
-  const loading = authLoading || tierLoading;
+  // const loading = authLoading || tierLoading;
 
   return {
     tier,
     usage,
     loading,
     error,
-    refresh: fetchTierData,
+    refresh: async () => { await refetch(); }, // Return Promise<void>
     // Level 1: Legacy tier-only checks (backward compatibility)
     hasFeature: checkFeature,
     getFeaturesByCategory: getFeatures,

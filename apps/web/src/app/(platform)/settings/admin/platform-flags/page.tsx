@@ -6,6 +6,13 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminPlatformFlags from '@/components/admin/AdminPlatformFlags';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function PlatformFlagsPage() {
   return (
     <ProtectedRoute>

@@ -7,6 +7,14 @@ import SyncStateBadge from "@/components/hours/SyncStateBadge";
 import TimezonePicker from "@/components/hours/TimezonePicker";
 import HoursPreview from "@/components/hours/HoursPreview";
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function HoursSettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = use(params);
   const clientApiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";

@@ -9,6 +9,13 @@ interface ProductNavigationProps {
   directorySlug?: string;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export function ProductNavigation({ tenantId, directorySlug }: ProductNavigationProps) {
   const { user, isAuthenticated } = useAuth();
   
@@ -55,5 +62,6 @@ export function ProductNavigation({ tenantId, directorySlug }: ProductNavigation
     </div>
   );
 }
+
 
 export default ProductNavigation;

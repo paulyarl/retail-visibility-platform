@@ -6,6 +6,13 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PageHeader, { Icons } from '@/components/PageHeader';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AppearanceSettingsPage() {
   const [mounted, setMounted] = useState(false);
   const theme = 'light'; // Fixed to light mode for now

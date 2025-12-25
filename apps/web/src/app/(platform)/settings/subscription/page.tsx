@@ -12,6 +12,8 @@ import { isPlatformUser, isPlatformAdmin, type UserData } from '@/lib/auth/acces
 import { useAuth } from '@/contexts/AuthContext';
 import { ContextBadges } from '@/components/ContextBadges';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
+import { useTenant } from '@/hooks/useApiQueries';
+import { useUpgradeRequests } from '@/hooks/useApiQueries';
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 
@@ -39,82 +41,35 @@ interface PendingRequest {
   processedBy?: string;
 }
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?: string } = {}) {
   const { user } = useAuth();
-  const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedTier, setSelectedTier] = useState<SubscriptionTier | ChainTier | null>(null);
-  const [showChangeModal, setShowChangeModal] = useState(false);
-  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
-  const [requestHistory, setRequestHistory] = useState<PendingRequest[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
   
-  // Get tenant ID for capacity data
+  // Get tenant ID for capacity data - declare this first
   const tenantId = propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
   
+  // Use React Query hooks instead of manual API calls
+  const { data: tenant, isLoading: tenantLoading, error: tenantError } = useTenant(tenantId || '');
+  const { data: pendingRequests = [], isLoading: pendingLoading } = useUpgradeRequests(tenantId || undefined, 'new,pending,waiting');
+  const { data: requestHistory = [], isLoading: historyLoading } = useUpgradeRequests(tenantId || undefined, 'complete,denied');
+
+  const combinedLoading = tenantLoading || pendingLoading || historyLoading;
+
   // Use centralized subscription usage hook
   const { usage: capacityData } = useSubscriptionUsage(tenantId || undefined);
 
-  useEffect(() => {
-    const loadSubscription = async () => {
-      try {
-        // Wait for user to be loaded
-        if (!user) {
-          setLoading(false);
-          return;
-        }
-        
-        // Get tenant ID from prop first, then fall back to localStorage
-        const tenantId = propTenantId || localStorage.getItem('tenantId');
-        
-        // Platform users viewing without tenant context - show catalog view
-        if (isPlatformUser(user) && !tenantId) {
-          setLoading(false);
-          return;
-        }
-        
-        // If no tenant context at all, can't show subscription
-        if (!tenantId) {
-          setLoading(false);
-          return;
-        }
-
-        // Fetch tenant info, pending requests, and history in parallel
-        // Note: SKU count now comes from useSubscriptionUsage hook
-        const [tenantRes, requestsRes, historyRes] = await Promise.all([
-          api.get(`/api/tenants/${tenantId}`),
-          api.get(`/api/upgrade-requests?tenantId=${tenantId}&status=new,pending,waiting`),
-          api.get(`/api/upgrade-requests?tenantId=${tenantId}&status=complete,denied`)
-        ]);
-        
-        if (tenantRes.ok) {
-          const data = await tenantRes.json();
-          
-          // Get pending requests
-          if (requestsRes.ok) {
-            const requestsData = await requestsRes.json();
-            setPendingRequests(requestsData.data || []);
-          }
-          
-          // Get request history
-          if (historyRes.ok) {
-            const historyData = await historyRes.json();
-            setRequestHistory(historyData.data || []);
-          }
-          
-          setTenant(data);
-        }
-      } catch (error) {
-        console.error('Failed to load user and subscription:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadSubscription();
-  }, [propTenantId, user]);
+  // Add back missing state variables
+  const [selectedTier, setSelectedTier] = useState<SubscriptionTier | ChainTier | null>(null);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Show loading while user or tenant data is being fetched
-  if (loading || !user) {
+  if (combinedLoading || !user) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <div className="text-neutral-600">Loading subscription details...</div>
@@ -642,7 +597,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {pendingRequests.map((request) => {
+                {pendingRequests.map((request: PendingRequest) => {
                   const requestedTierInfo = getTierInfo(request.requestedTier as any);
                   const statusColors = {
                     new: 'bg-blue-100 text-blue-800',
@@ -720,7 +675,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   </p>
                 </div>
                 <div className="space-y-3">
-                  {requestHistory.map((request) => {
+                  {requestHistory.map((request: PendingRequest) => {
                     const fromTierInfo = getTierInfo(request.currentTier as any);
                     const toTierInfo = getTierInfo(request.requestedTier as any);
                     const isApproved = request.status === 'complete';

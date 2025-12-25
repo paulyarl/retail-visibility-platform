@@ -8,6 +8,10 @@ import { DataExportWidget } from '@/components/security/gdpr/DataExportWidget';
 import { AccountDeletionModal } from '@/components/security/gdpr/AccountDeletionModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Privacy & Data Settings',
   description: 'Manage your privacy preferences, data exports, and GDPR compliance',

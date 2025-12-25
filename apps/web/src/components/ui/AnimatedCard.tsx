@@ -3,6 +3,13 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export interface AnimatedCardProps {
   children: React.ReactNode;
   className?: string;
@@ -10,6 +17,7 @@ export interface AnimatedCardProps {
   hover?: boolean;
   onClick?: () => void;
 }
+
 
 export function AnimatedCard({
   children,

@@ -9,6 +9,12 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { canManageUsers, canViewUsers } from '@/lib/auth/access-control';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface User {
   id: string;
   email: string;

@@ -3,6 +3,13 @@
 import React from 'react';
 
 // Standard navigation patterns and guidelines
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export const NavigationStandards = {
   // URL Patterns
   URL_PATTERNS: {
@@ -292,6 +299,7 @@ export const NavigationStandards = {
 };
 
 // Helper functions for consistent navigation
+
 export const NavigationHelpers = {
   // Generate consistent URL patterns
   generateUrl: (scope: 'platform' | 'tenant' | 'admin', path: string, tenantId?: string) => {
@@ -341,5 +349,6 @@ export const NavigationHelpers = {
     });
   },
 };
+
 
 export default NavigationStandards;

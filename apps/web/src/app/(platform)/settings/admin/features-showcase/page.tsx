@@ -6,6 +6,12 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 type ShowcaseMode = 'slider' | 'hybrid' | 'tabs' | 'grid' | 'video-hero' | 'random';
 
 interface ShowcaseConfig {

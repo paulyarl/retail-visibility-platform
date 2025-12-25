@@ -70,6 +70,14 @@ interface Photo {
   caption?: string;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const { tenantId, itemId } = use(params);
   const router = useRouter();

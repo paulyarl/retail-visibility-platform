@@ -22,6 +22,12 @@ import BulkSeedModal from '@/components/admin/BulkSeedModal';
 import BulkClearModal from '@/components/admin/BulkClearModal';
 import CleanupScanSessionsModal from '@/components/admin/CleanupScanSessionsModal';
 
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AdminToolsPage() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
 

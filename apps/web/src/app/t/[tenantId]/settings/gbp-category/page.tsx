@@ -10,6 +10,14 @@ import { Spinner } from '@/components/ui';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function GBPCategoryPage() {
   const params = useParams();
   const tenantId = params.tenantId as string;

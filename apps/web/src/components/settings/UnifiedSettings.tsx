@@ -6,6 +6,13 @@ import PageHeader from '@/components/PageHeader';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import SettingsSearch from '@/components/SettingsSearch';
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export type UnifiedSettingCard = {
   title: string;
   description: string;
@@ -21,12 +28,14 @@ export type UnifiedSettingCard = {
   };
 };
 
+
 export type UnifiedSettingsGroup = {
   title: string;
   description: string;
   cards: UnifiedSettingCard[];
   accessOptions?: any; // Group-level access control
 };
+
 
 export type UnifiedSettingsConfig = {
   title: string;
@@ -39,6 +48,7 @@ export type UnifiedSettingsConfig = {
 interface UnifiedSettingsProps {
   config: UnifiedSettingsConfig;
 }
+
 
 export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
   const router = useRouter();
@@ -167,11 +177,13 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
 }
 
 // Helper function to create tenant-scoped hrefs
+
 export const createTenantHref = (tenantId: string, path: string) => {
   return path.replace('[tenantId]', tenantId);
 };
 
 // Helper function to transform legacy settings config to unified format
+
 export const transformToUnifiedConfig = (
   legacyGroups: any[],
   config: Partial<UnifiedSettingsConfig>

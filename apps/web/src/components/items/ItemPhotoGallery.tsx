@@ -26,6 +26,13 @@ interface ItemPhotoGalleryProps {
   onUpdate?: () => void;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhotoGalleryProps) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);

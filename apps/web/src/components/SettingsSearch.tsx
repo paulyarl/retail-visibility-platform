@@ -16,6 +16,13 @@ interface SettingsSearchProps {
   onResultClick?: (href: string) => void;
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export function SettingsSearch({ settings, onResultClick }: SettingsSearchProps) {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -167,5 +174,6 @@ export function SettingsSearch({ settings, onResultClick }: SettingsSearchProps)
     </div>
   );
 }
+
 
 export default SettingsSearch;

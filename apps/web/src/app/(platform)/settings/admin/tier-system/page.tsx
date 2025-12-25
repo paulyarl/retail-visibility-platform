@@ -38,6 +38,14 @@ interface Tier {
   features: TierFeature[];
 }
 
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
 export default function TierSystemPage() {
   console.log('TierSystemPage component mounted');
   const { hasAccess, loading: accessLoading, isPlatformAdmin, user } = useAccessControl(null, AccessPresets.PLATFORM_ADMIN_ONLY);
