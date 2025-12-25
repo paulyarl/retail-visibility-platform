@@ -74,15 +74,16 @@ export function SecurityAlerts({ alerts, onMarkRead, onDismiss }: SecurityAlerts
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium">{alert.message}</p>
+                    <p className="font-medium">{alert.title}</p>
                     {!alert.read && (
                       <Badge variant="default" className="text-xs">
                         New
                       </Badge>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDistanceToNow(new Date(alert.timestamp), { addSuffix: true })}
+                  <p className="text-sm text-muted-foreground">{alert.message}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(alert.createdAt || alert.timestamp || new Date()), { addSuffix: true })}
                   </p>
                 </div>
                 

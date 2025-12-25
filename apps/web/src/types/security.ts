@@ -32,12 +32,17 @@ export interface LoginSession {
 
 export interface SecurityAlert {
   id: string;
-  type: 'unusual_login' | 'password_changed' | 'device_added' | 'mfa_disabled' | 'account_locked' | 'suspicious_activity';
+  type: 'failed_login' | 'new_device' | 'password_change' | 'suspicious_activity' | 'account_change' | 'unusual_login' | 'password_changed' | 'device_added' | 'mfa_disabled' | 'account_locked';
+  title: string;
   message: string;
-  timestamp: Date;
-  severity: 'info' | 'warning' | 'error' | 'critical';
+  createdAt: string | Date;
+  severity: 'info' | 'warning' | 'critical' | 'error';
   read: boolean;
+  readAt?: string | Date;
+  metadata?: Record<string, any>;
   actions?: SecurityAlertAction[];
+  // Legacy field for backwards compatibility
+  timestamp?: Date;
 }
 
 export interface SecurityAlertAction {
