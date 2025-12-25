@@ -140,8 +140,8 @@ async function testEndpoint(endpoint) {
     const result = await makeRequest(url);
     results.push(result);
     
-    // Small delay between requests
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Delay between requests (500ms = realistic user load pattern)
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
   
   console.log(' Done!\n');

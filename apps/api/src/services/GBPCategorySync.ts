@@ -9,6 +9,7 @@
  */
 
 import { Pool, PoolClient } from 'pg';
+import { getDirectPool } from '../utils/db-pool';
 
 interface GBPCategory {
   id: string;
@@ -38,8 +39,9 @@ interface SyncResult {
 export class GBPCategorySyncService {
   private pool: Pool;
 
-  constructor(pool: Pool) {
-    this.pool = pool;
+  constructor(pool?: Pool) {
+    // Use centralized singleton pool by default, allow injection for testing
+    this.pool = pool || getDirectPool();
   }
 
   /**

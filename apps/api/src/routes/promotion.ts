@@ -3,7 +3,7 @@ import { getDirectPool } from '../utils/db-pool';
 
 const router = Router();
 
-// Use shared connection pool
+// Use shared connection pool (safe to call at module load - getDirectPool returns singleton)
 const pool = getDirectPool();
 
 /**

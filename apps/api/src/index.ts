@@ -4932,6 +4932,11 @@ console.log('✅ Admin cached products routes mounted at /api/admin/cached-produ
 app.use('/api/admin/tools', authenticateToken, requireAdmin, adminToolsRoutes);
 console.log('✅ Admin tools routes mounted at /api/admin/tools');
 
+/* ------------------------------ admin sentry ------------------------------ */
+import sentryRoutes from './routes/admin/sentry';
+app.use('/api/admin/sentry', authenticateToken, requireAdmin, sentryRoutes);
+console.log('✅ Admin sentry routes mounted at /api/admin/sentry');
+
 /* ------------------------------ directory ------------------------------ */
 /* IMPORTANT: Specific paths MUST be mounted before catch-all /api/directory routes */
 

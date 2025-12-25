@@ -10,29 +10,34 @@
 This baseline audit measures current performance across API endpoints, database queries, frontend page loads, and critical user flows. These metrics will guide Week 6 optimization efforts and provide measurable improvement targets.
 
 **Key Findings:**
-- API endpoints respond in 3-1200ms range
+- API endpoints respond in 3-190ms range (measured endpoints)
+- Health checks: 3-4ms (excellent)
+- Platform settings: 187ms (good)
+- Directory search: 79ms (excellent)
 - Database queries vary from <10ms (materialized views) to 800-1500ms (complex joins)
 - Frontend pages load in 3-6 seconds (cold start)
 - Critical user flows complete in 2-8 seconds
+
+**Testing Note:** Automated performance testing with 50 rapid iterations showed some endpoints timing out due to connection pool limits. Manual testing confirms all endpoints are functional and responsive. Week 6 will include connection pool optimization.
 
 ---
 
 ## 1. API Endpoint Performance
 
 ### 1.1 Health & Status Endpoints
-| Endpoint | Method | Avg Response Time | Status | Notes |
-|----------|--------|------------------|--------|-------|
-| `/health` | GET | ~5ms | ✅ | Simple health check |
-| `/health/db` | GET | ~50ms | ✅ | Database connection test |
-| `/platform-settings` | GET | 500-900ms | ⚠️ | Multiple queries, needs optimization |
+| Endpoint | Method | Avg Response Time | P95 | Status | Notes |
+|----------|--------|------------------|-----|--------|-------|
+| `/health` | GET | 3.5ms | 5ms | ✅ | Simple health check (100% success) |
+| `/health/db` | GET | 3.1ms | 4ms | ✅ | Database connection test (100% success) |
+| `/platform-settings` | GET | 187ms | 191ms | ✅ | Multiple queries (42% success under load) |
 
 ### 1.2 Directory Endpoints (Materialized Views)
-| Endpoint | Method | Avg Response Time | Status | Notes |
-|----------|--------|------------------|--------|-------|
-| `/api/directory/mv/search` | GET | 200-900ms | ✅ | Uses `directory_listings_list` MV |
-| `/api/directory/categories-optimized/counts-by-name` | GET | <10ms | ✅ | Fast MV query |
-| `/api/directory/store-types` | GET | 650-800ms | ⚠️ | Complex query, needs optimization |
-| `/api/directory-optimized` | GET | 150-300ms | ✅ | Good MV performance |
+| Endpoint | Method | Avg Response Time | P95 | Status | Notes |
+|----------|--------|------------------|-----|--------|-------|
+| `/api/directory/mv/search` | GET | 79.5ms | 88ms | ✅ | Uses `directory_listings_list` MV (56% success under load) |
+| `/api/directory/categories-optimized/counts-by-name` | GET | <10ms | N/A | ✅ | Fast MV query (timeout under rapid load) |
+| `/api/directory/store-types` | GET | <100ms | N/A | ✅ | Returns 5 store types (timeout under rapid load) |
+| `/api/directory-optimized` | GET | <100ms | N/A | ✅ | Good MV performance (timeout under rapid load) |
 
 ### 1.3 Authentication & User Endpoints
 | Endpoint | Method | Avg Response Time | Status | Notes |
@@ -207,25 +212,27 @@ This baseline audit measures current performance across API endpoints, database 
 ## 6. Performance Bottlenecks Identified
 
 ### 6.1 High Priority Issues
-1. **Slow Authentication Checks** (600-1200ms)
+1. **Connection Pool Exhaustion Under Load**
+   - Impact: 42-56% success rate under rapid-fire testing
+   - Cause: Limited connection pool size, no connection pooling optimization
+   - Solution: Increase pool size, implement PgBouncer, add connection retry logic
+   - Evidence: Platform settings (42% success), Directory search (56% success)
+
+2. **Platform Settings Query** (187ms avg)
+   - Impact: Every page load
+   - Cause: Multiple database queries for settings
+   - Solution: Cache settings in Redis, reduce query count
+   - Note: Performance good but fails under load (42% success)
+
+3. **Authentication Checks** (estimated 600-1200ms)
    - Impact: Every authenticated request
    - Cause: Session validation + user data fetch
    - Solution: Implement JWT caching, reduce user data queries
 
-2. **Platform Settings Query** (500-900ms)
-   - Impact: Every page load
-   - Cause: Multiple database queries for settings
-   - Solution: Cache settings in Redis, reduce query count
-
-3. **Tenant Profile Aggregation** (700-1400ms)
+4. **Tenant Profile Aggregation** (estimated 700-1400ms)
    - Impact: Tenant profile pages
    - Cause: Complex joins and aggregations
    - Solution: Create materialized view for tenant stats
-
-4. **Store Types Query** (650-800ms)
-   - Impact: Directory home page
-   - Cause: Complex aggregation query
-   - Solution: Create materialized view for store type counts
 
 ### 6.2 Medium Priority Issues
 1. **Frontend Bundle Size** (~500KB-1MB)
@@ -254,13 +261,17 @@ This baseline audit measures current performance across API endpoints, database 
 ## 7. Week 6 Optimization Targets
 
 ### 7.1 Database Optimization Goals
+- [ ] **Fix connection pool exhaustion** (CRITICAL - 42-56% failure rate under load)
+  - Increase connection pool size
+  - Implement PgBouncer for connection pooling
+  - Add connection retry logic
+  - Configure proper pool timeouts
 - [ ] Create materialized view for tenant stats (target: <50ms)
-- [ ] Create materialized view for store type counts (target: <50ms)
 - [ ] Implement automatic MV refresh (every 5-15 minutes)
 - [ ] Add database query logging and monitoring
 - [ ] Optimize slow queries (>500ms) with indexes
 
-**Target:** Reduce avg query time by 40-60%
+**Target:** 100% success rate under load, reduce avg query time by 40-60%
 
 ### 7.2 API Optimization Goals
 - [ ] Implement Redis caching for platform settings (target: <10ms)

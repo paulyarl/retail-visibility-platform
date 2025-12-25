@@ -226,137 +226,75 @@ export default function SentryMonitoringPage() {
           ))}
         </div>
 
-        {/* Dashboard Templates */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Error Dashboard */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                Error Monitoring
-              </CardTitle>
-              <CardDescription>Real-time error tracking and issue management</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-neutral-600 dark:text-neutral-400">Latest Issues</span>
-                  <Badge variant="info">Live</Badge>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <div>
-                      <p className="font-medium text-sm">TypeError: Cannot read property</p>
-                      <p className="text-xs text-neutral-500">Web App - 2 minutes ago</p>
-                    </div>
-                    <Badge variant="error">High</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <div>
-                      <p className="font-medium text-sm">Network request failed</p>
-                      <p className="text-xs text-neutral-500">API Server - 5 minutes ago</p>
-                    </div>
-                    <Badge variant="warning">Medium</Badge>
-                  </div>
-                </div>
-                <Link
-                  href="https://sentry.io"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition-colors"
-                >
-                  View Full Error Dashboard
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Performance Dashboard */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Performance Monitoring
-              </CardTitle>
-              <CardDescription>Application performance metrics and bottlenecks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-neutral-600 dark:text-neutral-400">Performance Metrics</span>
-                  <Badge variant="success">Good</Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <p className="text-2xl font-bold text-green-600">1.2s</p>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Avg Response Time</p>
-                  </div>
-                  <div className="p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">99.5%</p>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Uptime</p>
-                  </div>
-                </div>
-                <Link
-                  href="https://sentry.io"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-                >
-                  View Full Performance Dashboard
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Release Tracking */}
+        {/* Integration Status */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              <svg className="w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Release Tracking
+              Sentry Integration Status
             </CardTitle>
-            <CardDescription>Monitor deployments and release health</CardDescription>
+            <CardDescription>Current state of Sentry monitoring integration</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span className="font-medium">v2.1.4</span>
-                  </div>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Web App - Deployed 2 hours ago</p>
-                </div>
-                <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span className="font-medium">v1.8.2</span>
-                  </div>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">API Server - Deployed 2 hours ago</p>
-                </div>
-                <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <span className="font-medium">v1.7.1</span>
-                  </div>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Mobile App - Issues detected</p>
+              <div className="flex items-center gap-3">
+                <div className={`h-3 w-3 rounded-full ${sentryConfigured ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                <div className="flex-1">
+                  <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                    {sentryConfigured ? 'API Configured' : 'API Not Configured'}
+                  </p>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    {sentryConfigured
+                      ? 'Sentry API token and organization slug are configured'
+                      : 'Add SENTRY_API_TOKEN and SENTRY_ORG_SLUG to environment variables'
+                    }
+                  </p>
                 </div>
               </div>
-              <Link
-                href="https://sentry.io"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 transition-colors"
-              >
-                View Full Release Dashboard
-              </Link>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <div className="text-center p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                  <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                    {metrics.length}
+                  </div>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">Metrics Available</p>
+                </div>
+                <div className="text-center p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                  <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                    {projects.length}
+                  </div>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">Projects Tracked</p>
+                </div>
+                <div className="text-center p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                  <div className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                    {sentryConfigured ? '🚀' : '⏳'}
+                  </div>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    {sentryConfigured ? 'Ready for Integration' : 'Setup Required'}
+                  </p>
+                </div>
+              </div>
+
+              {!sentryConfigured && (
+                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="font-medium text-blue-900 dark:text-blue-100">Next Steps</p>
+                      <ol className="mt-2 text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                        <li>1. Set up a Sentry account and create an organization</li>
+                        <li>2. Generate a personal access token with required permissions</li>
+                        <li>3. Add SENTRY_API_TOKEN and SENTRY_ORG_SLUG to environment variables</li>
+                        <li>4. Restart the application to enable live monitoring</li>
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
