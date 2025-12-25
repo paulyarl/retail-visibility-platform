@@ -1,20 +1,32 @@
 /**
  * Security Dashboard
- * Phase 3: Admin security overview
+ * Phase 3: Admin security overview with platform-wide session and alert monitoring
  */
 
 'use client';
 
 import { useSecurityMonitoring } from '@/hooks/useSecurityMonitoring';
+import { useAdminSecurityMonitoring } from '@/hooks/useAdminSecurityMonitoring';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Shield, AlertTriangle, Ban, Activity, TrendingUp, TrendingDown } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import { Shield, AlertTriangle, Ban, Activity, Users, Bell } from 'lucide-react';
 import { SecurityMetrics } from './SecurityMetrics';
 import { ThreatMonitor } from './ThreatMonitor';
 import { BlockedIPsTable } from './BlockedIPsTable';
+import { AdminSessionsTable } from '../admin/AdminSessionsTable';
+import { AdminAlertsTable } from '../admin/AdminAlertsTable';
 
 export function SecurityDashboard() {
   const { metrics, threats, blockedIPs, healthStatus, loading } = useSecurityMonitoring();
+  const { 
+    sessions, 
+    alerts, 
+    sessionStats, 
+    alertStats, 
+    loading: adminLoading,
+    revokeSession 
+  } = useAdminSecurityMonitoring();
 
   if (loading) {
     return (
@@ -109,14 +121,136 @@ export function SecurityDashboard() {
         </CardContent>
       </Card>
 
-      {/* Metrics */}
-      <SecurityMetrics metrics={metrics} />
+      {/* Platform-wide Security Monitoring */}
+      <Tabs defaultValue="sessions" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="sessions" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            User Sessions
+            {sessionStats && (
+              <Badge variant="secondary" className="ml-1">
+                {sessionStats.activeSessions}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="alerts" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Security Alerts
+            {alertStats && alertStats.unreadAlerts > 0 && (
+              <Badge variant="destructive" className="ml-1">
+                {alertStats.unreadAlerts}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="threats">Threats</TabsTrigger>
+          <TabsTrigger value="blocked">Blocked IPs</TabsTrigger>
+        </TabsList>
 
-      {/* Threat Monitor */}
-      <ThreatMonitor threats={threats} />
+        <TabsContent value="sessions" className="space-y-4">
+          {sessionStats && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Active Sessions</CardDescription>
+                  <CardTitle className="text-2xl">{sessionStats.activeSessions}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Active Users</CardDescription>
+                  <CardTitle className="text-2xl">{sessionStats.activeUsers}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Last 24h</CardDescription>
+                  <CardTitle className="text-2xl">{sessionStats.sessionsLast24h}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Revoked</CardDescription>
+                  <CardTitle className="text-2xl">{sessionStats.revokedSessions}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>All User Sessions</CardTitle>
+              <CardDescription>Platform-wide active sessions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {adminLoading ? (
+                <div className="h-32 bg-muted animate-pulse rounded-lg" />
+              ) : (
+                <AdminSessionsTable sessions={sessions} onRevoke={revokeSession} />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Blocked IPs */}
-      <BlockedIPsTable blockedIPs={blockedIPs} />
+        <TabsContent value="alerts" className="space-y-4">
+          {alertStats && (
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Total Alerts</CardDescription>
+                  <CardTitle className="text-2xl">{alertStats.totalAlerts}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Unread</CardDescription>
+                  <CardTitle className="text-2xl">{alertStats.unreadAlerts}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Last 24h</CardDescription>
+                  <CardTitle className="text-2xl">{alertStats.alertsLast24h}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Critical</CardDescription>
+                  <CardTitle className="text-2xl text-destructive">{alertStats.criticalAlerts}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Warnings</CardDescription>
+                  <CardTitle className="text-2xl text-yellow-600">{alertStats.warningAlerts}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>All Security Alerts</CardTitle>
+              <CardDescription>Platform-wide security notifications</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {adminLoading ? (
+                <div className="h-32 bg-muted animate-pulse rounded-lg" />
+              ) : (
+                <AdminAlertsTable alerts={alerts} />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="threats" className="space-y-4">
+          <SecurityMetrics metrics={metrics} />
+          <ThreatMonitor threats={threats} />
+        </TabsContent>
+
+        <TabsContent value="blocked" className="space-y-4">
+          <BlockedIPsTable blockedIPs={blockedIPs} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

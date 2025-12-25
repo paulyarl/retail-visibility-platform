@@ -5032,10 +5032,13 @@ console.log('✅ MFA routes mounted (two-factor authentication)');
 /* ------------------------------ Security Sessions & Alerts ------------------------------ */
 import authSessionsRoutes from './routes/auth-sessions';
 import securityAlertsRoutes from './routes/security-alerts';
+import adminSecurityMonitoringRoutes from './routes/admin/security-monitoring';
 app.use('/api/auth', authSessionsRoutes);
 app.use('/api/security', securityAlertsRoutes);
+app.use('/api/admin/security', adminSecurityMonitoringRoutes);
 console.log('✅ Security sessions routes mounted at /api/auth/sessions');
 console.log('✅ Security alerts routes mounted at /api/security/security-alerts');
+console.log('✅ Admin security monitoring routes mounted at /api/admin/security');
 
 /* ------------------------------ clone (products & categories) ------------------------------ */
 import cloneRoutes from './routes/clone';
