@@ -23,7 +23,7 @@ declare global {
 // General API rate limiter - applies to most endpoints
 export const generalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // Higher limit in dev for hot reload
   message: {
     error: 'rate_limit_exceeded',
     message: 'Too many requests from this IP, please try again after 15 minutes.',
@@ -91,7 +91,7 @@ export const uploadRateLimit = rateLimit({
 // Rate limiter for search endpoints
 export const searchRateLimit = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 30, // limit each IP to 30 searches per minute
+  max: process.env.NODE_ENV === 'production' ? 30 : 200, // Higher limit in dev for hot reload
   message: {
     error: 'search_rate_limit_exceeded',
     message: 'Too many search requests, please slow down.',

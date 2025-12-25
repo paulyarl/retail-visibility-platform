@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Map, Grid3x3, List, Sparkles } from 'lucide-react';
@@ -302,7 +302,10 @@ export default function DirectoryClient() {
     fetchFilters();
   }, []);
 
-  // Fetch directory listings
+  // Track search behavior once per unique search
+  const trackedSearchesRef = useRef<Set<string>>(new Set());
+  
+  // Fetch directory listings with debouncing
   useEffect(() => {
     const fetchListings = async () => {
       setLoading(true);
@@ -312,38 +315,44 @@ export default function DirectoryClient() {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const params = new URLSearchParams(searchParams.toString());
 
-        // Track directory browse behavior (Near Me search)
+        // Track directory browse behavior (Near Me search) - once per unique search
         const lat = params.get('lat');
         const lng = params.get('lng');
         const sort = params.get('sort');
         const search = params.get('search');
         
         if (lat && lng && sort === 'distance') {
-          // Track "Near Me" search
-          trackBehaviorClient({
-            entityType: 'search',
-            entityId: `near-me-${lat}-${lng}`,
-            entityName: 'Near Me Search',
-            pageType: 'search_results',
-            context: {
-              searchType: 'location',
-              latitude: parseFloat(lat),
-              longitude: parseFloat(lng),
-              sort
-            }
-          });
+          const searchKey = `near-me-${lat}-${lng}`;
+          if (!trackedSearchesRef.current.has(searchKey)) {
+            trackedSearchesRef.current.add(searchKey);
+            trackBehaviorClient({
+              entityType: 'search',
+              entityId: searchKey,
+              entityName: 'Near Me Search',
+              pageType: 'search_results',
+              context: {
+                searchType: 'location',
+                latitude: parseFloat(lat),
+                longitude: parseFloat(lng),
+                sort
+              }
+            });
+          }
         } else if (search) {
-          // Track text search
-          trackBehaviorClient({
-            entityType: 'search',
-            entityId: `search-${search}`,
-            entityName: search,
-            pageType: 'search_results',
-            context: {
-              searchType: 'text',
-              query: search
-            }
-          });
+          const searchKey = `search-${search}`;
+          if (!trackedSearchesRef.current.has(searchKey)) {
+            trackedSearchesRef.current.add(searchKey);
+            trackBehaviorClient({
+              entityType: 'search',
+              entityId: searchKey,
+              entityName: search,
+              pageType: 'search_results',
+              context: {
+                searchType: 'text',
+                query: search
+              }
+            });
+          }
         }
 
         // Use materialized view endpoint for faster queries
