@@ -329,7 +329,6 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
         INNER JOIN tenants t ON dll.tenant_id = t.id
         WHERE dll.slug != $1
           AND dll.is_published = true
-          AND dll.location_status = 'active'
           AND t.location_status IN ('active', 'inactive', 'closed')
           AND dll.state = $2
           AND dll.is_featured = true
