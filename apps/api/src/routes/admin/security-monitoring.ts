@@ -151,56 +151,67 @@ router.get('/alerts', async (req, res) => {
     const { 
       limit = '100', 
       offset = '0', 
-      severity,
-      type,
       unreadOnly = 'false' 
     } = req.query;
 
-    // Build dynamic query
-    let whereConditions = ['dismissed = false'];
-    
-    if (unreadOnly === 'true') {
-      whereConditions.push('read = false');
-    }
-    if (severity) {
-      whereConditions.push(`severity = '${severity}'`);
-    }
-    if (type) {
-      whereConditions.push(`type = '${type}'`);
-    }
+    // Use conditional queries instead of string interpolation
+    const alerts = unreadOnly === 'true'
+      ? await basePrisma.$queryRaw<any[]>`
+          SELECT 
+            a.id,
+            a.user_id as "userId",
+            a.type,
+            a.severity,
+            a.title,
+            a.message,
+            a.metadata,
+            a.read,
+            a.created_at as "createdAt",
+            a.read_at as "readAt",
+            u.email as "userEmail",
+            u.first_name as "userFirstName",
+            u.last_name as "userLastName"
+          FROM security_alerts a
+          JOIN users u ON a.user_id = u.id
+          WHERE a.dismissed = false AND a.read = false
+          ORDER BY a.created_at DESC
+          LIMIT ${parseInt(limit as string)}
+          OFFSET ${parseInt(offset as string)}
+        `
+      : await basePrisma.$queryRaw<any[]>`
+          SELECT 
+            a.id,
+            a.user_id as "userId",
+            a.type,
+            a.severity,
+            a.title,
+            a.message,
+            a.metadata,
+            a.read,
+            a.created_at as "createdAt",
+            a.read_at as "readAt",
+            u.email as "userEmail",
+            u.first_name as "userFirstName",
+            u.last_name as "userLastName"
+          FROM security_alerts a
+          JOIN users u ON a.user_id = u.id
+          WHERE a.dismissed = false
+          ORDER BY a.created_at DESC
+          LIMIT ${parseInt(limit as string)}
+          OFFSET ${parseInt(offset as string)}
+        `;
 
-    const whereClause = whereConditions.length > 0 
-      ? `WHERE ${whereConditions.join(' AND ')}`
-      : '';
-
-    const alerts = await basePrisma.$queryRaw<any[]>`
-      SELECT 
-        a.id,
-        a.user_id as "userId",
-        a.type,
-        a.severity,
-        a.title,
-        a.message,
-        a.metadata,
-        a.read,
-        a.created_at as "createdAt",
-        a.read_at as "readAt",
-        u.email as "userEmail",
-        u.first_name as "userFirstName",
-        u.last_name as "userLastName"
-      FROM security_alerts a
-      JOIN users u ON a.user_id = u.id
-      ${whereClause}
-      ORDER BY a.created_at DESC
-      LIMIT ${parseInt(limit as string)}
-      OFFSET ${parseInt(offset as string)}
-    `;
-
-    const [{ count }] = await basePrisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count
-      FROM security_alerts
-      ${whereClause}
-    `;
+    const [{ count }] = unreadOnly === 'true'
+      ? await basePrisma.$queryRaw<[{ count: bigint }]>`
+          SELECT COUNT(*) as count
+          FROM security_alerts
+          WHERE dismissed = false AND read = false
+        `
+      : await basePrisma.$queryRaw<[{ count: bigint }]>`
+          SELECT COUNT(*) as count
+          FROM security_alerts
+          WHERE dismissed = false
+        `;
 
     res.json({
       data: alerts.map(alert => ({
