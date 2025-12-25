@@ -27,9 +27,9 @@ export class MFAService {
 
   constructor() {
     // In production, this should come from environment variables
-    this.ENCRYPTION_KEY = process.env.MFA_ENCRYPTION_KEY || 'your-32-character-encryption-key-here';
-    if (this.ENCRYPTION_KEY.length !== 32) {
-      throw new Error('MFA_ENCRYPTION_KEY must be exactly 32 characters');
+    this.ENCRYPTION_KEY = process.env.MFA_ENCRYPTION_KEY || 'a1b2c3d4e5f678901234567890123456789012345678901234567890123456789012';
+    if (this.ENCRYPTION_KEY.length !== 64) {
+      throw new Error('MFA_ENCRYPTION_KEY must be exactly 64 characters (32 bytes in hex)');
     }
   }
 
