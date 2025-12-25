@@ -12,42 +12,7 @@ const router = Router();
 // All routes require authentication
 router.use(authenticateToken);
 
-/**
- * GET /user/security-alerts - Get security alerts for current user
- * Returns recent security events and notifications
- */
-router.get('/security-alerts', async (req, res) => {
-  try {
-    const userId = req.user?.userId;
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'unauthorized' });
-    }
-
-    // Mock data for now - replace with actual security alert service
-    const alerts = [
-      {
-        id: '1',
-        type: 'login',
-        severity: 'info',
-        message: 'New login from Chrome on Windows',
-        timestamp: new Date(),
-        read: false,
-      }
-    ];
-
-    res.json({
-      success: true,
-      alerts,
-    });
-  } catch (error) {
-    console.error('[Security Alerts Error]', error);
-    res.status(500).json({
-      error: 'internal_error',
-      message: 'Failed to fetch security alerts',
-    });
-  }
-});
+// Note: /security-alerts endpoint moved to security-alerts.ts for full implementation
 
 /**
  * GET /user/preferences - Get user preferences
