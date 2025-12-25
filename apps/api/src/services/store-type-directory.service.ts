@@ -221,7 +221,7 @@ class StoreTypeDirectoryService {
     radius?: number
   ) {
     try {
-      console.log(`[StoreTypeService] Fetching stores for type slug: ${typeSlug}`);
+      //console.log(`[StoreTypeService] Fetching stores for type slug: ${typeSlug}`);
       
       // Convert slug to expected name format (e.g., "toy-store" -> "Toy store")
       const expectedName = typeSlug
@@ -229,7 +229,7 @@ class StoreTypeDirectoryService {
         .map((word, index) => index === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word)
         .join(' ');
       
-      console.log(`[StoreTypeService] Expected category name: ${expectedName}`);
+      //console.log(`[StoreTypeService] Expected category name: ${expectedName}`);
       
       // First, get the GBP category ID and name from the slug
       // Try multiple matching strategies
@@ -244,7 +244,7 @@ class StoreTypeDirectoryService {
         LIMIT 1
       `, [typeSlug, expectedName, `gcid:${typeSlug.replace(/-/g, '_')}`]);
       
-      console.log(`[StoreTypeService] Category lookup result: ${JSON.stringify(categoryLookup.rows)}`);
+      //console.log(`[StoreTypeService] Category lookup result: ${JSON.stringify(categoryLookup.rows)}`);
       
       if (categoryLookup.rows.length === 0) {
         console.log(`[StoreTypeService] No category found for slug: ${typeSlug}`);
@@ -255,7 +255,7 @@ class StoreTypeDirectoryService {
       const categoryName = category.name;
       const categoryId = category.id;
       
-      console.log(`[StoreTypeService] Found category: ${categoryName} (${categoryId})`);
+      //console.log(`[StoreTypeService] Found category: ${categoryName} (${categoryId})`);
       
       // Query stores that have this GBP category (primary or secondary)
       // Match by both ID and name to handle different storage formats
@@ -312,7 +312,7 @@ class StoreTypeDirectoryService {
         LIMIT 100
       `, [categoryId, categoryName]);
       
-      console.log(`[StoreTypeService] Found ${result.rows.length} stores for category ${categoryName}`);
+      //console.log(`[StoreTypeService] Found ${result.rows.length} stores for category ${categoryName}`);
 
       const stores = result.rows;
 
@@ -365,7 +365,7 @@ class StoreTypeDirectoryService {
         .map((word, index) => index === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word)
         .join(' ');
       
-      console.log(`[StoreTypeService] getStoreTypeDetails for slug: ${typeSlug}, expected name: ${categoryName}`);
+      //console.log(`[StoreTypeService] getStoreTypeDetails for slug: ${typeSlug}, expected name: ${categoryName}`);
       
       // First lookup the category in gbp_categories_list
       const categoryLookup = await pool.query(`
@@ -379,7 +379,7 @@ class StoreTypeDirectoryService {
         LIMIT 1
       `, [typeSlug, categoryName, `gcid:${typeSlug.replace(/-/g, '_')}`]);
       
-      console.log(`[StoreTypeService] Category lookup result: ${JSON.stringify(categoryLookup.rows)}`);
+      //console.log(`[StoreTypeService] Category lookup result: ${JSON.stringify(categoryLookup.rows)}`);
       
       if (categoryLookup.rows.length === 0) {
         console.log(`[StoreTypeService] No category found in gbp_categories_list for: ${typeSlug}`);
@@ -421,7 +421,7 @@ class StoreTypeDirectoryService {
           AND dsl.is_published = true
       `, [categoryId, actualCategoryName]);
 
-      console.log(`[StoreTypeService] Store count query result: ${JSON.stringify(result.rows)}`);
+      //console.log(`[StoreTypeService] Store count query result: ${JSON.stringify(result.rows)}`);
 
       if (result.rows.length === 0 || parseInt(result.rows[0].store_count) === 0) {
         // Return empty result with category info

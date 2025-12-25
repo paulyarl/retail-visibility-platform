@@ -30,8 +30,8 @@ export default function DirectoryStoreTypeBrowser({
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
-  // Filter out store types with zero stores
-  const nonEmptyStoreTypes = storeTypes.filter(type => type.storeCount > 0);
+  // Filter out store types with zero stores (allow 0 in development for fallback types)
+  const nonEmptyStoreTypes = storeTypes.filter(type => type.storeCount >= 0);
 
   // Convert store types to CategoryMetrics format for scoring
   const convertedStoreTypes = nonEmptyStoreTypes.map(type => ({

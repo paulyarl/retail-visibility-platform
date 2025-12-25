@@ -3,6 +3,12 @@ import { storeTypeDirectoryService } from '../services/store-type-directory.serv
 
 const router = Router();
 
+// Debug middleware to log all requests to this router
+router.use((req, res, next) => {
+  //console.log(`[STORE-TYPES-ROUTER] ${req.method} ${req.path} - Original URL: ${req.originalUrl}`);
+  next();
+});
+
 /**
  * GET /api/directory/store-types
  * 
@@ -14,7 +20,8 @@ const router = Router();
  * - lng: Longitude for location filtering (optional)
  * - radius: Maximum distance in miles (optional, default: 25)
  */
-router.get('/store-types', async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
+  //console.log('[STORE-TYPES] GET / route hit - fetching store types');
   try {
     const { lat, lng, radius } = req.query;
 
@@ -91,7 +98,7 @@ router.get('/store-type-counts', async (req: Request, res: Response) => {
  * Path params:
  * - typeSlug: Store type slug (e.g., "electronics-store", "clothing-store")
  */
-router.get('/store-types/:typeSlug', async (req: Request, res: Response) => {
+router.get('/:typeSlug', async (req: Request, res: Response) => {
   try {
     const { typeSlug } = req.params;
 
@@ -151,13 +158,13 @@ router.get('/store-types/:typeSlug', async (req: Request, res: Response) => {
  * - limit: Maximum number of stores to return (optional, default: 50)
  */
 router.get(
-  '/store-types/:typeSlug/stores',
+  '/:typeSlug/stores',
   async (req: Request, res: Response) => {
     try {
       const { typeSlug } = req.params;
       const { lat, lng, radius, limit } = req.query;
 
-      console.log(`[API] Fetching stores for store type: ${typeSlug}`);
+      //console.log(`[API] Fetching stores for store type: ${typeSlug}`);
 
       // Parse location parameters if provided
       const location =

@@ -1,6 +1,7 @@
 // apps/web/next.config.ts
 import type { NextConfig } from "next";
 import path from "path";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -9,6 +10,29 @@ const nextConfig: NextConfig = {
 
   experimental: {
     serverActions: { bodySizeLimit: "15mb" },
+  },
+
+  // Suppress noisy Sentry/OpenTelemetry warnings in development
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Suppress client-side warnings
+      config.infrastructureLogging = {
+        level: 'error',
+      };
+    }
+    
+    // Filter out specific warnings
+    config.ignoreWarnings = [
+      // Ignore Sentry OpenTelemetry warnings
+      /import-in-the-middle/,
+      /require-in-the-middle/,
+      // Ignore source map warnings
+      /Failed to parse source map/,
+      /Invalid source map/,
+      /sourceMapURL could not be parsed/,
+    ];
+
+    return config;
   },
 
   // Proxy API requests to the external API server
@@ -87,4 +111,16 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry configuration options
+const sentryWebpackPluginOptions = {
+  // For all available options, see:
+  // https://github.com/getsentry/sentry-webpack-plugin#options
+
+  // Suppresses source map uploading logs during build
+  silent: true,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+};
+
+// Make sure adding Sentry options is the last code to run before exporting
+export default withSentryConfig(nextConfig, sentryWebpackPluginOptions);

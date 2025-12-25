@@ -13,6 +13,71 @@ const router = Router();
 router.use(authenticateToken);
 
 /**
+ * GET /user/security-alerts - Get security alerts for current user
+ * Returns recent security events and notifications
+ */
+router.get('/security-alerts', async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    // Mock data for now - replace with actual security alert service
+    const alerts = [
+      {
+        id: '1',
+        type: 'login',
+        severity: 'info',
+        message: 'New login from Chrome on Windows',
+        timestamp: new Date(),
+        read: false,
+      }
+    ];
+
+    res.json({
+      success: true,
+      alerts,
+    });
+  } catch (error) {
+    console.error('[Security Alerts Error]', error);
+    res.status(500).json({
+      error: 'internal_error',
+      message: 'Failed to fetch security alerts',
+    });
+  }
+});
+
+/**
+ * GET /user/preferences - Get user preferences
+ * Returns user's privacy and notification preferences
+ */
+router.get('/preferences', async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    // Mock data for now - replace with actual preferences service
+    const preferences: any[] = [];
+
+    res.json({
+      success: true,
+      data: preferences,
+    });
+  } catch (error) {
+    console.error('[Preferences Error]', error);
+    res.status(500).json({
+      error: 'internal_error',
+      message: 'Failed to fetch preferences',
+    });
+  }
+});
+
+/**
  * GET /user/profile - Get current user's profile
  * Returns comprehensive profile data including roles, permissions, and tenant access
  */

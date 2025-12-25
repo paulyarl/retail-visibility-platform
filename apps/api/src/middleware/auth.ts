@@ -34,6 +34,7 @@ import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 // JWT Payload interface
 // Note: Universal transform middleware makes both userId and userId available
 export interface JWTPayload {
+  id: string | undefined;
   userId?: string; // Added by universal transform middleware
   user_id?: string; // JWT token contains this
   email: string;

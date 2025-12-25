@@ -1,3 +1,9 @@
+// Sentry - Must be imported first for error tracking
+import * as Sentry from '@sentry/node';
+
+// New Relic APM - Must be imported first
+import './newrelic';
+
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
@@ -12,8 +18,12 @@ if (process.env.NODE_ENV === 'production') {
 import { Pool } from 'pg';
 import { prisma, basePrisma } from "./prisma";
 import { z } from "zod";
+import { setRequestContext } from "./context";
 import { getDirectPool } from "./utils/db-pool";
 import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
+import { applyRateLimit } from "./middleware/rate-limit";
+import { securityHeaders, additionalSecurityHeaders } from "./middleware/security-headers";
+import { inputValidationMiddleware } from "./middleware/input-validation";
 
 // Migration fix applied: ProductCondition enum renamed 'new' to 'brand_new'
 // Force rebuild v3: Railway build cache bypass
@@ -23,7 +33,7 @@ import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import { Flags } from "./config";
 import { TRIAL_CONFIG } from "./config/tenant-limits";
-import { setRequestContext } from "./context";
+import { getAlertStatus, performanceMonitoring } from "./services/alerting";
 import { StorageBuckets } from "./storage-config";
 import { audit, ensureAuditTable } from "./audit";
 import { dailyRatesJob } from "./jobs/rates";
@@ -181,7 +191,40 @@ import googleMerchantOAuthRoutes from './routes/google-merchant-oauth';
 
 const app = express();
 
+// Initialize Sentry for error tracking (only if DSN is provided)
+const sentryEnabled = process.env.SENTRY_DSN && process.env.SENTRY_DSN.trim() !== '';
+
+if (sentryEnabled) {
+  try {
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      // Use custom environment variable to distinguish staging from production
+      environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
+      tracesSampleRate: 0.1,
+      
+      // Don't send errors in development
+      beforeSend(event, hint) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Sentry error (not sent in dev):', hint.originalException || event);
+          return null;
+        }
+        return event;
+      },
+    });
+
+    console.log('✅ Sentry error tracking initialized');
+  } catch (error) {
+    console.error('⚠️  Failed to initialize Sentry:', error);
+  }
+} else {
+  console.log('⚠️  Sentry DSN not found - error tracking disabled');
+}
+
 /* ------------------------- middleware ------------------------- */
+// Security headers - applied first for maximum protection
+app.use(securityHeaders);
+app.use(additionalSecurityHeaders);
+
 app.use(cors({
   origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/ ,/www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
   credentials: true,
@@ -190,6 +233,15 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Rate limiting middleware - applied early for security
+app.use(applyRateLimit);
+
+// Input validation and sanitization middleware
+app.use(inputValidationMiddleware);
+
+// Performance monitoring middleware
+app.use(performanceMonitoring);
 
 // 🌟 UNIVERSAL TRANSFORM MIDDLEWARE - Makes naming conventions irrelevant!
 // Both snake_case AND camelCase work everywhere - API code and frontend get what they expect
@@ -225,12 +277,17 @@ import tenantCategoriesRoutes from './routes/tenant-categories';
 
 // Health check route
 const healthRoutes = (req: any, res: any) => {
+  const alertStatus = getAlertStatus();
+
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || 'unknown'
+    version: process.env.npm_package_version || 'unknown',
+    alerts: alertStatus,
+    memory: process.memoryUsage(),
+    // Add more health metrics as needed
   });
 };
 
@@ -4876,6 +4933,8 @@ app.use('/api/admin/tools', authenticateToken, requireAdmin, adminToolsRoutes);
 console.log('✅ Admin tools routes mounted at /api/admin/tools');
 
 /* ------------------------------ directory ------------------------------ */
+/* IMPORTANT: Specific paths MUST be mounted before catch-all /api/directory routes */
+
 /* ------------------------------ directory optimized ------------------------------ */
 app.use('/api/directory-optimized', directoryOptimizedRoutes);
 console.log('✅ Directory optimized routes mounted (materialized view - 6.7x faster)');
@@ -4884,25 +4943,25 @@ console.log('✅ Directory optimized routes mounted (materialized view - 6.7x fa
 app.use('/api/directory/categories-optimized', directoryCategoriesOptimizedRoutes);
 console.log('✅ Directory categories optimized routes mounted (category statistics - 10x faster)');
 
-/* ------------------------------ directory main ------------------------------ */
-app.use('/api/directory', directoryRoutes);
-console.log('✅ Directory listings routes mounted (directory_listings table)');
-
-/* ------------------------------ directory tenant ------------------------------ */
-app.use('/api/directory/tenant', directoryTenantRoutes);
-console.log('✅ Directory tenant routes mounted');
+/* ------------------------------ directory store types ------------------------------ */
+app.use('/api/directory/store-types', directoryStoreTypesRoutes);
+console.log('✅ Directory store types routes mounted at /api/directory/store-types');
 
 /* ------------------------------ directory categories ------------------------------ */
 app.use('/api/directory/categories', directoryCategoriesRoutes);
-console.log('✅ Directory categories routes mounted (category-based discovery)');
+console.log('✅ Directory categories routes mounted at /api/directory/categories');
 
-/* ------------------------------ directory store types ------------------------------ */
-app.use('/api/directory/store-types', directoryStoreTypesRoutes);
-console.log('✅ Directory store types routes mounted (store type discovery)');
+/* ------------------------------ directory tenant ------------------------------ */
+app.use('/api/directory/tenant', directoryTenantRoutes);
+console.log('✅ Directory tenant routes mounted at /api/directory/tenant');
+
+/* ------------------------------ directory main (has catch-all /:identifier) ------------------------------ */
+app.use('/api/directory', directoryRoutes);
+console.log('✅ Directory main routes mounted at /api/directory (includes /:identifier catch-all)');
 
 /* ------------------------------ directory map ------------------------------ */
 app.use('/api/directory', directoryMapRoutes);
-console.log('✅ Directory map routes mounted (unified map data with coordinates)');
+console.log('✅ Directory map routes mounted at /api/directory');
 
 /* ------------------------------ recommendations ------------------------------ */
 import recommendationRoutes from './routes/recommendations';
@@ -4943,9 +5002,15 @@ import storeReviewsRoutes from './routes/store-reviews';
 app.use('/api', storeReviewsRoutes);
 console.log('✅ Store reviews routes mounted at /api');
 
-/* ------------------------------ product likes ------------------------------ */
-app.use('/api/products', productLikesRoutes);
-console.log('✅ Product likes routes mounted at /api/products');
+/* ------------------------------ GDPR compliance ------------------------------ */
+import gdprRoutes from './routes/gdpr';
+app.use('/api/gdpr', gdprRoutes);
+console.log('✅ GDPR compliance routes mounted (data export, consent management)');
+
+/* ------------------------------ MFA (Multi-Factor Authentication) ------------------------------ */
+import mfaRoutes from './routes/mfa';
+app.use('/api/auth/mfa', mfaRoutes);
+console.log('✅ MFA routes mounted (two-factor authentication)');
 
 /* ------------------------------ clone (products & categories) ------------------------------ */
 import cloneRoutes from './routes/clone';
@@ -4985,6 +5050,11 @@ console.log('🔄 Billing routes imported successfully');
 
 app.use('/api', billingRoutes);
 console.log('✅ Billing routes mounted at /api');
+
+// Sentry error handler must be after all routes but before other error handlers
+if (sentryEnabled) {
+  Sentry.setupExpressErrorHandler(app);
+}
 
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);

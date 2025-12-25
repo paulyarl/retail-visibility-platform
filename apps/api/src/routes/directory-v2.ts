@@ -275,10 +275,45 @@ router.get('/locations', async (req: Request, res: Response) => {
 /**
  * GET /api/directory/:identifier
  * Get single listing by slug or tenant ID
+ * 
+ * IMPORTANT: This catch-all route should NOT match reserved paths
+ * Reserved paths are handled by dedicated routers mounted at specific paths
  */
-router.get('/:identifier', async (req: Request, res: Response) => {
+router.get('/:identifier', async (req: Request, res: Response, next) => {
+  const { identifier } = req.params;
+  console.log(`[DIRECTORY-V2] Catch-all hit for identifier: ${identifier}, originalUrl: ${req.originalUrl}`);
+  
+  // Handle reserved paths directly
+  const reservedPaths = ['store-types', 'categories', 'tenant', 'stores', 'search', 'locations', 'categories-optimized'];
+  if (reservedPaths.includes(identifier)) {
+    console.log('[DIRECTORY-V2] Handling reserved path directly:', identifier);
+    
+    // Handle store-types
+    if (identifier === 'store-types') {
+      try {
+        const { lat, lng, radius } = req.query;
+        const location = lat && lng ? { lat: parseFloat(lat as string), lng: parseFloat(lng as string) } : undefined;
+        const radiusMiles = radius ? parseFloat(radius as string) : 25;
+        
+        const { storeTypeDirectoryService } = await import('../services/store-type-directory.service');
+        const storeTypes = await storeTypeDirectoryService.getStoreTypes(location, radiusMiles);
+        
+        return res.json({
+          success: true,
+          data: { storeTypes, totalCount: storeTypes.length }
+        });
+      } catch (error) {
+        console.error('[DIRECTORY-V2] Error fetching store types:', error);
+        return res.status(500).json({ success: false, error: 'Failed to fetch store types' });
+      }
+    }
+    
+    // For other reserved paths, return 404 for now
+    return res.status(404).json({ error: 'not_found', message: 'Route not found' });
+  }
+  
+  console.log('[DIRECTORY-V2] Catch-all /:identifier route hit with identifier:', identifier);
   try {
-    const { identifier } = req.params;
 
     // Check if identifier is a tenant ID (starts with 't-')
     const isTenantId = identifier.startsWith('t-');

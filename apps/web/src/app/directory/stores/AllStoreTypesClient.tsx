@@ -51,7 +51,7 @@ export default function AllStoreTypesClient() {
   }, []);
 
   const filteredStoreTypes = storeTypes
-    .filter((type) => type.storeCount > 0) // Filter out empty store types
+    .filter((type) => type.storeCount >= 0) // Show all types in development, even with 0 count
     .filter((type) => type.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   if (loading) {

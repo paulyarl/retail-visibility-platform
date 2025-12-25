@@ -39,6 +39,7 @@
     "next-auth": "^4.24.13",
     "next-themes": "^0.4.6",
     "react-hook-form": "^7.66.0",
+    "require-in-the-middle": "^8.0.1",
     "square": "^43.2.0",
     "tailwind-merge": "^3.3.1",
     "uuid": "^13.0.0",

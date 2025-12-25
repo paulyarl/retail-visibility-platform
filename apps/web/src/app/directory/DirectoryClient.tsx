@@ -219,7 +219,13 @@ export default function DirectoryClient() {
         });
         
         // Try cache first for categories
+        // TEMP: Clear cache to force fresh API call
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(CACHE_CONFIG.categories.key);
+        }
+        
         let categories = getCachedData(CACHE_CONFIG.categories.key);
+        console.log('[DirectoryClient] Categories cache check:', categories ? 'HIT' : 'MISS');
         
         if (!categories) {
           // Fetch directory listing categories (store types) with counts
@@ -239,6 +245,8 @@ export default function DirectoryClient() {
               productCount: 0, // Not relevant for directory categories
             }));
             
+            console.log('[DirectoryClient] Processed categories:', categories);
+            
             // Cache the fresh data
             setCachedData(CACHE_CONFIG.categories.key, categories);
           } else {
@@ -249,21 +257,31 @@ export default function DirectoryClient() {
         setCategories(categories || []);
 
         // Try cache first for store types
+        // TEMP: Clear cache to force fresh API call
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(CACHE_CONFIG.storeTypes.key);
+        }
+        
         let storeTypes = getCachedData(CACHE_CONFIG.storeTypes.key);
+        console.log('[DirectoryClient] Store types cache check:', storeTypes ? 'HIT' : 'MISS');
         
         if (!storeTypes) {
+          console.log('[DirectoryClient] Making fresh API call to /api/directory/store-types');
           // Fetch store types
           const storeTypesRes = await fetch(`${apiBaseUrl}/api/directory/store-types`);
           
           if (storeTypesRes.ok) {
             const typesData = await storeTypesRes.json();
             storeTypes = typesData.data?.storeTypes || [];
+            console.log('[DirectoryClient] API response:', storeTypes);
             
             // Cache the fresh data
             setCachedData(CACHE_CONFIG.storeTypes.key, storeTypes);
           } else {
             console.error('Failed to fetch store types from server');
           }
+        } else {
+          console.log('[DirectoryClient] Using cached store types:', storeTypes);
         }
         
         setStoreTypes(storeTypes || []);

@@ -5,13 +5,17 @@ import { prisma } from '../prisma';
 const router = Router();
 
 /**
- * GET /api/health
- * Basic health check
+ * GET /health
+ * Basic health check - optimized for UptimeRobot monitoring
+ * Returns: status, healthy flag, uptime, and timestamp
  */
 router.get('/', (_req: Request, res: Response) => {
   res.json({ 
     status: 'ok',
-    timestamp: new Date().toISOString()
+    healthy: true,
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0'
   });
 });
 

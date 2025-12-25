@@ -150,6 +150,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       tenantIds,
+      id: undefined
     };
 
     // Generate tokens
@@ -224,6 +225,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         tenantIds: user.user_tenants.map((ut) => ut.tenant_id),
+        id: undefined
       };
 
       const accessToken = this.generateAccessToken(newPayload);

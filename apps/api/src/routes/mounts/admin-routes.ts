@@ -14,6 +14,7 @@ import taxonomyAdminRoutes from '../taxonomy-admin';
 import adminTenantsRoutes from '../admin/tenants';
 import platformCategoriesRoutes from '../admin/platform-categories';
 import gbpCategoriesSyncRoutes from '../admin/gbp-categories-sync';
+import securityRoutes from '../security';
 
 /**
  * Mount admin routes
@@ -23,6 +24,7 @@ export function mountAdminRoutes(app: Express) {
   console.log('👑 Mounting admin routes...');
 
   // Specific admin routes - MUST be mounted BEFORE generic routes to prevent conflicts
+  app.use('/api/security', securityRoutes); // Security routes have their own auth middleware
   app.use('/api/admin/platform-categories', authenticateToken, requireAdmin, platformCategoriesRoutes);
   app.use('/api/admin/gbp-categories', authenticateToken, requireAdmin, gbpCategoriesSyncRoutes);
   app.use('/api/admin/feature-overrides', authenticateToken, requireAdmin, featureOverridesRoutes);

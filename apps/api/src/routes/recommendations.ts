@@ -299,7 +299,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
     const { userId, lat, lng } = req.query;
     const limit = 6; // Show up to 6 recommendations on storefront
 
-    console.log(`[Storefront Recommendations] Getting enhanced recommendations for tenant: ${tenantId}`);
+    //console.log(`[Storefront Recommendations] Getting enhanced recommendations for tenant: ${tenantId}`);
 
     // Import database utility
     const { getDirectPool } = await import('../utils/db-pool');
@@ -442,15 +442,15 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
         current.gbp_primary_category_name
       ]);
 
-      console.log(`[Storefront Recommendations] MV query returned ${related.rows.length} rows`);
-      console.log(`[Storefront Recommendations] Current store - Platform Category: ${current.category_name}, GBP Category: ${current.gbp_primary_category_name}, City: ${current.city}, State: ${current.state}`);
+      //console.log(`[Storefront Recommendations] MV query returned ${related.rows.length} rows`);
+      //console.log(`[Storefront Recommendations] Current store - Platform Category: ${current.category_name}, GBP Category: ${current.gbp_primary_category_name}, City: ${current.city}, State: ${current.state}`);
       
       // Log all scores for debugging
-      related.rows.forEach((row: any, idx: number) => {
+     /*  related.rows.forEach((row: any, idx: number) => {
         if (idx < 10) { // Only log first 10 to avoid spam
           console.log(`[Storefront Recommendations] Store ${idx + 1}: ${row.business_name} - Platform: ${row.category_name}, GBP: ${row.gbp_primary_category_name}, City: ${row.city}, State: ${row.state}, Score: ${row.relevance_score}`);
         }
-      });
+      }); */
       
       // Filter and map results
       relatedListings = related.rows
@@ -484,7 +484,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           )
         }));
 
-      console.log(`[Storefront Recommendations] Found ${relatedListings.length} stores with score > 0 (after filtering from ${related.rows.length} total)`);
+      //console.log(`[Storefront Recommendations] Found ${relatedListings.length} stores with score > 0 (after filtering from ${related.rows.length} total)`);
 
     } catch (mvError) {
       console.log(`[Storefront Recommendations] MV approach failed, using fallback:`, mvError);
@@ -555,7 +555,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
         current.google_category_id
       ]);
 
-      console.log(`[Storefront Recommendations] Fallback query returned ${fallbackResult.rows.length} rows`);
+      //console.log(`[Storefront Recommendations] Fallback query returned ${fallbackResult.rows.length} rows`);
       
       relatedListings = fallbackResult.rows
         .filter((row: any) => (row.relevance_score || 0) >= 1)
@@ -694,7 +694,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
             relevanceScore: row.relevance_score || 0,
             reason: 'Nearby store'
           }));
-          console.log(`[Storefront Recommendations] Final fallback found ${relatedListings.length} stores`);
+          //console.log(`[Storefront Recommendations] Final fallback found ${relatedListings.length} stores`);
         }
       }
     }
@@ -808,7 +808,7 @@ router.get('/for-product-page/:productId', async (req: Request, res: Response) =
     const { limit = 6, userId } = req.query;
     const limitNum = Math.min(Math.max(Number(limit), 1), 10);
 
-    console.log(`[Product Recommendations] Getting recommendations for product: ${productId}, limit: ${limitNum}`);
+    //console.log(`[Product Recommendations] Getting recommendations for product: ${productId}, limit: ${limitNum}`);
 
     // First get the current product details
     const currentProductQuery = `
@@ -923,7 +923,7 @@ router.get('/for-product-page/:productId', async (req: Request, res: Response) =
         tenantId: row.tenant_id
       }));
 
-    console.log(`[Product Recommendations] Found ${recommendations.length} recommendations with score > 0`);
+    //console.log(`[Product Recommendations] Found ${recommendations.length} recommendations with score > 0`);
 
     res.json({
       recommendations,

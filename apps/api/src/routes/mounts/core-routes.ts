@@ -45,6 +45,7 @@ export function mountCoreRoutes(app: Express) {
   app.use('/upgrade-requests', upgradeRequestsRoutes);
   app.use('/permissions', permissionRoutes);
   app.use('/users', userRoutes);
+  app.use('/api/user', userRoutes);
   
   // IMPORTANT: Mount public tier routes BEFORE authenticated tenant routes
   // This allows /api/tenants/:id/tier/public to work without auth
