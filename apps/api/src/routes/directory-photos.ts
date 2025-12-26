@@ -139,6 +139,10 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         console.log('[Directory Photos] Bucket:', StorageBuckets.TENANTS.name);
         console.log('[Directory Photos] Uploading to Supabase...');
 
+        // Check auth status before upload
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        console.log('[Directory Photos] Auth check:', { user: user?.id, authError });
+
         const { error: uploadError, data: uploadData } = await supabase.storage
           .from(StorageBuckets.TENANTS.name)
           .upload(path, buffer, {
