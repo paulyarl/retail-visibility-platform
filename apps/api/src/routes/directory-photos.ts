@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../prisma";
 // Create service role Supabase client for storage operations (bypasses RLS)
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -150,8 +151,8 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         // Check if bucket exists
         try {
           const { data: buckets, error: listError } = await supabaseService.storage.listBuckets();
-          console.log('[Directory Photos] Available buckets:', buckets?.map(b => b.name));
-          const bucketExists = buckets?.some(b => b.name === StorageBuckets.TENANTS.name);
+          console.log('[Directory Photos] Available buckets:', buckets?.map((b: any) => b.name));
+          const bucketExists = buckets?.some((b: any) => b.name === StorageBuckets.TENANTS.name);
           console.log('[Directory Photos] Tenants bucket exists:', bucketExists);
           
           if (listError) {
