@@ -134,6 +134,10 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         const ext = mimeType.split('/')[1] || 'jpg';
         const filename = `${Date.now()}.${ext}`;
         const path = `directory/${listing.id}/${listing.slug || listing.id}/${filename}`;
+        console.log('[Directory Photos] Upload path:', path);
+        console.log('[Directory Photos] Buffer size:', buffer.length);
+        console.log('[Directory Photos] Bucket:', StorageBuckets.TENANTS.name);
+        console.log('[Directory Photos] Uploading to Supabase...');
 
         const { error: uploadError, data: uploadData } = await supabase.storage
           .from(StorageBuckets.TENANTS.name)
