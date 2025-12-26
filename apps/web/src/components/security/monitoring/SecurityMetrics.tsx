@@ -113,21 +113,21 @@ export function SecurityMetrics({ metrics }: SecurityMetricsProps) {
             </p>
           </div>
 
-          {/* Active Users */}
+          {/* Rate Limit Hits */}
           <div className="p-4 border rounded-lg space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-green-500" />
-                <p className="text-sm text-muted-foreground">Active Users</p>
+                <Shield className="h-4 w-4 text-red-500" />
+                <p className="text-sm text-muted-foreground">Rate Limit Hits</p>
               </div>
-              {getTrendIcon(metrics.activeUsers, metrics.previousPeriod?.activeUsers)}
+              {getTrendIcon(metrics.rateLimitHits, metrics.previousPeriod?.rateLimitHits)}
             </div>
             <div className="flex items-baseline gap-2">
-              <p className="text-2xl font-bold">{metrics.activeUsers}</p>
-              {getTrendPercentage(metrics.activeUsers, metrics.previousPeriod?.activeUsers)}
+              <p className="text-2xl font-bold">{metrics.rateLimitHits}</p>
+              {getTrendPercentage(metrics.rateLimitHits, metrics.previousPeriod?.rateLimitHits)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Last period: {metrics.previousPeriod?.activeUsers || 0}
+              Last period: {metrics.previousPeriod?.rateLimitHits || 0}
             </p>
           </div>
 

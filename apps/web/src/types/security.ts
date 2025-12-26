@@ -158,16 +158,17 @@ export interface SecurityMetrics {
   activeUsers: number;
   mfaAdoptionRate: number;
   averageResponseTime: number;
+  rateLimitHits: number;
   previousPeriod: {
     failedLoginAttempts: number;
     blockedRequests: number;
     suspiciousActivities: number;
     activeUsers: number;
+    rateLimitHits: number;
   };
   // Legacy fields for backwards compatibility
   failedLogins?: number;
   blockedIPs?: number;
-  rateLimitHits?: number;
   activeThreats?: number;
   timeRange?: string;
 }

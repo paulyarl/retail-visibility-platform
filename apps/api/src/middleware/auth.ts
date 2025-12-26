@@ -105,7 +105,7 @@ const makeBothConventionsAvailable = (obj: any): any => {
 /**
  * Middleware to authenticate JWT token
  */
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+export async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
