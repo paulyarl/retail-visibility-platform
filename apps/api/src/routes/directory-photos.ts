@@ -8,9 +8,6 @@ const supabaseService = createClient(
   process.env.SUPABASE_URL!,
   serviceRoleKey!
 );
-console.log('[Directory Photos] Service role client initialized with key type:', 
-  serviceRoleKey === process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SERVICE_ROLE' : 'ANON_KEY_FALLBACK'
-);
 import { StorageBuckets } from "../storage-config";
 import { generateQuickStart } from "../lib/id-generator";
 
@@ -37,7 +34,7 @@ async function resolveListing(identifier: string) {
     whereCondition = { slug: identifier };
   }
 
-  console.log(`[resolveListing] Looking for ${isTenantId ? 'tenant ID' : 'slug'}: "${identifier}"`);
+  console.log(`[resolveListing] Looking for tenant ID: "${identifier}"`);
   const listing = await prisma.tenants.findUnique({ where: whereCondition });
   console.log(`[resolveListing] Found listing:`, listing ? { id: listing.id, slug: listing.slug, name: listing.name } : 'NOT FOUND');
 
@@ -63,10 +60,8 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     console.log(`[Directory Photos] Found listing:`, listing ? { id: listing.id, slug: listing.slug, name: listing.name } : 'NOT FOUND');
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
-    console.log('[Directory Photos] Checking photo count limit...');
     // Enforce 10-photo limit
     const existingCount = await prisma.directory_photos.count({ where: { listing_id: listing.id } });
-    console.log('[Directory Photos] Existing photo count:', existingCount);
     if (existingCount >= 10) {
       return res.status(400).json({ error: "maximum 10 photos per directory listing" });
     }
@@ -80,24 +75,26 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     let alt: string | undefined;
     let caption: string | undefined;
 
-    console.log('[Directory Photos] Request type:', req.file ? 'multipart file' : req.is("application/json") ? 'JSON' : 'unknown');
-    console.log('[Directory Photos] Has file:', !!req.file);
-    console.log('[Directory Photos] Content-Type:', req.headers['content-type']);
 
     // Case A: multipart upload of a file
     if (req.file) {
-      console.log('[Directory Photos] Processing multipart file upload...');
-      if (!supabase) {
-        return res.status(500).json({ error: "server is not configured for direct uploads (missing SUPABASE envs)" });
-      }
-      
       const f = req.file; // buffer + mimetype + originalname
       const path = `directory/${listing.id}/${listing.slug || listing.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
       
-      console.log('[Directory Photos] Processing file path...',path);
-      
-      console.log('[Directory Photos] Processing file buffer...',f.buffer);
       const { error, data } = await supabase.storage.from(StorageBuckets.TENANTS.name).upload(path, f.buffer, {
+        cacheControl: "3600",
+        contentType: f.mimetype || "application/octet-stream",
+        upsert: false,
+      });
+      if (error) return res.status(500).json({ error: error.message });
+
+      const pub = supabase.storage.from(StorageBuckets.TENANTS.name).getPublicUrl(data.path);
+      url = pub.data.publicUrl;
+      contentType = f.mimetype;
+      bytes = f.size;
+      // Extract alt/caption from form data if present
+      alt = req.body.alt;
+      caption = req.body.caption;
         cacheControl: "3600",
         contentType: f.mimetype || "application/octet-stream",
         upsert: false,
@@ -115,45 +112,27 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
     // Case B: JSON body with url or dataUrl + metadata
     if (!req.file && req.is("application/json")) {
-      console.log('[Directory Photos] Processing JSON request...');
       const body = req.body || {};
-      console.log('[Directory Photos] Request body keys:', Object.keys(body));
-      console.log('[Directory Photos] Has dataUrl:', !!body.dataUrl);
-      console.log('[Directory Photos] Has url:', !!body.url);
-      console.log('[Directory Photos] Supabase available:', !!supabase);
 
       // Handle dataUrl (base64 encoded image from client)
       if (body.dataUrl && supabase) {
-        console.log('[Directory Photos] Processing dataUrl...');
         const dataUrl = body.dataUrl as string;
-        console.log('[Directory Photos] dataUrl length:', dataUrl?.length);
         const matches = dataUrl.match(/^data:(.+);base64,(.+)$/);
-        console.log('[Directory Photos] dataUrl matches:', !!matches);
         if (!matches) {
           return res.status(400).json({ error: "invalid dataUrl format" });
         }
 
         const mimeType = matches[1];
-        console.log('[Directory Photos] mimeType:', mimeType);
         const base64Data = matches[2];
-        console.log('[Directory Photos] base64Data length:', base64Data?.length);
-        console.log('[Directory Photos] Creating buffer...');
         const buffer = Buffer.from(base64Data, 'base64');
 
         const ext = mimeType.split('/')[1] || 'jpg';
         const filename = `${Date.now()}.${ext}`;
         const path = `directory/${listing.id}/${listing.slug || listing.id}/${filename}`;
-        console.log('[Directory Photos] Upload path:', path);
-        console.log('[Directory Photos] Buffer size:', buffer.length);
-        console.log('[Directory Photos] Bucket:', StorageBuckets.TENANTS.name);
-        console.log('[Directory Photos] Uploading to Supabase...');
 
         // Check if bucket exists
         try {
           const { data: buckets, error: listError } = await supabaseService.storage.listBuckets();
-          console.log('[Directory Photos] Available buckets:', buckets?.map((b: any) => b.name));
-          const bucketExists = buckets?.some((b: any) => b.name === StorageBuckets.TENANTS.name);
-          console.log('[Directory Photos] Tenants bucket exists:', bucketExists);
           
           if (listError) {
             console.error('[Directory Photos] Error listing buckets:', listError);
@@ -161,10 +140,6 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         } catch (bucketCheckError) {
           console.error('[Directory Photos] Bucket check failed:', bucketCheckError);
         }
-
-        // Check auth status before upload
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        console.log('[Directory Photos] Auth check:', { user: user?.id, authError });
 
         const { error: uploadError, data: uploadData } = await supabaseService.storage
           .from(StorageBuckets.TENANTS.name)
@@ -174,15 +149,8 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
             upsert: false,
           });
 
-        console.log('[Directory Photos] Upload result:', { error: uploadError, data: uploadData });
-
         if (uploadError) {
-          console.error('[Directory Photos] Supabase upload error details:', {
-            message: uploadError.message,
-            statusCode: (uploadError as any).statusCode || 'unknown',
-            error: (uploadError as any).error || uploadError.message,
-            details: uploadError
-          });
+          console.error('[Directory Photos] Supabase upload error:', uploadError.message);
           return res.status(500).json({ error: uploadError.message });
         }
 
@@ -193,20 +161,15 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
       } else {
         // Handle regular URL
         const providedUrl = body.url;
-        console.log('[Directory Photos] Provided URL:', providedUrl);
-
-        // Check if URL is already uploaded to this tenant's Supabase storage
-        const isTenantUrl = providedUrl && providedUrl.includes(`/public/${StorageBuckets.TENANTS.name}/${listing.id}/`);
-        console.log('[Directory Photos] URL contains tenant ID?', isTenantUrl);
-
-        if (isTenantUrl) {
-          console.log('[Directory Photos] Using tenant-owned URL directly (no upload needed)');
-          url = providedUrl;
-        } else {
-          console.log('[Directory Photos] Using provided URL directly (no upload):', providedUrl);
-          url = providedUrl;
+        if (providedUrl) {
+          // Check if URL is already uploaded to this tenant's Supabase storage
+          const isTenantUrl = providedUrl.includes(`/public/${StorageBuckets.TENANTS.name}/${listing.id}/`);
+          if (isTenantUrl) {
+            url = providedUrl;
+          } else {
+            url = providedUrl;
+          }
         }
-      }
 
       width = body.width;
       height = body.height;
@@ -219,13 +182,6 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
     if (!url) return res.status(400).json({ error: "missing image; provide multipart 'file', JSON 'url', or JSON 'dataUrl'" });
 
-    console.log('[Directory Photos] About to create photo with data:', {
-      tenant_id: listing.id,
-      listing_id: listing.id,
-      url: url?.substring(0, 50) + '...',
-      position: 'calculating...'
-    });
-
     // Find next available position (max + 1, or 0 if first)
     const maxPos = await prisma.directory_photos.findFirst({
       where: { listing_id: listing.id },
@@ -233,8 +189,6 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
       select: { position: true },
     });
     const nextPosition = maxPos && maxPos.position !== null ? maxPos.position + 1 : 0;
-
-    console.log('[Directory Photos] Creating photo at position:', nextPosition);
 
     const created = await prisma.directory_photos.create({
       data: {
