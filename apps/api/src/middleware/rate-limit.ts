@@ -57,7 +57,11 @@ export const authRateLimit = rateLimit({
   legacyHeaders: false,
   skip: (req: Request) => {
     // Skip rate limiting for health checks
-    return req.path === '/health';
+    if (req.path === '/health') return true;
+    
+    // Skip rate limiting for authenticated admin users
+    const user = (req as any).user;
+    return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
   handler: (req: Request, res: Response) => {
     res.status(429).json({
