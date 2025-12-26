@@ -157,6 +157,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         bytes = buffer.length;
       } else {
         // Handle regular URL
+        console.log('[Directory Photos] Using provided URL directly (no upload):', body.url);
         url = body.url;
       }
 
