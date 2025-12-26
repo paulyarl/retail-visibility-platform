@@ -1,7 +1,11 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import { prisma } from "../prisma";
-import { createClient } from "@supabase/supabase-js";
+// Create service role Supabase client for storage operations (bypasses RLS)
+const supabaseService = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY!
+);
 import { StorageBuckets } from "../storage-config";
 import { generateQuickStart } from "../lib/id-generator";
 
@@ -143,7 +147,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         console.log('[Directory Photos] Auth check:', { user: user?.id, authError });
 
-        const { error: uploadError, data: uploadData } = await supabase.storage
+        const { error: uploadError, data: uploadData } = await supabaseService.storage
           .from(StorageBuckets.TENANTS.name)
           .upload(path, buffer, {
             cacheControl: "3600",
@@ -163,7 +167,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
           return res.status(500).json({ error: uploadError.message });
         }
 
-        const pub = supabase.storage.from(StorageBuckets.TENANTS.name).getPublicUrl(uploadData.path);
+        const pub = supabaseService.storage.from(StorageBuckets.TENANTS.name).getPublicUrl(uploadData.path);
         url = pub.data.publicUrl;
         contentType = mimeType;
         bytes = buffer.length;
@@ -408,7 +412,7 @@ r.delete("/:listingId/photos/:photoId", async (req, res) => {
         const match = photo.url.match(/\/tenants\/(.+)$/);
         if (match) {
           const path = match[1];
-          await supabase.storage.from(StorageBuckets.TENANTS.name).remove([path]);
+          await supabaseService.storage.from(StorageBuckets.TENANTS.name).remove([path]);
         }
       } catch (storageError) {
         console.error("Failed to delete directory photo from storage:", storageError);
