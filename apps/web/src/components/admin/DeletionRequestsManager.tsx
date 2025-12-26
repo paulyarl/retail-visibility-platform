@@ -27,7 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/Dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { AlertTriangle, Calendar, User, XCircle, FileText, TrendingDown } from 'lucide-react';
+import { AlertTriangle, Calendar, User, XCircle, FileText, TrendingDown, Archive } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { api } from '@/lib/api';
 
@@ -40,6 +40,7 @@ interface DeletionRequest {
   userCreatedAt: string;
   reason: string | null;
   status: 'pending' | 'cancelled' | 'completed';
+  preserveData: boolean;
   requestedAt: string;
   scheduledDeletionDate: string;
   cancelledAt?: string;
@@ -272,8 +273,16 @@ export function DeletionRequestsManager() {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <div className="max-w-xs truncate text-sm">
-                                  {request.reason || <span className="text-muted-foreground italic">No reason provided</span>}
+                                <div className="space-y-1">
+                                  <div className="max-w-xs truncate text-sm">
+                                    {request.reason || <span className="text-muted-foreground italic">No reason provided</span>}
+                                  </div>
+                                  {request.preserveData && (
+                                    <Badge variant="info" className="text-xs">
+                                      <Archive className="h-3 w-3 mr-1" />
+                                      Data Preserved
+                                    </Badge>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -363,6 +372,33 @@ export function DeletionRequestsManager() {
                   <p className="text-sm">
                     {selectedRequest.reason || <span className="italic text-muted-foreground">No reason provided</span>}
                   </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Data Preservation</p>
+                <div className={`rounded-lg p-3 ${selectedRequest.preserveData ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-muted'}`}>
+                  {selectedRequest.preserveData ? (
+                    <div className="flex items-start gap-2">
+                      <Archive className="h-4 w-4 text-blue-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-600">Business data will be preserved</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Tenants, products, and photos will remain in the system. Only personal information will be removed.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2">
+                      <XCircle className="h-4 w-4 text-destructive mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-destructive">Complete deletion</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          All data including tenants, products, and photos will be permanently deleted.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

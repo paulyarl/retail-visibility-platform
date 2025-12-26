@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Textarea } from '@/components/ui/Textarea';
+import { Checkbox } from '@/components/ui/Checkbox';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/Dialog';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Archive } from 'lucide-react';
 
 interface AccountDeletionModalProps {
   open: boolean;
@@ -32,6 +33,7 @@ export function AccountDeletionModal({ open, onOpenChange }: AccountDeletionModa
   const [reason, setReason] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [password, setPassword] = useState('');
+  const [preserveData, setPreserveData] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -39,7 +41,7 @@ export function AccountDeletionModal({ open, onOpenChange }: AccountDeletionModa
     
     try {
       setSubmitting(true);
-      await requestDeletion({ reason, confirmation, password });
+      await requestDeletion({ reason, confirmation, password, preserveData });
       onOpenChange(false);
       resetForm();
     } catch (error) {
@@ -103,6 +105,31 @@ export function AccountDeletionModal({ open, onOpenChange }: AccountDeletionModa
                 Your account will be scheduled for deletion in 30 days. You can cancel this request
                 at any time during this period.
               </p>
+            </div>
+
+            <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="preserveData"
+                  checked={preserveData}
+                  onCheckedChange={(checked) => setPreserveData(checked as boolean)}
+                />
+                <div className="flex-1">
+                  <Label htmlFor="preserveData" className="flex items-center gap-2 cursor-pointer">
+                    <Archive className="h-4 w-4" />
+                    <span className="font-medium">Preserve my business data</span>
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Keep tenants, products, and photos for historical/archival purposes. 
+                    Your personal information will still be removed, but business data will be preserved.
+                  </p>
+                  {preserveData && (
+                    <div className="mt-2 text-xs text-blue-600 bg-blue-500/10 p-2 rounded">
+                      ✓ Your tenants, inventory, and photos will remain in the system (anonymized)
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}

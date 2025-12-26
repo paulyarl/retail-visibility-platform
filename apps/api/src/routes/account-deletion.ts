@@ -21,7 +21,7 @@ router.post('/delete', authenticateToken, async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { reason, confirmation, password } = req.body;
+    const { reason, confirmation, password, preserveData = false } = req.body;
 
     // Validate confirmation
     if (confirmation !== 'DELETE') {
@@ -67,6 +67,7 @@ router.post('/delete', authenticateToken, async (req, res) => {
         user_id,
         reason,
         status,
+        preserve_data,
         requested_at,
         scheduled_deletion_date,
         ip_address,
@@ -75,6 +76,7 @@ router.post('/delete', authenticateToken, async (req, res) => {
         ${userId},
         ${reason || null},
         'pending',
+        ${preserveData},
         NOW(),
         NOW() + INTERVAL '30 days',
         ${req.ip || null},
@@ -85,14 +87,19 @@ router.post('/delete', authenticateToken, async (req, res) => {
         user_id as "userId",
         reason,
         status,
+        preserve_data as "preserveData",
         requested_at as "requestedAt",
         scheduled_deletion_date as "scheduledDeletionDate"
     `;
 
+    const message = preserveData
+      ? 'Account deletion scheduled. Your business data (tenants, products, photos) will be preserved for historical purposes. Personal information will be removed in 30 days.'
+      : 'Account deletion scheduled. All data will be permanently deleted in 30 days. You can cancel anytime during this period.';
+
     res.json({
       success: true,
       data: deletionRequest,
-      message: 'Account deletion scheduled for 30 days from now. You can cancel anytime during this period.'
+      message
     });
   } catch (error) {
     console.error('[POST /api/gdpr/delete] Error:', error);

@@ -278,6 +278,7 @@ export interface AccountDeletionFormData {
   reason?: string;
   confirmation: string;
   password: string;
+  preserveData?: boolean;
 }
 
 export interface DataExportFormData {
