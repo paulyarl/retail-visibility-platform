@@ -106,17 +106,26 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
     // Case B: JSON body with url or dataUrl + metadata
     if (!req.file && req.is("application/json")) {
+      console.log('[Directory Photos] Processing JSON request...');
       const body = req.body || {};
+      console.log('[Directory Photos] Request body keys:', Object.keys(body));
+      console.log('[Directory Photos] Has dataUrl:', !!body.dataUrl);
+      console.log('[Directory Photos] Has url:', !!body.url);
+      console.log('[Directory Photos] Supabase available:', !!supabase);
 
       // Handle dataUrl (base64 encoded image from client)
       if (body.dataUrl && supabase) {
+        console.log('[Directory Photos] Processing dataUrl...');
         const dataUrl = body.dataUrl as string;
+        console.log('[Directory Photos] dataUrl length:', dataUrl?.length);
         const matches = dataUrl.match(/^data:(.+);base64,(.+)$/);
+        console.log('[Directory Photos] dataUrl matches:', !!matches);
         if (!matches) {
           return res.status(400).json({ error: "invalid dataUrl format" });
         }
 
         const mimeType = matches[1];
+        console.log('[Directory Photos] mimeType:', mimeType);
         const base64Data = matches[2];
         const buffer = Buffer.from(base64Data, 'base64');
 
