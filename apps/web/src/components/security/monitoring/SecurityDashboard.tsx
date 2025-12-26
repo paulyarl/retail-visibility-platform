@@ -9,13 +9,15 @@ import { useSecurityMonitoring } from '@/hooks/useSecurityMonitoring';
 import { useAdminSecurityMonitoring } from '@/hooks/useAdminSecurityMonitoring';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Shield, AlertTriangle, Ban, Activity, Users, Bell } from 'lucide-react';
+import { Shield, AlertTriangle, Ban, Activity, Users, Bell, Trash2, ExternalLink } from 'lucide-react';
 import { SecurityMetrics } from './SecurityMetrics';
 import { ThreatMonitor } from './ThreatMonitor';
 import { BlockedIPsTable } from './BlockedIPsTable';
 import { AdminSessionsTable } from '../admin/AdminSessionsTable';
 import { AdminAlertsTable } from '../admin/AdminAlertsTable';
+import Link from 'next/link';
 
 export function SecurityDashboard() {
   const { metrics, threats, blockedIPs, healthStatus, loading } = useSecurityMonitoring();
@@ -118,6 +120,40 @@ export function SecurityDashboard() {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Account Deletion Management */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Trash2 className="h-5 w-5" />
+                Account Deletion Management
+              </CardTitle>
+              <CardDescription>Manage user account deletion requests and grace periods</CardDescription>
+            </div>
+            <Link href="/settings/admin/deletion-requests">
+              <Button variant="outline" size="sm">
+                Manage Requests
+                <ExternalLink className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground">
+            <p>
+              Review and manage account deletion requests during the 30-day grace period. 
+              Monitor data preservation choices and handle admin overrides.
+            </p>
+            <div className="mt-4 flex items-center gap-2 text-xs">
+              <Badge variant="info">30-day grace period</Badge>
+              <Badge variant="default">Data preservation options</Badge>
+              <Badge variant="warning">Admin override capability</Badge>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
