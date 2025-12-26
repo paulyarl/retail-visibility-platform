@@ -81,9 +81,13 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
       if (!supabase) {
         return res.status(500).json({ error: "server is not configured for direct uploads (missing SUPABASE envs)" });
       }
+      
       const f = req.file; // buffer + mimetype + originalname
       const path = `directory/${listing.id}/${listing.slug || listing.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
-
+      
+      console.log('[Directory Photos] Processing file path...',path);
+      
+      console.log('[Directory Photos] Processing file buffer...',f.buffer);
       const { error, data } = await supabase.storage.from(StorageBuckets.TENANTS.name).upload(path, f.buffer, {
         cacheControl: "3600",
         contentType: f.mimetype || "application/octet-stream",
