@@ -121,6 +121,33 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     const payload = authService.verifyAccessToken(token);
     //console.log('[AUTH] Token verified successfully, payload:', { userId: payload.userId, user_id: payload.user_id, email: payload.email, role: payload.role });
     
+    // Check if the session has been revoked in the database
+    const userId = payload.userId || payload.user_id;
+    if (userId) {
+      try {
+        const { prisma } = await import('../prisma');
+        const session = await prisma.user_sessions.findFirst({
+          where: {
+            user_id: userId,
+            revoked_at: null,
+            OR: [
+              { expires_at: null },
+              { expires_at: { gt: new Date() } }
+            ]
+          },
+          select: { id: true }
+        });
+
+        if (!session) {
+          console.log('[AUTH] Session revoked or expired for user:', userId);
+          return res.status(401).json({ error: 'session_revoked', message: 'Your session has been revoked' });
+        }
+      } catch (error) {
+        console.error('[AUTH] Error checking session status:', error);
+        // If database check fails, allow request to proceed (fail open for availability)
+      }
+    }
+    
     // Apply universal transform to JWT payload to ensure both naming conventions
     const transformedPayload = makeBothConventionsAvailable(payload);
     //console.log('[AUTH] Payload transformed, setting req.user');

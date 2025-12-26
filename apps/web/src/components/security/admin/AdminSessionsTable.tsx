@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table';
 import { Monitor, Smartphone, Tablet, LogOut, User } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { Pagination } from '@/components/ui/Pagination';
 
 interface AdminSession {
   id: string;
@@ -43,9 +44,23 @@ interface AdminSession {
 interface AdminSessionsTableProps {
   sessions: AdminSession[];
   onRevoke: (sessionId: string) => Promise<void>;
+  // Pagination props
+  currentPage: number;
+  pageSize: number;
+  totalSessions: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
 }
 
-export function AdminSessionsTable({ sessions, onRevoke }: AdminSessionsTableProps) {
+export function AdminSessionsTable({ 
+  sessions, 
+  onRevoke,
+  currentPage,
+  pageSize,
+  totalSessions,
+  onPageChange,
+  onPageSizeChange
+}: AdminSessionsTableProps) {
   const [revoking, setRevoking] = useState<string | null>(null);
 
   const getDeviceIcon = (type: string) => {
@@ -90,6 +105,7 @@ export function AdminSessionsTable({ sessions, onRevoke }: AdminSessionsTablePro
         <TableHeader>
           <TableRow>
             <TableHead>User</TableHead>
+            <TableHead>Role</TableHead>
             <TableHead>Device</TableHead>
             <TableHead>Location</TableHead>
             <TableHead>IP Address</TableHead>
@@ -108,6 +124,9 @@ export function AdminSessionsTable({ sessions, onRevoke }: AdminSessionsTablePro
                     <div className="text-xs text-muted-foreground">{session.userEmail}</div>
                   </div>
                 </div>
+              </TableCell>
+              <TableCell>
+                <Badge variant="default">{session.userRole}</Badge>
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
@@ -160,6 +179,18 @@ export function AdminSessionsTable({ sessions, onRevoke }: AdminSessionsTablePro
           ))}
         </TableBody>
       </Table>
+      
+      {/* Pagination */}
+      {totalSessions > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalItems={totalSessions}
+          pageSize={pageSize}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
+      )}
     </div>
   );
 }

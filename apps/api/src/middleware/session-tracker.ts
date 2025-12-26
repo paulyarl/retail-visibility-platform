@@ -33,12 +33,52 @@ function parseDeviceInfo(userAgent: string) {
 }
 
 /**
- * Get approximate location from IP (basic implementation)
- * In production, you'd use a service like MaxMind GeoIP2
+ * Get location data from IP using IP-API (free service)
+ * Falls back to Unknown if service fails
  */
-async function getLocationFromIP(ipAddress: string) {
-  // For now, return a placeholder
-  // TODO: Integrate with GeoIP service
+async function getLocationFromIP(ipAddress: string): Promise<{
+  city: string;
+  region: string;
+  country: string;
+  coordinates: [number, number] | null;
+}> {
+  // Skip geolocation for local/private IPs
+  if (ipAddress === '127.0.0.1' || ipAddress === 'localhost' || ipAddress.startsWith('192.168.') || ipAddress.startsWith('10.') || ipAddress.startsWith('172.')) {
+    return {
+      city: 'Local Network',
+      region: 'Local',
+      country: 'Local',
+      coordinates: null,
+    };
+  }
+
+  try {
+    // Use IP-API for geolocation (free, no API key required)
+    const response = await fetch(`http://ip-api.com/json/${ipAddress}?fields=status,city,regionName,country,lat,lon`, {
+      timeout: 2000, // 2 second timeout
+    });
+
+    if (!response.ok) {
+      throw new Error(`IP-API responded with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      return {
+        city: data.city || 'Unknown',
+        region: data.regionName || 'Unknown',
+        country: data.country || 'Unknown',
+        coordinates: data.lat && data.lon ? [data.lat, data.lon] : null,
+      };
+    } else {
+      console.warn(`[GeoIP] IP-API failed for ${ipAddress}:`, data.message);
+    }
+  } catch (error) {
+    console.warn(`[GeoIP] Failed to geolocate IP ${ipAddress}:`, error);
+  }
+
+  // Fallback to Unknown
   return {
     city: 'Unknown',
     region: 'Unknown',

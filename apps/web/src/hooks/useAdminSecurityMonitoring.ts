@@ -85,18 +85,29 @@ export function useAdminSecurityMonitoring() {
   const [alertStats, setAlertStats] = useState<AlertStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Pagination state for sessions
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalSessions, setTotalSessions] = useState(0);
 
   const fetchSessions = useCallback(async () => {
     try {
-      const response = await api.get('/api/admin/security/sessions');
+      const offset = (currentPage - 1) * pageSize;
+      const params = new URLSearchParams({
+        limit: pageSize.toString(),
+        offset: offset.toString(),
+      });
+      const response = await api.get(`/api/admin/security/sessions?${params}`);
       if (!response.ok) throw new Error('Failed to fetch sessions');
       const data = await response.json();
       setSessions(data.data || []);
+      setTotalSessions(data.total || 0);
     } catch (err) {
       console.error('Failed to fetch admin sessions:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch sessions');
     }
-  }, []);
+  }, [currentPage, pageSize]);
 
   const fetchSessionStats = useCallback(async () => {
     try {
@@ -156,27 +167,35 @@ export function useAdminSecurityMonitoring() {
     }
   }, [fetchSessions, fetchSessionStats]);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await Promise.all([
-        fetchSessions(),
-        fetchSessionStats(),
-        fetchAlerts(),
-        fetchAlertStats(),
-        fetchFailedLogins(),
-      ]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to refresh data');
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchSessions, fetchSessionStats, fetchAlerts, fetchAlertStats, fetchFailedLogins]);
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setCurrentPage(1); // Reset to first page when changing page size
+  }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        await Promise.all([
+          fetchSessions(),
+          fetchSessionStats(),
+          fetchAlerts(),
+          fetchAlertStats(),
+          fetchFailedLogins(),
+        ]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to refresh data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [fetchSessions, fetchSessionStats, fetchAlerts, fetchAlertStats, fetchFailedLogins]);
 
   return {
     sessions,
@@ -187,6 +206,11 @@ export function useAdminSecurityMonitoring() {
     loading,
     error,
     revokeSession,
-    refresh,
+    // Pagination state and handlers
+    currentPage,
+    pageSize,
+    totalSessions,
+    handlePageChange,
+    handlePageSizeChange,
   };
 }

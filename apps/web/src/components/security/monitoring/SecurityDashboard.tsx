@@ -27,7 +27,12 @@ export function SecurityDashboard() {
     sessionStats, 
     alertStats, 
     loading: adminLoading,
-    revokeSession 
+    revokeSession,
+    currentPage,
+    pageSize,
+    totalSessions,
+    handlePageChange,
+    handlePageSizeChange,
   } = useAdminSecurityMonitoring();
 
   if (loading) {
@@ -221,7 +226,15 @@ export function SecurityDashboard() {
               {adminLoading ? (
                 <div className="h-32 bg-muted animate-pulse rounded-lg" />
               ) : (
-                <AdminSessionsTable sessions={sessions} onRevoke={revokeSession} />
+                <AdminSessionsTable 
+                  sessions={sessions} 
+                  onRevoke={revokeSession}
+                  currentPage={currentPage}
+                  pageSize={pageSize}
+                  totalSessions={totalSessions}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                />
               )}
             </CardContent>
           </Card>
