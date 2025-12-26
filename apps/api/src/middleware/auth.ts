@@ -25,7 +25,7 @@
  * - VIEWER: Read-only tenant access
  */
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../prisma';
+// import { prisma } from '../prisma'; // Commented out to avoid circular dependencies
 import * as jwt from 'jsonwebtoken';
 import { user_tenant_role, user_role } from '@prisma/client';
 import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
@@ -125,15 +125,17 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     const userId = payload.userId || payload.user_id;
     if (userId) {
       try {
-        const session = await prisma.$queryRaw<any[]>`
-          SELECT id FROM user_sessions
-          WHERE user_id = ${userId}
-            AND revoked_at IS NULL
-            AND (expires_at IS NULL OR expires_at > NOW())
-          LIMIT 1
-        `;
+        const { prisma } = await import('../prisma');
+        const session = await prisma.user_sessions_list.findFirst({
+          where: {
+            user_id: userId,
+            is_active: true,
+            expires_at: { gt: new Date() }
+          },
+          select: { id: true }
+        });
 
-        if (!session || session.length === 0) {
+        if (!session) {
           console.log('[AUTH] Session revoked or expired for user:', userId);
           return res.status(401).json({ error: 'session_revoked', message: 'Your session has been revoked' });
         }
