@@ -209,8 +209,12 @@ export function UnifiedStoreCard({
                         )}
                         {hoursStatus && (
                           <div 
-                            className={`w-2 h-2 rounded-full ${hoursStatus.isOpen ? 'bg-green-500' : 'bg-red-500'}`}
-                            title={hoursStatus.isOpen ? 'Open now' : 'Closed'}
+                            className={`w-2 h-2 rounded-full ${
+                              hoursStatus.status === 'open' ? 'bg-green-500' :
+                              hoursStatus.status === 'closed' ? 'bg-red-500' :
+                              'bg-orange-500' // opening-soon or closing-soon
+                            }`}
+                            title={hoursStatus.label}
                           />
                         )}
                       </div>
@@ -311,8 +315,12 @@ export function UnifiedStoreCard({
 
             {hoursStatus && (
               <div 
-                className={`w-2 h-2 rounded-full ${hoursStatus.isOpen ? 'bg-green-500' : 'bg-red-500'}`}
-                title={hoursStatus.isOpen ? 'Open now' : 'Closed'}
+                className={`w-2 h-2 rounded-full ${
+                  hoursStatus.status === 'open' ? 'bg-green-500' :
+                  hoursStatus.status === 'closed' ? 'bg-red-500' :
+                  'bg-orange-500' // opening-soon or closing-soon
+                }`}
+                title={hoursStatus.label}
               />
             )}
           </div>

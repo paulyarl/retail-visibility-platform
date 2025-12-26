@@ -22,7 +22,7 @@ function minutesToLabel(mins: number, timeZone?: string): string {
   return `${hour12}:${mmStr} ${period}`;
 }
 
-export function computeStoreStatus(hours: any): { isOpen: boolean; label: string } | null {
+export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open' | 'closed' | 'opening-soon' | 'closing-soon'; label: string } | null {
   if (!hours || typeof hours !== 'object') return null;
   const now = new Date();
   const locale = 'en-US';
@@ -48,7 +48,7 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; label: string
   if (closedSpecial) {
     const note = closedSpecial.note ? ` (${closedSpecial.note})` : '';
     // console.log('[StoreStatus] Store closed due to special hours:', closedSpecial);
-    return { isOpen: false, label: `Closed today (special hours)${note}` };
+    return { isOpen: false, status: 'closed', label: `Closed today (special hours)${note}` };
   }
   
   const regularToday = (hours as any)[todayName];
@@ -76,14 +76,24 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; label: string
   
   // Check if currently open in regular hours
   if (regularRange && currentMins >= regularRange.openM && currentMins < regularRange.closeM) {
-    return { isOpen: true, label: `Open now • Closes at ${minutesToLabel(regularRange.closeM, timeZone)}` };
+    // Check if closing soon (within 30 minutes)
+    const minutesUntilClose = regularRange.closeM - currentMins;
+    if (minutesUntilClose <= 30) {
+      return { isOpen: true, status: 'closing-soon', label: `Closing soon • Closes at ${minutesToLabel(regularRange.closeM, timeZone)}` };
+    }
+    return { isOpen: true, status: 'open', label: `Open now • Closes at ${minutesToLabel(regularRange.closeM, timeZone)}` };
   }
   
   // Check if currently open in any special hours
   for (const { range, note } of specialRanges) {
     if (range && currentMins >= range.openM && currentMins < range.closeM) {
       const noteText = note ? ` (${note})` : '';
-      return { isOpen: true, label: `Open now${noteText} • Closes at ${minutesToLabel(range.closeM, timeZone)} (special hours)` };
+      // Check if closing soon (within 30 minutes)
+      const minutesUntilClose = range.closeM - currentMins;
+      if (minutesUntilClose <= 30) {
+        return { isOpen: true, status: 'closing-soon', label: `Closing soon${noteText} • Closes at ${minutesToLabel(range.closeM, timeZone)} (special hours)` };
+      }
+      return { isOpen: true, status: 'open', label: `Open now${noteText} • Closes at ${minutesToLabel(range.closeM, timeZone)} (special hours)` };
     }
   }
   
@@ -92,13 +102,23 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; label: string
   for (const { range, note } of specialRanges) {
     if (range && currentMins < range.openM) {
       const noteText = note ? ` (${note})` : '';
-      return { isOpen: false, label: `Closed • Opens today at ${minutesToLabel(range.openM, timeZone)}${noteText} (special hours)` };
+      // Check if opening soon (within 30 minutes)
+      const minutesUntilOpen = range.openM - currentMins;
+      if (minutesUntilOpen <= 30) {
+        return { isOpen: false, status: 'opening-soon', label: `Opening soon${noteText} • Opens at ${minutesToLabel(range.openM, timeZone)} (special hours)` };
+      }
+      return { isOpen: false, status: 'closed', label: `Closed • Opens today at ${minutesToLabel(range.openM, timeZone)}${noteText} (special hours)` };
     }
   }
   
   // Check regular hours if no special hours apply
   if (regularRange && currentMins < regularRange.openM) {
-    return { isOpen: false, label: `Closed • Opens today at ${minutesToLabel(regularRange.openM, timeZone)}` };
+    // Check if opening soon (within 30 minutes)
+    const minutesUntilOpen = regularRange.openM - currentMins;
+    if (minutesUntilOpen <= 30) {
+      return { isOpen: false, status: 'opening-soon', label: `Opening soon • Opens at ${minutesToLabel(regularRange.openM, timeZone)}` };
+    }
+    return { isOpen: false, status: 'closed', label: `Closed • Opens today at ${minutesToLabel(regularRange.openM, timeZone)}` };
   }
   
   // After both regular and special hours close, find next open day
@@ -110,17 +130,17 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; label: string
     const r = parseRange((hours as any)[name]);
     if (r) {
       const dayLabel = i === 1 ? 'tomorrow' : name;
-      return { isOpen: false, label: `Closed • Opens ${dayLabel} at ${minutesToLabel(r.openM, timeZone)}` };
+      return { isOpen: false, status: 'closed', label: `Closed • Opens ${dayLabel} at ${minutesToLabel(r.openM, timeZone)}` };
     }
   }
   
   // If no hours found in next 7 days, check if any hours are set at all
   const hasAnyHours = Object.keys(hours).some(k => k !== 'timezone' && k !== 'special' && hours[k]);
   if (hasAnyHours) {
-    return { isOpen: false, label: 'Closed • Check hours for details' };
+    return { isOpen: false, status: 'closed', label: 'Closed • Check hours for details' };
   }
 
-  return { isOpen: false, label: 'Closed' };
+  return { isOpen: false, status: 'closed', label: 'Closed' };
 }
 
 /**
