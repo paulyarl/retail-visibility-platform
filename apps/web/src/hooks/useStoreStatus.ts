@@ -8,7 +8,7 @@ export interface StoreStatus {
   label: string;
 }
 
-export function useStoreStatus(tenantId: string, apiBase?: string) {
+export function useStoreStatus(tenantId?: string, apiBase?: string) {
   const [status, setStatus] = useState<StoreStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

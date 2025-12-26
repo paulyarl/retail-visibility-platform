@@ -135,6 +135,72 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       console.error('Failed to fetch business profile:', e);
     }
 
+    // Fetch raw business hours data for proper display
+    let rawBusinessHours: any = null;
+    try {
+      const hoursRes = await fetch(`${apiBaseUrl}/api/tenant/${tenantId}/business-hours`, {
+        cache: 'no-store',
+      });
+      if (hoursRes.ok) {
+        const hoursData = await hoursRes.json();
+        if (hoursData.success && hoursData.data) {
+          const { periods, timezone } = hoursData.data;
+          const hours: any = { timezone };
+          
+          // Convert periods to day-based format for BusinessHoursDisplay
+          periods.forEach((period: any) => {
+            // Convert API day format (MONDAY) to title case (Monday) for storefront display
+            const dayMap: Record<string, string> = {
+              'MONDAY': 'Monday',
+              'TUESDAY': 'Tuesday', 
+              'WEDNESDAY': 'Wednesday',
+              'THURSDAY': 'Thursday',
+              'FRIDAY': 'Friday',
+              'SATURDAY': 'Saturday',
+              'SUNDAY': 'Sunday'
+            };
+            const titleCaseDay = dayMap[period.day] || period.day;
+            if (titleCaseDay && !hours[titleCaseDay]) {
+              hours[titleCaseDay] = {
+                open: period.open,
+                close: period.close
+              };
+            }
+          });
+          
+          // Include periods array for BusinessHoursDisplay to handle multiple periods
+          if (periods.length > 0) {
+            hours.periods = periods;
+          }
+          
+          // Fetch and include special hours for status computation
+          try {
+            const specialRes = await fetch(`${apiBaseUrl}/api/tenant/${tenantId}/business-hours/special`, {
+              cache: 'no-store',
+            });
+            if (specialRes.ok) {
+              const specialData = await specialRes.json();
+              if (specialData.success && specialData.data?.overrides) {
+                hours.special = specialData.data.overrides.map((override: any) => ({
+                  date: override.date,
+                  open: override.open,
+                  close: override.close,
+                  isClosed: override.isClosed,
+                  note: override.note
+                }));
+              }
+            }
+          } catch (e) {
+            console.error('Failed to fetch special hours:', e);
+          }
+          
+          rawBusinessHours = hours;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch raw business hours:', e);
+    }
+
     // Fetch map location using utility
     const mapLocation = await getTenantMapLocation(tenantId);
 
@@ -210,12 +276,12 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
 
     const hasLogo = !!tenant.metadata?.logo_url;
     const hasBranding = hasLogo || hasHours;
-    const storeStatus = computeStoreStatus(businessHours);
+    const storeStatus = rawBusinessHours ? computeStoreStatus(rawBusinessHours) : null;
     
     // Find current category name if filtering
     const currentCategory = category ? categories.find((c: Category) => c.slug === category) : null;
     
-    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory };
+    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours: rawBusinessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -818,49 +884,79 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
               </h2>
               <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-                    const dayHours = businessHours[day];
-                    const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
-                    const formatTime = (time24: string): string => {
-                      if (!time24) return "";
-                      const [h, m] = time24.split(":").map(Number);
-                      const period = h >= 12 ? "PM" : "AM";
-                      const hour12 = h % 12 || 12;
-                      return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
-                    };
-                    return (
-                      <div
-                        key={day}
-                        className={`flex items-center justify-between p-3 rounded-lg border ${
-                          isToday
-                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                            : 'bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`font-medium ${isToday ? 'text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'}`}>
-                            {day}
-                          </span>
-                          {isToday && <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">Today</span>}
-                        </div>
-                        <div className={`text-right ${
-                          isToday
-                            ? 'text-blue-700 dark:text-blue-300'
-                            : dayHours ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-500 dark:text-neutral-400'
-                        }`}>
-                          {dayHours ? (
-                            <div className="text-sm">
-                              <div>{formatTime(dayHours.open)}</div>
-                              <div>{formatTime(dayHours.close)}</div>
-                            </div>
-                          ) : (
-                            <span className="text-sm">Closed</span>
-                          )}
-                        </div>
+                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
+                  const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
+
+                  // Check if we have periods format (multiple periods per day)
+                  const hasPeriodsFormat = businessHours?.periods && Array.isArray(businessHours.periods);
+                  let displayText = '';
+                  let hasHours = false;
+
+                  if (hasPeriodsFormat) {
+                    // New format: periods array
+                    const dayUpper = day.toUpperCase();
+                    const dayPeriods = businessHours.periods.filter((p: any) => p.day === dayUpper);
+                    hasHours = dayPeriods.length > 0;
+                    if (hasHours) {
+                      displayText = dayPeriods
+                        .map((period: any) => {
+                          const formatTime = (time24: string): string => {
+                            if (!time24) return "";
+                            const [h, m] = time24.split(":").map(Number);
+                            const period = h >= 12 ? "PM" : "AM";
+                            const hour12 = h % 12 || 12;
+                            return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+                          };
+                          return `${formatTime(period.open)} - ${formatTime(period.close)}`;
+                        })
+                        .join(', ');
+                    }
+                  } else {
+                    // Old format: single period per day
+                    const dayHours = businessHours?.[day];
+                    hasHours = !!dayHours;
+                    if (hasHours) {
+                      const formatTime = (time24: string): string => {
+                        if (!time24) return "";
+                        const [h, m] = time24.split(":").map(Number);
+                        const period = h >= 12 ? "PM" : "AM";
+                        const hour12 = h % 12 || 12;
+                        return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+                      };
+                      displayText = `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}`;
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={day}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        isToday
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                          : 'bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`font-medium ${isToday ? 'text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'}`}>
+                          {day}
+                        </span>
+                        {isToday && <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">Today</span>}
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className={`text-right ${
+                        isToday
+                          ? 'text-blue-700 dark:text-blue-300'
+                          : hasHours ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-500 dark:text-neutral-400'
+                      }`}>
+                        {hasHours ? (
+                          <span className="text-sm">{displayText}</span>
+                        ) : (
+                          <span className="text-sm">Closed</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
                 {/* Special Hours - Today & Upcoming */}
                 {(() => {

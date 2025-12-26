@@ -207,6 +207,42 @@ async function getBusinessProfile(tenantId: string) {
   }
 }
 
+async function getBusinessHours(tenantId: string) {
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  
+  try {
+    const res = await fetch(`${apiUrl}/api/tenant/${tenantId}/business-hours`);
+    if (!res.ok) return null;
+    
+    const data = await res.json();
+    if (!data.success || !data.data) return null;
+    
+    const { periods, timezone } = data.data;
+    const hours: any = { timezone };
+    
+    // Convert periods to day-based format for BusinessHoursDisplay
+    periods.forEach((period: any) => {
+      const dayName = period.day?.toUpperCase(); // Keep uppercase for BusinessHoursDisplay
+      if (dayName && !hours[dayName]) {
+        hours[dayName] = {
+          open: period.open,
+          close: period.close
+        };
+      }
+    });
+    
+    // Include periods array for BusinessHoursDisplay to handle multiple periods
+    if (periods.length > 0) {
+      hours.periods = periods;
+    }
+    
+    return hours;
+  } catch (error) {
+    console.error('Error fetching business hours:', error);
+    return null;
+  }
+}
+
 async function getFeaturedProducts(tenantId: string, limit: number = 6) {
   const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   
@@ -456,6 +492,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     directoryCategoryCountsMap,
     storefrontCategories,
     businessProfile,
+    businessHours,
     featuredProducts,
     relatedProducts,
     recommendations
@@ -464,13 +501,14 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     getDirectoryCategoryCountsMap(),
     getStorefrontCategories(listing.tenant_id),
     getBusinessProfile(listing.tenant_id),
+    getBusinessHours(listing.tenant_id),
     getFeaturedProducts(listing.tenant_id, 6),
     primaryCategory ? getRelatedProducts(primaryCategory.slug, listing.tenant_id, 6) : Promise.resolve([]),
     getStoreRecommendations(listing.tenant_id, primaryCategory?.slug)
   ]);
   
-  // Compute store status from business profile hours
-  const storeStatus = businessProfile?.hours ? computeStoreStatus(businessProfile.hours) : null;
+  // Compute store status from business hours data
+  const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;
   
   // Track user behavior for recommendations (fire and forget, don't await)
   trackStoreView(listing.tenant_id, listing.categories).catch(err => 
@@ -778,13 +816,13 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               </div>
 
               {/* Business Hours - Moved from left sidebar for mobile UX */}
-              {businessProfile?.hours && (
+              {businessHours && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
                     Hours
                   </h2>
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <BusinessHoursDisplay businessHours={businessProfile.hours} />
+                    <BusinessHoursDisplay businessHours={businessHours} />
                   </div>
                 </div>
               )}
