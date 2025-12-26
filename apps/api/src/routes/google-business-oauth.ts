@@ -381,7 +381,7 @@ router.get('/google/business/locations', async (req, res) => {
       });
     }
 
-    const accountsData = await accountsResponse.json();
+    const accountsData = await accountsResponse.json() as { accounts?: any[] };
     const accounts = accountsData.accounts || [];
 
     if (accounts.length === 0) {
@@ -408,7 +408,7 @@ router.get('/google/business/locations', async (req, res) => {
       );
 
       if (locationsResponse.ok) {
-        const locationsData = await locationsResponse.json();
+        const locationsData = await locationsResponse.json() as { locations?: any[] };
         const locations = locationsData.locations || [];
         
         for (const loc of locations) {

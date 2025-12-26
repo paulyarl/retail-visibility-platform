@@ -92,7 +92,7 @@ export async function listMerchantAccounts(account_id: string): Promise<any[]> {
       return [];
     }
 
-    const data = await response.json();
+    const data = await response.json() as { accountIdentifiers?: any[] };
     console.log('[GMC] authinfo response:', JSON.stringify(data, null, 2));
     
     // authinfo returns accountIdentifiers array with accountId
@@ -177,7 +177,7 @@ export async function listProducts(
       return [];
     }
 
-    const data = await response.json();
+    const data = await response.json() as { products?: any[] };
     return data.products || [];
   } catch (error) {
     console.error('[GMC] Error listing products:', error);
@@ -331,7 +331,7 @@ export async function getProductStats(
       return null;
     }
 
-    const data = await response.json();
+    const data = await response.json() as { products?: any[] };
     const products = data.products || [];
 
     const stats = {

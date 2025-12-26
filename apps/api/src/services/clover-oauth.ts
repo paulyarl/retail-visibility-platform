@@ -140,7 +140,13 @@ export async function exchangeCodeForToken(code: string): Promise<{
     throw new Error(`Failed to exchange code for token: ${error}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    merchant_id?: string;
+    merchantId?: string;
+  };
   
   // Extract merchant ID from response
   // Clover returns merchant_id in the token response
@@ -148,7 +154,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_in: data.expires_in,
-    merchant_id: data.merchant_id || data.merchantId
+    merchant_id: data.merchant_id || data.merchantId || '',
   };
 }
 
@@ -182,7 +188,10 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
     throw new Error(`Failed to refresh token: ${error}`);
   }
 
-  return await response.json();
+  return await response.json() as {
+    access_token: string;
+    expires_in?: number;
+  };
 }
 
 /**

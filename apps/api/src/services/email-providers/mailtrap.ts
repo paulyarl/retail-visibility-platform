@@ -43,11 +43,11 @@ export class MailtrapEmailProvider implements EmailProvider {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch(() => ({})) as { message?: string };
         throw new Error(`Mailtrap API error: ${response.status} - ${errorData.message || response.statusText}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as { message_id?: string };
       
       return {
         success: true,

@@ -235,7 +235,35 @@ export class BarcodeEnrichmentService {
       throw new Error(`UPC Database API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      success: boolean;
+      title?: string;
+      description?: string;
+      brand?: string;
+      category?: string;
+      msrp?: string;
+      images?: string[];
+      ean?: string;
+      asin?: string;
+      isbn?: string;
+      mpn?: string;
+      model?: string;
+      elid?: string;
+      weight?: string;
+      length?: string;
+      width?: string;
+      height?: string;
+      color?: string;
+      size?: string;
+      material?: string;
+      currency?: string;
+      lowest_recorded_price?: string;
+      highest_recorded_price?: string;
+      offers?: any[];
+      features?: string[];
+      warranty?: string;
+      manufacturer?: string;
+    };
 
     if (!data.success || !data.title) {
       return null;
@@ -243,12 +271,12 @@ export class BarcodeEnrichmentService {
 
     return {
       name: data.title || 'Unknown Product',
-      description: data.description || null,
+      description: data.description || undefined,
       brand: data.brand || 'Unknown',
       categoryPath: data.category ? [data.category] : [], 
       priceCents: data.msrp ? Math.round(parseFloat(data.msrp) * 100) : undefined,
-      imageUrl: data.images?.[0] || null,
-      imageThumbnailUrl: data.images?.[0] || null,
+      imageUrl: data.images?.[0] || undefined,
+      imageThumbnailUrl: data.images?.[0] || undefined,
       metadata: {
         // Identifiers
         upc: barcode,
@@ -313,7 +341,10 @@ export class BarcodeEnrichmentService {
       throw new Error(`Open Food Facts API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      status: number;
+      product?: any;
+    };
 
     if (data.status !== 1 || !data.product) {
       return null; // Product not found or incomplete

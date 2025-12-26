@@ -1646,14 +1646,14 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
         `https://api.clover.com/v3/merchants/${integration.merchant_id}/categories`,
         { headers: { 'Authorization': `Bearer ${integration.access_token}` } }
       );
-      const categoriesData = await categoriesResponse.json();
+      const categoriesData = await categoriesResponse.json() as { elements?: any[] };
       
       // Fetch items from Clover
       const itemsResponse = await fetch(
         `https://api.clover.com/v3/merchants/${integration.merchant_id}/items?expand=categories`,
         { headers: { 'Authorization': `Bearer ${integration.access_token}` } }
       );
-      const itemsData = await itemsResponse.json();
+      const itemsData = await itemsResponse.json() as { elements?: any[] };
       
       // Transform Clover API response to our format
       const categories = (categoriesData.elements || []).map((cat: any) => ({

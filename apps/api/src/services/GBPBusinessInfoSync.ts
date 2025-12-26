@@ -742,7 +742,41 @@ export async function readFromGoogle(tenantId: string): Promise<{
       return { success: false, data: null, error: `API error: ${response.status}` };
     }
 
-    const googleLocation = await response.json();
+    const googleLocation = await response.json() as {
+      title?: string;
+      phoneNumbers?: { primaryPhone?: string };
+      websiteUri?: string;
+      storefrontAddress?: {
+        addressLines?: string[];
+        locality?: string;
+        administrativeArea?: string;
+        postalCode?: string;
+        regionCode?: string;
+      };
+      profile?: { description?: string };
+      categories?: {
+        primaryCategory?: { name?: string; displayName?: string };
+        additionalCategories?: Array<{ name?: string; displayName?: string }>;
+      };
+      openInfo?: {
+        status?: string;
+        canReopen?: boolean;
+        openingDate?: { year?: number; month?: number; day?: number };
+      };
+      regularHours?: {
+        periods?: Array<{
+          openDay?: string;
+          openTime?: { hours?: number; minutes?: number };
+          closeDay?: string;
+          closeTime?: { hours?: number; minutes?: number };
+        }>;
+      };
+      metadata?: {
+        hasVoiceOfMerchant?: boolean;
+        canModifyServiceList?: boolean;
+        canHaveFoodMenus?: boolean;
+      };
+    };
 
     // Parse the response into our standard format
     const data: GoogleBusinessData = {
@@ -760,26 +794,26 @@ export async function readFromGoogle(tenantId: string): Promise<{
       description: googleLocation.profile?.description || null,
       categories: {
         primary: googleLocation.categories?.primaryCategory ? {
-          id: googleLocation.categories.primaryCategory.name,
-          name: googleLocation.categories.primaryCategory.displayName || googleLocation.categories.primaryCategory.name,
+          id: googleLocation.categories.primaryCategory.name || '',
+          name: googleLocation.categories.primaryCategory.displayName || googleLocation.categories.primaryCategory.name || '',
         } : null,
         secondary: (googleLocation.categories?.additionalCategories || []).map((cat: any) => ({
-          id: cat.name,
-          name: cat.displayName || cat.name,
+          id: cat.name || '',
+          name: cat.displayName || cat.name || '',
         })),
       },
       openInfo: googleLocation.openInfo ? {
-        status: googleLocation.openInfo.status || null,
+        status: (googleLocation.openInfo.status as 'OPEN' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY') || null,
         canReopen: googleLocation.openInfo.canReopen || null,
         openingDate: googleLocation.openInfo.openingDate ? 
           `${googleLocation.openInfo.openingDate.year}-${googleLocation.openInfo.openingDate.month}-${googleLocation.openInfo.openingDate.day}` : null,
       } : null,
       regularHours: googleLocation.regularHours ? {
         periods: (googleLocation.regularHours.periods || []).map((p: any) => ({
-          openDay: p.openDay,
-          openTime: p.openTime?.hours ? `${p.openTime.hours}:${p.openTime.minutes || '00'}` : null,
-          closeDay: p.closeDay,
-          closeTime: p.closeTime?.hours ? `${p.closeTime.hours}:${p.closeTime.minutes || '00'}` : null,
+          openDay: p.openDay || '',
+          openTime: p.openTime?.hours ? `${p.openTime.hours}:${p.openTime.minutes || '00'}` : '',
+          closeDay: p.closeDay || '',
+          closeTime: p.closeTime?.hours ? `${p.closeTime.hours}:${p.closeTime.minutes || '00'}` : '',
         })),
       } : null,
       metadata: googleLocation.metadata ? {

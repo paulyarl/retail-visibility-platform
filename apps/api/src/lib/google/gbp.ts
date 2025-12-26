@@ -82,7 +82,7 @@ export async function listBusinessAccounts(account_id: string): Promise<any[]> {
       return [];
     }
 
-    const data = await response.json();
+    const data = await response.json() as { accounts?: any[] };
     return data.accounts || [];
   } catch (error) {
     console.error('[GBP] Error listing business accounts:', error);
@@ -119,7 +119,7 @@ export async function listLocations(
       return [];
     }
 
-    const data = await response.json();
+    const data = await response.json() as { locations?: any[] };
     return data.locations || [];
   } catch (error) {
     console.error('[GBP] Error listing locations:', error);

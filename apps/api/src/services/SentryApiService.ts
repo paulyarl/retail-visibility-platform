@@ -76,7 +76,7 @@ export class SentryApiService {
         return { data: null as T, error: `API error: ${response.status} ${response.statusText}` };
       }
 
-      const data = await response.json();
+      const data = await response.json() as T;
       return { data };
     } catch (error) {
       console.error('[SentryApiService] Request failed:', error);

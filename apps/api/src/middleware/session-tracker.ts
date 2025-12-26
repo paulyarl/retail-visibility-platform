@@ -54,15 +54,21 @@ async function getLocationFromIP(ipAddress: string): Promise<{
 
   try {
     // Use IP-API for geolocation (free, no API key required)
-    const response = await fetch(`http://ip-api.com/json/${ipAddress}?fields=status,city,regionName,country,lat,lon`, {
-      timeout: 2000, // 2 second timeout
-    });
+    const response = await fetch(`http://ip-api.com/json/${ipAddress}?fields=status,city,regionName,country,lat,lon`);
 
     if (!response.ok) {
       throw new Error(`IP-API responded with status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      status: string;
+      city?: string;
+      regionName?: string;
+      country?: string;
+      lat?: number;
+      lon?: number;
+      message?: string;
+    };
 
     if (data.status === 'success') {
       return {

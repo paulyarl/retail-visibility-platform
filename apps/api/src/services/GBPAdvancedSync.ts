@@ -151,7 +151,7 @@ export async function listMedia(tenantId: string): Promise<{
       return { success: false, media: [], error: `API error: ${response.status}` };
     }
 
-    const data = await response.json();
+    const data = await response.json() as { mediaItems?: any[] };
     return { success: true, media: data.mediaItems || [] };
   } catch (error: any) {
     return { success: false, media: [], error: error.message };
@@ -205,7 +205,7 @@ export async function uploadPhoto(
       return { success: false, error: `API error: ${response.status}` };
     }
 
-    const result = await response.json();
+    const result = await response.json() as { name?: string };
     console.log(`[GBPAdvanced] Uploaded photo for tenant ${tenantId}`);
     return { success: true, mediaItemId: result.name };
   } catch (error: any) {
@@ -342,7 +342,7 @@ export async function createPost(
       return { success: false, error: `API error: ${response.status}` };
     }
 
-    const result = await response.json();
+    const result = await response.json() as { name?: string };
     console.log(`[GBPAdvanced] Created post for tenant ${tenantId}`);
     
     // Store post in database
@@ -388,7 +388,7 @@ export async function listPosts(tenantId: string): Promise<{
       return { success: false, posts: [], error: `API error: ${response.status}` };
     }
 
-    const data = await response.json();
+    const data = await response.json() as { localPosts?: any[] };
     return { success: true, posts: data.localPosts || [] };
   } catch (error: any) {
     return { success: false, posts: [], error: error.message };
@@ -494,7 +494,12 @@ export async function listReviews(
       return { success: false, reviews: [], error: `API error: ${response.status}` };
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      reviews?: Review[];
+      averageRating?: number;
+      totalReviewCount?: number;
+      nextPageToken?: string;
+    };
     
     // Store reviews in database
     if (data.reviews) {
@@ -635,7 +640,9 @@ export async function getAvailableAttributes(tenantId: string): Promise<{
       return { success: false, attributes: [], error: 'Failed to get location category' };
     }
 
-    const locationData = await locationResponse.json();
+    const locationData = await locationResponse.json() as {
+      categories?: { primaryCategory?: { name?: string } };
+    };
     const primaryCategory = locationData.categories?.primaryCategory?.name;
 
     if (!primaryCategory) {
@@ -657,7 +664,7 @@ export async function getAvailableAttributes(tenantId: string): Promise<{
       return { success: false, attributes: [], error: `API error: ${response.status}` };
     }
 
-    const data = await response.json();
+    const data = await response.json() as { attributes?: any[] };
     return { success: true, attributes: data.attributes || [] };
   } catch (error: any) {
     return { success: false, attributes: [], error: error.message };
@@ -697,7 +704,7 @@ export async function getLocationAttributes(tenantId: string): Promise<{
       return { success: false, attributes: [], error: `API error: ${response.status}` };
     }
 
-    const data = await response.json();
+    const data = await response.json() as { attributes?: BusinessAttribute[] };
     return { success: true, attributes: data.attributes || [] };
   } catch (error: any) {
     return { success: false, attributes: [], error: error.message };

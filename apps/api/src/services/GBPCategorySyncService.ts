@@ -278,7 +278,11 @@ export class GBPCategorySyncService {
           throw new Error(`Google API error: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = await response.json() as {
+          categories?: any[];
+          totalCategoryCount?: number;
+          nextPageToken?: string;
+        };
 
         if (data.categories) {
           categories.push(...data.categories.map((cat: any) => ({

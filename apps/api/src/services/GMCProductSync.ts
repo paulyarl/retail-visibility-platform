@@ -293,7 +293,7 @@ export async function syncProduct(
       };
     }
 
-    const result = await response.json();
+    const result = await response.json() as { id?: string };
     
     // Update item with sync status
     await prisma.inventory_items.update({
@@ -435,7 +435,7 @@ export async function batchSyncProducts(
       };
     }
 
-    const batchResult = await response.json();
+    const batchResult = await response.json() as { entries?: any[] };
     const entries = batchResult.entries || [];
 
     let synced = 0;

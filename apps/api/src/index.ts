@@ -741,7 +741,18 @@ app.post("/api/tenants/:id/geocode", async (req, res) => {
     
     const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${apiKey}`;
     const geocodeResponse = await fetch(geocodeUrl);
-    const geocodeData = await geocodeResponse.json();
+    const geocodeData = await geocodeResponse.json() as {
+      status: string;
+      results?: Array<{
+        geometry: {
+          location: {
+            lat: number;
+            lng: number;
+          };
+        };
+      }>;
+      error_message?: string;
+    };
     
     if (geocodeData.status !== 'OK' || !geocodeData.results || geocodeData.results.length === 0) {
       console.error(`[POST /api/tenants/${id}/geocode] Geocoding failed:`, geocodeData.status);
