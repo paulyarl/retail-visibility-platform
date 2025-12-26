@@ -47,6 +47,32 @@ const API_BASE_URL = API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://
 const TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const TENANT_KEY = 'current_tenant_id';
+const USER_CACHE_KEY = 'auth_user_cache';
+const USER_CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
+
+// Simple encryption/decryption for client-side caching
+function encrypt(text: string): string {
+  try {
+    // Use btoa for simple base64 encoding (not true encryption, but obscures data)
+    return btoa(encodeURIComponent(text));
+  } catch {
+    return text;
+  }
+}
+
+function decrypt(text: string): string {
+  try {
+    return decodeURIComponent(atob(text));
+  } catch {
+    return text;
+  }
+}
+
+interface CachedUser {
+  user: User;
+  tenantId: string | null;
+  timestamp: number;
+}
 
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -78,14 +104,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(TENANT_KEY);
+    localStorage.removeItem(USER_CACHE_KEY); // Clear cached user data
     try {
       // Expire cookie
       document.cookie = `access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
     } catch {}
   };
 
-  // Fetch current user
-  const fetchUser = useCallback(async () => {
+  // Cache management functions
+  const getCachedUser = (): CachedUser | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = localStorage.getItem(USER_CACHE_KEY);
+      if (!cached) return null;
+      
+      const decrypted = decrypt(cached);
+      const parsed: CachedUser = JSON.parse(decrypted);
+      
+      // Check if cache is expired
+      if (Date.now() - parsed.timestamp > USER_CACHE_TTL) {
+        localStorage.removeItem(USER_CACHE_KEY);
+        return null;
+      }
+      
+      return parsed;
+    } catch {
+      // Clear corrupted cache
+      localStorage.removeItem(USER_CACHE_KEY);
+      return null;
+    }
+  };
+
+  const setCachedUser = (user: User | null, tenantId: string | null) => {
+    if (typeof window === 'undefined' || !user) return;
+    
+    const cached: CachedUser = {
+      user,
+      tenantId,
+      timestamp: Date.now()
+    };
+    
+    try {
+      const encrypted = encrypt(JSON.stringify(cached));
+      localStorage.setItem(USER_CACHE_KEY, encrypted);
+    } catch (error) {
+      console.warn('[AuthContext] Failed to cache user:', error);
+    }
+  };
+
+  // Fetch current user - now uses encrypted caching to minimize API calls
+  const fetchUser = useCallback(async (forceRefresh = false) => {
     const token = getAccessToken();
     if (!token) {
       setUser(null);
@@ -93,8 +161,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Try to use cached user data first (unless force refresh is requested)
+    if (!forceRefresh) {
+      const cached = getCachedUser();
+      if (cached) {
+        console.log('[AuthContext] Using cached user data (avoiding API call)');
+        setUser(cached.user);
+        setCurrentTenantId(cached.tenantId);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     try {
-      // Use centralized api client for deduplication
+      // Only make API call if no valid cache or force refresh requested
+      console.log('[AuthContext] Fetching fresh user data from API');
       const response = await api.get(`${API_BASE_URL}/auth/me`);
 
       if (response.ok) {
@@ -114,11 +195,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setUser(transformedUser);
         
+        // Cache the authenticated user data
+        setCachedUser(transformedUser, currentTenantId);
+        
         // Set current tenant if not set
         if (!currentTenantId && transformedUser && transformedUser.tenants && transformedUser.tenants.length > 0) {
           const savedTenantId = localStorage.getItem(TENANT_KEY);
           const tenantExists = transformedUser.tenants.find((t: any) => t.id === savedTenantId);
-          setCurrentTenantId(tenantExists ? savedTenantId : transformedUser.tenants[0].id);
+          const newTenantId = tenantExists ? savedTenantId : transformedUser.tenants[0].id;
+          setCurrentTenantId(newTenantId);
+          // Update cache with tenant info
+          setCachedUser(transformedUser, newTenantId);
         }
       } else if (response.status === 401) {
         // Token expired, try to refresh
@@ -159,7 +246,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json();
         localStorage.setItem(TOKEN_KEY, data.accessToken);
         try { document.cookie = `access_token=${encodeURIComponent(data.accessToken)}; path=/; SameSite=Lax`; } catch {}
-        await fetchUser();
+        
+        // After token refresh, fetch fresh user data and update cache
+        console.log('[AuthContext] Token refreshed, updating cached user data');
+        await fetchUser(true); // Force refresh to get updated user data
       } else {
         // Only clear tokens if refresh endpoint explicitly says unauthorized
         if (response.status === 401) {
@@ -214,13 +304,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(transformedUser);
       
-      console.log('[AuthContext] Tokens saved to localStorage');
-      
-      // Set current tenant
-      if (transformedUser && transformedUser.tenants && transformedUser.tenants.length > 0) {
-        setCurrentTenantId(transformedUser.tenants[0].id);
-        localStorage.setItem(TENANT_KEY, transformedUser.tenants[0].id);
+      // Cache the authenticated user data immediately after login
+      if (transformedUser) {
+        const tenantId = transformedUser.tenants && transformedUser.tenants.length > 0 ? transformedUser.tenants[0].id : null;
+        setCachedUser(transformedUser, tenantId);
+        setCurrentTenantId(tenantId);
+        if (tenantId) {
+          localStorage.setItem(TENANT_KEY, tenantId);
+        }
       }
+      
+      console.log('[AuthContext] Tokens and user data cached locally');
     } catch (error) {
       // Don't log to console - error will be caught and displayed in UI
       throw error;
@@ -288,14 +382,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetchUser();
   }, [fetchUser]);
 
-  // Setup token refresh interval
-  // Backend tokens expire in 365 days, so refresh every 24 hours to keep session fresh
+  // Setup token refresh interval - less aggressive with caching
+  // Tokens expire in 365 days, so refresh every 6 hours instead of 24
+  // This provides better UX while still being secure
   useEffect(() => {
     if (!user) return;
 
     const interval = setInterval(() => {
+      console.log('[AuthContext] Periodic token refresh (every 6 hours)');
       refreshToken();
-    }, 24 * 60 * 60 * 1000); // Refresh every 24 hours (tokens expire in 365 days)
+    }, 6 * 60 * 60 * 1000); // Refresh every 6 hours
 
     return () => clearInterval(interval);
   }, [user, refreshToken]);
