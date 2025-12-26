@@ -2,9 +2,13 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { prisma } from "../prisma";
 // Create service role Supabase client for storage operations (bypasses RLS)
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 const supabaseService = createClient(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY!
+  serviceRoleKey!
+);
+console.log('[Directory Photos] Service role client initialized with key type:', 
+  serviceRoleKey === process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SERVICE_ROLE' : 'ANON_KEY_FALLBACK'
 );
 import { StorageBuckets } from "../storage-config";
 import { generateQuickStart } from "../lib/id-generator";
