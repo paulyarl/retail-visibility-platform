@@ -54,8 +54,10 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     console.log(`[Directory Photos] Found listing:`, listing ? { id: listing.id, slug: listing.slug, name: listing.name } : 'NOT FOUND');
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
+    console.log('[Directory Photos] Checking photo count limit...');
     // Enforce 10-photo limit
     const existingCount = await prisma.directory_photos.count({ where: { listing_id: listing.id } });
+    console.log('[Directory Photos] Existing photo count:', existingCount);
     if (existingCount >= 10) {
       return res.status(400).json({ error: "maximum 10 photos per directory listing" });
     }
@@ -69,8 +71,13 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     let alt: string | undefined;
     let caption: string | undefined;
 
+    console.log('[Directory Photos] Request type:', req.file ? 'multipart file' : req.is("application/json") ? 'JSON' : 'unknown');
+    console.log('[Directory Photos] Has file:', !!req.file);
+    console.log('[Directory Photos] Content-Type:', req.headers['content-type']);
+
     // Case A: multipart upload of a file
     if (req.file) {
+      console.log('[Directory Photos] Processing multipart file upload...');
       if (!supabase) {
         return res.status(500).json({ error: "server is not configured for direct uploads (missing SUPABASE envs)" });
       }
