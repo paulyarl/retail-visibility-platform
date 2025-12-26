@@ -5021,8 +5021,12 @@ console.log('✅ Store reviews routes mounted at /api');
 
 /* ------------------------------ GDPR compliance ------------------------------ */
 import gdprRoutes from './routes/gdpr';
+import accountDeletionRoutes from './routes/account-deletion';
 app.use('/api/gdpr', gdprRoutes);
+app.use('/api/gdpr', accountDeletionRoutes);
+app.use('/api', accountDeletionRoutes);
 console.log('✅ GDPR compliance routes mounted (data export, consent management)');
+console.log('✅ Account deletion request routes mounted (30-day grace period)');
 
 /* ------------------------------ MFA (Multi-Factor Authentication) ------------------------------ */
 import mfaRoutes from './routes/mfa';
