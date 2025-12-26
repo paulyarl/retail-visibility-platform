@@ -29,12 +29,12 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
   const timeZone: string | undefined = typeof hours.timezone === 'string' ? hours.timezone : undefined;
   const weekday = (d: Date) => d.toLocaleDateString(locale, { weekday: 'long', timeZone });
   const todayName = weekday(now);
-  
+
   // Check for special hours (they can override or extend regular hours)
   const todayDate = now.toLocaleDateString('en-CA', { timeZone }); // YYYY-MM-DD format
   const specialHours = hours.special as any[] | undefined;
   const todaySpecials = specialHours?.filter((sh: any) => sh.date === todayDate) || [];
-  
+
   // console.log('[StoreStatus] Checking hours for tenant:', {
   //   todayDate,
   //   todayName,
@@ -42,7 +42,7 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
   //   todaySpecialsCount: todaySpecials.length,
   //   todaySpecials: todaySpecials.map(sh => ({ date: sh.date, isClosed: sh.isClosed, note: sh.note }))
   // });
-  
+
   // If any special hour is marked as closed, the store is closed all day
   const closedSpecial = todaySpecials.find((sh: any) => sh.isClosed);
   if (closedSpecial) {
@@ -50,7 +50,7 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
     // console.log('[StoreStatus] Store closed due to special hours:', closedSpecial);
     return { isOpen: false, status: 'closed', label: `Closed today (special hours)${note}` };
   }
-  
+
   // Compute "now" in target timezone
   const fmt = new Intl.DateTimeFormat('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: timeZone });
   const parts = fmt.formatToParts(now);
@@ -71,7 +71,7 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
   // Check both regular and special hours for today
   // Support both old format (hours.Monday = {open, close}) and new format (hours.periods array)
   let regularRanges: { openM: number; closeM: number }[] = [];
-  
+
   if (hours.periods && Array.isArray(hours.periods)) {
     // New format: periods array
     const todayPeriods = hours.periods.filter((p: any) => p.day === todayName.toUpperCase());
@@ -82,9 +82,9 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
     const range = parseRange(regularToday);
     if (range) regularRanges = [range];
   }
-  
+
   const specialRanges = todaySpecials.map(sp => ({ range: parseRange(sp), note: sp.note })).filter(sr => sr.range !== null);
-  
+
   // Check if currently open in regular hours (any period)
   for (const range of regularRanges) {
     if (currentMins >= range.openM && currentMins < range.closeM) {
@@ -96,7 +96,7 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
       return { isOpen: true, status: 'open', label: `Open now • Closes at ${minutesToLabel(range.closeM, timeZone)}` };
     }
   }
-  
+
   // Check if currently open in any special hours
   for (const { range, note } of specialRanges) {
     if (range && currentMins >= range.openM && currentMins < range.closeM) {
@@ -109,7 +109,7 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
       return { isOpen: true, status: 'open', label: `Open now${noteText} • Closes at ${minutesToLabel(range.closeM, timeZone)} (special hours)` };
     }
   }
-  
+
   // Not currently open - check when we open next today
   // Priority: Special hours first, then regular hours
   for (const { range, note } of specialRanges) {
@@ -123,7 +123,7 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
       return { isOpen: false, status: 'closed', label: `Closed • Opens today at ${minutesToLabel(range.openM, timeZone)}${noteText} (special hours)` };
     }
   }
-  
+
   // Check regular hours if no special hours apply
   for (const range of regularRanges) {
     if (currentMins < range.openM) {
@@ -135,16 +135,16 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
       return { isOpen: false, status: 'closed', label: `Closed • Opens today at ${minutesToLabel(range.openM, timeZone)}` };
     }
   }
-  
+
   // After both regular and special hours close, find next open day
   // Find next open day within next 7 days
   for (let i = 1; i <= 7; i++) {
     const d = new Date(now);
     d.setDate(now.getDate() + i);
     const name = weekday(d);
-    
+
     let dayRanges: { openM: number; closeM: number }[] = [];
-    
+
     if (hours.periods && Array.isArray(hours.periods)) {
       // New format: periods array
       const dayPeriods = hours.periods.filter((p: any) => p.day === name.toUpperCase());
@@ -155,14 +155,14 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
       const range = parseRange(dayHours);
       if (range) dayRanges = [range];
     }
-    
+
     if (dayRanges.length > 0) {
       const dayLabel = i === 1 ? 'tomorrow' : name;
       const earliestOpen = Math.min(...dayRanges.map(r => r.openM));
       return { isOpen: false, status: 'closed', label: `Closed • Opens ${dayLabel} at ${minutesToLabel(earliestOpen, timeZone)}` };
     }
   }
-  
+
   // If no hours found in next 7 days, check if any hours are set at all
   const hasAnyHours = hours.periods ? hours.periods.length > 0 : Object.keys(hours).some(k => k !== 'timezone' && k !== 'special' && hours[k]);
   if (hasAnyHours) {
@@ -186,19 +186,19 @@ export function getTodaySpecialHours(hours: any): Array<{
   daysAway?: number;
 }> {
   if (!hours || typeof hours !== 'object') return [];
-  
+
   const now = new Date();
   const timeZone: string | undefined = typeof hours.timezone === 'string' ? hours.timezone : undefined;
   const todayDate = now.toLocaleDateString('en-CA', { timeZone }); // YYYY-MM-DD format
-  
+
   // Calculate date 7 days from now
   const nextWeek = new Date(now);
   nextWeek.setDate(nextWeek.getDate() + 7);
   const nextWeekDate = nextWeek.toLocaleDateString('en-CA', { timeZone });
-  
+
   const specialHours = hours.special as any[] | undefined;
   if (!specialHours || !Array.isArray(specialHours)) return [];
-  
+
   return specialHours
     .filter((sh: any) => {
       // Include today and next 7 days
@@ -206,7 +206,7 @@ export function getTodaySpecialHours(hours: any): Array<{
     })
     .map((sh: any) => {
       const isToday = sh.date === todayDate;
-      
+
       // Calculate days away for upcoming dates
       let daysAway: number | undefined;
       if (!isToday) {
@@ -214,7 +214,7 @@ export function getTodaySpecialHours(hours: any): Array<{
         const todayStart = new Date(todayDate + 'T00:00:00');
         daysAway = Math.ceil((specialDate.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
       }
-      
+
       return {
         date: sh.date,
         open: sh.open,

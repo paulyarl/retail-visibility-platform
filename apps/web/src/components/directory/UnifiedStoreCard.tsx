@@ -8,6 +8,8 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { MapPin, Star, Package, ExternalLink } from 'lucide-react';
 import { computeStoreStatus } from '@/lib/hours-utils';
 
+import { useStoreStatus } from "@/hooks/useStoreStatus";
+
 export interface DirectoryListing {
   id: string;
   tenantId: string;
@@ -65,47 +67,8 @@ export function UnifiedStoreCard({
   showLogo = true,
   className = ''
 }: UnifiedStoreCardProps) {
-  const [businessHours, setBusinessHours] = useState<any>(null); // Start with null to always fetch
-
-  // Debug logging for business hours
-  useEffect(() => {
-    // console.log(`[UnifiedStoreCard] ${listing.businessName} - Initial businessHours from API:`, listing.businessHours);
-  }, [listing.businessName, listing.businessHours]);
-
-  // Always fetch fresh business hours from tenant profile API for accurate data
-  useEffect(() => {
-    if (listing.tenantId) {
-      // console.log(`[UnifiedStoreCard] ${listing.businessName} - Fetching fresh business hours from tenant profile...`);
-      const fetchBusinessHours = async () => {
-        try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-          const response = await fetch(`${apiUrl}/public/tenant/${listing.tenantId}/profile`);
-          
-          if (response.ok) {
-            const profile = await response.json();
-            // console.log(`[UnifiedStoreCard] ${listing.businessName} - Fresh API response:`, profile.hours);
-            if (profile.hours) {
-              setBusinessHours(profile.hours);
-            }
-          } else {
-            console.log(`[UnifiedStoreCard] ${listing.businessName} - API fetch failed:`, response.status);
-          }
-        } catch (error) {
-          console.error(`[UnifiedStoreCard] ${listing.businessName} - Error fetching business hours:`, error);
-        }
-      };
-      
-      fetchBusinessHours();
-    }
-  }, [listing.tenantId, listing.businessName]);
-
-  // Compute business hours status
-  const hoursStatus = businessHours ? computeStoreStatus(businessHours) : null;
-  
-  /* useEffect(() => {
-    console.log(`[UnifiedStoreCard] ${listing.businessName} - Final hoursStatus:`, hoursStatus);
-  }, [listing.businessName, hoursStatus]);
- */
+  // Use centralized status hook instead of complex local logic
+  const { status: hoursStatus } = useStoreStatus(listing.tenantId);
   // Determine link destination based on linkType
   const linkHref = linkType === 'storefront' 
     ? `/tenant/${listing.tenantId}`
@@ -212,7 +175,9 @@ export function UnifiedStoreCard({
                             className={`w-2 h-2 rounded-full ${
                               hoursStatus.status === 'open' ? 'bg-green-500' :
                               hoursStatus.status === 'closed' ? 'bg-red-500' :
-                              'bg-orange-500' // opening-soon or closing-soon
+                              hoursStatus.status === 'opening-soon' ? 'bg-yellow-500' :
+                              hoursStatus.status === 'closing-soon' ? 'bg-orange-500' :
+                              'bg-gray-500' // fallback
                             }`}
                             title={hoursStatus.label}
                           />
@@ -318,7 +283,9 @@ export function UnifiedStoreCard({
                 className={`w-2 h-2 rounded-full ${
                   hoursStatus.status === 'open' ? 'bg-green-500' :
                   hoursStatus.status === 'closed' ? 'bg-red-500' :
-                  'bg-orange-500' // opening-soon or closing-soon
+                  hoursStatus.status === 'opening-soon' ? 'bg-yellow-500' :
+                  hoursStatus.status === 'closing-soon' ? 'bg-orange-500' :
+                  'bg-gray-500' // fallback
                 }`}
                 title={hoursStatus.label}
               />

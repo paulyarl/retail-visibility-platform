@@ -28,6 +28,18 @@ export default function BusinessHoursDisplay({ businessHours, className = '' }: 
   const todayHours = specialHours.filter(sh => sh.label === 'today');
   const upcomingHours = specialHours.filter(sh => sh.label === 'upcoming');
 
+  // Check if businessHours has the new periods format or old format
+  const hasPeriodsFormat = businessHours.periods && Array.isArray(businessHours.periods);
+  const periods = hasPeriodsFormat ? businessHours.periods : [];
+
+  // Group periods by day for the new format
+  const periodsByDay = periods.reduce((acc: Record<string, any[]>, period: any) => {
+    const day = period.day;
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(period);
+    return acc;
+  }, {} as Record<string, any[]>);
+
   return (
     <div className={className}>
       <h3 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
@@ -36,8 +48,30 @@ export default function BusinessHoursDisplay({ businessHours, className = '' }: 
       </h3>
       <div className="space-y-0">
         {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-          const dayHours = businessHours[day];
           const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
+          const dayUpper = day.toUpperCase();
+
+          let displayText = '';
+          let hasHours = false;
+
+          // Check new periods format first
+          if (hasPeriodsFormat && periodsByDay[dayUpper]) {
+            const dayPeriods = periodsByDay[dayUpper];
+            hasHours = dayPeriods.length > 0;
+            if (hasHours) {
+              displayText = dayPeriods
+                .map((period: any) => `${formatTime(period.open)} - ${formatTime(period.close)}`)
+                .join(', ');
+            }
+          } else {
+            // Fallback to old format
+            const dayHours = businessHours[day.toLowerCase()] || businessHours[dayUpper];
+            hasHours = !!dayHours;
+            if (hasHours) {
+              displayText = `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}`;
+            }
+          }
+
           return (
             <div 
               key={day} 
@@ -54,13 +88,10 @@ export default function BusinessHoursDisplay({ businessHours, className = '' }: 
               <div className={`text-right text-xs ${
                 isToday 
                   ? 'text-blue-600' 
-                  : dayHours ? 'text-gray-500' : 'text-gray-400'
+                  : hasHours ? 'text-gray-500' : 'text-gray-400'
               }`}>
-                {dayHours ? (
-                  <div className="flex flex-col">
-                    <span>{formatTime(dayHours.open)}</span>
-                    <span>{formatTime(dayHours.close)}</span>
-                  </div>
+                {hasHours ? (
+                  <span>{displayText}</span>
                 ) : (
                   <span>Closed</span>
                 )}

@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { computeStoreStatus, getTodaySpecialHours } from "@/lib/hours-utils";
+import { getTodaySpecialHours } from "@/lib/hours-utils";
+import { useStoreStatus } from "@/hooks/useStoreStatus";
 
 interface HoursPreviewProps {
   apiBase: string;
   tenantId: string;
 }
-
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -16,46 +16,37 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
-  const [status, setStatus] = useState<{ isOpen: boolean; label: string } | null>(null);
+  const { status, loading } = useStoreStatus(tenantId, apiBase);
   const [specialHours, setSpecialHours] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
+  // Fetch special hours separately since the hook only handles status
   useEffect(() => {
-    const fetchAndCompute = async () => {
+    const fetchSpecialHours = async () => {
       try {
-        setLoading(true);
-        const res = await fetch(`${apiBase}/public/tenant/${tenantId}/profile`, { cache: 'no-store' });
-        if (!res.ok) {
-          setStatus(null);
-          setSpecialHours([]);
-          return;
-        }
-        const data = await res.json();
-        const hours = data?.hours;
-        
-        if (hours) {
-          const computed = computeStoreStatus(hours);
-          setStatus(computed);
-          const todaySpecial = getTodaySpecialHours(hours);
-          setSpecialHours(todaySpecial);
-        } else {
-          setStatus(null);
-          setSpecialHours([]);
+        const response = await fetch(`${apiBase}/api/tenant/${tenantId}/business-hours/special`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data?.overrides) {
+            // Create a mock hours object for getTodaySpecialHours
+            const mockHours = {
+              special: data.data.overrides.map((override: any) => ({
+                date: override.date,
+                open: override.open,
+                close: override.close,
+                isClosed: override.isClosed,
+                note: override.note
+              }))
+            };
+            const todaySpecial = getTodaySpecialHours(mockHours);
+            setSpecialHours(todaySpecial);
+          }
         }
       } catch (error) {
-        console.error('Failed to fetch hours:', error);
-        setStatus(null);
-        setSpecialHours([]);
-      } finally {
-        setLoading(false);
+        console.error('Failed to fetch special hours:', error);
       }
     };
 
-    fetchAndCompute();
-    
-    // Refresh every 30 seconds to keep preview accurate
-    const interval = setInterval(fetchAndCompute, 30000);
-    return () => clearInterval(interval);
+    fetchSpecialHours();
   }, [apiBase, tenantId]);
 
   if (loading) {
@@ -97,17 +88,40 @@ export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
   }
 
   const isOpen = status.isOpen;
-  const dotColor = isOpen ? 'bg-green-500' : 'bg-red-500';
-  const statusText = isOpen ? 'Open' : 'Closed';
-  const statusColor = isOpen ? 'text-green-700' : 'text-red-700';
-  const bgGradient = isOpen 
-    ? 'from-green-50 to-emerald-50 border-green-200' 
-    : 'from-red-50 to-rose-50 border-red-200';
+  const statusType = status.status; // 'open' | 'closed' | 'opening-soon' | 'closing-soon'
+  
+  // Determine colors based on status type
+  let dotColor = 'bg-gray-500';
+  let statusText = 'Unknown';
+  let statusColor = 'text-gray-700';
+  let bgGradient = 'from-gray-50 to-gray-100 border-gray-200';
+  
+  if (statusType === 'open') {
+    dotColor = 'bg-green-500';
+    statusText = 'Open';
+    statusColor = 'text-green-700';
+    bgGradient = 'from-green-50 to-emerald-50 border-green-200';
+  } else if (statusType === 'closed') {
+    dotColor = 'bg-red-500';
+    statusText = 'Closed';
+    statusColor = 'text-red-700';
+    bgGradient = 'from-red-50 to-rose-50 border-red-200';
+  } else if (statusType === 'opening-soon') {
+    dotColor = 'bg-yellow-500';
+    statusText = 'Opening Soon';
+    statusColor = 'text-yellow-700';
+    bgGradient = 'from-yellow-50 to-amber-50 border-yellow-200';
+  } else if (statusType === 'closing-soon') {
+    dotColor = 'bg-orange-500';
+    statusText = 'Closing Soon';
+    statusColor = 'text-orange-700';
+    bgGradient = 'from-orange-50 to-amber-50 border-orange-200';
+  }
 
   return (
     <div className={`bg-gradient-to-br ${bgGradient} border-2 rounded-xl p-6 sticky top-6`}>
       <div className="flex items-center gap-3 mb-4">
-        <div className={`w-10 h-10 ${isOpen ? 'bg-green-500' : 'bg-red-500'} rounded-full flex items-center justify-center`}>
+        <div className={`w-10 h-10 ${dotColor} rounded-full flex items-center justify-center`}>
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />

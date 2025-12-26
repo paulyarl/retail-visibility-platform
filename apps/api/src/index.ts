@@ -299,6 +299,85 @@ const healthRoutes = (req: any, res: any) => {
 
 app.use('/health', healthRoutes);
 
+// PUBLIC STATUS ENDPOINT - No authentication required for status display
+app.get('/public/tenant/:tenantId/business-hours/status', async (req, res) => {
+  const { tenantId } = req.params;
+  
+  try {
+    // Get business hours data
+    const hoursRow = await prisma.business_hours_list.findUnique({ 
+      where: { tenant_id: tenantId } 
+    });
+    
+    if (!hoursRow) {
+      return res.json({ 
+        success: true, 
+        data: { 
+          isOpen: false, 
+          status: 'closed', 
+          label: 'Closed' 
+        } 
+      });
+    }
+
+    // Get special hours
+    const specialHours = await prisma.business_hours_special_list.findMany({ 
+      where: { tenant_id: tenantId }, 
+      orderBy: { date: 'asc' } 
+    });
+
+    // Build hours object
+    const periods = hoursRow.periods as any[] || [];
+    const hours: any = { timezone: hoursRow.timezone };
+    
+    // Convert periods to day-based format for computeStoreStatus
+    periods.forEach((period: any) => {
+      const dayName = period.day?.toLowerCase();
+      if (dayName && !hours[dayName]) {
+        hours[dayName] = {
+          open: period.open,
+          close: period.close
+        };
+      }
+    });
+    
+    // Include periods array for updated computeStoreStatus
+    if (periods.length > 0) {
+      hours.periods = periods;
+    }
+    
+    // Add special hours
+    if (specialHours.length > 0) {
+      hours.special = specialHours.map((sh: any) => ({
+        date: sh.date.toISOString().slice(0, 10),
+        open: sh.open,
+        close: sh.close,
+        isClosed: sh.isClosed,
+        note: sh.note
+      }));
+    }
+
+    // Import and use computeStoreStatus
+    const { computeStoreStatus } = await import('./lib/hours-utils');
+    const status = computeStoreStatus(hours);
+    
+    res.json({ 
+      success: true, 
+      data: status || { 
+        isOpen: false, 
+        status: 'closed', 
+        label: 'Closed' 
+      } 
+    });
+  } catch (error) {
+    console.error('Error computing store status:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to compute store status' 
+    });
+  }
+});
+
 // TENANTS - Now handled by tenantsRoutes below
 // app.get("/api/tenants", authenticateToken, async (req, res) => {
 //   try {

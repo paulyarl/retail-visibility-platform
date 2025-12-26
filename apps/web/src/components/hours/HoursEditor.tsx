@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import TimeInput from "./TimeInput";
 import { apiRequest } from "@/lib/api";
+import { useStoreStatus } from "@/hooks/useStoreStatus";
 
 type Period = { day: string; open: string; close: string };
 type SpecialHour = { date: string; isClosed: boolean; open?: string; close?: string; note?: string };
@@ -27,6 +28,17 @@ function to24Hour(time12: string): string {
   return `${hour.toString().padStart(2, "0")}:${m}`;
 }
 
+// Parse time string (HH:MM) to minutes since midnight
+function parseTimeToMinutes(time: string): number | null {
+  if (!time) return null;
+  const parts = time.split(':');
+  if (parts.length !== 2) return null;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
+
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -43,6 +55,9 @@ export default function HoursEditor({ apiBase, tenantId, timezone: externalTimez
 
   // Use external timezone if provided, otherwise use internal state
   const currentTimezone = externalTimezone || timezone;
+
+  // Use centralized status hook instead of local calculation
+  const { status: currentStatus } = useStoreStatus(tenantId, apiBase);
 
   // Sync with external timezone changes
   useEffect(() => {
@@ -143,53 +158,21 @@ export default function HoursEditor({ apiBase, tenantId, timezone: externalTimez
     }
   };
 
-  // Calculate current status - considering both regular and special hours
-  const now = new Date();
-  const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format
-  const currentDay = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: currentTimezone }).toUpperCase();
-  const currentTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: currentTimezone });
-  
-  // Check for special hours for today
-  const todaySpecial = specialHours.find(special => special.date === today);
-  
-  let isOpen = false;
-  let statusMessage = '';
-  
-  if (todaySpecial) {
-    // Use special hours if they exist for today
-    if (todaySpecial.isClosed) {
-      isOpen = false;
-      statusMessage = 'Closed today (special hours)';
-    } else if (todaySpecial.open && todaySpecial.close) {
-      // Special hours with specific times
-      isOpen = currentTime >= todaySpecial.open && currentTime < todaySpecial.close;
-      statusMessage = isOpen 
-        ? `Open now • Closes at ${to12Hour(todaySpecial.close)} (special hours)`
-        : `Closed • Opens at ${to12Hour(todaySpecial.open)} (special hours)`;
-    } else {
-      // Special hours but no specific times (treat as closed)
-      isOpen = false;
-      statusMessage = 'Closed today (special hours)';
-    }
-  } else {
-    // Use regular business hours
-    const todayPeriod = periods.find(p => p.day === currentDay);
-    if (todayPeriod) {
-      isOpen = currentTime >= todayPeriod.open && currentTime < todayPeriod.close;
-      statusMessage = isOpen 
-        ? `Open now • Closes at ${to12Hour(todayPeriod.close)}`
-        : 'Closed';
-    } else {
-      isOpen = false;
-      statusMessage = 'Closed';
-    }
-  }
+  // Calculate current status - using centralized hook
+  const statusType = currentStatus?.status || 'closed';
+  const statusMessage = currentStatus?.label || 'Closed';
 
   return (
     <div className="space-y-4">
       {/* Current Status Badge */}
       <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
-        <span className={`inline-block w-3 h-3 rounded-full ${isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
+        <span className={`inline-block w-3 h-3 rounded-full ${
+          statusType === 'open' ? 'bg-green-500' :
+          statusType === 'closed' ? 'bg-red-500' :
+          statusType === 'opening-soon' ? 'bg-yellow-500' :
+          statusType === 'closing-soon' ? 'bg-orange-500' :
+          'bg-gray-500' // fallback
+        }`}></span>
         <span className="font-medium text-gray-900">
           {statusMessage}
         </span>
