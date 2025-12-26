@@ -127,6 +127,8 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         const mimeType = matches[1];
         console.log('[Directory Photos] mimeType:', mimeType);
         const base64Data = matches[2];
+        console.log('[Directory Photos] base64Data length:', base64Data?.length);
+        console.log('[Directory Photos] Creating buffer...');
         const buffer = Buffer.from(base64Data, 'base64');
 
         const ext = mimeType.split('/')[1] || 'jpg';
