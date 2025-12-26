@@ -145,6 +145,13 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
     if (!url) return res.status(400).json({ error: "missing image; provide multipart 'file', JSON 'url', or JSON 'dataUrl'" });
 
+    console.log('[Directory Photos] About to create photo with data:', {
+      tenant_id: listing.id,
+      listing_id: listing.id,
+      url: url?.substring(0, 50) + '...',
+      position: 'calculating...'
+    });
+
     // Find next available position (max + 1, or 0 if first)
     const maxPos = await prisma.directory_photos.findFirst({
       where: { listing_id: listing.id },
@@ -152,6 +159,8 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
       select: { position: true },
     });
     const nextPosition = maxPos && maxPos.position !== null ? maxPos.position + 1 : 0;
+
+    console.log('[Directory Photos] Creating photo at position:', nextPosition);
 
     const created = await prisma.directory_photos.create({
       data: {
@@ -172,7 +181,17 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     return res.status(201).json(created);
   } catch (e: any) {
     console.error("directory photo upload error", e);
-    return res.status(500).json({ error: e?.message || "upload failed" });
+    console.error("Error details:", {
+      message: e?.message,
+      code: e?.code,
+      meta: e?.meta,
+      stack: e?.stack
+    });
+    return res.status(500).json({ 
+      error: e?.message || "upload failed",
+      code: e?.code,
+      details: e?.meta 
+    });
   }
 });
 
