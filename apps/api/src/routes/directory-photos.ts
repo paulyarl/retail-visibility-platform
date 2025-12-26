@@ -147,6 +147,20 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         console.log('[Directory Photos] Bucket:', StorageBuckets.TENANTS.name);
         console.log('[Directory Photos] Uploading to Supabase...');
 
+        // Check if bucket exists
+        try {
+          const { data: buckets, error: listError } = await supabaseService.storage.listBuckets();
+          console.log('[Directory Photos] Available buckets:', buckets?.map(b => b.name));
+          const bucketExists = buckets?.some(b => b.name === StorageBuckets.TENANTS.name);
+          console.log('[Directory Photos] Tenants bucket exists:', bucketExists);
+          
+          if (listError) {
+            console.error('[Directory Photos] Error listing buckets:', listError);
+          }
+        } catch (bucketCheckError) {
+          console.error('[Directory Photos] Bucket check failed:', bucketCheckError);
+        }
+
         // Check auth status before upload
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         console.log('[Directory Photos] Auth check:', { user: user?.id, authError });
