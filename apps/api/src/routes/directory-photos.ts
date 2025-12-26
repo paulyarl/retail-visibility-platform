@@ -41,26 +41,15 @@ async function resolveListing(identifier: string) {
   return listing;
 }
 
-/**
- * POST /:listingId/photos
- * Accepts EITHER:
- *  - multipart/form-data with field "file"
- *  - application/json with { url, width?, height?, bytes?, contentType?, exifRemoved?, alt?, caption? }
- *
- * Creates DirectoryPhoto linked to DirectoryListing and returns the created photo.
- * Enforces max 10 photos per listing.
- */
 r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
   try {
     const listingId = req.params.listingId;
 
-    // verify listing exists & get tenant
     console.log(`[Directory Photos] Looking for listing with identifier: "${listingId}"`);
     const listing = await resolveListing(listingId);
     console.log(`[Directory Photos] Found listing:`, listing ? { id: listing.id, slug: listing.slug, name: listing.name } : 'NOT FOUND');
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
-    // Enforce 10-photo limit
     const existingCount = await prisma.directory_photos.count({ where: { listing_id: listing.id } });
     if (existingCount >= 10) {
       return res.status(400).json({ error: "maximum 10 photos per directory listing" });
@@ -75,10 +64,8 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     let alt: string | undefined;
     let caption: string | undefined;
 
-
-    // Case A: multipart upload of a file
     if (req.file) {
-      const f = req.file; // buffer + mimetype + originalname
+      const f = req.file;
       const path = `directory/${listing.id}/${listing.slug || listing.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
       
       const { error, data } = await supabase.storage.from(StorageBuckets.TENANTS.name).upload(path, f.buffer, {
@@ -92,29 +79,13 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
       url = pub.data.publicUrl;
       contentType = f.mimetype;
       bytes = f.size;
-      // Extract alt/caption from form data if present
-      alt = req.body.alt;
-      caption = req.body.caption;
-        cacheControl: "3600",
-        contentType: f.mimetype || "application/octet-stream",
-        upsert: false,
-      });
-      if (error) return res.status(500).json({ error: error.message });
-
-      const pub = supabase.storage.from(StorageBuckets.TENANTS.name).getPublicUrl(data.path);
-      url = pub.data.publicUrl;
-      contentType = f.mimetype;
-      bytes = f.size;
-      // Extract alt/caption from form data if present
       alt = req.body.alt;
       caption = req.body.caption;
     }
 
-    // Case B: JSON body with url or dataUrl + metadata
     if (!req.file && req.is("application/json")) {
       const body = req.body || {};
 
-      // Handle dataUrl (base64 encoded image from client)
       if (body.dataUrl && supabase) {
         const dataUrl = body.dataUrl as string;
         const matches = dataUrl.match(/^data:(.+);base64,(.+)$/);
@@ -130,7 +101,6 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         const filename = `${Date.now()}.${ext}`;
         const path = `directory/${listing.id}/${listing.slug || listing.id}/${filename}`;
 
-        // Check if bucket exists
         try {
           const { data: buckets, error: listError } = await supabaseService.storage.listBuckets();
           
@@ -159,10 +129,8 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         contentType = mimeType;
         bytes = buffer.length;
       } else {
-        // Handle regular URL
         const providedUrl = body.url;
         if (providedUrl) {
-          // Check if URL is already uploaded to this tenant's Supabase storage
           const isTenantUrl = providedUrl.includes(`/public/${StorageBuckets.TENANTS.name}/${listing.id}/`);
           if (isTenantUrl) {
             url = providedUrl;
@@ -170,6 +138,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
             url = providedUrl;
           }
         }
+      }
 
       width = body.width;
       height = body.height;
@@ -182,7 +151,6 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
     if (!url) return res.status(400).json({ error: "missing image; provide multipart 'file', JSON 'url', or JSON 'dataUrl'" });
 
-    // Find next available position (max + 1, or 0 if first)
     const maxPos = await prisma.directory_photos.findFirst({
       where: { listing_id: listing.id },
       orderBy: { position: 'desc' },
@@ -193,7 +161,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     const created = await prisma.directory_photos.create({
       data: {
         tenant_id: listing.id,
-        listing_id: listing.id, // Fixed: Use listing.id instead of listingId parameter
+        listing_id: listing.id,
         url,
         width: width ?? null,
         height: height ?? null,
