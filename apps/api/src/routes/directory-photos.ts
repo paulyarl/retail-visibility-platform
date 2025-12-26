@@ -179,8 +179,8 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         if (uploadError) {
           console.error('[Directory Photos] Supabase upload error details:', {
             message: uploadError.message,
-            statusCode: uploadError.statusCode,
-            error: uploadError.error,
+            statusCode: (uploadError as any).statusCode || 'unknown',
+            error: (uploadError as any).error || uploadError.message,
             details: uploadError
           });
           return res.status(500).json({ error: uploadError.message });
