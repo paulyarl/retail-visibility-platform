@@ -21,7 +21,7 @@ interface User {
   last_name: string | null;
   role: 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'TENANT_ADMIN' | 'USER'; // All supported roles
   status: 'active' | 'inactive' | 'pending';
-  lastActive: string;
+  lastActive: string | null; // Allow null values
   tenants: number;
   tenantRoles?: Array<{
     tenantId: string;
@@ -699,7 +699,7 @@ export default function UsersManagementPage() {
                       </div>
                       <p className="text-sm text-neutral-600">{user.email}</p>
                       <p className="text-xs text-neutral-500 mt-1">
-                        Last active: {user.lastActive} • {user.tenants} tenant{user.tenants !== 1 ? 's' : ''}
+                        Last active: {user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'Never'} • {user.tenants} tenant{user.tenants !== 1 ? 's' : ''}
                       </p>
                     </div>
                   </div>
