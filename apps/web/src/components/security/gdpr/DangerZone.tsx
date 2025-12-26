@@ -18,33 +18,31 @@ export function DangerZone() {
   return (
     <>
       <Card className="border-destructive/50 bg-destructive/5">
-        <CardHeader 
+        <div 
           className="cursor-pointer hover:bg-destructive/10 transition-colors"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              <div>
-                <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                <CardDescription>
-                  Irreversible and destructive actions
-                </CardDescription>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                <div>
+                  <CardTitle className="text-destructive">Danger Zone</CardTitle>
+                  <CardDescription>
+                    Irreversible and destructive actions
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="text-destructive">
+                {isExpanded ? (
+                  <ChevronUp className="h-5 w-5" />
+                ) : (
+                  <ChevronDown className="h-5 w-5" />
+                )}
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              {isExpanded ? (
-                <ChevronUp className="h-5 w-5" />
-              ) : (
-                <ChevronDown className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
-        </CardHeader>
+          </CardHeader>
+        </div>
 
         {isExpanded && (
           <CardContent className="space-y-4 border-t border-destructive/20 pt-6">
