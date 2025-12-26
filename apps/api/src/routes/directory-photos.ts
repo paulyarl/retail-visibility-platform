@@ -157,8 +157,20 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
         bytes = buffer.length;
       } else {
         // Handle regular URL
-        console.log('[Directory Photos] Using provided URL directly (no upload):', body.url);
-        url = body.url;
+        const providedUrl = body.url;
+        console.log('[Directory Photos] Provided URL:', providedUrl);
+
+        // Check if URL is already uploaded to this tenant's Supabase storage
+        const isTenantUrl = providedUrl && providedUrl.includes(`/public/${StorageBuckets.TENANTS.name}/${listing.id}/`);
+        console.log('[Directory Photos] URL contains tenant ID?', isTenantUrl);
+
+        if (isTenantUrl) {
+          console.log('[Directory Photos] Using tenant-owned URL directly (no upload needed)');
+          url = providedUrl;
+        } else {
+          console.log('[Directory Photos] Using provided URL directly (no upload):', providedUrl);
+          url = providedUrl;
+        }
       }
 
       width = body.width;
