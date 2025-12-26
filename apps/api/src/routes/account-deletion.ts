@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { basePrisma } from '../prisma';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 
