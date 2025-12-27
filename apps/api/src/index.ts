@@ -90,6 +90,11 @@ import directoryPhotosRouter from './routes/directory-photos';
    import feedValidationRoutes from './routes/feed-validation';
    import businessProfileValidationRoutes from './routes/business-profile-validation';
 
+import cacheRoutes from './routes/cache';
+
+// Import cache utilities for inline usage
+import { memoryCache, cacheKeys, CACHE_TTL } from './utils/cache';
+
 // Authentication middleware and utilities
 // import authRoutes from './auth/auth.routes'; // Now handled by modular mounting
 import { authenticateToken, checkTenantAccess, requireAdmin } from './middleware/auth';
@@ -302,22 +307,35 @@ app.use('/health', healthRoutes);
 // PUBLIC STATUS ENDPOINT - No authentication required for status display
 app.get('/public/tenant/:tenantId/business-hours/status', async (req, res) => {
   const { tenantId } = req.params;
-  
+
   try {
+    // Check cache first
+    const cacheKey = cacheKeys.businessHoursStatus(tenantId)
+    const cachedResult = memoryCache.get(cacheKey)
+
+    if (cachedResult) {
+      console.log(`[Business Hours] Public cache hit for tenant ${tenantId}`)
+      return res.json(cachedResult)
+    }
+
+    console.log(`[Business Hours] Public cache miss for tenant ${tenantId}, fetching from database`)
     // Get business hours data
     const hoursRow = await prisma.business_hours_list.findUnique({ 
       where: { tenant_id: tenantId } 
     });
     
     if (!hoursRow) {
-      return res.json({ 
+      const result = { 
         success: true, 
         data: { 
           isOpen: false, 
           status: 'closed', 
           label: 'Closed' 
         } 
-      });
+      }
+      // Cache the result
+      memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+      return res.json(result)
     }
 
     // Get special hours
@@ -361,14 +379,19 @@ app.get('/public/tenant/:tenantId/business-hours/status', async (req, res) => {
     const { computeStoreStatus } = await import('./lib/hours-utils');
     const status = computeStoreStatus(hours);
     
-    res.json({ 
+    const result = { 
       success: true, 
       data: status || { 
         isOpen: false, 
         status: 'closed', 
         label: 'Closed' 
       } 
-    });
+    }
+
+    // Cache the result
+    memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+
+    res.json(result);
   } catch (error) {
     console.error('Error computing store status:', error);
     res.status(500).json({ 
@@ -5104,7 +5127,9 @@ console.log('✅ Photos routes mounted at /api/items');
 app.use('/api/directory', directoryPhotosRouter);
 console.log('✅ Directory photos routes mounted at /api/directory');
 
-/* ------------------------------ store reviews ------------------------------ */
+/* ------------------------------ cache ------------------------------ */
+app.use('/api/cache', cacheRoutes);
+console.log('✅ Cache routes mounted at /api/cache');
 import storeReviewsRoutes from './routes/store-reviews';
 app.use('/api', storeReviewsRoutes);
 console.log('✅ Store reviews routes mounted at /api');

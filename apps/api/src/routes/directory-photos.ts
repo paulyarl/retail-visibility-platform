@@ -50,7 +50,19 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     console.log(`[Directory Photos] Found listing:`, listing ? { id: listing.id, slug: listing.slug, name: listing.name } : 'NOT FOUND');
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
-    const existingCount = await prisma.directory_photos.count({ where: { listing_id: listing.id } });
+    // Check if directory listing exists (published to directory)
+    const directoryListing = await prisma.directory_listings_list.findFirst({
+      where: { tenant_id: listing.id }
+    });
+    console.log(`[Directory Photos] Directory listing exists:`, !!directoryListing);
+    if (!directoryListing) {
+      return res.status(400).json({
+        error: "Directory listing not published",
+        message: "Please publish your store to the directory first before uploading photos."
+      });
+    }
+
+    const existingCount = await prisma.directory_photos.count({ where: { listing_id: directoryListing.id } });
     if (existingCount >= 10) {
       return res.status(400).json({ error: "maximum 10 photos per directory listing" });
     }
@@ -152,7 +164,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     if (!url) return res.status(400).json({ error: "missing image; provide multipart 'file', JSON 'url', or JSON 'dataUrl'" });
 
     const maxPos = await prisma.directory_photos.findFirst({
-      where: { listing_id: listing.id },
+      where: { listing_id: directoryListing.id },
       orderBy: { position: 'desc' },
       select: { position: true },
     });
@@ -161,7 +173,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
     const created = await prisma.directory_photos.create({
       data: {
         tenant_id: listing.id,
-        listing_id: listing.id,
+        listing_id: directoryListing.id,
         url,
         width: width ?? null,
         height: height ?? null,
@@ -198,8 +210,14 @@ r.get("/:listingId/photos", async (req, res) => {
   const listing = await resolveListing(listingId);
   if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
+  // Check if directory listing exists
+  const directoryListing = await prisma.directory_listings_list.findFirst({
+    where: { tenant_id: listing.id }
+  });
+  if (!directoryListing) return res.status(404).json({ error: "directory listing not found" });
+
   const photos = await prisma.directory_photos.findMany({
-    where: { listing_id: listing.id },
+    where: { listing_id: directoryListing.id },
     orderBy: { position: "asc" },
   });
   res.json(photos);
@@ -217,9 +235,17 @@ r.put("/:listingId/photos/:photoId", async (req, res) => {
       return res.status(404).json({ error: "directory listing not found" });
     }
 
+    // Check if directory listing exists
+    const directoryListing = await prisma.directory_listings_list.findFirst({
+      where: { tenant_id: listing.id }
+    });
+    if (!directoryListing) {
+      return res.status(404).json({ error: "directory listing not found" });
+    }
+
     // Verify photo exists and belongs to this listing
     const photo = await prisma.directory_photos.findUnique({ where: { id: photoId } });
-    if (!photo || photo.listing_id !== listing.id) {
+    if (!photo || photo.listing_id !== directoryListing.id) {
       return res.status(404).json({ error: "photo not found" });
     }
 
@@ -227,7 +253,7 @@ r.put("/:listingId/photos/:photoId", async (req, res) => {
     if (position !== undefined && position !== photo.position) {
       // Find photo at target position (if any)
       const targetPhoto = await prisma.directory_photos.findFirst({
-        where: { listing_id: listing.id, position },
+        where: { listing_id: directoryListing.id, position },
       });
 
       // Use sequential updates to avoid Prisma transaction tracing issues
@@ -304,10 +330,16 @@ r.put("/:listingId/photos/reorder", async (req, res) => {
     const listing = await resolveListing(listingId);
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
+    // Check if directory listing exists
+    const directoryListing = await prisma.directory_listings_list.findFirst({
+      where: { tenant_id: listing.id }
+    });
+    if (!directoryListing) return res.status(404).json({ error: "directory listing not found" });
+
     // Verify all photos belong to this listing
     const photoIds = updates.map(u => u.id);
     const photos = await prisma.directory_photos.findMany({
-      where: { id: { in: photoIds }, listing_id: listing.id },
+      where: { id: { in: photoIds }, listing_id: directoryListing.id },
     });
 
     if (photos.length !== photoIds.length) {
@@ -340,9 +372,17 @@ r.delete("/:listingId/photos/:photoId", async (req, res) => {
     const listing = await resolveListing(listingId);
     if (!listing) return res.status(404).json({ error: "directory listing not found" });
 
+    // Check if directory listing exists
+    const directoryListing = await prisma.directory_listings_list.findFirst({
+      where: { tenant_id: listing.id }
+    });
+    if (!directoryListing) {
+      return res.status(404).json({ error: "directory listing not found" });
+    }
+
     // Verify photo exists and belongs to this listing
     const photo = await prisma.directory_photos.findUnique({ where: { id: photoId } });
-    if (!photo || photo.listing_id !== listing.id) {
+    if (!photo || photo.listing_id !== directoryListing.id) {
       return res.status(404).json({ error: "photo not found" });
     }
 
@@ -366,7 +406,7 @@ r.delete("/:listingId/photos/:photoId", async (req, res) => {
 
     // Re-pack positions: get all remaining photos and reassign positions 0, 1, 2...
     const remaining = await prisma.directory_photos.findMany({
-      where: { listing_id: listing.id },
+      where: { listing_id: directoryListing.id },
       orderBy: { position: "asc" },
     });
 

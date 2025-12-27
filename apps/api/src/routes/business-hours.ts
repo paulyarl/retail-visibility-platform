@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../prisma'
 import { requireFlag } from '../middleware/flags'
 import { generateGbpHoursSyncLogId, generateQuickStart } from '../lib/id-generator'
+import { memoryCache, cacheKeys, CACHE_TTL } from '../utils/cache'
 
 const router = Router()
 
@@ -46,6 +47,11 @@ router.put('/tenant/:tenantId/business-hours',
       updated_at: new Date()
     },
   })
+
+  // Invalidate cache for this tenant's business hours status
+  const cacheKey = cacheKeys.businessHoursStatus(tenantId)
+  memoryCache.delete(cacheKey)
+  console.log(`[Business Hours] Invalidated cache for tenant ${tenantId}`)
 
   // Update business profile hours
   const { updateBusinessProfileHours } = await import('../utils/business-hours-utils');
@@ -98,6 +104,11 @@ router.put('/tenant/:tenantId/business-hours/special',
   const { updateBusinessProfileHours } = await import('../utils/business-hours-utils');
   await updateBusinessProfileHours(tenantId);
 
+  // Invalidate cache for this tenant's business hours status
+  const cacheKey = cacheKeys.businessHoursStatus(tenantId)
+  memoryCache.delete(cacheKey)
+  console.log(`[Business Hours] Invalidated cache for tenant ${tenantId} (special hours update)`)
+
   res.json({ success: true })
 })
 
@@ -133,34 +144,48 @@ router.get('/tenant/:tenantId/gbp/hours/status',
 router.get('/tenant/:tenantId/business-hours/status',
   async (req, res) => {
   const { tenantId } = req.params
-  
+
   try {
+    // Check cache first
+    const cacheKey = cacheKeys.businessHoursStatus(tenantId)
+    const cachedResult = memoryCache.get(cacheKey)
+
+    if (cachedResult) {
+      console.log(`[Business Hours] Cache hit for tenant ${tenantId}`)
+      return res.json(cachedResult)
+    }
+
+    console.log(`[Business Hours] Cache miss for tenant ${tenantId}, fetching from database`)
+
     // Get business hours data
-    const hoursRow = await prisma.business_hours_list.findUnique({ 
-      where: { tenant_id: tenantId } 
+    const hoursRow = await prisma.business_hours_list.findUnique({
+      where: { tenant_id: tenantId }
     })
-    
+
     if (!hoursRow) {
-      return res.json({ 
-        success: true, 
-        data: { 
-          isOpen: false, 
-          status: 'closed', 
-          label: 'Closed' 
-        } 
-      })
+      const result = {
+        success: true,
+        data: {
+          isOpen: false,
+          status: 'closed',
+          label: 'Closed'
+        }
+      }
+      // Cache the result even for closed stores
+      memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+      return res.json(result)
     }
 
     // Get special hours
-    const specialHours = await prisma.business_hours_special_list.findMany({ 
-      where: { tenant_id: tenantId }, 
-      orderBy: { date: 'asc' } 
+    const specialHours = await prisma.business_hours_special_list.findMany({
+      where: { tenant_id: tenantId },
+      orderBy: { date: 'asc' }
     })
 
     // Build hours object
     const periods = hoursRow.periods as any[] || []
     const hours: any = { timezone: hoursRow.timezone }
-    
+
     // Convert periods to day-based format for computeStoreStatus
     periods.forEach((period: any) => {
       const dayName = period.day?.toLowerCase()
@@ -171,12 +196,12 @@ router.get('/tenant/:tenantId/business-hours/status',
         }
       }
     })
-    
+
     // Include periods array for updated computeStoreStatus
     if (periods.length > 0) {
       hours.periods = periods
     }
-    
+
     // Add special hours
     if (specialHours.length > 0) {
       hours.special = specialHours.map((sh: any) => ({
@@ -191,20 +216,25 @@ router.get('/tenant/:tenantId/business-hours/status',
     // Import and use computeStoreStatus
     const { computeStoreStatus } = await import('../lib/hours-utils')
     const status = computeStoreStatus(hours)
-    
-    res.json({ 
-      success: true, 
-      data: status || { 
-        isOpen: false, 
-        status: 'closed', 
-        label: 'Closed' 
-      } 
-    })
+
+    const result = {
+      success: true,
+      data: status || {
+        isOpen: false,
+        status: 'closed',
+        label: 'Closed'
+      }
+    }
+
+    // Cache the result
+    memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+
+    res.json(result)
   } catch (error) {
     console.error('Error computing store status:', error)
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to compute store status' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to compute store status'
     })
   }
 })
@@ -213,34 +243,48 @@ router.get('/tenant/:tenantId/business-hours/status',
 router.get('/business-hours/status/:tenantId',
   async (req, res) => {
   const { tenantId } = req.params
-  
+
   try {
+    // Check cache first
+    const cacheKey = cacheKeys.businessHoursStatus(tenantId)
+    const cachedResult = memoryCache.get(cacheKey)
+
+    if (cachedResult) {
+      console.log(`[Business Hours] Cache hit for tenant ${tenantId} (alias endpoint)`)
+      return res.json(cachedResult)
+    }
+
+    console.log(`[Business Hours] Cache miss for tenant ${tenantId}, fetching from database (alias endpoint)`)
+
     // Get business hours data
-    const hoursRow = await prisma.business_hours_list.findUnique({ 
-      where: { tenant_id: tenantId } 
+    const hoursRow = await prisma.business_hours_list.findUnique({
+      where: { tenant_id: tenantId }
     })
-    
+
     if (!hoursRow) {
-      return res.json({ 
-        success: true, 
-        data: { 
-          isOpen: false, 
-          status: 'closed', 
-          label: 'Closed' 
-        } 
-      })
+      const result = {
+        success: true,
+        data: {
+          isOpen: false,
+          status: 'closed',
+          label: 'Closed'
+        }
+      }
+      // Cache the result even for closed stores
+      memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+      return res.json(result)
     }
 
     // Get special hours
-    const specialHours = await prisma.business_hours_special_list.findMany({ 
-      where: { tenant_id: tenantId }, 
-      orderBy: { date: 'asc' } 
+    const specialHours = await prisma.business_hours_special_list.findMany({
+      where: { tenant_id: tenantId },
+      orderBy: { date: 'asc' }
     })
 
     // Build hours object
     const periods = hoursRow.periods as any[] || []
     const hours: any = { timezone: hoursRow.timezone }
-    
+
     // Convert periods to day-based format for computeStoreStatus
     periods.forEach((period: any) => {
       const dayName = period.day?.toLowerCase()
@@ -251,12 +295,12 @@ router.get('/business-hours/status/:tenantId',
         }
       }
     })
-    
+
     // Include periods array for updated computeStoreStatus
     if (periods.length > 0) {
       hours.periods = periods
     }
-    
+
     // Add special hours
     if (specialHours.length > 0) {
       hours.special = specialHours.map((sh: any) => ({
@@ -271,20 +315,25 @@ router.get('/business-hours/status/:tenantId',
     // Import and use computeStoreStatus
     const { computeStoreStatus } = await import('../lib/hours-utils')
     const status = computeStoreStatus(hours)
-    
-    res.json({ 
-      success: true, 
-      data: status || { 
-        isOpen: false, 
-        status: 'closed', 
-        label: 'Closed' 
-      } 
-    })
+
+    const result = {
+      success: true,
+      data: status || {
+        isOpen: false,
+        status: 'closed',
+        label: 'Closed'
+      }
+    }
+
+    // Cache the result
+    memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+
+    res.json(result)
   } catch (error) {
     console.error('Error computing store status:', error)
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to compute store status' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to compute store status'
     })
   }
 })

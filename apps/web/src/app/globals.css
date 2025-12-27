@@ -233,7 +233,7 @@ select:focus {
   input[type="url"],
   textarea,
   select {
-    color: var(--neutral-100) !important;
+    color: var(--indigo-700) !important;
   }
 
   input::placeholder,
