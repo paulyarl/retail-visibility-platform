@@ -1506,6 +1506,7 @@ model users {
   directory_featured_listings_list directory_featured_listings_list[]
   invitations                      invitations[]
   login_attempts                   login_attempts[]
+  security_alerts                  security_alerts[]
   security_audit_log               security_audit_log[]
   security_threats                 security_threats[]
   user_preferences                 user_preferences[]
@@ -1585,22 +1586,31 @@ model login_attempts {
   @@index([created_at])
 }
 
-model security_audit_log {
-  id            String   @id @default(dbgenerated("('audit_'::text || (gen_random_uuid())::text)")) @db.VarChar(255)
+model security_alerts {
+  id            String   @id @default(dbgenerated("('alert_'::text || (gen_random_uuid())::text)")) @db.VarChar(255)
   user_id       String?  @db.VarChar(255)
-  action        String   @db.VarChar(100)
-  resource_type String?  @db.VarChar(50)
-  resource_id   String?  @db.VarChar(255)
-  ip_address    String?  @db.VarChar(45)
-  user_agent    String?
+  user_email    String?  @db.VarChar(255)
+  user_first_name String? @db.VarChar(255)
+  user_last_name  String? @db.VarChar(255)
+  type          String   @db.VarChar(50)
+  severity      String   @default("info") @db.VarChar(20)
+  title         String   @db.VarChar(255)
+  message       String
   metadata      Json?    @default("{}")
+  read          Boolean  @default(false)
+  read_at       DateTime?
+  dismissed     Boolean  @default(false)
+  dismissed_at  DateTime?
   created_at    DateTime @default(now())
-  users         users?   @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  updated_at    DateTime @default(now())
+  users         users?   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([user_id])
-  @@index([action])
+  @@index([type])
+  @@index([severity])
+  @@index([read])
+  @@index([dismissed])
   @@index([created_at])
-  @@index([resource_type, resource_id], map: "security_audit_log_resource_idx")
 }
 
 model mv_refresh_throttle {

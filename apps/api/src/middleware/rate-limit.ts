@@ -1,6 +1,9 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
 
+// Import the createSecurityAlert function
+import { createSecurityAlert } from '../routes/admin-security';
+
 // Extend Express Request interface to include rateLimit property
 declare global {
   namespace Express {
@@ -33,9 +36,28 @@ export const generalRateLimit = rateLimit({
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skip: (req: Request) => {
     // Skip rate limiting for health checks
-    return req.path === '/health';
+    if (req.path === '/health') return true;
+
+    // Skip rate limiting for authenticated platform admin users
+    const user = (req as any).user;
+    return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
   handler: (req: Request, res: Response) => {
+    // Log security alert for rate limit violation
+    createSecurityAlert({
+      type: 'rate_limit_exceeded',
+      severity: 'warning',
+      title: 'Rate Limit Exceeded',
+      message: `Request limit exceeded for IP ${req.ip} on endpoint ${req.path}`,
+      metadata: {
+        endpoint: req.path,
+        method: req.method,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        rateLimit: req.rateLimit,
+      },
+    });
+
     res.status(429).json({
       error: 'rate_limit_exceeded',
       message: 'Too many requests from this IP, please try again after 15 minutes.',
@@ -64,6 +86,22 @@ export const authRateLimit = rateLimit({
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
   handler: (req: Request, res: Response) => {
+    // Log security alert for auth rate limit violation (higher severity)
+    createSecurityAlert({
+      type: 'auth_rate_limit_exceeded',
+      severity: 'critical',
+      title: 'Authentication Rate Limit Exceeded',
+      message: `Too many authentication attempts from IP ${req.ip}`,
+      metadata: {
+        endpoint: req.path,
+        method: req.method,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        rateLimit: req.rateLimit,
+        attemptedEmail: (req.body as any)?.email,
+      },
+    });
+
     res.status(429).json({
       error: 'auth_rate_limit_exceeded',
       message: 'Too many authentication attempts, please try again after 15 minutes.',
@@ -83,6 +121,11 @@ export const uploadRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req: Request) => {
+    // Skip rate limiting for authenticated platform admin users
+    const user = (req as any).user;
+    return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
+  },
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       error: 'upload_rate_limit_exceeded',
@@ -103,6 +146,11 @@ export const searchRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req: Request) => {
+    // Skip rate limiting for authenticated platform admin users
+    const user = (req as any).user;
+    return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
+  },
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       error: 'search_rate_limit_exceeded',
@@ -148,6 +196,11 @@ export const costlyApiRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req: Request) => {
+    // Skip rate limiting for authenticated platform admin users
+    const user = (req as any).user;
+    return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
+  },
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       error: 'costly_api_rate_limit_exceeded',
@@ -168,6 +221,11 @@ export const storeStatusRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req: Request) => {
+    // Skip rate limiting for authenticated platform admin users
+    const user = (req as any).user;
+    return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
+  },
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       error: 'store_status_rate_limit_exceeded',
