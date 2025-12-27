@@ -58,6 +58,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 src={settings.logoUrl} 
                 alt={settings.platformName || 'Platform Logo'} 
                 className="h-8 w-auto object-contain"
+                loading="lazy"
+                decoding="async"
+                width="32"
+                height="32"
+                style={{ aspectRatio: 'auto' }}
+                onError={(e) => {
+                  // Hide broken images
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             )}
             <span className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">

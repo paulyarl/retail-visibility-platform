@@ -139,6 +139,10 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       },
     }));
 
+    // Add caching headers for better performance (5 minute cache for tenant lists)
+    res.setHeader('Cache-Control', 'private, max-age=300'); // 5 minutes
+    res.setHeader('Vary', 'Authorization'); // Vary on auth header since results differ by user
+
     res.json(transformedTenants);
   } catch (error: any) {
     console.error('[TENANTS] Error fetching tenants list:', error);

@@ -98,12 +98,18 @@ export function useSecurityMonitoring(hours: number = 24) {
     const loadData = async () => {
       setLoading(true);
       try {
+        // Load critical data first (health status)
+        await fetchHealth();
+        
+        // Then load metrics and threats in parallel (but not with blocked IPs)
         await Promise.all([
           fetchMetrics(),
           fetchThreats(),
-          fetchBlockedIPs(),
-          fetchHealth(),
         ]);
+        
+        // Load blocked IPs last (least critical)
+        await fetchBlockedIPs();
+        
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load security data');

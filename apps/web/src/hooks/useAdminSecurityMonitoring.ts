@@ -206,13 +206,20 @@ export function useAdminSecurityMonitoring() {
       setLoading(true);
       setError(null);
       try {
+        // Load critical session data first
         await Promise.all([
           fetchSessions(),
           fetchSessionStats(),
+        ]);
+        
+        // Then load alerts data
+        await Promise.all([
           fetchAlerts(),
           fetchAlertStats(),
-          fetchFailedLogins(),
         ]);
+        
+        // Load failed logins last (least critical)
+        await fetchFailedLogins();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to refresh data');
       } finally {
