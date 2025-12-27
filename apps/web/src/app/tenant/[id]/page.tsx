@@ -580,7 +580,12 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
               
               {storeStatus && (
                 <p className="text-neutral-600 dark:text-neutral-400 mt-3 flex items-center gap-2">
-                  <span className={`inline-block w-2 h-2 rounded-full ${storeStatus.isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  <span className={`inline-block w-2 h-2 rounded-full ${
+                    storeStatus.status === 'open' ? 'bg-green-500' :
+                    storeStatus.status === 'closing-soon' ? 'bg-orange-500' :
+                    storeStatus.status === 'opening-soon' ? 'bg-blue-500' :
+                    'bg-red-500'
+                  }`}></span>
                   {storeStatus.label}
                 </p>
               )}

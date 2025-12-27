@@ -555,8 +555,18 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             {/* Store Open/Closed Status */}
             {storeStatus && (
               <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-                <span className={`inline-block w-2.5 h-2.5 rounded-full ${storeStatus.isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                <span className={`font-medium ${storeStatus.isOpen ? 'text-green-700' : 'text-red-700'}`}>
+                <span className={`inline-block w-2.5 h-2.5 rounded-full ${
+                  storeStatus.status === 'open' ? 'bg-green-500' :
+                  storeStatus.status === 'closing-soon' ? 'bg-orange-500' :
+                  storeStatus.status === 'opening-soon' ? 'bg-blue-500' :
+                  'bg-red-500'
+                }`}></span>
+                <span className={`font-medium ${
+                  storeStatus.status === 'open' ? 'text-green-700' :
+                  storeStatus.status === 'closing-soon' ? 'text-orange-700' :
+                  storeStatus.status === 'opening-soon' ? 'text-blue-700' :
+                  'text-red-700'
+                }`}>
                   {storeStatus.label}
                 </span>
               </div>

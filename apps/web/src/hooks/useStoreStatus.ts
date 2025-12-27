@@ -20,6 +20,12 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
       setLoading(true);
       setError(null);
 
+      if (!tenantId) {
+        setStatus(null);
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(`${baseUrl}/public/tenant/${tenantId}/business-hours/status`, {
         cache: 'no-store'
       });
