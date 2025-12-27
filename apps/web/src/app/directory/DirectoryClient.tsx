@@ -10,6 +10,7 @@ import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBrowser';
 import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
+import LastViewed from '@/components/directory/LastViewed'; // NEW: LastViewed component import
 import { Pagination } from '@/components/ui';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
@@ -604,6 +605,9 @@ export default function DirectoryClient() {
 
         {/* Directory Home Recommendations */}
         <DirectoryHomeRecommendations />
+
+        {/* Last Viewed Items */}
+        <LastViewed />
 
         {/* Help Section - Two Column */}
         {!loading && (

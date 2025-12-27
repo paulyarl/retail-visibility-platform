@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export interface StoreStatus {
   isOpen: boolean;
@@ -15,7 +15,7 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
 
   const baseUrl = apiBase || process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -26,9 +26,8 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
         return;
       }
 
-      const response = await fetch(`${baseUrl}/public/tenant/${tenantId}/business-hours/status`, {
-        cache: 'no-store'
-      });
+      // Use browser cache instead of no-store since we have server-side caching
+      const response = await fetch(`${baseUrl}/public/tenant/${tenantId}/business-hours/status`);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -48,21 +47,21 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenantId, baseUrl]);
 
   useEffect(() => {
     if (tenantId) {
       fetchStatus();
     }
-  }, [tenantId]);
+  }, [tenantId, fetchStatus]);
 
-  // Auto-refresh every 30 seconds to keep status current
+  // Reduce refresh frequency since we now have caching (server-side: 5 minutes, client-side: 1 minute)
   useEffect(() => {
     if (!tenantId) return;
 
-    const interval = setInterval(fetchStatus, 30000);
+    const interval = setInterval(fetchStatus, 60000); // 1 minute instead of 30 seconds
     return () => clearInterval(interval);
-  }, [tenantId]);
+  }, [tenantId, fetchStatus]);
 
   return {
     status,

@@ -157,6 +157,26 @@ export const costlyApiRateLimit = rateLimit({
   }
 });
 
+// Rate limiter for store status endpoints (more permissive since cached)
+export const storeStatusRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 500 : 2000, // Higher limit for cached endpoint
+  message: {
+    error: 'store_status_rate_limit_exceeded',
+    message: 'Too many store status requests, please try again after 15 minutes.',
+    retryAfter: 15 * 60 * 1000
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'store_status_rate_limit_exceeded',
+      message: 'Too many store status requests, please try again after 15 minutes.',
+      retryAfter: Math.ceil((req.rateLimit?.resetTime?.getTime() || Date.now() + 15 * 60 * 1000) / 1000)
+    });
+  }
+});
+
 /**
  * Apply appropriate rate limiting based on route path
  */
@@ -184,6 +204,12 @@ export function applyRateLimit(req: Request, res: Response, next: NextFunction) 
   // Admin endpoints
   if (path.startsWith('/api/admin/') || path.includes('/admin')) {
     adminRateLimit(req, res, next);
+    return;
+  }
+
+  // Store status endpoints (cached, essential for UI)
+  if (path.includes('/business-hours/status')) {
+    storeStatusRateLimit(req, res, next);
     return;
   }
 
