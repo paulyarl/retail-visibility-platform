@@ -175,8 +175,8 @@ export function UnifiedStoreCard({
                             className={`w-2 h-2 rounded-full ${
                               hoursStatus.status === 'open' ? 'bg-green-500' :
                               hoursStatus.status === 'closed' ? 'bg-red-500' :
-                              hoursStatus.status === 'opening-soon' ? 'bg-blue-500' :
-                              hoursStatus.status === 'closing-soon' ? 'bg-orange-500' :
+                              hoursStatus.status === 'opening-soon' ? 'bg-blue-300' :
+                              hoursStatus.status === 'closing-soon' ? 'bg-orange-300' :
                               'bg-gray-500' // fallback
                             }`}
                             title={hoursStatus.label}
@@ -283,8 +283,8 @@ export function UnifiedStoreCard({
                 className={`w-2 h-2 rounded-full ${
                   hoursStatus.status === 'open' ? 'bg-green-500' :
                   hoursStatus.status === 'closed' ? 'bg-red-500' :
-                  hoursStatus.status === 'opening-soon' ? 'bg-blue-500' :
-                  hoursStatus.status === 'closing-soon' ? 'bg-orange-500' :
+                  hoursStatus.status === 'opening-soon' ? 'bg-blue-300' :
+                  hoursStatus.status === 'closing-soon' ? 'bg-orange-300' :
                   'bg-gray-500' // fallback
                 }`}
                 title={hoursStatus.label}
