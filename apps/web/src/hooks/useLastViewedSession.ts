@@ -14,7 +14,8 @@ interface LastViewedSession {
  * Handles both authenticated users (userId) and anonymous users (sessionId)
  */
 export function useLastViewedSession(): LastViewedSession {
-  const { data: session } = useSession();
+  const sessionResult = useSession();
+  const session = sessionResult?.data;
   const [sessionId, setSessionId] = useState<string | undefined>();
 
   useEffect(() => {
