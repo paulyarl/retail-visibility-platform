@@ -12,7 +12,8 @@ import {
   trackUserBehavior,
   getProductsViewedBySameUsers,
   getStoresInUserFavoriteCategories,
-  getSimilarStoresInCategory
+  getSimilarStoresInCategory,
+  getLastViewedItems
 } from '../services/recommendationService';
 
 const router = Router();
@@ -1043,11 +1044,65 @@ router.get('/for-product-page/:productId', async (req: Request, res: Response) =
     });
 
   } catch (error) {
-    console.error('Error getting product recommendations:', error);
+    console.error('Error getting last viewed items:', error);
     res.status(500).json({
       error: 'recommendation_failed',
-      message: 'Failed to get product recommendations'
+      message: 'Failed to get last viewed items'
     });
   }
 });
+
+/**
+ * GET /api/recommendations/last-viewed
+ * Get user's last viewed items (stores, products, etc.)
+ * Supports both authenticated users (userId) and anonymous users (sessionId)
+ * Query parameters: userId or sessionId (one required), entityType, limit, daysBack
+ */
+router.get('/last-viewed', async (req: Request, res: Response) => {
+  try {
+    const { userId, sessionId, entityType = 'all', limit = 10, daysBack = 30 } = req.query;
+
+    // Must have either userId or sessionId
+    if (!userId && !sessionId) {
+      return res.status(400).json({
+        error: 'user_or_session_required',
+        message: 'Either userId or sessionId parameter is required'
+      });
+    }
+
+    // Validate entity type
+    const validEntityTypes = ['store', 'product', 'all'];
+    if (!validEntityTypes.includes(entityType as string)) {
+      return res.status(400).json({
+        error: 'invalid_entity_type',
+        message: 'Entity type must be one of: store, product, all'
+      });
+    }
+
+    const result = await getLastViewedItems(
+      userId as string,
+      sessionId as string,
+      entityType as 'store' | 'product' | 'all',
+      Math.min(Math.max(Number(limit), 1), 20), // 1-20 limit
+      Math.min(Math.max(Number(daysBack), 1), 90) // 1-90 days
+    );
+
+    res.json({
+      ...result,
+      userId: userId || null,
+      sessionId: sessionId || null,
+      entityType,
+      limit: Number(limit),
+      daysBack: Number(daysBack)
+    });
+
+  } catch (error) {
+    console.error('Error getting last viewed items:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get last viewed items'
+    });
+  }
+});
+
 export default router;

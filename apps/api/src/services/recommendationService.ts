@@ -711,3 +711,141 @@ export async function getSimilarStoresInCategory(
     return { recommendations: [], algorithm: 'similar_category', generatedAt: new Date() };
   }
 }
+
+/**
+ * NEW: Get user's last viewed items (stores, products, etc.)
+ * Returns chronologically ordered list of recently viewed entities
+ * Supports both authenticated users (userId) and anonymous users (sessionId)
+ */
+export async function getLastViewedItems(
+  userId?: string,
+  sessionId?: string,
+  entityType?: 'store' | 'product' | 'all',
+  limit: number = 10,
+  daysBack: number = 30
+): Promise<RecommendationResponse> {
+  const pool = getDirectPool();
+
+  // Must have either userId or sessionId
+  if (!userId && !sessionId) {
+    return { recommendations: [], algorithm: 'last_viewed', generatedAt: new Date() };
+  }
+
+  try {
+    // Build query to get last viewed items for user or session
+    let whereClause = `ub.timestamp >= NOW() - INTERVAL '${daysBack} days'`;
+    let params: any[] = [];
+
+    if (userId) {
+      whereClause += ` AND ub.user_id = $${params.length + 1}`;
+      params.push(userId);
+    } else if (sessionId) {
+      whereClause += ` AND ub.session_id = $${params.length + 1}`;
+      params.push(sessionId);
+    }
+
+    if (entityType && entityType !== 'all') {
+      whereClause += ` AND ub.entity_type = $${params.length + 1}`;
+      params.push(entityType);
+    }
+
+    const query = `
+      SELECT DISTINCT ON (ub.entity_id, ub.entity_type)
+        ub.entity_id,
+        ub.entity_type,
+        ub.entity_name,
+        ub.timestamp as last_viewed_at,
+        ub.page_type,
+        ub.context,
+        -- Get additional data based on entity type
+        CASE
+          WHEN ub.entity_type = 'store' THEN (
+            SELECT json_build_object(
+              'business_name', dcl.business_name,
+              'slug', dcl.slug,
+              'address', dcl.address,
+              'city', dcl.city,
+              'state', dcl.state,
+              'logo_url', dcl.logo_url,
+              'rating_avg', dcl.rating_avg,
+              'rating_count', dcl.rating_count
+            )
+            FROM directory_listings_list dcl
+            WHERE dcl.tenant_id = ub.entity_id
+              AND dcl.is_published = true
+          )
+          WHEN ub.entity_type = 'product' THEN (
+            SELECT json_build_object(
+              'title', ii.title,
+              'name', ii.name,
+              'price_cents', ii.price_cents,
+              'image_url', ii.image_url,
+              'currency', ii.currency,
+              'store_name', dcl.business_name,
+              'store_slug', dcl.slug
+            )
+            FROM inventory_items ii
+            JOIN directory_listings_list dcl ON ii.tenant_id = dcl.tenant_id
+            WHERE ii.id = ub.entity_id
+              AND ii.item_status = 'active'
+              AND ii.visibility = 'public'
+              AND dcl.is_published = true
+          )
+          ELSE NULL
+        END as entity_data
+      FROM user_behavior_simple ub
+      WHERE ${whereClause}
+      ORDER BY ub.entity_id, ub.entity_type, ub.timestamp DESC
+      LIMIT $${params.length + 1}
+    `;
+
+    params.push(limit);
+    const result = await pool.query(query, params);
+
+    const recommendations: Recommendation[] = result.rows
+      .filter((row: any) => row.entity_data) // Only include items that still exist
+      .map((row: any, index: number) => {
+        const data = row.entity_data;
+        const score = limit - index; // Higher score for more recent items
+
+        if (row.entity_type === 'store') {
+          return {
+            tenantId: row.entity_id,
+            businessName: data.business_name,
+            slug: data.slug,
+            score,
+            reason: `Viewed ${new Date(row.last_viewed_at).toLocaleDateString()}${data.rating_avg ? ` • ${data.rating_avg.toFixed(1)}⭐` : ''}`,
+            address: data.address,
+            city: data.city,
+            state: data.state,
+            logoUrl: data.logo_url
+          } as Recommendation;
+        } else if (row.entity_type === 'product') {
+          return {
+            tenantId: data.store_slug, // Use store slug as tenantId for display
+            businessName: data.store_name,
+            slug: data.store_slug,
+            score,
+            reason: `Viewed ${new Date(row.last_viewed_at).toLocaleDateString()}${data.price_cents ? ` • $${(data.price_cents / 100).toFixed(2)}` : ''}`,
+            productId: row.entity_id,
+            productName: data.title || data.name,
+            productPrice: data.price_cents ? data.price_cents / 100 : undefined,
+            productImage: data.image_url
+          } as Recommendation;
+        }
+
+        return null;
+      })
+      .filter((item): item is Recommendation => item !== null);
+
+    return {
+      recommendations,
+      algorithm: 'last_viewed',
+      generatedAt: new Date()
+    };
+
+  } catch (error) {
+    console.error('Error in getLastViewedItems:', error);
+    return { recommendations: [], algorithm: 'last_viewed', generatedAt: new Date() };
+  }
+}

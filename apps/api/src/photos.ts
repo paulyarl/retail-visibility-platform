@@ -26,7 +26,7 @@ const supabase =
  * Creates PhotoAsset linked to InventoryItem and returns the created asset.
  * Enforces max 11 photos per item (1 primary + 10 additional).
  */
-r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
+r.post("/:id/photos", upload.single("file"), async (req, res) => {
   try {
     const itemId = req.params.id;
 
@@ -162,8 +162,8 @@ r.post("/items/:id/photos", upload.single("file"), async (req, res) => {
   }
 });
 
-/** GET /items/:id/photos — list photos for an item, ordered by position */
-r.get("/items/:id/photos", async (req, res) => {
+/** GET /:id/photos — list photos for an item, ordered by position */
+r.get('/:id/photos', async (req, res) => {
   const item = await prisma.inventory_items.findUnique({ where: { id: req.params.id } });
   if (!item) return res.status(404).json({ error: "item not found" });
 
@@ -179,7 +179,7 @@ r.get("/items/:id/photos", async (req, res) => {
  * Migrates a legacy imageUrl to the photo_assets table so it can be managed.
  * This creates a photo_asset record from the item's existing imageUrl.
  */
-r.post("/items/:id/photos/migrate-legacy", async (req, res) => {
+r.post('/:id/photos/migrate-legacy', async (req, res) => {
   try {
     const itemId = req.params.id;
 
@@ -214,8 +214,8 @@ r.post("/items/:id/photos/migrate-legacy", async (req, res) => {
   }
 });
 
-/** PUT /items/:id/photos/:photoId — update alt, caption, or position */
-r.put("/items/:id/photos/:photoId", async (req, res) => {
+/** PUT /:id/photos/:photoId — update alt, caption, or position */
+r.put('/:id/photos/:photoId', async (req, res) => {
   try {
     const { id: itemId, photoId } = req.params;
     const { alt, caption, position } = req.body || {};
@@ -308,8 +308,8 @@ r.put("/items/:id/photos/:photoId", async (req, res) => {
   }
 });
 
-/** PUT /items/:id/photos/reorder — bulk reorder photos */
-r.put("/items/:id/photos/reorder", async (req, res) => {
+/** PUT /:id/photos/reorder — bulk reorder photos */
+r.put('/:id/photos/reorder', async (req, res) => {
   try {
     const itemId = req.params.id;
     const updates: Array<{ id: string; position: number }> = req.body;
@@ -360,8 +360,8 @@ r.put("/items/:id/photos/reorder", async (req, res) => {
   }
 });
 
-/** DELETE /items/:id/photos/:photoId — delete photo and re-pack positions */
-r.delete("/items/:id/photos/:photoId", async (req, res) => {
+/** DELETE /:id/photos/:photoId — delete photo and re-pack positions */
+r.delete('/:id/photos/:photoId', async (req, res) => {
   try {
     const { id: itemId, photoId } = req.params;
 
