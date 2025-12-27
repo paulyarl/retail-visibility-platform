@@ -1,7 +1,7 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
 
-// Import the createSecurityAlert function
+// Import the enhanced createSecurityAlert function
 import { createSecurityAlert } from '../routes/admin-security';
 
 // Extend Express Request interface to include rateLimit property
@@ -19,9 +19,98 @@ declare global {
 }
 
 /**
- * Rate limiting middleware for API security
- * Implements different limits for different endpoints and user types
+ * Collect comprehensive incident context for security analytics
  */
+async function collectIncidentContext(req: Request) {
+  const user = (req as any).user;
+  const context: any = {
+    // Request context
+    endpoint: req.path,
+    method: req.method,
+    ipAddress: req.ip,
+    userAgent: req.get('User-Agent'),
+    referer: req.get('Referer'),
+    timestamp: new Date().toISOString(),
+    rateLimit: req.rateLimit,
+
+    // Geographic context (from headers or IP geolocation)
+    geoData: {
+      country: req.get('CF-IPCountry') || req.get('X-Country-Code'),
+      region: req.get('CF-RAY') ? 'Cloudflare' : undefined,
+      timezone: req.get('X-Timezone'),
+    },
+
+    // Request patterns
+    requestPatterns: {
+      isApiRequest: req.path.startsWith('/api/'),
+      isAdminRequest: req.path.includes('/admin'),
+      isAuthRequest: req.path.includes('/auth') || req.path.includes('/login'),
+      isPublicRequest: req.path.startsWith('/public/'),
+      hasTenantContext: !!req.headers['x-tenant-id'],
+    },
+
+    // Risk indicators
+    riskIndicators: {
+      suspiciousUserAgent: false, // Could implement bot detection
+      rapidRequests: req.rateLimit?.remaining === 0,
+      unusualTiming: false, // Could detect off-hours activity
+      knownBadIP: false, // Could integrate with threat intelligence
+    },
+  };
+
+  // User context (if authenticated)
+  if (user) {
+    context.userContext = {
+      id: user.userId || user.id,
+      email: user.email,
+      role: user.role,
+      isAuthenticated: true,
+      hasMfa: !!user.mfa_enabled,
+      lastLogin: user.last_login,
+      accountAge: user.created_at ? Date.now() - new Date(user.created_at).getTime() : null,
+    };
+
+    // Tenant context
+    if (user.tenants || user.user_tenants) {
+      const tenants = user.tenants || user.user_tenants;
+      context.tenantContext = {
+        count: tenants.length,
+        primaryTenant: tenants.find((t: any) => t.role === 'OWNER')?.id,
+        hasMultipleLocations: tenants.length > 1,
+        subscriptionTiers: [...new Set(tenants.map((t: any) => t.subscription_tier).filter(Boolean))],
+      };
+    }
+
+    // Behavior patterns
+    context.behaviorPatterns = {
+      isNewUser: user.created_at && (Date.now() - new Date(user.created_at).getTime()) < (7 * 24 * 60 * 60 * 1000), // < 7 days
+      isPowerUser: user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT',
+      hasRecentActivity: user.last_login && (Date.now() - new Date(user.last_login).getTime()) < (24 * 60 * 60 * 1000), // < 24h
+    };
+  } else {
+    context.userContext = {
+      isAuthenticated: false,
+      isAnonymous: true,
+    };
+
+    // Anonymous user patterns
+    context.behaviorPatterns = {
+      isAnonymousAccess: true,
+      potentialBruteForce: req.path.includes('/login') || req.path.includes('/auth'),
+    };
+  }
+
+  // Session context
+  const sessionId = req.headers['x-session-id'] || req.cookies?.sessionId;
+  if (sessionId) {
+    context.sessionContext = {
+      hasSessionId: true,
+      // Could add session analytics here
+    };
+  }
+
+  return context;
+}
 
 // General API rate limiter - applies to most endpoints
 export const generalRateLimit = rateLimit({
@@ -42,20 +131,17 @@ export const generalRateLimit = rateLimit({
     const user = (req as any).user;
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
-  handler: (req: Request, res: Response) => {
-    // Log security alert for rate limit violation
+  handler: async (req: Request, res: Response) => {
+    // Collect comprehensive incident context for security analytics
+    const incidentContext = await collectIncidentContext(req);
+
+    // Log security alert for rate limit violation with full context
     createSecurityAlert({
       type: 'rate_limit_exceeded',
       severity: 'warning',
       title: 'Rate Limit Exceeded',
-      message: `Request limit exceeded for IP ${req.ip} on endpoint ${req.path}`,
-      metadata: {
-        endpoint: req.path,
-        method: req.method,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent'),
-        rateLimit: req.rateLimit,
-      },
+      message: `Request limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'authenticated user' : 'IP'} ${incidentContext.ipAddress} on endpoint ${incidentContext.endpoint}`,
+      metadata: incidentContext,
     });
 
     res.status(429).json({
@@ -85,21 +171,21 @@ export const authRateLimit = rateLimit({
     const user = (req as any).user;
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
-  handler: (req: Request, res: Response) => {
-    // Log security alert for auth rate limit violation (higher severity)
+  handler: async (req: Request, res: Response) => {
+    // Collect comprehensive incident context for critical security analytics
+    const incidentContext = await collectIncidentContext(req);
+
+    // Enhance risk indicators for auth attempts
+    incidentContext.riskIndicators.potentialBruteForce = true;
+    incidentContext.riskIndicators.authAttempt = true;
+
+    // Log security alert for auth rate limit violation (highest severity)
     createSecurityAlert({
       type: 'auth_rate_limit_exceeded',
       severity: 'critical',
       title: 'Authentication Rate Limit Exceeded',
-      message: `Too many authentication attempts from IP ${req.ip}`,
-      metadata: {
-        endpoint: req.path,
-        method: req.method,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent'),
-        rateLimit: req.rateLimit,
-        attemptedEmail: (req.body as any)?.email,
-      },
+      message: `Multiple failed authentication attempts from ${incidentContext.ipAddress}${incidentContext.userContext.isAuthenticated ? ` (user: ${incidentContext.userContext.email})` : ''} - potential brute force attack`,
+      metadata: incidentContext,
     });
 
     res.status(429).json({
@@ -126,7 +212,26 @@ export const uploadRateLimit = rateLimit({
     const user = (req as any).user;
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
-  handler: (req: Request, res: Response) => {
+  handler: async (req: Request, res: Response) => {
+    // Collect comprehensive incident context for upload analytics
+    const incidentContext = await collectIncidentContext(req);
+
+    // Enhance context for upload-specific patterns
+    incidentContext.uploadContext = {
+      contentType: req.get('Content-Type'),
+      contentLength: req.get('Content-Length'),
+      hasFileData: req.method === 'POST' && req.headers['content-type']?.includes('multipart'),
+    };
+
+    // Log security alert for upload rate limit violation
+    createSecurityAlert({
+      type: 'upload_rate_limit_exceeded',
+      severity: 'warning',
+      title: 'File Upload Rate Limit Exceeded',
+      message: `Upload limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} - potential abuse or spam`,
+      metadata: incidentContext,
+    });
+
     res.status(429).json({
       error: 'upload_rate_limit_exceeded',
       message: 'Too many file uploads, please try again after 1 hour.',
@@ -151,7 +256,27 @@ export const searchRateLimit = rateLimit({
     const user = (req as any).user;
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
-  handler: (req: Request, res: Response) => {
+  handler: async (req: Request, res: Response) => {
+    // Collect comprehensive incident context for search analytics
+    const incidentContext = await collectIncidentContext(req);
+
+    // Enhance context for search-specific patterns
+    incidentContext.searchContext = {
+      queryParams: req.query,
+      hasSearchTerm: !!req.query.q || !!req.query.query,
+      isDirectorySearch: req.path.includes('/directory'),
+      isProductSearch: req.path.includes('/items') || req.path.includes('/products'),
+    };
+
+    // Log security alert for search rate limit violation
+    createSecurityAlert({
+      type: 'search_rate_limit_exceeded',
+      severity: 'warning',
+      title: 'Search Rate Limit Exceeded',
+      message: `Search limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} - potential scraping or abuse`,
+      metadata: incidentContext,
+    });
+
     res.status(429).json({
       error: 'search_rate_limit_exceeded',
       message: 'Too many search requests, please slow down.',
@@ -201,7 +326,27 @@ export const costlyApiRateLimit = rateLimit({
     const user = (req as any).user;
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
-  handler: (req: Request, res: Response) => {
+  handler: async (req: Request, res: Response) => {
+    // Collect comprehensive incident context for costly API analytics
+    const incidentContext = await collectIncidentContext(req);
+
+    // Enhance context for costly API patterns
+    incidentContext.apiCostContext = {
+      isGeocoding: req.path.includes('/geocode'),
+      isGoogleService: req.path.includes('/google'),
+      isExternalService: req.path.includes('/external'),
+      estimatedCost: req.path.includes('/geocode') ? '$0.005' : 'variable',
+    };
+
+    // Log security alert for costly API rate limit violation
+    createSecurityAlert({
+      type: 'costly_api_rate_limit_exceeded',
+      severity: 'warning',
+      title: 'Costly API Rate Limit Exceeded',
+      message: `External API limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} - high-cost operations restricted`,
+      metadata: incidentContext,
+    });
+
     res.status(429).json({
       error: 'costly_api_rate_limit_exceeded',
       message: 'Too many API calls that incur costs, please try again after 1 hour.',
@@ -226,7 +371,27 @@ export const storeStatusRateLimit = rateLimit({
     const user = (req as any).user;
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
-  handler: (req: Request, res: Response) => {
+  handler: async (req: Request, res: Response) => {
+    // Collect comprehensive incident context for store status analytics
+    const incidentContext = await collectIncidentContext(req);
+
+    // Enhance context for store status patterns (cached, essential for UI)
+    incidentContext.storeStatusContext = {
+      isCachedEndpoint: true,
+      tenantId: req.params.tenantId,
+      isPublicAccess: req.path.startsWith('/public/'),
+      uiEssential: true, // Store status is critical for user experience
+    };
+
+    // Log security alert for store status rate limit violation (lower severity since cached)
+    createSecurityAlert({
+      type: 'store_status_rate_limit_exceeded',
+      severity: 'info', // Lower severity since this is cached and UI-essential
+      title: 'Store Status Rate Limit Exceeded',
+      message: `Store status limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} on tenant ${req.params.tenantId} - cached endpoint abuse`,
+      metadata: incidentContext,
+    });
+
     res.status(429).json({
       error: 'store_status_rate_limit_exceeded',
       message: 'Too many store status requests, please try again after 15 minutes.',

@@ -330,7 +330,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
 
       // Public endpoint (no auth)
       const response = await fetch(`${API_BASE_URL}/public/tenant/${testTenantId}`);
-      const data = await response.json();
+      const data: any = await response.json();
 
       expect(response.status).toBe(200);
       expect(data.location_status).toBe('active');
@@ -351,7 +351,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
 
       // Check public endpoint
       const response = await fetch(`${API_BASE_URL}/public/tenant/${testTenantId}`);
-      const data = await response.json();
+      const data: any = await response.json();
 
       expect(response.status).toBe(200);
       expect(data.location_status).toBe('inactive');
@@ -373,7 +373,7 @@ describe('Location Lifecycle Management - E2E Tests', () => {
 
       // Check public endpoint
       const response = await fetch(`${API_BASE_URL}/public/tenant/${testTenantId}`);
-      const data = await response.json();
+      const data: any = await response.json();
 
       expect(response.status).toBe(200);
       expect(data.location_status).toBe('archived');

@@ -5152,12 +5152,15 @@ console.log('✅ MFA routes mounted (two-factor authentication)');
 import authSessionsRoutes from './routes/auth-sessions';
 import securityAlertsRoutes from './routes/security-alerts';
 import adminSecurityMonitoringRoutes from './routes/admin/security-monitoring';
+import adminSecurityRoutes from './routes/admin-security';
 app.use('/api/auth', authSessionsRoutes);
 app.use('/api/security', securityAlertsRoutes);
 app.use('/api/admin/security', adminSecurityMonitoringRoutes);
+app.use('/api/admin/security', authenticateToken, requireAdmin, adminSecurityRoutes);
 console.log('✅ Security sessions routes mounted at /api/auth/sessions');
 console.log('✅ Security alerts routes mounted at /api/security/security-alerts');
 console.log('✅ Admin security monitoring routes mounted at /api/admin/security');
+console.log('✅ Admin security analytics routes mounted at /api/admin/security');
 
 /* ------------------------------ clone (products & categories) ------------------------------ */
 import cloneRoutes from './routes/clone';

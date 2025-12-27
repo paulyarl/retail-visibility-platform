@@ -99,7 +99,16 @@ export function useAdminSecurityMonitoring() {
         offset: offset.toString(),
       });
       const response = await api.get(`/api/admin/security/sessions?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch sessions');
+      if (!response.ok) {
+        // Handle 503 (service temporarily unavailable) gracefully
+        if (response.status === 503) {
+          console.warn('Sessions endpoint temporarily unavailable:', response.statusText);
+          setSessions([]);
+          setTotalSessions(0);
+          return;
+        }
+        throw new Error('Failed to fetch sessions');
+      }
       const data = await response.json();
       setSessions(data.data || []);
       setTotalSessions(data.total || 0);
@@ -112,7 +121,15 @@ export function useAdminSecurityMonitoring() {
   const fetchSessionStats = useCallback(async () => {
     try {
       const response = await api.get('/api/admin/security/sessions/stats');
-      if (!response.ok) throw new Error('Failed to fetch session stats');
+      if (!response.ok) {
+        // Handle 503 (service temporarily unavailable) gracefully
+        if (response.status === 503) {
+          console.warn('Session stats endpoint temporarily unavailable:', response.statusText);
+          setSessionStats(null);
+          return;
+        }
+        throw new Error('Failed to fetch session stats');
+      }
       const data = await response.json();
       setSessionStats(data);
     } catch (err) {
@@ -146,7 +163,15 @@ export function useAdminSecurityMonitoring() {
   const fetchFailedLogins = useCallback(async () => {
     try {
       const response = await api.get('/api/admin/security/failed-logins?limit=20');
-      if (!response.ok) throw new Error('Failed to fetch failed logins');
+      if (!response.ok) {
+        // Handle 503 (service temporarily unavailable) gracefully
+        if (response.status === 503) {
+          console.warn('Failed logins endpoint temporarily unavailable:', response.statusText);
+          setFailedLogins([]);
+          return;
+        }
+        throw new Error('Failed to fetch failed logins');
+      }
       const data = await response.json();
       setFailedLogins(data.data || []);
     } catch (err) {

@@ -19,13 +19,19 @@ async function logGDPRAction(
   metadata: Record<string, any> = {}
 ) {
   try {
-    await prisma.security_audit_log.create({
+    await prisma.security_alerts.create({
       data: {
         user_id: userId,
-        action,
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        metadata
+        type: 'gdpr_action',
+        severity: 'info',
+        title: `GDPR Action: ${action}`,
+        message: `GDPR compliance action performed`,
+        metadata: {
+          action,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          ...metadata
+        }
       }
     });
   } catch (error) {

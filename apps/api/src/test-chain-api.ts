@@ -55,7 +55,7 @@ async function testPropagateAPI() {
       }
     );
     
-    const data = await response.json();
+    const data: any = await response.json();
     
     if (!response.ok) {
       console.error('❌ API Error:', data);

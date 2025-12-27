@@ -1507,7 +1507,6 @@ model users {
   invitations                      invitations[]
   login_attempts                   login_attempts[]
   security_alerts                  security_alerts[]
-  security_audit_log               security_audit_log[]
   security_threats                 security_threats[]
   user_preferences                 user_preferences[]
   user_sessions_list               user_sessions_list[]

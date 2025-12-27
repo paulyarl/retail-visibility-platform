@@ -17,6 +17,7 @@ import { ThreatMonitor } from './ThreatMonitor';
 import { BlockedIPsTable } from './BlockedIPsTable';
 import { AdminSessionsTable } from '../admin/AdminSessionsTable';
 import { AdminAlertsTable } from '../admin/AdminAlertsTable';
+import { PlatformStabilityDashboard } from './PlatformStabilityDashboard';
 import Link from 'next/link';
 
 export function SecurityDashboard() {
@@ -183,6 +184,10 @@ export function SecurityDashboard() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="stability" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Platform Stability
+          </TabsTrigger>
           <TabsTrigger value="threats">Threats</TabsTrigger>
           <TabsTrigger value="blocked">Blocked IPs</TabsTrigger>
         </TabsList>
@@ -289,6 +294,10 @@ export function SecurityDashboard() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="stability" className="space-y-4">
+          <PlatformStabilityDashboard />
         </TabsContent>
 
         <TabsContent value="threats" className="space-y-4">

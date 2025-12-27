@@ -15,131 +15,28 @@ router.use(requireAdmin);
 
 /**
  * GET /api/admin/security/sessions
- * Get all active sessions across the platform
+ * Get all active sessions across the platform - TEMPORARILY DISABLED
+ * Note: user_sessions table was dropped during schema migration
  */
 router.get('/sessions', async (req, res) => {
-  try {
-    const { limit = '100', offset = '0', activeOnly = 'true' } = req.query;
-
-    // Fetch all sessions with user info
-    const sessions = activeOnly === 'true'
-      ? await basePrisma.$queryRaw<any[]>`
-          SELECT 
-            s.id,
-            s.user_id as "userId",
-            s.device_info as "deviceInfo",
-            s.ip_address as "ipAddress",
-            s.location,
-            s.user_agent as "userAgent",
-            s.is_current as "isCurrent",
-            s.last_activity as "lastActivity",
-            s.created_at as "createdAt",
-            s.expires_at as "expiresAt",
-            u.email as "userEmail",
-            u.first_name as "userFirstName",
-            u.last_name as "userLastName",
-            u.role as "userRole"
-          FROM user_sessions s
-          JOIN users u ON s.user_id = u.id
-          WHERE s.revoked_at IS NULL
-            AND (s.expires_at IS NULL OR s.expires_at > NOW())
-          ORDER BY s.last_activity DESC
-          LIMIT ${parseInt(limit as string)}
-          OFFSET ${parseInt(offset as string)}
-        `
-      : await basePrisma.$queryRaw<any[]>`
-          SELECT 
-            s.id,
-            s.user_id as "userId",
-            s.device_info as "deviceInfo",
-            s.ip_address as "ipAddress",
-            s.location,
-            s.user_agent as "userAgent",
-            s.is_current as "isCurrent",
-            s.last_activity as "lastActivity",
-            s.created_at as "createdAt",
-            s.expires_at as "expiresAt",
-            s.revoked_at as "revokedAt",
-            u.email as "userEmail",
-            u.first_name as "userFirstName",
-            u.last_name as "userLastName",
-            u.role as "userRole"
-          FROM user_sessions s
-          JOIN users u ON s.user_id = u.id
-          ORDER BY s.last_activity DESC
-          LIMIT ${parseInt(limit as string)}
-          OFFSET ${parseInt(offset as string)}
-        `;
-
-    // Get total count
-    const [{ count }] = activeOnly === 'true'
-      ? await basePrisma.$queryRaw<[{ count: bigint }]>`
-          SELECT COUNT(*) as count
-          FROM user_sessions
-          WHERE revoked_at IS NULL
-            AND (expires_at IS NULL OR expires_at > NOW())
-        `
-      : await basePrisma.$queryRaw<[{ count: bigint }]>`
-          SELECT COUNT(*) as count
-          FROM user_sessions
-        `;
-
-    res.json({
-      data: sessions.map(session => ({
-        ...session,
-        deviceInfo: session.deviceInfo || {},
-        location: session.location || {},
-      })),
-      total: Number(count),
-    });
-  } catch (error) {
-    console.error('[GET /api/admin/security/sessions] Error:', error);
-    res.status(500).json({ error: 'Failed to fetch sessions' });
-  }
+  res.status(503).json({
+    error: 'Service temporarily unavailable',
+    message: 'Session management is currently unavailable due to database migration. This feature will be restored in a future update.',
+    available: false
+  });
 });
 
 /**
  * GET /api/admin/security/sessions/stats
- * Get session statistics
+ * Get session statistics - TEMPORARILY DISABLED
+ * Note: user_sessions table was dropped during schema migration
  */
 router.get('/sessions/stats', async (req, res) => {
-  try {
-    const [stats] = await basePrisma.$queryRaw<any[]>`
-      SELECT 
-        COUNT(*) FILTER (WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())) as "activeSessions",
-        COUNT(DISTINCT user_id) FILTER (WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())) as "activeUsers",
-        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') as "sessionsLast24h",
-        COUNT(*) FILTER (WHERE revoked_at IS NOT NULL) as "revokedSessions"
-      FROM user_sessions
-    `;
-
-    // Get device breakdown
-    const deviceStats = await basePrisma.$queryRaw<any[]>`
-      SELECT 
-        (device_info->>'type') as "deviceType",
-        COUNT(*) as count
-      FROM user_sessions
-      WHERE revoked_at IS NULL
-        AND (expires_at IS NULL OR expires_at > NOW())
-      GROUP BY device_info->>'type'
-      ORDER BY count DESC
-    `;
-
-    res.json({
-      ...stats,
-      activeSessions: Number(stats.activeSessions),
-      activeUsers: Number(stats.activeUsers),
-      sessionsLast24h: Number(stats.sessionsLast24h),
-      revokedSessions: Number(stats.revokedSessions),
-      deviceBreakdown: deviceStats.map(d => ({
-        type: d.deviceType || 'unknown',
-        count: Number(d.count),
-      })),
-    });
-  } catch (error) {
-    console.error('[GET /api/admin/security/sessions/stats] Error:', error);
-    res.status(500).json({ error: 'Failed to fetch session stats' });
-  }
+  res.status(503).json({
+    error: 'Service temporarily unavailable',
+    message: 'Session statistics are currently unavailable due to database migration. This feature will be restored in a future update.',
+    available: false
+  });
 });
 
 /**
@@ -275,69 +172,28 @@ router.get('/alerts/stats', async (req, res) => {
 
 /**
  * DELETE /api/admin/security/sessions/:sessionId
- * Admin revoke any user's session
+ * Admin revoke any user's session - TEMPORARILY DISABLED
+ * Note: user_sessions table was dropped during schema migration
  */
 router.delete('/sessions/:sessionId', async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-
-    const result = await basePrisma.$executeRaw`
-      UPDATE user_sessions
-      SET revoked_at = NOW()
-      WHERE id = ${sessionId}
-        AND revoked_at IS NULL
-    `;
-
-    if (result === 0) {
-      return res.status(404).json({ error: 'Session not found or already revoked' });
-    }
-
-    res.json({ success: true, message: 'Session revoked by admin' });
-  } catch (error) {
-    console.error('[DELETE /api/admin/security/sessions/:sessionId] Error:', error);
-    res.status(500).json({ error: 'Failed to revoke session' });
-  }
+  res.status(503).json({
+    error: 'Service temporarily unavailable',
+    message: 'Session management is currently unavailable due to database migration. This feature will be restored in a future update.',
+    available: false
+  });
 });
 
 /**
  * GET /api/admin/security/failed-logins
- * Get recent failed login attempts
+ * Get recent failed login attempts - TEMPORARILY DISABLED
+ * Note: failed_login_attempts table was dropped during schema migration
  */
 router.get('/failed-logins', async (req, res) => {
-  try {
-    const { limit = '50', offset = '0' } = req.query;
-
-    const attempts = await basePrisma.$queryRaw<any[]>`
-      SELECT 
-        id,
-        email,
-        ip_address as "ipAddress",
-        user_agent as "userAgent",
-        reason,
-        metadata,
-        created_at as "createdAt"
-      FROM failed_login_attempts
-      ORDER BY created_at DESC
-      LIMIT ${parseInt(limit as string)}
-      OFFSET ${parseInt(offset as string)}
-    `;
-
-    const [{ count }] = await basePrisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count
-      FROM failed_login_attempts
-    `;
-
-    res.json({
-      data: attempts.map(attempt => ({
-        ...attempt,
-        metadata: attempt.metadata || {},
-      })),
-      total: Number(count),
-    });
-  } catch (error) {
-    console.error('[GET /api/admin/security/failed-logins] Error:', error);
-    res.status(500).json({ error: 'Failed to fetch failed login attempts' });
-  }
+  res.status(503).json({
+    error: 'Service temporarily unavailable',
+    message: 'Failed login tracking is currently unavailable due to database migration. This feature will be restored in a future update.',
+    available: false
+  });
 });
 
 export default router;
