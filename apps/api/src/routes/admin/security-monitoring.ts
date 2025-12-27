@@ -196,4 +196,37 @@ router.get('/failed-logins', async (req, res) => {
   });
 });
 
+/**
+ * DELETE /api/admin/security/alerts/bulk
+ * Bulk dismiss alerts by type or age
+ */
+router.delete('/alerts/bulk', async (req, res) => {
+  try {
+    const { type, olderThanDays } = req.body;
+
+    let query = 'UPDATE security_alerts SET dismissed = true, dismissed_at = NOW() WHERE dismissed = false';
+    const params: any[] = [];
+
+    if (type) {
+      query += ' AND type = $1';
+      params.push(type);
+    }
+
+    if (olderThanDays) {
+      query += ` AND created_at < NOW() - INTERVAL '${olderThanDays} days'`;
+    }
+
+    const result = await basePrisma.$executeRaw`${query}`;
+
+    res.json({
+      success: true,
+      dismissedCount: result,
+      message: `Dismissed ${result} security alerts`
+    });
+  } catch (error) {
+    console.error('[DELETE /api/admin/security/alerts/bulk] Error:', error);
+    res.status(500).json({ error: 'Failed to bulk dismiss alerts' });
+  }
+});
+
 export default router;

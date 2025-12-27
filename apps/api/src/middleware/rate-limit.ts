@@ -430,11 +430,11 @@ export function applyRateLimit(req: Request, res: Response, next: NextFunction) 
     return;
   }
 
-  // Store status endpoints (cached, essential for UI)
-  if (path.includes('/business-hours/status')) {
-    storeStatusRateLimit(req, res, next);
-    return;
-  }
+  // Store status endpoints (cached, essential for UI - NO RATE LIMIT)
+  // if (path.includes('/business-hours/status')) {
+  //   storeStatusRateLimit(req, res, next);
+  //   return;
+  // }
 
   // Costly API endpoints (geocoding, external services)
   if (path.includes('/geocode') || path.includes('/google') || path.includes('/external')) {
