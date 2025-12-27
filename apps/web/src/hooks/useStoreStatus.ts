@@ -13,7 +13,7 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const baseUrl = apiBase || (typeof window !== 'undefined' ? window.location.origin : '');
+  const baseUrl = apiBase || process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
   const fetchStatus = async () => {
     try {
