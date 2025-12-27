@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRateLimitErrorHandler } from './useRateLimitErrorHandler';
 
 export interface StoreStatus {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
   const [error, setError] = useState<string | null>(null);
 
   const baseUrl = apiBase || process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+  const { handleRateLimitError } = useRateLimitErrorHandler();
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -30,6 +32,14 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
       const response = await fetch(`${baseUrl}/public/tenant/${tenantId}/business-hours/status`);
 
       if (!response.ok) {
+        // Check if this is a rate limit error and handle it with user-friendly messaging
+        if (handleRateLimitError(response, `/public/tenant/${tenantId}/business-hours/status`)) {
+          // Rate limit error was handled, don't show generic error
+          setError(null);
+          setStatus(null);
+          setLoading(false);
+          return;
+        }
         throw new Error(`HTTP ${response.status}`);
       }
 
@@ -47,7 +57,7 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, baseUrl]);
+  }, [tenantId, baseUrl, handleRateLimitError]);
 
   useEffect(() => {
     if (tenantId) {

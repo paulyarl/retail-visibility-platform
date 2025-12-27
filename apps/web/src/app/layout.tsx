@@ -7,6 +7,7 @@ import { PlatformSettingsProvider } from "@/contexts/PlatformSettingsContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import DynamicFavicon from "@/components/DynamicFavicon";
 import { QueryClientWrapper } from "@/components/QueryClientWrapper";
+import { GlobalAlertProvider } from "@/components/ui/GlobalAlertProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,9 +43,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <QueryClientWrapper>
           <PlatformSettingsProvider>
             <AuthProvider>
-              <ErrorBoundary>
-                {children}
-              </ErrorBoundary>
+              <GlobalAlertProvider>
+                <ErrorBoundary>
+                  {children}
+                </ErrorBoundary>
+              </GlobalAlertProvider>
             </AuthProvider>
           </PlatformSettingsProvider>
         </QueryClientWrapper>

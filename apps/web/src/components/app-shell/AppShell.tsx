@@ -11,6 +11,7 @@ import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
+import { GlobalAlertBar } from "@/components/ui/GlobalAlertProvider";
 
 
 // Force edge runtime to prevent prerendering issues
@@ -178,6 +179,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
       </header>
+
+      {/* Global Alert Bar - Shows rate limit and other important alerts */}
+      <GlobalAlertBar />
+
       <main className="flex-1">
         {children}
       </main>
