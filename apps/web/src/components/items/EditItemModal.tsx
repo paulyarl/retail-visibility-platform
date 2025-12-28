@@ -602,7 +602,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
                 <p><span className="font-medium">Manufacturer:</span> {item.manufacturer}</p>
               )}
               {item.price !== undefined && (
-                <p><span className="font-medium">Price:</span> ${item.price.toFixed(2)}</p>
+                <p><span className="font-medium">Price:</span> ${(item.price ?? 0).toFixed(2)}</p>
               )}
               {item.stock !== undefined && (
                 <p><span className="font-medium">Stock:</span> {item.stock}</p>

@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from '@/lib/api';
+import { useTenantComplete } from './dashboard/useTenantComplete';
+import { useItemsComplete } from './useItemsComplete';
 
 interface Category {
   id: string;
@@ -14,8 +16,15 @@ interface TenantTier {
 }
 
 interface TenantUsage {
-  sku: { current: number; limit: number; percent: number };
-  location: { current: number; limit: number; percent: number };
+  products: number;
+  activeProducts: number;
+  monthlySkuQuota: number | null;
+  skusAddedThisMonth: number;
+  quotaRemaining: number | null;
+  locations: number;
+  users: number;
+  apiCalls: number;
+  storageGB: number;
 }
 
 interface Tenant {
@@ -98,33 +107,27 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 // Tenant-related queries
 export function useTenantTier(tenantId: string) {
-  return useQuery({
-    queryKey: ['tenant', tenantId, 'tier'],
-    queryFn: async (): Promise<TenantTier> => {
-      const response = await api.get(`/api/tenants/${tenantId}/tier`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tenant tier: ${response.status}`);
-      }
-      return response.json();
-    },
-    staleTime: 10 * 60 * 1000, // 10 minutes - tier data changes infrequently
-    gcTime: 30 * 60 * 1000, // 30 minutes cache
-  });
+  // Use consolidated data instead of separate API call
+  const { tier: consolidatedTier } = useTenantComplete(tenantId);
+
+  return {
+    data: consolidatedTier,
+    isLoading: false, // Data comes from consolidated hook
+    error: null,
+    refetch: () => Promise.resolve() // Handled by consolidated hook
+  };
 }
 
 export function useTenantUsage(tenantId: string) {
-  return useQuery({
-    queryKey: ['tenant', tenantId, 'usage'],
-    queryFn: async (): Promise<TenantUsage> => {
-      const response = await api.get(`/api/tenants/${tenantId}/usage`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tenant usage: ${response.status}`);
-      }
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes - usage updates frequently
-    gcTime: 15 * 60 * 1000, // 15 minutes cache
-  });
+  // Use consolidated data instead of separate API call
+  const { usage: consolidatedUsage } = useTenantComplete(tenantId);
+
+  return {
+    data: consolidatedUsage,
+    isLoading: false, // Data comes from consolidated hook
+    error: null,
+    refetch: () => Promise.resolve() // Handled by consolidated hook
+  };
 }
 
 export function useTenant(tenantId: string) {
@@ -160,53 +163,43 @@ export function useTenantCategories(tenantId: string) {
 
 // Items queries
 export function useItems(tenantId?: string, filters?: Record<string, any>) {
-  const queryKey = ['items', tenantId, filters].filter(Boolean);
-
-  return useQuery({
-    queryKey,
-    queryFn: async (): Promise<Item[]> => {
-      const params = new URLSearchParams();
-      if (tenantId) params.set('tenantId', tenantId);
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            params.set(key, String(value));
-          }
-        });
-      }
-
-      const url = `/api/items${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await api.get(url);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch items: ${response.status}`);
-      }
-      return response.json();
-    },
-    staleTime: 2 * 60 * 1000, // 2 minutes - items change more frequently
-    gcTime: 10 * 60 * 1000, // 10 minutes cache
+  // Use consolidated items hook instead of separate API calls
+  const { items: consolidatedItems, loading: itemsLoading } = useItemsComplete({
+    tenantId: tenantId || '',
+    initialPage: 1,
+    initialPageSize: 25,
+    initialStatus: "all",
+    initialVisibility: "all",
+    initialSearch: "",
+    initialCategory: null
   });
+
+  return {
+    data: consolidatedItems,
+    isLoading: itemsLoading,
+    error: null,
+    refetch: () => Promise.resolve() // Handled by consolidated hook
+  };
 }
 
 export function useItemsStats(tenantId?: string) {
-  return useQuery({
-    queryKey: ['items', 'stats', tenantId].filter(Boolean),
-    queryFn: async (): Promise<ItemsStats> => {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required for items stats');
-      }
-      const params = `?tenantId=${tenantId}`;
-      const response = await api.get(`/api/items/stats${params}`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch items stats: ${response.status}`);
-      }
-      return response.json();
-    },
-    staleTime: 1 * 60 * 1000, // 1 minute - stats update frequently
-    gcTime: 5 * 60 * 1000, // 5 minutes cache
-    enabled: !!tenantId, // Only run when tenantId is available
+  // Use consolidated items hook for stats instead of separate API call
+  const { stats: consolidatedStats, loading: statsLoading } = useItemsComplete({
+    tenantId: tenantId || '',
+    initialPage: 1,
+    initialPageSize: 25,
+    initialStatus: "all",
+    initialVisibility: "all",
+    initialSearch: "",
+    initialCategory: null
   });
+
+  return {
+    data: consolidatedStats,
+    isLoading: statsLoading,
+    error: null,
+    refetch: () => Promise.resolve() // Handled by consolidated hook
+  };
 }
 
 // Upgrade requests queries

@@ -1,8 +1,8 @@
 "use client";
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
-import { useTenantDashboard } from "@/hooks/dashboard/useTenantDashboard";
-import { useTenantTier } from "@/hooks/dashboard/useTenantTier";
+// Replace separate hooks with consolidated hook
+import { useTenantComplete } from "@/hooks/dashboard/useTenantComplete";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { canManageTenantSettings } from "@/lib/auth/access-control";
@@ -38,19 +38,16 @@ export const dynamic = 'force-dynamic';
 export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   const { user } = useAuth();
   
-  // Fetch dashboard stats
-  const { data, loading: statsLoading, error: statsError } = useTenantDashboard(tenantId);
+  // Consolidated data fetching - replaces 3 separate API calls with 1
+  const { tenant: tenantData, tier, usage, loading: completeLoading, error: completeError } = useTenantComplete(tenantId);
   
-  // Fetch tier information
-  const { tier, loading: tierLoading, error: tierError } = useTenantTier(tenantId);
-  
-  // Fetch user profile
+  // User profile (still separate since it's user-specific, not tenant-specific)
   const { profile, loading: profileLoading } = useUserProfile();
 
   const canManageSettings = user ? canManageTenantSettings(user, tenantId) : false;
   
-  const loading = statsLoading || tierLoading || profileLoading;
-  const error = statsError || tierError;
+  const loading = completeLoading || profileLoading;
+  const error = completeError;
 
   // Show skeleton while loading
   if (loading) {
@@ -110,11 +107,11 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
         <SubscriptionStateBanner tenantId={tenantId} />
 
         {/* Location Status Banner (Inactive/Closed/Pending/Archived) */}
-        {data?.info?.locationStatus && (
+        {tenantData?.locationStatus && (
           <LocationStatusBanner
-            locationStatus={data.info.locationStatus}
-            reopeningDate={data.info.reopeningDate}
-            tenantName={data.info.name || 'This Location'}
+            locationStatus={tenantData.locationStatus as "pending" | "active" | "inactive" | "closed" | "archived"}
+            reopeningDate={tenantData.statusInfo?.reopeningDate}
+            tenantName={tenantData.name || 'This Location'}
             tenantId={tenantId}
             variant="full"
           />
@@ -122,14 +119,14 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
         {/* Header */}
         <DashboardHeader 
-          title={`${data?.info?.name || 'Tenant'} Dashboard`}
+          title={`${tenantData?.name || 'Tenant'} Dashboard`}
           subtitle="Manage your retail inventory and visibility across platforms"
         />
 
         {/* Stats */}
         <DashboardStats
-          activeItems={data?.stats.activeItems || 0}
-          syncIssues={data?.stats.syncIssues || 0}
+          activeItems={usage?.products || 0} // Use usage data instead of separate stats
+          syncIssues={0} // TODO: Implement sync issues tracking
           tenantId={tenantId}
         />
 
@@ -160,7 +157,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
         {/* Visibility Cards - Path to Visibility */}
         <VisibilityCards
           tenantId={tenantId}
-          tenantName={data?.info?.name || 'Your Store'}
+          tenantName={tenantData?.name || 'Your Store'}
           hasStorefront={true}
           isInDirectory={false}
         />

@@ -2402,6 +2402,184 @@ app.get("/api/tenants/:tenant_id/categories", authenticateToken, checkTenantAcce
   }
 });
 
+// Consolidated Items endpoint - combines /api/items and /api/items/stats into one call
+app.get("/api/items/complete", authenticateToken, async (req, res) => {
+  try {
+    const tenant_id = req.query.tenant_id as string;
+    if (!tenant_id) {
+      return res.status(400).json({ error: "tenant_id_required" });
+    }
+
+    // Verify user has access to this tenant
+    const user = req.user as any;
+    const userId = user?.userId || user?.user_id;
+    if (!userId) {
+      return res.status(401).json({ error: "authentication_required" });
+    }
+
+    // Check tenant access
+    const userTenant = await prisma.user_tenants.findFirst({
+      where: {
+        user_id: userId,
+        tenant_id: tenant_id
+      }
+    });
+
+    if (!userTenant) {
+      return res.status(403).json({ error: "tenant_access_denied" });
+    }
+
+    console.log(`[Items Complete] Fetching consolidated data for tenant: ${tenant_id}`);
+
+    // Parse filters and pagination
+    const {
+      q: search = '',
+      status: statusFilter = 'all',
+      visibility: visibilityFilter = 'all',
+      categoryId,
+      categoryFilter = 'all',
+      page = '1',
+      limit = '25'
+    } = req.query;
+
+    const pageNum = parseInt(page as string, 10) || 1;
+    const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 25, 1), 50);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build where clause for items query
+    const where: any = {
+      tenant_id,
+      item_status: { not: 'trashed' } // Exclude trashed items by default
+    };
+
+    // Apply status filter
+    if (statusFilter && statusFilter !== 'all') {
+      where.item_status = statusFilter;
+    }
+
+    // Apply visibility filter
+    if (visibilityFilter && visibilityFilter !== 'all') {
+      where.visibility = visibilityFilter;
+    }
+
+    // Apply search filter
+    if (search && typeof search === 'string' && search.trim()) {
+      where.OR = [
+        { name: { contains: search.trim(), mode: 'insensitive' } },
+        { sku: { contains: search.trim(), mode: 'insensitive' } },
+        { description: { contains: search.trim(), mode: 'insensitive' } },
+        { brand: { contains: search.trim(), mode: 'insensitive' } },
+      ];
+    }
+
+    // Apply category filters
+    if (categoryId) {
+      where.directory_category_id = categoryId;
+    } else if (categoryFilter === 'assigned') {
+      where.directory_category_id = { not: null };
+    } else if (categoryFilter === 'unassigned') {
+      where.directory_category_id = null;
+    }
+
+    // Execute both queries in parallel
+    const [itemsResult, statsResult, totalCountResult] = await Promise.all([
+      // Items with pagination
+      prisma.inventory_items.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip: offset,
+        take: limitNum,
+      }),
+
+      // Stats query
+      Promise.resolve().then(async () => {
+        const [total, active, inactive, publicItems, privateItems, lowStock] = await Promise.all([
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: { not: 'trashed' } }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: 'active', visibility: { not: 'private' } }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: 'inactive', visibility: { not: 'private' } }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: 'active', visibility: { not: 'private' } }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: { not: 'trashed' }, visibility: 'public' }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: { not: 'trashed' }, visibility: 'private' }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: { not: 'trashed' }, stock: { lt: 10 } }
+          })
+        ]);
+
+        return {
+          total,
+          active: Math.max(0, active),
+          inactive: Math.max(0, inactive),
+          public: Math.max(0, publicItems),
+          private: Math.max(0, privateItems),
+          lowStock: Math.max(0, lowStock)
+        };
+      }),
+
+      // Total count for pagination
+      prisma.inventory_items.count({ where })
+    ]);
+
+    // Transform items for frontend compatibility
+    const transformedItems = itemsResult.map(item => ({
+      ...item,
+      price: item.price !== null ? Number(item.price) : null,
+      // Remove price_cents from response
+      price_cents: undefined,
+      // Ensure status field is set correctly
+      status: item.item_status || 'active',
+      itemStatus: item.item_status || 'active',
+      // Category info
+      tenantCategory: null, // Category info removed for now
+      tenantCategoryId: item.directory_category_id,
+      directory_category: undefined, // Remove from response
+      directory_category_id: undefined, // Remove from response
+    }));
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalCountResult / limitNum);
+    const hasMore = pageNum < totalPages;
+
+    const response = {
+      items: transformedItems,
+      stats: statsResult,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalItems: totalCountResult,
+        totalPages,
+        hasMore
+      },
+      _timestamp: new Date().toISOString()
+    };
+
+    console.log(`[Items Complete] Returning ${transformedItems.length} items with stats for tenant ${tenant_id}`);
+
+    // Cache for 30 seconds (items change more frequently)
+    res.setHeader('Cache-Control', 'private, max-age=30');
+    res.setHeader('Vary', 'Authorization');
+
+    res.json(response);
+  } catch (error: any) {
+    console.error('[Items Complete] Error:', error);
+    res.status(500).json({
+      error: 'internal_error',
+      message: 'Failed to fetch complete items data'
+    });
+  }
+});
+
 // Public endpoint for features showcase config (no auth required)
 app.get("/api/public/features-showcase-config", async (req, res) => {
   try {

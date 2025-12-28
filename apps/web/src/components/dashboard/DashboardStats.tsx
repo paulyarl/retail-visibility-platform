@@ -1,7 +1,6 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
 import { useSubscriptionUsage } from "@/hooks/useSubscriptionUsage";
-import { useStoreStatus } from "@/hooks/useStoreStatus";
 
 export interface DashboardStatsProps {
   activeItems: number;
@@ -19,9 +18,6 @@ export default function DashboardStats({ activeItems, syncIssues, tenantId }: Da
   // Get capacity data from centralized middleware
   const { usage, loading } = useSubscriptionUsage(tenantId);
   
-  // Get business hours status
-  const { status, loading: statusLoading } = useStoreStatus(tenantId);
-  
   // Animated counts
   const inventoryCount = useCountUp(usage?.skuUsage || 0);
   const listingsCount = useCountUp(activeItems);
@@ -29,7 +25,7 @@ export default function DashboardStats({ activeItems, syncIssues, tenantId }: Da
   const locationsCount = useCountUp(usage?.locationUsage || 0);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {/* Total Items - with capacity */}
       <Card>
         <CardHeader>
@@ -157,65 +153,6 @@ export default function DashboardStats({ activeItems, syncIssues, tenantId }: Da
               {usage.locationPercent}% capacity used
             </p>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Business Hours Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-neutral-600">
-            Store Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              {statusLoading ? (
-                <div className="animate-pulse">
-                  <div className="h-8 bg-neutral-200 rounded w-24 mb-1"></div>
-                  <div className="h-4 bg-neutral-200 rounded w-32"></div>
-                </div>
-              ) : status ? (
-                <div>
-                  <div className={`text-lg font-bold ${
-                    status.isOpen ? 'text-green-600' :
-                    status.status === 'opening-soon' ? 'text-blue-600' :
-                    status.status === 'closing-soon' ? 'text-orange-600' :
-                    'text-red-600'
-                  }`}>
-                    {status.isOpen ? 'Open' :
-                     status.status === 'opening-soon' ? 'Opening Soon' :
-                     status.status === 'closing-soon' ? 'Closing Soon' :
-                     'Closed'}
-                  </div>
-                  <p className="text-sm text-neutral-500 mt-1">
-                    {status.label}
-                  </p>
-                </div>
-              ) : (
-                <div className="text-neutral-500">
-                  <div className="text-lg font-bold">Unknown</div>
-                  <p className="text-sm mt-1">Check hours settings</p>
-                </div>
-              )}
-            </div>
-            <div className="p-3 bg-orange-100 rounded-full ml-4">
-              <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-          <div className="mt-3">
-            <a
-              href={`/t/${tenantId}/settings/hours`}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium inline-flex items-center gap-1"
-            >
-              Manage Hours
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          </div>
         </CardContent>
       </Card>
     </div>

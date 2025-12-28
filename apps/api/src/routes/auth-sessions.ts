@@ -29,21 +29,18 @@ router.get('/sessions', authenticateToken, async (req, res) => {
 
     // Fetch active sessions from database
     const sessions = await basePrisma.$queryRaw<any[]>`
-      SELECT 
+      SELECT
         id,
         device_info as "deviceInfo",
         ip_address as "ipAddress",
-        location,
         user_agent as "userAgent",
-        is_current as "isCurrent",
-        last_activity as "lastActivity",
         created_at as "createdAt",
         expires_at as "expiresAt"
-      FROM user_sessions
+      FROM user_sessions_list
       WHERE user_id = ${userId}
-        AND revoked_at IS NULL
+        AND is_active = true
         AND (expires_at IS NULL OR expires_at > NOW())
-      ORDER BY last_activity DESC
+      ORDER BY created_at DESC
     `;
 
     // Mark current session
@@ -79,11 +76,11 @@ router.delete('/sessions/:sessionId', authenticateToken, async (req, res) => {
 
     // Verify session belongs to user and revoke it
     const result = await basePrisma.$executeRaw`
-      UPDATE user_sessions
-      SET revoked_at = NOW()
+      UPDATE user_sessions_list
+      SET is_active = false
       WHERE id = ${sessionId}
         AND user_id = ${userId}
-        AND revoked_at IS NULL
+        AND is_active = true
     `;
 
     if (result === 0) {
@@ -129,11 +126,17 @@ router.post('/sessions/revoke-all', authenticateToken, async (req, res) => {
 
     // Revoke all sessions except current
     const result = await basePrisma.$executeRaw`
-      UPDATE user_sessions
-      SET revoked_at = NOW()
+      UPDATE user_sessions_list
+      SET is_active = false
       WHERE user_id = ${userId}
-        AND revoked_at IS NULL
-        AND token_hash != ${currentTokenHash}
+        AND is_active = true
+        AND id NOT IN (
+          SELECT id FROM user_sessions_list
+          WHERE user_id = ${userId}
+            AND is_active = true
+            AND expires_at > NOW()
+          LIMIT 1
+        )
     `;
 
     // Create security alert
@@ -174,11 +177,11 @@ router.put('/sessions/:sessionId/activity', authenticateToken, async (req, res) 
     }
 
     await basePrisma.$executeRaw`
-      UPDATE user_sessions
+      UPDATE user_sessions_list
       SET last_activity = NOW()
       WHERE id = ${sessionId}
         AND user_id = ${userId}
-        AND revoked_at IS NULL
+        AND is_active = true
     `;
 
     res.json({ success: true });

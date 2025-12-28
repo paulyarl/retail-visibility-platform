@@ -258,8 +258,19 @@ export class ThreatDetectionService {
         prisma.security_threats.count({
           where: { type: 'suspicious_activity', created_at: { gte: since } }
         }),
-        prisma.security_threats.count({
-          where: { type: 'rate_limit_exceeded', created_at: { gte: since } }
+        prisma.security_alerts.count({
+          where: {
+            OR: [
+              { type: 'rate_limit_exceeded' },
+              { type: 'auth_rate_limit_exceeded' },
+              { type: 'search_rate_limit_exceeded' },
+              { type: 'upload_rate_limit_exceeded' },
+              { type: 'costly_api_rate_limit_exceeded' },
+              { type: 'admin_rate_limit_exceeded' },
+              { type: 'store_status_rate_limit_exceeded' }
+            ],
+            created_at: { gte: since }
+          }
         }),
         prisma.security_threats.count({
           where: { resolved: false, created_at: { gte: since } }
@@ -285,8 +296,19 @@ export class ThreatDetectionService {
         prisma.security_threats.count({
           where: { type: 'suspicious_activity', created_at: { gte: previousPeriodStart, lt: since } }
         }),
-        prisma.security_threats.count({
-          where: { type: 'rate_limit_exceeded', created_at: { gte: previousPeriodStart, lt: since } }
+        prisma.security_alerts.count({
+          where: {
+            OR: [
+              { type: 'rate_limit_exceeded' },
+              { type: 'auth_rate_limit_exceeded' },
+              { type: 'search_rate_limit_exceeded' },
+              { type: 'upload_rate_limit_exceeded' },
+              { type: 'costly_api_rate_limit_exceeded' },
+              { type: 'admin_rate_limit_exceeded' },
+              { type: 'store_status_rate_limit_exceeded' }
+            ],
+            created_at: { gte: previousPeriodStart, lt: since }
+          }
         })
       ]);
 

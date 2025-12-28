@@ -7,6 +7,7 @@ import { Request, Response, NextFunction } from 'express';
 import { basePrisma } from '../prisma';
 import crypto from 'crypto';
 import { UAParser } from 'ua-parser-js';
+import { generateSessionId } from '../lib/id-generator';
 
 interface SessionInfo {
   userId: string;
@@ -106,15 +107,15 @@ export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
 
     // Check if session already exists
     const existingSession = await basePrisma.$queryRaw<any[]>`
-      SELECT id FROM user_sessions
+      SELECT id FROM user_sessions_list
       WHERE token_hash = ${tokenHash}
-        AND revoked_at IS NULL
+        AND is_active = true
     `;
 
     if (existingSession.length > 0) {
       // Update existing session
       await basePrisma.$executeRaw`
-        UPDATE user_sessions
+        UPDATE user_sessions_list
         SET last_activity = NOW()
         WHERE token_hash = ${tokenHash}
       `;
@@ -122,9 +123,9 @@ export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
       // Check if this is a new device
       const existingSessions = await basePrisma.$queryRaw<any[]>`
         SELECT device_info
-        FROM user_sessions
+        FROM user_sessions_list
         WHERE user_id = ${userId}
-          AND revoked_at IS NULL
+          AND is_active = true
       `;
 
       const isNewDevice = !existingSessions.some(session => {
@@ -135,24 +136,24 @@ export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
 
       // Create new session
       await basePrisma.$executeRaw`
-        INSERT INTO user_sessions (
+        INSERT INTO user_sessions_list (
+          id,
           user_id,
           token_hash,
           device_info,
           ip_address,
-          location,
           user_agent,
-          is_current,
+          location,
           last_activity,
           expires_at
         ) VALUES (
+         ${generateSessionId()},
           ${userId},
           ${tokenHash},
           ${JSON.stringify(deviceInfo)}::jsonb,
           ${ipAddress},
-          ${JSON.stringify(location)}::jsonb,
           ${userAgent},
-          true,
+          ${JSON.stringify(location)}::jsonb,
           NOW(),
           NOW() + INTERVAL '30 days'
         )
@@ -176,7 +177,6 @@ export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
             'You signed in from a new device.',
             ${JSON.stringify({
               device: `${deviceInfo.browser} on ${deviceInfo.os}`,
-              location: `${location.city}, ${location.country}`,
               ip: ipAddress,
               timestamp: new Date().toISOString(),
             })}::jsonb

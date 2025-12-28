@@ -8,7 +8,7 @@ export interface Item {
   brand?: string;
   manufacturer?: string;
   condition?: 'new' | 'used' | 'refurbished';
-  price: number;
+  price: number | null; // Allow null prices to match database schema
   stock: number;
   status: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed';
   itemStatus?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed'; // Backend field name

@@ -490,7 +490,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   <div>
                     <dt className="text-sm font-medium text-neutral-500">Price</dt>
                     <dd className="text-2xl font-bold text-neutral-900 dark:text-white">
-                      ${(item.price).toFixed(2)}
+                      ${(item.price ?? 0).toFixed(2)}
                     </dd>
                   </div>
                   <div>

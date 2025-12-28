@@ -1453,18 +1453,22 @@ model user_behavior_simple {
 }
 
 model user_sessions_list {
-  id          String   @id
-  user_id     String
-  device_info String?
-  ip_address  String?
-  user_agent  String?
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now())
-  expires_at  DateTime
-  users       users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String
+  token_hash   String?  @unique
+  device_info  String?
+  ip_address   String?
+  user_agent   String?
+  location     Json?
+  last_activity DateTime?
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  expires_at   DateTime
+  users        users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([expires_at])
   @@index([user_id])
+  @@index([last_activity])
 }
 
 model user_tenants {

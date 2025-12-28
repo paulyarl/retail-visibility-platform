@@ -766,52 +766,187 @@ router.get('/:tenantId/categories-unmapped', async (req, res) => {
 });
 
 /**
- * GET /api/v1/tenants/:tenantId/categories/alignment-status
- * Get category alignment status and metrics
+ * GET /api/v1/tenants/:tenantId/categories/complete
+ * Consolidated endpoint returning categories, alignment status, and tenant info in one call
+ * Reduces 3 separate calls to 1 consolidated call
+ * Pattern: API Consolidation for Frontend Optimization
  */
-router.get('/:tenantId/categories-alignment-status', async (req, res) => {
+router.get('/:tenantId/categories/complete', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
-    const [total, mapped, unmapped] = await Promise.all([
-      prisma.directory_category.count({
-        where: { tenantId:tenantId, isActive: true },
-      }),
-      prisma.directory_category.count({
+    // Check tenant access
+    if (!hasAccessToTenant(req, tenantId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'Access to this tenant is not allowed',
+      });
+    }
+
+    console.log(`[CATEGORIES] Fetching complete categories data for tenant: ${tenantId}`);
+
+    // Single comprehensive query - replaces 3 separate calls
+    const [categories, alignmentStatus, tenant] = await Promise.all([
+      // Categories data (replaces /api/v1/tenants/:id/categories)
+      prisma.directory_category.findMany({
         where: {
-          tenantId:tenantId,
+          tenantId,
           isActive: true,
-          googleCategoryId: { not: null },
         },
-      }),
-      prisma.directory_category.count({
-        where: {
-          tenantId:tenantId,
-          isActive: true,
-          googleCategoryId: null,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          googleCategoryId: true,
+          sortOrder: true,
+          createdAt: true,
+          updatedAt: true,
         },
+        orderBy: { sortOrder: 'asc' },
       }),
+
+      // Alignment status calculation (replaces /api/v1/tenants/:id/categories-alignment-status)
+      Promise.resolve().then(async () => {
+        const [total, mapped] = await Promise.all([
+          prisma.directory_category.count({
+            where: { tenantId, isActive: true }
+          }),
+          prisma.directory_category.count({
+            where: {
+              tenantId,
+              isActive: true,
+              googleCategoryId: { not: null }
+            }
+          })
+        ]);
+
+        const unmapped = total - mapped;
+        const mappingCoverage = total > 0 ? Math.round((mapped / total) * 100) : 0;
+        const isCompliant = mappingCoverage >= 80;
+
+        return {
+          total,
+          mapped,
+          unmapped,
+          mappingCoverage,
+          isCompliant,
+          status: isCompliant ? 'compliant' : unmapped > 0 ? 'needs_alignment' : 'unknown'
+        };
+      }),
+
+      // Tenant info (replaces /api/tenants/:id)
+      prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: {
+          id: true,
+          name: true,
+          organization_id: true,
+          location_status: true,
+          _count: {
+            select: {
+              inventory_items: true,
+              user_tenants: true,
+            },
+          },
+        },
+      })
     ]);
 
-    const mappingCoverage = total > 0 ? (mapped / total) * 100 : 0;
-    const isCompliant = mappingCoverage === 100;
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found'
+      });
+    }
 
-    res.json({
-      success: true,
-      data: {
-        total,
-        mapped,
-        unmapped,
-        mappingCoverage: parseFloat(mappingCoverage.toFixed(2)),
-        isCompliant,
-        status: isCompliant ? 'compliant' : unmapped > 0 ? 'needs_alignment' : 'unknown',
+    // Get organization info if tenant belongs to one
+    let organizationInfo = null;
+    if (tenant.organization_id) {
+      const organization = await prisma.organizations_list.findUnique({
+        where: { id: tenant.organization_id },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (organization) {
+        // Get other tenants in the organization for propagation
+        const orgTenants = await prisma.tenants.findMany({
+          where: { organization_id: tenant.organization_id },
+          select: {
+            id: true,
+            name: true,
+            metadata: true,
+          },
+        });
+
+        const tenantsWithHeroFlag = orgTenants.map(t => ({
+          id: t.id,
+          name: t.name,
+          isHero: (t.metadata as any)?.isHeroLocation === true
+        }));
+
+        organizationInfo = {
+          id: organization.id,
+          name: organization.name,
+          tenants: tenantsWithHeroFlag
+        };
+      }
+    }
+
+    // Check if current tenant is hero location
+    const tenantMetadata = tenant as any;
+    const isHeroLocation = tenantMetadata?.metadata?.isHeroLocation === true;
+
+    // Transform categories for frontend compatibility
+    const transformedCategories = categories.map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      googleCategoryId: cat.googleCategoryId,
+      isActive: true, // We already filtered for active
+      sortOrder: cat.sortOrder,
+      createdAt: cat.createdAt,
+      updatedAt: cat.updatedAt,
+    }));
+
+    // Return consolidated response
+    const consolidatedResponse = {
+      categories: transformedCategories,
+      alignmentStatus,
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        organizationId: tenant.organization_id,
+        isHeroLocation,
+        stats: {
+          productCount: tenant._count.inventory_items,
+          userCount: tenant._count.user_tenants,
+        }
       },
+      organization: organizationInfo,
+      _timestamp: new Date().toISOString(),
+    };
+
+    console.log(`[CATEGORIES] Returning consolidated data:`, {
+      categoriesCount: transformedCategories.length,
+      alignmentCoverage: alignmentStatus.mappingCoverage,
+      hasOrganization: !!organizationInfo,
     });
-  } catch (error) {
-    console.error('Error fetching alignment status:', error);
+
+    // Cache for 1 minute (categories change more frequently than tenant data)
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.setHeader('Vary', 'Authorization');
+
+    res.json(consolidatedResponse);
+  } catch (error: any) {
+    console.error('[CATEGORIES] Error fetching complete categories data:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch alignment status',
+      error: 'internal_error',
+      message: 'Failed to fetch complete categories data',
     });
   }
 });

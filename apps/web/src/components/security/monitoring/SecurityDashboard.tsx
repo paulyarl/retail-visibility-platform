@@ -5,8 +5,12 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
+
 import { useSecurityMonitoring } from '@/hooks/useSecurityMonitoring';
 import { useAdminSecurityMonitoring } from '@/hooks/useAdminSecurityMonitoring';
+import { getAlertsByType } from '@/services/securityMonitoring';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -35,6 +39,27 @@ export function SecurityDashboard() {
     handlePageChange,
     handlePageSizeChange,
   } = useAdminSecurityMonitoring();
+
+  const { user } = useAuth();
+  const currentUserId = user?.id;
+
+  const [alertsByType, setAlertsByType] = useState<any[]>([]);
+  const [alertsByTypeLoading, setAlertsByTypeLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAlertsByType = async () => {
+      try {
+        const data = await getAlertsByType(5, 168); // 5 examples per type, 7 days
+        setAlertsByType(data);
+      } catch (error) {
+        console.error('Failed to fetch alerts by type:', error);
+      } finally {
+        setAlertsByTypeLoading(false);
+      }
+    };
+
+    fetchAlertsByType();
+  }, []);
 
   if (loading) {
     return (
@@ -184,6 +209,15 @@ export function SecurityDashboard() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="alert-types" className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Alert Types
+            {alertsByType.length > 0 && (
+              <Badge variant="warning" className="ml-1">
+                {alertsByType.length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="stability" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
             Platform Stability
@@ -234,6 +268,7 @@ export function SecurityDashboard() {
                 <AdminSessionsTable 
                   sessions={sessions} 
                   onRevoke={revokeSession}
+                  currentUserId={currentUserId}
                   currentPage={currentPage}
                   pageSize={pageSize}
                   totalSessions={totalSessions}
@@ -296,8 +331,78 @@ export function SecurityDashboard() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="stability" className="space-y-4">
-          <PlatformStabilityDashboard />
+        <TabsContent value="alert-types" className="space-y-4">
+          {alertsByTypeLoading ? (
+            <div className="h-32 bg-muted animate-pulse rounded-lg" />
+          ) : alertsByType.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No alerts found in the selected time period</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {alertsByType.map((alertGroup: any) => (
+                <Card key={alertGroup.type}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Badge variant={
+                            alertGroup.type.includes('critical') || alertGroup.type.includes('brute_force') ? 'error' :
+                            alertGroup.type.includes('warning') || alertGroup.type.includes('rate_limit') ? 'warning' :
+                            'info'
+                          }>
+                            {alertGroup.type.replace(/_/g, ' ').toUpperCase()}
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription>
+                          {alertGroup.count} total alerts • {alertGroup.unreadCount} unread • Latest: {new Date(alertGroup.latestAlert).toLocaleString()}
+                        </CardDescription>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold">{alertGroup.count}</div>
+                        <div className="text-sm text-muted-foreground">Total</div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium">Recent Examples:</h4>
+                      <div className="space-y-2">
+                        {alertGroup.recentAlerts.map((alert: any, index: number) => (
+                          <div key={index} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant={
+                                  alert.severity === 'critical' ? 'error' :
+                                  alert.severity === 'warning' ? 'warning' : 'info'
+                                } className="text-xs">
+                                  {alert.severity}
+                                </Badge>
+                                {!alert.read && (
+                                  <Badge variant="info" className="text-xs">Unread</Badge>
+                                )}
+                              </div>
+                              <p className="text-sm font-medium">{alert.title}</p>
+                              <p className="text-xs text-muted-foreground">{alert.message}</p>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                {alert.userEmail && (
+                                  <span>User: {alert.userEmail}</span>
+                                )}
+                                <span>{new Date(alert.createdAt).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="threats" className="space-y-4">

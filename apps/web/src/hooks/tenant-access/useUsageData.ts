@@ -1,62 +1,38 @@
 /**
  * Usage Data Hook
- * 
+ *
  * Focused hook for fetching and managing tenant usage statistics.
  * Handles products, locations, users, and other usage metrics.
+ * Now uses consolidated useTenantComplete data instead of separate API calls.
  */
 
-import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { useMemo } from 'react';
+import { useTenantComplete } from '../dashboard/useTenantComplete';
 import type { UsageDataResult, TenantUsage, UsageMetric } from './types';
 
 /**
  * Hook for fetching tenant usage data
- * 
+ * Now uses consolidated data from useTenantComplete instead of separate API calls
+ *
  * @param tenantId - The tenant ID to fetch usage data for
  * @returns Usage data with limit checking functions
  */
 export function useUsageData(tenantId: string | null): UsageDataResult {
-  const [usage, setUsage] = useState<TenantUsage | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use consolidated data instead of separate API calls
+  const { usage: consolidatedUsage, loading, error, refresh } = useTenantComplete(tenantId);
 
-  const fetchUsageData = async () => {
-    if (!tenantId) {
-      setLoading(false);
-      return;
-    }
+  // Transform consolidated usage data to expected format
+  const usage: TenantUsage | null = useMemo(() => {
+    if (!consolidatedUsage) return null;
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Fetch usage statistics
-      const response = await api.get(`/api/tenants/${tenantId}/usage`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch usage data: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      // Transform API response to standardized usage format
-      const usageData: TenantUsage = {
-        products: createUsageMetric(data.currentItems || 0, data.monthlySkuQuota),
-        locations: createUsageMetric(1, null), // TODO: Get actual location count and limit
-        users: createUsageMetric(0, null), // TODO: Get actual user count and limit
-        apiCalls: createUsageMetric(0, null), // TODO: Get actual API call count and limit
-        storageGB: createUsageMetric(0, null) // TODO: Get actual storage usage and limit
-      };
-
-      setUsage(usageData);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load usage data';
-      setError(errorMessage);
-      console.error('[useUsageData] Error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    return {
+      products: createUsageMetric(consolidatedUsage.products, null), // TODO: Get limit from tier data
+      locations: createUsageMetric(consolidatedUsage.locations, null), // TODO: Get limit from tier data
+      users: createUsageMetric(consolidatedUsage.users, null), // TODO: Get limit from tier data
+      apiCalls: createUsageMetric(consolidatedUsage.apiCalls, null), // TODO: Get limit from tier data
+      storageGB: createUsageMetric(consolidatedUsage.storageGB, null) // TODO: Get limit from tier data
+    };
+  }, [consolidatedUsage]);
 
   // Helper function to create standardized usage metrics
   const createUsageMetric = (current: number, limit: number | null): UsageMetric => {
@@ -87,28 +63,12 @@ export function useUsageData(tenantId: string | null): UsageDataResult {
     return metric.percent;
   };
 
-  // Auto-fetch when tenantId changes
-  useEffect(() => {
-    fetchUsageData();
-  }, [tenantId]);
-
-  // Set up background refresh for usage data (every 30 seconds)
-  useEffect(() => {
-    if (!tenantId) return;
-
-    const interval = setInterval(() => {
-      fetchUsageData();
-    }, 30 * 1000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, [tenantId]);
-
   return {
     usage,
     isLimitReached,
     getUsagePercentage,
     loading,
     error,
-    refresh: fetchUsageData
+    refresh
   };
 }

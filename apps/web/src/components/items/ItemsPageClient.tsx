@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button, Input, Modal, ModalFooter, ConfirmDialog } from "@/components/ui";
-import { useTenantItems } from "@/hooks/useTenantItems";
+// Replace separate hook with consolidated hook
+import { useItemsComplete } from "@/hooks/useItemsComplete";
 import { useItemsViewMode } from "@/hooks/useItemsViewMode";
 import { useItemsModals } from "@/hooks/useItemsModals";
 import { useItemsActions } from "@/hooks/useItemsActions";
@@ -54,7 +55,15 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     setPage,
     setPageSize,
     refresh,
-  } = useTenantItems({ tenantId });
+  } = useItemsComplete({
+    tenantId,
+    initialPage: 1,
+    initialPageSize: 25,
+    initialStatus: "all",
+    initialVisibility: "all",
+    initialSearch: "",
+    initialCategory: null
+  });
 
   const { viewMode, setViewMode } = useItemsViewMode();
 

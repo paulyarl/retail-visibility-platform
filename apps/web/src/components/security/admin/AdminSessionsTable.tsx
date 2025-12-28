@@ -44,6 +44,7 @@ interface AdminSession {
 interface AdminSessionsTableProps {
   sessions: AdminSession[];
   onRevoke: (sessionId: string) => Promise<void>;
+  currentUserId?: string; // Current admin user's ID to prevent self-revocation
   // Pagination props
   currentPage: number;
   pageSize: number;
@@ -55,6 +56,7 @@ interface AdminSessionsTableProps {
 export function AdminSessionsTable({ 
   sessions, 
   onRevoke,
+  currentUserId,
   currentPage,
   pageSize,
   totalSessions,
@@ -158,22 +160,28 @@ export function AdminSessionsTable({
                 </div>
               </TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRevoke(session.id)}
-                  disabled={revoking === session.id}
-                  className="text-destructive hover:text-destructive"
-                >
-                  {revoking === session.id ? (
-                    'Revoking...'
-                  ) : (
-                    <>
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Revoke
-                    </>
-                  )}
-                </Button>
+                {session.userId === currentUserId ? (
+                  <Badge variant="default" className="text-xs">
+                    Current Session
+                  </Badge>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRevoke(session.id)}
+                    disabled={revoking === session.id}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    {revoking === session.id ? (
+                      'Revoking...'
+                    ) : (
+                      <>
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Revoke
+                      </>
+                    )}
+                  </Button>
+                )}
               </TableCell>
             </TableRow>
           ))}

@@ -15,15 +15,52 @@ router.use(requireAdmin);
 
 /**
  * GET /api/admin/security/sessions
- * Get all active sessions across the platform - TEMPORARILY DISABLED
- * Note: user_sessions table was dropped during schema migration
+ * Get all active sessions across the platform
  */
 router.get('/sessions', async (req, res) => {
-  res.status(503).json({
-    error: 'Service temporarily unavailable',
-    message: 'Session management is currently unavailable due to database migration. This feature will be restored in a future update.',
-    available: false
-  });
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 25, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    // Get active sessions with user information
+    const sessions = await basePrisma.$queryRaw<any[]>`
+      SELECT
+        s.id,
+        s.user_id as "userId",
+        u.email as "userEmail",
+        u.first_name as "userFirstName",
+        u.last_name as "userLastName",
+        u.role as "userRole",
+        s.device_info as "deviceInfo",
+        s.ip_address as "ipAddress",
+        s.location,
+        s.user_agent as "userAgent",
+        s.created_at as "createdAt",
+        s.expires_at as "expiresAt",
+        s.last_activity as "lastActivity"
+      FROM user_sessions_list s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.is_active = true
+        AND s.expires_at > NOW()
+      ORDER BY s.created_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `;
+
+    const [{ count }] = await basePrisma.$queryRaw<[{ count: bigint }]>`SELECT COUNT(*) as count FROM user_sessions_list WHERE is_active = true AND expires_at > NOW()`;
+
+    res.json({
+      data: sessions.map(session => ({
+        ...session,
+        deviceInfo: session.deviceInfo || {},
+        location: session.location || {},
+      })),
+      total: Number(count),
+    });
+  } catch (error) {
+    console.error('[GET /api/admin/security/sessions] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch sessions' });
+  }
 });
 
 /**
@@ -171,16 +208,77 @@ router.get('/alerts/stats', async (req, res) => {
 });
 
 /**
- * DELETE /api/admin/security/sessions/:sessionId
- * Admin revoke any user's session - TEMPORARILY DISABLED
- * Note: user_sessions table was dropped during schema migration
+ * GET /api/admin/security/alerts/by-type
+ * Get alerts grouped by type with counts and recent examples
  */
-router.delete('/sessions/:sessionId', async (req, res) => {
-  res.status(503).json({
-    error: 'Service temporarily unavailable',
-    message: 'Session management is currently unavailable due to database migration. This feature will be restored in a future update.',
-    available: false
-  });
+router.get('/alerts/by-type', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 5, 10); // Max 10 examples per type
+    const hours = parseInt(req.query.hours as string) || 168; // Default 7 days
+
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+    // Get alert counts by type
+    const typeCounts = await basePrisma.$queryRaw<any[]>`
+      SELECT
+        type,
+        COUNT(*) as count,
+        MAX(created_at) as latest_alert,
+        COUNT(*) FILTER (WHERE read = false) as unread_count
+      FROM security_alerts
+      WHERE dismissed = false
+        AND created_at >= ${since}
+      GROUP BY type
+      ORDER BY count DESC
+    `;
+
+    // Get recent examples for each type
+    const alertsByType = await Promise.all(
+      typeCounts.map(async (typeInfo: any) => {
+        const recentAlerts = await basePrisma.$queryRaw<any[]>`
+          SELECT
+            a.id,
+            a.type,
+            a.severity,
+            a.title,
+            a.message,
+            a.created_at as "createdAt",
+            a.read,
+            u.email as "userEmail",
+            u.first_name as "userFirstName",
+            u.last_name as "userLastName"
+          FROM security_alerts a
+          LEFT JOIN users u ON a.user_id = u.id
+          WHERE a.type = ${typeInfo.type}
+            AND a.dismissed = false
+            AND a.created_at >= ${since}
+          ORDER BY a.created_at DESC
+          LIMIT ${limit}
+        `;
+
+        return {
+          type: typeInfo.type,
+          count: Number(typeInfo.count),
+          unreadCount: Number(typeInfo.unread_count),
+          latestAlert: typeInfo.latest_alert,
+          recentAlerts: recentAlerts.map(alert => ({
+            ...alert,
+            createdAt: alert.createdAt.toISOString(),
+          })),
+        };
+      })
+    );
+
+    res.json({
+      data: alertsByType,
+      totalTypes: alertsByType.length,
+      timeRange: `${hours} hours`,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[GET /api/admin/security/alerts/by-type] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch alerts by type' });
+  }
 });
 
 /**

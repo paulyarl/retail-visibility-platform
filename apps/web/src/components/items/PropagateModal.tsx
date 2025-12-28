@@ -107,7 +107,7 @@ export default function PropagateModal({
                   {item.name}
                 </div>
                 <div className="text-sm text-neutral-600 dark:text-neutral-400">
-                  SKU: {item.sku} • ${(item.price / 100).toFixed(2)}
+                  SKU: {item.sku} • ${((item.price ?? 0) / 100).toFixed(2)}
                 </div>
               </div>
             </div>

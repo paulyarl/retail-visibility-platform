@@ -136,18 +136,23 @@ export function LoginActivityTable({ sessions, onRevoke, onRevokeAll }: LoginAct
                   </div>
                 </TableCell>
                 <TableCell>
-                  {typeof session.location === 'string' 
-                    ? session.location 
-                    : `${session.location.city}, ${session.location.country}`
-                  }
+                  {session.location && typeof session.location === 'object' && session.location.city
+                    ? `${session.location.city}, ${session.location.country || 'Unknown'}`
+                    : typeof session.location === 'string'
+                    ? session.location
+                    : 'Unknown Location'}
                 </TableCell>
                 <TableCell>
                   <code className="text-xs bg-muted px-2 py-1 rounded">
-                    {session.ipAddress}
+                    {session.ipAddress || 'Unknown'}
                   </code>
                 </TableCell>
                 <TableCell>
-                  {formatDistanceToNow(new Date(session.lastActivity), { addSuffix: true })}
+                  {session.lastActivity
+                    ? formatDistanceToNow(new Date(session.lastActivity), { addSuffix: true })
+                    : session.createdAt
+                    ? formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })
+                    : 'Recently'}
                 </TableCell>
                 <TableCell className="text-right">
                   {!session.isCurrent && (

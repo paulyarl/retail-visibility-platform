@@ -114,6 +114,25 @@ export async function getSecurityHealth(): Promise<SecurityHealthStatus> {
 }
 
 /**
+ * Get alerts grouped by type with counts and recent examples
+ */
+export async function getAlertsByType(limit: number = 5, hours: number = 168): Promise<any[]> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    hours: hours.toString(),
+  });
+
+  const response = await api.get(`/api/admin/security/alerts/by-type?${params}`);
+
+  if (!response.ok) {
+    throw new Error('Failed to get alerts by type');
+  }
+
+  const result: any = await response.json();
+  return result.data || [];
+}
+
+/**
  * Export security report
  */
 export async function exportSecurityReport(
