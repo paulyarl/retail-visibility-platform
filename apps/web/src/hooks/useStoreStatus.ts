@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRateLimitErrorHandler } from './useRateLimitErrorHandler';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface StoreStatus {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
 
   const baseUrl = apiBase || process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
   const { handleRateLimitError } = useRateLimitErrorHandler();
+  const { user } = useAuth();
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -65,13 +67,13 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
     }
   }, [tenantId, fetchStatus]);
 
-  // Reduce refresh frequency since we now have caching (server-side: 5 minutes, client-side: 1 minute)
+  // Only enable refresh for authenticated users - anonymous users get static status
   useEffect(() => {
-    if (!tenantId) return;
+    if (!tenantId || !user) return; // No refresh for anonymous users
 
-    const interval = setInterval(fetchStatus, 60000); // 1 minute instead of 30 seconds
+    const interval = setInterval(fetchStatus, 900000); // 15 minutes for authenticated users
     return () => clearInterval(interval);
-  }, [tenantId, fetchStatus]);
+  }, [tenantId, user, fetchStatus]);
 
   return {
     status,
