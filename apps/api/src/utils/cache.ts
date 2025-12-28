@@ -151,6 +151,6 @@ export const cacheKeys = {
 
 // Cache TTL constants (in seconds)
 export const CACHE_TTL = {
-  BUSINESS_HOURS_STATUS: 300, // 5 minutes - status can change based on time
+  BUSINESS_HOURS_STATUS: 900, // 5 minutes - status can change based on time
   BUSINESS_HOURS_DATA: 1800   // 30 minutes - raw data changes less frequently
 }

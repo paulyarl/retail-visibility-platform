@@ -27,6 +27,9 @@ interface StoreCardProps {
     website?: string;
     distance?: number;
     isOpen?: boolean;
+    isClosed?: boolean;
+    isOpening?: boolean;
+    isClosing?: boolean;
     directoryPublished?: boolean; // Add directory publish status
     category?: {
       name: string;

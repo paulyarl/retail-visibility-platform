@@ -31,7 +31,7 @@ class ApiCache {
   /**
    * Set cache entry with TTL
    */
-  set(key: string, data: any, ttl: number = 30000): void {
+  set(key: string, data: any, ttl: number = 60000): void {
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
@@ -77,7 +77,7 @@ export const apiCache = new ApiCache();
 export async function cachedFetch(
   url: string,
   options?: RequestInit,
-  ttl: number = 30000 // 30 seconds default
+  ttl: number = 60000 // 60 seconds default (1 min)
 ): Promise<Response> {
   const cacheKey = `${url}:${JSON.stringify(options || {})}`;
 
