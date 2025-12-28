@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { cachedFetch } from '@/lib/api-cache';
 import Image from "next/image";
 import { canManageTenantSettings } from "@/lib/auth/access-control";
 import PublicFooter from "@/components/PublicFooter";
@@ -76,7 +77,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
         try {
           // Call backend API directly (public endpoint, no auth needed)
           const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-          const response = await fetch(`${API_BASE_URL}/api/platform-stats`);
+          const response = await cachedFetch(`${API_BASE_URL}/api/platform-stats`);
           if (response.ok) {
             const data = await response.json();
             setPlatformStats(data);
@@ -106,7 +107,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
         // Fetch from public endpoint (no auth needed for reading)
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${API_BASE_URL}/api/public/features-showcase-config`);
+        const response = await cachedFetch(`${API_BASE_URL}/api/public/features-showcase-config`);
         if (response.ok) {
           const data = await response.json();
           setShowcaseMode(data.mode || 'hybrid');
@@ -126,7 +127,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
       try {
         if (!selectedTenantId) { setHoursInfo(null); return; }
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${API_BASE_URL}/public/tenant/${selectedTenantId}/profile`, { cache: 'no-store' });
+        const res = await cachedFetch(`${API_BASE_URL}/public/tenant/${selectedTenantId}/profile`, { cache: 'no-store' });
         if (!res.ok) { setHoursInfo(null); return; }
         const prof = await res.json();
         const hours = prof?.hours;
@@ -153,7 +154,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
       
       try {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const tenantRes = await api.get(`${apiBaseUrl}/api/tenants/${selectedTenantId}`);
+        const tenantRes = await cachedFetch(`${apiBaseUrl}/api/tenants/${selectedTenantId}`);
         if (tenantRes.ok) {
           const tenantInfo = await tenantRes.json();
           setTenantData({

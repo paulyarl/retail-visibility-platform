@@ -431,10 +431,10 @@ export function applyRateLimit(req: Request, res: Response, next: NextFunction) 
   }
 
   // Store status endpoints (cached, essential for UI - NO RATE LIMIT)
-  // if (path.includes('/business-hours/status')) {
-  //   storeStatusRateLimit(req, res, next);
-  //   return;
-  // }
+  if (path.includes('/business-hours/status')) {
+    // Skip rate limiting entirely for store status endpoints
+    return next();
+  }
 
   // Costly API endpoints (geocoding, external services)
   if (path.includes('/geocode') || path.includes('/google') || path.includes('/external')) {
