@@ -1,5 +1,6 @@
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
+import * as crypto from 'crypto';
 import { user_role } from '@prisma/client';
 import { prisma } from '../prisma';
 import { JWTPayload } from '../middleware/auth';
@@ -163,10 +164,14 @@ export class AuthService {
       data: { last_login: new Date() },
     });
 
-    // Create session
+    // Generate token hash for session tracking
+    const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+
+    // Create session with token hash so middleware can find/update it
     await prisma.user_sessions_list.create({
       data: {
         user_id: user.id,
+        token_hash: tokenHash,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },
     });
