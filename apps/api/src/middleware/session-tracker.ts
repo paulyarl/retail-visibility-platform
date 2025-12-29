@@ -15,6 +15,7 @@ interface SessionInfo {
   ipAddress: string;
   userAgent: string;
   deviceName?: string;
+  userRole?: string;
 }
 
 /**
@@ -100,7 +101,7 @@ async function getLocationFromIP(ipAddress: string): Promise<{
  * Create or update user session
  */
 export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
-  const { userId, token, ipAddress, userAgent, deviceName } = sessionInfo;
+  const { userId, token, ipAddress, userAgent, deviceName, userRole } = sessionInfo;
 
   try {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -145,6 +146,49 @@ export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
         return existingDevice.browser === deviceInfo.browser &&
                existingDevice.os === deviceInfo.os;
       });
+
+      // Check session limits before creating new session
+      const isPlatformAdmin = userRole === 'PLATFORM_ADMIN' || userRole === 'PLATFORM_SUPPORT';
+      const maxSessions = isPlatformAdmin ? 50 : 10; // Platform admins: 50 sessions, regular users: 10
+
+      // Count active sessions for this user
+      const [{ sessionCount }] = await basePrisma.$queryRaw<[{ sessionCount: bigint }]>`SELECT COUNT(*) as sessionCount FROM user_sessions_list WHERE user_id = ${userId} AND is_active = true`;
+
+      if (Number(sessionCount) >= maxSessions) {
+        // Find and deactivate the oldest session to make room for the new one
+        await basePrisma.$executeRaw`
+          UPDATE user_sessions_list
+          SET is_active = false
+          WHERE user_id = ${userId}
+            AND is_active = true
+          ORDER BY last_activity ASC
+          LIMIT 1
+        `;
+
+        // Create security alert for session limit exceeded
+        await basePrisma.$executeRaw`
+          INSERT INTO security_alerts (
+            user_id,
+            type,
+            severity,
+            title,
+            message,
+            metadata
+          ) VALUES (
+            ${userId},
+            'session_limit',
+            'warning',
+            'Session Limit Exceeded',
+            'Maximum concurrent sessions reached. Oldest session was automatically deactivated.',
+            ${JSON.stringify({
+              sessionLimit: maxSessions,
+              activeSessions: Number(sessionCount),
+              action: 'auto_cleanup_oldest',
+              timestamp: new Date().toISOString(),
+            })}::jsonb
+          )
+        `;
+      }
 
       // Create new session
       await basePrisma.$executeRaw`
@@ -232,6 +276,7 @@ export function sessionActivityMiddleware(req: Request, res: Response, next: Nex
         ipAddress,
         userAgent,
         deviceName,
+        userRole: req.user?.role,
       }).catch(err => {
         console.error('[sessionActivityMiddleware] Error tracking session:', err);
       });

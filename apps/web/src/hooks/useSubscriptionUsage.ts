@@ -56,8 +56,8 @@ export interface SubscriptionUsage {
 }
 
 export function useSubscriptionUsage(tenantIdProp?: string) {
-  // Get tenant ID from prop or localStorage
-  const tenantId = tenantIdProp || localStorage.getItem('tenantId') || undefined;
+  // Get tenant ID from prop or localStorage (only on client side)
+  const tenantId = tenantIdProp || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null) || undefined;
 
   // Use React Query hooks for cached data
   const { data: tenant, isLoading: tenantLoading, error: tenantError } = useTenant(tenantId || '');

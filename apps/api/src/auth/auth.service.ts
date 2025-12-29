@@ -119,6 +119,20 @@ export class AuthService {
    * Login user
    */
   async login(data: LoginData) {
+    // Rate limiting: Check recent login attempts for this user
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentLogins = await prisma.user_sessions_list.count({
+      where: {
+        users: { email: data.email.toLowerCase() },
+        created_at: { gte: oneHourAgo },
+      },
+    });
+
+    const maxLoginsPerHour = 5;
+    if (recentLogins >= maxLoginsPerHour) {
+      throw new Error(`Too many login attempts. Maximum ${maxLoginsPerHour} logins per hour allowed.`);
+    }
+
     // Find user
     const user = await prisma.users.findUnique({
       where: { email: data.email.toLowerCase() },

@@ -65,15 +65,57 @@ router.get('/sessions', async (req, res) => {
 
 /**
  * GET /api/admin/security/sessions/stats
- * Get session statistics - TEMPORARILY DISABLED
- * Note: user_sessions table was dropped during schema migration
+ * Get session statistics and user session counts
  */
 router.get('/sessions/stats', async (req, res) => {
-  res.status(503).json({
-    error: 'Service temporarily unavailable',
-    message: 'Session statistics are currently unavailable due to database migration. This feature will be restored in a future update.',
-    available: false
-  });
+  try {
+    // Get overall session stats
+    const [overallStats] = await basePrisma.$queryRaw<any[]>`SELECT COUNT(*) as totalSessions FROM user_sessions_list WHERE is_active = true AND expires_at > NOW()`;
+
+    // Get sessions per user (top 20 users with most sessions)
+    const userSessionCounts = await basePrisma.$queryRaw<any[]>`SELECT u.email, COUNT(s.id) as session_count FROM user_sessions_list s JOIN users u ON s.user_id = u.id WHERE s.is_active = true AND s.expires_at > NOW() GROUP BY u.email ORDER BY session_count DESC LIMIT 20`;
+
+    // Get users exceeding session limits
+    const usersOverLimit = await basePrisma.$queryRaw<any[]>`
+      SELECT
+        u.email,
+        u.role,
+        COUNT(s.id) as active_sessions,
+        CASE
+          WHEN u.role IN ('PLATFORM_ADMIN', 'PLATFORM_SUPPORT') THEN 50
+          ELSE 10
+        END as session_limit
+      FROM user_sessions_list s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.is_active = true AND s.expires_at > NOW()
+      GROUP BY u.id, u.email, u.role
+      HAVING COUNT(s.id) >= CASE
+        WHEN u.role IN ('PLATFORM_ADMIN', 'PLATFORM_SUPPORT') THEN 50
+        ELSE 10
+      END
+      ORDER BY active_sessions DESC
+    `;
+
+    res.json({
+      overall: {
+        totalActiveSessions: Number(overallStats.totalSessions),
+        usersOverLimit: usersOverLimit.length,
+      },
+      topUsers: userSessionCounts.map(u => ({
+        email: u.email,
+        sessionCount: Number(u.session_count),
+      })),
+      overLimit: usersOverLimit.map(u => ({
+        email: u.email,
+        role: u.role,
+        activeSessions: Number(u.active_sessions),
+        sessionLimit: u.session_limit,
+      })),
+    });
+  } catch (error) {
+    console.error('[GET /api/admin/security/sessions/stats] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch session stats' });
+  }
 });
 
 /**
