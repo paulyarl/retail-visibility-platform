@@ -557,13 +557,53 @@ async function getUserLocationServer(): Promise<{
  * Client-side behavior tracking (for interactive elements)
  * Now uses caching for better performance and reliability
  */
+// Simple decryption for client-side caching (matches AuthContext)
+function decrypt(text: string): string {
+  try {
+    return decodeURIComponent(atob(text));
+  } catch {
+    return text;
+  }
+}
+
 export function trackBehaviorClient(trackingData: Omit<TrackingData, 'durationSeconds'>): void {
   if (typeof window === 'undefined') return;
 
+  // Get user information from localStorage (set by auth context)
+  let userId: string | undefined;
+  let sessionId: string | undefined;
+  
+  try {
+    const authUser = localStorage.getItem('auth_user_cache');
+    
+    if (authUser) {
+      const decrypted = decrypt(authUser);
+      const parsed = JSON.parse(decrypted);
+      if (parsed?.user?.id) {
+        userId = parsed.user.id;
+      }
+    }
+    
+    // For anonymous users, use session ID from localStorage
+    const lastViewedSession = localStorage.getItem('lastViewedSessionId');
+    if (lastViewedSession && !userId) {
+      sessionId = lastViewedSession;
+    }
+  } catch (error) {
+    console.error('[Tracking] Error getting user data:', error);
+  }
+
   const cache = getTrackingCache();
   
-  // Add event to cache (timestamp and priority will be added internally)
-  cache.addEvent(trackingData);
+  // Add event to cache with user/session info
+  const eventWithUser = {
+    ...trackingData,
+    userId,
+    sessionId
+  };
+  
+  console.log('[Tracking Debug] Adding event:', eventWithUser);
+  cache.addEvent(eventWithUser);
 }
 
 /**

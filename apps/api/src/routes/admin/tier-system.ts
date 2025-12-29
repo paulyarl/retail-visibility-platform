@@ -674,6 +674,13 @@ router.patch('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async (
 
     const { reason, ...updateData } = parsed.data;
 
+    // Transform camelCase field names to snake_case for Prisma
+    const transformedData: any = {};
+    if (updateData.featureKey !== undefined) transformedData.feature_key = updateData.featureKey;
+    if (updateData.featureName !== undefined) transformedData.feature_name = updateData.featureName;
+    if (updateData.isInherited !== undefined) transformedData.is_inherited = updateData.isInherited;
+    if (updateData.metadata !== undefined) transformedData.metadata = updateData.metadata;
+
     // Check if tier exists
     const tier = await prisma.subscription_tiers_list.findUnique({
       where: { tier_key: tierId },
@@ -697,7 +704,7 @@ router.patch('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async (
     const updatedFeature = await prisma.tier_features_list.update({
       where: { id: featureId },
       data: {
-        ...updateData,
+        ...transformedData,
         updated_at: new Date(),
       },
       include: {

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { 
-  Building2, 
-  Users, 
-  Package, 
-  Trash2, 
-  Rocket, 
+import {
+  Building2,
+  Users,
+  Package,
+  Trash2,
+  Rocket,
   Eraser,
   Clock,
   FileText,
@@ -120,6 +120,36 @@ export default function AdminToolsPage() {
     },
   ];
 
+  const directories = [
+    {
+      id: 'directory',
+      href: '/admin/directory',
+      icon: Shield,
+      title: 'Platform Directory Management',
+      description: 'Manage directory listings, featured placements, and quality across all tenants',
+      color: 'from-red-500 to-pink-600',
+      stats: 'Directory Control',
+    },
+    {
+      id: 'listings',
+      href: '/admin/directory/listings',
+      icon: Rocket,
+      title: 'All Directory Listings',
+      description: 'View and manage directory listings across all tenants',
+      color: 'from-cyan-500 to-blue-600',
+      stats: 'View directory listings',
+    },
+    {
+      id: 'featured',
+      href: '/admin/directory/featured',
+      icon: Package,
+      title: 'Featured Listings',
+      description: 'Manage featured placements and priorities',
+      color: 'from-purple-500 to-pink-600',
+      stats: 'Featured Listings',
+    },
+  ];
+
   const categories = [
     { id: 'organization', title: '🏢 Organization Management', icon: Building2 },
     { id: 'user', title: '👤 User Management', icon: Users },
@@ -189,14 +219,55 @@ export default function AdminToolsPage() {
             })}
           </div>
         </div>
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            📊 Directory Dashboards
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {directories.map((directory) => {
+              const Icon = directory.icon;
+              return (
+                <a
+                  key={directory.id}
+                  href={directory.href}
+                  className="group relative bg-gradient-to-br from-white to-gray-50 dark:from-gray-700 dark:to-gray-800 rounded-xl p-6 border-2 border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 transition-all duration-200 hover:shadow-2xl"
+                >
+                  {/* Icon */}
+                  <div className={`w-14 h-14 bg-gradient-to-br ${directory.color} rounded-lg flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-200`}>
+                    <Icon className="w-7 h-7 text-white" />
+                  </div>
+
+                  {/* Content */}
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    {directory.title}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    {directory.description}
+                  </p>
+
+                  {/* Stats Badge */}
+                  <div className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300 rounded-full text-xs font-medium">
+                    <span className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></span>
+                    {directory.stats}
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="absolute top-6 right-6 text-gray-400 group-hover:text-cyan-500 group-hover:translate-x-1 transition-all duration-200">
+                    →
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Tools Grid */}
         {categories.map((category) => {
           const categoryTools = tools.filter((tool) => tool.category === category.id);
-          const gridCols = categoryTools.length === 1 
-            ? 'grid-cols-1 md:grid-cols-1 lg:grid-cols-1 max-w-md' 
+          const gridCols = categoryTools.length === 1
+            ? 'grid-cols-1 md:grid-cols-1 lg:grid-cols-1 max-w-md'
             : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
-          
+
           return (
             <div key={category.id} className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -283,9 +354,9 @@ export default function AdminToolsPage() {
         <BulkClearModal onClose={() => setActiveModal(null)} />
       )}
       {activeModal === 'cleanup-sessions' && (
-        <CleanupScanSessionsModal 
+        <CleanupScanSessionsModal
           isOpen={true}
-          onClose={() => setActiveModal(null)} 
+          onClose={() => setActiveModal(null)}
         />
       )}
     </div>

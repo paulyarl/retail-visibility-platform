@@ -15,6 +15,7 @@ import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 import LocationClosedBanner from '@/components/storefront/LocationClosedBanner';
+import StorefrontViewTracker from '@/components/tracking/StorefrontViewTracker';
 import StorefrontActions from '@/components/products/StorefrontActions';
 import { StorefrontRecommendations } from './StorefrontClient';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
@@ -469,6 +470,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      {/* Client-side storefront tracking */}
+      <StorefrontViewTracker tenantId={id} categoriesViewed={productCategories.map((c: any) => c.name)} />
+
       {/* Header with Business Name and Logo */}
       <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -761,28 +761,36 @@ export async function getLastViewedItems(
         CASE
           WHEN ub.entity_type = 'store' THEN (
             SELECT json_build_object(
-              'business_name', dcl.business_name,
+              'businessName', dcl.business_name,
               'slug', dcl.slug,
               'address', dcl.address,
               'city', dcl.city,
               'state', dcl.state,
-              'logo_url', dcl.logo_url,
-              'rating_avg', dcl.rating_avg,
-              'rating_count', dcl.rating_count
+              'logoUrl', dcl.logo_url,
+              'ratingAvg', dcl.rating_avg,
+              'ratingCount', dcl.rating_count,
+              'productCount', COALESCE((
+                SELECT COUNT(*)
+                FROM inventory_items ii
+                WHERE ii.tenant_id = dcl.tenant_id
+                  AND ii.item_status = 'active'
+                  AND ii.visibility = 'public'
+              ), 0)
             )
             FROM directory_listings_list dcl
-            WHERE dcl.tenant_id = ub.entity_id
+            WHERE (dcl.tenant_id = ub.entity_id OR dcl.slug = ub.entity_id)
               AND dcl.is_published = true
+            LIMIT 1
           )
           WHEN ub.entity_type = 'product' THEN (
             SELECT json_build_object(
               'title', ii.title,
               'name', ii.name,
-              'price_cents', ii.price_cents,
-              'image_url', ii.image_url,
+              'priceCents', ii.price_cents,
+              'imageUrl', ii.image_url,
               'currency', ii.currency,
-              'store_name', dcl.business_name,
-              'store_slug', dcl.slug
+              'storeName', dcl.business_name,
+              'storeSlug', dcl.slug
             )
             FROM inventory_items ii
             JOIN directory_listings_list dcl ON ii.tenant_id = dcl.tenant_id
@@ -811,26 +819,29 @@ export async function getLastViewedItems(
         if (row.entity_type === 'store') {
           return {
             tenantId: row.entity_id,
-            businessName: data.business_name,
+            businessName: data.businessName,
             slug: data.slug,
             score,
-            reason: `Viewed ${new Date(row.last_viewed_at).toLocaleDateString()}${data.rating_avg ? ` • ${data.rating_avg.toFixed(1)}⭐` : ''}`,
+            reason: `Viewed ${new Date(row.last_viewed_at).toLocaleDateString()}${data.ratingAvg ? ` • ${data.ratingAvg.toFixed(1)}⭐` : ''}`,
             address: data.address,
             city: data.city,
             state: data.state,
-            logoUrl: data.logo_url
+            logoUrl: data.logoUrl,
+            ratingAvg: data.ratingAvg,
+            ratingCount: data.ratingCount,
+            productCount: data.productCount
           } as Recommendation;
         } else if (row.entity_type === 'product') {
           return {
-            tenantId: data.store_slug, // Use store slug as tenantId for display
-            businessName: data.store_name,
-            slug: data.store_slug,
+            tenantId: data.storeSlug, // Use store slug as tenantId for display
+            businessName: data.storeName,
+            slug: data.storeSlug,
             score,
-            reason: `Viewed ${new Date(row.last_viewed_at).toLocaleDateString()}${data.price_cents ? ` • $${(data.price_cents / 100).toFixed(2)}` : ''}`,
+            reason: `Viewed ${new Date(row.last_viewed_at).toLocaleDateString()}${data.priceCents ? ` • $${(data.priceCents / 100).toFixed(2)}` : ''}`,
             productId: row.entity_id,
             productName: data.title || data.name,
-            productPrice: data.price_cents ? data.price_cents / 100 : undefined,
-            productImage: data.image_url
+            productPrice: data.priceCents ? data.priceCents / 100 : undefined,
+            productImage: data.imageUrl
           } as Recommendation;
         }
 

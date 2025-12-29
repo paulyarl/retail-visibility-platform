@@ -19,6 +19,9 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
   const { handleRateLimitError } = useRateLimitErrorHandler();
   const { user } = useAuth();
 
+  // Memoize the rate limit error handler to prevent fetchStatus recreation
+  const memoizedHandleRateLimitError = useCallback(handleRateLimitError, []);
+
   const fetchStatus = useCallback(async () => {
     try {
       setLoading(true);
@@ -35,7 +38,7 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
 
       if (!response.ok) {
         // Check if this is a rate limit error and handle it with user-friendly messaging
-        if (handleRateLimitError(response, `/public/tenant/${tenantId}/business-hours/status`)) {
+        if (memoizedHandleRateLimitError(response, `/public/tenant/${tenantId}/business-hours/status`)) {
           // Rate limit error was handled, don't show generic error
           setError(null);
           setStatus(null);
@@ -59,7 +62,7 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, baseUrl, handleRateLimitError]);
+  }, [tenantId, baseUrl, memoizedHandleRateLimitError]);
 
   useEffect(() => {
     if (tenantId) {

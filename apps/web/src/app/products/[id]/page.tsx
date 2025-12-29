@@ -5,7 +5,8 @@ import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLanding
 import { ProductNavigation } from '@/components/products/ProductNavigation';
 import { ProductRecommendations } from '@/components/products/ProductRecommendations';
 import { computeStoreStatus } from '@/lib/hours-utils';
-import { trackProductView } from '@/utils/behaviorTracking';
+import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
+import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';
@@ -277,10 +278,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const { product, tenant, storeStatus, directorySlug } = data;
   const businessName = tenant.metadata?.businessName || tenant.name;
   
-  // Track product view for recommendations (fire and forget)
-  trackProductView(product.id, product.tenantId, product.tenantCategoryId || undefined).catch(err => 
-    console.error('Failed to track product view:', err)
-  );
+  // Track product view for recommendations (using client component)
+  // This will run on the client side where we can access localStorage for user info
 
   // Check if product is publicly accessible
   const isPubliclyAccessible = product.itemStatus === 'active' && product.visibility === 'public';
@@ -323,10 +322,18 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   return (
     <>
+    <ProductLikeProvider>
       {/* Structured Data */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+
+      {/* Product View Tracking */}
+      <ProductViewTracker 
+        productId={product.id}
+        tenantId={product.tenantId}
+        categoryId={product.tenantCategoryId}
       />
 
       {/* Navigation Buttons (for authenticated users) */}
@@ -374,6 +381,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <ProductRecommendations productId={product.id} tenantId={product.tenantId} />
       </div>
-    </>
-  );
+    </ProductLikeProvider>
+  </>
+);
 }

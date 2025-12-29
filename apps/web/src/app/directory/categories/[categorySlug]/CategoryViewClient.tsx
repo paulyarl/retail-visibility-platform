@@ -13,6 +13,7 @@ import { slugsMatch } from '@/utils/slug';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import CategoryBrowseTracker from '@/components/tracking/CategoryBrowseTracker';
 
 // Dynamically import Google Maps to avoid SSR issues
 const DirectoryMapGoogle = dynamic(() => import('@/components/directory/DirectoryMapGoogle'), {
@@ -184,6 +185,9 @@ export default function CategoryViewClient({
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      {/* Client-side category tracking */}
+      <CategoryBrowseTracker categoryId={category?.id || categorySlug} categorySlug={categorySlug} />
+
       {/* Page Title Section */}
       <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
         <div className="container mx-auto px-4 py-6">

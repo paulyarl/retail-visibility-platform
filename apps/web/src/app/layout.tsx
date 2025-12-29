@@ -4,7 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlatformSettingsProvider } from "@/contexts/PlatformSettingsContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider as CustomAuthProvider } from "@/contexts/AuthContext";
 import DynamicFavicon from "@/components/DynamicFavicon";
 import { QueryClientWrapper } from "@/components/QueryClientWrapper";
 import { GlobalAlertProvider } from "@/components/ui/GlobalAlertProvider";
@@ -42,13 +42,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <QueryClientWrapper>
           <PlatformSettingsProvider>
-            <AuthProvider>
+            <CustomAuthProvider>
               <GlobalAlertProvider>
                 <ErrorBoundary>
                   {children}
                 </ErrorBoundary>
               </GlobalAlertProvider>
-            </AuthProvider>
+            </CustomAuthProvider>
           </PlatformSettingsProvider>
         </QueryClientWrapper>
         {/* <Analytics /> */}

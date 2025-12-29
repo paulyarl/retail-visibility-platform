@@ -47,10 +47,10 @@ interface LastViewedProps {
 }
 
 // Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
+// export const runtime = 'edge';
 
 // Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
+// export const dynamic = 'force-dynamic';
 
 export default function LastViewed({
   title = "Recently Viewed",
@@ -58,7 +58,9 @@ export default function LastViewed({
   entityType = 'all',
   showEmptyState = true
 }: LastViewedProps) {
+  
   const { userId, sessionId, isAuthenticated } = useLastViewedSession();
+  
   const [items, setItems] = useState<LastViewedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +83,8 @@ export default function LastViewed({
         const params = new URLSearchParams({
           entityType,
           limit: limit.toString(),
-          daysBack: '30' // Last 30 days
+          daysBack: '30',
+          _t: Date.now().toString() // Force fresh request
         });
 
         if (userId) {
@@ -199,6 +202,7 @@ export default function LastViewed({
           // Items grid
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {items.map((item, index) => {
+              const itemId = item.type === 'store' ? (item.data as LastViewedStore).tenantId : (item.data as LastViewedProduct).productId;
               if (item.type === 'store') {
                 const storeData = item.data as LastViewedStore;
                 return (

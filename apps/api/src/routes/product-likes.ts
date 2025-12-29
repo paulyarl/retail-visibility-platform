@@ -13,10 +13,12 @@ const router = Router();
 /**
  * GET /api/products/:productId/likes
  * Get like status and count for a product
+ * Query params: userId, sessionId (optional - for user-specific status)
  */
 router.get('/:productId/likes', async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
+    const { userId, sessionId } = req.query;
 
     // For now, we'll use a simple approach with a likes count in metadata
     // In production, you'd want a proper likes table with user tracking
@@ -32,8 +34,23 @@ router.get('/:productId/likes', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const likes = (product.metadata as any)?.likes || 0;
-    const userLiked = false; // TODO: Implement user-specific like tracking
+    const metadata = (product.metadata as any) || {};
+    const likes = metadata.likes || 0;
+    
+    // Check if current user/session has liked (if userId/sessionId provided)
+    let userLiked = false;
+    if ((userId || sessionId) && metadata.likedBy) {
+      const likedBy = Array.isArray(metadata.likedBy) ? metadata.likedBy : [];
+      userLiked = likedBy.some((entry: any) => {
+        if (typeof entry === 'string') {
+          // Legacy format - just userId
+          return entry === userId;
+        } else {
+          // New format - { userId, sessionId }
+          return entry.userId === userId || entry.sessionId === sessionId;
+        }
+      });
+    }
 
     res.json({
       productId,
@@ -49,14 +66,16 @@ router.get('/:productId/likes', async (req: Request, res: Response) => {
 /**
  * POST /api/products/:productId/like
  * Like a product (increment count)
+ * Request body: { userId?, sessionId? } - for user/session alignment
  */
-router.post('/:productId/like', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:productId/like', async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
-    const userId = (req as any).user?.userId;
+    const { userId, sessionId } = req.body;
 
-    if (!userId) {
-      return res.status(401).json({ error: 'Authentication required' });
+    // Require either userId or sessionId for tracking
+    if (!userId && !sessionId) {
+      return res.status(400).json({ error: 'userId or sessionId required for tracking' });
     }
 
     // Check if product exists
@@ -80,12 +99,21 @@ router.post('/:productId/like', authenticateToken, async (req: Request, res: Res
       metadata.likedBy = [];
     }
 
-    // Check if user already liked
-    const userIndex = metadata.likedBy.indexOf(userId);
-    if (userIndex === -1) {
-      // User hasn't liked yet, add like
+    // Check if user/session already liked
+    const existingLike = metadata.likedBy.find((entry: any) => {
+      if (typeof entry === 'string') {
+        // Legacy format - just userId
+        return entry === userId;
+      } else {
+        // New format - { userId, sessionId }
+        return entry.userId === userId || entry.sessionId === sessionId;
+      }
+    });
+
+    if (!existingLike) {
+      // User/session hasn't liked yet, add like
       metadata.likes += 1;
-      metadata.likedBy.push(userId);
+      metadata.likedBy.push({ userId, sessionId, timestamp: new Date().toISOString() });
 
       // Update product metadata
       await prisma.inventory_items.update({
@@ -111,14 +139,16 @@ router.post('/:productId/like', authenticateToken, async (req: Request, res: Res
 /**
  * DELETE /api/products/:productId/like
  * Unlike a product (decrement count)
+ * Request body: { userId?, sessionId? } - for user/session alignment
  */
-router.delete('/:productId/like', authenticateToken, async (req: Request, res: Response) => {
+router.delete('/:productId/like', async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
-    const userId = (req as any).user?.userId;
+    const { userId, sessionId } = req.body;
 
-    if (!userId) {
-      return res.status(401).json({ error: 'Authentication required' });
+    // Require either userId or sessionId for tracking
+    if (!userId && !sessionId) {
+      return res.status(400).json({ error: 'userId or sessionId required for tracking' });
     }
 
     // Check if product exists
@@ -134,13 +164,22 @@ router.delete('/:productId/like', authenticateToken, async (req: Request, res: R
     // Get current metadata
     const metadata = (product.metadata as any) || {};
 
-    // Check if user has liked
+    // Check if user/session has liked
     if (metadata.likedBy && Array.isArray(metadata.likedBy)) {
-      const userIndex = metadata.likedBy.indexOf(userId);
-      if (userIndex !== -1) {
-        // User has liked, remove like
+      const likeIndex = metadata.likedBy.findIndex((entry: any) => {
+        if (typeof entry === 'string') {
+          // Legacy format - just userId
+          return entry === userId;
+        } else {
+          // New format - { userId, sessionId }
+          return entry.userId === userId || entry.sessionId === sessionId;
+        }
+      });
+
+      if (likeIndex !== -1) {
+        // User/session has liked, remove like
         metadata.likes = Math.max(0, (metadata.likes || 0) - 1);
-        metadata.likedBy.splice(userIndex, 1);
+        metadata.likedBy.splice(likeIndex, 1);
 
         // Update product metadata
         await prisma.inventory_items.update({

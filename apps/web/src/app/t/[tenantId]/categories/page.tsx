@@ -224,12 +224,12 @@ export default function CategoriesPage() {
         if (!catRes.ok) throw new Error('Failed to fetch categories')
         const catData = await catRes.json()
         setCategories(catData.data || [])
-
+/* 
         // Fetch alignment status
         const statusRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
         if (!statusRes.ok) throw new Error('Failed to fetch alignment status')
         const statusData = await statusRes.json()
-        setAlignmentStatus(statusData.data)
+        setAlignmentStatus(statusData.data) */
 
         // Check if this is a hero location and get organization info
         const tenantRes = await api.get(`${API_BASE_URL}/api/tenants/${tenantId}`)
@@ -327,14 +327,9 @@ export default function CategoriesPage() {
     }
 
     // Refresh data
-    const [catRes, statusRes] = await Promise.all([
-      api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`),
-      api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
-    ])
+    const catRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`)
     const catData = await catRes.json()
-    const statusData = await statusRes.json()
     setCategories(catData.data || [])
-    setAlignmentStatus(statusData.data)
     
     setIsModalOpen(false)
     setSelected(null)
@@ -389,14 +384,9 @@ export default function CategoriesPage() {
         throw new Error(body || 'Failed to delete category')
       }
       // Refresh
-      const [catRes, statusRes] = await Promise.all([
-        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`),
-        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
-      ])
+      const catRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`)
       const catData = await catRes.json()
-      const statusData = await statusRes.json()
       setCategories(catData.data || [])
-      setAlignmentStatus(statusData.data)
       showToast('success', 'Category deleted')
     } catch (err: any) {
       showToast('error', err?.message || 'Failed to delete category')

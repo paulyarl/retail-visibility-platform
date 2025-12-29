@@ -12,7 +12,6 @@ import QuickActions from "./QuickActions";
 import DashboardSkeleton from "./DashboardSkeleton";
 import TierBadge from "./TierBadge";
 import TierGainsWelcome from "./TierGainsWelcome";
-import WhatYouCanDo from "./WhatYouCanDo";
 import UserProfileBadge from "./UserProfileBadge";
 import VisibilityCards from "./VisibilityCards";
 import TenantLimitBadge from "@/components/tenant/TenantLimitBadge";
@@ -162,13 +161,6 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
           isInDirectory={false}
         />
 
-        {/* Tier-Aware Feature Showcase */}
-        {tier && (
-          <WhatYouCanDo 
-            tier={tier}
-            tenantId={tenantId}
-          />
-        )}
       </div>
     </div>
   );

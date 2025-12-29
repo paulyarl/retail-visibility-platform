@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { api, apiRequest } from '@/lib/api';
+import { useProductLikes } from '@/components/likes/ProductLikeProvider';
 
 interface Product {
   id: string;
@@ -30,6 +31,23 @@ interface ProductActionsProps {
 }
 
 export default function ProductActions({ product, tenant, productUrl, variant = 'product' }: ProductActionsProps) {
+  // Check if ProductLikeProvider is available
+  let likeProviderAvailable = false;
+  let likeProduct: any = null;
+  let unlikeProduct: any = null;
+  let getLikeStatus: any = null;
+
+  try {
+    const provider = useProductLikes();
+    likeProviderAvailable = true;
+    likeProduct = provider.likeProduct;
+    unlikeProduct = provider.unlikeProduct;
+    getLikeStatus = provider.getLikeStatus;
+  } catch (error) {
+    // ProductLikeProvider not available - disable like functionality
+    likeProviderAvailable = false;
+  }
+
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [showShareOptions, setShowShareOptions] = useState(false);
@@ -44,12 +62,13 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
   const shareUrl = productUrl;
 
   const fetchLikeStatus = async () => {
+    if (!likeProviderAvailable || !getLikeStatus) return;
+    
     try {
-      const response = await api.get(`/api/products/${product.id}/likes`);
-      if (response.ok) {
-        const data = await response.json();
-        setLiked(data.userLiked);
-        setLikeCount(data.likes);
+      const result = await getLikeStatus(product.id);
+      if (result) {
+        setLiked(result.userLiked);
+        setLikeCount(result.likes);
       }
     } catch (error) {
       console.error('Failed to fetch like status:', error);
@@ -57,10 +76,10 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
   };
 
   useEffect(() => {
-    if (variant === 'product') {
+    if (variant === 'product' && likeProviderAvailable) {
       fetchLikeStatus();
     }
-  }, [product.id, variant]);
+  }, [product.id, variant, likeProviderAvailable]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -104,26 +123,17 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
   };
 
   const handleLike = async () => {
-    if (loading) return;
+    if (loading || !likeProviderAvailable || !likeProduct || !unlikeProduct) return;
 
     setLoading(true);
     try {
-      const method = liked ? 'DELETE' : 'POST';
-      const endpoint = `/api/products/${product.id}/like`;
-      
-      let response;
-      if (method === 'POST') {
-        response = await api.post(endpoint);
-      } else {
-        response = await apiRequest(endpoint, { method: 'DELETE' });
-      }
+      const result = liked 
+        ? await unlikeProduct(product.id)
+        : await likeProduct(product.id);
 
-      if (response.ok) {
-        const data = await response.json();
-        setLiked(data.userLiked);
-        setLikeCount(data.likes);
-      } else {
-        console.error('Failed to toggle like:', response.statusText);
+      if (result.success) {
+        setLiked(result.userLiked);
+        setLikeCount(result.likes);
       }
     } catch (error) {
       console.error('Failed to toggle like:', error);
@@ -144,7 +154,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
     <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {variant === 'product' && (
+          {variant === 'product' && likeProviderAvailable && (
             <button
               onClick={handleLike}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${

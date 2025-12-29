@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 
 interface LastViewedSession {
@@ -14,18 +14,12 @@ interface LastViewedSession {
  * Handles both authenticated users (userId) and anonymous users (sessionId)
  */
 export function useLastViewedSession(): LastViewedSession {
-  const sessionResult = useSession();
-  const session = sessionResult?.data;
+  const { user, isAuthenticated } = useAuth();
   const [sessionId, setSessionId] = useState<string | undefined>();
 
   useEffect(() => {
-    // For authenticated users, use the userId from session (handle NextAuth JWT strategy)
-    // Extract user ID safely - handle different session structures like behaviorTracking.ts
-    const userId = (session as any)?.user?.id || 
-                   (session as any)?.userId || 
-                   undefined;
-    
-    if (userId) {
+    // For authenticated users, use the userId from the auth context
+    if (user?.id) {
       return; // Don't set sessionId for authenticated users
     }
 
@@ -36,11 +30,11 @@ export function useLastViewedSession(): LastViewedSession {
       localStorage.setItem('lastViewedSessionId', storedSessionId);
     }
     setSessionId(storedSessionId);
-  }, [session]);
+  }, [user?.id]);
 
   return {
-    userId: (session as any)?.user?.id || (session as any)?.userId,
+    userId: user?.id,
     sessionId,
-    isAuthenticated: !!((session as any)?.user?.id || (session as any)?.userId)
+    isAuthenticated
   };
 }

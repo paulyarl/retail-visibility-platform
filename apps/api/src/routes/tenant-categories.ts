@@ -15,6 +15,11 @@ console.log('🔥 TENANT CATEGORIES ROUTES MODULE LOADED');
 
 const router = Router();
 
+// Schema definitions
+const propagateCategoriesSchema = z.object({
+  mode: z.enum(['create_only', 'update_only', 'create_or_update']).optional().default('create_or_update'),
+});
+
 // Helper to check tenant access
 function hasAccessToTenant(req: Request, tenantId: string): boolean {
   if (!req.user) return false;
@@ -766,11 +771,64 @@ router.get('/:tenantId/categories-unmapped', async (req, res) => {
 });
 
 /**
- * GET /api/v1/tenants/:tenantId/categories/complete
- * Consolidated endpoint returning categories, alignment status, and tenant info in one call
- * Reduces 3 separate calls to 1 consolidated call
- * Pattern: API Consolidation for Frontend Optimization
+ * GET /api/v1/tenants/:tenantId/categories-alignment-status
+ * Get category alignment status for a tenant
+ * Returns mapping statistics for GBP category alignment
  */
+router.get('/:tenantId/categories-alignment-status', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    // Check tenant access
+    if (!hasAccessToTenant(req, tenantId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'Access to this tenant is not allowed',
+      });
+    }
+
+    // Calculate alignment status
+    const [total, mapped] = await Promise.all([
+      prisma.directory_category.count({
+        where: { tenantId, isActive: true }
+      }),
+      prisma.directory_category.count({
+        where: {
+          tenantId,
+          isActive: true,
+          googleCategoryId: { not: null }
+        }
+      })
+    ]);
+
+    const unmapped = total - mapped;
+    const mappingCoverage = total > 0 ? Math.round((mapped / total) * 100) : 0;
+    const isCompliant = mappingCoverage >= 80;
+
+    const alignmentStatus = {
+      total,
+      mapped,
+      unmapped,
+      mappingCoverage,
+      isCompliant,
+      status: isCompliant ? 'compliant' : unmapped > 0 ? 'needs_alignment' : 'unknown'
+    };
+
+    res.json({
+      success: true,
+      data: alignmentStatus,
+    });
+  } catch (error) {
+    console.error('Error fetching alignment status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch alignment status',
+    });
+  }
+});
+
+/**
 router.get('/:tenantId/categories/complete', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
@@ -951,14 +1009,6 @@ router.get('/:tenantId/categories/complete', authenticateToken, async (req: Requ
   }
 });
 
-const propagateCategoriesSchema = z.object({
-  mode: z.enum(['create_only', 'update_only', 'create_or_update']).optional().default('create_or_update'),
-});
-
-/**
- * POST /api/v1/tenants/:tenantId/categories/propagate
- * Propagate all categories from hero tenant to all location tenants
- * Body: { mode?: 'create_only' | 'update_only' | 'create_or_update' }
  * Permission: Tenant admin (Professional tier+, 2+ locations required)
  */
 router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropagationTier('categories'), async (req, res) => {

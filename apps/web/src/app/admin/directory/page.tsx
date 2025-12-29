@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import DirectoryOverviewClient from '@/components/admin/directory/DirectoryOverviewClient';
+import PageHeader from '@/components/PageHeader';
 
 
 // Force dynamic rendering to prevent prerendering issues
@@ -9,14 +10,19 @@ export const dynamic = 'force-dynamic';
 export default async function AdminDirectoryPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Directory Management
-        </h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Manage directory listings, featured placements, and quality across all tenants
-        </p>
-      </div>
+      <PageHeader
+              title="Directory Management"
+              description="Manage directory listings, featured placements, and quality across all tenants"
+              actions={
+                <Link
+                  href="/settings/admin"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  ← Admin Dashboard
+                </Link>
+              }
+            />
+
 
       <Suspense fallback={
         <div className="animate-pulse space-y-6">

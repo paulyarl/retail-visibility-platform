@@ -6,14 +6,13 @@ import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/compone
 import RelatedStores from '@/components/directory/RelatedStores';
 import DirectoryActions from '@/components/directory/DirectoryActions';
 import StoreRatingsSection from '@/components/directory/StoreRatingsSection';
-import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
-import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
-import BusinessHoursDisplay from '@/components/shared/BusinessHoursDisplay';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import StoreDirectoryCategories from '@/components/directory/StoreDirectoryCategories';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
+import StoreViewTracker from '@/components/tracking/StoreViewTracker';
+import BusinessHoursDisplay from '@/components/shared/BusinessHoursDisplay';
 
 interface StoreDetailPageProps {
   params: {
@@ -539,6 +538,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
           { name: listing.business_name, url: currentUrl },
         ]}
       />
+
+      {/* Client-side store tracking */}
+      <StoreViewTracker tenantId={listing.tenant_id} categories={listing.categories} />
 
       <div className="min-h-screen bg-gray-50">
         {/* Header with Visit Storefront Banner */}

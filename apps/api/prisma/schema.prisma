@@ -1430,7 +1430,7 @@ model upgrade_requests {
 
 model user_behavior_simple {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id          String?   @db.Uuid
+  user_id          String?   @db.VarChar(255)
   session_id       String?   @db.VarChar(255)
   entity_type      String    @db.VarChar(20)
   entity_id        String

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useAdminDirectoryListings } from '@/hooks/admin/useAdminDirectoryListings';
+import PageHeader from '@/components/PageHeader';
+import Link from 'next/link';
 import DirectoryListingsTable from '@/components/admin/directory/DirectoryListingsTable';
 
 
@@ -41,15 +43,19 @@ export default function AdminDirectoryListingsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          All Directory Listings
-        </h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          View and manage directory listings across all tenants
-        </p>
-      </div>
+      <PageHeader
+        title="All Directory Listings"
+        description="View and manage directory listings across all tenants"
+        actions={
+          <Link
+            href="/admin/directory"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            ← Directory Panel
+          </Link>
+        }
+      />
+   
 
       {/* Filters */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4">

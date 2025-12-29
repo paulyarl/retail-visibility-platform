@@ -5297,7 +5297,9 @@ console.log('✅ Feed validation routes mounted at /api/tenant');
 app.use('/api/tenant', authenticateToken, tenantCategoriesRoutes);
 console.log('✅ Tenant categories routes mounted at /api/tenant');
 
-/* ------------------------------ photos ------------------------------ */
+/* ------------------------------ products ------------------------------ */
+app.use('/api/products', productLikesRoutes);
+console.log('✅ Product likes routes mounted at /api/products');
 app.use('/api/items', photosRouter);
 console.log('✅ Photos routes mounted at /api/items');
 
