@@ -137,7 +137,6 @@ export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
       // Create new session
       await basePrisma.$executeRaw`
         INSERT INTO user_sessions_list (
-          id,
           user_id,
           token_hash,
           device_info,
@@ -147,7 +146,6 @@ export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
           last_activity,
           expires_at
         ) VALUES (
-         ${generateSessionId()},
           ${userId},
           ${tokenHash},
           ${JSON.stringify(deviceInfo)}::jsonb,

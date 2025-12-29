@@ -166,7 +166,6 @@ export class AuthService {
     // Create session
     await prisma.user_sessions_list.create({
       data: {
-        id: generateSessionId(),
         user_id: user.id,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },

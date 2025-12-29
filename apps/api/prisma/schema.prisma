@@ -1453,7 +1453,7 @@ model user_behavior_simple {
 }
 
 model user_sessions_list {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id           String   @id @default(dbgenerated("('sess_'::text || (gen_random_uuid())::text)")) @db.VarChar(255)
   user_id      String
   token_hash   String?  @unique
   device_info  String?
