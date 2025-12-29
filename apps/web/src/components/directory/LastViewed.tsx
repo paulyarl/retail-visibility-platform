@@ -247,7 +247,7 @@ export default function LastViewed({
                 return (
                   <a
                     key={`product-${productData.productId}-${index}`}
-                    href={`/tenant/${productData.tenantId}/product/${productData.productId}`}
+                    href={`/products/${productData.productId}`}
                     className="block"
                   >
                     <SwisProductCard
