@@ -295,35 +295,72 @@ router.get('/failed-logins', async (req, res) => {
 });
 
 /**
- * DELETE /api/admin/security/alerts/bulk
- * Bulk dismiss alerts by type or age
+ * DELETE /api/admin/security/sessions/:sessionId
+ * Revoke a specific session (admin only)
  */
-router.delete('/alerts/bulk', async (req, res) => {
+router.delete('/sessions/:sessionId', async (req, res) => {
   try {
-    const { type, olderThanDays } = req.body;
+    const { sessionId } = req.params;
 
-    let query = 'UPDATE security_alerts SET dismissed = true, dismissed_at = NOW() WHERE dismissed = false';
-    const params: any[] = [];
+    // Verify session exists and belongs to a user
+    const [session] = await basePrisma.$queryRaw<any[]>`
+      SELECT s.id, s.user_id, u.email as user_email
+      FROM user_sessions_list s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.id = ${sessionId}
+        AND s.is_active = true
+    `;
 
-    if (type) {
-      query += ' AND type = $1';
-      params.push(type);
+    if (!session) {
+      return res.status(404).json({
+        error: 'Session not found',
+        message: 'The specified session does not exist or has already been revoked'
+      });
     }
 
-    if (olderThanDays) {
-      query += ` AND created_at < NOW() - INTERVAL '${olderThanDays} days'`;
-    }
+    // Revoke the session
+    const result = await basePrisma.$executeRaw`
+      UPDATE user_sessions_list
+      SET is_active = false
+      WHERE id = ${sessionId}
+    `;
 
-    const result = await basePrisma.$executeRaw`${query}`;
+    // Create security alert for session revocation
+    await basePrisma.$executeRaw`
+      INSERT INTO security_alerts (
+        user_id,
+        type,
+        severity,
+        title,
+        message,
+        metadata
+      ) VALUES (
+        ${session.user_id},
+        'account_change',
+        'warning',
+        'Session Revoked by Admin',
+        'Your session was revoked by a platform administrator.',
+        ${JSON.stringify({
+          sessionId,
+          revokedBy: req.user?.user_id || 'system',
+          revokedAt: new Date().toISOString(),
+          reason: 'Admin revocation'
+        })}::jsonb
+      )
+    `;
 
     res.json({
       success: true,
-      dismissedCount: result,
-      message: `Dismissed ${result} security alerts`
+      message: 'Session revoked successfully',
+      sessionId,
+      userEmail: session.user_email
     });
   } catch (error) {
-    console.error('[DELETE /api/admin/security/alerts/bulk] Error:', error);
-    res.status(500).json({ error: 'Failed to bulk dismiss alerts' });
+    console.error('[DELETE /api/admin/security/sessions/:sessionId] Error:', error);
+    res.status(500).json({
+      error: 'Failed to revoke session',
+      message: 'An internal error occurred while revoking the session'
+    });
   }
 });
 

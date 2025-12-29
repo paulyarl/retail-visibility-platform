@@ -1,9 +1,4 @@
-/**
- * Authenticated API client
- * Automatically includes JWT token in requests
- * Works with both Next.js API routes (/api/*) and direct backend calls
- * Includes request deduplication for GET requests
- */
+import { getDeviceInfoHeader } from './device-info';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || 'http://localhost:4000';
 
@@ -94,6 +89,16 @@ export async function apiRequest(
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
+
+  // Add device info header for session tracking
+  if (typeof window !== 'undefined') {
+    try {
+      headers['x-device-info'] = getDeviceInfoHeader();
+    } catch (error) {
+      console.warn('[API] Failed to add device info header:', error);
+    }
+  }
+
   // Only set Content-Type when sending a body on non-GET methods
   if (isWrite && options.body && !('Content-Type' in headers)) {
     headers['Content-Type'] = 'application/json';

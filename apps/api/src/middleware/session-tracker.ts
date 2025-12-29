@@ -14,6 +14,7 @@ interface SessionInfo {
   token: string;
   ipAddress: string;
   userAgent: string;
+  deviceName?: string;
 }
 
 /**
@@ -30,6 +31,7 @@ function parseDeviceInfo(userAgent: string) {
     os: result.os.name || 'Unknown',
     osVersion: result.os.version || '',
     device: result.device.vendor || result.device.model || 'Unknown',
+    name: undefined as string | undefined, // Will be set from browser data if available
   };
 }
 
@@ -98,11 +100,17 @@ async function getLocationFromIP(ipAddress: string): Promise<{
  * Create or update user session
  */
 export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
-  const { userId, token, ipAddress, userAgent } = sessionInfo;
+  const { userId, token, ipAddress, userAgent, deviceName } = sessionInfo;
 
   try {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const deviceInfo = parseDeviceInfo(userAgent);
+
+    // Override device name with browser-provided name if available
+    if (deviceName) {
+      deviceInfo.name = deviceName;
+    }
+
     const location = await getLocationFromIP(ipAddress);
 
     // Check if session already exists
@@ -113,10 +121,14 @@ export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
     `;
 
     if (existingSession.length > 0) {
-      // Update existing session
+      // Update existing session with location/IP/device data
       await basePrisma.$executeRaw`
         UPDATE user_sessions_list
-        SET last_activity = NOW()
+        SET last_activity = NOW(),
+            device_info = ${JSON.stringify(deviceInfo)}::jsonb,
+            ip_address = ${ipAddress},
+            user_agent = ${userAgent},
+            location = ${JSON.stringify(location)}::jsonb
         WHERE token_hash = ${tokenHash}
       `;
     } else {
@@ -196,10 +208,22 @@ export function sessionActivityMiddleware(req: Request, res: Response, next: Nex
   if (req.user?.user_id) {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (token) {
-      const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 
-                        req.socket.remoteAddress || 
+      const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+                        req.socket.remoteAddress ||
                         'unknown';
       const userAgent = req.headers['user-agent'] || 'unknown';
+
+      // Get device info from header if available
+      let deviceName: string | undefined;
+      const deviceInfoHeader = req.headers['x-device-info'] as string;
+      if (deviceInfoHeader) {
+        try {
+          const deviceInfo = JSON.parse(deviceInfoHeader);
+          deviceName = deviceInfo.name;
+        } catch (error) {
+          console.warn('[sessionActivityMiddleware] Failed to parse device info header:', error);
+        }
+      }
 
       // Track session asynchronously (don't block request)
       trackSession({
@@ -207,6 +231,7 @@ export function sessionActivityMiddleware(req: Request, res: Response, next: Nex
         token,
         ipAddress,
         userAgent,
+        deviceName,
       }).catch(err => {
         console.error('[sessionActivityMiddleware] Error tracking session:', err);
       });
