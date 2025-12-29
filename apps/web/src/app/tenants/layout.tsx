@@ -8,11 +8,11 @@ import Link from 'next/link';
 export default function TenantsLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const nav = [
-    { label: 'Your Locations', href: '/tenants' },
+    { label: 'Locations', href: '/tenants' },
     { label: 'Account', href: '/settings/account' },
     { label: 'Subscription', href: '/settings/subscription' },
-    { label: 'Platform Dashboard', href: '/' },
-    { label: 'Platform Settings', href: '/settings' },
+    { label: 'Dashboard', href: '/' },
+    { label: 'Settings', href: '/settings' },
   ];
 
   return (
