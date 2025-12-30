@@ -3,6 +3,8 @@
  * Provides persistent caching with TTL for API responses
  */
 
+import { CacheEncryption } from './cache-encryption';
+
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -12,6 +14,7 @@ interface CacheEntry<T> {
 interface CacheOptions {
   ttl?: number; // Time to live in milliseconds
   tenantId?: string; // Optional tenant scoping
+  userId?: string; // Optional user ID for encryption
 }
 
 export class LocalStorageCache {
@@ -36,14 +39,16 @@ export class LocalStorageCache {
   /**
    * Get cached data if valid, null otherwise
    */
-  static get<T>(key: string, tenantId?: string): T | null {
+  static async get<T>(key: string, options: CacheOptions = {}): Promise<T | null> {
     try {
+      const { tenantId, userId } = options;
       const cacheKey = this.getKey(key, tenantId);
       const stored = localStorage.getItem(cacheKey);
 
       if (!stored) return null;
 
-      const entry: CacheEntry<T> = JSON.parse(stored);
+      const decrypted = await CacheEncryption.decrypt(stored, userId);
+      const entry: CacheEntry<T> = JSON.parse(decrypted);
 
       if (this.isExpired(entry)) {
         this.delete(key, tenantId);
@@ -60,9 +65,9 @@ export class LocalStorageCache {
   /**
    * Set cache entry with TTL
    */
-  static set<T>(key: string, data: T, options: CacheOptions = {}): void {
+  static async set<T>(key: string, data: T, options: CacheOptions = {}): Promise<void> {
     try {
-      const { ttl = this.DEFAULT_TTL, tenantId } = options;
+      const { ttl = this.DEFAULT_TTL, tenantId, userId } = options;
       const cacheKey = this.getKey(key, tenantId);
 
       const entry: CacheEntry<T> = {
@@ -71,7 +76,8 @@ export class LocalStorageCache {
         ttl
       };
 
-      localStorage.setItem(cacheKey, JSON.stringify(entry));
+      const encrypted = await CacheEncryption.encrypt(JSON.stringify(entry), userId);
+      localStorage.setItem(cacheKey, encrypted);
     } catch (error) {
       console.warn('[LocalStorageCache] Error writing to cache:', error);
     }

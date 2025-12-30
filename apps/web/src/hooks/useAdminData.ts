@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AdminCacheService, ConsolidatedAdminData } from '@/lib/cache/admin-cache-service';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface UseAdminDataReturn {
   adminData: ConsolidatedAdminData | null;
@@ -22,12 +23,13 @@ export interface UseAdminDataReturn {
  * Provides consolidated admin data fetching with performance optimizations
  */
 export function useAdminData(): UseAdminDataReturn {
+  const { user } = useAuth();
   // Use React Query for admin data fetching with caching
   const { data: adminData, isLoading: adminLoading, error: adminError, refetch } = useQuery({
     queryKey: ['admin', 'consolidated-data'],
     queryFn: async (): Promise<ConsolidatedAdminData> => {
       try {
-        const data = await AdminCacheService.getConsolidatedAdminData(true);
+        const data = await AdminCacheService.getConsolidatedAdminData(true, user?.id);
         return data;
       } catch (error) {
         console.error('[useAdminData] Failed to fetch admin data:', error);

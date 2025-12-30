@@ -70,12 +70,12 @@ export class CachedTenantService {
    * Get consolidated tenant data with local storage caching
    * Falls back to individual API calls if consolidated endpoint fails
    */
-  static async getTenantData(tenantId: string, useCache = true): Promise<CachedTenantData> {
+  static async getTenantData(tenantId: string, useCache = true, userId?: string): Promise<CachedTenantData> {
     const cacheKey = `tenant-data`;
 
     // Try to get from cache first
     if (useCache) {
-      const cached = LocalStorageCache.get<CachedTenantData>(cacheKey, tenantId);
+      const cached = await LocalStorageCache.get<CachedTenantData>(cacheKey, { tenantId, userId });
       if (cached && cached._cacheVersion === this.CACHE_VERSION) {
         console.log(`[CachedTenantService] Cache hit for tenant ${tenantId}`);
         return cached;
@@ -99,7 +99,7 @@ export class CachedTenantService {
         };
 
         // Cache the consolidated data
-        LocalStorageCache.set(cacheKey, cachedData, {
+        await LocalStorageCache.set(cacheKey, cachedData, {
           ttl: Math.min(this.TENANT_CACHE_TTL, this.TIER_CACHE_TTL, this.USAGE_CACHE_TTL),
           tenantId
         });
@@ -126,7 +126,7 @@ export class CachedTenantService {
     };
 
     // Cache the assembled data
-    LocalStorageCache.set(cacheKey, cachedData, {
+    await LocalStorageCache.set(cacheKey, cachedData, {
       ttl: Math.min(this.TENANT_CACHE_TTL, this.TIER_CACHE_TTL, this.USAGE_CACHE_TTL),
       tenantId
     });
@@ -141,7 +141,7 @@ export class CachedTenantService {
     const cacheKey = `tenant-info`;
 
     if (useCache) {
-      const cached = LocalStorageCache.get<TenantInfo>(cacheKey, tenantId);
+      const cached = await LocalStorageCache.get<TenantInfo>(cacheKey, { tenantId });
       if (cached) {
         return cached;
       }
@@ -154,7 +154,7 @@ export class CachedTenantService {
 
     const data = await response.json();
 
-    LocalStorageCache.set(cacheKey, data, { ttl: this.TENANT_CACHE_TTL, tenantId });
+    await LocalStorageCache.set(cacheKey, data, { ttl: this.TENANT_CACHE_TTL, tenantId });
 
     return data;
   }
@@ -166,7 +166,7 @@ export class CachedTenantService {
     const cacheKey = `tenant-tier`;
 
     if (useCache) {
-      const cached = LocalStorageCache.get<TenantTier>(cacheKey, tenantId);
+      const cached = await LocalStorageCache.get<TenantTier>(cacheKey, { tenantId });
       if (cached) {
         return cached;
       }
@@ -179,7 +179,7 @@ export class CachedTenantService {
 
     const data = await response.json();
 
-    LocalStorageCache.set(cacheKey, data, { ttl: this.TIER_CACHE_TTL, tenantId });
+    await LocalStorageCache.set(cacheKey, data, { ttl: this.TIER_CACHE_TTL, tenantId });
 
     return data;
   }
@@ -191,7 +191,7 @@ export class CachedTenantService {
     const cacheKey = `tenant-usage`;
 
     if (useCache) {
-      const cached = LocalStorageCache.get<TenantUsage>(cacheKey, tenantId);
+      const cached = await LocalStorageCache.get<TenantUsage>(cacheKey, { tenantId });
       if (cached) {
         return cached;
       }
@@ -220,7 +220,7 @@ export class CachedTenantService {
       storageGB: data.storageGB || 0
     };
 
-    LocalStorageCache.set(cacheKey, usage, { ttl: this.USAGE_CACHE_TTL, tenantId });
+    await LocalStorageCache.set(cacheKey, usage, { ttl: this.USAGE_CACHE_TTL, tenantId });
 
     return usage;
   }

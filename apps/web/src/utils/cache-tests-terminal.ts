@@ -25,7 +25,7 @@ const mockLocalStorageAPI = {
 console.log('🧪 Running Cache Tests in Terminal...\n');
 
 // Test basic cache operations
-function testBasicCache() {
+async function testBasicCache() {
   console.log('Testing LocalStorage Cache...');
 
   try {
@@ -37,7 +37,7 @@ function testBasicCache() {
     // Test tenant-scoped cache
     const TEST_TENANT_ID = 'tid-r6cccpag';
     LocalStorageCache.set('tenant-data', { tenantId: TEST_TENANT_ID }, { tenantId: TEST_TENANT_ID });
-    const tenantData = LocalStorageCache.get('tenant-data', TEST_TENANT_ID);
+    const tenantData = await LocalStorageCache.get('tenant-data', { tenantId: TEST_TENANT_ID });
     console.log('✅ Tenant-scoped cache:', tenantData);
 
     // Test cache stats
@@ -80,7 +80,7 @@ function testCacheExpiration() {
 }
 
 // Test cache invalidation
-function testCacheInvalidation() {
+async function testCacheInvalidation() {
   console.log('Testing Cache Invalidation...');
 
   try {
@@ -91,7 +91,7 @@ function testCacheInvalidation() {
     console.log('✅ Set test data');
 
     // Check it exists
-    const before = LocalStorageCache.get('test-invalidate', TEST_TENANT_ID);
+    const before = await LocalStorageCache.get('test-invalidate', { tenantId: TEST_TENANT_ID });
     console.log('✅ Data exists:', !!before);
 
     // Clear tenant cache (simulate what CachedTenantService does)
@@ -101,7 +101,7 @@ function testCacheInvalidation() {
     console.log('🗑️ Invalidated tenant cache');
 
     // Check it's gone
-    const after = LocalStorageCache.get('test-invalidate', TEST_TENANT_ID);
+    const after = await LocalStorageCache.get('test-invalidate', { tenantId: TEST_TENANT_ID });
     console.log('✅ Data cleared:', !after);
 
     console.log('🎉 Cache invalidation test complete!\n');

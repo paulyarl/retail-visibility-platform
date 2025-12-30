@@ -11,7 +11,7 @@ const TEST_TENANT_ID = 'tid-r6cccpag';
 
 export const cacheTestUtils = {
   // Test basic cache operations
-  testBasicCache: () => {
+  testBasicCache: async () => {
     console.log('🧪 Testing LocalStorage Cache...');
 
     try {
@@ -22,7 +22,7 @@ export const cacheTestUtils = {
 
       // Test tenant-scoped cache
       LocalStorageCache.set('tenant-data', { tenantId: TEST_TENANT_ID }, { tenantId: TEST_TENANT_ID });
-      const tenantData = LocalStorageCache.get('tenant-data', TEST_TENANT_ID);
+      const tenantData = await LocalStorageCache.get('tenant-data', { tenantId: TEST_TENANT_ID });
       console.log('✅ Tenant-scoped cache:', tenantData);
 
       // Test cache stats
@@ -72,7 +72,7 @@ export const cacheTestUtils = {
   },
 
   // Test cache invalidation
-  testCacheInvalidation: () => {
+  testCacheInvalidation: async () => {
     console.log('🧪 Testing cache invalidation...');
 
     try {
@@ -81,7 +81,7 @@ export const cacheTestUtils = {
       console.log('✅ Set test data');
 
       // Check it exists
-      const before = LocalStorageCache.get('test-invalidate', TEST_TENANT_ID);
+      const before = await LocalStorageCache.get('test-invalidate', { tenantId: TEST_TENANT_ID });
       console.log('✅ Data exists:', !!before);
 
       // Clear tenant cache
@@ -89,7 +89,7 @@ export const cacheTestUtils = {
       console.log('🗑️ Invalidated tenant cache');
 
       // Check it's gone
-      const after = LocalStorageCache.get('test-invalidate', TEST_TENANT_ID);
+      const after = await LocalStorageCache.get('test-invalidate', { tenantId: TEST_TENANT_ID });
       console.log('✅ Data cleared:', !after);
 
       console.log('🎉 Cache invalidation test complete!');
@@ -102,20 +102,23 @@ export const cacheTestUtils = {
 
   // Run all tests
   runAllTests: async () => {
-    console.log('🚀 Running all cache tests...\n');
+    console.log('🧪 Running All Cache Tests...\n');
 
     try {
-      const basicResult = cacheTestUtils.testBasicCache();
-      console.log('');
+      const basicResult = await cacheTestUtils.testBasicCache();
+      console.log('\n');
 
       const tenantResult = await cacheTestUtils.testTenantService();
-      console.log('');
+      console.log('\n');
 
-      const invalidationResult = cacheTestUtils.testCacheInvalidation();
-      console.log('');
+      const invalidationResult = await cacheTestUtils.testCacheInvalidation();
+      console.log('\n');
 
       const allPassed = basicResult && tenantResult && invalidationResult;
-      console.log(allPassed ? '🎊 All tests completed successfully!' : '⚠️ Some tests failed');
+      console.log(`🎯 Test Summary: ${allPassed ? '✅ ALL PASSED' : '❌ SOME FAILED'}`);
+      console.log(`   Basic Cache: ${basicResult ? '✅' : '❌'}`);
+      console.log(`   Tenant Service: ${tenantResult ? '✅' : '❌'}`);
+      console.log(`   Cache Invalidation: ${invalidationResult ? '✅' : '❌'}`);
 
       return allPassed;
     } catch (error) {

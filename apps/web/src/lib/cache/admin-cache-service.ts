@@ -74,12 +74,12 @@ export class AdminCacheService {
    * Get consolidated admin data with local storage caching
    * Fetches all admin data in parallel and caches results
    */
-  static async getConsolidatedAdminData(useCache = true): Promise<ConsolidatedAdminData> {
+  static async getConsolidatedAdminData(useCache = true, userId?: string): Promise<ConsolidatedAdminData> {
     const cacheKey = 'admin-consolidated-data';
 
     // Try to get from cache first
     if (useCache) {
-      const cached = LocalStorageCache.get<ConsolidatedAdminData>(cacheKey);
+      const cached = await LocalStorageCache.get<ConsolidatedAdminData>(cacheKey, { userId });
       if (cached && cached._cacheVersion === this.CACHE_VERSION) {
         console.log('[AdminCacheService] Cache hit for consolidated admin data');
         return cached;
@@ -99,13 +99,13 @@ export class AdminCacheService {
         securityAlertStatsData,
         failedLoginsData
       ] = await Promise.allSettled([
-        this.getTenantsList(false),
-        this.getSyncStats(false),
-        this.getSecuritySessions(false),
-        this.getSecurityStats(false),
-        this.getSecurityAlerts(false),
-        this.getSecurityAlertStats(false),
-        this.getFailedLogins(false)
+        this.getTenantsList(false, userId),
+        this.getSyncStats(false, userId),
+        this.getSecuritySessions(false, undefined, userId),
+        this.getSecurityStats(false, userId),
+        this.getSecurityAlerts(false, userId),
+        this.getSecurityAlertStats(false, userId),
+        this.getFailedLogins(false, userId)
       ]);
 
       // Build consolidated data object
@@ -128,8 +128,9 @@ export class AdminCacheService {
       };
 
       // Cache the consolidated data
-      LocalStorageCache.set(cacheKey, consolidatedData, {
-        ttl: Math.min(this.TENANTS_CACHE_TTL, this.SYNC_STATS_CACHE_TTL, this.SECURITY_CACHE_TTL)
+      await LocalStorageCache.set(cacheKey, consolidatedData, {
+        ttl: Math.min(this.TENANTS_CACHE_TTL, this.SYNC_STATS_CACHE_TTL, this.SECURITY_CACHE_TTL),
+        userId
       });
 
       return consolidatedData;
@@ -154,11 +155,11 @@ export class AdminCacheService {
   /**
    * Get tenants list with caching
    */
-  static async getTenantsList(useCache = true): Promise<AdminTenantsData> {
+  static async getTenantsList(useCache = true, userId?: string): Promise<AdminTenantsData> {
     const cacheKey = 'admin-tenants';
 
     if (useCache) {
-      const cached = LocalStorageCache.get<AdminTenantsData>(cacheKey);
+      const cached = await LocalStorageCache.get<AdminTenantsData>(cacheKey, { userId });
       if (cached) {
         return cached;
       }
@@ -183,11 +184,11 @@ export class AdminCacheService {
   /**
    * Get sync statistics with caching
    */
-  static async getSyncStats(useCache = true): Promise<AdminSyncStats> {
+  static async getSyncStats(useCache = true, userId?: string): Promise<AdminSyncStats> {
     const cacheKey = 'admin-sync-stats';
 
     if (useCache) {
-      const cached = LocalStorageCache.get<AdminSyncStats>(cacheKey);
+      const cached = await LocalStorageCache.get<AdminSyncStats>(cacheKey, { userId });
       if (cached) {
         return cached;
       }
@@ -215,11 +216,11 @@ export class AdminCacheService {
   /**
    * Get security sessions with caching
    */
-  static async getSecuritySessions(useCache = true, params?: { limit?: number; offset?: number }): Promise<AdminSecuritySessions> {
+  static async getSecuritySessions(useCache = true, params?: { limit?: number; offset?: number }, userId?: string): Promise<AdminSecuritySessions> {
     const cacheKey = `admin-security-sessions-${JSON.stringify(params || {})}`;
 
     if (useCache) {
-      const cached = LocalStorageCache.get<AdminSecuritySessions>(cacheKey);
+      const cached = await LocalStorageCache.get<AdminSecuritySessions>(cacheKey, { userId });
       if (cached) {
         return cached;
       }
@@ -253,11 +254,11 @@ export class AdminCacheService {
   /**
    * Get security statistics with caching
    */
-  static async getSecurityStats(useCache = true): Promise<AdminSecurityStats> {
+  static async getSecurityStats(useCache = true, userId?: string): Promise<AdminSecurityStats> {
     const cacheKey = 'admin-security-stats';
 
     if (useCache) {
-      const cached = LocalStorageCache.get<AdminSecurityStats>(cacheKey);
+      const cached = await LocalStorageCache.get<AdminSecurityStats>(cacheKey, { userId });
       if (cached) {
         return cached;
       }
@@ -282,11 +283,11 @@ export class AdminCacheService {
   /**
    * Get security alerts with caching
    */
-  static async getSecurityAlerts(useCache = true): Promise<AdminSecurityAlerts> {
+  static async getSecurityAlerts(useCache = true, userId?: string): Promise<AdminSecurityAlerts> {
     const cacheKey = 'admin-security-alerts';
 
     if (useCache) {
-      const cached = LocalStorageCache.get<AdminSecurityAlerts>(cacheKey);
+      const cached = await LocalStorageCache.get<AdminSecurityAlerts>(cacheKey, { userId });
       if (cached) {
         return cached;
       }
@@ -311,11 +312,11 @@ export class AdminCacheService {
   /**
    * Get security alert statistics with caching
    */
-  static async getSecurityAlertStats(useCache = true): Promise<AdminSecurityAlertStats> {
+  static async getSecurityAlertStats(useCache = true, userId?: string): Promise<AdminSecurityAlertStats> {
     const cacheKey = 'admin-security-alert-stats';
 
     if (useCache) {
-      const cached = LocalStorageCache.get<AdminSecurityAlertStats>(cacheKey);
+      const cached = await LocalStorageCache.get<AdminSecurityAlertStats>(cacheKey, { userId });
       if (cached) {
         return cached;
       }
@@ -336,11 +337,11 @@ export class AdminCacheService {
   /**
    * Get failed login attempts with caching
    */
-  static async getFailedLogins(useCache = true): Promise<AdminFailedLogins> {
+  static async getFailedLogins(useCache = true, userId?: string): Promise<AdminFailedLogins> {
     const cacheKey = 'admin-failed-logins';
 
     if (useCache) {
-      const cached = LocalStorageCache.get<AdminFailedLogins>(cacheKey);
+      const cached = await LocalStorageCache.get<AdminFailedLogins>(cacheKey, { userId });
       if (cached) {
         return cached;
       }
