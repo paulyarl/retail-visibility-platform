@@ -597,9 +597,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="space-y-6">
             {/* Main Content Column */}
-            <div className="lg:col-span-9 space-y-6">
+            <div className="space-y-6">
               {/* Store Header */}
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-start gap-6">
@@ -722,13 +722,13 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             </div>
 
             {/* Right Column - Contact Info */}
-            <div className="lg:col-span-3 space-y-6">
+            <div className="space-y-6">
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   Contact
                 </h2>
                 <div>
-                            <ContactInformationCollapsible tenant={listing} fullAddress={fullAddress} />
+                            <ContactInformationCollapsible tenant={listing} fullAddress={fullAddress} initialExpanded={true} />
                           </div>
                 
                   

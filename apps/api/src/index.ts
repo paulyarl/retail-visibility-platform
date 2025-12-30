@@ -2545,6 +2545,9 @@ app.get("/api/items/complete", authenticateToken, async (req, res) => {
       tenantCategoryId: item.directory_category_id,
       directory_category: undefined, // Remove from response
       directory_category_id: undefined, // Remove from response
+      // Map image_url to imageUrl for frontend compatibility
+      imageUrl: item.image_url || null,
+      image_url: undefined, // Remove from response
     }));
 
     // Calculate pagination info
