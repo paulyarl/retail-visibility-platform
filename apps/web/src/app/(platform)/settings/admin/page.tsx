@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
+import { useAdminData } from '@/hooks/useAdminData';
 
 type AdminSection = {
   title: string;
@@ -44,61 +45,8 @@ export default function AdminDashboardPage() {
     AccessPresets.PLATFORM_ADMIN_ONLY
   );
 
-  const [stats, setStats] = useState({
-    totalTenants: 0,
-    totalUsers: 0,
-  });
-  const [syncStats, setSyncStats] = useState({
-    totalRuns: 0,
-    successRate: 0,
-    outOfSyncCount: 0,
-    failedRuns: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [syncLoading, setSyncLoading] = useState(true);
-
-  useEffect(() => {
-    const loadStats = async () => {
-      try {
-        // Fetch real tenant count
-        const tenantsRes = await api.get('/api/tenants');
-        const tenants = await tenantsRes.json();
-        
-        setStats({
-          totalTenants: Array.isArray(tenants) ? tenants.length : 0,
-          totalUsers: 2, // TODO: Fetch from users API when available
-        });
-      } catch (error) {
-        console.error('Failed to load stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadStats();
-  }, []);
-
-  useEffect(() => {
-    const loadSyncStats = async () => {
-      try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await api.get(`${apiBaseUrl}/api/admin/sync-stats`);
-        if (res.ok) {
-          const data = await res.json();
-          setSyncStats(data.stats || {
-            totalRuns: 0,
-            successRate: 0,
-            outOfSyncCount: 0,
-            failedRuns: 0,
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load sync stats:', error);
-      } finally {
-        setSyncLoading(false);
-      }
-    };
-    loadSyncStats();
-  }, []);
+  // Use cached admin data hook
+  const { tenants, syncStats, loading: adminDataLoading, error: adminDataError } = useAdminData();
 
   const adminGroups: AdminGroup[] = [
     {
@@ -204,7 +152,7 @@ export default function AdminDashboardPage() {
             </svg>
           ),
           color: 'bg-amber-500',
-          stats: `${stats.totalTenants} tenants`,
+          stats: `${tenants?.total || 0} tenants`,
         },
         {
           title: 'Tier System',
@@ -268,7 +216,7 @@ export default function AdminDashboardPage() {
             </svg>
           ),
           color: 'bg-purple-500',
-          stats: `${stats.totalUsers} users`,
+          stats: `2 users`,
         },
       ],
     },
@@ -286,7 +234,7 @@ export default function AdminDashboardPage() {
             </svg>
           ),
           color: 'bg-green-500',
-          stats: `${stats.totalTenants} tenants`,
+          stats: `${tenants?.total || 0} tenants`,
         },
         {
           title: 'Organizations',
@@ -381,7 +329,7 @@ export default function AdminDashboardPage() {
             </svg>
           ),
           color: 'bg-cyan-500',
-          stats: syncLoading ? 'Loading...' : `${syncStats.successRate}% success rate`,
+          stats: adminDataLoading ? 'Loading...' : `${syncStats?.successRate || 0}% success rate`,
           badge: 'M3',
         },
       ],
@@ -539,7 +487,7 @@ export default function AdminDashboardPage() {
   ];
 
   // Access control checks
-  if (accessLoading || loading) {
+  if (accessLoading || adminDataLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
         <Spinner size="lg" />
@@ -580,10 +528,10 @@ export default function AdminDashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Total Tenants</p>
-                  {loading ? (
+                  {adminDataLoading ? (
                     <Spinner size="sm" className="mt-2" />
                   ) : (
-                    <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">{stats.totalTenants}</p>
+                    <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">{tenants?.total || 0}</p>
                   )}
                 </div>
                 <div className="h-12 w-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
@@ -600,10 +548,10 @@ export default function AdminDashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Total Users</p>
-                  {loading ? (
+                  {adminDataLoading ? (
                     <Spinner size="sm" className="mt-2" />
                   ) : (
-                    <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">{stats.totalUsers}</p>
+                    <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">2</p> // TODO: Add user count to cached admin data
                   )}
                 </div>
                 <div className="h-12 w-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">

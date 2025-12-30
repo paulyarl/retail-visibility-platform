@@ -13,6 +13,7 @@ import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoG
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursDisplay from '@/components/shared/BusinessHoursDisplay';
+import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
 
 interface StoreDetailPageProps {
   params: {
@@ -724,37 +725,12 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             <div className="lg:col-span-3 space-y-6">
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Contact Information
+                  Contact
                 </h2>
+                <div>
+                            <ContactInformationCollapsible tenant={listing} fullAddress={fullAddress} />
+                          </div>
                 
-                {/* Contact Details - Enclosed Style */}
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 mb-4">
-                  {fullAddress && (
-                    <div className="flex items-start gap-2 mb-3">
-                      <MapPin className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-gray-700">{fullAddress}</p>
-                    </div>
-                  )}
-                  {listing.phone && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <Phone className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                      <a href={`tel:${listing.phone}`} className="text-sm text-blue-600 hover:text-blue-700">
-                        {listing.phone}
-                      </a>
-                    </div>
-                  )}
-                  {listing.email && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <Mail className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                      <a 
-                        href={`mailto:${listing.email}`} 
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                        suppressHydrationWarning
-                      >
-                        {listing.email}
-                      </a>
-                    </div>
-                  )}
                   
                   {/* Social Links */}
                   {businessProfile?.social_links && Object.keys(businessProfile.social_links).length > 0 && (
@@ -851,8 +827,6 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             </div>
           </div>
         </div>
-
-      </div>
 
       {/* Featured Products */}
       {featuredProducts.length > 0 && (

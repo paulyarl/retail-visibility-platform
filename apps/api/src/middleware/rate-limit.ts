@@ -414,8 +414,9 @@ export function applyRateLimit(req: Request, res: Response, next: NextFunction) 
 
   // File upload endpoints
   if (path.includes('/upload') || req.method === 'POST' && req.headers['content-type']?.includes('multipart')) {
-    uploadRateLimit(req, res, next);
-    return;
+    /* uploadRateLimit(req, res, next);
+    return; */
+     return next();
   }
 
   // Search endpoints
@@ -426,8 +427,9 @@ export function applyRateLimit(req: Request, res: Response, next: NextFunction) 
 
   // Admin endpoints
   if (path.startsWith('/api/admin/') || path.includes('/admin')) {
-    adminRateLimit(req, res, next);
-    return;
+    /* adminRateLimit(req, res, next);
+    return; */
+     return next();
   }
 
   // Store status endpoints (cached, essential for UI - NO RATE LIMIT)

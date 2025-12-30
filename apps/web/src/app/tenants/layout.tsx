@@ -3,16 +3,23 @@
 import { useState } from 'react';
 import SettingsFooter from '@/components/SettingsFooter';
 import GeneralSidebar from '@/components/GeneralSidebar';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function TenantsLayout({ children }: { children: React.ReactNode }) {
+  
+  const params = useParams();
+  const tenantId = params.tenantId as string;
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const nav = [
-    { label: 'Locations', href: '/tenants' },
-    { label: 'Account', href: '/settings/account' },
+    { label: 'Store Dashboard', href: '/t/${tenantId}/dashboard' },
+    { label: 'My Locations', href: '/tenants' },
+    { label: 'Location Inventory', href: '/t/${tenantId}/items' },
+    { label: 'Onboarding', href: '/t/${tenantId}/onboarding' },
+    { label: 'Store Settings', href: '/t/${tenantId}/settings' },
+    { label: 'My Account', href: '/settings/account' },
     { label: 'Subscription', href: '/settings/subscription' },
-    { label: 'Dashboard', href: '/' },
-    { label: 'Settings', href: '/settings' },
   ];
 
   return (

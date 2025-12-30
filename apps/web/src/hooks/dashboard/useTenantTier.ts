@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { CachedTenantService, CachedTenantData } from '@/lib/cache/cached-tenant-service';
 import { 
   resolveTier, 
   ResolvedTier, 
@@ -99,88 +100,69 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
     }
   };
 
-  // Use React Query for tier data fetching with caching
-  const { data: tierData, isLoading: tierLoading, error: tierError, refetch } = useQuery({
-    queryKey: ['tenant', tenantId, 'tier', !!authUser],
-    queryFn: async () => {
+  // Use CachedTenantService for persistent local storage caching
+  const { data: tenantData, isLoading: tenantLoading, error: tenantError, refetch } = useQuery({
+    queryKey: ['tenant', tenantId, 'cached-data', !!authUser],
+    queryFn: async (): Promise<CachedTenantData | null> => {
       if (!tenantId) return null;
 
-      // Use public tier endpoint if no auth, otherwise use authenticated endpoint
-      const tierEndpoint = authUser 
-        ? `/api/tenants/${tenantId}/tier`
-        : `/api/tenants/${tenantId}/tier/public`;
-
-      // Fetch tenant and organization tier data
-      const tenantResponse = await api.get(tierEndpoint);
-      
-      if (!tenantResponse.ok) {
-        throw new Error(`Failed to fetch tenant tier: ${tenantResponse.status}`);
+      try {
+        const data = await CachedTenantService.getTenantData(tenantId, true);
+        return data;
+      } catch (error) {
+        console.error('[useTenantTier] Failed to fetch tenant data:', error);
+        throw error;
       }
-
-      const tierData = await tenantResponse.json();
-
-      let organizationTier: TierInfo | null = null;
-      let tenantTier: TierInfo | null = null;
-      let isChain = false;
-
-      // Process tenant tier response
-      organizationTier = tierData.organizationTier ? mapApiTierToTierInfo(tierData.organizationTier) : null;
-      tenantTier = tierData.tenantTier ? mapApiTierToTierInfo(tierData.tenantTier) : null;
-      isChain = tierData.isChain || false;
-
-      // Resolve effective tier using middleware
-      const resolvedTier = resolveTier(organizationTier, tenantTier, isChain);
-
-      return {
-        tier: resolvedTier,
-        isChain
-      };
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes - tier data changes infrequently
-    gcTime: 30 * 60 * 1000, // 30 minutes cache
+    staleTime: 5 * 60 * 1000, // 5 minutes - local storage handles longer-term caching
+    gcTime: 15 * 60 * 1000, // 15 minutes
     enabled: !!tenantId, // Only run when tenantId is available
   });
 
-  // Use React Query for usage data fetching
-  const { data: usageData, isLoading: usageLoading, error: usageError } = useQuery({
-    queryKey: ['tenant', tenantId, 'usage'],
-    queryFn: async (): Promise<TenantUsage> => {
-      if (!tenantId) {
-        return {
-          products: 0,
-          locations: 0,
-          users: 0,
-          apiCalls: 0,
-          storageGB: 0
-        };
-      }
+  // Extract tier and usage data from cached tenant data
+  const tierData = useMemo(() => {
+    if (!tenantData) return null;
 
-      const usageResponse = await api.get(`/api/tenants/${tenantId}/usage`);
-      
-      if (!usageResponse.ok) {
-        throw new Error(`Failed to fetch tenant usage: ${usageResponse.status}`);
-      }
+    // Reconstruct tier data from cached format
+    const { tenant, tier: tierInfo } = tenantData;
 
-      const usage = await usageResponse.json();
-      return {
-        products: usage.products || 0,
-        locations: usage.locations || 0,
-        users: usage.users || 0,
-        apiCalls: usage.apiCalls || 0,
-        storageGB: usage.storageGB || 0
-      };
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes - usage updates more frequently
-    gcTime: 15 * 60 * 1000, // 15 minutes cache
-    enabled: !!tenantId && !!authUser, // Only run when authenticated and tenantId available
-  });
+    let organizationTier: TierInfo | null = null;
+    let tenantTier: TierInfo | null = null;
+    let isChain = false;
+
+    if (tierInfo.organizationTier) {
+      organizationTier = mapApiTierToTierInfo(tierInfo.organizationTier);
+    }
+    if (tierInfo.tenantTier) {
+      tenantTier = mapApiTierToTierInfo(tierInfo.tenantTier);
+    }
+    isChain = tierInfo.isChain || false;
+
+    const resolvedTier = resolveTier(organizationTier, tenantTier, isChain);
+
+    return {
+      tier: resolvedTier,
+      isChain
+    };
+  }, [tenantData]);
+
+  const usageData = useMemo(() => {
+    if (!tenantData?.usage) return null;
+
+    return {
+      products: tenantData.usage.currentItems || 0,
+      locations: tenantData.usage.locations || 1,
+      users: tenantData.usage.users || 0,
+      apiCalls: tenantData.usage.apiCalls || 0,
+      storageGB: tenantData.usage.storageGB || 0
+    };
+  }, [tenantData]);
 
   // Extract data from React Query results
   const tier = tierData?.tier || null;
   const usage = usageData || null;
-  const loading = authLoading || tierLoading || (authUser ? usageLoading : false);
-  const error = (tierError ? (tierError instanceof Error ? tierError.message : String(tierError)) : null) || 
-                (usageError ? (usageError instanceof Error ? usageError.message : String(usageError)) : null);
+  const loading = authLoading || tenantLoading;
+  const error = tenantError ? (tenantError instanceof Error ? tenantError.message : String(tenantError)) : null;
 
   // EMERGENCY: Feature name mapping to fix frontend/backend conflicts
   const EMERGENCY_FEATURE_MAPPING: Record<string, string> = {
