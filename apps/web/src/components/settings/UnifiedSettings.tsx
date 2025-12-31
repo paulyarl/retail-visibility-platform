@@ -117,7 +117,7 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
             id={group.title.toLowerCase().replace(/\s+/g, '-')}
             className="scroll-mt-8"
           >
-            <CachedProtectedCard accessOptions={group.accessOptions}>
+            <CachedProtectedCard accessOptions={group.accessOptions} tenantId={config.tenantId}>
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {group.title}
@@ -132,6 +132,7 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
                   <CachedProtectedCard
                     key={card.title}
                     accessOptions={card.accessOptions}
+                    tenantId={config.tenantId}
                   >
                     <AnimatedCard
                       onClick={() => handleCardClick(card.href)}
