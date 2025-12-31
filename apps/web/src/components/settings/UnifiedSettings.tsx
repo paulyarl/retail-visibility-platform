@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, AnimatedCard } from '@/components/ui';
 import PageHeader from '@/components/PageHeader';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
+import { CachedProtectedCard } from '@/lib/auth/CachedProtectedCard';
 import SettingsSearch from '@/components/SettingsSearch';
 
 
@@ -116,7 +117,7 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
             id={group.title.toLowerCase().replace(/\s+/g, '-')}
             className="scroll-mt-8"
           >
-            <ProtectedCard accessOptions={group.accessOptions}>
+            <CachedProtectedCard accessOptions={group.accessOptions}>
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {group.title}
@@ -128,7 +129,7 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {group.cards.map((card) => (
-                  <ProtectedCard
+                  <CachedProtectedCard
                     key={card.title}
                     accessOptions={card.accessOptions}
                   >
@@ -165,10 +166,10 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
                         )}
                       </CardHeader>
                     </AnimatedCard>
-                  </ProtectedCard>
+                  </CachedProtectedCard>
                 ))}
               </div>
-            </ProtectedCard>
+            </CachedProtectedCard>
           </div>
         ))}
       </div>
