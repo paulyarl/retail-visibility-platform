@@ -18,6 +18,8 @@ import {
   AccessControlOptions,
   checkAccess,
   isPlatformAdmin,
+  isPlatformSupport,
+  isPlatformViewer,
   isTenantOwnerOrAdmin,
   getTenantRole,
   isOrganizationAdmin,
@@ -39,6 +41,8 @@ export interface UseAccessControlResult {
   hasAccess: boolean;
   accessReason?: string;
   isPlatformAdmin: boolean;
+  isPlatformSupport: boolean;
+  isPlatformViewer: boolean;
   isTenantAdmin: boolean;
   isOrgAdmin: boolean;
   isOrgMember: boolean;
@@ -157,6 +161,8 @@ export function useAccessControl(
       error,
       hasAccess: false,
       isPlatformAdmin: false,
+      isPlatformSupport: false,
+      isPlatformViewer: false,
       isTenantAdmin: false,
       isOrgAdmin: false,
       isOrgMember: false,
@@ -173,6 +179,8 @@ export function useAccessControl(
 
   const accessCheck = checkAccess(user, context, options);
   const platformAdmin = isPlatformAdmin(user);
+  const platformSupport = isPlatformSupport(user);
+  const platformViewer = isPlatformViewer(user);
   const tenantAdmin = tenantId ? isTenantOwnerOrAdmin(user, tenantId) : false;
   const orgAdmin = organizationData ? isOrganizationAdmin(user, organizationData) : false;
   const orgMember = organizationData ? isOrganizationMember(user, organizationData) : false;
@@ -187,6 +195,8 @@ export function useAccessControl(
     hasAccess: accessCheck.hasAccess,
     accessReason: accessCheck.reason,
     isPlatformAdmin: platformAdmin,
+    isPlatformSupport: platformSupport,
+    isPlatformViewer: platformViewer,
     isTenantAdmin: tenantAdmin,
     isOrgAdmin: orgAdmin,
     isOrgMember: orgMember,

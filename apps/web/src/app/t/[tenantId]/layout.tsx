@@ -77,16 +77,16 @@ export default async function TenantLayout({ children, params }: { children: Rea
   const ffAppShellNav = isFeatureEnabled('FF_APP_SHELL_NAV', tenantId);
 
   const nav = [
-    { label: 'Store Dashboard', href: `/t/${tenantId}/dashboard` },
     { label: 'My Locations', href: `/tenants` },
+    { label: 'Location Dashboard', href: `/t/${tenantId}/dashboard` },    
     { label: 'Intentory', href: `/t/${tenantId}/items` },
     { label: 'Barcode Scan', href: `/t/${tenantId}/scan` },
     { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
     { label: 'Categories', href: `/t/${tenantId}/categories` },
     { label: 'Onboarding', href: `/t/${tenantId}/onboarding` },
-    { label: 'Settings', href: `/t/${tenantId}/settings` },
+    { label: 'Location Settings', href: `/t/${tenantId}/settings` },
     { label: 'My Account', href: `/settings/account` },
-    { label: 'Subscription', href: `/settings/Subscription` },
+    { label: 'Platform Settings', href: `/settings` },
   ];
 
   return (

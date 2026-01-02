@@ -23,6 +23,8 @@ export interface UserData {
   email: string;
   role?: PlatformRole;
   isPlatformAdmin?: boolean; // Deprecated - use role === 'PLATFORM_ADMIN'
+  isPlatformViewer?: boolean; // Deprecated - use role === 'PLATFORM_VIEWER'
+  isPlatformSupport?: boolean; // Deprecated - use role === 'PLATFORM_SUPPORT'
   tenants?: Array<{
     tenantId?: string; // New format
     id?: string; // Legacy format from AuthContext
@@ -94,6 +96,24 @@ export function isPlatformAdmin(user: UserData): boolean {
 }
 
 /**
+ * Check if user is a platform support
+ */
+export function isPlatformSupport(user: UserData): boolean {
+  return user.role === 'PLATFORM_SUPPORT' || 
+         user.role === 'USER' || // Legacy
+         user.isPlatformSupport === true; // Legacy
+}
+
+/**
+ * Check if user is a platform viewer
+ */
+export function isPlatformViewer(user: UserData): boolean {
+  return user.role === 'PLATFORM_VIEWER' || 
+         user.role === 'USER' || // Legacy
+         user.isPlatformViewer === true; // Legacy
+}
+
+/**
  * Permission Helpers
  * These functions check if a user has permission to perform specific actions.
  * Use these instead of checking roles directly for better maintainability.
@@ -144,6 +164,7 @@ export function isTenantAdmin(user: UserData): boolean {
 export function canPerformTenantSupport(user: UserData): boolean {
   return user.role === 'PLATFORM_ADMIN' || 
          user.role === 'PLATFORM_SUPPORT' || 
+         user.role === 'OWNER' ||
          user.role === 'TENANT_OWNER' ||
          user.role === 'TENANT_ADMIN' ||
          user.role === 'ADMIN'; // Legacy
@@ -308,8 +329,7 @@ export function canDeleteTenant(user: UserData, tenantId: string): boolean {
   if (isPlatformAdmin(user)) return true;
   
   // Only tenant owners can delete
-  const memberRole = getTenantRole(user, tenantId);
-  return memberRole === 'OWNER'||memberRole === 'TENANT_OWNER';
+  return hasTenantAdminAccess(user, tenantId);
 }
 
 /**
@@ -340,8 +360,7 @@ export function canManageTenantInventory(user: UserData, tenantId: string): bool
   if (isPlatformAdmin(user)) return true;
   
   // Tenant owners, admins, and members can manage inventory
-  const memberRole = getTenantRole(user, tenantId);
-  return memberRole === 'OWNER' || memberRole === 'ADMIN' || memberRole === 'MEMBER';
+   return hasTenantRole(user, tenantId, ['OWNER', 'ADMIN','TENANT_OWNER','TENANT_ADMIN','TENANT_MEMBER']);
 }
 
 /**
@@ -397,12 +416,12 @@ export function hasTenantRole(user: UserData, tenantId: string, roles: UserRole[
   return userRole ? roles.includes(userRole) : false;
 }
 
-export function isTenantOwnerOrAdmin(user: UserData, tenantId: string): boolean {
-  return hasTenantRole(user, tenantId, ['OWNER', 'ADMIN']);
+export function isTenantOwnerOrAdmin(user: UserData, tenantId: string): boolean {  
+  return hasTenantRole(user, tenantId, ['OWNER', 'ADMIN','TENANT_OWNER','TENANT_ADMIN']);
 }
 
 export function isTenantOwnerLegacy(user: UserData, tenantId: string): boolean {
-  return hasTenantRole(user, tenantId, ['OWNER']);
+  return hasTenantRole(user, tenantId, ['OWNER','TENANT_OWNER']);
 }
 
 /**

@@ -23,7 +23,7 @@ export function generateTenantId(): string {
  * URL-safe, readable, unique
  */
 export function generateUserId(): string {
-  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
   return `uid-${nanoid()}`;
 }
 

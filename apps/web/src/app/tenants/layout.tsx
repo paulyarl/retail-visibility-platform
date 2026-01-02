@@ -13,11 +13,7 @@ export default function TenantsLayout({ children }: { children: React.ReactNode 
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const nav = [
-    { label: 'Store Dashboard', href: '/t/${tenantId}/dashboard' },
-    { label: 'My Locations', href: '/tenants' },
-    { label: 'Location Inventory', href: '/t/${tenantId}/items' },
-    { label: 'Onboarding', href: '/t/${tenantId}/onboarding' },
-    { label: 'Store Settings', href: '/t/${tenantId}/settings' },
+    { label: 'My Locations', href: '/tenants' },   
     { label: 'My Account', href: '/settings/account' },
     { label: 'Subscription', href: '/settings/subscription' },
   ];

@@ -137,7 +137,15 @@ export class AuthService {
     const user = await prisma.users.findUnique({
       where: { email: data.email.toLowerCase() },
       include: {
-        user_tenants: true,
+        user_tenants: {
+          include: {
+            tenants: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -201,7 +209,7 @@ export class AuthService {
         email_verified: user.email_verified,
         tenants: user.user_tenants.map((ut) => ({
           id: ut.tenant_id,
-          name: 'Unknown',
+          name: ut.tenants?.name || ut.tenant_id,
           role: ut.role,
         })),
       },

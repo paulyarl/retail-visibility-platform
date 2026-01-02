@@ -21,13 +21,21 @@ import { getMaintenanceState } from '../utils/subscription-status';
 // NOTE: 'trial' is not a tier - it's a time-limited status that can apply to any tier
 export const TIER_FEATURES = {
   google_only: [
+    'manual_barcode',
     'google_shopping',
+    'bulk_import',
+    'categories',
     'google_merchant_center',
     'basic_product_pages',
     'qr_codes_512',
     'performance_analytics',
+    'quick_start_wizard',
+    'square_sync',
+    'clover_sync',
   ],
   starter: [
+    'manual_barcode',
+    'barcode_scan',
     'storefront',
     'product_search',
     'mobile_responsive',
