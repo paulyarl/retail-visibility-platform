@@ -1,3 +1,4 @@
+import { api } from '@/lib/api';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -15,7 +16,7 @@ export async function GET(
     // Get auth token from request
     const authHeader = request.headers.get('authorization') || request.headers.get('cookie');
     
-    const response = await fetch(`${apiUrl}/api/tenants/${tenantId}/tier`, {
+    const response = await api.get(`${apiUrl}/api/tenants/${tenantId}/tier`, {
       headers: {
         'Authorization': authHeader || '',
         'Cookie': request.headers.get('cookie') || '',

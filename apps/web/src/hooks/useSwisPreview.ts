@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { SwisPreviewItem } from '@/components/tenant/SwisPreviewWidget';
+import { api } from '@/lib/api';
 
 interface UseSwisPreviewOptions {
   tenantId: string;
@@ -35,7 +36,7 @@ export function useSwisPreview({
         sort: sortOrder,
       });
 
-      const response = await fetch(`/api/tenant/${tenantId}/swis/preview?${params}`);
+      const response = await api.get(`/api/tenant/${tenantId}/swis/preview?${params}`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch products (${response.status})`);

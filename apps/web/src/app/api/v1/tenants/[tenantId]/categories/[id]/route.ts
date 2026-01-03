@@ -1,3 +1,4 @@
+import { api } from '@/lib/api';
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -22,7 +23,7 @@ export async function GET(
       headers['Authorization'] = authHeader;
     }
 
-    const response = await fetch(url, {
+    const response = await api.get(url, {
       method: 'GET',
       headers,
     });
@@ -60,7 +61,7 @@ export async function PATCH(
       headers['Authorization'] = authHeader;
     }
 
-    const response = await fetch(url, {
+    const response = await api.patch(url, body, {
       method: 'PATCH',
       headers,
       body: JSON.stringify(body),
@@ -98,7 +99,7 @@ export async function DELETE(
       headers['Authorization'] = authHeader;
     }
 
-    const response = await fetch(url, {
+    const response = await api.delete(url, {
       method: 'DELETE',
       headers,
     });
@@ -140,7 +141,7 @@ export async function PUT(
       headers['Authorization'] = authHeader;
     }
 
-    const response = await fetch(url, {
+    const response = await api.put(url, body, {
       method: 'PUT',
       headers,
       body: JSON.stringify(body),

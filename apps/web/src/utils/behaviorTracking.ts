@@ -10,6 +10,7 @@
 
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { api } from '@/lib/api';
 
 // Client-side tracking cache
 interface CachedTrackingEvent extends TrackingData {
@@ -196,7 +197,7 @@ class BehaviorTrackingCache {
         headers['Content-Type'] = 'application/json';
       }
       
-      const response = await fetch(`${apiUrl}/api/recommendations/track-batch`, {
+      const response = await api.post(`${apiUrl}/api/recommendations/track-batch`, {
         method: 'POST',
         headers,
         body: requestBody

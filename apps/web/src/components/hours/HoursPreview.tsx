@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getTodaySpecialHours } from "@/lib/hours-utils";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { api } from "@/lib/api";
 
 interface HoursPreviewProps {
   apiBase: string;
@@ -23,7 +24,7 @@ export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
   useEffect(() => {
     const fetchSpecialHours = async () => {
       try {
-        const response = await fetch(`${apiBase}/api/tenant/${tenantId}/business-hours/special`);
+        const response = await api.get(`${apiBase}/api/tenant/${tenantId}/business-hours/special`);
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.data?.overrides) {

@@ -1,3 +1,4 @@
+import { api } from '@/lib/api';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -64,7 +65,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       headers['Authorization'] = authHeader;
     }
     
-    const res = await fetch(`${base}/api/tenants/${encodeURIComponent(id)}`, {
+    const res = await api.patch(`${base}/api/tenants/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify(body),
@@ -102,7 +103,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
       headers['Authorization'] = authHeader;
     }
     
-    const res = await fetch(`${base}/api/tenants/${encodeURIComponent(id)}`, {
+    const res = await api.delete(`${base}/api/tenants/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers,
     });

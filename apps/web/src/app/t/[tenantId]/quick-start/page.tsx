@@ -7,6 +7,7 @@ import { ContextBadges } from '@/components/ContextBadges';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { Badge } from '@/components/ui';
 import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
+import { api } from '@/lib/api';
 
 // Add slider thumb styling
 const sliderStyles = `
@@ -132,7 +133,8 @@ export default function QuickStartPage() {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start/eligibility`, {
+      //const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start/eligibility`, {
+      const res = await api.get(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start/eligibility`, {
         headers,
         credentials: 'include',
       });
@@ -167,7 +169,8 @@ export default function QuickStartPage() {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start`, {
+      //const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start`, {
+      const res = await api.post(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start`, {
         method: 'POST',
         headers,
         credentials: 'include',

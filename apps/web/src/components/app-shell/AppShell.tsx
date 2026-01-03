@@ -70,7 +70,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               />
             )}
             <span className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
-              {settings?.platformName || 'Visible Shell'}
+              {settings?.platformName || 'Visible Shelf'}
             </span>
             {hydrated ? (
               tenantName ? (

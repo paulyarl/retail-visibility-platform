@@ -3,12 +3,8 @@ import { isFeatureEnabled } from '@/lib/featureFlags';
 
 interface AppLinks {
   dashboard: string;
-  inventory: string;
-  trash?: string;
-  categories?: string;
-  tenants: string;
-  propagation?: string;
-  integrations?: string;
+  inventory: string; 
+  tenants: string; 
   settings: string;
 }
 
@@ -26,8 +22,7 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
   const [links, setLinks] = useState<AppLinks>({
     dashboard: '/',
     inventory: '/items',
-    tenants: '/tenants',
-    propagation: undefined,
+    tenants: '/tenants', 
     settings: '/settings',
   });
   const [tenantScopedLinksOn, setTenantScopedLinksOn] = useState(false);
@@ -43,25 +38,17 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
     if (tenantUrlsOn && tenantId) {
       setLinks({
         dashboard: `/t/${tenantId}/dashboard`,
-        inventory: `/t/${tenantId}/items`,
-        trash: `/t/${tenantId}/trash`,
-        categories: `/t/${tenantId}/categories/manage`,
-        tenants: '/tenants',
-        propagation: `/t/${tenantId}/propagation`,
-        integrations: `/t/${tenantId}/settings/integrations`,
+        inventory: `/t/${tenantId}/items`, 
+        tenants: '/tenants',  
         settings: `/t/${tenantId}/settings`,
       });
       setTenantScopedLinksOn(true);
     } else {
       setLinks({
         dashboard: '/',
-        inventory: '/items',
-        trash: undefined,
-        categories: undefined,
+        inventory: '/items', 
         tenants: '/tenants',
-        propagation: undefined,
-        integrations: undefined,
-        settings: '/settings',
+        settings: '/settings',  
       });
       setTenantScopedLinksOn(false);
     }

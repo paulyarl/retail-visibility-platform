@@ -16,6 +16,7 @@ export interface TenantInfo {
   subdomain?: string;
   createdAt: string;
   statusInfo?: any;
+  logoUrl?: string | null;
   stats?: {
     productCount: number;
     userCount: number;

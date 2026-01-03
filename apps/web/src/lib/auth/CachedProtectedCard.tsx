@@ -67,6 +67,8 @@ export function CachedProtectedCard({
             return hasPermission('PLATFORM_ADMIN_ONLY');
           case 'PLATFORM_SUPPORT':
             return hasPermission('PLATFORM_SUPPORT');
+          case 'PLATFORM_VIEWER':
+            return hasPermission('PLATFORM_STAFF');
           case 'ADMIN':
             return hasPermission('PLATFORM_ADMIN_ONLY'); // ADMIN maps to PLATFORM_ADMIN_ONLY
           default:

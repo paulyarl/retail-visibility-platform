@@ -251,6 +251,11 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
         location_status: true,
         subdomain: true,
         created_at: true,
+        tenant_business_profiles_list: {
+          select: {
+            logo_url: true,
+          },
+        },
         _count: {
           select: {
             inventory_items: true,
@@ -280,6 +285,7 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       createdAt: tenant.created_at,
       locationStatus: tenant.location_status,
       statusInfo: getLocationStatusInfo(tenant.location_status as any),
+      logoUrl: (tenant as any).tenant_business_profiles_list?.logo_url || null,
       stats: {
         productCount: (tenant as any)._count.inventory_items,
         userCount: (tenant as any)._count.user_tenants,
@@ -588,6 +594,11 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
         location_status: true,
         subdomain: true,
         created_at: true,
+        tenant_business_profiles_list: {
+          select: {
+            logo_url: true,
+          },
+        },
         _count: {
           select: {
             inventory_items: true,
@@ -671,6 +682,7 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
         locationStatus: tenant.location_status,
         subdomain: tenant.subdomain,
         createdAt: tenant.created_at,
+        logoUrl: (tenant as any).tenant_business_profiles_list?.logo_url || null,
         statusInfo: getLocationStatusInfo(tenant.location_status as any),
         stats: {
           productCount: tenant._count.inventory_items,

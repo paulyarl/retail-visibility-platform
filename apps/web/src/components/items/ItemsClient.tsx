@@ -40,6 +40,7 @@ import SyncStatusIndicator from './SyncStatusIndicator';
 
 // Types
 import { Item } from '@/services/itemsDataService';
+import { api } from '@/lib/api';
 
 interface ItemsClientProps {
   initialItems?: Item[];
@@ -114,7 +115,7 @@ export default function ItemsClient({
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch(`/api/tenants/${initialTenantId}/categories`);
+        const response = await api.get(`/api/tenants/${initialTenantId}/categories`);
         if (response.ok) {
           const data = await response.json();
           setCategories(data.categories || []);

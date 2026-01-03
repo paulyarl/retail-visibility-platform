@@ -1,7 +1,7 @@
 "use client";
 
 import UnifiedSettings, { UnifiedSettingsConfig, transformToUnifiedConfig } from './UnifiedSettings';
-
+import { useTenantComplete } from "@/hooks/dashboard/useTenantComplete";
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic';
 
 export default function TenantSettings({ tenantId }: { tenantId: string }) {
   // Legacy settings groups - will be transformed to unified format
+   // Consolidated data fetching - replaces 3 separate API calls with 1
+  const { tenant: tenantData, tier, usage, loading: completeLoading, error: completeError } = useTenantComplete(tenantId);
   const legacySettingsGroups = [
     {
       title: 'Account & Preferences',
@@ -324,7 +326,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
   ];
 
   const config: UnifiedSettingsConfig = transformToUnifiedConfig(legacySettingsGroups, {
-    title: 'Settings',
+    title: `${tenantData?.name} Store Settings`,
     description: 'Manage your store settings and preferences',
     tenantId,
   });

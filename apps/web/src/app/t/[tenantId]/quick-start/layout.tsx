@@ -10,6 +10,7 @@
 import { useParams } from 'next/navigation';
 import { TierGate } from '@/components/tier/TierGate';
 import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 
 
 // Force edge runtime to prevent prerendering issues
@@ -38,7 +39,8 @@ export default function QuickStartLayout({ children }: { children: React.ReactNo
         }
         
         // Use /tier endpoint which properly resolves effective tier from org + tenant
-        const res = await fetch(`${apiUrl}/api/tenants/${tenantId}/tier`, {
+        //const res = await fetch(`${apiUrl}/api/tenants/${tenantId}/tier`, {
+        const res = await api.get(`${apiUrl}/api/tenants/${tenantId}/tier`, {
           headers,
           credentials: 'include',
         });

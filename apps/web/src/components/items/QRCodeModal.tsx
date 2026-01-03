@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui';
 import { QRCodeGenerator } from './QRCodeGenerator';
+import { api } from '@/lib/api';
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -30,7 +31,7 @@ export function QRCodeModal(props: QRCodeModalProps) {
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         
         // Use public tier endpoint (no auth required for storefront)
-        const tierResponse = await fetch(`${apiUrl}/api/tenants/${actualTenantId}/tier/public`);
+        const tierResponse = await api.get(`${apiUrl}/api/tenants/${actualTenantId}/tier/public`);
         if (tierResponse.ok) {
           const tierData = await tierResponse.json();
           const effectiveTierId = tierData.effective?.id || tierData.tier;
@@ -39,7 +40,7 @@ export function QRCodeModal(props: QRCodeModalProps) {
           // Fetch logo if professional or above
           if (effectiveTierId === 'enterprise' || effectiveTierId === 'organization' || effectiveTierId === 'chain_enterprise' || effectiveTierId === 'professional' || effectiveTierId === 'chain_professional') {
             try {
-              const profileResponse = await fetch(`${apiUrl}/api/tenants/${actualTenantId}/profile`);
+              const profileResponse = await api.get(`${apiUrl}/api/tenants/${actualTenantId}/profile`);
               if (profileResponse.ok) {
                 const profile = await profileResponse.json();
                 setTenantLogo(profile.logo_url || null);

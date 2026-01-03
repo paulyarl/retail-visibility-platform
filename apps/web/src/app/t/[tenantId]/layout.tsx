@@ -78,15 +78,13 @@ export default async function TenantLayout({ children, params }: { children: Rea
 
   const nav = [
     { label: 'My Locations', href: `/tenants` },
-    { label: 'Location Dashboard', href: `/t/${tenantId}/dashboard` },    
+    { label: 'Dashboard', href: `/t/${tenantId}/dashboard` },    
     { label: 'Intentory', href: `/t/${tenantId}/items` },
     { label: 'Barcode Scan', href: `/t/${tenantId}/scan` },
     { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
     { label: 'Categories', href: `/t/${tenantId}/categories` },
     { label: 'Onboarding', href: `/t/${tenantId}/onboarding` },
-    { label: 'Location Settings', href: `/t/${tenantId}/settings` },
-    { label: 'My Account', href: `/settings/account` },
-    { label: 'Platform Settings', href: `/settings` },
+    { label: 'Settings', href: `/t/${tenantId}/settings` },
   ];
 
   return (

@@ -1,3 +1,4 @@
+import { api } from '@/lib/api';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
@@ -18,7 +19,7 @@ export async function GET(req: Request) {
     headers['Authorization'] = authHeader;
   }
   
-  const res = await fetch(upstreamUrl, { headers });
+  const res = await api.get(upstreamUrl, { headers });
   
   if (!res.ok) {
     const text = await res.text();
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
       headers['Authorization'] = authHeader;
     }
     
-    const res = await fetch(`${base}/api/tenants`, {
+    const res = await api.post(`${base}/api/tenants`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { UnifiedStoreCard } from '@/components/directory/UnifiedStoreCard';
+import { api } from '@/lib/api';
 
 
 // Force edge runtime to prevent prerendering issues
@@ -19,7 +20,7 @@ export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
     const fetchRecommendations = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiUrl}/api/recommendations/for-storefront/${tenantId}`);
+        const response = await api.get(`${apiUrl}/api/recommendations/for-storefront/${tenantId}`);
         const data = await response.json();
         // API returns nested structure: { recommendations: [{ type, title, recommendations: [...stores] }] }
         // Flatten to get the actual store recommendations

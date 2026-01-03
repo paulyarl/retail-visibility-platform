@@ -1,3 +1,4 @@
+import { api } from '@/lib/api';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -6,7 +7,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const url = `${base}/items/${encodeURIComponent(id)}/photos`;
 
-    const res = await fetch(url, {
+    const res = await api.get(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -35,13 +36,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const url = `${base}/items/${encodeURIComponent(id)}/photos`;
     console.log('proxy uploading to:', url);
 
-    const res = await fetch(url, {
+    const res = await api.post(url, {
       method: 'POST',
       headers: {
         'Content-Type': req.headers.get('Content-Type') || 'application/json',
       },
       body: req.body,
-      // @ts-expect-error - duplex is a new fetch feature
       duplex: 'half',
     });
     
