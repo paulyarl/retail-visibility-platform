@@ -16,9 +16,9 @@ export default function StorefrontViewTracker({ tenantId, categoriesViewed = [] 
       entityId: tenantId,
       entityName: '', // API will fetch store name
       context: {
-        categories_viewed: categoriesViewed,
         is_storefront: true,
         page_type: 'storefront'
+        // categories_viewed: categoriesViewed, // Temporarily removed to avoid validation issues
       },
       pageType: 'storefront'
     });

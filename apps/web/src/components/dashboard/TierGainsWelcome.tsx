@@ -1,5 +1,5 @@
 "use client";
-
+import { UserProfileData } from "@/hooks/useUserProfile";
 import { Card, CardContent } from '@/components/ui';
 import Link from 'next/link';
 
@@ -121,22 +121,19 @@ function getTierGains(tier: string) {
           }
         ],
         cta: {
-          text: 'View Your Products',
-          href: '/items'
+          text: 'View Your Stores',
+          href: '/tenants'
         }
       };
 
     case 'starter':
     case 'growth':
       return {
-        title: '🏪 You Now Have Your Own Storefront + Multi-Location Power!',
+        title: '🏪 You Now Have Your Own Storefront',
         subtitle: 'Beyond Google - you now have a beautiful online store AND can manage multiple locations efficiently.',
         gains: [
           // NEW in Starter
-          {
-            name: '✨ Multi-Location Propagation',
-            description: 'Update products & user roles across all locations at once (2+ locations)'
-          },
+          
           {
             name: '✨ Public Storefront',
             description: 'Your own website where customers can browse and shop'
@@ -157,15 +154,11 @@ function getTierGains(tier: string) {
           {
             name: 'Manual Barcode Entry',
             description: 'Enrich your product listings with detailed information'
-          },
-          {
-            name: 'Performance Analytics',
-            description: 'See how your products perform'
           }
         ],
         cta: {
-          text: 'View Your Storefront',
-          href: '/storefront'
+          text: 'View Your Stores',
+          href: '/tenants'
         }
       };
 
@@ -175,11 +168,6 @@ function getTierGains(tier: string) {
         title: '⚡ Automation + Full Propagation Suite Unlocked!',
         subtitle: 'Save hours every week with smart automation AND manage all your locations from one dashboard.',
         gains: [
-          // NEW in Professional
-          {
-            name: '✨ Full Propagation Suite',
-            description: 'Propagate hours, categories, profiles, GBP settings across all locations'
-          },
           {
             name: '✨ Smart Barcode Scanner',
             description: 'Scan products with your camera - we auto-fill everything instantly'
@@ -220,8 +208,8 @@ function getTierGains(tier: string) {
           }
         ],
         cta: {
-          text: 'Start Scanning Products',
-          href: '/scan'
+          text: 'View Your Stores',
+          href: '/tenants'
         }
       };
 
@@ -242,10 +230,6 @@ function getTierGains(tier: string) {
           {
             name: '✨ API Access & Unlimited SKUs',
             description: 'Integrate with your systems, no product limits'
-          },
-          {
-            name: '✨ Dedicated Account Manager',
-            description: 'Personal support for your business'
           },
           // From Professional
           {
@@ -268,8 +252,8 @@ function getTierGains(tier: string) {
           }
         ],
         cta: {
-          text: 'Customize Your Platform',
-          href: '/settings/branding'
+          text: 'View Your Stores',
+          href: '/tenants'
         }
       };
 
@@ -283,6 +267,11 @@ function getTierGains(tier: string) {
             name: '✨ Product Propagation',
             description: 'Update prices, add products at HQ - push to all locations instantly'
           },
+          // NEW in Organization
+          {
+            name: '✨ Full Propagation Suite',
+            description: 'Propagate hours, categories, profiles, GBP settings across all locations'
+          },
           {
             name: '✨ Organization Dashboard',
             description: 'See performance across all your locations in one view'
@@ -291,10 +280,7 @@ function getTierGains(tier: string) {
             name: '✨ Hero Location Testing',
             description: 'Test changes at one location before rolling out chain-wide'
           },
-          {
-            name: '✨ Unlimited Locations',
-            description: 'Manage as many locations as you need from one place'
-          },
+         
           // From Professional
           {
             name: 'Smart Scanner & Quick Start',
@@ -317,7 +303,7 @@ function getTierGains(tier: string) {
         ],
         cta: {
           text: 'Manage Your Locations',
-          href: '/locations'
+          href: '/tenants'
         }
       };
 

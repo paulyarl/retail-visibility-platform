@@ -75,8 +75,8 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-neutral-900 dark:text-white">Email</p>
-                    <a href="mailto:support@retailvisibility.com" className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400">
-                      support@retailvisibility.com
+                    <a href="mailto:support@visibleshelf.com" className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400">
+                      support@visibleshelf.com
                     </a>
                   </div>
                 </div>

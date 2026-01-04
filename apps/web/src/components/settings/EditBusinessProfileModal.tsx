@@ -33,9 +33,10 @@ export default function EditBusinessProfileModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [pastedLogoUrl, setPastedLogoUrl] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(formData.logo_url || null);
   const [geocoding, setGeocoding] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Reset form when modal opens/closes or profile changes
   useEffect(() => {
@@ -48,6 +49,57 @@ export default function EditBusinessProfileModal({
       setLogoPreview(profile?.logo_url || null);
     }
   }, [isOpen, profile]);
+
+  // Fetch and optimize pasted logo URL
+  const optimizePastedLogoUrl = async (url: string) => {
+    try {
+      setUploadingLogo(true);
+      setError(null);
+
+      // Fetch the image from the URL
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to fetch image from URL');
+      }
+
+      const blob = await response.blob();
+      
+      // Convert blob to File
+      const file = new File([blob], 'logo.png', { type: blob.type || 'image/png' });
+
+      // Use centralized image upload middleware
+      const result = await uploadImage(file, ImageUploadPresets.logo);
+
+      // Get tenant ID from localStorage
+      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+      if (!tenantId) {
+        setError('No tenant selected');
+        return null;
+      }
+
+      // Upload to server
+      const res = await api.post(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
+        tenant_id: tenantId, 
+        dataUrl: result.dataUrl, 
+        contentType: result.contentType 
+      });
+
+      const payload = await res.json();
+      if (!res.ok) {
+        setError(payload?.error || "Upload failed");
+        return null;
+      }
+
+      // Return the optimized URL
+      return payload.url;
+    } catch (err: any) {
+      console.error('Failed to optimize pasted logo URL:', err);
+      setError(err.message || 'Failed to fetch and optimize logo from URL');
+      return null;
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   // Handle logo file upload
   const handleLogoUpload = async (file: File) => {
@@ -99,58 +151,40 @@ export default function EditBusinessProfileModal({
     }
   };
 
-  // Fetch and optimize pasted logo URL
-  const optimizePastedLogoUrl = async (url: string) => {
+  // Upload logo from pasted URL
+  const handleUploadLogoFromUrl = async () => {
+    if (!pastedLogoUrl.trim()) return;
+
     try {
       setUploadingLogo(true);
       setError(null);
 
-      // Fetch the image from the URL
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error('Failed to fetch image from URL');
-      }
-
-      const blob = await response.blob();
-      
-      // Convert blob to File
-      const file = new File([blob], 'logo.png', { type: blob.type || 'image/png' });
-
-      // Use centralized image upload middleware
-      const result = await uploadImage(file, ImageUploadPresets.logo);
-
-      // Get tenant ID from localStorage
+      // Send URL directly to API - let the server fetch and process it
       const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
       if (!tenantId) {
         setError('No tenant selected');
-        return null;
+        return;
       }
 
-      // Upload to server
-      const body = JSON.stringify({ 
-        tenant_id: tenantId, 
-        dataUrl: result.dataUrl, 
-        contentType: result.contentType 
-      });
-
       const res = await api.post(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
-        tenant_id: tenantId, 
-        dataUrl: result.dataUrl, 
-        contentType: result.contentType 
+        url: pastedLogoUrl
       });
 
       const payload = await res.json();
       if (!res.ok) {
         setError(payload?.error || "Upload failed");
-        return null;
+        return;
       }
 
-      // Return the optimized URL
-      return payload.url;
+      // Update form data with uploaded URL
+      const uploadedUrl = payload.url;
+      if (uploadedUrl) {
+        handleChange('logo_url', uploadedUrl);
+        setLogoPreview(uploadedUrl);
+        setPastedLogoUrl(""); // Clear the input after successful upload
+      }
     } catch (err: any) {
-      console.error('Failed to optimize pasted logo URL:', err);
-      setError(err.message || 'Failed to fetch and optimize logo from URL');
-      return null;
+      setError(err.message || 'Failed to upload logo from URL');
     } finally {
       setUploadingLogo(false);
     }
@@ -642,6 +676,27 @@ export default function EditBusinessProfileModal({
                   {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
                 </div>
               </label>
+            </div>
+
+            {/* URL Paste Input */}
+            <div className="flex gap-2 mb-2">
+              <div className="flex-1">
+                <Input
+                  type="url"
+                  placeholder="Or paste logo URL: https://example.com/logo.png"
+                  value={pastedLogoUrl}
+                  onChange={(e) => setPastedLogoUrl(e.target.value)}
+                  disabled={uploadingLogo}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleUploadLogoFromUrl}
+                disabled={!pastedLogoUrl.trim() || uploadingLogo}
+                className="px-4 py-2 bg-secondary-600 text-white rounded-lg hover:bg-secondary-700 disabled:opacity-50 text-sm font-medium whitespace-nowrap"
+              >
+                {uploadingLogo ? 'Uploading...' : 'Upload from URL'}
+              </button>
             </div>
 
             {/* Manual URL Input */}

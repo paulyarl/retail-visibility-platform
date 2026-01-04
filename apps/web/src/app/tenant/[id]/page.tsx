@@ -25,6 +25,7 @@ import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import { trackStorefrontView } from '@/utils/behaviorTracking';
 import ContactInformationCollapsible from '@/components/storefront/ContactInformationCollapsible';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
+import LastViewed from '@/components/directory/LastViewed';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -774,6 +775,16 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           )}
         </div>
       </main>
+
+      {/* Recently Viewed Stores */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <LastViewed 
+          title="Other Stores You Viewed" 
+          entityType="store"
+          limit={3}
+          showEmptyState={false}
+        />
+      </div>
 
       {/* Store Ratings and Reviews - After Products */}
       <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">

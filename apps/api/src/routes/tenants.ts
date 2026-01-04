@@ -9,6 +9,18 @@ import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess, requirePlatformAdmin } from '../middleware/auth';
 import { canViewAllTenants } from '../utils/platform-admin';
 import { getLocationStatusInfo } from '../utils/location-status';
+import fs from 'fs';
+import path from 'path';
+import { z } from 'zod';
+import { createClient } from '@supabase/supabase-js';
+import { StorageBuckets } from '../storage-config';
+
+// Create service role Supabase client for storage operations (bypasses RLS)
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const supabaseService = createClient(
+  process.env.SUPABASE_URL!,
+  serviceRoleKey!
+);
 
 // Rate limiting store (simple in-memory for now, could be Redis in production)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
@@ -778,6 +790,159 @@ router.get('/my-subdomains', async (req: Request, res: Response) => {
       success: false,
       error: 'internal_error',
       message: 'Failed to fetch subdomains'
+    });
+  }
+});
+
+/**
+ * POST /api/tenants/:id/logo
+ * Upload a logo for a tenant's business profile
+ */
+router.post('/:id/logo', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { url: logoUrl } = req.body;
+
+    console.log(`[TENANTS] Logo upload request for tenant: ${id}`);
+
+    // Validate required fields
+    if (!logoUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_url',
+        message: 'Logo URL is required'
+      });
+    }
+
+    // Validate URL format
+    try {
+      new URL(logoUrl);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_url',
+        message: 'Invalid URL format'
+      });
+    }
+
+    // Fetch the image from the URL
+    console.log(`[TENANTS] Fetching image from URL: ${logoUrl}`);
+    const fetchResponse = await fetch(logoUrl, {
+      headers: {
+        'User-Agent': 'VisibleShelf/1.0',
+      },
+      signal: AbortSignal.timeout(30000), // 30 second timeout
+    });
+
+    if (!fetchResponse.ok) {
+      return res.status(400).json({
+        success: false,
+        error: 'fetch_failed',
+        message: `Failed to fetch image from URL: ${fetchResponse.status} ${fetchResponse.statusText}`
+      });
+    }
+
+    // Get content type
+    const contentType = fetchResponse.headers.get('content-type') || 'image/jpeg';
+
+    // Validate content type
+    if (!contentType.startsWith('image/')) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_content_type',
+        message: 'URL must point to an image file'
+      });
+    }
+
+    // Convert response to buffer
+    const arrayBuffer = await fetchResponse.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (imageBuffer.length > maxSize) {
+      return res.status(400).json({
+        success: false,
+        error: 'file_too_large',
+        message: 'Logo file must be less than 5MB'
+      });
+    }
+
+    // Generate unique filename
+    const urlPath = new URL(logoUrl).pathname;
+    const fileExtension = contentType.split('/')[1] || urlPath.split('.').pop() || 'png';
+    const fileName = `tenant-logo-${id}-${Date.now()}.${fileExtension}`;
+
+    // Upload to Supabase TENANTS bucket
+    const supabasePath = `logos/${id}/${fileName}`;
+    const { error: uploadError, data: uploadData } = await supabaseService.storage
+      .from(StorageBuckets.TENANTS.name)
+      .upload(supabasePath, imageBuffer, {
+        cacheControl: "3600",
+        contentType: contentType,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('[TENANTS] Supabase upload error:', uploadError.message);
+      return res.status(500).json({
+        success: false,
+        error: 'upload_failed',
+        message: 'Failed to upload logo to storage'
+      });
+    }
+
+    // Get public URL
+    const { data: publicUrlData } = supabaseService.storage
+      .from(StorageBuckets.TENANTS.name)
+      .getPublicUrl(supabasePath);
+    
+    const uploadedLogoUrl = publicUrlData.publicUrl;
+
+    console.log(`[TENANTS] Logo uploaded to Supabase: ${uploadedLogoUrl}`);
+
+    // Update tenant's business profile with logo URL
+    await prisma.tenant_business_profiles_list.upsert({
+      where: { tenant_id: id },
+      update: { logo_url: uploadedLogoUrl },
+      create: {
+        tenant_id: id,
+        logo_url: uploadedLogoUrl,
+        business_name: '', // Will be filled by business profile
+        address_line1: '',
+        city: '',
+        state: '',
+        postal_code: '',
+        country_code: 'US',
+        phone_number: '',
+        email: '',
+        website: '',
+        business_description: '',
+        updated_at: new Date(),
+      }
+    });
+
+    console.log(`[TENANTS] Logo uploaded successfully for tenant ${id}: ${uploadedLogoUrl}`);
+
+    res.json({
+      success: true,
+      url: uploadedLogoUrl,
+      message: 'Logo uploaded successfully'
+    });
+
+  } catch (error: any) {
+    console.error('[TENANTS] Error uploading logo:', error);
+    if (error.name === 'AbortError') {
+      return res.status(408).json({
+        success: false,
+        error: 'timeout',
+        message: 'Request timed out while fetching image'
+      });
+    }
+    res.status(500).json({
+      success: false,
+      error: 'upload_failed',
+      message: 'Failed to upload logo'
     });
   }
 });

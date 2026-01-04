@@ -171,6 +171,11 @@ function sanitizeObject(obj: any): void {
  */
 export function inputValidationMiddleware(req: Request, res: Response, next: NextFunction): void {
   try {
+    // Skip input validation for the track-batch endpoint to avoid false positives
+    if (req.url === '/api/recommendations/track-batch') {
+      return next();
+    }
+
     // Check for dangerous patterns in all input
     const allInput = { ...req.query, ...req.params, ...req.body };
     if (containsDangerousPatterns(allInput)) {

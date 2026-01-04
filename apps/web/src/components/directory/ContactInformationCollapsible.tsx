@@ -42,7 +42,9 @@ export default function ContactInformationCollapsible({
                 className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-colors"
             >
                 <div className="flex items-center gap-3">
-                   
+                    <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
+                        Contact Information
+                    </h2>
                     <span className="text-sm text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-700 px-3 py-1 rounded-full">
                         {contactCount} contact method{contactCount !== 1 ? 's' : ''}
                     </span>

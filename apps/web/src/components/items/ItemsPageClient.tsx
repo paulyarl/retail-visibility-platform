@@ -500,7 +500,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Inventory</h1>
+        <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Store Inventory</h1>
         <p className="text-sm text-neutral-600 dark:text-neutral-400">
           Manage what's on your shelf and make it visible online
         </p>

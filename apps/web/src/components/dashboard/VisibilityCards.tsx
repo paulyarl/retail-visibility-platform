@@ -10,7 +10,7 @@
  */
 
 'use client';
-
+import { UserProfileData } from "@/hooks/useUserProfile";
 import { Card, CardContent } from '@/components/ui';
 import { ExternalLink, Store, MapPin, Eye, Settings } from 'lucide-react';
 import Link from 'next/link';
@@ -25,6 +25,8 @@ interface VisibilityCardsProps {
   tenantCity?: string;
   tenantState?: string;
   tenantCategory?: string;
+  profile?: UserProfileData;
+  
 }
 
 export default function VisibilityCards({
@@ -37,6 +39,7 @@ export default function VisibilityCards({
   tenantCity,
   tenantState,
   tenantCategory,
+  profile,
 }: VisibilityCardsProps) {
   // Generate URLs if not provided
   const finalStorefrontUrl = storefrontUrl || `/tenant/${tenantId}`;
@@ -109,7 +112,7 @@ export default function VisibilityCards({
                 </Link>
                 
                 <Link
-                  href={`/t/${tenantId}/settings/storefront`}
+                  href={`/t/${tenantId}/settings`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-300 text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-colors text-sm"
                 >
                   <Settings className="w-4 h-4" />

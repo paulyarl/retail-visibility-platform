@@ -2403,30 +2403,11 @@ app.get("/api/tenants/:tenant_id/categories", authenticateToken, checkTenantAcce
 });
 
 // Consolidated Items endpoint - combines /api/items and /api/items/stats into one call
-app.get("/api/items/complete", authenticateToken, async (req, res) => {
+app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const tenant_id = req.query.tenant_id as string;
     if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
-    }
-
-    // Verify user has access to this tenant
-    const user = req.user as any;
-    const userId = user?.userId || user?.user_id;
-    if (!userId) {
-      return res.status(401).json({ error: "authentication_required" });
-    }
-
-    // Check tenant access
-    const userTenant = await prisma.user_tenants.findFirst({
-      where: {
-        user_id: userId,
-        tenant_id: tenant_id
-      }
-    });
-
-    if (!userTenant) {
-      return res.status(403).json({ error: "tenant_access_denied" });
     }
 
     console.log(`[Items Complete] Fetching consolidated data for tenant: ${tenant_id}`);

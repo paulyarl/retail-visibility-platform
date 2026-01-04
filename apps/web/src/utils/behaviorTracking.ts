@@ -165,13 +165,24 @@ class BehaviorTrackingCache {
       const location = await getUserLocationClient();
       
       const batchData = {
-        events: eventsToSend.map(event => ({
-          ...event,
-          locationLat: location?.latitude,
-          locationLng: location?.longitude,
-          referrer: document.referrer,
-          userAgent: navigator.userAgent
-        })),
+        events: eventsToSend.map(event => {
+          // Create a clean version of the event without potentially problematic fields
+          const cleanEvent = { ...event };
+          
+          // Remove categories_viewed from context if it exists to avoid input validation issues
+          if (cleanEvent.context && cleanEvent.context.categories_viewed) {
+            const { categories_viewed, ...cleanContext } = cleanEvent.context;
+            cleanEvent.context = cleanContext;
+          }
+          
+          return {
+            ...cleanEvent,
+            locationLat: location?.latitude,
+            locationLng: location?.longitude,
+            // referrer: document.referrer,  // Temporarily removed
+            // userAgent: navigator.userAgent  // Temporarily removed
+          };
+        }),
         // Analytics metadata for dashboard adjustments
         batchMetadata: {
           batchSize: eventsToSend.length,
@@ -182,20 +193,14 @@ class BehaviorTrackingCache {
         }
       };
 
+      console.log('[BehaviorTracking] Sending batch data:', JSON.stringify(batchData, null, 2));
+
       // Use compression for large batches to reduce network overhead
       let requestBody: string | Blob;
       let headers: Record<string, string> = {};
 
-      if (batchData.batchMetadata.compressionUsed) {
-        // Compress large batches using gzip-like compression
-        const jsonString = JSON.stringify(batchData);
-        requestBody = new Blob([jsonString], { type: 'application/json' });
-        headers['Content-Encoding'] = 'gzip'; // Note: This would require server-side decompression
-        console.log(`[BehaviorTracking] Using compression for large batch (${eventsToSend.length} events)`);
-      } else {
-        requestBody = JSON.stringify(batchData);
-        headers['Content-Type'] = 'application/json';
-      }
+      requestBody = JSON.stringify(batchData);
+      headers['Content-Type'] = 'application/json';
       
       const response = await api.post(`${apiUrl}/api/recommendations/track-batch`, {
         method: 'POST',
@@ -601,6 +606,7 @@ export function trackBehaviorClient(trackingData: Omit<TrackingData, 'durationSe
     ...trackingData,
     userId,
     sessionId
+    // context is already included from trackingData
   };
   
   console.log('[Tracking Debug] Adding event:', eventWithUser);

@@ -6,12 +6,21 @@ import { triggerRevalidate } from '../utils/revalidate';
 import { categoryService } from '../services/CategoryService';
 import { getCategoryById } from '../lib/google/taxonomy';
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
-import { authenticateToken, requireTenantAdmin } from '../middleware/auth';
+import { authenticateToken, requireTenantAdmin, checkTenantAccess } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
 import { generateProductCatId, generateQsCatId, generateQuickStart, generateSpecialHoursId, generateUserTenantId } from '../lib/id-generator';
 import { getDirectPool } from '../utils/db-pool';
+import { createClient } from '@supabase/supabase-js';
+import { StorageBuckets } from '../storage-config';
 
 console.log('🔥 TENANT CATEGORIES ROUTES MODULE LOADED');
+
+// Create service role Supabase client for storage operations (bypasses RLS)
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const supabaseService = createClient(
+  process.env.SUPABASE_URL!,
+  serviceRoleKey!
+);
 
 const router = Router();
 
@@ -1884,6 +1893,122 @@ router.put('/gbp-category', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update GBP categories'
+    });
+  }
+});
+
+/**
+ * POST /api/tenant/:tenantId/logo
+ * Upload a logo for a tenant's business profile
+ */
+router.post('/:tenantId/logo', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const { tenant_id, dataUrl, contentType } = req.body;
+
+    console.log(`[TENANTS] Logo upload request for tenant: ${tenantId}`);
+
+    // Validate required fields
+    if (!dataUrl || !contentType) {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_data',
+        message: 'dataUrl and contentType are required'
+      });
+    }
+
+    // Validate content type
+    if (!contentType.startsWith('image/')) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_content_type',
+        message: 'Content type must be an image type'
+      });
+    }
+
+    // Extract base64 data from dataUrl (remove data:image/jpeg;base64, prefix)
+    const base64Data = dataUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+
+    // Convert base64 to buffer
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (imageBuffer.length > maxSize) {
+      return res.status(400).json({
+        success: false,
+        error: 'file_too_large',
+        message: 'Logo file must be less than 5MB'
+      });
+    }
+
+    // Generate unique filename
+    const fileExtension = contentType.split('/')[1] || 'png';
+    const fileName = `tenant-logo-${tenantId}-${Date.now()}.${fileExtension}`;
+
+    // Upload to Supabase TENANTS bucket
+    const supabasePath = `logos/${tenantId}/${fileName}`;
+    const { error: uploadError, data: uploadData } = await supabaseService.storage
+      .from(StorageBuckets.TENANTS.name)
+      .upload(supabasePath, imageBuffer, {
+        cacheControl: "3600",
+        contentType: contentType,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('[TENANTS] Supabase upload error:', uploadError.message);
+      return res.status(500).json({
+        success: false,
+        error: 'upload_failed',
+        message: 'Failed to upload logo to storage'
+      });
+    }
+
+    // Get public URL
+    const { data: publicUrlData } = supabaseService.storage
+      .from(StorageBuckets.TENANTS.name)
+      .getPublicUrl(supabasePath);
+
+    const logoUrl = publicUrlData.publicUrl;
+
+    console.log(`[TENANTS] Logo uploaded to Supabase: ${logoUrl}`);
+
+    // Update tenant's business profile with logo URL
+    await prisma.tenant_business_profiles_list.upsert({
+      where: { tenant_id: tenantId },
+      update: { logo_url: logoUrl },
+      create: {
+        tenant_id: tenantId,
+        logo_url: logoUrl,
+        business_name: '', // Will be filled by business profile
+        address_line1: '',
+        city: '',
+        state: '',
+        postal_code: '',
+        country_code: 'US',
+        phone_number: '',
+        email: '',
+        website: '',
+        business_description: '',
+        updated_at: new Date(),
+      }
+    });
+
+    console.log(`[TENANTS] Logo uploaded successfully for tenant ${tenantId}: ${logoUrl}`);
+
+    res.json({
+      success: true,
+      url: logoUrl,
+      message: 'Logo uploaded successfully'
+    });
+
+  } catch (error: any) {
+    console.error('[TENANTS] Error uploading logo:', error);
+    res.status(500).json({
+      success: false,
+      error: 'upload_failed',
+      message: 'Failed to upload logo'
     });
   }
 });

@@ -4,6 +4,7 @@ import ProductGallery from '@/components/products/ProductGallery';
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
 import { ProductNavigation } from '@/components/products/ProductNavigation';
 import { ProductRecommendations } from '@/components/products/ProductRecommendations';
+import LastViewed from '@/components/directory/LastViewed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
@@ -380,6 +381,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       {/* Product Recommendations */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <ProductRecommendations productId={product.id} tenantId={product.tenantId} />
+      </div>
+
+      {/* Recently Viewed Products */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <LastViewed 
+          title="Recently Viewed Products"
+          entityType="product"
+          limit={4}
+          showEmptyState={false}
+        />
       </div>
     </ProductLikeProvider>
   </>
