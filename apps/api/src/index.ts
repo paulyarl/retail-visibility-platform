@@ -5359,7 +5359,8 @@ console.log('✅ Google Merchant Center OAuth routes mounted at /api/google/oaut
 /* ------------------------------ store reviews ------------------------------ */
 import storeReviewsRoutes from './routes/store-reviews';
 app.use('/api/stores', storeReviewsRoutes);
-console.log('✅ Store reviews routes mounted at /api/stores');
+app.use('/api', storeReviewsRoutes); // Mount at /api for helpful votes endpoint
+console.log('✅ Store reviews routes mounted at /api/stores and /api');
 
 // Sentry error handler must be after all routes but before other error handlers
 if (sentryEnabled) {

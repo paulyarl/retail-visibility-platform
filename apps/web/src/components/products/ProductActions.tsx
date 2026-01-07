@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { api, apiRequest } from '@/lib/api';
-import { useProductLikes } from '@/components/likes/ProductLikeProvider';
 
 interface Product {
   id: string;
@@ -31,27 +29,9 @@ interface ProductActionsProps {
 }
 
 export default function ProductActions({ product, tenant, productUrl, variant = 'product' }: ProductActionsProps) {
-  // Check if ProductLikeProvider is available
-  let likeProviderAvailable = false;
-  let likeProduct: any = null;
-  let unlikeProduct: any = null;
-  let getLikeStatus: any = null;
-
-  try {
-    const provider = useProductLikes();
-    likeProviderAvailable = true;
-    likeProduct = provider.likeProduct;
-    unlikeProduct = provider.unlikeProduct;
-    getLikeStatus = provider.getLikeStatus;
-  } catch (error) {
-    // ProductLikeProvider not available - disable like functionality
-    likeProviderAvailable = false;
-  }
-
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
+  const [favorited, setFavorited] = useState(false);
+  const [favoriteCount, setFavoriteCount] = useState(0);
   const [showShareOptions, setShowShareOptions] = useState(false);
-  const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const productTitle = product.title || product.name;
@@ -61,25 +41,15 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
     : `Check out ${businessName} - great products and deals!`;
   const shareUrl = productUrl;
 
-  const fetchLikeStatus = async () => {
-    if (!likeProviderAvailable || !getLikeStatus) return;
-    
-    try {
-      const result = await getLikeStatus(product.id);
-      if (result) {
-        setLiked(result.userLiked);
-        setLikeCount(result.likes);
-      }
-    } catch (error) {
-      console.error('Failed to fetch like status:', error);
-    }
-  };
-
+  // Load favorite status from localStorage
   useEffect(() => {
-    if (variant === 'product' && likeProviderAvailable) {
-      fetchLikeStatus();
-    }
-  }, [product.id, variant, likeProviderAvailable]);
+    const favorites = JSON.parse(localStorage.getItem('product_favorites') || '{}');
+    setFavorited(!!favorites[product.id]);
+    
+    // Load favorite count
+    const counts = JSON.parse(localStorage.getItem('product_favorite_counts') || '{}');
+    setFavoriteCount(counts[product.id] || 0);
+  }, [product.id]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -122,24 +92,24 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
     window.print();
   };
 
-  const handleLike = async () => {
-    if (loading || !likeProviderAvailable || !likeProduct || !unlikeProduct) return;
-
-    setLoading(true);
-    try {
-      const result = liked 
-        ? await unlikeProduct(product.id)
-        : await likeProduct(product.id);
-
-      if (result.success) {
-        setLiked(result.userLiked);
-        setLikeCount(result.likes);
-      }
-    } catch (error) {
-      console.error('Failed to toggle like:', error);
-    } finally {
-      setLoading(false);
+  const handleFavorite = () => {
+    const favorites = JSON.parse(localStorage.getItem('product_favorites') || '{}');
+    const counts = JSON.parse(localStorage.getItem('product_favorite_counts') || '{}');
+    
+    if (favorited) {
+      delete favorites[product.id];
+      counts[product.id] = Math.max(0, (counts[product.id] || 0) - 1);
+      setFavorited(false);
+      setFavoriteCount(counts[product.id]);
+    } else {
+      favorites[product.id] = true;
+      counts[product.id] = (counts[product.id] || 0) + 1;
+      setFavorited(true);
+      setFavoriteCount(counts[product.id]);
     }
+    
+    localStorage.setItem('product_favorites', JSON.stringify(favorites));
+    localStorage.setItem('product_favorite_counts', JSON.stringify(counts));
   };
 
   const handleReview = () => {
@@ -167,18 +137,18 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
     <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {variant === 'product' && likeProviderAvailable && (
+          {variant === 'product' && (
             <button
-              onClick={handleLike}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                liked
-                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-              }`}
-              title={liked ? 'Unlike this product' : 'Like this product'}
+              onClick={handleFavorite}
+              className="flex items-center gap-1 p-2 hover:bg-gray-100 rounded-lg transition-colors group"
+              title={favorited ? "Remove from favorites" : "Add to favorites"}
             >
-              <svg
-                className={`h-5 w-5 ${liked ? 'fill-current' : ''}`}
+              <svg 
+                className={`w-5 h-5 transition-colors ${
+                  favorited 
+                    ? 'fill-red-500 text-red-500' 
+                    : 'text-gray-600 group-hover:text-red-500'
+                }`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -190,9 +160,9 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
                   d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                 />
               </svg>
-              <span className="text-sm font-medium">
-                {liked ? 'Liked' : 'Like'} {likeCount > 0 && `(${likeCount})`}
-              </span>
+              {favoriteCount > 0 && (
+                <span className="text-xs font-medium text-gray-600">{favoriteCount}</span>
+              )}
             </button>
           )}
         </div>

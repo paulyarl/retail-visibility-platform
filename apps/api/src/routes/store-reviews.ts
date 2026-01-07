@@ -159,7 +159,7 @@ router.get('/:tenantId/reviews', async (req: Request, res: Response) => {
       LEFT JOIN users u ON sr.user_id = u.id
       WHERE sr.tenant_id = $1 AND sr.approval_status = 'approved'
       ${orderByClause}
-      LIMIT $3 OFFSET $4
+      LIMIT $2 OFFSET $3
     `;
 
     const reviewsResult = await pool.query(reviewsQuery, [
@@ -567,8 +567,8 @@ router.post('/reviews/:reviewId/helpful', authenticateToken, async (req: Request
       }
       
       const insertVoteQuery = `
-        INSERT INTO review_helpful_votes (review_id, user_id, is_helpful, created_at)
-        VALUES ($1, $2, $3, NOW())
+        INSERT INTO review_helpful_votes (id, review_id, user_id, is_helpful, created_at)
+        VALUES (gen_random_uuid(), $1, $2, $3, NOW())
         ON CONFLICT (review_id, user_id) DO UPDATE SET
           is_helpful = EXCLUDED.is_helpful
       `;
@@ -969,9 +969,13 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
     const { tenantId, productId } = req.params;
     const userId = req.user?.userId;
 
+    console.log('Creating product review:', { tenantId, productId, userId, body: req.body });
+
     // Validate request body
     const validatedData = createReviewSchema.parse(req.body);
     const { rating, reviewText, verifiedPurchase, locationLat, locationLng } = validatedData;
+
+    console.log('Validated review data:', { rating, reviewText, verifiedPurchase, locationLat, locationLng });
 
     const pool = getDirectPool();
 
@@ -982,7 +986,10 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
     `;
     const existingReviewResult = await pool.query(existingReviewQuery, [tenantId, productId, userId]);
 
+    console.log('Existing review check:', existingReviewResult.rows.length);
+
     if (existingReviewResult.rows.length > 0) {
+      console.log('User already reviewed this product');
       return res.status(400).json({
         success: false,
         error: 'You have already submitted a review for this product. Use PUT to update your review.'
@@ -998,6 +1005,10 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
       RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
     `;
 
+    console.log('Executing insert query with params:', [
+      tenantId, productId, userId, rating, reviewText, verifiedPurchase, locationLat, locationLng
+    ]);
+
     const result = await pool.query(insertQuery, [
       tenantId,
       productId,
@@ -1010,6 +1021,7 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
     ]);
 
     const review = result.rows[0];
+    console.log('Review created successfully:', review);
 
     // Update rating summary for authenticated reviews (approved immediately)
     await updateRatingSummary(pool, tenantId);
@@ -1022,6 +1034,7 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
   } catch (error) {
     console.error('Error creating authenticated product review:', error);
     if (error instanceof z.ZodError) {
+      console.error('Zod validation errors:', error.issues);
       const errors = error.issues || [];
       return res.status(400).json({
         success: false,
@@ -1029,6 +1042,7 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
         details: errors
       });
     }
+    console.error('Database or other error:', (error as Error).message);
     res.status(500).json({
       success: false,
       error: 'Failed to create product review'
@@ -1085,14 +1099,14 @@ router.get('/:tenantId/products/:productId/reviews', async (req: Request, res: R
       LEFT JOIN users u ON sr.user_id = u.id
       WHERE sr.tenant_id = $1 AND sr.product_id = $2 AND sr.approval_status = 'approved'
       ${orderByClause}
-      LIMIT $4 OFFSET $5
+      LIMIT $3 OFFSET $4
     `;
 
     const reviewsResult = await pool.query(reviewsQuery, [
       tenantId,
       productId,
-      offset,
-      limitNum
+      limitNum,
+      offset
     ]);
 
     // Get total count for pagination
@@ -1150,9 +1164,13 @@ router.put('/:tenantId/products/:productId/reviews', authenticateToken, async (r
     const { tenantId, productId } = req.params;
     const userId = req.user?.userId;
 
+    console.log('Updating product review:', { tenantId, productId, userId, body: req.body });
+
     // Validate request body
     const validatedData = updateReviewSchema.parse(req.body);
     const { rating, reviewText, verifiedPurchase, locationLat, locationLng } = validatedData;
+
+    console.log('Validated update data:', { rating, reviewText, verifiedPurchase, locationLat, locationLng });
 
     const pool = getDirectPool();
 
@@ -1163,7 +1181,10 @@ router.put('/:tenantId/products/:productId/reviews', authenticateToken, async (r
     `;
     const existingReviewResult = await pool.query(existingReviewQuery, [tenantId, productId, userId]);
 
+    console.log('Existing review check:', existingReviewResult.rows.length);
+
     if (existingReviewResult.rows.length === 0) {
+      console.log('No existing review found');
       return res.status(404).json({
         success: false,
         error: 'Product review not found. Create a review first.'
@@ -1171,11 +1192,12 @@ router.put('/:tenantId/products/:productId/reviews', authenticateToken, async (r
     }
 
     const reviewId = existingReviewResult.rows[0].id;
+    console.log('Found review ID:', reviewId);
 
     // Build dynamic update query
     const updateFields = [];
     const updateValues = [];
-    let paramIndex = 3;
+    let paramIndex = 1; // Start from 1, not 3
 
     if (rating !== undefined) {
       updateFields.push(`rating = $${paramIndex++}`);

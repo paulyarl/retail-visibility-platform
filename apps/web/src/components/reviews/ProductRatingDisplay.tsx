@@ -121,14 +121,41 @@ export default function ProductRatingDisplay({ productId, tenantId, showWriteRev
 
   const handleReviewSubmit = async (formData: any) => {
     try {
+      // Map frontend field names to backend schema expectations
+      const mappedData = {
+        rating: formData.rating,
+        reviewText: formData.content,  // Map content → reviewText
+        verifiedPurchase: formData.verifiedPurchase,
+        locationLat: formData.locationLat,
+        locationLng: formData.locationLng,
+        // Include anonymous user fields if present
+        userName: formData.userName,
+        userEmail: formData.userEmail,
+        sessionId: formData.sessionId
+      };
+
+      // Determine if this is a new review or an update
+      const isUpdate = userReview !== null;
       const endpoint = isAuthenticated
         ? `/api/stores/${tenantId}/products/${productId}/reviews`
         : `/api/stores/${tenantId}/products/${productId}/reviews/anonymous`;
 
-      const response = await api.post(endpoint, formData);
+      console.log('Submitting review to:', endpoint, mappedData, 'isUpdate:', isUpdate);
+      
+      let response;
+      if (isUpdate && isAuthenticated) {
+        // Use PUT for updates
+        response = await api.put(endpoint, mappedData);
+      } else {
+        // Use POST for new reviews
+        response = await api.post(endpoint, mappedData);
+      }
+
+      console.log('Review submission response:', response.status, response.statusText);
 
       if (response.ok) {
         const responseData = await response.json();
+        console.log('Review submission success:', responseData);
         if (responseData.success) {
           setShowReviewForm(false);
           // Refresh reviews
@@ -137,7 +164,16 @@ export default function ProductRatingDisplay({ productId, tenantId, showWriteRev
           throw new Error(responseData.error || 'Failed to submit review');
         }
       } else {
-        throw new Error('Failed to submit review');
+        // Try to get error details from response
+        let errorDetails = 'Failed to submit review';
+        try {
+          const errorData = await response.json();
+          console.error('Review submission error response:', errorData);
+          errorDetails = errorData.error || errorData.message || errorDetails;
+        } catch (parseError) {
+          console.error('Could not parse error response:', parseError);
+        }
+        throw new Error(errorDetails);
       }
     } catch (err) {
       console.error('Error submitting review:', err);
