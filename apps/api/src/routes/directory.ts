@@ -369,9 +369,31 @@ router.get('/locations', async (req, res) => {
 });
 
 /**
- * GET /api/directory/:slug
- * Get single directory listing by slug
+ * GET /api/directory/tenant/:tenantId
+ * Get directory slug by tenant ID
  */
+router.get('/tenant/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    const result = await prisma.$queryRaw<Array<{ slug: string }>>`
+      SELECT slug
+      FROM directory_listings_list dll
+      WHERE dll.tenant_id = ${tenantId}
+        AND dll.is_published = true
+      LIMIT 1
+    `;
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'directory_listing_not_found' });
+    }
+
+    return res.json({ slug: result[0].slug });
+  } catch (error: any) {
+    console.error('[GET /api/directory/tenant/:tenantId] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_directory_slug' });
+  }
+});
 router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;

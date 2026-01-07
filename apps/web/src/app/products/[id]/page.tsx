@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
+import Link from 'next/link';
 import ProductGallery from '@/components/products/ProductGallery';
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
 import { ProductNavigation } from '@/components/products/ProductNavigation';
@@ -9,6 +10,8 @@ import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
 import ProductReviewsSection from '@/components/products/ProductReviewsSection';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
+import ProductBusinessInfoCollapsible from '@/components/products/ProductBusinessInfoCollapsible';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';
@@ -391,6 +394,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      {/* Business Information */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <ProductBusinessInfoCollapsible product={product} tenant={tenant} storeStatus={storeStatus} />
+      </div>
+
       {/* Recently Viewed Products */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <LastViewed 
@@ -400,6 +408,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           showEmptyState={false}
         />
       </div>
+
+      {/* Platform Branding Footer */}
+      <PoweredByFooter />
     </ProductLikeProvider>
   </>
 );

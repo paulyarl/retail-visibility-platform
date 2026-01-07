@@ -9,7 +9,7 @@ interface DirectoryTenantPageProps {
 async function getTenantSlug(tenantId: string): Promise<string | null> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${apiUrl}/api/directory/${tenantId}`, {
+    const res = await fetch(`${apiUrl}/api/directory/tenant/${tenantId}`, {
       cache: 'no-store',
     });
 
@@ -18,9 +18,9 @@ async function getTenantSlug(tenantId: string): Promise<string | null> {
     }
 
     const data = await res.json();
-    return data.listing?.slug || null;
+    return data.slug || null;
   } catch (error) {
-    console.error('Error fetching tenant directory listing:', error);
+    console.error('Error fetching tenant directory slug:', error);
     return null;
   }
 }
