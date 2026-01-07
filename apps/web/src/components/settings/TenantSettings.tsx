@@ -201,7 +201,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
       description: 'Manage your Google Business Profile integration',
       cards: [
         {
-          title: 'Business Hours',
+          title: 'Store Hours',
           description: 'Manage hours and special days (syncs to Google)',
           icon: (
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

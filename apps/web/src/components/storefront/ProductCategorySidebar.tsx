@@ -47,7 +47,7 @@ export default function ProductCategorySidebar({
           Product Categories
         </h2>
         <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">
-          Store Product Categories
+          Product Categories
         </span>
       </div>
       

@@ -709,7 +709,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               {/* Business Description - Full Width Pane */}
               {businessProfile?.business_description && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">About This Business</h2>
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">About Us</h2>
                   <div className="prose prose-gray max-w-none">
                     <p className="text-gray-700 leading-relaxed text-base whitespace-pre-wrap">
                       {businessProfile.business_description}
@@ -831,7 +831,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               {listing.address && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                    Location
+                    Our Location
                   </h2>
                   <GoogleMapEmbed address={listing.address} />
                 </div>

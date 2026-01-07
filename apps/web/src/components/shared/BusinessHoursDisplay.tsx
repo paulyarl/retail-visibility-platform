@@ -44,7 +44,7 @@ export default function BusinessHoursDisplay({ businessHours, className = '' }: 
     <div className={className}>
       <h3 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
         <Clock className="w-4 h-4 text-gray-500" />
-        Business Hours
+        Store Hours
       </h3>
       <div className="space-y-0">
         {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {

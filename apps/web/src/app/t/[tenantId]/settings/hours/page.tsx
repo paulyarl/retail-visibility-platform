@@ -68,7 +68,7 @@ export default function HoursSettingsPage({ params }: { params: Promise<{ tenant
           {/* Regular Hours Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-              <h2 className="text-xl font-bold text-gray-900">Business Hours</h2>
+              <h2 className="text-xl font-bold text-gray-900">Store Hours</h2>
               <p className="text-sm text-gray-600 mt-1">Set your weekly operating schedule</p>
             </div>
             <div className="p-6">

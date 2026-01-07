@@ -78,7 +78,7 @@ export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav
                 href={`/t/${tenantId}/settings/hours`}
                 className={isMobile ? "block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors" : "block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"}
               >
-                Business Hours
+                Store Hours
               </Link>
             )}
           </>

@@ -36,7 +36,7 @@ export default function ProductCategoriesCollapsible({
       >
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold text-gray-900">
-            Product Categories
+            Browse our product categories
           </h2>
           <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
             {totalProducts} products
