@@ -10,6 +10,7 @@ import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 // Dynamically import Google Maps to avoid SSR issues
 const DirectoryMapGoogle = dynamic(() => import('@/components/directory/DirectoryMapGoogle'), {
@@ -350,6 +351,9 @@ export default function StoreTypeViewClient({
         {/* Store Type Recommendations */}
         <StoreTypeRecommendations storeTypeSlug={storeTypeSlug} />
       </div>
+
+                  {/* Platform Branding Footer */}
+                  <PoweredByFooter />
     </div>
   );
 }

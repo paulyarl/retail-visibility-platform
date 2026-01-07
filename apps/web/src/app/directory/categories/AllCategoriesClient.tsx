@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Package, ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface Category {
   id: string;
@@ -218,6 +219,9 @@ export default function AllCategoriesClient() {
           </>
         )}
       </div>
+
+                  {/* Platform Branding Footer */}
+                  <PoweredByFooter />
     </div>
   );
 }

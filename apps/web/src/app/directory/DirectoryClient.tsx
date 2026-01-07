@@ -13,6 +13,7 @@ import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreType
 import LastViewed from '@/components/directory/LastViewed'; // NEW: LastViewed component import
 import { Pagination } from '@/components/ui';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 import dynamic from 'next/dynamic';
 
 // Cache configuration for directory data
@@ -652,6 +653,9 @@ export default function DirectoryClient() {
             </div>
           </div>
         )}
+        
+      {/* Platform Branding Footer */}
+      <PoweredByFooter />
       </div>
     </div>
   );

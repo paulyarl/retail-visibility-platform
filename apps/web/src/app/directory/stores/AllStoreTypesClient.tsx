@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Store, ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface StoreType {
   name: string;
@@ -191,6 +192,9 @@ export default function AllStoreTypesClient() {
           </>
         )}
       </div>
+
+                  {/* Platform Branding Footer */}
+                  <PoweredByFooter />
     </div>
   );
 }

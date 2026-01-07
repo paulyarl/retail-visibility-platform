@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Star, MessageSquare, User } from 'lucide-react';
+//import { Star, MessageSquare, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ReviewForm from '@/components/reviews/ReviewForm';
 import { api } from '@/lib/api';
+import { MessageSquare, Star, User } from 'lucide-react';
 
 interface ProductRatingDisplayProps {
   productId: string;

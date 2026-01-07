@@ -9,9 +9,9 @@ import LastViewed from '@/components/directory/LastViewed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
-import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import ProductBusinessInfoCollapsible from '@/components/products/ProductBusinessInfoCollapsible';
+import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';

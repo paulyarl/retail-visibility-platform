@@ -14,6 +14,7 @@ import ProductCategoriesCollapsible from '@/components/directory/ProductCategori
 import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface StoreDetailPageProps {
   params: {
@@ -905,6 +906,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
       {/* Related Stores */}
       <RelatedStores currentSlug={slugForRelated} />
+
+            {/* Platform Branding Footer */}
+            <PoweredByFooter />
     </>
   );
 }

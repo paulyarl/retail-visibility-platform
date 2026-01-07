@@ -1,6 +1,8 @@
 'use client';
 
-import ProductRatingDisplay from '@/components/reviews/ProductRatingDisplay';
+import ProductRatingDisplay from "../reviews/ProductRatingDisplay";
+
+//import ProductRatingDisplay from '@/components/reviews/ProductRatingDisplay';
 
 interface ProductReviewsSectionProps {
   productId: string;
