@@ -20,29 +20,19 @@ router.get('/categories', async (req: Request, res: Response) => {
   try {
     const { lat, lng, radius } = req.query;
 
-    // Query directory_category directly to get ALL available categories
-    // Use directory_category_products for store/product counts
+    // Query platform_categories table to get admin-managed categories
     const result = await getDirectPool().query(`
       SELECT 
-        dc.id,
-        dc.name,
-        dc.slug,
-        dc."googleCategoryId",
-        dc."sortOrder",
-        COALESCE(dcp.store_count, 0) as store_count,
-        COALESCE(dcp.product_count, 0) as total_products
-      FROM directory_category dc
-      LEFT JOIN (
-        SELECT 
-          category_slug,
-          COUNT(DISTINCT tenant_id) as store_count,
-          SUM(CAST(actual_product_count AS INTEGER)) as product_count
-        FROM directory_category_products 
-        WHERE is_published = true
-        GROUP BY category_slug
-      ) dcp ON dcp.category_slug = dc.slug
-      WHERE dc."tenantId" = 'platform' AND dc."isActive" = true
-      ORDER BY dc."sortOrder" ASC, dc.name ASC
+        pc.id,
+        pc.name,
+        pc.slug,
+        pc.google_category_id,
+        pc.sort_order,
+        0 as store_count,
+        0 as total_products
+      FROM platform_categories pc
+      WHERE pc.is_active = true
+      ORDER BY pc.sort_order ASC, pc.name ASC
     `);
 
     // Transform to expected format
@@ -50,7 +40,7 @@ router.get('/categories', async (req: Request, res: Response) => {
       id: row.id,
       name: row.name,
       slug: row.slug,
-      googleCategoryId: row.googleCategoryId,
+      googleCategoryId: row.google_category_id,
       storeCount: parseInt(row.store_count || '0'),
       productCount: parseInt(row.total_products || '0'),
     }));
