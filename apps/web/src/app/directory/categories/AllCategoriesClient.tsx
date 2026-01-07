@@ -218,10 +218,7 @@ export default function AllCategoriesClient() {
             </div>
           </>
         )}
-      </div>
-
-                  {/* Platform Branding Footer */}
-                  <PoweredByFooter />
+      </div> 
     </div>
   );
 }

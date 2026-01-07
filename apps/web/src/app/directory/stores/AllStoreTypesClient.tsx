@@ -193,8 +193,6 @@ export default function AllStoreTypesClient() {
         )}
       </div>
 
-                  {/* Platform Branding Footer */}
-                  <PoweredByFooter />
     </div>
   );
 }

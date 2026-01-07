@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Sparkles, Zap, RefreshCw, Globe, Store, Package, ArrowRight, CheckCircle } from 'lucide-react';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 
 // Force edge runtime to prevent prerendering issues
@@ -290,6 +291,10 @@ export default function AboutDirectoryClient() {
           </div>
         </div>
       </div>
+
+      
+                        {/* Platform Branding Footer */}
+                        <PoweredByFooter />
     </div>
   );
 }
