@@ -5,6 +5,7 @@ import { Star } from 'lucide-react';
 
 interface ReviewFormProps {
   tenantId: string;
+  productId?: string; // Optional - for product reviews
   onClose: () => void;
   onSubmit: (review: {
     rating: number;
@@ -12,18 +13,30 @@ interface ReviewFormProps {
     content: string;
     userName: string;
     userEmail: string;
+    sessionId?: string;
   }) => Promise<void>;
+  isAnonymous?: boolean; // New prop to indicate anonymous mode
+  initialValues?: { // New prop for editing existing reviews
+    rating: number;
+    reviewText: string;
+  };
 }
 
-export default function ReviewForm({ tenantId, onClose, onSubmit }: ReviewFormProps) {
-  const [rating, setRating] = useState(0);
+export default function ReviewForm({ tenantId, onClose, onSubmit, isAnonymous = false, initialValues }: ReviewFormProps) {
+  console.log('[ReviewForm] Component mounted, isAnonymous:', isAnonymous, 'tenantId:', tenantId, 'initialValues:', initialValues);
+  const [rating, setRating] = useState(initialValues?.rating || 0);
   const [hoveredStar, setHoveredStar] = useState(0);
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(initialValues?.reviewText || '');
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Generate session ID for anonymous users
+  const generateSessionId = () => {
+    return `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +51,7 @@ export default function ReviewForm({ tenantId, onClose, onSubmit }: ReviewFormPr
       return;
     }
     
-    if (!userName.trim() || !userEmail.trim()) {
+    if (isAnonymous && (!userName.trim() || !userEmail.trim())) {
       setError('Please provide your name and email');
       return;
     }
@@ -47,12 +60,15 @@ export default function ReviewForm({ tenantId, onClose, onSubmit }: ReviewFormPr
     setError('');
 
     try {
+      const sessionId = isAnonymous ? generateSessionId() : undefined;
+      
       await onSubmit({
         rating,
         title: title.trim(),
         content: content.trim(),
         userName: userName.trim(),
-        userEmail: userEmail.trim()
+        userEmail: userEmail.trim(),
+        sessionId
       });
       
       // Reset form

@@ -787,7 +787,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
       </div>
 
       {/* Store Ratings and Reviews - After Products */}
-      <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
+      <div id="storefront-reviews-section" className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <StoreRatingDisplay tenantId={id} showWriteReview={true} />
         </div>
@@ -801,7 +801,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
               (tenant.metadata?.social_links as any)?.twitter ||
               (tenant.metadata?.social_links as any)?.linkedin ? (
               <div className="pt-2 border-t border-neutral-200 dark:border-neutral-600 mt-3">
-                <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-2">Follow Us</p>
+                <h2 className="text-lg font-semibold text-neutral-500 dark:text-neutral-400 mb-2">Follow Us</h2>
                 <div className="flex flex-wrap gap-3">
                   {(tenant.metadata?.social_links as any)?.facebook && (
                     <a
@@ -930,8 +930,21 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
           {/* Platform Branding (unless Enterprise with removal) */}
           {!features.removePlatformBranding && (
-            <div className="mt-8 pt-8 border-t border-neutral-200 dark:border-neutral-700 text-center text-sm text-neutral-500">
-              <p>Powered by {platformSettings?.platformName || 'Visible Shelf'} ⚡</p>
+            <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700 text-sm text-neutral-500">
+              <Link href="/" title={platformSettings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} ><div className="flex items-center justify-center gap-2" >
+                <span>⚡Powered by</span>
+                <img 
+                  src={platformSettings?.logoUrl} 
+                  alt={platformSettings?.platformName || 'Platform Logo'} 
+                  className="h-8 w-auto object-contain"
+                  loading="lazy"
+                  decoding="async"
+                  width="32"
+                  height="32"
+                />
+                <span>{platformSettings?.platformName || 'Visible Shelf'}</span>
+              </div>
+              </Link>
             </div>
           )}
         </div>

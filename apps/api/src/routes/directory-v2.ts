@@ -209,7 +209,9 @@ router.get('/search', async (req: Request, res: Response) => {
  * GET /api/directory/categories
  * Get list of available business categories
  */
+/*
 router.get('/categories', async (req: Request, res: Response) => {
+  console.log('[DIRECTORY-V2] /categories route hit - returning hardcoded categories');
   try {
     // Return predefined list of business categories
     const categories = [
@@ -242,6 +244,7 @@ router.get('/categories', async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'categories_failed' });
   }
 });
+*/
 
 /**
  * GET /api/directory/locations
@@ -283,8 +286,14 @@ router.get('/:identifier', async (req: Request, res: Response, next) => {
   const { identifier } = req.params;
   console.log(`[DIRECTORY-V2] Catch-all hit for identifier: ${identifier}, originalUrl: ${req.originalUrl}`);
   
+  // Skip categories-related paths - let the categories router handle them
+  if (identifier === 'categories' || identifier.startsWith('categories/')) {
+    console.log(`[DIRECTORY-V2] Skipping categories path: ${identifier}`);
+    return next();
+  }
+  
   // Handle reserved paths directly
-  const reservedPaths = ['store-types', 'categories', 'tenant', 'stores', 'search', 'locations', 'categories-optimized'];
+  const reservedPaths = ['store-types', 'tenant', 'stores', 'search', 'locations', 'categories-optimized'];
   if (reservedPaths.includes(identifier)) {
     console.log('[DIRECTORY-V2] Handling reserved path directly:', identifier);
     

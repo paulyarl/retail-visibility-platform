@@ -6,6 +6,7 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { SafeImage } from '@/components/SafeImage';
 import ProductActions from '@/components/products/ProductActions';
 import { api } from '@/lib/api';
+import Link from 'next/link';
 
 // Public QR Code Section Component
 function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl: string; productName: string; tenantId: string }) {
@@ -979,14 +980,31 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: 
           )}
         </div>
 
-        {/* Platform Branding (unless Enterprise with removal) */}
-        {!features.removePlatformBranding && (
-          <div className="mt-8 text-center text-sm text-neutral-500">
-            <p>Powered by {platformSettings?.platformName || 'Visible Shelf'} ⚡</p>
-          </div>
-        )}
+       
       </div>
+       {/* Platform Branding (unless Enterprise with removal) */}
+        {!features.removePlatformBranding && (
+          <Link href="/" style={{ textDecoration: 'none' }}><div className="flex items-center justify-center gap-2">
+                <span>⚡Powered by</span>
+            {platformSettings?.logoUrl && (
+              <img
+                src={platformSettings.logoUrl}
+                alt={platformSettings.platformName || 'Platform Logo'}
+                 className="h-8 w-auto object-contain"
+                  loading="lazy"
+                  decoding="async"
+                  width="32"
+                  height="32"
+                style={{ aspectRatio: 'auto' }}
+              />
+              
+            )}
+            <span>{platformSettings?.platformName || 'Visible Shelf'}</span>
+          </div>
+          </Link>
+        )}
     </div>
+    
   );
 }
 

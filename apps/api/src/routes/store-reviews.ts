@@ -10,16 +10,19 @@ const createReviewSchema = z.object({
   rating: z.number().min(1).max(5),
   reviewText: z.string().optional(),
   verifiedPurchase: z.boolean().default(false),
-  locationLat: z.number().optional(),
-  locationLng: z.number().optional(),
+  locationLat: z.number().nullable().optional(),
+  locationLng: z.number().nullable().optional(),
+  userName: z.string().optional(), // For anonymous reviews
+  userEmail: z.string().optional(), // For anonymous reviews
+  sessionId: z.string().optional(), // For anonymous reviews
 });
 
 const updateReviewSchema = z.object({
   rating: z.number().min(1).max(5).optional(),
   reviewText: z.string().optional(),
   verifiedPurchase: z.boolean().optional(),
-  locationLat: z.number().optional(),
-  locationLng: z.number().optional(),
+  locationLat: z.number().nullable().optional(),
+  locationLng: z.number().nullable().optional(),
 });
 
 const helpfulVoteSchema = z.object({
@@ -108,7 +111,7 @@ async function updateDirectoryListingRatings(pool: any, tenantId: string) {
 }
 
 // GET /api/stores/:tenantId/reviews - Get all reviews for a store
-router.get('/stores/:tenantId/reviews', async (req: Request, res: Response) => {
+router.get('/:tenantId/reviews', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { page = '1', limit = '10', sort = 'newest' } = req.query;
@@ -137,7 +140,7 @@ router.get('/stores/:tenantId/reviews', async (req: Request, res: Response) => {
         break;
     }
 
-    // Get reviews with user info
+    // Get reviews with user info (only approved reviews for public)
     const reviewsQuery = `
       SELECT 
         sr.id,
@@ -147,23 +150,20 @@ router.get('/stores/:tenantId/reviews', async (req: Request, res: Response) => {
         sr.verified_purchase,
         sr.created_at,
         sr.updated_at,
-        u.id as user_id,
+        sr.user_id,
+        sr.session_id,
         u.first_name,
         u.last_name,
-        u.email,
-        -- Check if current user voted
-        CASE WHEN hv.user_id IS NOT NULL THEN hv.is_helpful ELSE NULL END as user_vote
+        u.email
       FROM store_reviews sr
-      JOIN users u ON sr.user_id = u.id
-      LEFT JOIN review_helpful_votes hv ON hv.review_id = sr.id AND hv.user_id = $2
-      WHERE sr.tenant_id = $1
+      LEFT JOIN users u ON sr.user_id = u.id
+      WHERE sr.tenant_id = $1 AND sr.approval_status = 'approved'
       ${orderByClause}
       LIMIT $3 OFFSET $4
     `;
 
     const reviewsResult = await pool.query(reviewsQuery, [
       tenantId,
-      req.user?.userId || req.user?.user_id || null,
       limitNum,
       offset
     ]);
@@ -226,11 +226,97 @@ router.get('/stores/:tenantId/reviews', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/stores/:tenantId/reviews - Create a new review
-router.post('/stores/:tenantId/reviews', authenticateToken, async (req: Request, res: Response) => {
+// POST /api/stores/:tenantId/reviews/anonymous - Create a new anonymous review
+router.post('/:tenantId/reviews/anonymous', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
-    const userId = req.user!.userId || req.user!.user_id;
+    
+    // Validate request body
+    const validatedData = createReviewSchema.parse(req.body);
+    const { rating, reviewText, verifiedPurchase, locationLat, locationLng, userName, userEmail, sessionId } = validatedData;
+
+    // Require userName and userEmail for anonymous reviews
+    if (!userName || !userEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'userName and userEmail are required for anonymous reviews'
+      });
+    }
+
+    const pool = getDirectPool();
+
+    // Generate or use provided session ID
+    const finalSessionId = sessionId || `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Check if this session has already reviewed this store
+    const existingReviewQuery = `
+      SELECT id FROM store_reviews
+      WHERE tenant_id = $1 AND session_id = $2
+    `;
+    const existingReviewResult = await pool.query(existingReviewQuery, [tenantId, finalSessionId]);
+
+    if (existingReviewResult.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'You have already submitted a review for this store.'
+      });
+    }
+
+    // Create the anonymous review (pending approval)
+    const insertQuery = `
+      INSERT INTO store_reviews (
+        tenant_id, session_id, rating, review_text, verified_purchase,
+        location_lat, location_lng, approval_status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', NOW(), NOW())
+      RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
+    `;
+
+    const result = await pool.query(insertQuery, [
+      tenantId,
+      finalSessionId,
+      rating,
+      reviewText || null,
+      verifiedPurchase,
+      locationLat || null,
+      locationLng || null
+    ]);
+
+    const review = result.rows[0];
+
+    // For anonymous reviews, we don't update the rating summary until approved
+    // The summary will be updated when the review is approved
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...review,
+        sessionId: finalSessionId,
+        message: 'Your review has been submitted and is pending approval. It will be visible once approved by the store owner.'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error creating anonymous review:', error);
+    if (error instanceof z.ZodError) {
+      const errors = error.issues || [];
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid input data',
+        details: errors
+      });
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create review'
+    });
+  }
+});
+
+// POST /api/stores/:tenantId/reviews - Create a new authenticated review
+router.post('/:tenantId/reviews', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const userId = req.user?.userId;
     
     // Validate request body
     const validatedData = createReviewSchema.parse(req.body);
@@ -248,17 +334,17 @@ router.post('/stores/:tenantId/reviews', authenticateToken, async (req: Request,
     if (existingReviewResult.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        error: 'You have already reviewed this store. Use PUT to update your review.'
+        error: 'You have already submitted a review for this store. Use PUT to update your review.'
       });
     }
 
-    // Create the review
+    // Create the authenticated review (automatically approved)
     const insertQuery = `
       INSERT INTO store_reviews (
         tenant_id, user_id, rating, review_text, verified_purchase,
-        location_lat, location_lng, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-      RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at
+        location_lat, location_lng, approval_status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved', NOW(), NOW())
+      RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
     `;
 
     const result = await pool.query(insertQuery, [
@@ -273,7 +359,7 @@ router.post('/stores/:tenantId/reviews', authenticateToken, async (req: Request,
 
     const review = result.rows[0];
 
-    // Update rating summary
+    // Update rating summary for authenticated reviews (approved immediately)
     await updateRatingSummary(pool, tenantId);
 
     res.status(201).json({
@@ -282,7 +368,7 @@ router.post('/stores/:tenantId/reviews', authenticateToken, async (req: Request,
     });
 
   } catch (error) {
-    console.error('Error creating review:', error);
+    console.error('Error creating authenticated review:', error);
     if (error instanceof z.ZodError) {
       const errors = error.issues || [];
       return res.status(400).json({
@@ -299,7 +385,7 @@ router.post('/stores/:tenantId/reviews', authenticateToken, async (req: Request,
 });
 
 // PUT /api/stores/:tenantId/reviews - Update user's review
-router.put('/stores/:tenantId/reviews', authenticateToken, async (req: Request, res: Response) => {
+router.put('/:tenantId/reviews', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const userId = req.user?.userId;
@@ -392,7 +478,7 @@ router.put('/stores/:tenantId/reviews', authenticateToken, async (req: Request, 
 });
 
 // DELETE /api/stores/:tenantId/reviews - Delete user's review
-router.delete('/stores/:tenantId/reviews', authenticateToken, async (req: Request, res: Response) => {
+router.delete('/:tenantId/reviews', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const userId = req.user?.userId;
@@ -522,7 +608,7 @@ router.post('/reviews/:reviewId/helpful', authenticateToken, async (req: Request
 });
 
 // GET /api/stores/:tenantId/reviews/summary - Get rating summary for a store
-router.get('/stores/:tenantId/reviews/summary', async (req: Request, res: Response) => {
+router.get('/:tenantId/reviews/summary', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
@@ -573,7 +659,7 @@ router.get('/stores/:tenantId/reviews/summary', async (req: Request, res: Respon
 });
 
 // GET /api/stores/:tenantId/reviews/user - Get current user's review for a store
-router.get('/stores/:tenantId/reviews/user', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/reviews/user', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const userId = req.user!.userId || req.user!.user_id;
@@ -607,6 +693,677 @@ router.get('/stores/:tenantId/reviews/user', authenticateToken, async (req: Requ
     res.status(500).json({
       success: false,
       error: 'Failed to fetch user review'
+    });
+  }
+});
+
+// GET /api/stores/:tenantId/reviews/pending - Get pending reviews for approval (store owners/admins only)
+router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const userId = req.user?.userId || req.user?.user_id;
+    const userRole = req.user?.role;
+
+    const pool = getDirectPool();
+
+    // Check if user has permission to view pending reviews
+    // Allow platform admins, or users who are owners/admins of this tenant
+    if (userRole !== 'PLATFORM_ADMIN' && userRole !== 'PLATFORM_SUPPORT') {
+      // Check if user is owner/admin of this tenant
+      const tenantCheckQuery = `
+        SELECT role FROM user_tenants
+        WHERE user_id = $1 AND tenant_id = $2 AND role IN ('OWNER', 'ADMIN')
+      `;
+      const tenantCheckResult = await pool.query(tenantCheckQuery, [userId, tenantId]);
+      
+      if (tenantCheckResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to view pending reviews for this store'
+        });
+      }
+    }
+
+    // Get pending reviews
+    const pendingReviewsQuery = `
+      SELECT 
+        sr.id,
+        sr.rating,
+        sr.review_text,
+        sr.helpful_count,
+        sr.verified_purchase,
+        sr.created_at,
+        sr.updated_at,
+        sr.session_id,
+        sr.user_id,
+        u.first_name,
+        u.last_name,
+        u.email
+      FROM store_reviews sr
+      LEFT JOIN users u ON sr.user_id = u.id
+      WHERE sr.tenant_id = $1 AND sr.approval_status = 'pending'
+      ORDER BY sr.created_at ASC
+    `;
+
+    const result = await pool.query(pendingReviewsQuery, [tenantId]);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+
+  } catch (error) {
+    console.error('Error fetching pending reviews:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch pending reviews'
+    });
+  }
+});
+
+// POST /api/stores/:tenantId/reviews/:reviewId/approve - Approve a pending review
+router.post('/:tenantId/reviews/:reviewId/approve', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId, reviewId } = req.params;
+    const userId = req.user?.userId || req.user?.user_id;
+    const userRole = req.user?.role;
+
+    const pool = getDirectPool();
+
+    // Check permissions
+    if (userRole !== 'PLATFORM_ADMIN' && userRole !== 'PLATFORM_SUPPORT') {
+      const tenantCheckQuery = `
+        SELECT role FROM user_tenants
+        WHERE user_id = $1 AND tenant_id = $2 AND role IN ('OWNER', 'ADMIN')
+      `;
+      const tenantCheckResult = await pool.query(tenantCheckQuery, [userId, tenantId]);
+      
+      if (tenantCheckResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to approve reviews for this store'
+        });
+      }
+    }
+
+    // Approve the review
+    const approveQuery = `
+      UPDATE store_reviews
+      SET approval_status = 'approved', approved_by = $1, approved_at = NOW(), updated_at = NOW()
+      WHERE id = $2 AND tenant_id = $3 AND approval_status = 'pending'
+      RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
+    `;
+
+    const result = await pool.query(approveQuery, [userId, reviewId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Review not found or already processed'
+      });
+    }
+
+    // Update rating summary after approval
+    await updateRatingSummary(pool, tenantId);
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Review approved successfully'
+    });
+
+  } catch (error) {
+    console.error('Error approving review:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to approve review'
+    });
+  }
+});
+
+// POST /api/stores/:tenantId/reviews/:reviewId/reject - Reject a pending review
+router.post('/:tenantId/reviews/:reviewId/reject', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId, reviewId } = req.params;
+    const { reason } = req.body;
+    const userId = req.user?.userId || req.user?.user_id;
+    const userRole = req.user?.role;
+
+    const pool = getDirectPool();
+
+    // Check permissions
+    if (userRole !== 'PLATFORM_ADMIN' && userRole !== 'PLATFORM_SUPPORT') {
+      const tenantCheckQuery = `
+        SELECT role FROM user_tenants
+        WHERE user_id = $1 AND tenant_id = $2 AND role IN ('OWNER', 'ADMIN')
+      `;
+      const tenantCheckResult = await pool.query(tenantCheckQuery, [userId, tenantId]);
+      
+      if (tenantCheckResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to reject reviews for this store'
+        });
+      }
+    }
+
+    // Reject the review
+    const rejectQuery = `
+      UPDATE store_reviews
+      SET approval_status = 'rejected', approved_by = $1, approved_at = NOW(), rejection_reason = $2, updated_at = NOW()
+      WHERE id = $3 AND tenant_id = $4 AND approval_status = 'pending'
+      RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
+    `;
+
+    const result = await pool.query(rejectQuery, [userId, reason || null, reviewId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Review not found or already processed'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Review rejected successfully'
+    });
+
+  } catch (error) {
+    console.error('Error rejecting review:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reject review'
+    });
+  }
+});
+
+// POST /api/stores/:tenantId/products/:productId/reviews/anonymous - Create a new anonymous product review
+router.post('/:tenantId/products/:productId/reviews/anonymous', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, productId } = req.params;
+
+    // Validate request body
+    const validatedData = createReviewSchema.parse(req.body);
+    const { rating, reviewText, verifiedPurchase, locationLat, locationLng, userName, userEmail, sessionId } = validatedData;
+
+    // Require userName and userEmail for anonymous reviews
+    if (!userName || !userEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'userName and userEmail are required for anonymous reviews'
+      });
+    }
+
+    const pool = getDirectPool();
+
+    // Generate or use provided session ID
+    const finalSessionId = sessionId || `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Check if this session has already reviewed this product
+    const existingReviewQuery = `
+      SELECT id FROM store_reviews
+      WHERE tenant_id = $1 AND product_id = $2 AND session_id = $3
+    `;
+    const existingReviewResult = await pool.query(existingReviewQuery, [tenantId, productId, finalSessionId]);
+
+    if (existingReviewResult.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'You have already submitted a review for this product.'
+      });
+    }
+
+    // Create the anonymous product review (pending approval)
+    const insertQuery = `
+      INSERT INTO store_reviews (
+        tenant_id, product_id, session_id, rating, review_text, verified_purchase,
+        location_lat, location_lng, approval_status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', NOW(), NOW())
+      RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
+    `;
+
+    const result = await pool.query(insertQuery, [
+      tenantId,
+      productId,
+      finalSessionId,
+      rating,
+      reviewText || null,
+      verifiedPurchase,
+      locationLat || null,
+      locationLng || null
+    ]);
+
+    const review = result.rows[0];
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...review,
+        sessionId: finalSessionId,
+        message: 'Your product review has been submitted and is pending approval. It will be visible once approved by the store owner.'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error creating anonymous product review:', error);
+    if (error instanceof z.ZodError) {
+      const errors = error.issues || [];
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid input data',
+        details: errors
+      });
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create product review'
+    });
+  }
+});
+
+// POST /api/stores/:tenantId/products/:productId/reviews - Create a new authenticated product review
+router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId, productId } = req.params;
+    const userId = req.user?.userId;
+
+    // Validate request body
+    const validatedData = createReviewSchema.parse(req.body);
+    const { rating, reviewText, verifiedPurchase, locationLat, locationLng } = validatedData;
+
+    const pool = getDirectPool();
+
+    // Check if user already reviewed this product
+    const existingReviewQuery = `
+      SELECT id FROM store_reviews
+      WHERE tenant_id = $1 AND product_id = $2 AND user_id = $3
+    `;
+    const existingReviewResult = await pool.query(existingReviewQuery, [tenantId, productId, userId]);
+
+    if (existingReviewResult.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'You have already submitted a review for this product. Use PUT to update your review.'
+      });
+    }
+
+    // Create the authenticated product review (automatically approved)
+    const insertQuery = `
+      INSERT INTO store_reviews (
+        tenant_id, product_id, user_id, rating, review_text, verified_purchase,
+        location_lat, location_lng, approval_status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'approved', NOW(), NOW())
+      RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
+    `;
+
+    const result = await pool.query(insertQuery, [
+      tenantId,
+      productId,
+      userId,
+      rating,
+      reviewText || null,
+      verifiedPurchase,
+      locationLat || null,
+      locationLng || null
+    ]);
+
+    const review = result.rows[0];
+
+    // Update rating summary for authenticated reviews (approved immediately)
+    await updateRatingSummary(pool, tenantId);
+
+    res.status(201).json({
+      success: true,
+      data: review
+    });
+
+  } catch (error) {
+    console.error('Error creating authenticated product review:', error);
+    if (error instanceof z.ZodError) {
+      const errors = error.issues || [];
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid input data',
+        details: errors
+      });
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create product review'
+    });
+  }
+});
+
+// GET /api/stores/:tenantId/products/:productId/reviews - Get reviews for a specific product
+router.get('/:tenantId/products/:productId/reviews', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, productId } = req.params;
+    const { page = '1', limit = '10', sort = 'newest' } = req.query;
+
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(50, Math.max(1, Number(limit)));
+    const offset = (pageNum - 1) * limitNum;
+
+    const pool = getDirectPool();
+
+    // Determine order by clause
+    let orderByClause = 'ORDER BY ';
+    switch (sort) {
+      case 'rating_high':
+        orderByClause += 'sr.rating DESC, sr.created_at DESC';
+        break;
+      case 'rating_low':
+        orderByClause += 'sr.rating ASC, sr.created_at DESC';
+        break;
+      case 'helpful':
+        orderByClause += 'sr.helpful_count DESC, sr.created_at DESC';
+        break;
+      case 'newest':
+      default:
+        orderByClause += 'sr.created_at DESC';
+        break;
+    }
+
+    // Get reviews with user info (only approved reviews for public)
+    const reviewsQuery = `
+      SELECT
+        sr.id,
+        sr.rating,
+        sr.review_text,
+        sr.helpful_count,
+        sr.verified_purchase,
+        sr.created_at,
+        sr.updated_at,
+        sr.user_id,
+        sr.session_id,
+        u.first_name,
+        u.last_name,
+        u.email
+      FROM store_reviews sr
+      LEFT JOIN users u ON sr.user_id = u.id
+      WHERE sr.tenant_id = $1 AND sr.product_id = $2 AND sr.approval_status = 'approved'
+      ${orderByClause}
+      LIMIT $4 OFFSET $5
+    `;
+
+    const reviewsResult = await pool.query(reviewsQuery, [
+      tenantId,
+      productId,
+      offset,
+      limitNum
+    ]);
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM store_reviews
+      WHERE tenant_id = $1 AND product_id = $2 AND approval_status = 'approved'
+    `;
+    const countResult = await pool.query(countQuery, [tenantId, productId]);
+    const totalReviews = parseInt(countResult.rows[0].total);
+
+    // Get rating summary for this product
+    const summaryQuery = `
+      SELECT
+        COALESCE(AVG(rating), 0) as rating_avg,
+        COUNT(*) as rating_count,
+        COUNT(*) FILTER (WHERE rating = 1) as rating_1_count,
+        COUNT(*) FILTER (WHERE rating = 2) as rating_2_count,
+        COUNT(*) FILTER (WHERE rating = 3) as rating_3_count,
+        COUNT(*) FILTER (WHERE rating = 4) as rating_4_count,
+        COUNT(*) FILTER (WHERE rating = 5) as rating_5_count,
+        COUNT(*) FILTER (WHERE verified_purchase = true) as verified_purchase_count
+      FROM store_reviews
+      WHERE tenant_id = $1 AND product_id = $2 AND approval_status = 'approved'
+    `;
+    const summaryResult = await pool.query(summaryQuery, [tenantId, productId]);
+    const summary = summaryResult.rows[0];
+
+    res.json({
+      success: true,
+      data: {
+        reviews: reviewsResult.rows,
+        summary,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: totalReviews,
+          totalPages: Math.ceil(totalReviews / limitNum)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching product reviews:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch product reviews'
+    });
+  }
+});
+
+// PUT /api/stores/:tenantId/products/:productId/reviews - Update user's product review
+router.put('/:tenantId/products/:productId/reviews', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId, productId } = req.params;
+    const userId = req.user?.userId;
+
+    // Validate request body
+    const validatedData = updateReviewSchema.parse(req.body);
+    const { rating, reviewText, verifiedPurchase, locationLat, locationLng } = validatedData;
+
+    const pool = getDirectPool();
+
+    // Check if review exists
+    const existingReviewQuery = `
+      SELECT id FROM store_reviews
+      WHERE tenant_id = $1 AND product_id = $2 AND user_id = $3
+    `;
+    const existingReviewResult = await pool.query(existingReviewQuery, [tenantId, productId, userId]);
+
+    if (existingReviewResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product review not found. Create a review first.'
+      });
+    }
+
+    const reviewId = existingReviewResult.rows[0].id;
+
+    // Build dynamic update query
+    const updateFields = [];
+    const updateValues = [];
+    let paramIndex = 3;
+
+    if (rating !== undefined) {
+      updateFields.push(`rating = $${paramIndex++}`);
+      updateValues.push(rating);
+    }
+    if (reviewText !== undefined) {
+      updateFields.push(`review_text = $${paramIndex++}`);
+      updateValues.push(reviewText);
+    }
+    if (verifiedPurchase !== undefined) {
+      updateFields.push(`verified_purchase = $${paramIndex++}`);
+      updateValues.push(verifiedPurchase);
+    }
+    if (locationLat !== undefined) {
+      updateFields.push(`location_lat = $${paramIndex++}`);
+      updateValues.push(locationLat);
+    }
+    if (locationLng !== undefined) {
+      updateFields.push(`location_lng = $${paramIndex++}`);
+      updateValues.push(locationLng);
+    }
+
+    updateFields.push(`updated_at = NOW()`);
+    updateValues.push(reviewId);
+
+    const updateQuery = `
+      UPDATE store_reviews
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, updated_at
+    `;
+
+    const result = await pool.query(updateQuery, updateValues);
+
+    const review = result.rows[0];
+
+    // Update rating summary
+    await updateRatingSummary(pool, tenantId);
+
+    res.json({
+      success: true,
+      data: review
+    });
+
+  } catch (error) {
+    console.error('Error updating product review:', error);
+    if (error instanceof z.ZodError) {
+      const errors = error.issues || [];
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid input data',
+        details: errors
+      });
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update product review'
+    });
+  }
+});
+
+// DELETE /api/stores/:tenantId/products/:productId/reviews - Delete user's product review
+router.delete('/:tenantId/products/:productId/reviews', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId, productId } = req.params;
+    const userId = req.user?.userId;
+
+    const pool = getDirectPool();
+
+    // Delete the product review
+    const deleteQuery = `
+      DELETE FROM store_reviews
+      WHERE tenant_id = $1 AND product_id = $2 AND user_id = $3
+      RETURNING id
+    `;
+
+    const result = await pool.query(deleteQuery, [tenantId, productId, userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product review not found'
+      });
+    }
+
+    // Update rating summary
+    await updateRatingSummary(pool, tenantId);
+
+    res.json({
+      success: true,
+      message: 'Product review deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting product review:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete product review'
+    });
+  }
+});
+
+// GET /api/stores/:tenantId/products/:productId/reviews/user - Get current user's review for a product
+router.get('/:tenantId/products/:productId/reviews/user', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId, productId } = req.params;
+    const userId = req.user!.userId || req.user!.user_id;
+
+    const pool = getDirectPool();
+
+    const reviewQuery = `
+      SELECT
+        id,
+        rating,
+        review_text,
+        verified_purchase,
+        location_lat,
+        location_lng,
+        created_at,
+        updated_at
+      FROM store_reviews
+      WHERE tenant_id = $1 AND product_id = $2 AND user_id = $3
+    `;
+    const result = await pool.query(reviewQuery, [tenantId, productId, userId]);
+
+    const review = result.rows[0] || null;
+
+    res.json({
+      success: true,
+      data: review
+    });
+
+  } catch (error) {
+    console.error('Error fetching user product review:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch user product review'
+    });
+  }
+});
+
+// GET /api/stores/:tenantId/products/:productId/reviews/summary - Get rating summary for a product
+router.get('/:tenantId/products/:productId/reviews/summary', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, productId } = req.params;
+
+    const pool = getDirectPool();
+
+    const summaryQuery = `
+      SELECT
+        COALESCE(AVG(rating), 0) as rating_avg,
+        COUNT(*) as rating_count,
+        COUNT(*) FILTER (WHERE rating = 1) as rating_1_count,
+        COUNT(*) FILTER (WHERE rating = 2) as rating_2_count,
+        COUNT(*) FILTER (WHERE rating = 3) as rating_3_count,
+        COUNT(*) FILTER (WHERE rating = 4) as rating_4_count,
+        COUNT(*) FILTER (WHERE rating = 5) as rating_5_count,
+        COALESCE(SUM(helpful_count), 0) as helpful_count_total,
+        COUNT(*) FILTER (WHERE verified_purchase = true) as verified_purchase_count,
+        MAX(created_at) as last_review_at
+      FROM store_reviews
+      WHERE tenant_id = $1 AND product_id = $2 AND approval_status = 'approved'
+    `;
+    const result = await pool.query(summaryQuery, [tenantId, productId]);
+
+    const summary = result.rows[0] || {
+      rating_avg: 0,
+      rating_count: 0,
+      rating_1_count: 0,
+      rating_2_count: 0,
+      rating_3_count: 0,
+      rating_4_count: 0,
+      rating_5_count: 0,
+      helpful_count_total: 0,
+      verified_purchase_count: 0,
+      last_review_at: null
+    };
+
+    res.json({
+      success: true,
+      data: summary
+    });
+
+  } catch (error) {
+    console.error('Error fetching product review summary:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch product review summary'
     });
   }
 });

@@ -53,8 +53,14 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
   const [userReview, setUserReview] = useState<Review | null>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
   
+  console.log('[StoreRatingDisplay] RENDER - showReviewForm:', showReviewForm, 'isAuthenticated:', isAuthenticated);
+  
   // Use API base URL for server-side API calls
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+
+  useEffect(() => {
+    console.log('[StoreRatingDisplay] showReviewForm changed to:', showReviewForm);
+  }, [showReviewForm]);
 
   useEffect(() => {
     fetchRatingSummary();
@@ -154,20 +160,39 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
     content: string;
     userName: string;
     userEmail: string;
+    sessionId?: string;
   }) => {
     try {
       const token = getAccessToken();
-      if (!token) {
-        throw new Error('Authentication required');
+      
+      // Use different endpoints based on authentication status
+      const endpoint = token 
+        ? `/api/stores/${tenantId}/reviews` 
+        : `/api/stores/${tenantId}/reviews/anonymous`;
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`/api/stores/${tenantId}/reviews`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(reviewData)
+        headers,
+        body: JSON.stringify({
+          rating: reviewData.rating,
+          reviewText: reviewData.content,
+          locationLat: null,
+          locationLng: null,
+          // For anonymous reviews
+          ...(reviewData.sessionId && {
+            sessionId: reviewData.sessionId,
+            userName: reviewData.userName,
+            userEmail: reviewData.userEmail,
+          })
+        })
       });
 
       if (!response.ok) {
@@ -178,7 +203,9 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
       // Refresh data
       fetchRatingSummary();
       fetchReviews();
-      fetchUserReview();
+      if (isAuthenticated) {
+        fetchUserReview();
+      }
       setShowReviewForm(false);
     } catch (error) {
       console.error('Error submitting review:', error);
@@ -240,20 +267,34 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
           <Star className="w-4 h-4 text-gray-300 dark:text-gray-600" />
           <span className="text-sm">No reviews yet</span>
           {showWriteReview && (
-            isAuthenticated ? (
-              <button
-                onClick={() => setShowReviewForm(true)}
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-              >
-                Be the first to review
-              </button>
-            ) : (
-              <span className="text-gray-400 text-sm">
-                <a href="/login" className="text-blue-600 hover:text-blue-700">Login</a> to write a review
-              </span>
-            )
+            <button
+              onClick={() => {
+                console.log('[StoreRatingDisplay] Button clicked, setting showReviewForm to true');
+                setShowReviewForm(true);
+              }}
+              className="text-blue-600 hover:text-blue-700 text-sm font-medium cursor-pointer relative z-10"
+              style={{ pointerEvents: 'auto' }}
+            >
+              Be the first to review
+            </button>
           )}
         </div>
+
+        {/* Review Form Modal - Render here for early return */}
+        {showReviewForm && (
+          <>
+            {(() => {
+              console.log('[StoreRatingDisplay] Rendering ReviewForm modal, isAnonymous:', !isAuthenticated);
+              return null;
+            })()}
+            <ReviewForm
+              tenantId={tenantId}
+              onClose={() => setShowReviewForm(false)}
+              onSubmit={handleReviewSubmit}
+              isAnonymous={!isAuthenticated}
+            />
+          </>
+        )}
       </div>
     );
   }
@@ -309,21 +350,12 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
         </div>
 
         {showWriteReview && (
-          isAuthenticated ? (
-            <button
-              onClick={() => setShowReviewForm(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              {userReview ? 'Edit Review' : 'Write Review'}
-            </button>
-          ) : (
-            <a
-              href="/login"
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
-            >
-              Login to Review
-            </a>
-          )
+          <button
+            onClick={() => setShowReviewForm(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            {userReview ? 'Edit Review' : 'Write Review'}
+          </button>
         )}
       </div>
 
@@ -407,11 +439,22 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
 
       {/* Review Form Modal */}
       {showReviewForm && (
-        <ReviewForm
-          tenantId={tenantId}
-          onClose={() => setShowReviewForm(false)}
-          onSubmit={handleReviewSubmit}
-        />
+        <>
+          {(() => {
+            console.log('[StoreRatingDisplay] Rendering ReviewForm modal, isAnonymous:', !isAuthenticated);
+            return null;
+          })()}
+          <ReviewForm
+            tenantId={tenantId}
+            onClose={() => setShowReviewForm(false)}
+            onSubmit={handleReviewSubmit}
+            isAnonymous={!isAuthenticated}
+            initialValues={userReview ? {
+              rating: userReview.rating,
+              reviewText: userReview.review_text || ''
+            } : undefined}
+          />
+        </>
       )}
     </div>
   );

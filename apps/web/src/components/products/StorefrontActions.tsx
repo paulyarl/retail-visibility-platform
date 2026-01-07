@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, MessageSquare } from 'lucide-react';
 import ProductActions from './ProductActions';
 
 interface StorefrontActionsProps {
@@ -19,6 +19,12 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export default function StorefrontActions({ tenantId, businessName, tenantSlug, directoryPublished }: StorefrontActionsProps) {
+  const handleReview = () => {
+    const reviewsSection = document.getElementById('storefront-reviews-section');
+    if (reviewsSection) {
+      reviewsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
   return (
     <div className="flex items-center justify-between gap-4">
       {/* View in Directory Button - Left side */}
@@ -33,6 +39,16 @@ export default function StorefrontActions({ tenantId, businessName, tenantSlug, 
             <span>View in Directory</span>
           </Link>
         )}
+
+        {/* Review Button */}
+        <button
+          onClick={handleReview}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+          title="Read and write reviews"
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>Review</span>
+        </button>
       </div>
       
       {/* Product Actions (Print & Share) - Right side */}

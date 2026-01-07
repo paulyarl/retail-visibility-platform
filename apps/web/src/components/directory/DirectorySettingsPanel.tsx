@@ -38,7 +38,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
       setSaveMessage('Listing published successfully!');
       setTimeout(() => setSaveMessage(''), 3000);
     }
-  }, [listing?.isPublished, saveMessage]);
+  }, [listing?.isPublished]);
 
   const handleSave = async () => {
     try {

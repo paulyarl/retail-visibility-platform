@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useCallback } from 'react';
 import CategorySelectorMulti, { CategoryOption } from '@/components/shared/CategorySelectorMulti';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 
@@ -18,33 +19,69 @@ export default function DirectoryCategorySelectorAdapter({
   onSecondaryChange,
   disabled = false,
 }: DirectoryCategorySelectorAdapterProps) {
+  console.log('[DirectoryCategorySelectorAdapter] Re-rendering', { primary, secondary: secondary.length });
+
   const { categories, loading, error } = useDirectoryCategories();
 
-  // Convert directory categories to CategoryOption format
-  const categoryOptions: CategoryOption[] = categories.map(cat => ({
-    id: cat.slug, // Use slug as ID for directory categories
-    name: cat.name,
-    slug: cat.slug,
-  }));
+  // Memoize category options to prevent recreation on every render
+  const categoryOptions: CategoryOption[] = useMemo(() =>
+    categories.map(cat => ({
+      id: cat.slug, // Use slug as ID for directory categories
+      name: cat.name,
+      slug: cat.slug,
+    })), [categories]);
 
-  // Convert between string names and CategoryOption
-  const primaryOption: CategoryOption | null = primary ? {
-    id: categories.find(c => c.name === primary)?.slug || primary,
-    name: primary,
-  } : null;
+  // Memoize primary option to prevent recreation
+  const primaryOption: CategoryOption | null = useMemo(() => {
+    if (!primary) return null;
+    const found = categories.find(c => c.name === primary);
+    return {
+      id: found?.slug || primary,
+      name: primary,
+    };
+  }, [primary, categories]);
 
-  const secondaryOptions: CategoryOption[] = secondary.map(name => ({
-    id: categories.find(c => c.name === name)?.slug || name,
-    name: name,
-  }));
+  // Memoize secondary options to prevent recreation
+  const secondaryOptions: CategoryOption[] = useMemo(() =>
+    secondary.map(name => {
+      const found = categories.find(c => c.name === name);
+      return {
+        id: found?.slug || name,
+        name: name,
+      };
+    }), [secondary, categories]);
 
-  const handlePrimaryChangeAdapter = (category: CategoryOption | null) => {
+  // Memoize event handlers to prevent recreation
+  const handlePrimaryChangeAdapter = useCallback((category: CategoryOption | null) => {
     onPrimaryChange(category?.name || '');
-  };
+  }, [onPrimaryChange]);
 
-  const handleSecondaryChangeAdapter = (categories: CategoryOption[]) => {
+  const handleSecondaryChangeAdapter = useCallback((categories: CategoryOption[]) => {
     onSecondaryChange(categories.map(c => c.name));
-  };
+  }, [onSecondaryChange]);
+
+  // Memoize search function to prevent recreation
+  const handleSearch = useCallback(async (query: string): Promise<CategoryOption[]> => {
+    try {
+      const response = await fetch(`/api/directory/categories/search?q=${encodeURIComponent(query)}`);
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+      const data = await response.json();
+      if (data.success && data.data.categories) {
+        // Convert search results to CategoryOption format
+        return data.data.categories.map((cat: any) => ({
+          id: cat.slug,
+          name: cat.name,
+          slug: cat.slug,
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Directory category search error:', error);
+      return [];
+    }
+  }, []);
 
   return (
     <CategorySelectorMulti
@@ -54,6 +91,7 @@ export default function DirectoryCategorySelectorAdapter({
       onSecondaryChange={handleSecondaryChangeAdapter}
       categories={categoryOptions}
       loading={loading}
+      onSearch={handleSearch}
       searchPlaceholder="Search for categories..."
       primaryLabel="Primary Category"
       secondaryLabel="Secondary Categories"

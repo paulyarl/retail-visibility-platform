@@ -35,6 +35,8 @@ export interface DirectoryListingHook {
 }
 
 export function useDirectoryListing(tenantId: string): DirectoryListingHook {
+  console.log('[useDirectoryListing] Hook called for tenantId:', tenantId);
+  
   const [listing, setListing] = useState<DirectoryListing | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

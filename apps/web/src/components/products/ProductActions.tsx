@@ -142,7 +142,20 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
     }
   };
 
-  // Social media share URLs
+  const handleReview = () => {
+    // Scroll to the reviews section
+    const reviewsSection = document.getElementById('product-reviews-section');
+    if (reviewsSection) {
+      reviewsSection.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start' 
+      });
+      // Add a small delay to account for smooth scrolling
+      setTimeout(() => {
+        reviewsSection.focus({ preventScroll: true });
+      }, 500);
+    }
+  };
   const shareLinks = {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`,
     twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
@@ -202,6 +215,25 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
               </svg>
               <span className="text-sm font-medium hidden sm:inline">Storefront</span>
             </a>
+          )}
+
+          {/* Write Review Button - Only on product pages */}
+          {variant === 'product' && (
+            <button
+              onClick={handleReview}
+              className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              title="Write a review for this product"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
+              </svg>
+              <span className="text-sm font-medium hidden sm:inline">Review</span>
+            </button>
           )}
 
           {/* Print Button */}

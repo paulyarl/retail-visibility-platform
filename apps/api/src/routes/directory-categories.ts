@@ -16,22 +16,22 @@ const router = Router();
  * - radius: Radius in miles for location filtering (optional, default: 25) - NOT YET IMPLEMENTED
  */
 router.get('/categories', async (req: Request, res: Response) => {
+  console.log('[DIRECTORY-CATEGORIES] Route hit: /api/directory/categories');
   try {
     const { lat, lng, radius } = req.query;
 
-    // Query platform_categories directly to get ALL available categories
+    // Query directory_category directly to get ALL available categories
     // Use directory_category_products for store/product counts
     const result = await getDirectPool().query(`
       SELECT 
-        pc.id,
-        pc.name,
-        pc.slug,
-        pc.google_category_id,
-        pc.icon_emoji,
-        pc.sort_order,
+        dc.id,
+        dc.name,
+        dc.slug,
+        dc."googleCategoryId",
+        dc."sortOrder",
         COALESCE(dcp.store_count, 0) as store_count,
         COALESCE(dcp.product_count, 0) as total_products
-      FROM platform_categories pc
+      FROM directory_category dc
       LEFT JOIN (
         SELECT 
           category_slug,
@@ -40,9 +40,9 @@ router.get('/categories', async (req: Request, res: Response) => {
         FROM directory_category_products 
         WHERE is_published = true
         GROUP BY category_slug
-      ) dcp ON dcp.category_slug = pc.slug
-      WHERE pc.is_active = true
-      ORDER BY pc.sort_order ASC, pc.name ASC
+      ) dcp ON dcp.category_slug = dc.slug
+      WHERE dc."tenantId" = 'platform' AND dc."isActive" = true
+      ORDER BY dc."sortOrder" ASC, dc.name ASC
     `);
 
     // Transform to expected format
@@ -50,8 +50,7 @@ router.get('/categories', async (req: Request, res: Response) => {
       id: row.id,
       name: row.name,
       slug: row.slug,
-      googleCategoryId: row.google_category_id,
-      icon: row.icon_emoji,
+      googleCategoryId: row.googleCategoryId,
       storeCount: parseInt(row.store_count || '0'),
       productCount: parseInt(row.total_products || '0'),
     }));
@@ -74,15 +73,7 @@ router.get('/categories', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /api/directory/categories/:categoryId
- * 
- * Get details for a specific category including breadcrumb path
- * 
- * Path params:
- * - categoryId: Category ID
- */
-router.get('/categories/:categoryId', async (req: Request, res: Response) => {
+router.get('/:categoryId', async (req: Request, res: Response) => {
   try {
     const { categoryId } = req.params;
 
@@ -137,7 +128,7 @@ router.get('/categories/:categoryId', async (req: Request, res: Response) => {
  * - limit: Maximum number of stores to return (optional, default: 50)
  */
 router.get(
-  '/categories/:categorySlug/stores',
+  '/:categorySlug/stores',
   async (req: Request, res: Response) => {
     try {
       const { categorySlug } = req.params;
@@ -212,7 +203,7 @@ router.get(
  * - categoryId: Category ID (optional, if not provided returns root categories)
  */
 router.get(
-  '/categories/:categoryId/hierarchy',
+  '/:categoryId/hierarchy',
   async (req: Request, res: Response) => {
     try {
       const { categoryId } = req.params;
@@ -260,15 +251,34 @@ router.get('/categories/search', async (req: Request, res: Response) => {
 
     const maxResults = limit ? parseInt(limit as string, 10) : 20;
 
-    // Get all categories and filter by search query
-    // TODO: Implement full-text search in the service for better performance
-    const allCategories = await categoryDirectoryService.getCategoriesWithStores();
-    
+    // Use direct SQL query instead of service to avoid Prisma connection pool issues
+    const result = await getDirectPool().query(`
+      SELECT 
+        dc.id,
+        dc.name,
+        dc.slug,
+        dc."googleCategoryId",
+        COALESCE(dcp.store_count, 0) as store_count,
+        COALESCE(dcp.product_count, 0) as total_products
+      FROM directory_category dc
+      LEFT JOIN (
+        SELECT 
+          category_slug,
+          COUNT(DISTINCT tenant_id) as store_count,
+          SUM(CAST(actual_product_count AS INTEGER)) as product_count
+        FROM directory_category_products 
+        WHERE is_published = true
+        GROUP BY category_slug
+      ) dcp ON dcp.category_slug = dc.slug
+      WHERE dc."tenantId" = 'platform' AND dc."isActive" = true
+      ORDER BY dc."sortOrder" ASC, dc.name ASC
+    `);
+
+    // Filter categories by search query
     const searchLower = q.toLowerCase();
-    const filtered = allCategories.filter(
-      (cat) =>
-        cat.name.toLowerCase().includes(searchLower) ||
-        cat.slug.toLowerCase().includes(searchLower)
+    const filtered = result.rows.filter((cat: any) =>
+      cat.name.toLowerCase().includes(searchLower) ||
+      cat.slug.toLowerCase().includes(searchLower)
     );
 
     const limited = filtered.slice(0, maxResults);

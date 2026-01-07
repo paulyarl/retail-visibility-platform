@@ -5239,9 +5239,9 @@ console.log('✅ Directory categories optimized routes mounted (category statist
 app.use('/api/directory/store-types', directoryStoreTypesRoutes);
 console.log('✅ Directory store types routes mounted at /api/directory/store-types');
 
-/* ------------------------------ directory categories ------------------------------ */
-app.use('/api/directory/categories', directoryCategoriesRoutes);
-console.log('✅ Directory categories routes mounted at /api/directory/categories');
+/* ------------------------------ Directory Categories routes - NEW for category-based discovery (mount BEFORE directory routes for precedence)
+app.use('/api/directory', directoryCategoriesRoutes);
+console.log('✅ Directory categories routes mounted at /api/directory');
 
 /* ------------------------------ directory tenant ------------------------------ */
 app.use('/api/directory/tenant', directoryTenantRoutes);
@@ -5294,9 +5294,6 @@ console.log('✅ Directory photos routes mounted at /api/directory');
 /* ------------------------------ cache ------------------------------ */
 app.use('/api/cache', cacheRoutes);
 console.log('✅ Cache routes mounted at /api/cache');
-import storeReviewsRoutes from './routes/store-reviews';
-app.use('/api', storeReviewsRoutes);
-console.log('✅ Store reviews routes mounted at /api');
 
 /* ------------------------------ GDPR compliance ------------------------------ */
 import gdprRoutes from './routes/gdpr';
@@ -5359,11 +5356,10 @@ console.log('✅ Google Business Profile OAuth routes mounted at /api/google/bus
 app.use('/api', googleMerchantOAuthRoutes);
 console.log('✅ Google Merchant Center OAuth routes mounted at /api/google/oauth');
 
-/* ------------------------------ billing ------------------------------ */
-console.log('🔄 Billing routes imported successfully');
-
-app.use('/api', billingRoutes);
-console.log('✅ Billing routes mounted at /api');
+/* ------------------------------ store reviews ------------------------------ */
+import storeReviewsRoutes from './routes/store-reviews';
+app.use('/api/stores', storeReviewsRoutes);
+console.log('✅ Store reviews routes mounted at /api/stores');
 
 // Sentry error handler must be after all routes but before other error handlers
 if (sentryEnabled) {

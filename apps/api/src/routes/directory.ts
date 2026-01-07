@@ -296,6 +296,7 @@ router.get('/search', async (req, res) => {
  * GET /api/directory/categories
  * Get list of available business categories
  */
+/*
 router.get('/categories', async (req, res) => {
   try {
     // Return predefined list of business categories
@@ -329,6 +330,7 @@ router.get('/categories', async (req, res) => {
     return res.status(500).json({ error: 'failed_to_get_categories' });
   }
 });
+*/
 
 /**
  * GET /api/directory/locations

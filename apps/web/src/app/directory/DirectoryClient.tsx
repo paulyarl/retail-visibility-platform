@@ -12,7 +12,6 @@ import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBr
 import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
 import LastViewed from '@/components/directory/LastViewed'; // NEW: LastViewed component import
 import { Pagination } from '@/components/ui';
-import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import dynamic from 'next/dynamic';
 
@@ -155,7 +154,6 @@ interface DirectoryResponse {
 }
 
 export default function DirectoryClient() {
-  const { settings } = usePlatformSettings();
   const searchParams = useSearchParams();
   const [data, setData] = useState<DirectoryResponse | null>(null);
   const [loading, setLoading] = useState(true);

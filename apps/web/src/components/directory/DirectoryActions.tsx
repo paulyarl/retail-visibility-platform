@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Heart, Printer, Share2 } from 'lucide-react';
+import { Heart, Printer, Share2, MessageSquare } from 'lucide-react';
 
 interface DirectoryActionsProps {
   listing: {
@@ -79,6 +79,13 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
     }
   };
 
+  const handleReview = () => {
+    const reviewsSection = document.getElementById('reviews-section');
+    if (reviewsSection) {
+      reviewsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const shareLinks = {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`,
     twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
@@ -88,6 +95,16 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
 
   return (
     <div className="flex items-center gap-2">
+      {/* Review Button */}
+      <button
+        onClick={handleReview}
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+        title="Read and write reviews"
+      >
+        <MessageSquare className="w-4 h-4" />
+        <span className="hidden sm:inline">Review</span>
+      </button>
+
       {/* Favorite Button with Count */}
       <button
         onClick={handleFavorite}

@@ -91,7 +91,7 @@ export default function NavLinks({
         href={links.settings}
         onClick={onClick}
       >
-        {tenantScopedLinksOn ? 'Tenant Settings' : 'Settings'}
+        {tenantScopedLinksOn ? 'Store Settings' : 'Settings'}
       </a>
     </nav>
   );

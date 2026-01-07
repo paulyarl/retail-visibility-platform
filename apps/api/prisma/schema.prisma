@@ -706,6 +706,7 @@ model inventory_items {
   tenants               tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   photo_assets          photo_assets[]
   product_performances  product_performances[]
+  store_reviews         store_reviews[]
 
   @@unique([tenant_id, sku])
   @@index([source])
@@ -969,13 +970,12 @@ model quick_start_product_cache {
 }
 
 model review_helpful_votes {
-  id         String   @id
-  review_id  String
-  user_id    String
-  is_helpful Boolean
-  created_at DateTime @default(now())
-
-  @@unique([review_id, user_id])
+  id            String    @id
+  review_id     String
+  user_id       String
+  is_helpful    Boolean
+  created_at    DateTime  @default(now())
+  store_reviews store_reviews @relation(fields: [review_id], references: [id], onDelete: Cascade)
 }
 
 model scan_results_list {
@@ -1159,19 +1159,34 @@ model store_rating_summary {
 }
 
 model store_reviews {
-  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id         String
-  user_id           String
-  rating            Int
-  review_text       String?
-  helpful_count     Int?      @default(0)
-  verified_purchase Boolean?  @default(false)
-  location_lat      Decimal?  @db.Decimal(10, 8)
-  location_lng      Decimal?  @db.Decimal(11, 8)
-  created_at        DateTime? @default(now()) @db.Timestamp(6)
-  updated_at        DateTime? @default(now()) @db.Timestamp(6)
+  id                 String            @id
+  tenant_id          String
+  user_id            String?
+  session_id         String?
+  product_id         String?           // Optional - for product-specific reviews
+  rating             Int
+  review_text        String?
+  helpful_count      Int               @default(0)
+  verified_purchase  Boolean           @default(false)
+  location_lat       Float?
+  location_lng       Float?
+  approval_status    review_status     @default(pending)
+  approved_by        String?
+  approved_at        DateTime?
+  rejection_reason   String?
+  created_at         DateTime          @default(now())
+  updated_at         DateTime          @default(now())
+  tenants            tenants           @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  users              users?            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  inventory_items    inventory_items?  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  review_helpful_votes review_helpful_votes[]
 
-  @@unique([tenant_id, user_id])
+  @@index([tenant_id, approval_status])
+  @@index([tenant_id, created_at])
+  @@index([user_id])
+  @@index([session_id])
+  @@index([approval_status])
+  @@index([product_id])
 }
 
 model storefront_mv_refresh_log {
@@ -1366,6 +1381,7 @@ model tenants {
   tenant_feature_overrides_list    tenant_feature_overrides_list[]
   organizations_list               organizations_list?                @relation(fields: [organization_id], references: [id])
   user_tenants                     user_tenants[]
+  store_reviews                    store_reviews[]
 
   @@index([directory_visible], map: "idx_tenant_directory_visible")
   @@index([google_sync_enabled, google_last_sync], map: "idx_tenant_google_sync")
@@ -1515,6 +1531,12 @@ model users {
   user_preferences                 user_preferences[]
   user_sessions_list               user_sessions_list[]
   user_tenants                     user_tenants[]
+  store_reviews                    store_reviews[]
+
+  @@index([email])
+  @@index([role])
+  @@index([is_active])
+  @@index([created_at])
 }
 
 model consent_records {
@@ -1757,6 +1779,12 @@ enum user_role {
   TENANT_MANAGER
   TENANT_MEMBER
   TENANT_VIEWER
+}
+
+enum review_status {
+  pending
+  approved
+  rejected
 }
 
 enum user_tenant_role {

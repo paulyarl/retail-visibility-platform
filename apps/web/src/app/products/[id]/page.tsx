@@ -8,6 +8,7 @@ import LastViewed from '@/components/directory/LastViewed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
+import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';
@@ -381,6 +382,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       {/* Product Recommendations */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <ProductRecommendations productId={product.id} tenantId={product.tenantId} />
+      </div>
+
+      {/* Product Reviews */}
+      <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />
+        </div>
       </div>
 
       {/* Recently Viewed Products */}

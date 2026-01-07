@@ -345,79 +345,100 @@ router.post('/categories/quick-start', authenticateToken, requireAdmin, async (r
   }
 });
 
-// Bulk import endpoint for platform categories from external source
+// Bulk import endpoint for platform categories from external source or seed file
 router.post('/categories/bulk-import', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { source = 'default', categories: externalCategories } = req.body;
+    console.log('[Bulk Import] Request body:', req.body);
+    const { source = 'seed', categories: externalCategories } = req.body;
+    console.log('[Bulk Import] Parsed source:', source, 'externalCategories present:', !!externalCategories);
+    
     const { prisma } = await import('../prisma');
-    const { generateQsCatId } = await import('../lib/id-generator');
+    const { generateProductCatId } = await import('../lib/id-generator');
     
     let categoriesToImport: any[] = [];
     
     // Load from different sources
-    if (source === 'default' || source === 'file') {
-      // Load from seed file
-      const seedData = await import('../data/platform-categories-seed.json');
-      const rawData: any = seedData.default || seedData;
-      // Handle both array format (old) and object format (new)
-      categoriesToImport = Array.isArray(rawData) ? rawData : (rawData.categories || []);
+    if (source === 'seed' || source === 'file') {
+      console.log('[Bulk Import] Loading from seed file using fs');
+      // Load from seed file using fs like the gbp-seed endpoint
+      const seedPath = path.join(__dirname, '../data/platform-categories-seed.json');
+      const seedData = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
+      categoriesToImport = Array.isArray(seedData) ? seedData : (seedData.categories || []);
+      console.log('[Bulk Import] Loaded', categoriesToImport.length, 'categories from seed file');
     } else if (source === 'custom' && externalCategories) {
       // Use provided categories from request body
       categoriesToImport = externalCategories;
+      console.log('[Bulk Import] Using', categoriesToImport.length, 'custom categories from request');
     } else {
+      console.log('[Bulk Import] Invalid source:', source, 'returning invalid_source error');
       return res.status(400).json({ success: false, error: 'invalid_source' });
     }
+    
+    console.log(`[Bulk Import] Processing ${categoriesToImport.length} categories from ${source} source`);
     
     const results = {
       total: categoriesToImport.length,
       created: 0,
+      updated: 0,
       skipped: 0,
       errors: 0,
       details: [] as any[],
     };
     
-    // Import categories
+    // Import categories with full seed data
     for (const category of categoriesToImport) {
       try {
-        // Check if category already exists
+        // Check if category already exists (by google_category_id or slug)
         const existing = await prisma.directory_category.findFirst({
           where: {
             tenantId: 'platform',
-            slug: category.slug,
+            OR: [
+              { googleCategoryId: category.google_category_id || category.googleCategoryId },
+              { slug: category.slug },
+            ],
           },
         });
         
+        const categoryData = {
+          name: category.name,
+          slug: category.slug,
+          googleCategoryId: category.google_category_id || category.googleCategoryId,
+          sortOrder: category.sort_order || category.sortOrder || 0,
+          isActive: true,
+          updatedAt: new Date(),
+        };
+        
         if (existing) {
-          console.log(`[Bulk Import] Skipping duplicate category: ${category.name}`);
-          results.skipped++;
+          // Update existing category with new data
+          await prisma.directory_category.update({
+            where: { id: existing.id },
+            data: categoryData,
+          });
+          results.updated++;
           results.details.push({
             name: category.name,
-            status: 'skipped',
-            reason: 'duplicate_slug',
+            status: 'updated',
+            id: existing.id,
           });
-          continue;
-        }
-        
-        // Create category
-        const created = await prisma.directory_category.create({
-          data: {
-            id: generateProductCatId('platform'),
-            tenantId: 'pltf',
+        } else {
+          // Create new category
+          const created = await prisma.directory_category.create({
+            data: {
+              id: generateProductCatId('platform'),
+              tenantId: 'platform',
+              ...categoryData,
+              createdAt: new Date(),
+            } as any,
+          });
+          results.created++;
+          results.details.push({
             name: category.name,
-            slug: category.slug,
-            updatedAt: new Date(),
-            createdAt: new Date(),
-          } as any,
-        });
-        
-        results.created++;
-        results.details.push({
-          name: category.name,
-          status: 'created',
-          id: created.id,
-        });
+            status: 'created',
+            id: created.id,
+          });
+        }
       } catch (error: any) {
-        console.error(`[Bulk Import] Failed to create category ${category.name}:`, error);
+        console.error(`[Bulk Import] Failed to process category ${category.name}:`, error);
         results.errors++;
         results.details.push({
           name: category.name,
@@ -430,10 +451,13 @@ router.post('/categories/bulk-import', authenticateToken, requireAdmin, async (r
     // Fetch all platform categories to return
     const allCategories = await categoryService.getTenantCategories('platform');
     
+    console.log(`[Bulk Import] Completed: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped, ${results.errors} errors`);
+    
     return res.json({
       success: true,
       data: allCategories,
       import_results: results,
+      message: `Import completed: ${results.created} created, ${results.updated} updated, ${results.errors} errors`,
     });
   } catch (e: any) {
     console.error('[Bulk Import] Error:', e);

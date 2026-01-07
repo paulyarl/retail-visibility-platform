@@ -209,7 +209,10 @@ class BehaviorTrackingCache {
       });
 
       if (!response.ok) {
-        throw new Error(`Batch send failed: ${response.status}`);
+        // For tracking failures, handle silently - users don't need to know about behavior tracking failures
+        console.warn(`[BehaviorTracking] Silent tracking failure (${response.status}) - continuing without error`);
+        // Don't throw - just return and continue with retry logic
+        return;
       }
 
       // Success - reset retry state
@@ -219,7 +222,8 @@ class BehaviorTrackingCache {
 
       console.log(`[BehaviorTracking] Sent ${eventsToSend.length} events in batch (priorities: ${Object.entries(this.getPriorityBreakdown(eventsToSend)).map(([p, c]) => `${p}:${c}`).join(', ')})`);
     } catch (error) {
-      console.error('[BehaviorTracking] Batch send failed:', error);
+      // For tracking failures, use warn instead of error - these are not user-facing issues
+      console.warn('[BehaviorTracking] Tracking batch failed, will retry:', error instanceof Error ? error.message : 'Unknown error');
       
       // Increment retry attempts
       this.retryState.attempts++;
@@ -448,7 +452,8 @@ export async function trackBehavior(trackingData: TrackingData): Promise<void> {
       })
     });
   } catch (error) {
-    console.error('Error tracking behavior:', error);
+    // Tracking failures should be silent - don't show to users
+    console.warn('Silent tracking failure:', error instanceof Error ? error.message : 'Unknown error');
     // Don't throw - tracking failures shouldn't break the page
   }
 }
