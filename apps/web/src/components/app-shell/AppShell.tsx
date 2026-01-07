@@ -54,7 +54,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             {settings?.logoUrl && (
-              <img 
+              <Link href="/" title={settings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} ><img 
                 src={settings.logoUrl} 
                 alt={settings.platformName || 'Platform Logo'} 
                 className="h-8 w-auto object-contain"
@@ -67,10 +67,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   // Hide broken images
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
-              />
+              /></Link>
             )}
             <span className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
-              {settings?.platformName || 'Visible Shelf'}
+              <Link href="/" title={settings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} >{settings?.platformName || 'Visible Shelf'}</Link>
             </span>
             {hydrated ? (
               tenantName ? (

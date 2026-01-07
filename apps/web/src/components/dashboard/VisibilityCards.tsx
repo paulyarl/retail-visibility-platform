@@ -43,7 +43,7 @@ export default function VisibilityCards({
 }: VisibilityCardsProps) {
   // Generate URLs if not provided
   const finalStorefrontUrl = storefrontUrl || `/tenant/${tenantId}`;
-  const finalDirectoryUrl = directoryUrl || `/directory/${tenantId}`;
+  const finalDirectoryUrl = directoryUrl || `/directory`;
   
   // Build directory URL with location and category filters for proximity viewing
   const buildDirectoryUrl = () => {
@@ -103,8 +103,8 @@ export default function VisibilityCards({
               <div className="flex flex-wrap gap-2">
                 <Link
                   href={finalStorefrontUrl}
-                  target="_blank"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm pointer-events-auto cursor-pointer"
+                  style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
                   <Eye className="w-4 h-4" />
                   View Storefront
@@ -113,7 +113,8 @@ export default function VisibilityCards({
                 
                 <Link
                   href={`/t/${tenantId}/settings`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-300 text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-colors text-sm"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-300 text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-colors text-sm pointer-events-auto cursor-pointer"
+                  style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
                   <Settings className="w-4 h-4" />
                   Settings
@@ -168,9 +169,9 @@ export default function VisibilityCards({
                 {/* Always show Browse Directory - filtered by location and category for proximity viewing */}
                 <Link
                   href={proximityDirectoryUrl}
-                  target="_blank"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm pointer-events-auto cursor-pointer"
                   title={tenantCity && tenantCategory ? `Browse ${tenantCategory} stores in ${tenantCity}, ${tenantState}` : 'Browse directory'}
+                  style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
                   <Eye className="w-4 h-4" />
                   {isInDirectory ? 'View Your Listing' : 'Browse Directory'}
@@ -181,7 +182,8 @@ export default function VisibilityCards({
                 {!isInDirectory ? (
                   <Link
                     href={`/t/${tenantId}/settings/directory`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm pointer-events-auto cursor-pointer"
+                    style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                   >
                     <MapPin className="w-4 h-4" />
                     Get Listed
@@ -189,7 +191,8 @@ export default function VisibilityCards({
                 ) : (
                   <Link
                     href={`/t/${tenantId}/settings/directory`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm pointer-events-auto cursor-pointer"
+                    style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                   >
                     <Settings className="w-4 h-4" />
                     Settings
