@@ -249,7 +249,10 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
     if (review.first_name) {
       return `${review.first_name} ${review.last_name || ''}`.trim();
     }
-    return review.email.split('@')[0];
+    if (review.email) {
+      return review.email.split('@')[0];
+    }
+    return 'Anonymous';
   };
 
   if (loading) {
