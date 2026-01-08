@@ -2512,8 +2512,39 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
       prisma.inventory_items.count({ where })
     ]);
 
+    // Fetch category data for each item (similar to individual item endpoint)
+    const itemsWithCategories = await Promise.all(
+      itemsResult.map(async (item) => {
+        let tenantCategory = null;
+        if (item.directory_category_id) {
+          // Primary lookup: by directory_category_id (most reliable)
+          const category = await prisma.directory_category.findFirst({
+            where: { 
+              id: item.directory_category_id,
+              tenantId: item.tenant_id
+            },
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              googleCategoryId: true,
+            },
+          });
+          if (category) {
+            tenantCategory = {
+              id: category.id,
+              name: category.name,
+              slug: category.slug,
+              googleCategoryId: category.googleCategoryId,
+            };
+          }
+        }
+        return { ...item, tenantCategory };
+      })
+    );
+
     // Transform items for frontend compatibility
-    const transformedItems = itemsResult.map(item => ({
+    const transformedItems = itemsWithCategories.map(item => ({
       ...item,
       price: item.price !== null ? Number(item.price) : null,
       // Remove price_cents from response
@@ -2522,7 +2553,7 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
       status: item.item_status || 'active',
       itemStatus: item.item_status || 'active',
       // Category info
-      tenantCategory: null, // Category info removed for now
+      tenantCategory: item.tenantCategory,
       tenantCategoryId: item.directory_category_id,
       directory_category: undefined, // Remove from response
       directory_category_id: undefined, // Remove from response
