@@ -37,57 +37,63 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     let relatedListings = [];
 
     try {
-      // Try using the correct materialized view with proper refresh triggers
+      // Try using actual directory tables instead of non-existent materialized view
       const relatedQuery = `
-        SELECT DISTINCT ON (dcp.category_id, dcp.tenant_id)
-          dcp.tenant_id,
-          dcp.category_id,
-          dcp.category_name,
-          dcp.tenant_name as business_name,
-          dcp.tenant_slug as slug,
-          dcp.address,
-          dcp.listing_city as city,
-          dcp.listing_state as state,
-          dcp.latitude,
-          dcp.longitude,
-          dcp.rating_avg,
-          dcp.rating_count,
-          dcp.actual_product_count as product_count,
-          dcp.is_featured,
-          dcp.subscription_tier,
-          dcp.is_published as isPublished,
-          dcp.quality_score,
+        SELECT DISTINCT ON (dcl.tenant_id)
+          dcl.tenant_id,
+          dcl.category_id,
+          dcl.category_name,
+          dcl.business_name,
+          dcl.slug,
+          dcl.address,
+          dcl.city,
+          dcl.state,
+          dcl.latitude,
+          dcl.longitude,
+          dcl.rating_avg,
+          dcl.rating_count,
+          dcl.logo_url,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM inventory_items ii
+            WHERE ii.tenant_id = dcl.tenant_id
+              AND ii.item_status = 'active'
+              AND ii.visibility = 'public'
+          ), 0) as product_count,
+          dcl.is_featured,
+          t.subscription_tier,
+          dcl.is_active_location as isPublished,
+          0 as quality_score,
           
           -- Calculate relevance score based on category match, location, rating
           (
             CASE
-              WHEN dcp.category_name = $1 THEN 2  -- Direct category match
+              WHEN dcl.category_name = $1 THEN 2  -- Direct category match
               ELSE 0
             END * 2 +
             (
               CASE
-                WHEN dcp.listing_city = $2 AND dcp.listing_state = $3 THEN 2
-                WHEN dcp.listing_state = $3 THEN 1
+                WHEN dcl.city = $2 AND dcl.state = $3 THEN 2
+                WHEN dcl.state = $3 THEN 1
                 ELSE 0
               END
             ) +
             (
               CASE
-                WHEN ABS(COALESCE(dcp.rating_avg, 0) - $4) < 0.5 THEN 1
+                WHEN ABS(COALESCE(dcl.rating_avg, 0) - $4) < 0.5 THEN 1
                 ELSE 0
               END
             )
           ) as relevance_score
           
-        FROM directory_category_products dcp
-        LEFT JOIN directory_category_listings dcl ON dcl.tenant_id = dcp.tenant_id AND dcl.is_primary = true
-        WHERE dcp.actual_product_count > 0  -- Only stores with actual products
-          AND dcp.is_published = true
-          AND dcp.directory_visible = true
-          AND dcp.tenant_id != $5  -- Use tenant_id for reliable exclusion
+        FROM directory_category_listings dcl
+        LEFT JOIN tenants t ON dcl.tenant_id = t.id
+        WHERE dcl.is_active_location = true
+          AND dcl.is_directory_visible = true
+          AND dcl.tenant_id != $5  -- Use tenant_id for reliable exclusion
           AND dcl.logo_url IS NOT NULL
           AND dcl.logo_url != ''  -- Hard requirement: must have logo
-        ORDER BY dcp.category_id, dcp.tenant_id, relevance_score DESC, dcp.rating_avg DESC, dcp.actual_product_count DESC
+        ORDER BY dcl.tenant_id, relevance_score DESC, dcl.rating_avg DESC, product_count DESC
       `;
 
       const related = await getDirectPool().query(relatedQuery, [
@@ -98,17 +104,15 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
         current.tenant_id || '',  // Use current store's tenant_id for exclusion
       ]);
 
-      console.log(`[DEBUG] MV query returned ${related.rows.length} rows`);
+      console.log(`[DEBUG] Related stores query returned ${related.rows.length} rows`);
       
       // Debug: Check if the problematic tenant is in the raw results
       const problematicTenant = related.rows.find(row => row.tenant_id === 't-lwx9znk8');
       if (problematicTenant) {
-        console.log('[DEBUG] Found problematic tenant t-lwx9znk8 in raw MV results:', {
+        console.log('[DEBUG] Found problematic tenant t-lwx9znk8 in raw results:', {
           tenant_id: problematicTenant.tenant_id,
           relevance_score: problematicTenant.relevance_score,
-          is_published: problematicTenant.is_published,
-          location_status: problematicTenant.location_status,
-          tenant_location_status: problematicTenant.tenant_location_status
+          is_published: problematicTenant.isPublished
         });
       }
 
@@ -118,12 +122,12 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
         .map((row: any) => {
           // Debug logging for the problematic tenant
           if (row.tenant_id === 't-lwx9znk8') {
-            console.log('[DEBUG] Tenant t-lwx9znk8 found in MV results:', {
+            console.log('[DEBUG] Tenant t-lwx9znk8 found in results:', {
               tenant_id: row.tenant_id,
               relevance_score: row.relevance_score,
-              is_published: row.is_published,
+              is_published: row.isPublished,
               business_name: row.business_name,
-              actual_product_count: row.product_count
+              product_count: row.product_count
             });
           }
           
@@ -143,7 +147,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
           longitude: row.longitude,
           primaryCategory: row.category_name,
           secondaryCategories: [],
-          logoUrl: null, // Not in this MV
+          logoUrl: row.logo_url, // Now available from directory_category_listings
           description: null, // Not in this MV
           ratingAvg: row.rating_avg || 0,
           ratingCount: row.rating_count || 0,

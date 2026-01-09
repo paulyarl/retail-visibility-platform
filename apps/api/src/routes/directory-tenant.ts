@@ -319,7 +319,7 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
       INSERT INTO directory_listings_list (
         id, tenant_id, business_name, slug, address, city, state, zip_code,
         phone, email, website, latitude, longitude, primary_category,
-        secondary_categories, logo_url, description, is_published,
+        secondary_categories, logo_url, description, keywords, is_published,
         subscription_tier, product_count, rating_avg, rating_count,
         business_hours, created_at, updated_at
       )
@@ -342,6 +342,7 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
         ds.secondary_categories as secondary_categories,
         bp.logo_url,
         ds.seo_description as description,
+        ds.seo_keywords as keywords,
         true as is_published,
         t.subscription_tier,
         COALESCE((SELECT COUNT(*) FROM inventory_items WHERE tenant_id = t.id AND item_status = 'active'), 0) as product_count,
@@ -370,6 +371,7 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
         secondary_categories = EXCLUDED.secondary_categories,
         logo_url = EXCLUDED.logo_url,
         description = EXCLUDED.description,
+        keywords = EXCLUDED.keywords,
         business_hours = EXCLUDED.business_hours,
         is_published = true,
         subscription_tier = EXCLUDED.subscription_tier,

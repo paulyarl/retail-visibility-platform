@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import StoreDirectoryCategories from "./StoreDirectoryCategories";
 
-interface ProductCategoriesCollapsibleProps {
+interface DirectoryProductCategoriesCollapsibleProps {
   categories: any[];
   tenantId: string;
   uncategorizedCount: number;
@@ -22,7 +22,7 @@ export default function ProductCategoriesCollapsible({
   categories,
   tenantId,
   uncategorizedCount,
-}: ProductCategoriesCollapsibleProps) {
+}: DirectoryProductCategoriesCollapsibleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const totalProducts = categories.reduce((sum: number, cat: any) => sum + (cat.count || 0), 0) + uncategorizedCount;

@@ -54,7 +54,7 @@ function calculateActivityScore(lastUpdated: string, firstAdded: string): number
  */
 router.get('/search', async (req: Request, res: Response) => {
   try {
-    const { category, city, state, sort = 'rating', page = '1', limit = '12' } = req.query;
+    const { category, city, state, sort = 'rating', page = '1', limit = '12', q: searchQuery } = req.query;
 
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
@@ -76,15 +76,29 @@ router.get('/search', async (req: Request, res: Response) => {
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
       
-      // Filter will be applied in the WHERE clause after the JOIN with directory_listings_list
-      // We'll check both primary_category and secondary_categories array
+      // Add category filter to conditions
+      conditions.push(`(dll.primary_category = $${paramIndex}::text OR $${paramIndex}::text = ANY(dll.secondary_categories))`);
       params.push(categoryName);
       paramIndex++;
     }
 
-    // Primary category filter (optional)
-    const { primaryOnly } = req.query;
-    // REMOVED: is_primary filter since column doesn't exist in materialized view
+    // Keyword/text search filtering
+    if (searchQuery && typeof searchQuery === 'string' && searchQuery.trim()) {
+      const searchTerm = searchQuery.trim();
+      params.push(searchTerm, searchTerm, searchTerm);
+      conditions.push(`
+        (
+          -- Search in business name, description, or keywords from settings
+          dll.business_name ILIKE $${paramIndex} OR 
+          dll.description ILIKE $${paramIndex + 1} OR
+          EXISTS (
+            SELECT 1 FROM unnest(dsl.seo_keywords) AS keyword 
+            WHERE keyword ILIKE $${paramIndex + 2}
+          )
+        )
+      `);
+      paramIndex += 3;
+    }
 
     // Location filters are now handled directly in the query
 
@@ -123,7 +137,7 @@ router.get('/search', async (req: Request, res: Response) => {
         null as google_category_id,
         null as googleCategoryId,
         null as icon,
-        ${category ? 'CASE WHEN dll.primary_category = $1 THEN true ELSE false END' : 'false'} as is_primary,
+        ${category ? `CASE WHEN dll.primary_category = $${paramIndex}::text THEN true ELSE false END` : 'false'} as is_primary,
         dll.rating_avg,
         dll.rating_count,
         -- Calculate real product count from inventory_items
@@ -150,6 +164,7 @@ router.get('/search', async (req: Request, res: Response) => {
         true as directory_published
       FROM directory_listings_list dll
       INNER JOIN tenants t ON dll.tenant_id = t.id
+      LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
       LEFT JOIN (
         SELECT 
           tenant_id,
@@ -160,12 +175,9 @@ router.get('/search', async (req: Request, res: Response) => {
           AND directory_category_id IS NOT NULL  -- Only count products with categories (matches storefront filter)
         GROUP BY tenant_id
       ) real_counts ON dll.tenant_id = real_counts.tenant_id
-      WHERE dll.is_published = true
-        ${city ? `AND LOWER(dll.city) = LOWER($${paramIndex})` : ''}
-        ${state ? `AND LOWER(dll.state) = LOWER($${paramIndex})` : ''}
-        ${category ? `AND (dll.primary_category = $1 OR $1 = ANY(dll.secondary_categories))` : ''}
+      WHERE ${conditions.join(' AND ')}
       ORDER BY dll.tenant_id, dll.rating_avg DESC NULLS LAST, dll.rating_count DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      LIMIT $${paramIndex}::int OFFSET $${paramIndex + 1}::int
     `;
     
     //console.log('[Directory MV Search] Query:', listingsQuery);
@@ -178,10 +190,8 @@ router.get('/search', async (req: Request, res: Response) => {
       SELECT COUNT(DISTINCT dll.tenant_id) as count
       FROM directory_listings_list dll
       INNER JOIN tenants t ON dll.tenant_id = t.id
-      WHERE dll.is_published = true
-        ${city ? `AND LOWER(dll.city) = LOWER($${paramIndex})` : ''}
-        ${state ? `AND LOWER(dll.state) = LOWER($${paramIndex})` : ''}
-        ${category ? `AND (dll.primary_category = $1 OR $1 = ANY(dll.secondary_categories))` : ''}
+      LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
+      WHERE ${conditions.join(' AND ')}
     `;
     const countResult = await getDirectPool().query(countQuery, params);
 

@@ -9,12 +9,13 @@ import StoreRatingsSection from '@/components/directory/StoreRatingsSection';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import StoreDirectoryCategories from '@/components/directory/StoreDirectoryCategories';
-import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
-import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
+import DirectoryKeywordTags from '@/components/directory/DirectoryKeywordTags';
 import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
+import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 
 interface StoreDetailPageProps {
   params: {
@@ -653,6 +654,13 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                               <span>{category.name}</span>
                             </Link>
                           ))}
+                      </div>
+                    )}
+                
+                    {/* Keywords */}
+                    {listing.keywords && listing.keywords.length > 0 && (
+                      <div className="mt-3">
+                        <DirectoryKeywordTags keywords={listing.keywords} />
                       </div>
                     )}
                 

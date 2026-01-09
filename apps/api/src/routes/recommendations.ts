@@ -430,7 +430,6 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
          dcl.category_name,
          dcl.category_slug,
          dcl.google_category_id,
-         dcl.gbp_primary_category_name,
          dcl.is_primary,
          dcl.rating_avg,
          dcl.rating_count,
@@ -493,7 +492,6 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           dcl.category_name,
           dcl.category_slug,
           dcl.google_category_id,
-          dcl.gbp_primary_category_name,
           dcl.is_primary,
           dcl.rating_avg,
           dcl.rating_count,
@@ -514,7 +512,6 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           (
             (
               CASE
-                WHEN LOWER(dcl.gbp_primary_category_name) = LOWER($7) THEN 4
                 WHEN dcl.google_category_id = $6 THEN 3
                 WHEN dcl.category_name = $1 THEN 2
                 ELSE 0
@@ -550,17 +547,16 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
         current.state,
         current.rating_avg || 0,
         tenantId,
-        current.google_category_id,
-        current.gbp_primary_category_name
+        current.google_category_id
       ]);
 
       //console.log(`[Storefront Recommendations] MV query returned ${related.rows.length} rows`);
-      //console.log(`[Storefront Recommendations] Current store - Platform Category: ${current.category_name}, GBP Category: ${current.gbp_primary_category_name}, City: ${current.city}, State: ${current.state}`);
+      //console.log(`[Storefront Recommendations] Current store - Platform Category: ${current.category_name}, City: ${current.city}, State: ${current.state}`);
       
       // Log all scores for debugging
      /*  related.rows.forEach((row: any, idx: number) => {
         if (idx < 10) { // Only log first 10 to avoid spam
-          console.log(`[Storefront Recommendations] Store ${idx + 1}: ${row.business_name} - Platform: ${row.category_name}, GBP: ${row.gbp_primary_category_name}, City: ${row.city}, State: ${row.state}, Score: ${row.relevance_score}`);
+          console.log(`[Storefront Recommendations] Store ${idx + 1}: ${row.business_name} - Platform: ${row.category_name}, City: ${row.city}, State: ${row.state}, Score: ${row.relevance_score}`);
         }
       }); */
       
@@ -586,9 +582,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           reason: getReasonText(
             row.relevance_score, 
             row.category_name === current.category_name || 
-            row.google_category_id === current.google_category_id ||
-            (row.gbp_primary_category_name && current.gbp_primary_category_name && 
-             row.gbp_primary_category_name.toLowerCase() === current.gbp_primary_category_name.toLowerCase()),
+            row.google_category_id === current.google_category_id,
             current.city, 
             row.city, 
             current.state, 
@@ -690,9 +684,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           reason: getReasonText(
             row.relevance_score, 
             row.category_name === current.category_name || 
-            row.google_category_id === current.google_category_id ||
-            (row.gbp_primary_category_name && current.gbp_primary_category_name && 
-             row.gbp_primary_category_name.toLowerCase() === current.gbp_primary_category_name.toLowerCase()),
+            row.google_category_id === current.google_category_id,
             current.city, 
             row.city, 
             current.state, 

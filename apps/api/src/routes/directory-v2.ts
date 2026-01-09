@@ -331,18 +331,22 @@ router.get('/:identifier', async (req: Request, res: Response, next) => {
     if (isTenantId) {
       // Query by tenant_id
       query = `
-        SELECT * FROM directory_listings_list
-         WHERE tenant_id = $1 AND is_published = true
-           AND (business_hours IS NULL OR business_hours::text != 'null')
+        SELECT dll.*, dsl.seo_keywords as keywords
+        FROM directory_listings_list dll
+        LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
+         WHERE dll.tenant_id = $1 AND dll.is_published = true
+           AND (dll.business_hours IS NULL OR dll.business_hours::text != 'null')
          LIMIT 1
       `;
       params = [identifier];
     } else {
       // Query by slug
       query = `
-        SELECT * FROM directory_listings_list
-         WHERE slug = $1 AND is_published = true
-           AND (business_hours IS NULL OR business_hours::text != 'null')
+        SELECT dll.*, dsl.seo_keywords as keywords
+        FROM directory_listings_list dll
+        LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
+         WHERE dll.slug = $1 AND dll.is_published = true
+           AND (dll.business_hours IS NULL OR dll.business_hours::text != 'null')
          LIMIT 1
       `;
       params = [identifier];

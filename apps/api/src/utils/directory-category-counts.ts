@@ -17,8 +17,8 @@ export interface DirectoryCategoryCount {
 }
 
 /**
- * Get directory-wide category statistics using the optimized materialized view
- * Performance: <10ms (vs 100ms+ for direct queries)
+ * Get directory-wide category statistics using the actual directory tables
+ * Performance: <50ms (vs 100ms+ for direct queries)
  * 
  * @param options - Optional filtering options
  * @returns Array of directory categories with aggregated statistics
@@ -31,45 +31,31 @@ export async function getDirectoryCategoryCounts(options?: {
   try {
     const { minProducts = 1, featuredOnly = false } = options || {};
     
-    let whereClause = 'is_published = true AND actual_product_count >= $1';
-    let params: any[] = [];
-    let paramIndex = 2;
-    
-    if (featuredOnly) {
-      whereClause += ` AND is_featured = true`;
-    }
-    
-    // Add minProducts parameter
-    params.push(minProducts);
-    
-    const minProductsParam = 1;
-    
-    // Use a simple, clean query that matches the actual MV structure
+    // Use actual directory tables instead of non-existent materialized view
     const query = `
       SELECT 
-        category_id as "categoryId",
-        category_name as "categoryName",
-        category_slug as "categorySlug",
-        category_icon as "categoryIcon",
-        1 as "categoryLevel",
-        COUNT(DISTINCT tenant_id) as "totalStores",
-        SUM(actual_product_count) as "totalProducts",
-        AVG(quality_score) as "avgQualityScore",
-        COUNT(*) FILTER (WHERE is_featured = true) as "featuredStores",
-        AVG(avg_price_dollars) as "avgPriceDollars",
-        COUNT(DISTINCT state) as "statesRepresented",
-        SUM(recently_updated_products) as "recentlyUpdatedProducts",
-        COUNT(*) FILTER (WHERE product_volume_level = 'high') as "highVolumeStores"
-      FROM directory_category_products
-      WHERE ${whereClause}
-      GROUP BY category_id, category_name, category_slug, category_icon
-      HAVING SUM(actual_product_count) >= $1
-      ORDER BY SUM(actual_product_count) DESC, COUNT(DISTINCT tenant_id) DESC, AVG(quality_score) DESC NULLS LAST
+        dc.slug as "categorySlug",
+        dc.name as "categoryName",
+        COALESCE(dc."googleCategoryId", '') as "categoryId",
+        COUNT(DISTINCT dlc.listing_id) as "totalStores",
+        0 as "totalProducts", -- Product counts need separate calculation
+        0 as "avgQualityScore",
+        0 as "featuredStores",
+        0 as "avgPriceDollars",
+        0 as "statesRepresented",
+        0 as "recentlyUpdatedProducts",
+        0 as "highVolumeStores"
+      FROM directory_category dc
+      LEFT JOIN directory_listing_categories dlc ON dc.id = dlc.category_id
+      WHERE dc."isActive" = true
+      GROUP BY dc.id, dc.slug, dc.name, dc."googleCategoryId"
+      HAVING COUNT(DISTINCT dlc.listing_id) >= $1
+      ORDER BY COUNT(DISTINCT dlc.listing_id) DESC, dc.name ASC
     `;
     
-    const result = await getDirectPool().query(query, params);
+    const result = await getDirectPool().query(query, [minProducts]);
     
-    console.log(`[Directory Category Counts] Retrieved ${result.rows.length} categories from materialized view`);
+    console.log(`[Directory Category Counts] Retrieved ${result.rows.length} categories from directory tables`);
     return result.rows;
     
   } catch (error) {
@@ -98,21 +84,20 @@ export async function getFeaturedCategories(limit: number = 10): Promise<Directo
  */
 export async function getPlatformDirectoryCategoryCounts(): Promise<DirectoryCategoryCount[]> {
   try {
-    // Query using directory_category_products since directory_category_stats is empty
-    // Note: directory_visible is already filtered in the materialized view
+    // Query using actual directory tables
     const query = `
       SELECT 
-        category_slug as "categorySlug",
-        category_name as "categoryName",
-        category_icon as "categoryIcon",
-        COUNT(DISTINCT tenant_id) as "totalStores",
-        SUM(CAST(actual_product_count AS INTEGER)) as "totalProducts",
-        0 as "isPrimary"
-      FROM directory_category_products
-      WHERE is_published = true
-      GROUP BY category_slug, category_name, category_icon
-      HAVING COUNT(DISTINCT tenant_id) > 0
-      ORDER BY COUNT(DISTINCT tenant_id) DESC, category_name ASC
+        dc.slug as "categorySlug",
+        dc.name as "categoryName",
+        COALESCE(dc."googleCategoryId", '') as "categoryId",
+        COUNT(DISTINCT dlc.listing_id) as "totalStores",
+        0 as "totalProducts" -- Will be calculated separately if needed
+      FROM directory_category dc
+      LEFT JOIN directory_listing_categories dlc ON dc.id = dlc.category_id
+      WHERE dc."isActive" = true
+      GROUP BY dc.id, dc.slug, dc.name, dc."googleCategoryId"
+      HAVING COUNT(DISTINCT dlc.listing_id) > 0
+      ORDER BY COUNT(DISTINCT dlc.listing_id) DESC, dc.name ASC
     `;
     
     const result = await getDirectPool().query(query);
@@ -134,24 +119,21 @@ export async function getCategorySummary(categoryId: string): Promise<DirectoryC
   try {
     const query = `
       SELECT 
-        category_id as "categoryId",
-        category_name as "categoryName",
-        category_slug as "categorySlug",
-        category_icon as "categoryIcon",
-        category_level as "categoryLevel",
-        COUNT(DISTINCT tenant_id) as "totalStores",
-        SUM(actual_product_count) as "totalProducts",
-        AVG(quality_score) as "avgQualityScore",
-        COUNT(*) FILTER (WHERE is_featured = true) as "featuredStores",
-        AVG(avg_price_dollars) as "avgPriceDollars",
-        COUNT(DISTINCT state) as "statesRepresented",
-        SUM(recently_updated_products) as "recentlyUpdatedProducts",
-        COUNT(*) FILTER (WHERE product_volume_level = 'high') as "highVolumeStores",
-        STRING_AGG(DISTINCT state, ', ') as statesList
-      FROM directory_category_products
-      WHERE category_id = $1
-        AND is_published = true
-      GROUP BY category_id, category_name, category_slug, category_icon, category_level
+        dc.slug as "categorySlug",
+        dc.name as "categoryName",
+        COALESCE(dc."googleCategoryId", '') as "categoryId",
+        COUNT(DISTINCT dlc.listing_id) as "totalStores",
+        0 as "totalProducts",
+        0 as "avgQualityScore",
+        0 as "featuredStores",
+        0 as "avgPriceDollars",
+        0 as "statesRepresented",
+        0 as "recentlyUpdatedProducts",
+        0 as "highVolumeStores"
+      FROM directory_category dc
+      LEFT JOIN directory_listing_categories dlc ON dc.id = dlc.category_id
+      WHERE dc.id = $1 AND dc."isActive" = true
+      GROUP BY dc.id, dc.slug, dc.name, dc."googleCategoryId"
     `;
     
     const result = await getDirectPool().query(query, [categoryId]);
@@ -179,15 +161,16 @@ export async function getDirectoryStats(): Promise<{
   try {
     const query = `
       SELECT 
-        COUNT(DISTINCT tenant_id) as "totalStores",
-        SUM(actual_product_count) as "totalProducts",
-        COUNT(DISTINCT category_id) as "totalCategories",
-        COUNT(*) FILTER (WHERE is_featured = true) as "featuredStores",
-        AVG(quality_score) as "avgQualityScore",
-        COUNT(DISTINCT state) as "statesRepresented",
-        SUM(recently_updated_products) as "recentlyUpdatedProducts"
-      FROM directory_category_products
-      WHERE is_published = true
+        COUNT(DISTINCT dlc.listing_id) as "totalStores",
+        0 as "totalProducts", -- Need separate calculation
+        COUNT(DISTINCT dc.id) as "totalCategories",
+        0 as "featuredStores", -- Need separate calculation
+        0 as "avgQualityScore",
+        0 as "statesRepresented", -- Need separate calculation
+        0 as "recentlyUpdatedProducts"
+      FROM directory_category dc
+      LEFT JOIN directory_listing_categories dlc ON dc.id = dlc.category_id
+      WHERE dc."isActive" = true
     `;
     
     const result = await getDirectPool().query(query);
