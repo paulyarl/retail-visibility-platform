@@ -187,13 +187,15 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
     });
 
     const tenant: Tenant = { id: product.tenantId, name: 'Store', metadata: {} };
-    
+    let businessName;
+
     let storeStatus = null;
     if (profileRes.ok) {
       const profile = await profileRes.json();
       // Extract business name from profile
       tenant.name = profile.business_name || 'Store';
       // Merge business profile data into tenant metadata
+      businessName = profile.business_name;
       tenant.metadata = {
         businessName: profile.business_name,
         phone: profile.phone_number,
@@ -210,8 +212,33 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
       storeStatus = computeStoreStatus(profile.hours);
     }
     
+  // Fetch directory publish status
+  let directoryPublished = false;
+  const tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  try {
+    const directoryRes = await fetch(`${apiBaseUrl}/api/directory/${tenantSlug}`, {
+      cache: 'no-store',
+    });
+    if (directoryRes.ok) {
+      // If the directory page exists, the store is published
+      directoryPublished = true;
+    }
+  } catch (e) {
+    // Directory page doesn't exist or error - store is not published
+    directoryPublished = false;
+  }
+  let returnSlang;
+
+  if (directoryPublished) {
+    returnSlang = tenantSlug;
+    
+  } else {
+    returnSlang = null;
+  }
+product.tenantId
+    
     // Return tenant ID for directory link (we'll use tenant ID directly)
-    return { product, tenant, storeStatus, directorySlug: product.tenantId };
+    return { product, tenant, storeStatus, directorySlug: returnSlang };
   } catch (error) {
     console.error('Error fetching product:', error);
     return null;
