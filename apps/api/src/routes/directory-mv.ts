@@ -331,9 +331,9 @@ router.get('/categories', async (req: Request, res: Response) => {
       LEFT JOIN (
         SELECT 
           category_slug,
-          SUM(CAST(actual_product_count AS INTEGER)) as product_count
+          COUNT(*) as product_count
         FROM directory_category_products 
-        WHERE is_published = true
+        WHERE store_published = true
         GROUP BY category_slug
       ) dcp ON dcp.category_slug = pc.slug
       WHERE pc.is_active = true
@@ -425,9 +425,9 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
       LEFT JOIN (
         SELECT 
           category_slug,
-          SUM(CAST(actual_product_count AS INTEGER)) as product_count
+          COUNT(*) as product_count
         FROM directory_category_products 
-        WHERE is_published = true
+        WHERE store_published = true
         GROUP BY category_slug
       ) dcp ON dcp.category_slug = pc.slug
       WHERE pc.is_active = true 
