@@ -325,15 +325,81 @@ router.get('/alerts/by-type', async (req, res) => {
 
 /**
  * GET /api/admin/security/failed-logins
- * Get recent failed login attempts - TEMPORARILY DISABLED
- * Note: failed_login_attempts table was dropped during schema migration
+ * Get recent failed login attempts
  */
 router.get('/failed-logins', async (req, res) => {
-  res.status(503).json({
-    error: 'Service temporarily unavailable',
-    message: 'Failed login tracking is currently unavailable due to database migration. This feature will be restored in a future update.',
-    available: false
-  });
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    // Get failed login attempts with user information
+    const failedLogins = await basePrisma.login_attempts.findMany({
+      where: {
+        success: false
+      },
+      include: {
+        users: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true,
+            role: true
+          }
+        }
+      },
+      orderBy: {
+        created_at: 'desc'
+      },
+      take: limit,
+      skip: offset
+    });
+
+    // Get total count of failed logins
+    const totalCount = await basePrisma.login_attempts.count({
+      where: {
+        success: false
+      }
+    });
+
+    // Transform the data for the response
+    const transformedLogins = failedLogins.map(login => ({
+      id: login.id,
+      userId: login.user_id,
+      email: login.email,
+      ipAddress: login.ip_address,
+      userAgent: login.user_agent,
+      failureReason: login.failure_reason,
+      metadata: login.metadata,
+      createdAt: login.created_at,
+      user: login.users ? {
+        id: login.users.id,
+        email: login.users.email,
+        firstName: login.users.first_name,
+        lastName: login.users.last_name,
+        role: login.users.role
+      } : null
+    }));
+
+    res.json({
+      success: true,
+      data: transformedLogins,
+      pagination: {
+        total: totalCount,
+        limit,
+        offset,
+        hasMore: offset + limit < totalCount
+      }
+    });
+
+  } catch (error) {
+    console.error('[Security Monitoring] Error fetching failed logins:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch failed login attempts'
+    });
+  }
 });
 
 /**

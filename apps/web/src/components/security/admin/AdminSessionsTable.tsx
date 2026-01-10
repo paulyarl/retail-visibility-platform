@@ -31,6 +31,8 @@ interface AdminSession {
     type: string;
     browser: string;
     os: string;
+    browserVersion?: string;
+    osVersion?: string;
   };
   ipAddress: string;
   location: {
@@ -135,7 +137,7 @@ export function AdminSessionsTable({
                   {getDeviceIcon(session.deviceInfo?.type)}
                   <div className="text-sm">
                     {session.deviceInfo 
-                      ? `${session.deviceInfo.browser} on ${session.deviceInfo.os}`
+                      ? `${session.deviceInfo.browser} ${session.deviceInfo.browserVersion || ''} on ${session.deviceInfo.os} ${session.deviceInfo.osVersion || ''}`.trim()
                       : 'Unknown Device'
                     }
                   </div>

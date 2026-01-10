@@ -33,9 +33,11 @@ router.get('/sessions', authenticateToken, async (req, res) => {
         id,
         device_info as "deviceInfo",
         ip_address as "ipAddress",
+        location,
         user_agent as "userAgent",
         created_at as "createdAt",
-        expires_at as "expiresAt"
+        expires_at as "expiresAt",
+        last_activity as "lastActivity"
       FROM user_sessions_list
       WHERE user_id = ${userId}
         AND is_active = true

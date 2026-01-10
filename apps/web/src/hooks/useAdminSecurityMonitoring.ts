@@ -110,7 +110,16 @@ export function useAdminSecurityMonitoring() {
         throw new Error('Failed to fetch sessions');
       }
       const data = await response.json();
-      setSessions(data.data || []);
+      // Parse deviceInfo JSON string for each session
+      const parsedSessions = (data.data || []).map((session: any) => ({
+        ...session,
+        deviceInfo: session.deviceInfo ? JSON.parse(session.deviceInfo) : {
+          type: 'Unknown',
+          browser: 'Unknown', 
+          os: 'Unknown'
+        }
+      }));
+      setSessions(parsedSessions);
       setTotalSessions(data.total || 0);
     } catch (err) {
       console.error('Failed to fetch admin sessions:', err);

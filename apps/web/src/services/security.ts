@@ -17,7 +17,18 @@ export async function getActiveSessions(): Promise<LoginSession[]> {
   }
 
   const data: ApiResponse<LoginSession[]> = await response.json();
-  return data.data || [];
+  
+  // Parse deviceInfo JSON string for each session
+  const parsedSessions = (data.data || []).map((session: any) => ({
+    ...session,
+    deviceInfo: session.deviceInfo ? JSON.parse(session.deviceInfo) : {
+      type: 'Unknown',
+      browser: 'Unknown', 
+      os: 'Unknown'
+    }
+  }));
+  
+  return parsedSessions;
 }
 
 /**

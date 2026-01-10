@@ -123,7 +123,7 @@ export function LoginActivityTable({ sessions, onRevoke, onRevokeAll }: LoginAct
                     <div>
                       <div className="font-medium">
                         {session.deviceInfo 
-                          ? `${session.deviceInfo.browser} on ${session.deviceInfo.os}`
+                          ? `${session.deviceInfo.browser} ${session.deviceInfo.browserVersion || ''} on ${session.deviceInfo.os} ${session.deviceInfo.osVersion || ''}`.trim()
                           : session.device || 'Unknown Device'
                         }
                       </div>
