@@ -74,16 +74,9 @@ export default function TenantUsersPage() {
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/tenants/${tenantId}/users/invite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      const response = await api.post(`/api/tenants/${tenantId}/users/invite`, {
+        email: inviteEmail,
+        role: inviteRole,
       });
 
       if (response.ok) {
@@ -112,15 +105,7 @@ export default function TenantUsersPage() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/tenants/${tenantId}/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await api.delete(`/api/tenants/${tenantId}/users/${userId}`);
 
       if (response.ok) {
         await loadUsers();

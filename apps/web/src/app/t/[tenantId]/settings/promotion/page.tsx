@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Star, TrendingUp, Eye, MousePointer, Calendar, DollarSign, Check, X } from 'lucide-react';
+import { api } from '@/lib/api';
 
 interface PromotionStatus {
   isPromoted: boolean;
@@ -80,7 +81,7 @@ export default function PromotionSettingsPage() {
   const fetchPromotionStatus = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/promotion/status`);
+      const response = await api.get(`/api/tenants/${tenantId}/promotion/status`);
       if (response.ok) {
         const data = await response.json();
         setStatus(data);
@@ -98,13 +99,9 @@ export default function PromotionSettingsPage() {
   const handleEnablePromotion = async () => {
     setProcessing(true);
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/promotion/enable`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tier: selectedTier,
-          durationMonths: duration,
-        }),
+      const response = await api.post(`/api/tenants/${tenantId}/promotion/enable`, {
+        tier: selectedTier,
+        durationMonths: duration,
       });
 
       if (response.ok) {
@@ -126,9 +123,7 @@ export default function PromotionSettingsPage() {
 
     setProcessing(true);
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/promotion/disable`, {
-        method: 'POST',
-      });
+      const response = await api.post(`/api/tenants/${tenantId}/promotion/disable`);
 
       if (response.ok) {
         await fetchPromotionStatus();

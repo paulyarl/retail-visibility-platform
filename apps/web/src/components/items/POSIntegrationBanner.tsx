@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { X } from 'lucide-react';
+import { api } from '@/lib/api';
 
 interface POSIntegrationBannerProps {
   tenantId: string;
@@ -31,24 +32,9 @@ export default function POSIntegrationBanner({
   // Check if POS is connected
   useEffect(() => {
     const checkPOSConnection = async () => {
+      setLoading(true);
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        
-        // Get access token from localStorage (same way AuthContext does)
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-        
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}/integrations/clover`, {
-          headers,
-          credentials: 'include'
-        });
+        const response = await api.get(`/api/tenants/${tenantId}/integrations/clover`);
         if (response.ok) {
           const data = await response.json();
           setHasPOS(data.connected || false);

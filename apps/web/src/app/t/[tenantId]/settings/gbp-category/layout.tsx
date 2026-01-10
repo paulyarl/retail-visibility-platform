@@ -10,6 +10,7 @@
 import { useParams } from 'next/navigation';
 import { TierGate } from '@/components/tier/TierGate';
 import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 
 
 // Force edge runtime to prevent prerendering issues
@@ -29,18 +30,7 @@ export default function GBPCategoryLayout({ children }: { children: React.ReactN
     // Fetch tenant tier
     const fetchTier = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-        
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        const res = await fetch(`${apiUrl}/api/tenants/${tenantId}`, {
-          headers,
-          credentials: 'include',
-        });
+        const res = await api.get(`/api/tenants/${tenantId}`);
         
         if (res.ok) {
           const data = await res.json();

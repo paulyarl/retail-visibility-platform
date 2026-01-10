@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Label, Textarea } from '@/components/ui';
 import { useToast } from '@/components/ui/use-toast';
-import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import Image from 'next/image';
 import PageHeader, { Icons } from '@/components/PageHeader';
@@ -39,7 +39,7 @@ export default function BrandingSettings() {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<BrandingFormValues>({
-    resolver: zodResolver(brandingSchema),
+    resolver: zodResolver(brandingSchema as any),
     defaultValues: {
       platformName: '',
       platformDescription: '',
