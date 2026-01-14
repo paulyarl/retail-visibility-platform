@@ -47,11 +47,43 @@ function CheckoutPageContent() {
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(gatewayType || 'square');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [availableGateways, setAvailableGateways] = useState<PaymentMethod[]>([]);
 
   // Get the cart for this tenant
   const cart = tenantId ? getCart(tenantId) : null;
   const cartItems = cart?.items || [];
   const subtotal = cart?.subtotal || 0;
+
+  // Fetch available payment gateways
+  useEffect(() => {
+    const fetchPaymentGateways = async () => {
+      if (!tenantId) return;
+      
+      try {
+        const response = await fetch(`/api/tenants/${tenantId}/payment-gateways`);
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        const gateways = data.gateways || [];
+        
+        // Extract active gateway types
+        const activeTypes = gateways
+          .filter((gateway: any) => gateway.is_active)
+          .map((gateway: any) => gateway.gateway_type as PaymentMethod);
+        
+        setAvailableGateways(activeTypes);
+        
+        // Set default payment method to first available if current selection is not available
+        if (activeTypes.length > 0 && !activeTypes.includes(paymentMethod)) {
+          setPaymentMethod(activeTypes[0]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch payment gateways:', error);
+      }
+    };
+
+    fetchPaymentGateways();
+  }, [tenantId]);
 
   // Initialize checkout - switch to cart and validate
   useEffect(() => {
@@ -292,63 +324,78 @@ function CheckoutPageContent() {
                         Select Payment Method
                       </h3>
                       
-                      {/* Square Option */}
-                      <button
-                        onClick={() => setPaymentMethod('square')}
-                        className={`w-full p-4 rounded-lg border-2 transition-all ${
-                          paymentMethod === 'square'
-                            ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
-                            : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <CreditCard className="h-6 w-6 text-primary-600" />
-                          <div className="text-left flex-1">
-                            <div className="font-medium text-neutral-900 dark:text-white">
-                              Credit or Debit Card
-                            </div>
-                            <div className="text-sm text-neutral-600 dark:text-neutral-400">
-                              Visa, Mastercard, Amex, Discover
-                            </div>
-                          </div>
-                          {paymentMethod === 'square' && (
-                            <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
-                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            </div>
-                          )}
+                      {/* Only show available payment gateways */}
+                      {availableGateways.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <CreditCard className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                          <p>No payment methods are configured</p>
+                          <p className="text-sm">Please contact the store to set up payment options</p>
                         </div>
-                      </button>
+                      ) : (
+                        <>
+                          {/* Square Option - Only show if configured */}
+                          {availableGateways.includes('square') && (
+                            <button
+                              onClick={() => setPaymentMethod('square')}
+                              className={`w-full p-4 rounded-lg border-2 transition-all ${
+                                paymentMethod === 'square'
+                                  ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                                  : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <CreditCard className="h-6 w-6 text-primary-600" />
+                                <div className="text-left flex-1">
+                                  <div className="font-medium text-neutral-900 dark:text-white">
+                                    Credit or Debit Card
+                                  </div>
+                                  <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                                    Visa, Mastercard, Amex, Discover
+                                  </div>
+                                </div>
+                                {paymentMethod === 'square' && (
+                                  <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
+                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          )}
 
-                      {/* PayPal Option */}
-                      <button
-                        onClick={() => setPaymentMethod('paypal')}
-                        className={`w-full p-4 rounded-lg border-2 transition-all ${
-                          paymentMethod === 'paypal'
-                            ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
-                            : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Wallet className="h-6 w-6 text-[#0070BA]" />
-                          <div className="text-left flex-1">
-                            <div className="font-medium text-neutral-900 dark:text-white">
-                              PayPal
-                            </div>
-                            <div className="text-sm text-neutral-600 dark:text-neutral-400">
-                              Pay with your PayPal account
-                            </div>
-                          </div>
-                          {paymentMethod === 'paypal' && (
-                            <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
-                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            </div>
+                          {/* PayPal Option - Only show if configured */}
+                          {availableGateways.includes('paypal') && (
+                            <button
+                              onClick={() => setPaymentMethod('paypal')}
+                              className={`w-full p-4 rounded-lg border-2 transition-all ${
+                                paymentMethod === 'paypal'
+                                  ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                                  : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Wallet className="h-6 w-6 text-[#0070BA]" />
+                                <div className="text-left flex-1">
+                                  <div className="font-medium text-neutral-900 dark:text-white">
+                                    PayPal
+                                  </div>
+                                  <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                                    Pay with your PayPal account
+                                  </div>
+                                </div>
+                                {paymentMethod === 'paypal' && (
+                                  <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
+                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
                           )}
-                        </div>
-                      </button>
+                        </>
+                      )}
                     </div>
 
                     {/* Conditional Payment Form */}
