@@ -37,6 +37,7 @@ function CheckoutPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantId = searchParams?.get('tenantId');
+  const gatewayType = searchParams?.get('gatewayType') as PaymentMethod | null;
   
   const { getCart, clearCart, markCartAsPaid, activeCartTenantId, switchCart } = useCart();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('review');
@@ -44,7 +45,7 @@ function CheckoutPageContent() {
   const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod | null>(null);
   const [fulfillmentFee, setFulfillmentFee] = useState<number>(0);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('square');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(gatewayType || 'square');
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Get the cart for this tenant

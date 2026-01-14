@@ -219,7 +219,7 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
 
   useEffect(() => {
     createOrderAndPayment();
-  }, []);
+  }, [props.customerInfo, props.shippingAddress, props.fulfillmentMethod, props.cartItems]);
 
   const createOrderAndPayment = async () => {
     try {
