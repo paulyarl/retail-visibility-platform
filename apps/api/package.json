@@ -79,6 +79,7 @@
     "sharp": "^0.34.5",
     "speakeasy": "^2.0.0",
     "square": "^43.2.0",
+    "stripe": "^17.5.0",
     "tslib": "^2.6.2",
     "ua-parser-js": "^2.0.7",
     "validator": "^13.15.26",
