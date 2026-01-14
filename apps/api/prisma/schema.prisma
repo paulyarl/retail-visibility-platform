@@ -705,16 +705,23 @@ model inventory_items {
   missing_description   Boolean                  @default(false)
   missing_specs         Boolean                  @default(false)
   missing_brand         Boolean                  @default(false)
-  sale_price_cents      Int?
-  payment_gateway_type  String?                  @db.VarChar(50)
-  payment_gateway_id    String?                  @db.VarChar(255)
-  payment_gateway       tenant_payment_gateways? @relation(fields: [payment_gateway_id], references: [id], onUpdate: NoAction, map: "fk_inventory_items_payment_gateway")
-  tenants               tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  order_items           order_items[]
-  photo_assets          photo_assets[]
-  product_performances  product_performances[]
-  shopping_cart_items   shopping_cart_items[]
-  store_reviews         store_reviews[]
+  sale_price_cents         Int?
+  payment_gateway_type     String?                   @db.VarChar(50)
+  payment_gateway_id       String?                   @db.VarChar(255)
+  product_type             product_type              @default(physical)
+  digital_delivery_method  digital_delivery_method?
+  digital_assets           Json?
+  access_duration_days     Int?
+  download_limit           Int?
+  license_type             license_type?
+  payment_gateway          tenant_payment_gateways?  @relation(fields: [payment_gateway_id], references: [id], onUpdate: NoAction, map: "fk_inventory_items_payment_gateway")
+  tenants                  tenants                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  digital_access_grants    digital_access_grants[]
+  order_items              order_items[]
+  photo_assets             photo_assets[]
+  product_performances     product_performances[]
+  shopping_cart_items      shopping_cart_items[]
+  store_reviews            store_reviews[]
 
   @@unique([tenant_id, sku])
   @@index([source])
@@ -1718,6 +1725,7 @@ model orders {
   created_at             DateTime               @default(now()) @db.Timestamp(6)
   updated_at             DateTime               @default(now()) @db.Timestamp(6)
   shipping_provider      String?                @db.VarChar(50)
+  digital_access_grants  digital_access_grants[]
   order_items            order_items[]
   order_status_history   order_status_history[]
   tenants                tenants                @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_orders_tenant_id")
@@ -1755,12 +1763,16 @@ model order_items {
   quantity_refunded  Int              @default(0)
   is_refundable      Boolean          @default(true)
   metadata           Json?            @default("{}")
-  notes              String?
-  created_at         DateTime         @default(now()) @db.Timestamp(6)
-  updated_at         DateTime         @default(now()) @db.Timestamp(6)
-  list_price_cents   Int?
-  inventory_items    inventory_items? @relation(fields: [inventory_item_id], references: [id], onUpdate: NoAction, map: "fk_order_items_inventory_item_id")
-  orders             orders           @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_order_items_order_id")
+  notes                    String?
+  created_at               DateTime                  @default(now()) @db.Timestamp(6)
+  updated_at               DateTime                  @default(now()) @db.Timestamp(6)
+  list_price_cents         Int?
+  product_type             product_type              @default(physical)
+  digital_delivery_status  digital_delivery_status?  @default(pending)
+  digital_delivered_at     DateTime?                 @db.Timestamptz(6)
+  digital_access_grants    digital_access_grants[]
+  inventory_items          inventory_items?          @relation(fields: [inventory_item_id], references: [id], onUpdate: NoAction, map: "fk_order_items_inventory_item_id")
+  orders                   orders                    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_order_items_order_id")
 
   @@index([order_id], map: "idx_order_items_order_id")
   @@index([inventory_item_id], map: "idx_order_items_inventory_item_id")
@@ -2351,4 +2363,61 @@ model oauth_tokens {
   @@index([gateway_type], map: "idx_oauth_tokens_gateway_type")
   @@index([expires_at], map: "idx_oauth_tokens_expires_at")
   @@map("oauth_tokens")
+}
+
+// Digital Products Support
+enum product_type {
+  physical
+  digital
+  hybrid
+}
+
+enum digital_delivery_method {
+  direct_download
+  external_link
+  license_key
+  access_grant
+}
+
+enum license_type {
+  personal
+  commercial
+  educational
+  enterprise
+}
+
+enum digital_delivery_status {
+  pending
+  delivered
+  failed
+  revoked
+}
+
+model digital_access_grants {
+  id                 String    @id @db.VarChar(255)
+  order_id           String    @db.VarChar(255)
+  order_item_id      String    @db.VarChar(255)
+  inventory_item_id  String    @db.VarChar(255)
+  customer_email     String    @db.VarChar(500)
+  access_token       String    @unique @db.VarChar(255)
+  download_count     Int       @default(0)
+  download_limit     Int?
+  expires_at         DateTime? @db.Timestamptz(6)
+  first_accessed_at  DateTime? @db.Timestamptz(6)
+  last_accessed_at   DateTime? @db.Timestamptz(6)
+  revoked_at         DateTime? @db.Timestamptz(6)
+  revoked_reason     String?
+  created_at         DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
+  
+  inventory_items    inventory_items @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade)
+  orders             orders          @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  order_items        order_items     @relation(fields: [order_item_id], references: [id], onDelete: Cascade)
+  
+  @@index([customer_email], map: "idx_digital_access_grants_customer_email")
+  @@index([access_token], map: "idx_digital_access_grants_access_token")
+  @@index([order_id], map: "idx_digital_access_grants_order_id")
+  @@index([inventory_item_id], map: "idx_digital_access_grants_inventory_item_id")
+  @@index([expires_at], map: "idx_digital_access_grants_expires_at")
+  @@index([revoked_at], map: "idx_digital_access_grants_revoked_at")
 }
