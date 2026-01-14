@@ -54,7 +54,7 @@ export function mountCoreRoutes(app: Express) {
   
   app.use('/api/tenants', authenticateToken, tenantsRoutes);
   app.use('/api/tenants', authenticateToken, tenantUserRoutes);
-  app.use('/api/tenants', paymentGatewaysRoutes);
+  app.use('/api/tenants', authenticateToken, paymentGatewaysRoutes);
   app.use(platformSettingsRoutes);
   app.use('/api/platform-stats', platformStatsRoutes);
   app.use('/api', businessHoursRoutes);
