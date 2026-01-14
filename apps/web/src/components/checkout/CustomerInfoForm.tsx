@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Button } from '@/components/ui/Button';
 import {
   Form,
@@ -15,14 +13,12 @@ import {
 } from '@/components/ui/Form';
 import { Input } from '@/components/ui/Input';
 
-const customerInfoSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
-});
-
-type CustomerInfoFormData = z.infer<typeof customerInfoSchema>;
+type CustomerInfoFormData = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+};
 
 interface CustomerInfoFormProps {
   initialData?: CustomerInfoFormData | null;
@@ -33,7 +29,6 @@ export function CustomerInfoForm({ initialData, onSubmit }: CustomerInfoFormProp
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<CustomerInfoFormData>({
-    resolver: zodResolver(customerInfoSchema),
     defaultValues: initialData || {
       email: '',
       firstName: '',
