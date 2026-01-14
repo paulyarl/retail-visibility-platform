@@ -62,14 +62,25 @@ function SquarePaymentFormContent({
   useEffect(() => {
     const initializeSquare = async () => {
       try {
+        // Check if Square.js is loaded
         if (!window.Square) {
-          throw new Error('Square.js failed to load');
+          throw new Error('Square.js failed to load. Please refresh the page.');
         }
 
-        const paymentsInstance = window.Square.payments(
-          process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID!,
-          process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID!
-        );
+        // Check if required environment variables are available
+        const appId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID;
+        const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID;
+        
+        if (!appId || !locationId) {
+          throw new Error('Square payment configuration is missing. Please contact support.');
+        }
+
+        // Initialize Square payments
+        const paymentsInstance = window.Square.payments(appId, locationId);
+        
+        if (!paymentsInstance) {
+          throw new Error('Failed to initialize Square payments instance');
+        }
 
         setPayments(paymentsInstance);
 
@@ -286,7 +297,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
   // Load Square.js script
   useEffect(() => {
     if (document.getElementById('square-js')) {
-      return;
+      return; // Already loaded
     }
 
     const script = document.createElement('script');
@@ -296,10 +307,19 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
     script.onload = () => {
       console.log('Square.js loaded successfully');
     };
-    script.onerror = () => {
-      setError('Failed to load Square payment form');
+    script.onerror = (error) => {
+      console.error('Failed to load Square.js script:', error);
+      setError('Failed to load Square payment form. Please refresh the page.');
     };
     document.body.appendChild(script);
+
+    // Cleanup function
+    return () => {
+      const existingScript = document.getElementById('square-js');
+      if (existingScript && existingScript.parentNode) {
+        existingScript.parentNode.removeChild(existingScript);
+      }
+    };
   }, []);
 
   if (isLoading) {
