@@ -33,8 +33,49 @@ function decrypt(text: string): string {
 }
 
 /**
+ * GET /api/tenants/:tenantId/payment-gateways/public
+ * List active payment gateways for a tenant (public endpoint for checkout)
+ * No authentication required - only returns gateway types, not credentials
+ */
+router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+
+    const gateways = await prisma.tenant_payment_gateways.findMany({
+      where: { 
+        tenant_id: tenantId,
+        is_active: true, // Only return active gateways
+      },
+      select: {
+        id: true,
+        gateway_type: true,
+        is_active: true,
+        is_default: true,
+        // Don't expose sensitive config data
+      },
+      orderBy: [
+        { is_default: 'desc' },
+        { created_at: 'desc' },
+      ],
+    });
+
+    res.json({
+      success: true,
+      gateways,
+    });
+  } catch (error: any) {
+    console.error('[Payment Gateways] Public list error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'list_failed',
+      message: 'Failed to list payment gateways',
+    });
+  }
+});
+
+/**
  * GET /api/tenants/:tenantId/payment-gateways
- * List all payment gateways for a tenant
+ * List all payment gateways for a tenant (authenticated)
  */
 router.get('/:tenantId/payment-gateways', requireAuth, checkTenantAccess, async (req: Request, res: Response) => {
   console.log('[PaymentGateways] Request received:', {

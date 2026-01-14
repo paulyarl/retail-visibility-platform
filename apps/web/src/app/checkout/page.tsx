@@ -13,6 +13,7 @@ import SquarePaymentForm from '@/components/checkout/SquarePaymentForm';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet } from 'lucide-react';
+import { api } from '@/lib/api';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
 type PaymentMethod = 'square' | 'paypal';
@@ -54,16 +55,23 @@ function CheckoutPageContent() {
   const cartItems = cart?.items || [];
   const subtotal = cart?.subtotal || 0;
 
-  // Fetch available payment gateways
+  // Fetch available payment gateways (public endpoint for checkout)
   useEffect(() => {
     const fetchPaymentGateways = async () => {
       if (!tenantId) return;
       
       try {
-        const response = await fetch(`/api/tenants/${tenantId}/payment-gateways`);
-        if (!response.ok) return;
+        console.log('[Checkout] Fetching payment gateways for tenant:', tenantId);
+        // Use direct fetch for public checkout - no auth required
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/tenants/${tenantId}/payment-gateways/public`);
+        
+        if (!response.ok) {
+          console.error('[Checkout] Failed to fetch payment gateways:', response.status);
+          return;
+        }
         
         const data = await response.json();
+        console.log('[Checkout] Payment gateways data:', data);
         const gateways = data.gateways || [];
         
         // Extract active gateway types
@@ -71,14 +79,16 @@ function CheckoutPageContent() {
           .filter((gateway: any) => gateway.is_active)
           .map((gateway: any) => gateway.gateway_type as PaymentMethod);
         
+        console.log('[Checkout] Active gateway types:', activeTypes);
         setAvailableGateways(activeTypes);
         
         // Set default payment method to first available if current selection is not available
         if (activeTypes.length > 0 && !activeTypes.includes(paymentMethod)) {
+          console.log('[Checkout] Setting default payment method to:', activeTypes[0]);
           setPaymentMethod(activeTypes[0]);
         }
       } catch (error) {
-        console.error('Failed to fetch payment gateways:', error);
+        console.error('[Checkout] Failed to fetch payment gateways:', error);
       }
     };
 

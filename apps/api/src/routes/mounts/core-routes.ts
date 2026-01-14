@@ -52,9 +52,12 @@ export function mountCoreRoutes(app: Express) {
   // This allows /api/tenants/:id/tier/public to work without auth
   app.use('/api', tenantTierRoutes);
   
+  // IMPORTANT: Mount payment gateways WITHOUT global auth middleware
+  // Individual routes handle their own authentication (public vs authenticated)
+  app.use('/api/tenants', paymentGatewaysRoutes);
+  
   app.use('/api/tenants', authenticateToken, tenantsRoutes);
   app.use('/api/tenants', authenticateToken, tenantUserRoutes);
-  app.use('/api/tenants', authenticateToken, paymentGatewaysRoutes);
   app.use(platformSettingsRoutes);
   app.use('/api/platform-stats', platformStatsRoutes);
   app.use('/api', businessHoursRoutes);
