@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Button } from '@/components/ui/Button';
 import {
   Form,
@@ -22,16 +20,14 @@ import {
   SelectValue,
 } from '@/components/ui/shadcn-select';
 
-const shippingAddressSchema = z.object({
-  addressLine1: z.string().min(1, 'Address is required'),
-  addressLine2: z.string().optional(),
-  city: z.string().min(1, 'City is required'),
-  state: z.string().min(2, 'State is required'),
-  postalCode: z.string().min(5, 'Postal code must be at least 5 characters'),
-  country: z.string().min(1, 'Country is required'),
-});
-
-type ShippingAddressFormData = z.infer<typeof shippingAddressSchema>;
+type ShippingAddressFormData = {
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+};
 
 interface ShippingAddressFormProps {
   initialData?: ShippingAddressFormData | null;
@@ -50,7 +46,6 @@ export function ShippingAddressForm({ initialData, onSubmit }: ShippingAddressFo
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ShippingAddressFormData>({
-    resolver: zodResolver(shippingAddressSchema),
     defaultValues: initialData || {
       addressLine1: '',
       addressLine2: '',
