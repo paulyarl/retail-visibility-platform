@@ -24,8 +24,16 @@ export class SquareOAuthService {
     this.environment = (process.env.SQUARE_ENVIRONMENT as 'sandbox' | 'production') || 'sandbox';
     this.tokenEncryption = new TokenEncryptionService();
 
-    if (!this.applicationId || !this.applicationSecret || !this.redirectUri) {
-      console.warn('[Square OAuth] Missing required environment variables');
+    // Check for missing environment variables and log specifically which ones
+    const missingVars: string[] = [];
+    if (!this.applicationId) missingVars.push('SQUARE_APPLICATION_ID');
+    if (!this.applicationSecret) missingVars.push('SQUARE_APPLICATION_SECRET');
+    if (!this.redirectUri) missingVars.push('SQUARE_OAUTH_REDIRECT_URI');
+
+    if (missingVars.length > 0) {
+      console.warn(`[Square OAuth] Missing required environment variables: ${missingVars.join(', ')}`);
+    } else {
+      console.log('[Square OAuth] All required environment variables are configured');
     }
   }
 

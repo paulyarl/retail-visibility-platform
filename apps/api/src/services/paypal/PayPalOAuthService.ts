@@ -24,8 +24,16 @@ export class PayPalOAuthService {
     this.environment = (process.env.PAYPAL_ENVIRONMENT as 'sandbox' | 'production') || 'sandbox';
     this.tokenEncryption = new TokenEncryptionService();
 
-    if (!this.clientId || !this.clientSecret || !this.redirectUri) {
-      console.warn('[PayPal OAuth] Missing required environment variables');
+    // Check for missing environment variables and log specifically which ones
+    const missingVars: string[] = [];
+    if (!this.clientId) missingVars.push('PAYPAL_CLIENT_ID');
+    if (!this.clientSecret) missingVars.push('PAYPAL_CLIENT_SECRET');
+    if (!this.redirectUri) missingVars.push('PAYPAL_OAUTH_REDIRECT_URI');
+
+    if (missingVars.length > 0) {
+      console.warn(`[PayPal OAuth] Missing required environment variables: ${missingVars.join(', ')}`);
+    } else {
+      console.log('[PayPal OAuth] All required environment variables are configured');
     }
   }
 
