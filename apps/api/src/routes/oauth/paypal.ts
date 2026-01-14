@@ -47,12 +47,14 @@ router.get('/callback', async (req, res) => {
   try {
     const { code, state, error, error_description } = req.query;
 
+    const webBaseUrl = process.env.WEB_BASE_URL || 'https://www.visibleshelf.store';
+
     // Handle OAuth errors from PayPal
     if (error) {
       console.error('[PayPal OAuth] Callback error:', error, error_description);
       const errorMessage = encodeURIComponent(error_description as string || error as string);
       return res.redirect(
-        `/settings/payment-gateways?error=paypal_oauth&message=${errorMessage}`
+        `${webBaseUrl}/settings/payment-gateways?error=paypal_oauth&message=${errorMessage}`
       );
     }
 
@@ -68,19 +70,20 @@ router.get('/callback', async (req, res) => {
     } catch (error: any) {
       console.error('[PayPal OAuth] State verification failed:', error);
       return res.redirect(
-        `/settings/payment-gateways?error=paypal_oauth&message=Invalid+or+expired+state+parameter`
+        `${webBaseUrl}/settings/payment-gateways?error=paypal_oauth&message=Invalid+or+expired+state+parameter`
       );
     }
 
     // Exchange code for token
     await paypalOAuth.exchangeCodeForToken(code, tenantId);
 
-    // Redirect to success page
-    res.redirect(`/t/${tenantId}/settings/payment-gateways?connected=paypal&success=true`);
+    // Redirect to success page (use web domain, not API domain)
+    res.redirect(`${webBaseUrl}/t/${tenantId}/settings/payment-gateways?connected=paypal&success=true`);
   } catch (error: any) {
     console.error('[PayPal OAuth] Callback error:', error);
+    const webBaseUrl = process.env.WEB_BASE_URL || 'https://www.visibleshelf.store';
     const errorMessage = encodeURIComponent(error.message || 'OAuth connection failed');
-    res.redirect(`/settings/payment-gateways?error=paypal_oauth&message=${errorMessage}`);
+    res.redirect(`${webBaseUrl}/settings/payment-gateways?error=paypal_oauth&message=${errorMessage}`);
   }
 });
 

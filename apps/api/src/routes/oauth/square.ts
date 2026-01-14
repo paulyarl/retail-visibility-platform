@@ -47,12 +47,14 @@ router.get('/callback', async (req, res) => {
   try {
     const { code, state, error, error_description } = req.query;
 
+    const webBaseUrl = process.env.WEB_BASE_URL || 'https://www.visibleshelf.store';
+
     // Handle OAuth errors from Square
     if (error) {
       console.error('[Square OAuth] Callback error:', error, error_description);
       const errorMessage = encodeURIComponent(error_description as string || error as string);
       return res.redirect(
-        `/settings/payment-gateways?error=square_oauth&message=${errorMessage}`
+        `${webBaseUrl}/settings/payment-gateways?error=square_oauth&message=${errorMessage}`
       );
     }
 
@@ -68,19 +70,20 @@ router.get('/callback', async (req, res) => {
     } catch (error: any) {
       console.error('[Square OAuth] State verification failed:', error);
       return res.redirect(
-        `/settings/payment-gateways?error=square_oauth&message=Invalid+or+expired+state+parameter`
+        `${webBaseUrl}/settings/payment-gateways?error=square_oauth&message=Invalid+or+expired+state+parameter`
       );
     }
 
     // Exchange code for token
     await squareOAuth.exchangeCodeForToken(code, tenantId);
 
-    // Redirect to success page
-    res.redirect(`/t/${tenantId}/settings/payment-gateways?connected=square&success=true`);
+    // Redirect to success page (use web domain, not API domain)
+    res.redirect(`${webBaseUrl}/t/${tenantId}/settings/payment-gateways?connected=square&success=true`);
   } catch (error: any) {
     console.error('[Square OAuth] Callback error:', error);
+    const webBaseUrl = process.env.WEB_BASE_URL || 'https://www.visibleshelf.store';
     const errorMessage = encodeURIComponent(error.message || 'OAuth connection failed');
-    res.redirect(`/settings/payment-gateways?error=square_oauth&message=${errorMessage}`);
+    res.redirect(`${webBaseUrl}/settings/payment-gateways?error=square_oauth&message=${errorMessage}`);
   }
 });
 
