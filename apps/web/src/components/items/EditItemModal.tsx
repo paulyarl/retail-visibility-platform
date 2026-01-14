@@ -5,6 +5,8 @@ import { useFeatureFlag } from '@/lib/featureFlags';
 import { apiRequest } from '@/lib/api';
 import TenantCategorySelector from './TenantCategorySelector';
 import PaymentGatewaySelector from '@/components/products/PaymentGatewaySelector';
+import ProductTypeSelector, { ProductType } from './ProductTypeSelector';
+import DigitalProductConfig, { DigitalProductData } from './DigitalProductConfig';
 import { Item } from '@/services/itemsDataService';
 
 // Helper component to display category name by ID
@@ -67,6 +69,14 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
     gateway_type: string | null;
     gateway_id: string | null;
   }>({ gateway_type: null, gateway_id: null });
+  const [productType, setProductType] = useState<ProductType>('physical');
+  const [digitalProductData, setDigitalProductData] = useState<DigitalProductData>({
+    deliveryMethod: 'direct_download',
+    assets: [],
+    licenseType: 'personal',
+    accessDurationDays: null,
+    downloadLimit: null,
+  });
 
   // Feature flag: sticky quick actions footer
   const ffQuick = useFeatureFlag('FF_CATEGORY_QUICK_ACTIONS');
@@ -114,6 +124,18 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         gateway_type: (item as any).payment_gateway_type || null,
         gateway_id: (item as any).payment_gateway_id || null
       });
+      
+      // Load product type and digital product data
+      setProductType((item as any).product_type || 'physical');
+      if ((item as any).product_type === 'digital' || (item as any).product_type === 'hybrid') {
+        setDigitalProductData({
+          deliveryMethod: (item as any).digital_delivery_method || 'direct_download',
+          assets: (item as any).digital_assets || [],
+          licenseType: (item as any).license_type || 'personal',
+          accessDurationDays: (item as any).access_duration_days || null,
+          downloadLimit: (item as any).download_limit || null,
+        });
+      }
     }
   }, [item]);
 
@@ -196,6 +218,15 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         tenantCategoryId: tenantCategoryId || null,
         payment_gateway_type: gatewaySelection.gateway_type,
         payment_gateway_id: gatewaySelection.gateway_id,
+        // Digital product fields
+        product_type: productType,
+        ...(productType === 'digital' || productType === 'hybrid' ? {
+          digital_delivery_method: digitalProductData.deliveryMethod,
+          digital_assets: digitalProductData.assets,
+          license_type: digitalProductData.licenseType,
+          access_duration_days: digitalProductData.accessDurationDays,
+          download_limit: digitalProductData.downloadLimit,
+        } : {}),
       } as Item;
 
       await onSave(updatedItem);
@@ -287,6 +318,27 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             {status === 'archived' && '📦 Archived - Preserved but will not sync to Google'}
           </p>
         </div>
+
+        {/* Product Type Selector */}
+        <ProductTypeSelector
+          value={productType}
+          onChange={setProductType}
+          disabled={saving}
+        />
+
+        {/* Digital Product Configuration */}
+        {(productType === 'digital' || productType === 'hybrid') && (
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Digital Product Settings
+            </h3>
+            <DigitalProductConfig
+              value={digitalProductData}
+              onChange={setDigitalProductData}
+              disabled={saving}
+            />
+          </div>
+        )}
 
         {/* SKU Field */}
         <div>
@@ -417,22 +469,24 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           )}
         </div>
 
-        {/* Stock Field */}
-        <div>
-          <Input
-            label="Stock Quantity"
-            type="number"
-            step="1.0"
-            min="0"
-            value={stock}
-            onChange={(e) => setStock(e.target.value)}
-            placeholder="e.g., 100"
-            disabled={saving}
-          />
-          <p className="text-xs text-neutral-500 mt-1">
-            Available quantity in inventory
-          </p>
-        </div>
+        {/* Stock Field - Only for physical and hybrid products */}
+        {productType !== 'digital' && (
+          <div>
+            <Input
+              label="Stock Quantity"
+              type="number"
+              step="1.0"
+              min="0"
+              value={stock}
+              onChange={(e) => setStock(e.target.value)}
+              placeholder="e.g., 100"
+              disabled={saving}
+            />
+            <p className="text-xs text-neutral-500 mt-1">
+              Available quantity in inventory
+            </p>
+          </div>
+        )}
 
         {/* Description Field */}
         <div>
