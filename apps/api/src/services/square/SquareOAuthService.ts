@@ -53,6 +53,7 @@ export class SquareOAuthService {
       scope: 'PAYMENTS_READ PAYMENTS_WRITE MERCHANT_PROFILE_READ',
       session: 'false',
       state: stateParam,
+      redirect_uri: this.redirectUri,
     });
 
     return `${baseUrl}?${params.toString()}`;
