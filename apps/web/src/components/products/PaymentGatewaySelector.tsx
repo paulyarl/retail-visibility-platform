@@ -52,7 +52,10 @@ export default function PaymentGatewaySelector({
     const loadGateways = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/tenants/${tenantId}/payment-gateways`);
+        
+        // Import api dynamically to avoid SSR issues
+        const { api } = await import('@/lib/api');
+        const response = await api.get(`/api/tenants/${tenantId}/payment-gateways`);
         
         if (!response.ok) {
           throw new Error('Failed to load payment gateways');

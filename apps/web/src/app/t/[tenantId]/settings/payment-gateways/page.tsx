@@ -119,6 +119,13 @@ export default function PaymentGatewaysPage() {
     try {
       setLoading(true);
       setError(null);
+      
+      // Debug: Check what tokens are available
+      console.log('[PaymentGateways] Debug - checking tokens before API call:');
+      console.log('- localStorage access_token:', localStorage.getItem('access_token') ? 'present' : 'missing');
+      console.log('- localStorage auth_token:', localStorage.getItem('auth_token') ? 'present' : 'missing');
+      console.log('- Cookie auth_token:', document.cookie.includes('auth_token') ? 'present' : 'missing');
+      
       const response = await api.get(`/api/tenants/${tenantId}/payment-gateways`);
       if (!response.ok) throw new Error('Failed to load payment gateways');
       const data = await response.json();

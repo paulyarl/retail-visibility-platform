@@ -37,6 +37,15 @@ function decrypt(text: string): string {
  * List all payment gateways for a tenant
  */
 router.get('/:tenantId/payment-gateways', requireAuth, checkTenantAccess, async (req: Request, res: Response) => {
+  console.log('[PaymentGateways] Request received:', {
+    tenantId: req.params.tenantId,
+    user: req.user ? { id: req.user.userId, email: req.user.email, role: req.user.role } : null,
+    headers: {
+      authorization: req.headers.authorization ? 'present' : 'missing',
+      'content-type': req.headers['content-type']
+    }
+  });
+
   try {
     const { tenantId } = req.params;
 

@@ -41,16 +41,20 @@ function getAccessToken(): string | null {
   }
 
   // Fall back to cookie (current auth system)
-  const cookieToken = getCookie('auth_token');
+  const cookieToken = getCookie('access_token');
   if (cookieToken) {
-    console.log('[API] Found token in cookie auth_token');
+    console.log('[API] Found token in cookie access_token');
     return cookieToken;
   }
 
   // Debug: Check what auth-related data is actually stored
-  console.log('[API] No token found. Debug info:');
-  console.log('- localStorage keys:', Object.keys(localStorage).filter(k => k.includes('auth') || k.includes('token') || k.includes('access')));
-  console.log('- Cookies:', document.cookie);
+  console.log('[API] Token retrieval debug:');
+  console.log('- localStorage access_token:', localStorage.getItem('access_token') ? 'present' : 'missing');
+  console.log('- localStorage auth_token:', localStorage.getItem('auth_token') ? 'present' : 'missing');
+  console.log('- Cookie auth_token:', getCookie('auth_token') ? 'present' : 'missing');
+  console.log('- Cookie csrf:', getCookie('csrf') ? 'present' : 'missing');
+  console.log('- All cookies:', document.cookie);
+  console.log('- localStorage keys with auth/token:', Object.keys(localStorage).filter(k => k.toLowerCase().includes('auth') || k.toLowerCase().includes('token') || k.toLowerCase().includes('access')));
 
   return null;
 }
