@@ -1,25 +1,52 @@
 import { Router } from 'express';
-const { Client: SquareClient } = require('square');
 import { prisma } from '../../prisma';
+import { digitalFulfillmentService } from '../../services/digital-assets';
 import { randomUUID } from 'crypto';
 
 const router = Router();
 
-// Initialize Square client
-const getSquareClient = () => {
+// Note: Square SDK integration removed - using direct API calls instead
+// The Square SDK has complex typing issues in this environment
+// Process Square payment
+const processSquarePayment = async (sourceId: string, amount: number, orderId: string, customerInfo: any) => {
   const accessToken = process.env.SQUARE_ACCESS_TOKEN;
-  const environment = process.env.SQUARE_ENVIRONMENT === 'production' 
-    ? 'production' 
-    : 'sandbox';
+  const locationId = process.env.SQUARE_LOCATION_ID;
+  const environment = process.env.SQUARE_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
+  const baseUrl = environment === 'production' 
+    ? 'https://connect.squareup.com' 
+    : 'https://connect.squareupsandbox.com';
 
-  if (!accessToken) {
-    throw new Error('Square access token not configured');
+  if (!accessToken || !locationId) {
+    throw new Error('Square configuration missing');
   }
 
-  return new SquareClient({
-    accessToken,
-    environment,
+  const response = await fetch(`${baseUrl}/v2/payments`, {
+    method: 'POST',
+    headers: {
+      'Square-Version': '2024-01-18',
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      source_id: sourceId,
+      idempotency_key: randomUUID(),
+      amount_money: {
+        amount: amount,
+        currency: 'USD',
+      },
+      location_id: locationId,
+      reference_id: orderId,
+      note: `Order ${orderId} - ${customerInfo.firstName} ${customerInfo.lastName}`,
+      buyer_email_address: customerInfo.email,
+    }),
   });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Square payment failed: ${error}`);
+  }
+
+  return await response.json();
 };
 
 // Process Square payment
@@ -43,35 +70,13 @@ router.post('/process-payment', async (req, res) => {
       });
     }
 
-    const squareClient = getSquareClient();
-    const locationId = process.env.SQUARE_LOCATION_ID;
-
-    if (!locationId) {
-      return res.status(500).json({
-        error: 'Square configuration missing',
-        message: 'Square location ID not configured'
-      });
-    }
-
-    // Create payment with Square
-    const { result, statusCode } = await squareClient.paymentsApi.createPayment({
-      sourceId,
-      idempotencyKey: randomUUID(),
-      amountMoney: {
-        amount: BigInt(amount),
-        currency: 'USD',
-      },
-      locationId,
-      referenceId: orderId,
-      note: `Order ${orderId} - ${customerInfo.firstName} ${customerInfo.lastName}`,
-      buyerEmailAddress: customerInfo.email,
-    });
-
-    if (statusCode !== 200 || !result.payment) {
-      throw new Error('Square payment failed');
-    }
-
+    // Process payment with Square API
+    const result = await processSquarePayment(sourceId, amount, orderId, customerInfo) as any;
     const payment = result.payment;
+
+    if (!payment) {
+      throw new Error('Square payment failed - no payment object returned');
+    }
 
     // Update payment record in database
     await prisma.payments.update({
@@ -92,6 +97,27 @@ router.post('/process-payment', async (req, res) => {
         updated_at: new Date(),
       },
     });
+
+    // Fulfill digital products
+    try {
+      const hasDigital = await digitalFulfillmentService.hasDigitalProducts(orderId);
+      if (hasDigital) {
+        console.log('[Square] Order contains digital products, fulfilling...');
+        const baseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+        const fulfillmentResult = await digitalFulfillmentService.fulfillOrder(
+          orderId,
+          baseUrl
+        );
+        console.log('[Square] Digital fulfillment result:', {
+          success: fulfillmentResult.success,
+          grants: fulfillmentResult.accessGrants.length,
+          errors: fulfillmentResult.errors.length,
+        });
+      }
+    } catch (error) {
+      console.error('[Square] Digital fulfillment failed:', error);
+      // Don't fail the payment if digital fulfillment fails - can retry later
+    }
 
     console.log('[Square] Payment processed successfully:', {
       orderId,

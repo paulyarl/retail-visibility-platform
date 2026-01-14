@@ -2,6 +2,7 @@ import { Router } from 'express';
 //import { prisma } from '../prisma';
 import { authenticateToken } from '../../middleware/auth';
 import { prisma } from '../../prisma';
+import { digitalFulfillmentService } from '../../services/digital-assets';
 
 const router = Router();
 
@@ -246,6 +247,27 @@ router.post('/capture-order', async (req, res) => {
             // Continue processing other items even if one fails
           }
         }
+      }
+
+      // Fulfill digital products
+      try {
+        const hasDigital = await digitalFulfillmentService.hasDigitalProducts(payment.orders.id);
+        if (hasDigital) {
+          console.log('[PayPal] Order contains digital products, fulfilling...');
+          const baseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+          const fulfillmentResult = await digitalFulfillmentService.fulfillOrder(
+            payment.orders.id,
+            baseUrl
+          );
+          console.log('[PayPal] Digital fulfillment result:', {
+            success: fulfillmentResult.success,
+            grants: fulfillmentResult.accessGrants.length,
+            errors: fulfillmentResult.errors.length,
+          });
+        }
+      } catch (error) {
+        console.error('[PayPal] Digital fulfillment failed:', error);
+        // Don't fail the payment if digital fulfillment fails - can retry later
       }
     }
 

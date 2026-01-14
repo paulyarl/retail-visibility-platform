@@ -23,6 +23,7 @@ import analyticsRoutes from '../analytics';
 import tenantsRoutes from '../tenants';
 import tenantTierRoutes from '../tenant-tier';
 import paymentGatewaysRoutes from '../payment-gateways';
+import digitalDownloadsRoutes from '../digital-downloads';
 
 /**
  * Mount core business routes
@@ -55,6 +56,9 @@ export function mountCoreRoutes(app: Express) {
   // IMPORTANT: Mount payment gateways WITHOUT global auth middleware
   // Individual routes handle their own authentication (public vs authenticated)
   app.use('/api/tenants', paymentGatewaysRoutes);
+  
+  // IMPORTANT: Mount digital downloads WITHOUT auth - uses access tokens for security
+  app.use('/api/download', digitalDownloadsRoutes);
   
   app.use('/api/tenants', authenticateToken, tenantsRoutes);
   app.use('/api/tenants', authenticateToken, tenantUserRoutes);
