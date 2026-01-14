@@ -1,0 +1,346 @@
+// Phase 3A: Order Management Foundation - Prisma Schema Additions
+// Add these models and enums to your schema.prisma file at the end
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum order_status {
+  draft
+  confirmed
+  paid
+  processing
+  shipped
+  delivered
+  cancelled
+  refunded
+}
+
+enum payment_status {
+  pending
+  authorized
+  paid
+  partially_refunded
+  refunded
+  failed
+  cancelled
+}
+
+enum fulfillment_status {
+  unfulfilled
+  partially_fulfilled
+  fulfilled
+  cancelled
+}
+
+enum payment_method {
+  credit_card
+  debit_card
+  paypal
+  apple_pay
+  google_pay
+  cash
+  check
+  bank_transfer
+  other
+}
+
+enum shipment_status {
+  pending
+  label_created
+  picked_up
+  in_transit
+  out_for_delivery
+  delivered
+  failed_delivery
+  returned
+  cancelled
+}
+
+// ============================================================================
+// MODELS
+// ============================================================================
+
+model orders {
+  id                      String              @id
+  tenant_id               String
+  customer_id             String?
+  order_number            String              @unique
+  order_status            order_status        @default(draft)
+  payment_status          payment_status      @default(pending)
+  fulfillment_status      fulfillment_status  @default(unfulfilled)
+  
+  // Pricing (in cents)
+  subtotal_cents          Int                 @default(0)
+  tax_cents               Int                 @default(0)
+  shipping_cents          Int                 @default(0)
+  discount_cents          Int                 @default(0)
+  total_cents             Int                 @default(0)
+  currency                String              @default("USD") @db.VarChar(3)
+  
+  // Customer Info (denormalized)
+  customer_email          String              @db.VarChar(255)
+  customer_name           String?             @db.VarChar(255)
+  customer_phone          String?             @db.VarChar(50)
+  
+  // Shipping Address
+  shipping_address_line1  String?             @db.VarChar(255)
+  shipping_address_line2  String?             @db.VarChar(255)
+  shipping_city           String?             @db.VarChar(100)
+  shipping_state          String?             @db.VarChar(100)
+  shipping_postal_code    String?             @db.VarChar(20)
+  shipping_country        String?             @default("US") @db.VarChar(2)
+  
+  // Billing Address
+  billing_address_line1   String?             @db.VarChar(255)
+  billing_address_line2   String?             @db.VarChar(255)
+  billing_city            String?             @db.VarChar(100)
+  billing_state           String?             @db.VarChar(100)
+  billing_postal_code     String?             @db.VarChar(20)
+  billing_country         String?             @default("US") @db.VarChar(2)
+  
+  // Metadata
+  notes                   String?
+  internal_notes          String?
+  metadata                Json                @default("{}")
+  source                  String?             @db.VarChar(50)
+  source_id               String?             @db.VarChar(255)
+  ip_address              String?             @db.VarChar(45)
+  user_agent              String?
+  
+  // Timestamps
+  confirmed_at            DateTime?           @db.Timestamptz(6)
+  paid_at                 DateTime?           @db.Timestamptz(6)
+  fulfilled_at            DateTime?           @db.Timestamptz(6)
+  cancelled_at            DateTime?           @db.Timestamptz(6)
+  created_at              DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime            @db.Timestamptz(6)
+  
+  // Relations
+  tenants                 tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  customers               customers?          @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+  order_items             order_items[]
+  payments                payments[]
+  shipments               shipments[]
+  order_status_history    order_status_history[]
+  
+  @@index([tenant_id, order_status], map: "idx_orders_tenant_id_status")
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_orders_tenant_id_created_at")
+  @@index([customer_id], map: "idx_orders_customer_id")
+  @@index([customer_email], map: "idx_orders_customer_email")
+  @@index([order_number], map: "idx_orders_order_number")
+  @@index([tenant_id, order_number], map: "idx_orders_tenant_id_order_number")
+  @@index([source], map: "idx_orders_source")
+  @@index([payment_status], map: "idx_orders_payment_status")
+  @@index([fulfillment_status], map: "idx_orders_fulfillment_status")
+}
+
+model order_items {
+  id                    String            @id
+  order_id              String
+  inventory_item_id     String?
+  
+  // Product Info (denormalized)
+  sku                   String            @db.VarChar(255)
+  name                  String            @db.VarChar(500)
+  description           String?
+  image_url             String?
+  
+  // Pricing (in cents)
+  quantity              Int               @default(1)
+  unit_price_cents      Int
+  subtotal_cents        Int
+  tax_cents             Int               @default(0)
+  discount_cents        Int               @default(0)
+  total_cents           Int
+  
+  // Fulfillment
+  quantity_fulfilled    Int               @default(0)
+  quantity_refunded     Int               @default(0)
+  is_refundable         Boolean           @default(true)
+  
+  // Metadata
+  metadata              Json              @default("{}")
+  notes                 String?
+  
+  // Timestamps
+  created_at            DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime          @db.Timestamptz(6)
+  
+  // Relations
+  orders                orders            @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  inventory_items       inventory_items?  @relation(fields: [inventory_item_id], references: [id], onDelete: SetNull)
+  
+  @@index([order_id], map: "idx_order_items_order_id")
+  @@index([inventory_item_id], map: "idx_order_items_inventory_item_id")
+  @@index([sku], map: "idx_order_items_sku")
+}
+
+model payments {
+  id                        String          @id
+  order_id                  String
+  tenant_id                 String
+  
+  // Payment Details
+  amount_cents              Int
+  currency                  String          @default("USD") @db.VarChar(3)
+  payment_method            payment_method?
+  payment_status            payment_status  @default(pending)
+  
+  // Gateway Info
+  gateway                   String?         @db.VarChar(50)
+  gateway_transaction_id    String?         @unique @db.VarChar(255)
+  gateway_customer_id       String?         @db.VarChar(255)
+  gateway_payment_method_id String?         @db.VarChar(255)
+  
+  // Payment Method Details
+  payment_method_details    Json?
+  
+  // Processing
+  authorized_at             DateTime?       @db.Timestamptz(6)
+  captured_at               DateTime?       @db.Timestamptz(6)
+  failed_at                 DateTime?       @db.Timestamptz(6)
+  cancelled_at              DateTime?       @db.Timestamptz(6)
+  
+  // Error Handling
+  error_code                String?         @db.VarChar(100)
+  error_message             String?
+  
+  // Metadata
+  metadata                  Json            @default("{}")
+  ip_address                String?         @db.VarChar(45)
+  
+  // Timestamps
+  created_at                DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime        @db.Timestamptz(6)
+  
+  // Relations
+  orders                    orders          @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  tenants                   tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  refunds                   refunds[]
+  
+  @@index([order_id], map: "idx_payments_order_id")
+  @@index([tenant_id], map: "idx_payments_tenant_id")
+  @@index([gateway_transaction_id], map: "idx_payments_gateway_transaction_id")
+  @@index([gateway], map: "idx_payments_gateway")
+  @@index([payment_status], map: "idx_payments_payment_status")
+}
+
+model shipments {
+  id                      String            @id
+  order_id                String
+  tenant_id               String
+  
+  // Shipping Details
+  carrier                 String?           @db.VarChar(50)
+  service_level           String?           @db.VarChar(50)
+  tracking_number         String?           @db.VarChar(255)
+  tracking_url            String?
+  
+  // Status
+  shipment_status         shipment_status   @default(pending)
+  
+  // Address
+  address_line1           String            @db.VarChar(255)
+  address_line2           String?           @db.VarChar(255)
+  city                    String            @db.VarChar(100)
+  state                   String            @db.VarChar(100)
+  postal_code             String            @db.VarChar(20)
+  country                 String            @default("US") @db.VarChar(2)
+  
+  // Costs (in cents)
+  shipping_cost_cents     Int?
+  label_cost_cents        Int?
+  
+  // Label
+  label_url               String?
+  label_format            String?           @db.VarChar(10)
+  
+  // Dimensions & Weight
+  weight_oz               Decimal?          @db.Decimal(10, 2)
+  length_in               Decimal?          @db.Decimal(10, 2)
+  width_in                Decimal?          @db.Decimal(10, 2)
+  height_in               Decimal?          @db.Decimal(10, 2)
+  
+  // Tracking Events
+  shipped_at              DateTime?         @db.Timestamptz(6)
+  in_transit_at           DateTime?         @db.Timestamptz(6)
+  out_for_delivery_at     DateTime?         @db.Timestamptz(6)
+  delivered_at            DateTime?         @db.Timestamptz(6)
+  failed_delivery_at      DateTime?         @db.Timestamptz(6)
+  returned_at             DateTime?         @db.Timestamptz(6)
+  
+  // Metadata
+  metadata                Json              @default("{}")
+  notes                   String?
+  
+  // Timestamps
+  created_at              DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime          @db.Timestamptz(6)
+  
+  // Relations
+  orders                  orders            @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  tenants                 tenants           @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  
+  @@index([order_id], map: "idx_shipments_order_id")
+  @@index([tenant_id], map: "idx_shipments_tenant_id")
+  @@index([tracking_number], map: "idx_shipments_tracking_number")
+  @@index([shipment_status], map: "idx_shipments_shipment_status")
+  @@index([carrier], map: "idx_shipments_carrier")
+}
+
+model order_status_history {
+  id                  String        @id
+  order_id            String
+  
+  // Status Change
+  from_status         order_status?
+  to_status           order_status
+  
+  // Actor
+  changed_by_user_id  String?
+  changed_by_name     String?       @db.VarChar(255)
+  
+  // Details
+  reason              String?
+  notes               String?
+  metadata            Json          @default("{}")
+  
+  // Timestamp
+  created_at          DateTime      @default(now()) @db.Timestamptz(6)
+  
+  // Relations
+  orders              orders        @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  users               users?        @relation(fields: [changed_by_user_id], references: [id], onDelete: SetNull)
+  
+  @@index([order_id, created_at(sort: Desc)], map: "idx_order_status_history_order_id_created_at")
+  @@index([changed_by_user_id], map: "idx_order_status_history_changed_by_user_id")
+}
+
+// ============================================================================
+// PLACEHOLDER MODELS (To be implemented in Phase 3D)
+// ============================================================================
+
+// Note: The orders model references a 'customers' table that will be created in Phase 3D
+// For now, the customer_id field is nullable and the relation is optional
+// The payments model references a 'refunds' table that will be created in Phase 3B
+
+model customers {
+  id    String  @id
+  email String
+  // ... more fields to be added in Phase 3D
+  
+  orders orders[]
+  
+  @@map("customers_placeholder")
+}
+
+model refunds {
+  id         String @id
+  payment_id String
+  // ... more fields to be added in Phase 3B
+  
+  payments payments @relation(fields: [payment_id], references: [id], onDelete: Cascade)
+  
+  @@map("refunds_placeholder")
+}

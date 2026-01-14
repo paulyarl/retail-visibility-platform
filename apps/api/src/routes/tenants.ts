@@ -268,6 +268,11 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
             logo_url: true,
           },
         },
+        payment_gateways: {
+          where: { is_active: true },
+          take: 1,
+          select: { id: true },
+        },
         _count: {
           select: {
             inventory_items: true,
@@ -287,6 +292,9 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       });
     }
 
+    // Check if tenant has active payment gateway for cart feature
+    const hasActivePaymentGateway = (tenant as any).payment_gateways?.length > 0;
+
     // Transform for frontend compatibility
     const transformedTenant = {
       id: tenant.id,
@@ -298,6 +306,7 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       locationStatus: tenant.location_status,
       statusInfo: getLocationStatusInfo(tenant.location_status as any),
       logoUrl: (tenant as any).tenant_business_profiles_list?.logo_url || null,
+      hasActivePaymentGateway,
       stats: {
         productCount: (tenant as any)._count.inventory_items,
         userCount: (tenant as any)._count.user_tenants,

@@ -28,6 +28,10 @@ interface ProductData {
     value: string;
     currency: string;
   };
+  salePrice?: {
+    value: string;
+    currency: string;
+  };
   availability: 'in_stock' | 'out_of_stock' | 'preorder' | 'backorder';
   condition: 'new' | 'refurbished' | 'used';
   brand?: string;
@@ -141,6 +145,7 @@ function convertToGoogleProduct(
   })();
 
   const price = item.price_cents ? (item.price_cents / 100).toFixed(2) : '0.00';
+  const salePrice = item.sale_price_cents ? (item.sale_price_cents / 100).toFixed(2) : null;
   const availability = item.stock_quantity > 0 ? 'in stock' : 'out of stock';
   
   // Build product link
@@ -168,6 +173,14 @@ function convertToGoogleProduct(
       currency: 'USD',
     },
   };
+
+  // Add sale price if available (Google will show strikethrough pricing)
+  if (salePrice && parseFloat(salePrice) < parseFloat(price)) {
+    googleProduct.salePrice = {
+      value: salePrice,
+      currency: 'USD',
+    };
+  }
 
   // Pickup intent (in-store pickup scenarios)
   const mode = options?.fulfillmentMode || 'standard';

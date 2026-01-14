@@ -4,6 +4,7 @@ import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
 import { useFeatureFlag } from '@/lib/featureFlags';
 import { apiRequest } from '@/lib/api';
 import TenantCategorySelector from './TenantCategorySelector';
+import PaymentGatewaySelector from '@/components/products/PaymentGatewaySelector';
 import { Item } from '@/services/itemsDataService';
 
 // Helper component to display category name by ID
@@ -51,6 +52,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [condition, setCondition] = useState<'new' | 'used' | 'refurbished'>('new');
   const [mpn, setMpn] = useState('');
   const [price, setPrice] = useState('');
+  const [salePrice, setSalePrice] = useState('');
   const [stock, setStock] = useState('');
   const [description, setDescription] = useState('');
   const [enhancedDescription, setEnhancedDescription] = useState('');
@@ -61,6 +63,10 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   const [error, setError] = useState<string | null>(null);
   const [tenantCategoryId, setTenantCategoryId] = useState<string>('');
   const [showCategorySelector, setShowCategorySelector] = useState(false);
+  const [gatewaySelection, setGatewaySelection] = useState<{
+    gateway_type: string | null;
+    gateway_id: string | null;
+  }>({ gateway_type: null, gateway_id: null });
 
   // Feature flag: sticky quick actions footer
   const ffQuick = useFeatureFlag('FF_CATEGORY_QUICK_ACTIONS');
@@ -91,6 +97,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setCondition(((item as any).condition === 'brand_new' ? 'new' : (item as any).condition) || 'new');
       setMpn((item as any).mpn || '');
       setPrice(item.price ? item.price.toFixed(2) : '');
+      setSalePrice((item as any).salePriceCents ? ((item as any).salePriceCents / 100).toFixed(2) : '');
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
       // Extract enriched fields from metadata
@@ -103,6 +110,10 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       const mappedStatus = currentStatus === 'inactive' ? 'archived' : currentStatus;
       setStatus((mappedStatus === 'draft' || mappedStatus === 'active' || mappedStatus === 'archived') ? mappedStatus : 'draft');
       setTenantCategoryId(item.tenantCategoryId || '');
+      setGatewaySelection({
+        gateway_type: (item as any).payment_gateway_type || null,
+        gateway_id: (item as any).payment_gateway_id || null
+      });
     }
   }, [item]);
 
@@ -176,12 +187,15 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         condition: condition,
         mpn: mpn.trim() || undefined,
         price: price ? parseFloat(price) : undefined,
+        salePriceCents: salePrice ? Math.round(parseFloat(salePrice) * 100) : undefined,
         stock: stock ? parseInt(stock) : undefined,
         description: description.trim() || undefined,
         metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         itemStatus: status === 'draft' ? 'active' : status, // Map draft to active for API, send as itemStatus
         item_status: status === 'draft' ? 'active' : status, // Also send snake_case version for backend
         tenantCategoryId: tenantCategoryId || null,
+        payment_gateway_type: gatewaySelection.gateway_type,
+        payment_gateway_id: gatewaySelection.gateway_id,
       } as Item;
 
       await onSave(updatedItem);
@@ -364,12 +378,12 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </p>
         </div>
 
-        {/* Price Field */}
+        {/* List Price Field */}
         <div>
           <Input
-            label="Price"
+            label="List Price (Regular Price)"
             type="number"
-            step="0.5"
+            step="0.01"
             min="0"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
@@ -377,8 +391,30 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             disabled={saving}
           />
           <p className="text-xs text-neutral-500 mt-1">
-            Price in dollars (e.g., 12.99)
+            Regular price in dollars
           </p>
+        </div>
+
+        {/* Sale Price Field */}
+        <div>
+          <Input
+            label="Sale Price (Optional)"
+            type="number"
+            step="0.01"
+            min="0"
+            value={salePrice}
+            onChange={(e) => setSalePrice(e.target.value)}
+            placeholder="e.g., 9.99"
+            disabled={saving}
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            Discounted price (leave empty if not on sale)
+          </p>
+          {salePrice && price && parseFloat(salePrice) >= parseFloat(price) && (
+            <p className="text-xs text-red-600 mt-1">
+              ⚠️ Sale price must be less than list price
+            </p>
+          )}
         </div>
 
         {/* Stock Field */}
@@ -586,6 +622,16 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           <p className="text-xs text-neutral-500 mt-2">
             Assign a category to organize your products. Categories with Google IDs will sync to Google Shopping.
           </p>
+        </div>
+
+        {/* Payment Gateway Section */}
+        <div>
+          <PaymentGatewaySelector
+            tenantId={getTenantIdFromUrl() || ''}
+            value={gatewaySelection}
+            onChange={setGatewaySelection}
+            disabled={saving}
+          />
         </div>
 
         {/* Current Values Display - Only show when editing existing item */}

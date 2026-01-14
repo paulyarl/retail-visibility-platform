@@ -26,6 +26,7 @@ import { trackStorefrontView } from '@/utils/behaviorTracking';
 import ContactInformationCollapsible from '@/components/storefront/ContactInformationCollapsible';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import LastViewed from '@/components/directory/LastViewed';
+import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -48,6 +49,7 @@ interface Tenant {
   id: string;
   name: string;
   subscriptionTier?: string;
+  hasActivePaymentGateway?: boolean;
   metadata?: {
     businessName?: string;
     phone?: string;
@@ -101,6 +103,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
 
     const tenant: Tenant & { access?: { storefront: boolean } } = await tenantRes.json();
 
+    
     // Fetch business profile
     let hasHours = false;
     let businessHours: any = null;
@@ -628,6 +631,11 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         </div>
       )}
 
+      {/* Fulfillment & Payment Options */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <FulfillmentOptionsPane tenantId={id} compact={true} />
+      </div>
+
       {/* Products Section */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div>
@@ -718,7 +726,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           ) : (
             <>
               {/* Product Display with Grid/List Toggle */}
-              <ProductDisplay products={products} tenantId={id} />
+              <ProductDisplay products={products} tenantId={id} tenantName={tenant.name} tenantLogo={tenant.metadata?.logo_url} />
 
               {/* Pagination */}
               {totalPages > 1 && (

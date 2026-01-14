@@ -20,14 +20,21 @@ interface User {
   first_name: string | null;
   last_name: string | null;
   role: 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'TENANT_ADMIN' | 'USER'; // All supported roles
-  status: 'active' | 'inactive' | 'pending';
+  is_active: boolean;
+  email_verified: boolean;
+  status: 'active' | 'inactive' | 'pending'; // Calculated status from API
   lastActive: string | null; // Allow null values
-  tenants: number;
+  tenant: number;
+  tenantCount: number;
   tenantRoles?: Array<{
     tenantId: string;
     tenantName: string;
     role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER' | 'PLATFORM_ADMIN'|'TENANT_ADMIN'; // Tenant-level roles
   }>;
+  // Pending invitation fields
+  isPending?: boolean;
+  invitationId?: string;
+  expiresAt?: string;
 }
 
 
@@ -164,7 +171,7 @@ export default function UsersManagementPage() {
       return null;
     } */
 
-    const assignmentCount = user.tenantRoles?.length || user.tenants;
+    const assignmentCount = user.tenantRoles?.length || user.tenant;
     //console.log('[Admin Users] Assignment count: ', assignmentCount);
     if (assignmentCount === 0) {
       
@@ -338,7 +345,7 @@ export default function UsersManagementPage() {
       // Optimistic update instead of full reload
       setUsers(prevUsers => 
         prevUsers.map(u => u.id === editingUser.id ? 
-          { ...u, name: editName, email: editEmail, role: editRole as User['role'], status: editStatus } : u
+          { ...u, name: editName, email: editEmail, role: editRole as User['role'], status: editStatus, is_active: editStatus === 'active' } : u
         )
       );
       
@@ -390,26 +397,53 @@ export default function UsersManagementPage() {
   };
 
   const handleDelete = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      setError(null);
-      const res = await api.delete(`/api/admin/users/${userId}`);
-      
-      if (res.status === 204 || res.ok) {
-        setSuccess('User deleted successfully');
-        // Optimistic update instead of full reload
-        setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to delete user');
+    // Check if this is a pending invitation
+    if (userId.startsWith('pending-')) {
+      const invitationId = userId.replace('pending-', '');
+      if (!confirm('Are you sure you want to cancel this invitation? This action cannot be undone.')) {
+        return;
       }
-    } catch (err) {
-      console.error('[Users] Delete error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete user');
+
+      try {
+        setError(null);
+        const res = await api.delete(`/api/admin/invitations/${invitationId}`);
+        
+        if (res.ok) {
+          setSuccess('Invitation cancelled successfully');
+          // Optimistic update instead of full reload
+          setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
+          setTimeout(() => setSuccess(null), 3000);
+        } else {
+          const data = await res.json();
+          throw new Error(data.error || 'Failed to cancel invitation');
+        }
+      } catch (err) {
+        console.error('[Users] Delete invitation error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to cancel invitation');
+      }
+    } else {
+      // Regular user deletion
+      if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+        return;
+      }
+
+      try {
+        setError(null);
+        const res = await api.delete(`/api/admin/users/${userId}`);
+        
+        if (res.status === 204 || res.ok) {
+          setSuccess('User deleted successfully');
+          // Optimistic update instead of full reload
+          setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
+          setTimeout(() => setSuccess(null), 3000);
+        } else {
+          const data = await res.json();
+          throw new Error(data.error || 'Failed to delete user');
+        }
+      } catch (err) {
+        console.error('[Users] Delete error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to delete user');
+      }
     }
   };
 
@@ -699,22 +733,40 @@ export default function UsersManagementPage() {
                       </div>
                       <p className="text-sm text-neutral-600">{user.email}</p>
                       <p className="text-xs text-neutral-500 mt-1">
-                        Last active: {user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'Never'} • {user.tenants} tenant{user.tenants !== 1 ? 's' : ''}
+                        Last active: {user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'Never'} • {user.tenant} tenant{user.tenant !== 1 ? 's' : ''}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => handleEditClick(user)} disabled={!canManage} title={!canManage ? 'View only' : 'Edit user details and role'}>
-                      Edit Role
-                    </Button>
-                    <Button size="sm" variant="primary" onClick={() => handleManageTenantsClick(user)} disabled={!canManage} title={!canManage ? 'View only' : 'Manage tenant assignments'}>
-                      Manage Tenants
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id)} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
-                      <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </Button>
+                    {user.isPending ? (
+                      <>
+                        <Button size="sm" variant="secondary" disabled title="Pending invitation cannot be edited">
+                          Edit Role
+                        </Button>
+                        <Button size="sm" variant="primary" disabled title="Pending invitation cannot be managed">
+                          Manage Tenants
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id)} disabled={!canManage} title={!canManage ? 'View only' : 'Cancel invitation'}>
+                          <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button size="sm" variant="secondary" onClick={() => handleEditClick(user)} disabled={!canManage} title={!canManage ? 'View only' : 'Edit user details and role'}>
+                          Edit Role
+                        </Button>
+                        <Button size="sm" variant="primary" onClick={() => handleManageTenantsClick(user)} disabled={!canManage} title={!canManage ? 'View only' : 'Manage tenant assignments'}>
+                          Manage Tenants
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id)} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
+                          <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </motion.div>
                   ))}

@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
+import { AddToCartButton } from '@/components/products/AddToCartButton';
+import { PriceDisplay } from '@/components/products/PriceDisplay';
 import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { SafeImage } from '@/components/SafeImage';
@@ -276,6 +279,8 @@ interface Product {
   condition?: string;
   description?: string;
   price: number;
+  priceCents?: number;
+  salePriceCents?: number;
   currency: string;
   imageUrl?: string;
   sku: string;
@@ -363,6 +368,7 @@ interface Tenant {
   id: string;
   name: string;
   subscriptionTier?: string;
+  hasActivePaymentGateway?: boolean;
   metadata?: {
     businessName?: string;
     phone?: string;
@@ -377,9 +383,10 @@ interface TierBasedLandingPageProps {
   tenant: Tenant;
   storeStatus?: any;
   gallery?: React.ReactNode;
+  fulfillmentPane?: React.ReactNode;
 }
 
-export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: TierBasedLandingPageProps) {
+export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane }: TierBasedLandingPageProps) {
   const { settings: platformSettings } = usePlatformSettings();
   const tier = tenant.subscriptionTier || 'trial';
   const features = getLandingPageFeatures(tier);
@@ -436,15 +443,6 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: 
           variant="product"
         />
 
-        {/* QR Code Section - Professional+ Tier */}
-        {features.qrCodes && (
-          <PublicQRCodeSection
-            productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/products/${product.id}`}
-            productName={product.name}
-            tenantId={product.tenantId}
-          />
-        )}
-
         {/* Product Info */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h1 className="text-3xl font-bold text-neutral-900 mb-2">{product.title || product.name}</h1>
@@ -471,12 +469,13 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: 
           {(product.manufacturer || product.tenantCategory) && <div className="mb-3" />}
           
           <div className="flex items-baseline gap-2 mb-6">
-            <span className="text-4xl font-bold" style={{ color: primaryColor }}>
-              {new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: product.currency || 'USD',
-              }).format(product.price)}
-            </span>
+            <PriceDisplay
+              priceCents={product.priceCents || Math.round(product.price * 100)}
+              salePriceCents={product.salePriceCents}
+              variant="large"
+              showSavingsBadge={true}
+              className="mb-2"
+            />
             <span className="text-sm text-neutral-500">SKU: {product.sku}</span>
           </div>
 
@@ -499,6 +498,27 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: 
               {product.availability === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
             </span>
           </div>
+
+          {/* Add to Cart Button - Only show if tenant has order processing enabled */}
+          {tenant.hasActivePaymentGateway && (
+            <div className="mb-6">
+              <AddToCartButton
+                product={{
+                  id: product.id,
+                  name: product.title,
+                  sku: product.sku,
+                  priceCents: product.priceCents || Math.round(product.price * 100),
+                  salePriceCents: product.salePriceCents,
+                  imageUrl: product.imageUrl,
+                  stock: product.availability === 'in_stock' ? 999 : 0,
+                  tenantId: product.tenantId,
+                }}
+                tenantName={tenant.metadata?.businessName || tenant.name}
+                tenantLogo={businessLogo}
+                className="w-full"
+              />
+            </div>
+          )}
 
           {/* Product Identifiers */}
           {(product.upc || product.gtin || product.mpn) && (
@@ -722,6 +742,22 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery }: 
                 </div>
               ))}
             </dl>
+          </div>
+        )}
+
+        {/* QR Code CTA Section - Professional+ Tier */}
+        {features.qrCodes && (
+          <PublicQRCodeSection
+            productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/products/${product.id}`}
+            productName={product.name}
+            tenantId={product.tenantId}
+          />
+        )}
+
+        {/* Fulfillment & Payment Options - After QR Code */}
+        {fulfillmentPane && (
+          <div className="mb-6">
+            {fulfillmentPane}
           </div>
         )}
 

@@ -1668,6 +1668,7 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
         name: item.name,
         sku: item.sku || item.code || `CLV-${item.id.substring(0, 8)}`,
         price: item.price || 0,
+        salePrice: item.priceType === 'VARIABLE' ? null : (item.alternatePrices?.[0]?.price || null), // Clover sale price
         stockCount: item.stockCount || 0,
         categoryId: item.categories?.elements?.[0]?.id || null
       }));
@@ -1867,6 +1868,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, async (req: Request, re
               data: {
                 name: cloverItem.name,
                 price_cents: cloverItem.price,
+                sale_price_cents: cloverItem.salePrice || null,
                 stock: cloverItem.stockCount,
                 directory_category_id: rvpCategoryId,
                 updated_at: new Date()
@@ -1893,6 +1895,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, async (req: Request, re
               sku: cloverItem.sku,
               name: cloverItem.name,
               priceCents: cloverItem.price,
+              salePriceCents: cloverItem.salePrice || null,
               stockQuantity: cloverItem.stockCount,
               directory_category_id: rvpCategoryId,
               itemStatus: 'active',

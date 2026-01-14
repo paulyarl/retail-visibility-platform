@@ -265,6 +265,95 @@ export function generateQuickStart(prefix: string = 'qsid'): string {
   const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 8);
   return `${prefix}-${nanoid()}`;
 }
+
+/**
+ * Sequential Order Number Generator
+ * Format: ORD-YYYY-NNNNNN (e.g., ORD-2026-000001)
+ * Thread-safe with retry logic and collision avoidance
+ */
+import { prisma } from '../prisma';
+
+export async function generateOrderNumber(tenantId: string): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `ORD-${year}-`;
+
+  // Add small random delay to reduce concurrent collision probability
+  await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
+
+  // Try up to 10 times to find an available order number
+  for (let attempt = 0; attempt < 10; attempt++) {
+    // Get the count of orders for this year (more reliable than max)
+    const orderCount = await prisma.orders.count({
+      where: {
+        tenant_id: tenantId,
+        order_number: {
+          startsWith: prefix,
+        },
+      },
+    });
+
+    // Calculate next sequence with random offset for concurrent requests
+    let nextSequence = orderCount + 1 + Math.floor(Math.random() * 10);
+    
+    // Add attempt offset on retry
+    if (attempt > 0) {
+      nextSequence += attempt * 10;
+    }
+
+    const sequentialNumber = nextSequence.toString().padStart(6, '0');
+    
+    // For guest checkout (demo-tenant), add timestamp to ensure uniqueness
+    const timestampSuffix = tenantId === 'demo-tenant' ? 
+      `-${Date.now().toString().slice(-4)}` : '';
+    
+    const orderNumber = `${prefix}${sequentialNumber}${timestampSuffix}`;
+
+    // Check if this order number is available
+    const existing = await prisma.orders.findUnique({
+      where: { order_number: orderNumber },
+    });
+
+    if (!existing) {
+      return orderNumber;
+    }
+
+    // Wait a bit before retry
+    await new Promise(resolve => setTimeout(resolve, 50 * (attempt + 1)));
+  }
+
+  // Fallback: use timestamp-based unique number
+  const timestamp = Date.now();
+  const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return `${prefix}${timestamp}${randomSuffix}`;
+}
+
+/**
+ * Generates payment IDs
+ * Format: pay-abc123xyz (14 chars)
+ */
+export function generatePaymentId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
+  return `pay-${nanoid()}`;
+}
+
+/**
+ * Generates order item IDs
+ * Format: item-abc123 (12 chars)
+ */
+export function generateOrderItemId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `item-${nanoid()}`;
+}
+
+/**
+ * Generates shipment IDs
+ * Format: ship-abc123 (12 chars)
+ */
+export function generateShipmentId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ship-${nanoid()}`;
+}
+
 /**
  * Example outputs:
  * 

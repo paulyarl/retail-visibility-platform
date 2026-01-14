@@ -58,7 +58,7 @@ export default function PrivacyPage() {
                 and buyer contact details), when those integrations are enabled.
               </li>
               <li>Usage data (feature usage, performance metrics, error logs).</li>
-              <li>Billing details processed via our payment provider (e.g. Stripe).</li>
+              <li>Billing details processed via our payment providers (Square, PayPal).</li>
             </ul>
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-10 mb-3">2. How We Use Your Information</h2>

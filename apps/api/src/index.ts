@@ -143,6 +143,10 @@ import scanRoutes from './routes/scan';
 import scanMetricsRoutes from './routes/scan-metrics';
 import quickStartRoutes from './routes/quick-start';
 import tenantsRoutes from './routes/tenants';
+import paymentGatewaysRoutes from './routes/payment-gateways';
+import fulfillmentSettingsRoutes from './routes/fulfillment-settings';
+import buyerOrdersRoutes from './routes/buyer-orders';
+import tenantOrdersRoutes from './routes/tenant-orders';
 import productLikesRoutes from './routes/product-likes';
 import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
@@ -242,6 +246,13 @@ app.use(cors({
   methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
   allowedHeaders: ['content-type','authorization','x-csrf-token','x-tenant-id','x-no-retry','x-device-info'],
 }));
+
+// IMPORTANT: Webhook routes MUST be mounted BEFORE JSON parsing middleware
+// Stripe signature verification requires raw body access
+import webhooksRoutes from './routes/webhooks';
+app.use('/api/webhooks', webhooksRoutes);
+console.log('✅ Webhooks routes mounted at /api/webhooks (Phase 3B: Payment Event Processing)');
+
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -1991,6 +2002,84 @@ app.get("/public/tenant/:tenant_id/categories", async (req, res) => {
   }
 });
 
+// Public endpoint to get tenant payment gateway status (no auth required)
+app.get("/public/tenant/:tenant_id/payment-gateways", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    // Get tenant's payment gateways
+    const paymentGateways = await prisma.tenant_payment_gateways.findMany({
+      where: {
+        tenant_id: tenant_id,
+        is_active: true,
+      },
+      select: {
+        id: true,
+        gateway_type: true,
+        is_active: true,
+        is_default: true,
+        config: true,
+        created_at: true,
+      },
+      orderBy: [
+        { is_default: 'desc' },
+        { created_at: 'desc' },
+      ],
+    });
+
+    // Check if tenant has any active payment gateways
+    const hasActivePaymentGateway = paymentGateways.length > 0;
+    
+    // Get default gateway type (first one with is_default=true, or first active gateway)
+    const defaultGateway = paymentGateways.find(pg => pg.is_default) || paymentGateways[0];
+    const defaultGatewayType = defaultGateway?.gateway_type || null;
+
+    res.json({
+      success: true,
+      hasActivePaymentGateway,
+      defaultGatewayType,
+      gateways: paymentGateways.map(pg => {
+        const config = pg.config as any || {};
+        // Provide friendly display names for common gateways
+        let displayName = config.display_name;
+        if (!displayName) {
+          switch (pg.gateway_type.toLowerCase()) {
+            case 'paypal':
+              displayName = 'PayPal';
+              break;
+            case 'stripe':
+              displayName = 'Stripe';
+              break;
+            case 'square':
+              displayName = 'Square';
+              break;
+            default:
+              displayName = pg.gateway_type;
+          }
+        }
+        
+        return {
+          id: pg.id,
+          gateway_type: pg.gateway_type,
+          gatewayType: pg.gateway_type, // Legacy format
+          is_active: pg.is_active,
+          isActive: pg.is_active, // Legacy format
+          is_default: pg.is_default,
+          display_name: displayName,
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('Public payment gateway status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch payment gateway status',
+    });
+  }
+});
+
 // Product-level categories endpoint (for product sidebar)
 app.get("/api/categories/product-level/:tenant_id", async (req, res) => {
   try {
@@ -3580,6 +3669,15 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     }
   }
 
+  // Check if tenant has active payment gateway for cart feature
+  const hasActivePaymentGateway = await prisma.tenant_payment_gateways.findFirst({
+    where: {
+      tenant_id: it.tenant_id,
+      is_active: true,
+    },
+    select: { id: true },
+  });
+
   // Fetch tenant category - prioritize directory_category_id, fallback to category_path slug lookup
   let tenantCategory = null;
   if (it.directory_category_id) {
@@ -3631,13 +3729,16 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   // Convert Decimal price to number for frontend compatibility
   // Hide price_cents from frontend since price is the authoritative field
   // Map image_url to imageUrl for frontend compatibility
-  const { price_cents, image_url, ...itemWithoutPriceCents } = it;
+  const { price_cents, image_url, sale_price_cents, ...itemWithoutPriceCents } = it;
   const transformed = {
     ...itemWithoutPriceCents,
     price: it.price !== null && it.price !== undefined ? Number(it.price) : null,
+    priceCents: price_cents !== null && price_cents !== undefined ? Number(price_cents) : null,
+    salePriceCents: sale_price_cents !== null && sale_price_cents !== undefined ? Number(sale_price_cents) : null,
     imageUrl: image_url || null,
     tenantCategory,
     tenantCategoryId: it.directory_category_id,
+    hasActivePaymentGateway: !!hasActivePaymentGateway,
   };
 
   res.json(transformed);
@@ -5217,6 +5318,43 @@ import sentryRoutes from './routes/admin/sentry';
 app.use('/api/admin/sentry', authenticateToken, requireAdmin, sentryRoutes);
 console.log('✅ Admin sentry routes mounted at /api/admin/sentry');
 
+/* ------------------------------ OAuth (Payment Gateway Integration) ------------------------------ */
+import oauthRoutes from './routes/oauth';
+app.use('/api/oauth', oauthRoutes);
+console.log('✅ OAuth routes mounted at /api/oauth (PayPal & Square payment gateway OAuth)');
+
+/* ------------------------------ checkout (Guest) ------------------------------ */
+import checkoutRoutes from './routes/checkout';
+import checkoutPaymentsRoutes from './routes/checkout-payments';
+import paypalRoutes from './routes/checkout/paypal';
+import squareCheckoutRoutes from './routes/checkout/square';
+app.use('/api/checkout', checkoutRoutes);
+app.use('/api/checkout', checkoutPaymentsRoutes);
+app.use('/api/checkout/paypal', paypalRoutes);
+app.use('/api/checkout/square', squareCheckoutRoutes);
+console.log('✅ PayPal checkout routes mounted at /api/checkout/paypal');
+console.log('✅ Square checkout routes mounted at /api/checkout/square');
+
+/* ------------------------------ buyer orders (Public - No Auth) ------------------------------ */
+app.use('/api/orders', buyerOrdersRoutes);
+console.log('✅ Buyer orders routes mounted at /api/orders/buyer (Public access)');
+
+/* ------------------------------ orders (Phase 3A) ------------------------------ */
+import ordersRoutes from './routes/orders';
+app.use('/api/orders', authenticateToken, ordersRoutes);
+console.log('✅ Orders routes mounted at /api/orders (Phase 3A: Order Management Foundation)');
+
+/* ------------------------------ shopping carts (Phase 3C) ------------------------------ */
+import shoppingCartsRoutes from './routes/shopping-carts';
+app.use('/api/shopping-carts', shoppingCartsRoutes);
+console.log('✅ Shopping carts routes mounted at /api/shopping-carts (Phase 3C: Database-Persisted Carts)');
+
+/* ------------------------------ payments (Phase 3B) ------------------------------ */
+import paymentsRoutes from './routes/payments';
+app.use('/api/payments', authenticateToken, paymentsRoutes);
+app.use('/api/orders', authenticateToken, paymentsRoutes);
+console.log('✅ Payments routes mounted at /api/payments and /api/orders (Phase 3B: Payment Processing)');
+
 /* ------------------------------ directory ------------------------------ */
 /* IMPORTANT: Specific paths MUST be mounted before catch-all /api/directory routes */
 
@@ -5264,6 +5402,18 @@ console.log('✅ GBP routes mounted (Google Business Profile category search)');
 /* ------------------------------ tenants ------------------------------ */
 app.use('/api/tenants', tenantsRoutes);
 console.log('✅ Tenants routes mounted at /api/tenants');
+
+/* ------------------------------ payment gateways ------------------------------ */
+app.use('/api/tenants', paymentGatewaysRoutes);
+console.log('✅ Payment gateway routes mounted at /api/tenants/:tenantId/payment-gateways');
+
+/* ------------------------------ fulfillment settings ------------------------------ */
+app.use(fulfillmentSettingsRoutes);
+console.log('✅ Fulfillment settings routes mounted at /api/tenants/:tenantId/fulfillment-settings');
+
+/* ------------------------------ tenant orders ------------------------------ */
+app.use('/api', tenantOrdersRoutes);
+console.log('✅ Tenant orders routes mounted at /api/tenants/:tenantId/orders');
 
 /* ------------------------------ feed validation ------------------------------ */
 // NOTE: Must be mounted BEFORE tenantCategoriesRoutes to avoid /:tenantId/categories/:id matching /coverage

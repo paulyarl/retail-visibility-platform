@@ -156,6 +156,12 @@ export const TenantSidebarTemplate = () => {
       hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
     },
     {
+      label: 'Orders',
+      href: '/t/[tenantId]/orders',
+      icon: NavigationHelpers.getStandardIcon('ANALYTICS'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
+    },
+    {
       label: 'Categories',
       href: '/t/[tenantId]/categories',
       icon: NavigationHelpers.getStandardIcon('ANALYTICS'),
@@ -188,6 +194,10 @@ export const TenantSidebarTemplate = () => {
         {
           label: 'Business Profile',
           href: '/t/[tenantId]/settings/business'
+        },
+        {
+          label: 'Fulfillment',
+          href: '/t/[tenantId]/settings/fulfillment'
         },
         {
           label: 'Integrations',

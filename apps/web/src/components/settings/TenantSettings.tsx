@@ -254,6 +254,51 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
       ],
     },
     {
+      title: 'Order Processing',
+      description: 'Configure payment gateways and online order processing',
+      cards: [
+        {
+          title: 'Order Management',
+          description: 'View and manage customer orders, fulfillment, and tracking',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/orders`,
+          color: 'bg-purple-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+        },
+        {
+          title: 'Payment Gateways',
+          description: 'Configure Square, PayPal, and other payment processors for online orders',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/payment-gateways`,
+          color: 'bg-emerald-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+        },
+        {
+          title: 'Fulfillment Options',
+          description: 'Configure pickup, delivery, and shipping options for customers',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/fulfillment`,
+          color: 'bg-blue-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+        },
+      ],
+    },
+    {
       title: 'POS Integrations',
       description: 'Connect your point-of-sale systems',
       cards: [

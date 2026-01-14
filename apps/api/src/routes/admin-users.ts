@@ -48,10 +48,18 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
           role: true,
           created_at: true,
           last_login: true,
+          is_active: true,
+          email_verified: true,
           user_tenants: {
             select: {
               tenant_id: true,
               role: true,
+              tenants: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
             },
           },
         },
@@ -92,6 +100,8 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
           role: true,
           created_at: true,
           last_login: true,
+          is_active: true,
+          email_verified: true,
           user_tenants: {
             where: {
               tenant_id: {
@@ -101,6 +111,12 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
             select: {
               tenant_id: true,
               role: true,
+              tenants: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
             },
           },
         },
@@ -118,7 +134,80 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
 
     console.log('[ADMIN USERS] Raw users from database:', users?.length || 0, 'users found');
     
-    // Format response
+    // Get pending invitations for the same scope
+    let invitations: any[] = [];
+    if (requestingUser.role === 'PLATFORM_ADMIN' || requestingUser.role === 'ADMIN') {
+      // Platform admins see all invitations
+      invitations = await prisma.invitations.findMany({
+        where: {
+          accepted_at: null,
+          expires_at: {
+            gt: new Date(),
+          },
+        },
+        include: {
+          tenants: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          users: {
+            select: {
+              first_name: true,
+              last_name: true,
+            },
+          },
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+    } else if (requestingUser.role === 'OWNER') {
+      // Tenant owners see invitations for their tenants
+      const ownerTenants = await prisma.user_tenants.findMany({
+        where: {
+          user_id: requestingUser.userId,
+          role: 'OWNER',
+        },
+        select: {
+          tenant_id: true,
+        },
+      });
+
+      const tenantIds = ownerTenants.map(ut => ut.tenant_id);
+
+      invitations = await prisma.invitations.findMany({
+        where: {
+          tenant_id: {
+            in: tenantIds,
+          },
+          accepted_at: null,
+          expires_at: {
+            gt: new Date(),
+          },
+        },
+        include: {
+          tenants: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          users: {
+            select: {
+              first_name: true,
+              last_name: true,
+            },
+          },
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+    }
+
+    // Format users with proper status
     const formattedUsers = users.map(user => ({
       id: user.id,
       email: user.email,
@@ -128,14 +217,49 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
       role: user.role,
       created_at: user.created_at,
       last_login: user.last_login,
+      last_login_at: user.last_login, // Frontend expects last_login_at
       lastActive: user.last_login, // Frontend expects lastActive
+      is_active: user.is_active,
+      email_verified: user.email_verified,
+      status: user.is_active ? 'active' : 'inactive', // Calculate status from is_active
       tenantCount: user.user_tenants?.length || 0,
       tenant: user.user_tenants?.length || 0, // Alias for compatibility
       tenantRoles: user.user_tenants?.map((ut: any) => ({
-        tenant_id: ut.tenantId,
+        tenantId: ut.tenant_id,
+        tenantName: ut.tenants?.name || 'Unknown Tenant',
         role: ut.role,
       })) || [],
     }));
+
+    // Format pending invitations as users with 'pending' status
+    const pendingUsers = invitations.map(inv => ({
+      id: `pending-${inv.id}`, // Prefix to distinguish from real users
+      email: inv.email,
+      first_name: null,
+      last_name: null,
+      name: null,
+      role: inv.role,
+      created_at: inv.created_at,
+      last_login: null,
+      last_login_at: null,
+      lastActive: null,
+      is_active: false, // Pending users are not active yet
+      email_verified: false, // Not verified until they accept
+      status: 'pending', // Explicit pending status
+      tenantCount: 1,
+      tenant: 1,
+      tenantRoles: [{
+        tenantId: inv.tenant_id,
+        tenantName: inv.tenants?.name || 'Unknown Tenant',
+        role: inv.role,
+      }],
+      isPending: true, // Flag to identify pending invitations
+      invitationId: inv.id,
+      expiresAt: inv.expires_at,
+    }));
+
+    // Combine real users and pending invitations
+    const allUsers = [...formattedUsers, ...pendingUsers];
 
     /* console.log('[ADMIN USERS] Formatted users for response:', formattedUsers?.length || 0, 'users');
     console.log('[ADMIN USERS] Sample user data:', formattedUsers[0] ? {
@@ -147,13 +271,13 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
 
     res.json({ 
       success: true, 
-      users: formattedUsers,
-      user_tenants: formattedUsers, // Keep for backward compatibility
-      userTenants: formattedUsers, // CamelCase version
-      data: formattedUsers, // Generic data field
-      items: formattedUsers, // Items field
-      results: formattedUsers, // Results field
-      total: formattedUsers.length 
+      users: allUsers,
+      user_tenants: allUsers, // Keep for backward compatibility
+      userTenants: allUsers, // CamelCase version
+      data: allUsers, // Generic data field
+      items: allUsers, // Items field
+      results: allUsers, // Results field
+      total: allUsers.length 
     });
   } catch (error: any) {
     console.error('[Admin Users] Error listing user_tenants:', error);
@@ -445,6 +569,83 @@ router.delete('/users/:userId', requirePlatformAdmin, async (req: Request, res: 
     res.status(500).json({
       success: false,
       error: 'Failed to delete user',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/invitations/:id
+ * Cancel/delete an invitation
+ */
+router.delete('/invitations/:id', requirePlatformUser, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const requestingUser = (req as any).user;
+
+    // Find the invitation
+    const invitation = await prisma.invitations.findUnique({
+      where: { id },
+      include: {
+        tenants: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!invitation) {
+      return res.status(404).json({
+        success: false,
+        error: 'Invitation not found',
+      });
+    }
+
+    // Check permissions
+    if (requestingUser.role === 'PLATFORM_ADMIN' || requestingUser.role === 'ADMIN') {
+      // Platform admins can delete any invitation
+    } else if (requestingUser.role === 'OWNER') {
+      // Tenant owners can only delete invitations for their tenants
+      const ownerTenants = await prisma.user_tenants.findMany({
+        where: {
+          user_id: requestingUser.userId,
+          role: 'OWNER',
+        },
+        select: {
+          tenant_id: true,
+        },
+      });
+
+      const tenantIds = ownerTenants.map(ut => ut.tenant_id);
+      
+      if (!tenantIds.includes(invitation.tenant_id)) {
+        return res.status(403).json({
+          success: false,
+          error: 'You can only cancel invitations for your tenants',
+        });
+      }
+    } else {
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions to cancel invitations',
+      });
+    }
+
+    // Delete the invitation
+    await prisma.invitations.delete({
+      where: { id },
+    });
+
+    res.json({
+      success: true,
+      message: 'Invitation cancelled successfully',
+    });
+  } catch (error: any) {
+    console.error('[Admin Users] Error deleting invitation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to cancel invitation',
       message: error.message,
     });
   }

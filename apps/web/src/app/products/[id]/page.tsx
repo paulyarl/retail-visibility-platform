@@ -12,6 +12,7 @@ import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import ProductBusinessInfoCollapsible from '@/components/products/ProductBusinessInfoCollapsible';
 import ProductReviewsSection from '@/components/products/ProductReviewsSection';
+import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';
@@ -114,12 +115,14 @@ interface Product {
     content: string;
   }>;
   landingPageTheme?: string;
+  hasActivePaymentGateway?: boolean;
 }
 
 interface Tenant {
   id: string;
   name: string;
   subscriptionTier?: string;
+  hasActivePaymentGateway?: boolean;
   metadata?: {
     businessName?: string;
     phone?: string;
@@ -186,7 +189,12 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
       cache: 'no-store',
     });
 
-    const tenant: Tenant = { id: product.tenantId, name: 'Store', metadata: {} };
+    const tenant: Tenant = { 
+      id: product.tenantId, 
+      name: 'Store', 
+      metadata: {},
+      hasActivePaymentGateway: productData.hasActivePaymentGateway || false,
+    };
     let businessName;
 
     let storeStatus = null;
@@ -407,6 +415,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         tenant={tenant}
         storeStatus={storeStatus}
         gallery={gallery.length > 1 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
+        fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
       />
 
       {/* Product Recommendations */}

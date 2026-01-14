@@ -5,6 +5,7 @@ import { UnifiedStoreCard } from './UnifiedStoreCard';
 import SwisProductCard from '../tenant/SwisProductCard';
 import { Skeleton } from '@/components/ui';
 import { useLastViewedSession } from '@/hooks/useLastViewedSession';
+import { AddToCartButton } from '@/components/products/AddToCartButton';
 
 // Types for last viewed items
 interface LastViewedStore {
@@ -32,6 +33,8 @@ interface LastViewedProduct {
   slug: string;
   score: number;
   reason: string;
+  hasActivePaymentGateway?: boolean;
+  tenantLogo?: string;
 }
 
 interface LastViewedItem {
@@ -119,7 +122,9 @@ export default function LastViewed({
                 businessName: item.businessName,
                 slug: item.slug,
                 score: item.score,
-                reason: item.reason
+                reason: item.reason,
+                hasActivePaymentGateway: item.hasActivePaymentGateway,
+                tenantLogo: item.tenantLogo
               }
             };
           } else {
@@ -245,17 +250,38 @@ export default function LastViewed({
                 };
 
                 return (
-                  <a
+                  <div
                     key={`product-${productData.productId}-${index}`}
-                    href={`/products/${productData.productId}`}
                     className="block"
                   >
-                    <SwisProductCard
-                      item={swisItem}
-                      index={index}
-                      badgesEnabled={false}
-                    />
-                  </a>
+                    <a href={`/products/${productData.productId}`}>
+                      <SwisProductCard
+                        item={swisItem}
+                        index={index}
+                        badgesEnabled={false}
+                      />
+                    </a>
+                    
+                    {/* Add to Cart Button - Only show if tenant has payment gateway */}
+                    {productData.hasActivePaymentGateway && productData.productPrice && (
+                      <div className="mt-2">
+                        <AddToCartButton
+                          product={{
+                            id: productData.productId,
+                            name: productData.productName,
+                            sku: productData.productId,
+                            priceCents: Math.round((productData.productPrice || 0) * 100),
+                            imageUrl: productData.productImage,
+                            stock: 999,
+                            tenantId: productData.tenantId,
+                          }}
+                          tenantName={productData.businessName}
+                          tenantLogo={productData.tenantLogo}
+                          className="w-full"
+                        />
+                      </div>
+                    )}
+                  </div>
                 );
               }
             })}
