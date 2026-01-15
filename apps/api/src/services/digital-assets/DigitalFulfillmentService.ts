@@ -5,6 +5,7 @@
 
 import { prisma } from '../../prisma';
 import { digitalAccessService } from './DigitalAccessService';
+import { digitalDownloadEmailService } from '../email/DigitalDownloadEmailService';
 
 export interface FulfillmentResult {
   success: boolean;
@@ -136,6 +137,16 @@ export class DigitalFulfillmentService {
         errors: result.errors.length,
       });
 
+      // Send email notification if any grants were created
+      if (result.accessGrants.length > 0) {
+        try {
+          await this.sendDownloadEmail(order, result.accessGrants);
+        } catch (emailError) {
+          console.error('[DigitalFulfillment] Failed to send email:', emailError);
+          // Don't fail fulfillment if email fails
+        }
+      }
+
       return result;
 
     } catch (error: any) {
@@ -237,6 +248,55 @@ export class DigitalFulfillmentService {
 
     // Retry fulfillment
     return this.fulfillOrder(orderId, baseUrl);
+  }
+
+  /**
+   * Send download email to customer
+   */
+  private async sendDownloadEmail(order: any, accessGrants: FulfillmentResult['accessGrants']): Promise<void> {
+    console.log('[DigitalFulfillment] Preparing download email for order:', order.id);
+
+    // Get download details for each grant
+    const downloads = await Promise.all(
+      accessGrants.map(async (grant) => {
+        const accessGrant = await prisma.digital_access_grants.findFirst({
+          where: { access_token: grant.accessToken },
+        });
+
+        const item = await prisma.inventory_items.findUnique({
+          where: { id: accessGrant?.inventory_item_id },
+        });
+
+        const assets = (item?.digital_assets as any[]) || [];
+        const asset = assets[0];
+
+        return {
+          productName: grant.productName,
+          downloadUrl: grant.downloadUrl,
+          accessDurationDays: accessGrant?.expires_at 
+            ? Math.ceil((accessGrant.expires_at.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+            : null,
+          downloadLimit: accessGrant?.download_limit || null,
+          downloadsRemaining: accessGrant?.download_limit 
+            ? accessGrant.download_limit - (accessGrant.download_count || 0)
+            : null,
+          fileSize: asset?.file_size_bytes,
+          expiresAt: accessGrant?.expires_at,
+        };
+      })
+    );
+
+    // Send email
+    await digitalDownloadEmailService.sendDownloadReceipt({
+      customerEmail: order.customer_email,
+      customerName: order.customer_name || 'Customer',
+      orderId: order.id,
+      orderNumber: order.order_number,
+      orderTotal: order.total_cents,
+      downloads,
+    });
+
+    console.log('[DigitalFulfillment] Download email sent to:', order.customer_email);
   }
 }
 
