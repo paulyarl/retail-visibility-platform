@@ -208,9 +208,10 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         manufacturer: manufacturer.trim() || undefined,
         condition: condition,
         mpn: mpn.trim() || undefined,
-        price: price ? parseFloat(price) : undefined,
+        price_cents: price ? Math.round(parseFloat(price) * 100) : 0, // Convert dollars to cents
+        price: price ? parseFloat(price) : undefined, // Keep for display
         salePriceCents: salePrice ? Math.round(parseFloat(salePrice) * 100) : undefined,
-        stock: stock ? parseInt(stock) : undefined,
+        stock: stock ? parseInt(stock) : 0,
         description: description.trim() || undefined,
         metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         itemStatus: status === 'draft' ? 'active' : status, // Map draft to active for API, send as itemStatus
