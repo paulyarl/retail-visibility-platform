@@ -420,7 +420,7 @@ router.get('/admin/products/featuring/stats', authenticateToken, async (req, res
       return res.status(403).json({ error: 'Platform admin access required' });
     }
 
-    const [totalFeatured, byTier, expiringSoon] = await Promise.all([
+    const [totalFeatured, byTierRaw, expiringSoon] = await Promise.all([
       // Total featured products
       prisma.inventory_items.count({
         where: {
@@ -456,6 +456,12 @@ router.get('/admin/products/featuring/stats', authenticateToken, async (req, res
         }
       })
     ]);
+
+    // Convert BigInt to number for JSON serialization
+    const byTier = (byTierRaw as any[]).map(row => ({
+      tier: row.tier,
+      count: Number(row.count)
+    }));
 
     res.json({
       totalFeatured,

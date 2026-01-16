@@ -3354,9 +3354,8 @@ console.log('✅ Directory store types routes mounted at /api/directory/store-ty
 // Mount photos router (handles all photo endpoints with position support)
 app.use('/api/directory', directoryPhotosRouter);
 
-// Mount directory routes (has catch-all :identifier route that would intercept /directory paths)
-// Changed from /api to /api/directory to avoid conflicting with other API routes
-app.use('/api/directory', directoryRoutes);
+// Directory routes are mounted later (line ~5200) after all specific directory paths
+// to avoid catch-all :identifier route intercepting specific paths
 
 // Legacy photo upload handler removed - now handled by photos router
 // Old routes:
