@@ -5,7 +5,7 @@ const router = Router();
 
 // Debug middleware to log all requests to this router
 router.use((req, res, next) => {
-  //console.log(`[STORE-TYPES-ROUTER] ${req.method} ${req.path} - Original URL: ${req.originalUrl}`);
+  console.log(`[STORE-TYPES-ROUTER] ${req.method} ${req.path} - Original URL: ${req.originalUrl}`);
   next();
 });
 
@@ -21,9 +21,10 @@ router.use((req, res, next) => {
  * - radius: Maximum distance in miles (optional, default: 25)
  */
 router.get('/', async (req: Request, res: Response) => {
-  //console.log('[STORE-TYPES] GET / route hit - fetching store types');
+  console.log('[STORE-TYPES] GET / route hit - fetching store types');
   try {
     const { lat, lng, radius } = req.query;
+    console.log('[STORE-TYPES] Query params:', { lat, lng, radius });
 
     // Parse location parameters if provided
     const location =
@@ -35,12 +36,15 @@ router.get('/', async (req: Request, res: Response) => {
         : undefined;
 
     const radiusMiles = radius ? parseFloat(radius as string) : 25;
+    console.log('[STORE-TYPES] Parsed params:', { location, radiusMiles });
 
     // Get store types
+    console.log('[STORE-TYPES] About to call getStoreTypes...');
     const storeTypes = await storeTypeDirectoryService.getStoreTypes(
       location,
       radiusMiles
     );
+    console.log('[STORE-TYPES] Got store types:', storeTypes?.length || 0);
 
     res.json({
       success: true,
@@ -49,11 +53,12 @@ router.get('/', async (req: Request, res: Response) => {
         totalCount: storeTypes.length,
       },
     });
-  } catch (error) {
-    console.error('Error fetching store types:', error);
+  } catch (error: any) {
+    console.error('[STORE-TYPES] Error fetching store types:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch store types',
+      error: 'failed_to_fetch_store_types',
+      message: error?.message,
     });
   }
 });

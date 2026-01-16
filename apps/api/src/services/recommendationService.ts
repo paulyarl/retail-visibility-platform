@@ -406,17 +406,18 @@ export async function getProductsViewedBySameUsers(
         opv.entity_id as product_id,
         opv.entity_name as product_name,
         opv.view_count as score,
-        ii.tenant_id,
-        ii.title,
-        ii.price_cents,
-        ii.image_url,
+        sp.tenant_id,
+        sp.title,
+        sp.price_cents,
+        sp.image_url,
+        sp.has_active_payment_gateway,
+        sp.default_gateway_type,
         dcl.business_name as store_name,
         dcl.slug as store_slug
       FROM other_products_viewed opv
-      JOIN inventory_items ii ON opv.entity_id = ii.id
-      JOIN directory_listings_list dcl ON ii.tenant_id = dcl.tenant_id
-      WHERE ii.is_active = true
-        AND dcl.tenant_exists = true
+      JOIN storefront_products sp ON opv.entity_id = sp.id
+      JOIN directory_listings_list dcl ON sp.tenant_id = dcl.tenant_id
+      WHERE dcl.tenant_exists = true
         AND dcl.is_directory_visible = true
     `;
     
@@ -433,7 +434,9 @@ export async function getProductsViewedBySameUsers(
       productId: row.product_id,
       productName: row.product_name,
       productPrice: row.price_cents ? row.price_cents / 100 : undefined,
-      productImage: row.image_url
+      productImage: row.image_url,
+      hasActivePaymentGateway: row.has_active_payment_gateway,
+      defaultGatewayType: row.default_gateway_type
     }));
 
     return {
@@ -750,16 +753,31 @@ export async function getLastViewedItems(
     }
 
     const query = `
-      SELECT DISTINCT ON (ub.entity_id, ub.entity_type)
-        ub.entity_id,
-        ub.entity_type,
-        ub.entity_name,
-        ub.timestamp as last_viewed_at,
-        ub.page_type,
-        ub.context,
+      WITH ranked_views AS (
+        SELECT 
+          ub.entity_id,
+          ub.entity_type,
+          ub.entity_name,
+          ub.timestamp as last_viewed_at,
+          ub.page_type,
+          ub.context,
+          ROW_NUMBER() OVER (
+            PARTITION BY ub.entity_id, ub.entity_type 
+            ORDER BY ub.timestamp DESC
+          ) as rn
+        FROM user_behavior_simple ub
+        WHERE ${whereClause}
+      )
+      SELECT 
+        rv.entity_id,
+        rv.entity_type,
+        rv.entity_name,
+        rv.last_viewed_at,
+        rv.page_type,
+        rv.context,
         -- Get additional data based on entity type
         CASE
-          WHEN ub.entity_type = 'store' THEN (
+          WHEN rv.entity_type = 'store' THEN (
             SELECT json_build_object(
               'businessName', dcl.business_name,
               'slug', dcl.slug,
@@ -778,32 +796,33 @@ export async function getLastViewedItems(
               ), 0)
             )
             FROM directory_listings_list dcl
-            WHERE (dcl.tenant_id = ub.entity_id OR dcl.slug = ub.entity_id)
+            WHERE (dcl.tenant_id = rv.entity_id OR dcl.slug = rv.entity_id)
               AND dcl.is_published = true
             LIMIT 1
           )
-          WHEN ub.entity_type = 'product' THEN (
+          WHEN rv.entity_type = 'product' THEN (
             SELECT json_build_object(
-              'title', ii.title,
-              'name', ii.name,
-              'priceCents', ii.price_cents,
-              'imageUrl', ii.image_url,
-              'currency', ii.currency,
+              'title', sp.title,
+              'name', sp.name,
+              'priceCents', sp.price_cents,
+              'imageUrl', sp.image_url,
+              'currency', sp.currency,
               'storeName', dcl.business_name,
-              'storeSlug', dcl.slug
+              'storeSlug', dcl.slug,
+              'tenantId', sp.tenant_id,
+              'hasActivePaymentGateway', sp.has_active_payment_gateway,
+              'defaultGatewayType', sp.default_gateway_type
             )
-            FROM inventory_items ii
-            JOIN directory_listings_list dcl ON ii.tenant_id = dcl.tenant_id
-            WHERE ii.id = ub.entity_id
-              AND ii.item_status = 'active'
-              AND ii.visibility = 'public'
+            FROM storefront_products sp
+            JOIN directory_listings_list dcl ON sp.tenant_id = dcl.tenant_id
+            WHERE sp.id = rv.entity_id
               AND dcl.is_published = true
           )
           ELSE NULL
         END as entity_data
-      FROM user_behavior_simple ub
-      WHERE ${whereClause}
-      ORDER BY ub.entity_id, ub.entity_type, ub.timestamp DESC
+      FROM ranked_views rv
+      WHERE rv.rn = 1
+      ORDER BY rv.last_viewed_at DESC
       LIMIT $${params.length + 1}
     `;
 
@@ -833,7 +852,7 @@ export async function getLastViewedItems(
           } as Recommendation;
         } else if (row.entity_type === 'product') {
           return {
-            tenantId: data.storeSlug, // Use store slug as tenantId for display
+            tenantId: data.tenantId, // Use actual tenant ID for payment gateway checks
             businessName: data.storeName,
             slug: data.storeSlug,
             score,
@@ -841,7 +860,9 @@ export async function getLastViewedItems(
             productId: row.entity_id,
             productName: data.title || data.name,
             productPrice: data.priceCents ? data.priceCents / 100 : undefined,
-            productImage: data.imageUrl
+            productImage: data.imageUrl,
+            hasActivePaymentGateway: data.hasActivePaymentGateway,
+            defaultGatewayType: data.defaultGatewayType
           } as Recommendation;
         }
 

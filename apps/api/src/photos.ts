@@ -48,6 +48,7 @@ r.post("/:id/photos", upload.single("file"), async (req, res) => {
     let exifRemoved = true;
     let alt: string | undefined;
     let caption: string | undefined;
+    let variant_id: string | undefined;
 
     // Case A: multipart upload of a file
     if (req.file) {
@@ -68,9 +69,10 @@ r.post("/:id/photos", upload.single("file"), async (req, res) => {
       url = pub.data.publicUrl;
       contentType = f.mimetype;
       bytes = f.size;
-      // Extract alt/caption from form data if present
+      // Extract alt/caption/variant_id from form data if present
       alt = req.body.alt;
       caption = req.body.caption;
+      variant_id = req.body.variant_id;
     }
 
     // Case B: JSON body with url or dataUrl + metadata
@@ -121,6 +123,7 @@ r.post("/:id/photos", upload.single("file"), async (req, res) => {
       exifRemoved = body.exifRemoved ?? true;
       alt = body.alt;
       caption = body.caption;
+      variant_id = body.variant_id;
     }
 
     if (!url) return res.status(400).json({ error: "missing image; provide multipart 'file', JSON 'url', or JSON 'dataUrl'" });
@@ -147,6 +150,7 @@ r.post("/:id/photos", upload.single("file"), async (req, res) => {
         position: nextPosition,
         alt: alt ?? null,
         caption: caption ?? null,
+        variant_id: variant_id ?? null,
       },
     });
 

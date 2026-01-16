@@ -6,6 +6,16 @@ import { useMultiCart } from '@/hooks/useMultiCart';
 import { Button } from '@/components/ui/Button';
 import { ShoppingCart, Check, ArrowRight } from 'lucide-react';
 
+interface ProductVariant {
+  id: string;
+  sku: string;
+  variant_name: string;
+  price_cents: number;
+  sale_price_cents?: number;
+  stock: number;
+  attributes: Record<string, string>;
+}
+
 interface AddToCartButtonProps {
   product: {
     id: string;
@@ -16,22 +26,28 @@ interface AddToCartButtonProps {
     imageUrl?: string;
     stock?: number;
     tenantId: string;
+    tenantLogo?: string;
     payment_gateway_type?: string | null;
     payment_gateway_id?: string | null;
+    has_variants?: boolean;
   };
+  variant?: ProductVariant | null; // Selected variant if product has variants
   tenantName: string;
   tenantLogo?: string;
   quantity?: number;
   className?: string;
+  hasActivePaymentGateway?: boolean; // Simple boolean from MV - does tenant have payment gateway?
   defaultGatewayType?: string; // Tenant's default gateway type (no hardcoded fallback)
 }
 
 export function AddToCartButton({ 
   product, 
+  variant,
   tenantName, 
   tenantLogo,
   quantity = 1, 
   className,
+  hasActivePaymentGateway = false, // Default to false if not provided
   defaultGatewayType // No default fallback - must come from tenant
 }: AddToCartButtonProps) {
   const router = useRouter();
@@ -41,6 +57,12 @@ export function AddToCartButton({
   const [addedToGateway, setAddedToGateway] = useState<string | null>(null);
 
   const handleAddToCart = async () => {
+    // Validate variant selection if product has variants
+    if (product.has_variants && !variant) {
+      alert('Please select all product options before adding to cart.');
+      return;
+    }
+
     // Determine gateway type: product's assignment > tenant's default (no hardcoded fallback)
     const gatewayType = product.payment_gateway_type || defaultGatewayType;
     
@@ -50,19 +72,27 @@ export function AddToCartButton({
       return;
     }
     
+    // Use variant data if available, otherwise use product data
+    const itemSku = variant?.sku || product.sku;
+    const itemStock = variant?.stock ?? product.stock;
+    const itemPriceCents = variant?.price_cents || product.priceCents;
+    const itemSalePriceCents = variant?.sale_price_cents || product.salePriceCents;
+    
     // Check if adding this quantity would exceed available stock
     const cart = getCartByGateway(product.tenantId, gatewayType);
-    const existingItem = cart?.cart.items.find(item => item.product_id === product.id);
+    const existingItem = cart?.cart.items.find(
+      item => item.product_id === product.id && item.variant_id === variant?.id
+    );
     const currentCartQuantity = existingItem?.quantity || 0;
     const totalQuantity = currentCartQuantity + quantity;
 
-    if (product.stock !== undefined && totalQuantity > product.stock) {
-      alert(`Cannot add ${quantity} more. Only ${product.stock - currentCartQuantity} available (${currentCartQuantity} already in cart).`);
+    if (itemStock !== undefined && totalQuantity > itemStock) {
+      alert(`Cannot add ${quantity} more. Only ${itemStock - currentCartQuantity} available (${currentCartQuantity} already in cart).`);
       return;
     }
 
-    const effectivePrice = product.salePriceCents || product.priceCents;
-    const isOnSale = Boolean(product.salePriceCents && product.salePriceCents < product.priceCents);
+    const effectivePrice = itemSalePriceCents || itemPriceCents;
+    const isOnSale = Boolean(itemSalePriceCents && itemSalePriceCents < itemPriceCents);
     
     // Calculate pricing fields based on sale status
     const listPriceCents = isOnSale ? product.priceCents : undefined;
@@ -72,14 +102,18 @@ export function AddToCartButton({
     await addToCart(product.tenantId, tenantName, gatewayType, {
       product_id: product.id,
       product_name: product.name,
-      product_sku: product.sku,
+      product_sku: itemSku,
       quantity,
       price_cents: effectivePrice,
       list_price_cents: listPriceCents,
       discount_cents: discountCents,
       product_image: product.imageUrl,
+      // Variant information
+      variant_id: variant?.id,
+      variant_name: variant?.variant_name,
+      variant_attributes: variant?.attributes,
       gateway_id: product.payment_gateway_id || undefined,
-    });
+    }, product.tenantLogo || tenantLogo);
 
     setAdded(true);
     setShowSuccess(true);
@@ -93,16 +127,15 @@ export function AddToCartButton({
 
   const handleBuyNow = () => {
     handleAddToCart();
-    router.push(`/cart/${product.tenantId}`);
+    router.push('/carts');
   };
 
-  const isOutOfStock = product.stock !== undefined && product.stock <= 0;
-  const noGatewayAvailable = !product.payment_gateway_type && !defaultGatewayType;
-
-  // If no gateway available, don't show add to cart at all
-  if (noGatewayAvailable) {
+  // Simple check: if tenant doesn't have payment gateway, don't show button
+  if (!hasActivePaymentGateway) {
     return null;
   }
+
+  const isOutOfStock = product.stock !== undefined && product.stock <= 0;
 
   if (isOutOfStock) {
     return (
@@ -149,8 +182,8 @@ export function AddToCartButton({
       <div className="flex gap-2">
         <Button
           onClick={handleAddToCart}
-          variant={added ? 'outline' : 'default'}
-          className={`flex-1 ${added ? 'border-green-600 text-green-700 hover:bg-green-50' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+          variant="outline"
+          className={`bg-white text-gray-900 ${added ? 'border-green-600' : 'border-gray-300 hover:border-gray-400'}`}
         >
           {added ? (
             <>
@@ -166,7 +199,8 @@ export function AddToCartButton({
         </Button>
         <Button 
           onClick={handleBuyNow} 
-          className="bg-orange-600 hover:bg-orange-700 text-white"
+          variant="outline"
+          className="bg-white text-gray-900 border-gray-300 hover:border-gray-400"
         >
           Buy Now
         </Button>

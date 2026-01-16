@@ -189,6 +189,7 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
       cache: 'no-store',
     });
 
+    // Payment gateway status is already included in the product data from the MV
     const tenant: Tenant = { 
       id: product.tenantId, 
       name: 'Store', 

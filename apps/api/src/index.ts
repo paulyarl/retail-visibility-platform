@@ -130,13 +130,7 @@ import permissionRoutes from './routes/permissions';
 // import directorySupportRoutes from './routes/directory-support';
 // import directoryCategoriesRoutes from './routes/directory-categories';
 // import directoryStoreTypesRoutes from './routes/directory-store-types';
-import directoryRoutes from './routes/directory-v2';
-import directoryTenantRoutes from './routes/directory-tenant';
-import directoryCategoriesRoutes from './routes/directory-categories';
-import directoryStoreTypesRoutes from './routes/directory-store-types';
-import directoryOptimizedRoutes from './routes/directory-optimized';
-import directoryCategoriesOptimizedRoutes from './routes/directory-categories-optimized';
-import directoryMapRoutes from './routes/directory-map';
+// Directory routes imported later in file (line ~5120) before mounting
 import storefrontRoutes from './routes/storefront';
 import gbpRoutes from './routes/gbp';
 import scanRoutes from './routes/scan';
@@ -2610,7 +2604,7 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
           const category = await prisma.directory_category.findFirst({
             where: { 
               id: item.directory_category_id,
-              tenantId: item.tenant_id
+              tenantId: item.tenant_id // Use Prisma schema field name (camelCase)
             },
             select: {
               id: true,
@@ -3313,6 +3307,50 @@ const photoUploadHandler = async (req: any, res: any) => {
   }
 };
 
+// Mount consolidated directory route BEFORE any other /api/directory routes
+import directoryConsolidatedRoutes from './routes/directory-consolidated';
+app.use('/api/directory', directoryConsolidatedRoutes);
+console.log('✅ Directory consolidated routes mounted at /api/directory');
+
+// Mount store-types route BEFORE any other /api/directory routes
+// VERY SIMPLE TEST - This should definitely work
+app.get('/api/directory/simple-test', (req, res) => {
+  console.log('[SIMPLE-TEST] Route hit!');
+  res.json({ message: 'Simple test working!' });
+});
+
+// Test route to verify mounting order
+app.get('/api/directory/store-types/test', (req, res) => {
+  res.json({ message: 'Test route working!' });
+});
+
+// Direct route handler to bypass any router conflicts
+console.log('[STORE-TYPES] Registering direct route handler...');
+app.get('/api/directory/store-types', async (req, res) => {
+  console.log('[STORE-TYPES] Direct route hit - fetching store types');
+  try {
+    const { storeTypeDirectoryService } = await import('./services/store-type-directory.service');
+    const { lat, lng, radius } = req.query;
+    
+    const location = lat && lng ? { lat: parseFloat(lat as string), lng: parseFloat(lng as string) } : undefined;
+    const radiusMiles = radius ? parseFloat(radius as string) : 25;
+    
+    const storeTypes = await storeTypeDirectoryService.getStoreTypes(location, radiusMiles);
+    
+    res.json({
+      success: true,
+      data: { storeTypes, totalCount: storeTypes.length }
+    });
+  } catch (error: any) {
+    console.error('[STORE-TYPES] Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch store types' });
+  }
+});
+
+import directoryStoreTypesRoutes from './routes/directory-store-types';
+app.use('/api/directory/store-types', directoryStoreTypesRoutes);
+console.log('✅ Directory store types routes mounted at /api/directory/store-types');
+
 // Mount photos router (handles all photo endpoints with position support)
 app.use('/api/directory', directoryPhotosRouter);
 
@@ -3430,6 +3468,96 @@ app.get(["/api/items/stats", "/api/inventory/stats"], authenticateToken, async (
   } catch (error) {
     console.error('[GET /api/items/stats] Error:', error);
     return res.status(500).json({ error: 'failed_to_get_stats' });
+  }
+});
+
+// Tenant-scoped route alias for items (supports /api/tenants/:tenantId/items)
+app.get("/api/tenants/:tenantId/items", authenticateToken, async (req, res) => {
+  // Extract tenant_id from path and merge with query params
+  const queryWithTenant = { ...req.query, tenant_id: req.params.tenantId };
+  const parsed = listQuery.safeParse(queryWithTenant);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_query_params", details: parsed.error.flatten() });
+  
+  const tenant_id = parsed.data.tenant_id;
+  if (!tenant_id) {
+    return res.status(400).json({ error: "tenant_id_required" });
+  }
+
+  const isAdmin = isPlatformAdmin(req.user);
+  let hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenant_id) ?? false);
+
+  if (!hasAccess && req.user?.userId && tenant_id) {
+    try {
+      const userTenant = await prisma.user_tenants.findUnique({
+        where: {
+          user_id_tenant_id: {
+            user_id: req.user.userId,
+            tenant_id,
+          },
+        },
+        select: { id: true },
+      });
+      hasAccess = !!userTenant;
+    } catch (e) {
+      console.error('[GET /api/tenants/:tenantId/items] Error checking tenant membership:', e);
+    }
+  }
+
+  if (!hasAccess) {
+    return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
+  }
+  
+  try {
+    const where: any = { tenant_id };
+    if (parsed.data.status !== 'trashed') {
+      where.item_status = { not: 'trashed' };
+    }
+    if (parsed.data.search) {
+      const searchTerm = parsed.data.search.toLowerCase();
+      where.OR = [
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { sku: { contains: searchTerm, mode: 'insensitive' } },
+        { brand: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+    if (parsed.data.category) {
+      where.category = parsed.data.category;
+    }
+    if (parsed.data.status && parsed.data.status !== 'all') {
+      where.item_status = parsed.data.status;
+    }
+    if (parsed.data.visibility && parsed.data.visibility !== 'all') {
+      where.visibility = parsed.data.visibility;
+    }
+
+    // Parse pagination params (page-based, not offset-based)
+    const page = parseInt(parsed.data.page || '1', 10);
+    const limit = parseInt(parsed.data.limit || '25', 10);
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      prisma.inventory_items.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        skip: skip,
+      }),
+      prisma.inventory_items.count({ where }),
+    ]);
+
+    res.json({
+      items,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        hasMore: page * limit < total,
+      },
+    });
+  } catch (e: any) {
+    console.error('[GET /api/tenants/:tenantId/items] Error listing items:', e);
+    res.status(500).json({ error: "failed_to_list_items", message: e?.message });
   }
 });
 
@@ -3669,14 +3797,33 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     }
   }
 
-  // Check if tenant has active payment gateway for cart feature
-  const hasActivePaymentGateway = await prisma.tenant_payment_gateways.findFirst({
-    where: {
-      tenant_id: it.tenant_id,
-      is_active: true,
-    },
-    select: { id: true },
-  });
+  // Check payment gateway status from MV (fast, pre-computed)
+  let hasActivePaymentGateway = false;
+  let defaultGatewayType: string | null = null;
+  try {
+    const mvData = await getDirectPool().query(
+      'SELECT has_active_payment_gateway, default_gateway_type FROM storefront_products WHERE id = $1 LIMIT 1',
+      [req.params.id]
+    );
+    if (mvData.rows.length > 0) {
+      hasActivePaymentGateway = mvData.rows[0].has_active_payment_gateway || false;
+      defaultGatewayType = mvData.rows[0].default_gateway_type || null;
+    }
+    console.log(`[GET /items/${req.params.id}] MV payment gateway:`, hasActivePaymentGateway, 'type:', defaultGatewayType, 'tenant:', it.tenant_id);
+  } catch (e) {
+    console.log(`[GET /items/${req.params.id}] MV query failed, using fallback for tenant:`, it.tenant_id);
+    // Fallback: query payment gateway table directly if MV fails
+    const gateway = await prisma.tenant_payment_gateways.findFirst({
+      where: {
+        tenant_id: it.tenant_id,
+        is_active: true,
+      },
+      select: { id: true, gateway_type: true },
+    });
+    hasActivePaymentGateway = !!gateway;
+    defaultGatewayType = gateway?.gateway_type || null;
+    console.log(`[GET /items/${req.params.id}] Fallback payment gateway:`, hasActivePaymentGateway, 'type:', defaultGatewayType);
+  }
 
   // Fetch tenant category - prioritize directory_category_id, fallback to category_path slug lookup
   let tenantCategory = null;
@@ -3738,7 +3885,8 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     imageUrl: image_url || null,
     tenantCategory,
     tenantCategoryId: it.directory_category_id,
-    hasActivePaymentGateway: !!hasActivePaymentGateway,
+    hasActivePaymentGateway: hasActivePaymentGateway || false,
+    defaultGatewayType: defaultGatewayType || null,
   };
 
   res.json(transformed);
@@ -3807,6 +3955,22 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
   
   console.log('[POST /items] Parsed data:', parsed.data);
   try {
+    // If category is assigned, look up the slug for category_path
+    let categoryPath: string[] = parsed.data.category_path || [];
+    if (parsed.data.directory_category_id && categoryPath.length === 0) {
+      const category = await prisma.directory_category.findFirst({
+        where: {
+          id: parsed.data.directory_category_id,
+          tenantId: parsed.data.tenant_id
+        },
+        select: { slug: true }
+      });
+      if (category) {
+        categoryPath = [category.slug];
+        console.log('[POST /items] Auto-populated category_path:', categoryPath);
+      }
+    }
+
     const data = {
       ...parsed.data,
       title: parsed.data.title || parsed.data.name,
@@ -3821,7 +3985,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       tenant_id: parsed.data.tenant_id || '', // Ensure tenant_id is always a string
       // Category assignment - keep both directory_category_id and category_path for storefront compatibility
       directory_category_id: parsed.data.directory_category_id || null,
-      category_path: parsed.data.category_path || [],
+      category_path: categoryPath,
     };
     
     const created = await prisma.inventory_items.create({ 
@@ -5000,6 +5164,49 @@ app.post('/api/admin/taxonomy/sync', requireAdmin, async (req, res) => {
 app.use('/api', scanRoutes);
 console.log('✅ Scan routes mounted at /api');
 
+/* ------------------------------ PUBLIC ROUTES - MUST BE BEFORE AUTHENTICATED CATCH-ALLS ------------------------------ */
+/* These routes must be mounted before any authenticated /api catch-all routes */
+
+/* ------------------------------ recommendations (PUBLIC) ------------------------------ */
+import recommendationRoutes from './routes/recommendations';
+app.use('/api/recommendations', recommendationRoutes);
+console.log('✅ Recommendation routes mounted (MVP recommendation system - PUBLIC)');
+
+/* ------------------------------ directory routes (PUBLIC) ------------------------------ */
+/* IMPORTANT: Specific paths MUST be mounted before catch-all /api/directory routes */
+
+/* ------------------------------ directory optimized ------------------------------ */
+import directoryOptimizedRoutes from './routes/directory-optimized';
+app.use('/api/directory-optimized', directoryOptimizedRoutes);
+console.log('✅ Directory optimized routes mounted (materialized view - 6.7x faster)');
+
+/* ------------------------------ directory categories optimized ------------------------------ */
+import directoryCategoriesOptimizedRoutes from './routes/directory-categories-optimized';
+app.use('/api/directory/categories-optimized', directoryCategoriesOptimizedRoutes);
+console.log('✅ Directory categories optimized routes mounted (category statistics - 10x faster)');
+
+/* ------------------------------ directory tenant ------------------------------ */
+import directoryTenantRoutes from './routes/directory-tenant';
+app.use('/api/directory/tenant', directoryTenantRoutes);
+console.log('✅ Directory tenant routes mounted at /api/directory/tenant');
+
+/* ------------------------------ directory map ------------------------------ */
+import directoryMapRoutes from './routes/directory-map';
+app.use('/api/directory', directoryMapRoutes);
+console.log('✅ Directory map routes mounted at /api/directory');
+
+/* ------------------------------ directory main (has catch-all /:identifier) ------------------------------ */
+import directoryRoutes from './routes/directory';
+app.use('/api/directory', directoryRoutes);
+console.log('✅ Directory main routes mounted at /api/directory (includes /:identifier catch-all)');
+
+/* ------------------------------ END PUBLIC ROUTES ------------------------------ */
+
+/* ------------------------------ product variants ------------------------------ */
+import variantsRoutes from './routes/variants';
+app.use('/api', variantsRoutes);
+console.log('✅ Product variants routes mounted at /api (auth applied per-route)');
+
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenant_id/items/:itemId/category
 // Body: { directory_category_id?: string, categorySlug?: string }
@@ -5318,6 +5525,16 @@ import sentryRoutes from './routes/admin/sentry';
 app.use('/api/admin/sentry', authenticateToken, requireAdmin, sentryRoutes);
 console.log('✅ Admin sentry routes mounted at /api/admin/sentry');
 
+/* ------------------------------ product featuring ------------------------------ */
+import productFeaturingRoutes from './routes/product-featuring';
+app.use('/api', productFeaturingRoutes);
+console.log('✅ Product featuring routes mounted at /api');
+
+/* ------------------------------ storefront featured products (MV optimized) ------------------------------ */
+import storefrontFeaturedRoutes from './routes/storefront-featured';
+app.use('/api/storefront', storefrontFeaturedRoutes);
+console.log('✅ Storefront featured products routes mounted at /api/storefront');
+
 /* ------------------------------ OAuth (Payment Gateway Integration) ------------------------------ */
 import oauthRoutes from './routes/oauth';
 app.use('/api/oauth', oauthRoutes);
@@ -5355,41 +5572,8 @@ app.use('/api/payments', authenticateToken, paymentsRoutes);
 app.use('/api/orders', authenticateToken, paymentsRoutes);
 console.log('✅ Payments routes mounted at /api/payments and /api/orders (Phase 3B: Payment Processing)');
 
-/* ------------------------------ directory ------------------------------ */
-/* IMPORTANT: Specific paths MUST be mounted before catch-all /api/directory routes */
-
-/* ------------------------------ directory optimized ------------------------------ */
-app.use('/api/directory-optimized', directoryOptimizedRoutes);
-console.log('✅ Directory optimized routes mounted (materialized view - 6.7x faster)');
-
-/* ------------------------------ directory categories optimized ------------------------------ */
-app.use('/api/directory/categories-optimized', directoryCategoriesOptimizedRoutes);
-console.log('✅ Directory categories optimized routes mounted (category statistics - 10x faster)');
-
-/* ------------------------------ directory store types ------------------------------ */
-app.use('/api/directory/store-types', directoryStoreTypesRoutes);
-console.log('✅ Directory store types routes mounted at /api/directory/store-types');
-
-/* ------------------------------ Directory Categories routes - NEW for category-based discovery (mount BEFORE directory routes for precedence)
-app.use('/api/directory', directoryCategoriesRoutes);
-console.log('✅ Directory categories routes mounted at /api/directory');
-
-/* ------------------------------ directory tenant ------------------------------ */
-app.use('/api/directory/tenant', directoryTenantRoutes);
-console.log('✅ Directory tenant routes mounted at /api/directory/tenant');
-
-/* ------------------------------ directory main (has catch-all /:identifier) ------------------------------ */
-app.use('/api/directory', directoryRoutes);
-console.log('✅ Directory main routes mounted at /api/directory (includes /:identifier catch-all)');
-
-/* ------------------------------ directory map ------------------------------ */
-app.use('/api/directory', directoryMapRoutes);
-console.log('✅ Directory map routes mounted at /api/directory');
-
-/* ------------------------------ recommendations ------------------------------ */
-import recommendationRoutes from './routes/recommendations';
-app.use('/api/recommendations', recommendationRoutes);
-console.log('✅ Recommendation routes mounted (MVP recommendation system)');
+/* ------------------------------ directory and recommendations routes moved earlier ------------------------------ */
+/* NOTE: Directory and recommendations routes are now mounted BEFORE authenticated catch-all routes (see line ~5109) */
 
 /* ------------------------------ storefront (materialized view) ------------------------------ */
 app.use('/api/storefront', storefrontRoutes);

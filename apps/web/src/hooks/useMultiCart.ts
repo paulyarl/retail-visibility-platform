@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import {
+import { 
   Cart,
   CartSummary,
   CartItem,
@@ -13,7 +13,8 @@ import {
   removeFromCart,
   clearCart,
   getTotalItemCount,
-  migrateOldCarts
+  migrateOldCarts,
+  backfillCartLogos
 } from '@/lib/cart/cartManager';
 
 export function useMultiCart(tenantId?: string) {
@@ -22,12 +23,18 @@ export function useMultiCart(tenantId?: string) {
   const [loading, setLoading] = useState(true);
 
   // Load carts from localStorage
-  const loadCarts = useCallback(() => {
+  const loadCarts = useCallback(async () => {
     try {
       // Migrate old carts on first load
       if (typeof window !== 'undefined' && !sessionStorage.getItem('carts_migrated')) {
         migrateOldCarts();
         sessionStorage.setItem('carts_migrated', 'true');
+      }
+
+      // Backfill tenant logos for existing carts (one-time)
+      if (typeof window !== 'undefined' && !sessionStorage.getItem('logos_backfilled')) {
+        await backfillCartLogos();
+        sessionStorage.setItem('logos_backfilled', 'true');
       }
 
       const allCarts = getAllCarts(tenantId);
@@ -57,15 +64,26 @@ export function useMultiCart(tenantId?: string) {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [loadCarts]);
 
+  // Listen for custom cart-updated events (same-tab updates)
+  useEffect(() => {
+    const handleCartUpdate = () => {
+      loadCarts();
+    };
+
+    window.addEventListener('cart-updated', handleCartUpdate);
+    return () => window.removeEventListener('cart-updated', handleCartUpdate);
+  }, [loadCarts]);
+
   // Add item to cart with intelligent routing
   const addToCart = useCallback(async (
     tenantId: string,
     tenantName: string,
     gatewayType: string,
-    item: Omit<CartItem, 'gateway_type'>
+    item: Omit<CartItem, 'gateway_type'>,
+    tenantLogo?: string
   ) => {
     try {
-      addToCartManager(tenantId, tenantName, gatewayType, item);
+      addToCartManager(tenantId, tenantName, gatewayType, item, tenantLogo);
       loadCarts();
       return { success: true };
     } catch (error) {

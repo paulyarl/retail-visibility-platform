@@ -30,6 +30,7 @@ export interface DigitalProductData {
   accessDurationDays?: number | null;
   downloadLimit?: number | null;
   externalUrl?: string;
+  assetName?: string;
   accessInstructions?: string;
 }
 
@@ -74,11 +75,11 @@ export default function DigitalProductConfig({ value, onChange, disabled }: Digi
   };
 
   const handleAddExternalLink = () => {
-    if (!value.externalUrl) return;
+    if (!value.externalUrl || !value.assetName) return;
     
     const newAsset: DigitalAsset = {
       id: `asset_${Date.now()}`,
-      name: value.externalUrl.split('/').pop() || 'External File',
+      name: value.assetName.trim(),
       type: 'link',
       storage_method: 'external',
       external_url: value.externalUrl,
@@ -89,6 +90,7 @@ export default function DigitalProductConfig({ value, onChange, disabled }: Digi
       ...value,
       assets: [...value.assets, newAsset],
       externalUrl: '',
+      assetName: '',
       accessInstructions: '',
     });
   };
@@ -190,6 +192,16 @@ export default function DigitalProductConfig({ value, onChange, disabled }: Digi
       {value.deliveryMethod === 'external_link' && (
         <div className="space-y-4">
           <Input
+            label="Asset Name/Title"
+            type="text"
+            value={value.assetName || ''}
+            onChange={(e) => onChange({ ...value, assetName: e.target.value })}
+            placeholder="e.g., User Guide PDF, Installation Video, Source Code"
+            disabled={disabled}
+            helperText="Give this asset a descriptive name so customers know what they're downloading"
+          />
+
+          <Input
             label="Download Link"
             type="url"
             value={value.externalUrl || ''}
@@ -215,7 +227,7 @@ export default function DigitalProductConfig({ value, onChange, disabled }: Digi
 
           <Button
             onClick={handleAddExternalLink}
-            disabled={!value.externalUrl || disabled}
+            disabled={!value.externalUrl || !value.assetName || disabled}
             variant="secondary"
             size="sm"
           >

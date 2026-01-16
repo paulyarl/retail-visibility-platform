@@ -79,7 +79,19 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
         let description = item.description;
         let image_url = item.image_url;
 
-        if (item.inventory_item_id) {
+        // If variant is specified, fetch variant data
+        if (item.variant_id) {
+          const variant = await prisma.product_variants.findUnique({
+            where: { id: item.variant_id },
+          });
+
+          if (variant) {
+            unit_price_cents = unit_price_cents || variant.sale_price_cents || variant.price_cents || 0;
+            sku = sku || variant.sku;
+            // Append variant name to product name
+            name = item.variant_name ? `${name} (${item.variant_name})` : name;
+          }
+        } else if (item.inventory_item_id) {
           const inventoryItem = await prisma.inventory_items.findUnique({
             where: { id: item.inventory_item_id },
           });
@@ -106,6 +118,9 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
           name,
           description,
           image_url,
+          variant_id: item.variant_id || null,
+          variant_name: item.variant_name || null,
+          variant_attributes: item.variant_attributes || null,
           ...calculation,
         };
       })

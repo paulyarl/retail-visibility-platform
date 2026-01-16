@@ -991,7 +991,7 @@ router.get('/for-product-page/:productId', async (req: Request, res: Response) =
       WHERE ii.id != $6  -- Exclude current product
         AND ii.item_status = 'active'
         AND ii.visibility = 'public'
-        AND ii.tenant_id IS NOT NULL
+        AND ii.tenant_id = $4  -- CRITICAL: Only show products from same tenant
         AND ii.price_cents > 0
         AND ii.image_url IS NOT NULL
         AND ii.image_url != ''  -- Hard requirement: must have photo

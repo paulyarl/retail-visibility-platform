@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { UnifiedStoreCard } from './UnifiedStoreCard';
-import SwisProductCard from '../tenant/SwisProductCard';
 import { Skeleton } from '@/components/ui';
 import { useLastViewedSession } from '@/hooks/useLastViewedSession';
-import { AddToCartButton } from '@/components/products/AddToCartButton';
+import SmartProductCard from '@/components/products/SmartProductCard';
+import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 
 // Types for last viewed items
 interface LastViewedStore {
@@ -235,53 +235,29 @@ export default function LastViewed({
                 );
               } else {
                 const productData = item.data as LastViewedProduct;
-                // Transform product data to SwisProductCard format
-                const swisItem = {
-                  id: productData.productId,
-                  title: productData.productName,
-                  price: productData.productPrice || 0,
-                  currency: 'USD',
-                  image_url: productData.productImage,
-                  availability: 'in_stock' as const,
-                  brand: productData.businessName,
-                  categoryPath: [],
-                  sku: productData.productId, // Use productId as SKU
-                  updated_at: new Date().toISOString() // Current timestamp
-                };
-
+                
                 return (
-                  <div
-                    key={`product-${productData.productId}-${index}`}
-                    className="block"
-                  >
-                    <a href={`/products/${productData.productId}`}>
-                      <SwisProductCard
-                        item={swisItem}
-                        index={index}
-                        badgesEnabled={false}
-                      />
-                    </a>
-                    
-                    {/* Add to Cart Button - Only show if tenant has payment gateway */}
-                    {productData.hasActivePaymentGateway && productData.productPrice && (
-                      <div className="mt-2">
-                        <AddToCartButton
-                          product={{
-                            id: productData.productId,
-                            name: productData.productName,
-                            sku: productData.productId,
-                            priceCents: Math.round((productData.productPrice || 0) * 100),
-                            imageUrl: productData.productImage,
-                            stock: 999,
-                            tenantId: productData.tenantId,
-                          }}
-                          tenantName={productData.businessName}
-                          tenantLogo={productData.tenantLogo}
-                          className="w-full"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  <TenantPaymentProvider key={`product-${productData.productId}-${index}`} tenantId={productData.tenantId}>
+                    <SmartProductCard
+                      product={{
+                        id: productData.productId,
+                        sku: productData.productId,
+                        name: productData.productName,
+                        title: productData.productName,
+                        brand: productData.businessName,
+                        priceCents: Math.round((productData.productPrice || 0) * 100),
+                        stock: 999,
+                        imageUrl: productData.productImage,
+                        tenantId: productData.tenantId,
+                        availability: 'in_stock',
+                      }}
+                      tenantName={productData.businessName}
+                      tenantLogo={productData.tenantLogo}
+                      variant="compact"
+                      showCategory={false}
+                      showDescription={false}
+                    />
+                  </TenantPaymentProvider>
                 );
               }
             })}

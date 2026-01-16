@@ -10,6 +10,7 @@ import { SafeImage } from '@/components/SafeImage';
 import ProductActions from '@/components/products/ProductActions';
 import { api } from '@/lib/api';
 import Link from 'next/link';
+import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 
 // Public QR Code Section Component
 function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl: string; productName: string; tenantId: string }) {
@@ -515,7 +516,8 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                 }}
                 tenantName={tenant.metadata?.businessName || tenant.name}
                 tenantLogo={businessLogo}
-                className="w-full"
+                hasActivePaymentGateway={tenant.hasActivePaymentGateway}
+                defaultGatewayType={(product as any).defaultGatewayType}
               />
             </div>
           )}

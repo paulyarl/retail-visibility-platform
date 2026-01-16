@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMultiCart } from '@/hooks/useMultiCart';
 
 interface Product {
   id: string;
@@ -29,6 +31,8 @@ interface ProductActionsProps {
 }
 
 export default function ProductActions({ product, tenant, productUrl, variant = 'product' }: ProductActionsProps) {
+  const router = useRouter();
+  const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
   const [favorited, setFavorited] = useState(false);
   const [favoriteCount, setFavoriteCount] = useState(0);
   const [showShareOptions, setShowShareOptions] = useState(false);
@@ -126,6 +130,11 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
       }, 500);
     }
   };
+
+  const handleViewCart = () => {
+    router.push('/carts');
+  };
+
   const shareLinks = {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`,
     twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
@@ -203,6 +212,30 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
                 />
               </svg>
               <span className="text-sm font-medium hidden sm:inline">Review</span>
+            </button>
+          )}
+
+          {/* Cart Button - Only on product pages */}
+          {variant === 'product' && (
+            <button
+              onClick={handleViewCart}
+              className="relative flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              title="View your shopping cart"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+              <span className="text-sm font-medium hidden sm:inline">Cart</span>
+              {totalItems > 0 && (
+                <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
+                  {totalItems > 99 ? '99+' : totalItems}
+                </span>
+              )}
             </button>
           )}
 

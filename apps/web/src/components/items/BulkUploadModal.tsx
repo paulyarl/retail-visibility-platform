@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button } from '@/components/ui';
-import { downloadCSVTemplate, parseCSV, validateCSVItems, type CSVItem } from '@/lib/csv-utils';
+import { downloadCSVTemplate, parseCSV, validateCSVItems, autoGenerateSKUs, type CSVItem } from '@/lib/csv-utils';
 import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 
 interface BulkUploadModalProps {
@@ -36,14 +36,17 @@ export default function BulkUploadModal({ tenantId, onClose, onSuccess }: BulkUp
       const text = await selectedFile.text();
       const parsedItems = parseCSV(text);
       
+      // Auto-generate SKUs for items that don't have them
+      const itemsWithSKUs = autoGenerateSKUs(parsedItems, tenantId);
+      
       // Validate
-      const validation = validateCSVItems(parsedItems);
+      const validation = validateCSVItems(itemsWithSKUs);
       if (!validation.valid) {
         setErrors(validation.errors);
         return;
       }
 
-      setItems(parsedItems);
+      setItems(itemsWithSKUs);
     } catch (error) {
       setErrors([error instanceof Error ? error.message : 'Failed to parse CSV']);
     }

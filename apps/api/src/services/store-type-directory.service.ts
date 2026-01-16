@@ -259,8 +259,8 @@ class StoreTypeDirectoryService {
       
       // Query stores that have this GBP category (primary or secondary)
       // Match by both ID and name to handle different storage formats
-      const result = await getDirectPool().query(`
-        SELECT
+      const result = await getDirectPool().query(
+        `SELECT
           t.id as tenant_id,
           t.id,
           t.name as business_name,
@@ -309,8 +309,9 @@ class StoreTypeDirectoryService {
           dsl.rating_avg DESC NULLS LAST,
           real_counts.product_count DESC NULLS LAST,
           dsl.created_at DESC
-        LIMIT 100
-      `, [categoryId, categoryName]);
+        LIMIT 100`,
+        [categoryId, categoryName]
+      );
       
       //console.log(`[StoreTypeService] Found ${result.rows.length} stores for category ${categoryName}`);
 

@@ -398,64 +398,40 @@ router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const result = await prisma.$queryRaw<Array<any>>`
-      SELECT 
-        dll.id,
-        dll.tenantId as "tenantId",
-        dll.business_name as "businessName",
-        dll.slug,
-        dll.address,
-        dll.city,
-        dll.state,
-        dll.zip_code as "zipCode",
-        dll.phone,
-        dll.email,
-        dll.website,
-        dll.latitude,
-        dll.longitude,
-        dll.primary_category as "primaryCategory",
-        dll.secondary_categories as "secondaryCategories",
-        dll.logo_url as "logoUrl",
-        dll.description,
-        dll.business_hours as "businessHours",
-        dll.rating_avg as "ratingAvg",
-        dll.rating_count as "ratingCount",
-        dll.product_count as "productCount",
-        dll.is_featured as "isFeatured",
-        dll.subscription_tier as "subscriptionTier",
-        dll.use_custom_website as "useCustomWebsite",
-        dll.map_privacy_mode as "mapPrivacyMode",
-        dll.display_map as "displayMap"
-      FROM directory_listings_list dll
-      INNER JOIN tenants t ON dll.tenant_id = t.id
-      WHERE dll.slug = ${slug}
-        AND dll.is_published = true
-      LIMIT 1
-    `;
+    // Use a direct database connection instead of Prisma raw query
+    const { getDirectPool } = await import('../utils/db-pool');
+    const pool = getDirectPool();
+    
+    const result = await pool.query(
+      `SELECT * FROM directory_listings_list 
+       WHERE slug = $1 AND is_published = true 
+       LIMIT 1`,
+      [slug]
+    );
 
-    if (result.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'listing_not_found' });
     }
 
-    const listing = result[0];
+    const listing = result.rows[0];
     
     // Transform primary_category and secondary_categories into categories array
     const categories = [];
     
-    if (listing.primaryCategory) {
+    if (listing.primary_category) {
       try {
         // Handle both string and object formats
         let primary;
-        if (typeof listing.primaryCategory === 'string') {
+        if (typeof listing.primary_category === 'string') {
           try {
             // Try to parse as JSON first
-            primary = JSON.parse(listing.primaryCategory);
+            primary = JSON.parse(listing.primary_category);
           } catch {
             // If not JSON, treat as plain string (category name)
-            primary = { name: listing.primaryCategory };
+            primary = { name: listing.primary_category };
           }
         } else {
-          primary = listing.primaryCategory;
+          primary = listing.primary_category;
         }
         
         if (primary && primary.name) {
@@ -476,19 +452,19 @@ router.get('/:slug', async (req, res) => {
       }
     }
     
-    if (listing.secondaryCategories) {
+    if (listing.secondary_categories) {
       try {
         let secondary;
-        if (typeof listing.secondaryCategories === 'string') {
+        if (typeof listing.secondary_categories === 'string') {
           try {
             // Try to parse as JSON
-            secondary = JSON.parse(listing.secondaryCategories);
+            secondary = JSON.parse(listing.secondary_categories);
           } catch {
             // If not JSON, wrap in array
-            secondary = [listing.secondaryCategories];
+            secondary = [listing.secondary_categories];
           }
         } else {
-          secondary = listing.secondaryCategories;
+          secondary = listing.secondary_categories;
         }
         
         if (Array.isArray(secondary)) {
@@ -518,7 +494,40 @@ router.get('/:slug', async (req, res) => {
     // Add categories array to the response
     listing.categories = categories;
 
-    return res.json(listing);
+    // Transform the listing to match the expected response format
+    const transformedListing = {
+      id: listing.id,
+      tenantId: listing.tenant_id,
+      businessName: listing.business_name,
+      slug: listing.slug,
+      address: listing.address,
+      city: listing.city,
+      state: listing.state,
+      zipCode: listing.zip_code,
+      phone: listing.phone,
+      email: listing.email,
+      website: listing.website,
+      latitude: listing.latitude,
+      longitude: listing.longitude,
+      primaryCategory: listing.primary_category,
+      secondaryCategories: listing.secondary_categories,
+      logoUrl: listing.logo_url,
+      description: listing.description,
+      businessHours: listing.business_hours,
+      ratingAvg: listing.rating_avg,
+      ratingCount: listing.rating_count,
+      productCount: listing.product_count,
+      isFeatured: listing.is_featured,
+      subscriptionTier: listing.subscription_tier,
+      useCustomWebsite: listing.use_custom_website,
+      isPublished: listing.is_published,
+      createdAt: listing.created_at,
+      updatedAt: listing.updated_at,
+      keywords: listing.keywords,
+      categories: categories // Add the transformed categories array
+    };
+
+    return res.json(transformedListing);
   } catch (error: any) {
     console.error('[GET /api/directory/:slug] Error:', error);
     return res.status(500).json({ error: 'failed_to_get_listing' });

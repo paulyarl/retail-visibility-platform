@@ -7,7 +7,9 @@ import TenantCategorySelector from './TenantCategorySelector';
 import PaymentGatewaySelector from '@/components/products/PaymentGatewaySelector';
 import ProductTypeSelector, { ProductType } from './ProductTypeSelector';
 import DigitalProductConfig, { DigitalProductData } from './DigitalProductConfig';
+import ProductVariants, { ProductVariant } from './ProductVariants';
 import { Item } from '@/services/itemsDataService';
+import { generateSKU, generateTenantKey } from '@/lib/sku-generator';
 
 // Helper component to display category name by ID
 function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
@@ -77,6 +79,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
     accessDurationDays: null,
     downloadLimit: null,
   });
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
 
   // Feature flag: sticky quick actions footer
   const ffQuick = useFeatureFlag('FF_CATEGORY_QUICK_ACTIONS');
@@ -136,8 +140,69 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           downloadLimit: (item as any).download_limit || null,
         });
       }
+
+      // Load variants if item has them
+      setHasVariants((item as any).has_variants || false);
+      if ((item as any).has_variants && item.id) {
+        const tenantId = getTenantIdFromUrl();
+        if (tenantId) {
+          // Fetch variants from API
+          apiRequest(`api/items/${item.id}/variants`)
+            .then(async (response) => {
+              if (response.ok) {
+                const data = await response.json();
+                setVariants(data.variants || []);
+              }
+            })
+            .catch((error) => {
+              console.error('Failed to load variants:', error);
+            });
+        }
+      } else {
+        setVariants([]);
+      }
+    } else {
+      // Reset form for new item creation
+      setSku('');
+      setName('');
+      setBrand('');
+      setManufacturer('');
+      setCondition('new');
+      setMpn('');
+      setPrice('');
+      setSalePrice('');
+      setStock('0'); // Will be updated when product type changes
+      setDescription('');
+      setEnhancedDescription('');
+      setFeatures('');
+      setSpecifications('');
+      setStatus('active');
+      setTenantCategoryId('');
+      setGatewaySelection({ gateway_type: null, gateway_id: null });
+      setProductType('physical');
+      setDigitalProductData({
+        deliveryMethod: 'direct_download',
+        assets: [],
+        licenseType: 'personal',
+        accessDurationDays: null,
+        downloadLimit: null,
+      });
     }
   }, [item]);
+
+  // Auto-adjust stock quantity for digital products
+  useEffect(() => {
+    // Only auto-adjust for new items (not editing existing)
+    if (item) return;
+    
+    if (productType === 'digital' || productType === 'hybrid') {
+      // Digital products have unlimited availability
+      setStock('9999');
+    } else if (productType === 'physical') {
+      // Reset to 0 for physical products
+      setStock('0');
+    }
+  }, [productType, item]);
 
   // Keyboard shortcuts when modal open and flag enabled
   useEffect(() => {
@@ -174,6 +239,23 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       return;
     }
 
+    // Auto-generate SKU if empty
+    let finalSku = sku.trim();
+    if (!finalSku) {
+      const tenantId = getTenantIdFromUrl();
+      finalSku = generateSKU({
+        tenantKey: tenantId ? generateTenantKey(tenantId) : undefined,
+        productType: productType,
+        deliveryMethod: productType === 'digital' || productType === 'hybrid' 
+          ? digitalProductData.deliveryMethod 
+          : undefined,
+        accessControl: productType === 'digital' || productType === 'hybrid'
+          ? digitalProductData.licenseType
+          : undefined,
+      });
+      setSku(finalSku); // Update the form field
+    }
+
     setSaving(true);
     setError(null);
 
@@ -202,7 +284,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
 
       const updatedItem = {
         ...(item || {}),
-        sku: sku.trim(),
+        sku: finalSku,
         name: name.trim(),
         brand: brand.trim() || undefined,
         manufacturer: manufacturer.trim() || undefined,
@@ -231,6 +313,74 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       } as Item;
 
       await onSave(updatedItem);
+
+      // Save variants if enabled and item has been created
+      if (hasVariants && variants.length > 0 && updatedItem.id) {
+        try {
+          const tenantId = getTenantIdFromUrl();
+          if (tenantId) {
+            // Auto-generate SKUs for variants without SKUs
+            const variantsWithSkus = variants.map((v, index) => {
+              if (!v.sku || !v.sku.trim()) {
+                // Generate variant SKU: ParentSKU-AttributeValues
+                const attrValues = Object.values(v.attributes)
+                  .filter(val => val)
+                  .map(val => val.toUpperCase().substring(0, 3))
+                  .join('-');
+                return {
+                  ...v,
+                  sku: `${finalSku}-${attrValues || `VAR${index + 1}`}`,
+                };
+              }
+              return v;
+            });
+
+            // Separate new variants (no id) from existing variants (has id)
+            const newVariants = variantsWithSkus.filter(v => !v.id);
+            const existingVariants = variantsWithSkus.filter(v => v.id);
+
+            // Create new variants
+            if (newVariants.length > 0) {
+              const createResponse = await apiRequest(
+                `api/items/${updatedItem.id}/variants/bulk`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ variants: newVariants }),
+                }
+              );
+
+              if (!createResponse.ok) {
+                const error = await createResponse.json();
+                throw new Error(error.error || 'Failed to create variants');
+              }
+            }
+
+            // Update existing variants
+            for (const variant of existingVariants) {
+              const updateResponse = await apiRequest(
+                `api/variants/${variant.id}`,
+                {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(variant),
+                }
+              );
+
+              if (!updateResponse.ok) {
+                const error = await updateResponse.json();
+                throw new Error(error.error || `Failed to update variant ${variant.variant_name}`);
+              }
+            }
+          }
+        } catch (variantError) {
+          console.error('Failed to save variants:', variantError);
+          setError('Item saved, but failed to save variants. Please try editing the item again.');
+          setSaving(false);
+          return;
+        }
+      }
+
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save item');
@@ -341,17 +491,59 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </div>
         )}
 
+        {/* Product Variants Section */}
+        <div className="border-t pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Product Variations
+              </h3>
+              <p className="text-sm text-neutral-600 mt-1">
+                Offer different options like sizes, colors, or configurations
+              </p>
+            </div>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasVariants}
+                onChange={(e) => setHasVariants(e.target.checked)}
+                disabled={saving}
+                className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+              />
+              <span className="ml-2 text-sm font-medium text-neutral-700">
+                Enable Variants
+              </span>
+            </label>
+          </div>
+          
+          {hasVariants && (
+            <ProductVariants
+              parentItemId={item?.id}
+              tenantId={getTenantIdFromUrl() || ''}
+              variants={variants}
+              onChange={setVariants}
+              disabled={saving}
+            />
+          )}
+        </div>
+
         {/* SKU Field */}
         <div>
           <Input
-            label="SKU"
+            label="SKU (Optional)"
             value={sku}
             onChange={(e) => setSku(e.target.value)}
-            placeholder="e.g., SKU-001"
+            placeholder="Leave empty to auto-generate"
             disabled={saving}
           />
           <p className="text-xs text-neutral-500 mt-1">
-            Unique product identifier
+            {sku.trim() ? (
+              'Unique product identifier'
+            ) : (
+              <span className="text-blue-600">
+                ✨ Will auto-generate with tenant prefix, product type, delivery method, and access control
+              </span>
+            )}
           </p>
         </div>
 
@@ -370,83 +562,78 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </p>
         </div>
 
-        {/* Brand Field */}
-        <div>
-          <Input
-            label="Brand"
-            value={brand}
-            onChange={(e) => setBrand(e.target.value)}
-            placeholder="e.g., Fresh Farms"
-            disabled={saving}
-          />
-          <p className="text-xs text-neutral-500 mt-1">
-            Brand name (optional)
-          </p>
-        </div>
+      {/* Brand Field */}
+      <Input
+        label="Brand"
+        value={brand}
+        onChange={(e) => setBrand(e.target.value)}
+        placeholder="e.g., Nike, Apple, Local Farms..."
+        disabled={saving}
+        helperText="Product brand or maker"
+      />
 
-        {/* Manufacturer Field */}
-        <div>
-          <Input
-            label="Manufacturer"
-            value={manufacturer}
-            onChange={(e) => setManufacturer(e.target.value)}
-            placeholder="e.g., Local Beekeepers Co."
-            disabled={saving}
-          />
-          <p className="text-xs text-neutral-500 mt-1">
-            Supplier or manufacturer name (optional)
-          </p>
-        </div>
+      {/* Manufacturer Field - Only for Physical/Hybrid */}
+      {productType !== 'digital' && (
+        <Input
+          label="Manufacturer"
+          value={manufacturer}
+          onChange={(e) => setManufacturer(e.target.value)}
+          placeholder="e.g., Nike Inc., Apple Inc..."
+          disabled={saving}
+          helperText="Company that manufactures the product (optional)"
+        />
+      )}
 
+      {/* Condition Field - Only for Physical/Hybrid */}
+      {productType !== 'digital' && (
         <div>
-          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
             Condition
           </label>
           <select
             value={condition}
-            onChange={(e) => setCondition(e.target.value as any)}
+            onChange={(e) => setCondition(e.target.value as 'new' | 'used' | 'refurbished')}
             disabled={saving}
-            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed"
           >
             <option value="new">New</option>
             <option value="used">Used</option>
             <option value="refurbished">Refurbished</option>
           </select>
           <p className="text-xs text-neutral-500 mt-1">
-            Used for your product pages and Google sync.
+            Product condition (required by Google Shopping)
           </p>
         </div>
+      )}
 
-        {/* MPN Field */}
-        <div>
-          <Input
-            label="MPN (Manufacturer Part Number)"
-            value={mpn}
-            onChange={(e) => setMpn(e.target.value)}
-            placeholder="e.g., A2056, MK-2024-BLK"
-            disabled={saving}
-          />
-          <p className="text-xs text-neutral-500 mt-1">
-            Manufacturer's unique part number (optional, helps with Google visibility)
-          </p>
-        </div>
+      {/* MPN Field - Only for Physical/Hybrid */}
+      {productType !== 'digital' && (
+        <Input
+          label="MPN (Manufacturer Part Number)"
+          value={mpn}
+          onChange={(e) => setMpn(e.target.value)}
+          placeholder="e.g., SKU123, PART-456..."
+          disabled={saving}
+          helperText="Manufacturer's part number (optional, helps with Google Shopping)"
+        />
+      )}
 
-        {/* List Price Field */}
-        <div>
-          <Input
-            label="List Price (Regular Price)"
-            type="number"
-            step="0.01"
-            min="0"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="e.g., 12.99"
-            disabled={saving}
-          />
-          <p className="text-xs text-neutral-500 mt-1">
-            Regular price in dollars
-          </p>
-        </div>
+      {/* List Price Field */}
+      <div>
+        <Input
+          label="List Price (Regular Price)"
+          type="number"
+          step="0.01"
+          min="0"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          placeholder="e.g., 12.99"
+          disabled={saving}
+        />
+        <p className="text-xs text-neutral-500 mt-1">
+          Regular price in dollars
+        </p>
+      </div>
 
         {/* Sale Price Field */}
         <div>

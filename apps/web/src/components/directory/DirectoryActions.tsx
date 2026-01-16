@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Heart, Printer, Share2, MessageSquare } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Heart, Printer, Share2, MessageSquare, ShoppingCart } from 'lucide-react';
+import { useMultiCart } from '@/hooks/useMultiCart';
 
 interface DirectoryActionsProps {
   listing: {
@@ -22,6 +24,8 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export default function DirectoryActions({ listing, currentUrl }: DirectoryActionsProps) {
+  const router = useRouter();
+  const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [favoriteCount, setFavoriteCount] = useState(0);
@@ -86,6 +90,10 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
     }
   };
 
+  const handleViewCart = () => {
+    router.push('/carts');
+  };
+
   const shareLinks = {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`,
     twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
@@ -103,6 +111,21 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
       >
         <MessageSquare className="w-4 h-4" />
         <span className="hidden sm:inline">Review</span>
+      </button>
+
+      {/* Cart Button */}
+      <button
+        onClick={handleViewCart}
+        className="relative inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+        title="View your shopping cart"
+      >
+        <ShoppingCart className="w-4 h-4" />
+        <span className="hidden sm:inline">Cart</span>
+        {totalItems > 0 && (
+          <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
+            {totalItems > 99 ? '99+' : totalItems}
+          </span>
+        )}
       </button>
 
       {/* Favorite Button with Count */}

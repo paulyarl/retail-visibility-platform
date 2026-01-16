@@ -595,9 +595,15 @@ export function trackBehaviorClient(trackingData: Omit<TrackingData, 'durationSe
       }
     }
     
-    // For anonymous users, use session ID from localStorage
-    const lastViewedSession = localStorage.getItem('lastViewedSessionId');
-    if (lastViewedSession && !userId) {
+    // For anonymous users, get or create session ID
+    if (!userId) {
+      let lastViewedSession = localStorage.getItem('lastViewedSessionId');
+      if (!lastViewedSession) {
+        // Create new session ID if it doesn't exist
+        lastViewedSession = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem('lastViewedSessionId', lastViewedSession);
+        console.log('[Tracking] Created new session ID:', lastViewedSession);
+      }
       sessionId = lastViewedSession;
     }
   } catch (error) {

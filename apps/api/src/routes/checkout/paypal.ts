@@ -231,9 +231,23 @@ router.post('/capture-order', async (req, res) => {
       });
 
       for (const item of orderItems) {
-        if (item.inventory_item_id) {
+        // If item has variant, deduct from variant stock
+        if (item.variant_id) {
           try {
-            // Reduce stock using decrement to handle concurrent orders safely
+            await prisma.product_variants.update({
+              where: { id: item.variant_id },
+              data: {
+                stock: { decrement: item.quantity },
+                updated_at: new Date(),
+              },
+            });
+            console.log(`[Inventory] Reduced variant stock for ${item.variant_id} by ${item.quantity}`);
+          } catch (error) {
+            console.error(`[Inventory] Failed to reduce variant stock for ${item.variant_id}:`, error);
+          }
+        } else if (item.inventory_item_id) {
+          // Otherwise deduct from parent product stock
+          try {
             await prisma.inventory_items.update({
               where: { id: item.inventory_item_id },
               data: {
@@ -244,7 +258,6 @@ router.post('/capture-order', async (req, res) => {
             console.log(`[Inventory] Reduced stock for item ${item.inventory_item_id} by ${item.quantity}`);
           } catch (error) {
             console.error(`[Inventory] Failed to reduce stock for item ${item.inventory_item_id}:`, error);
-            // Continue processing other items even if one fails
           }
         }
       }

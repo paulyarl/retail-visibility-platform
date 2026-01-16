@@ -5,7 +5,8 @@
  * Used by both CLI seeding script and Quick Start API endpoint.
  */
 
-import { generateItemId, generateQuickStartSku, generateQuickStart } from './id-generator';
+import { generateItemId, generateQuickStart } from './id-generator';
+import { generateAutoSKU } from './sku-generator';
 import { suggestCategories, getCategoryById } from './google/taxonomy';
 import { productCacheService } from '../services/ProductCacheService';
 import { z } from 'zod';
@@ -909,7 +910,12 @@ export async function generateQuickStartProducts(
       const itemData = {
         id: itemId,
         tenant_id: tenant_id,
-        sku: generateQuickStartSku(timestamp + globalIndex), // Use timestamp + global index for unique SKUs
+        sku: generateAutoSKU({
+          tenantId: tenant_id,
+          productType: 'physical', // Quick-start defaults to physical products
+          deliveryMethod: 'shipping',
+          accessControl: 'public',
+        }),
         name: product.name,
         title: product.name,
         brand: product.brand || 'Generic',
@@ -1066,7 +1072,8 @@ export async function generateQuickStartProducts(
                 item.tenant_id,
                 item.id,
                 imageModel, // Use selected AI model
-                imageQuality
+                imageQuality,
+                true // Use platform cache bucket for reusable Quick Start images
               );
               
               if (image) {

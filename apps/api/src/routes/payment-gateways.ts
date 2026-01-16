@@ -33,6 +33,44 @@ function decrypt(text: string): string {
 }
 
 /**
+ * GET /api/tenants/:tenantId/payment-gateway
+ * Check if tenant has active payment gateway (public endpoint for cart/purchase checks)
+ * No authentication required - returns boolean and default gateway type
+ */
+router.get('/:tenantId/payment-gateway', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+
+    const activeGateway = await prisma.tenant_payment_gateways.findFirst({
+      where: { 
+        tenant_id: tenantId,
+        is_active: true,
+      },
+      select: {
+        gateway_type: true,
+        is_default: true,
+      },
+      orderBy: [
+        { is_default: 'desc' },
+        { created_at: 'desc' },
+      ],
+    });
+
+    res.json({
+      hasActiveGateway: !!activeGateway,
+      defaultGatewayType: activeGateway?.gateway_type || null,
+    });
+  } catch (error: any) {
+    console.error('[Payment Gateway] Status check error:', error);
+    res.status(500).json({
+      hasActiveGateway: false,
+      defaultGatewayType: null,
+      error: 'check_failed',
+    });
+  }
+});
+
+/**
  * GET /api/tenants/:tenantId/payment-gateways/public
  * List active payment gateways for a tenant (public endpoint for checkout)
  * No authentication required - only returns gateway types, not credentials

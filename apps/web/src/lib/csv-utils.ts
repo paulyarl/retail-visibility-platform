@@ -2,6 +2,8 @@
  * CSV Utilities for Bulk Inventory Upload
  */
 
+import { generateSKU, generateTenantKey } from './sku-generator';
+
 export interface CSVItem {
   itemStatus: string | undefined;
   name: string;
@@ -109,9 +111,11 @@ export const CSV_EXAMPLE_DATA = [
 export function generateCSVTemplate(): string {
   const comments = [
     '# RVP Bulk Import Template',
-    '# Required fields: name, sku, price',
-    '# Optional fields: title, brand, manufacturer, description, currency, availability, imageUrl, category, status, visibility',
+    '# Required fields: name, price',
+    '# Optional fields: sku, title, brand, manufacturer, description, currency, availability, imageUrl, category, status, visibility',
     '#',
+    '# SKU: Leave empty to auto-generate with BULK identifier (e.g., ULCW-BULK-0001-A7K9)',
+    '#      This makes bulk uploaded products easy to identify and search',
     '# Category: Use your tenant category names (will be created if new)',
     '# Status: active, inactive, archived, draft (default: active)',
     '# Visibility: public, private (default: public)',
@@ -153,6 +157,48 @@ export function downloadCSVTemplate() {
 }
 
 /**
+ * Auto-generate SKUs for items that don't have them
+ * Bulk uploaded items get 'BULK' prefix pattern for easy identification
+ */
+export function autoGenerateSKUs(items: CSVItem[], tenantId: string): CSVItem[] {
+  let bulkCounter = 0;
+  
+  return items.map(item => {
+    // If SKU is empty or whitespace, generate one
+    if (!item.sku || !item.sku.trim()) {
+      bulkCounter++;
+      
+      // Generate SKU with identifiable pattern for bulk uploads
+      // Pattern: {TenantKey}-BULK-{Counter}-{Random}
+      // Example: ULCW-BULK-0001-A7K9
+      const tenantKey = generateTenantKey(tenantId);
+      const counterStr = bulkCounter.toString().padStart(4, '0');
+      const randomSuffix = generateRandomSuffix();
+      const generatedSKU = `${tenantKey}-BULK-${counterStr}-${randomSuffix}`;
+      
+      return {
+        ...item,
+        sku: generatedSKU,
+      };
+    }
+    
+    return item;
+  });
+}
+
+/**
+ * Generate random suffix for SKU uniqueness
+ */
+function generateRandomSuffix(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = '';
+  for (let i = 0; i < 4; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
  * Parse CSV file
  */
 export function parseCSV(csvText: string): CSVItem[] {
@@ -185,7 +231,7 @@ export function parseCSV(csvText: string): CSVItem[] {
         description: item.description || '',
         price: parseFloat(item.price) || 0,
         currency: item.currency || 'USD',
-        sku: item.sku || '',
+        sku: item.sku || '', // Will be auto-generated if empty
         availability: item.availability || 'in_stock',
         imageUrl: item.imageUrl || undefined,
         category: item.category || undefined,
@@ -194,9 +240,9 @@ export function parseCSV(csvText: string): CSVItem[] {
         itemStatus: undefined
       };
 
-      // Basic validation
-      if (!validatedItem.name || !validatedItem.sku) {
-        throw new Error(`Line ${i + 1}: name and sku are required`);
+      // Basic validation - only name is required now (SKU will be auto-generated)
+      if (!validatedItem.name) {
+        throw new Error(`Line ${i + 1}: name is required`);
       }
 
       items.push(validatedItem);

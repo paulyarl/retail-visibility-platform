@@ -2,6 +2,7 @@ import { Button, Badge } from '@/components/ui';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { useState, useEffect } from 'react';
 import { apiRequest } from '@/lib/api';
+import TenantSKUPrefix from './TenantSKUPrefix';
 
 interface ItemsHeaderProps {
   stats: {
@@ -174,7 +175,12 @@ export default function ItemsHeader({
         </div>
       </div>
 
-      {/* Action Buttons - Organized by priority: Core → Secondary → Preview */}
+      {/* Tenant SKU Prefix Display */}
+      <div className="mb-4">
+        <TenantSKUPrefix />
+      </div>
+
+      {/* Action Buttons */}
       <div className="flex flex-wrap gap-3">
         {/* CORE ACTIONS - Creating products */}
         <Button 

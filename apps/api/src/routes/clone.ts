@@ -9,7 +9,8 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { requireWritableSubscription } from '../middleware/tier-access';
-import { generateItemId, generateProductCatId, generateQsCatId, generateQuickStartSku } from '../lib/id-generator';
+import { generateItemId, generateProductCatId, generateQsCatId } from '../lib/id-generator';
+import { generateAutoSKU } from '../lib/sku-generator';
 
 const router = Router();
 
@@ -94,10 +95,13 @@ router.post('/product', authenticateToken, requireWritableSubscription, async (r
     // Generate new SKU if not provided
     let newSku = modifications?.sku;
     if (!newSku) {
-      // Auto-generate variant SKU
-      const baseSku = originalProduct.sku || '';
-      const timestamp = Date.now().toString().slice(-6);
-      newSku = baseSku ? `${baseSku}-V${timestamp}` : generateQuickStartSku(Date.now());
+      // Auto-generate variant SKU using new system
+      newSku = generateAutoSKU({
+        tenantId: tenantId,
+        productType: (originalProduct as any).product_type || 'physical',
+        deliveryMethod: (originalProduct as any).digital_delivery_method,
+        accessControl: (originalProduct as any).license_type,
+      });
     }
 
     // Check if SKU already exists

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCart } from '@/contexts/CartContext';
+import { useMultiCart } from '@/hooks/useMultiCart';
 import { CheckoutProgress } from '@/components/checkout/CheckoutProgress';
 import { OrderSummary } from '@/components/checkout/OrderSummary';
 import { CustomerInfoForm } from '@/components/checkout/CustomerInfoForm';
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet } from 'lucide-react';
 import { api } from '@/lib/api';
+import { getCart, clearCart } from '@/lib/cart/cartManager';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
 type PaymentMethod = 'square' | 'paypal';
@@ -40,7 +41,7 @@ function CheckoutPageContent() {
   const tenantId = searchParams?.get('tenantId');
   const gatewayType = searchParams?.get('gatewayType') as PaymentMethod | null;
   
-  const { getCart, clearCart, markCartAsPaid, activeCartTenantId, switchCart } = useCart();
+  const { carts } = useMultiCart();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('review');
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod | null>(null);
@@ -50,10 +51,10 @@ function CheckoutPageContent() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [availableGateways, setAvailableGateways] = useState<PaymentMethod[]>([]);
 
-  // Get the cart for this tenant
-  const cart = tenantId ? getCart(tenantId) : null;
+  // Get the cart for this tenant and gateway type from multi-cart system
+  const cart = tenantId && gatewayType ? getCart(tenantId, gatewayType) : null;
   const cartItems = cart?.items || [];
-  const subtotal = cart?.subtotal || 0;
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.price_cents * item.quantity), 0);
 
   // Fetch available payment gateways (public endpoint for checkout)
   useEffect(() => {
@@ -95,46 +96,39 @@ function CheckoutPageContent() {
     fetchPaymentGateways();
   }, [tenantId]);
 
-  // Initialize checkout - switch to cart and validate
+  // Initialize checkout - validate cart exists
   useEffect(() => {
     console.log('[Checkout] Initialization check:', { 
-      tenantId, 
-      hasCart: !!cart, 
-      cartStatus: cart?.status,
+      tenantId,
+      gatewayType,
+      hasCart: !!cart,
+      itemCount: cart?.items?.length,
       isInitialized 
     });
 
-    if (!tenantId) {
-      console.log('[Checkout] No tenant ID, redirecting to /carts');
+    if (!tenantId || !gatewayType) {
+      console.log('[Checkout] Missing tenant ID or gateway type, redirecting to /carts');
       router.push('/carts');
       return;
     }
 
     if (cart) {
       console.log('[Checkout] Cart found:', { 
-        tenantId: cart.tenantId, 
-        status: cart.status, 
-        itemCount: cart.itemCount 
+        tenantId: cart.tenant_id,
+        gatewayType: cart.gateway_type,
+        itemCount: cart.items.length
       });
-
-      // Cart exists - check if it's valid for checkout
-      if (cart.status === 'paid' || cart.status === 'fulfilled') {
-        console.log('[Checkout] Cart already paid, redirecting to /carts');
-        router.push('/carts');
-        return;
-      }
       
-      // Valid cart - switch to it and mark as initialized
+      // Valid cart - mark as initialized
       if (!isInitialized) {
         console.log('[Checkout] Valid cart, initializing checkout');
-        switchCart(tenantId);
         setIsInitialized(true);
       }
     } else if (!isInitialized) {
       // Cart doesn't exist yet - give it a moment to load from localStorage
       console.log('[Checkout] No cart found, waiting for load...');
       const timer = setTimeout(() => {
-        const loadedCart = getCart(tenantId);
+        const loadedCart = tenantId && gatewayType ? getCart(tenantId, gatewayType) : null;
         if (!loadedCart) {
           console.log('[Checkout] Cart still not found after delay, redirecting');
           router.push('/carts');
@@ -146,10 +140,23 @@ function CheckoutPageContent() {
       
       return () => clearTimeout(timer);
     }
-  }, [tenantId, cart, switchCart, router, getCart, isInitialized]);
+  }, [tenantId, gatewayType, cart, router, isInitialized]);
 
   const platformFee = Math.round(subtotal * 0.03); // 3% platform fee
   const total = subtotal + platformFee + fulfillmentFee;
+
+  // Map cart items to payment form format
+  const mappedCartItems = cartItems.map(item => ({
+    id: item.product_id,
+    name: item.product_name,
+    sku: item.product_sku || '',
+    quantity: item.quantity,
+    unitPrice: item.price_cents, // Keep in cents - OrderSummary.formatCurrency expects cents
+    listPrice: item.list_price_cents,
+    imageUrl: item.product_image,
+    inventoryItemId: item.product_id,
+    tenantId: tenantId || ''
+  }));
 
   if (!tenantId || !cart) {
     return (
@@ -192,12 +199,16 @@ function CheckoutPageContent() {
       shippingAddress,
       fulfillmentMethod,
       fulfillmentFee,
-      tenantId
+      tenantId,
+      gatewayType
     });
     
-    // Mark this specific tenant's cart as paid after successful payment
-    if (tenantId) {
-      await markCartAsPaid(tenantId, orderNumber, customerInfo, shippingAddress, fulfillmentMethod || undefined, fulfillmentFee, gatewayTransactionId);
+    // Clear the cart after successful payment
+    if (tenantId && gatewayType) {
+      clearCart(tenantId, gatewayType);
+      
+      // Trigger cart update event
+      window.dispatchEvent(new Event('cart-updated'));
     }
     
     // Save customer email/phone to localStorage for order history lookup
@@ -214,18 +225,13 @@ function CheckoutPageContent() {
 
   const handleBack = () => {
     if (currentStep === 'payment') {
-      // If pickup, go back to fulfillment, otherwise shipping
-      if (fulfillmentMethod === 'pickup') {
-        setCurrentStep('fulfillment');
-      } else {
-        setCurrentStep('shipping');
-      }
+      setCurrentStep('shipping');
     } else if (currentStep === 'shipping') {
       setCurrentStep('fulfillment');
     } else if (currentStep === 'fulfillment') {
       setCurrentStep('review');
     } else {
-      router.push(`/cart/${tenantId}`);
+      router.push('/carts');
     }
   };
 
@@ -234,22 +240,44 @@ function CheckoutPageContent() {
       <div className="container mx-auto px-4 max-w-7xl">
           {/* Header */}
           <div className="mb-8">
-            <Button
-              variant="ghost"
-              onClick={handleBack}
-              className="mb-4"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
+            {/* Navigation Options */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <Button
+                variant="ghost"
+                onClick={handleBack}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push('/carts')}
+              >
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Edit Cart
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/tenant/${tenantId}`)}
+              >
+                <Store className="mr-2 h-4 w-4" />
+                Back to Store
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push('/directory')}
+              >
+                Continue Shopping
+              </Button>
+            </div>
             
             {/* Store Branding */}
             <div className="flex items-center gap-3 mb-4 p-4 bg-white rounded-lg border">
               <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                {cart.tenantLogo ? (
+                {cart.tenant_logo ? (
                   <img
-                    src={cart.tenantLogo}
-                    alt={cart.tenantName}
+                    src={cart.tenant_logo}
+                    alt={cart.tenant_name}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -258,7 +286,7 @@ function CheckoutPageContent() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Purchasing from</p>
-                <p className="font-semibold text-gray-900">{cart.tenantName}</p>
+                <p className="font-semibold text-gray-900">{cart.tenant_name}</p>
               </div>
             </div>
             
@@ -415,7 +443,7 @@ function CheckoutPageContent() {
                         customerInfo={customerInfo}
                         shippingAddress={shippingAddress ?? undefined}
                         fulfillmentMethod={fulfillmentMethod}
-                        cartItems={cartItems}
+                        cartItems={mappedCartItems}
                         onSuccess={handlePaymentSuccess}
                         onBack={() => setCurrentStep('shipping')}
                       />
@@ -425,7 +453,7 @@ function CheckoutPageContent() {
                         customerInfo={customerInfo}
                         shippingAddress={shippingAddress ?? undefined}
                         fulfillmentMethod={fulfillmentMethod}
-                        cartItems={cartItems}
+                        cartItems={mappedCartItems}
                         onSuccess={handlePaymentSuccess}
                         onBack={() => setCurrentStep('shipping')}
                       />
@@ -439,7 +467,7 @@ function CheckoutPageContent() {
             <div className="lg:col-span-1">
               <div className="sticky top-8">
                 <OrderSummary
-                  items={cartItems}
+                  items={mappedCartItems}
                   subtotal={subtotal}
                   platformFee={platformFee}
                   shipping={fulfillmentFee}

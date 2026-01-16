@@ -11,6 +11,7 @@ type Photo = {
   position: number;
   alt?: string | null;
   caption?: string | null;
+  variant_id?: string | null;
 };
 
 type Item = {
@@ -18,6 +19,14 @@ type Item = {
   sku: string;
   name: string;
   imageUrl?: string;
+  has_variants?: boolean;
+};
+
+type ProductVariant = {
+  id: string;
+  variant_name: string;
+  sku: string;
+  is_active: boolean;
 };
 
 interface ItemPhotoGalleryProps {
@@ -41,6 +50,9 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAlt, setEditAlt] = useState("");
   const [editCaption, setEditCaption] = useState("");
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [variantsLoading, setVariantsLoading] = useState(false);
 
   const loadPhotos = async () => {
     try {
@@ -68,6 +80,28 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
     }
   };
 
+  // Load variants if item has them
+  useEffect(() => {
+    if (!item.has_variants) return;
+
+    const loadVariants = async () => {
+      try {
+        setVariantsLoading(true);
+        const res = await api.get(`/api/items/${item.id}/variants`);
+        if (res.ok) {
+          const data = await res.json();
+          setVariants(data.variants || []);
+        }
+      } catch (e) {
+        console.error("Failed to load variants:", e);
+      } finally {
+        setVariantsLoading(false);
+      }
+    };
+
+    loadVariants();
+  }, [item.id, item.has_variants]);
+
   useEffect(() => {
     loadPhotos();
   }, [item.id]);
@@ -93,6 +127,7 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
         tenantId,
         dataUrl,
         contentType: "image/jpeg",
+        variant_id: selectedVariantId, // Include variant_id if variant is selected
       });
 
       if (!res.ok) {
@@ -196,16 +231,50 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
     return <div className="text-sm text-neutral-500">Loading photos...</div>;
   }
 
+  // Filter photos by selected variant
+  const filteredPhotos = selectedVariantId
+    ? photos.filter(p => p.variant_id === selectedVariantId)
+    : photos.filter(p => !p.variant_id); // Show parent photos by default
+
+  const displayPhotos = filteredPhotos;
+
   return (
     <div className="space-y-4">
+      {/* Variant Selector */}
+      {item.has_variants && variants.length > 0 && (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Assign photos to:
+          </label>
+          <select
+            value={selectedVariantId || ""}
+            onChange={(e) => setSelectedVariantId(e.target.value || null)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            disabled={variantsLoading}
+          >
+            <option value="">Parent Product (Default)</option>
+            {variants.map((variant) => (
+              <option key={variant.id} value={variant.id}>
+                {variant.variant_name} - {variant.sku}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs text-gray-600">
+            {selectedVariantId
+              ? `Photos uploaded will be assigned to this variant. Showing ${displayPhotos.length} photo(s) for this variant.`
+              : `Photos uploaded will be assigned to the parent product. Showing ${displayPhotos.length} parent photo(s).`}
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium text-neutral-700">
-          Photos ({photos.length}/11)
+          Photos ({displayPhotos.length}/11)
         </div>
         <label
           className={`cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-            photos.length >= 11 || uploading
+            displayPhotos.length >= 11 || uploading
               ? "bg-neutral-200 text-neutral-400 cursor-not-allowed"
               : "bg-primary-600 text-white hover:bg-primary-700"
           }`}
@@ -223,7 +292,7 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
             type="file"
             accept="image/*"
             onChange={handleUpload}
-            disabled={photos.length >= 11 || uploading}
+            disabled={displayPhotos.length >= 11 || uploading}
             className="hidden"
           />
         </label>
@@ -237,13 +306,15 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
       )}
 
       {/* Gallery Grid */}
-      {photos.length === 0 ? (
+      {displayPhotos.length === 0 ? (
         <div className="text-center py-8 text-sm text-neutral-500">
-          No photos yet. Add your first photo above.
+          {selectedVariantId 
+            ? "No photos for this variant yet. Upload photos above to assign them to this variant."
+            : "No photos yet. Add your first photo above."}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {photos.map((photo) => (
+          {displayPhotos.map((photo) => (
             <div
               key={photo.id}
               className="relative group border border-neutral-200 rounded-lg overflow-hidden bg-white"

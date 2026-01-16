@@ -11,7 +11,7 @@ const DANGEROUS_PATTERNS = [
   /(\bUNION\b|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bDROP\b|\bCREATE\b|\bALTER\b|\bEXEC\b|\bEXECUTE\b)/i,
   /(<script|javascript:|vbscript:|onload=|onerror=|onclick=|onmouseover=)/i,
   /(\.\.|\/etc\/passwd|\/etc\/shadow|\/proc\/|\/home\/)/i,
-  /(\bNULL\b|\bnull\b)/i,
+  // Removed null pattern - null is a valid JSON value and shouldn't be blocked
   /(-{2,}|\/\*|\*\/)/, // SQL comments
 ];
 

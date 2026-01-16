@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import SmartProductCard from './SmartProductCard';
+import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 
 interface RecommendedProduct {
   id: string;
@@ -57,58 +58,27 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {recommendations.map((product) => (
-          <Link
-            key={product.id}
-            href={`/products/${product.id}`}
-            className="group block bg-white dark:bg-neutral-800 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
-          >
-            {/* Product Image */}
-            <div className="relative aspect-square bg-gray-100 dark:bg-gray-700">
-              {product.imageUrl ? (
-                <Image
-                  src={product.imageUrl}
-                  alt={product.title}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-200"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-              )}
-            </div>
-
-            {/* Product Info */}
-            <div className="p-4">
-              <h3 className="text-sm font-medium text-neutral-900 dark:text-white line-clamp-2 mb-1">
-                {product.title}
-              </h3>
-
-              {product.brand && (
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
-                  {product.brand}
-                </p>
-              )}
-
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-semibold text-neutral-900 dark:text-white">
-                  {new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: product.currency,
-                  }).format(product.price)}
-                </span>
-
-                {product.relevanceScore >= 4 && (
-                  <span className="text-xs bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-2 py-1 rounded-full">
-                    Great Match
-                  </span>
-                )}
-              </div>
-            </div>
-          </Link>
+          <TenantPaymentProvider key={product.id} tenantId={product.tenantId}>
+            <SmartProductCard
+              product={{
+                id: product.id,
+                sku: product.id,
+                name: product.name,
+                title: product.title,
+                brand: product.brand,
+                priceCents: Math.round(product.price * 100),
+                stock: 999,
+                imageUrl: product.imageUrl,
+                tenantId: product.tenantId,
+                availability: 'in_stock',
+              }}
+              tenantName=""
+              variant="compact"
+              showCategory={false}
+              showDescription={false}
+              className="h-full"
+            />
+          </TenantPaymentProvider>
         ))}
       </div>
 

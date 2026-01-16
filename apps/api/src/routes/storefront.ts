@@ -29,43 +29,24 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const skip = (pageNum - 1) * limitNum;
     
-    // Build WHERE clause - match the filters used in storefront_category_counts MV
+    // Build WHERE clause for storefront_products MV
     const conditions: string[] = [
-      'ii.tenant_id = $1',
-      "ii.item_status = 'active'",
-      "ii.visibility = 'public'"
+      'sp.tenant_id = $1'
+      // Note: MV only contains active, public products - no need to filter again
     ];
     const params: any[] = [tenantId];
     let paramIndex = 2;
     
     // When no specific category is selected, only show products that have categories
-    // Check both category_path array AND directory_category_id for backwards compatibility
-    // Note: array_length returns NULL for empty arrays, so we need COALESCE
     if (!category) {
-      conditions.push('(COALESCE(array_length(ii.category_path, 1), 0) > 0 OR ii.directory_category_id IS NOT NULL)');
+      conditions.push('sp.category_id IS NOT NULL');
     }
     
-    // Category filter - check BOTH category_path array AND directory_category_id
+    // Category filter - match by slug (MV uses category_slug)
     if (category && typeof category === 'string') {
-      // First get the category details to match by both slug and ID
-      const categoryQuery = `
-        SELECT id, slug FROM directory_category 
-        WHERE "tenantId" = $1 AND "isActive" = true AND slug = $2
-        LIMIT 1
-      `;
-      const categoryResult = await getDirectPool().query(categoryQuery, [tenantId, category]);
-      
-      if (categoryResult.rows.length > 0) {
-        const cat = categoryResult.rows[0];
-        conditions.push(`($${paramIndex} = ANY(ii.category_path) OR ii.directory_category_id = $${paramIndex + 1})`);
-        params.push(category, cat.id);
-        paramIndex += 2;
-      } else {
-        // Fallback: just check category_path if category not found
-        conditions.push(`$${paramIndex} = ANY(ii.category_path)`);
-        params.push(category);
-        paramIndex++;
-      }
+      conditions.push(`sp.category_slug = $${paramIndex}`);
+      params.push(category);
+      paramIndex++;
     }
     
     // Search filter (name or SKU)
@@ -77,51 +58,53 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     
     const whereClause = conditions.join(' AND ');
     
-    // Query base tables for individual products
+    // Query storefront_products MV for individual products (includes payment gateway info)
     const query = `
       SELECT 
-        ii.id,
-        ii.tenant_id,
-        ii.sku,
-        ii.name,
-        ii.name as title,
-        ii.description,
-        ii.marketing_description,
-        ii.price_cents / 100.0 as price,
-        ii.price_cents,
-        currency,
-        stock,
-        quantity,
-        availability,
-        image_url,
-        image_gallery,
-        brand,
-        manufacturer,
-        condition,
-        gtin,
-        mpn,
-        metadata,
-        custom_cta,
-        social_links,
-        custom_branding,
-        custom_sections,
-        landing_page_theme,
-        ii.category_path,
-        ii.directory_category_id,
-        CASE WHEN ii.image_url IS NOT NULL THEN true ELSE false END as has_image,
-        CASE WHEN (ii.stock > 0 OR ii.quantity > 0) THEN true ELSE false END as in_stock,
-        CASE WHEN array_length(ii.image_gallery, 1) > 0 THEN true ELSE false END as has_gallery,
-        ii.created_at,
-        ii.updated_at
-      FROM inventory_items ii
+        sp.id,
+        sp.tenant_id,
+        sp.sku,
+        sp.name,
+        sp.title,
+        sp.description,
+        sp.marketing_description,
+        sp.price_cents / 100.0 as price,
+        sp.price_cents,
+        sp.currency,
+        sp.stock,
+        sp.quantity,
+        sp.availability,
+        sp.image_url,
+        sp.image_gallery,
+        sp.brand,
+        sp.manufacturer,
+        sp.condition,
+        sp.gtin,
+        sp.mpn,
+        sp.metadata,
+        sp.custom_cta,
+        sp.social_links,
+        sp.custom_branding,
+        sp.custom_sections,
+        sp.landing_page_theme,
+        sp.category_slug,
+        sp.category_id as directory_category_id,
+        sp.has_image,
+        sp.in_stock,
+        sp.has_gallery,
+        sp.has_active_payment_gateway,
+        sp.default_gateway_type,
+        sp.created_at,
+        sp.updated_at
+      FROM storefront_products sp
       WHERE ${whereClause}
-      ORDER BY ii.updated_at DESC
+      ORDER BY sp.updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
     const countQuery = `
       SELECT COUNT(*) as count
-      FROM inventory_items ii
+      FROM storefront_products sp
       WHERE ${whereClause}
     `;
     
@@ -138,8 +121,8 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       console.log(`[Storefront] Category: ${category}, Count: ${totalCount}, Returned: ${itemsResult.rows.length}`);
     }
     
-    // Fetch categories by both slug (from category_path) and id (from directory_category_id)
-    const categorySlugs = [...new Set(itemsResult.rows.flatMap((item: any) => item.category_path || []).filter(Boolean))];
+    // Fetch categories by slug (from category_slug) and id (from directory_category_id)
+    const categorySlugs = [...new Set(itemsResult.rows.map((item: any) => item.category_slug).filter(Boolean))];
     const categoryIds = [...new Set(itemsResult.rows.map((item: any) => item.directory_category_id).filter(Boolean))];
     
     // Build category query to fetch by slug OR id
@@ -256,38 +239,29 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
     // This handles products that use either method of category assignment
     const query = `
       SELECT
-        dc.name as category_name,
-        dc.slug as category_slug,
-        dc."googleCategoryId" as google_category_id,
-        COUNT(DISTINCT ii.id) as count,
-        COUNT(DISTINCT ii.id) FILTER (WHERE ii.image_url IS NOT NULL) as products_with_images,
-        COUNT(DISTINCT ii.id) FILTER (WHERE ii.description IS NOT NULL OR ii.marketing_description IS NOT NULL) as products_with_descriptions,
-        AVG(ii.price_cents) as avg_price_cents,
-        MIN(ii.price_cents) as min_price_cents,
-        MAX(ii.price_cents) as max_price_cents
-      FROM directory_category dc
-      INNER JOIN inventory_items ii ON (
-        (ii.category_path && ARRAY[dc.slug]) OR (ii.directory_category_id = dc.id)
-      )
-        AND ii.tenant_id = dc."tenantId"
-        AND ii.item_status = 'active'
-        AND ii.visibility = 'public'
-      WHERE dc."tenantId" = $1
-        AND dc."isActive" = true
-      GROUP BY dc.name, dc.slug, dc."googleCategoryId"
-      HAVING COUNT(DISTINCT ii.id) > 0
-      ORDER BY dc.name ASC
+        sp.category_name,
+        sp.category_slug,
+        sp.google_category_id,
+        COUNT(DISTINCT sp.id) as count,
+        COUNT(DISTINCT sp.id) FILTER (WHERE sp.has_image = true) as products_with_images,
+        COUNT(DISTINCT sp.id) FILTER (WHERE sp.description IS NOT NULL OR sp.marketing_description IS NOT NULL) as products_with_descriptions,
+        AVG(sp.price_cents) as avg_price_cents,
+        MIN(sp.price_cents) as min_price_cents,
+        MAX(sp.price_cents) as max_price_cents
+      FROM storefront_products sp
+      WHERE sp.tenant_id = $1
+        AND sp.category_id IS NOT NULL
+      GROUP BY sp.category_name, sp.category_slug, sp.google_category_id
+      HAVING COUNT(DISTINCT sp.id) > 0
+      ORDER BY sp.category_name ASC
     `;
     
-    // Get uncategorized count - products with NO category assignment (neither category_path nor directory_category_id)
+    // Get uncategorized count - products with NO category assignment
     const uncategorizedQuery = `
       SELECT COUNT(*) as count
-      FROM inventory_items ii
-      WHERE ii.tenant_id = $1
-        AND ii.item_status = 'active'
-        AND ii.visibility = 'public'
-        AND (ii.category_path IS NULL OR COALESCE(array_length(ii.category_path, 1), 0) = 0)
-        AND ii.directory_category_id IS NULL
+      FROM storefront_products sp
+      WHERE sp.tenant_id = $1
+        AND sp.category_id IS NULL
     `;
     
     const [categoriesResult, uncategorizedResult] = await Promise.all([

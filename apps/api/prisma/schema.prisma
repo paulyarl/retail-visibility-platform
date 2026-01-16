@@ -702,33 +702,36 @@ model inventory_items {
   enriched_by           String?
   enriched_from_barcode String?
   missing_images        Boolean                  @default(false)
-  missing_description   Boolean                  @default(false)
-  missing_specs         Boolean                  @default(false)
-  missing_brand         Boolean                  @default(false)
+  missing_description      Boolean?                  @default(false)
+  missing_specs            Boolean?                  @default(false)
+  missing_brand            Boolean?                  @default(false)
+  has_variants             Boolean?                  @default(false)
   sale_price_cents         Int?
-  payment_gateway_type     String?                   @db.VarChar(50)
-  payment_gateway_id       String?                   @db.VarChar(255)
-  product_type             product_type              @default(physical)
+  product_type             product_type?             @default(physical)
   digital_delivery_method  digital_delivery_method?
   digital_assets           Json?
+  license_type             license_type?
   access_duration_days     Int?
   download_limit           Int?
-  license_type             license_type?
-  payment_gateway          tenant_payment_gateways?  @relation(fields: [payment_gateway_id], references: [id], onUpdate: NoAction, map: "fk_inventory_items_payment_gateway")
-  tenants                  tenants                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  digital_access_grants    digital_access_grants[]
-  order_items              order_items[]
+  is_featured              Boolean                   @default(false) @map("is_featured")
+  featured_at              DateTime?                 @map("featured_at")
+  featured_until           DateTime?                 @map("featured_until")
+  featured_priority        Int                       @default(0) @map("featured_priority")
   photo_assets             photo_assets[]
-  product_performances     product_performances[]
-  shopping_cart_items      shopping_cart_items[]
-  store_reviews            store_reviews[]
+  product_variants      product_variants[]
+  product_performances  product_performances[]
+  shopping_cart_items   shopping_cart_items[]
+  store_reviews         store_reviews[]
+  tenants               tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  order_items           order_items[]
+  digital_access_grants digital_access_grants[]
 
   @@unique([tenant_id, sku])
   @@index([source])
   @@index([tenant_id, enrichment_status])
   @@index([tenant_id, updated_at])
-  @@index([payment_gateway_id], map: "idx_inventory_items_payment_gateway_id")
-  @@index([payment_gateway_type], map: "idx_inventory_items_payment_gateway_type")
+  @@index([has_variants])
+  @@index([tenant_id, is_featured, featured_priority(sort: Desc), featured_at(sort: Desc)])
 }
 
 model invitations {
@@ -863,7 +866,7 @@ model permission_matrix_list {
 }
 
 model photo_assets {
-  id              String          @id
+  id              String            @id
   tenantId        String
   inventoryItemId String
   url             String
@@ -871,20 +874,23 @@ model photo_assets {
   height          Int?
   contentType     String?
   bytes           Int?
-  exifRemoved     Boolean         @default(false)
-  capturedAt      DateTime?       @db.Timestamptz(6)
-  createdAt       DateTime        @default(now()) @db.Timestamptz(6)
+  exifRemoved     Boolean           @default(false)
+  capturedAt      DateTime?         @db.Timestamptz(6)
+  createdAt       DateTime          @default(now()) @db.Timestamptz(6)
   publicUrl       String?
   signedUrl       String?
-  position        Int             @default(0)
+  position        Int               @default(0)
   alt             String?
   caption         String?
-  inventory_items inventory_items @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
-  tenants         tenants         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  variant_id      String?
+  inventory_items inventory_items   @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  tenants         tenants           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product_variants product_variants? @relation(fields: [variant_id], references: [id], onDelete: Cascade)
 
   @@unique([inventoryItemId, position], map: "photo_assets_inventory_item_id_position_unique")
   @@index([inventoryItemId], map: "idx_photo_assets_inventory_item_id")
   @@index([tenantId], map: "idx_photo_assets_tenant_id")
+  @@index([variant_id], map: "idx_photo_assets_variant_id")
 }
 
 model platform_categories {
@@ -1395,6 +1401,7 @@ model tenants {
   photo_assets                     photo_assets[]
   platform_fee_overrides           platform_fee_overrides[]
   product_performances             product_performances[]
+  product_variants                 product_variants[]
   refunds                          refunds[]
   scan_results_list                scan_results_list[]
   scan_sessions_list               scan_sessions_list[]
@@ -1770,13 +1777,18 @@ model order_items {
   product_type             product_type              @default(physical)
   digital_delivery_status  digital_delivery_status?  @default(pending)
   digital_delivered_at     DateTime?                 @db.Timestamptz(6)
+  variant_id               String?
+  variant_name             String?
+  variant_attributes       Json?
   digital_access_grants    digital_access_grants[]
   inventory_items          inventory_items?          @relation(fields: [inventory_item_id], references: [id], onUpdate: NoAction, map: "fk_order_items_inventory_item_id")
   orders                   orders                    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_order_items_order_id")
+  product_variants         product_variants?         @relation(fields: [variant_id], references: [id], onDelete: SetNull)
 
   @@index([order_id], map: "idx_order_items_order_id")
   @@index([inventory_item_id], map: "idx_order_items_inventory_item_id")
   @@index([sku], map: "idx_order_items_sku")
+  @@index([variant_id], map: "idx_order_items_variant_id")
 }
 
 model payments {
@@ -1946,7 +1958,6 @@ model tenant_payment_gateways {
   oauth_merchant_id        String?
   created_at               DateTime?         @default(now()) @db.Timestamp(6)
   updated_at               DateTime?         @default(now()) @updatedAt @db.Timestamp(6)
-  inventory_items          inventory_items[]
   tenants                  tenants           @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_payment_gateways_tenant")
 
   @@unique([tenant_id, gateway_type], map: "uq_tenant_gateway_type")
@@ -2420,4 +2431,32 @@ model digital_access_grants {
   @@index([inventory_item_id], map: "idx_digital_access_grants_inventory_item_id")
   @@index([expires_at], map: "idx_digital_access_grants_expires_at")
   @@index([revoked_at], map: "idx_digital_access_grants_revoked_at")
+}
+
+model product_variants {
+  id              String           @id
+  parent_item_id  String
+  tenant_id       String
+  sku             String
+  variant_name    String
+  price_cents     Int?
+  sale_price_cents Int?
+  stock           Int              @default(0)
+  image_url       String?
+  attributes      Json             @default("{}")
+  sort_order      Int              @default(0)
+  is_active       Boolean          @default(true)
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @default(now())
+  
+  inventory_items inventory_items  @relation(fields: [parent_item_id], references: [id], onDelete: Cascade)
+  tenants         tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  order_items     order_items[]
+  photo_assets    photo_assets[]
+  
+  @@unique([tenant_id, sku])
+  @@index([parent_item_id])
+  @@index([tenant_id])
+  @@index([sku])
+  @@index([is_active])
 }

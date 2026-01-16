@@ -16,6 +16,8 @@ import ContactInformationCollapsible from '@/components/directory/ContactInforma
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
+import SmartProductCard from '@/components/products/SmartProductCard';
+import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 
 interface StoreDetailPageProps {
   params: {
@@ -23,149 +25,26 @@ interface StoreDetailPageProps {
   };
 }
 
-async function getStoreListing(identifier: string) {
+async function getConsolidatedDirectoryData(slug: string) {
   const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   
   try {
-    const res = await fetch(`${apiUrl}/api/directory/${identifier}`, {
+    const res = await fetch(`${apiUrl}/api/directory/consolidated/${slug}`, {
       next: { revalidate: 300 }, // Revalidate every 5 minutes
     });
 
     if (!res.ok) {
+      console.error('Consolidated directory API failed:', res.status, res.statusText);
       return null;
     }
 
     const data = await res.json();
-    const listing = data.listing;
-    
-    // Fetch business profile to get GBP categories (same as storefront, but using public endpoint)
-    if (listing && listing.tenant_id) {
-      try {
-        const profileRes = await fetch(`${apiUrl}/public/tenant/${listing.tenant_id}/profile`, {
-          next: { revalidate: 300 },
-        });
-        
-        if (profileRes.ok) {
-          const profile = await profileRes.json();
-          
-          // Extract GBP categories from profile metadata
-          const gbpCategories = profile.metadata?.gbp_categories || profile.metadata?.gbpCategories;
-          
-          if (gbpCategories) {
-            const categories = [];
-            
-            // Add primary category
-            if (gbpCategories.primary) {
-              categories.push({
-                id: gbpCategories.primary.id,
-                name: gbpCategories.primary.name,
-                slug: gbpCategories.primary.id?.replace('gcid:', '').replace(/_/g, '-') || 
-                      gbpCategories.primary.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-'),
-                isPrimary: true
-              });
-            }
-            
-            // Add secondary categories
-            if (gbpCategories.secondary && Array.isArray(gbpCategories.secondary)) {
-              gbpCategories.secondary.forEach((cat: any) => {
-                categories.push({
-                  id: cat.id,
-                  name: cat.name,
-                  slug: cat.id?.replace('gcid:', '').replace(/_/g, '-') || 
-                        cat.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-'),
-                  isPrimary: false
-                });
-              });
-            }
-            
-            listing.categories = categories;
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching business profile for GBP categories:', error);
-      }
-    }
-    
-    return listing;
+    return data.data;
   } catch (error) {
-    console.error('Error fetching store:', error);
+    console.error('Error fetching consolidated directory data:', error);
     return null;
   }
 }
-
-async function getGbpCategoryCounts() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
-  try {
-    const res = await fetch(`${apiUrl}/api/directory/categories-optimized/gbp-counts`, {
-      next: { revalidate: 300 }, // Revalidate every 5 minutes
-    });
-
-    if (!res.ok) {
-      console.error('GBP category counts API failed:', res.status, res.statusText);
-      return {};
-    }
-
-    const data = await res.json();
-    
-    // Convert categories array to slug->count mapping for easy lookup
-    const categoryCounts: Record<string, number> = {};
-    if (data.categories && Array.isArray(data.categories)) {
-      data.categories.forEach((category: any) => {
-        // Use categorySlug first, fallback to category_slug
-        const slug = category.categorySlug || category.category_slug;
-        const stores = category.totalStores || category.total_stores;
-        categoryCounts[slug] = parseInt(stores) || 0;
-        
-        // Also map category name to slug for common categories
-        const categoryName = category.categoryName || category.category_name;
-        const nameSlug = categoryName
-          .toLowerCase()
-          .replace(/[^a-z0-9\s]/g, '') // Remove special characters
-          .replace(/\s+/g, '-') // Replace spaces with hyphens
-          .replace(/-+/g, '-') // Remove duplicate hyphens
-          .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-        
-        categoryCounts[nameSlug] = parseInt(stores) || 0;
-      });
-    }
-    
-    // Add fallback for common categories that might not exist
-    categoryCounts['international'] = categoryCounts['international'] || 0;
-    categoryCounts['international-foods'] = categoryCounts['international-foods'] || 0;
-    
-    return categoryCounts;
-  } catch (error) {
-    console.error('Error fetching GBP category counts:', error);
-    return {};
-  }
-}
-
-async function getDirectoryCategoryCountsMap() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
-  try {
-    // Query the materialized view directly for category counts
-    const res = await fetch(`${apiUrl}/api/directory/categories-optimized/counts-by-name`, {
-      next: { revalidate: 300 }, // Revalidate every 5 minutes
-    });
-
-    if (!res.ok) {
-      console.error('Directory category counts API failed:', res.status, res.statusText);
-      return {};
-    }
-
-    const data = await res.json();
-    // Return a map of category name -> count
-    return data.counts || {};
-  } catch (error) {
-    console.error('Error fetching directory category counts:', error);
-    return {};
-  }
-}
-
-// Directory categories are already in the listing from the materialized view
-// No separate fetch needed - they come from directory_listings_list.primary_category and secondary_categories
 
 async function getStorefrontCategories(tenantId: string) {
   const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -249,7 +128,8 @@ async function getFeaturedProducts(tenantId: string, limit: number = 6) {
   const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   
   try {
-    const res = await fetch(`${apiUrl}/api/storefront/${tenantId}/products?limit=${limit}`, {
+    // Use the featured products endpoint that queries is_featured from database
+    const res = await fetch(`${apiUrl}/api/storefront/${tenantId}/featured-products?limit=${limit}`, {
       next: { revalidate: 300 },
     });
 
@@ -258,7 +138,7 @@ async function getFeaturedProducts(tenantId: string, limit: number = 6) {
     }
 
     const data = await res.json();
-    return data.items || [];
+    return data.products || [];
   } catch (error) {
     console.error('Error fetching featured products:', error);
     return [];
@@ -427,18 +307,19 @@ async function getUserLocation(): Promise<{
 
 export async function generateMetadata({ params }: StoreDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const listing = await getStoreListing(slug);
+  const consolidatedData = await getConsolidatedDirectoryData(slug);
 
-  if (!listing) {
+  if (!consolidatedData?.listing) {
     return {
       title: 'Store Not Found',
     };
   }
 
-  const businessName = listing.business_name || 'Business';
+  const listing = consolidatedData.listing;
+  const businessName = listing.businessName || 'Business';
   const title = `${businessName} - ${listing.city}, ${listing.state}`;
   const description = listing.description || 
-    `Visit ${businessName} in ${listing.city}, ${listing.state}. ${listing.product_count || 0} products available.`;
+    `Visit ${businessName} in ${listing.city}, ${listing.state}. ${listing.productCount || 0} products available.`;
 
   return {
     title,
@@ -447,73 +328,53 @@ export async function generateMetadata({ params }: StoreDetailPageProps): Promis
       title,
       description,
       type: 'website',
-      images: listing.logo_url ? [listing.logo_url] : [],
+      images: listing.logoUrl ? [listing.logoUrl] : [],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: listing.logo_url ? [listing.logo_url] : [],
+      images: listing.logoUrl ? [listing.logoUrl] : [],
     },
   };
 }
 
 export default async function StoreDetailPage({ params }: StoreDetailPageProps) {
   const { slug: identifier } = await params;
-  const listing = await getStoreListing(identifier);
+  const consolidatedData = await getConsolidatedDirectoryData(identifier);
 
-  if (!listing) {
+  if (!consolidatedData?.listing) {
     notFound();
   }
 
-  // Get primary category early for parallel fetching
+  const listing = consolidatedData.listing;
+  const featuredProducts = consolidatedData.featuredProducts || [];
+  const storeTypes = consolidatedData.storeTypes || [];
+  const categoryCounts = consolidatedData.categoryCounts || [];
+  const recommendations = consolidatedData.recommendations || [];
+  const paymentGatewayStatus = consolidatedData.paymentGatewayStatus || { hasActiveGateway: false, defaultGatewayType: null };
+
+  // Get primary category early for additional data fetching
   const primaryCategory = listing.categories?.find((c: any) => c.isPrimary) || listing.categories?.[0];
 
-  // Build directory categories from the listing (already in materialized view)
-  const storeDirectoryCategories = [];
-  if (listing.primary_category) {
-    storeDirectoryCategories.push({
-      name: listing.primary_category,
-      slug: listing.primary_category.toLowerCase().replace(/\s+/g, '-'),
-      isPrimary: true
-    });
-  }
-  if (listing.secondary_categories && Array.isArray(listing.secondary_categories)) {
-    listing.secondary_categories.forEach((catName: string) => {
-      storeDirectoryCategories.push({
-        name: catName,
-        slug: catName.toLowerCase().replace(/\s+/g, '-'),
-        isPrimary: false
-      });
-    });
-  }
-
-  // Fetch all independent data in parallel for better performance
+  // Fetch remaining data that's not in the consolidated endpoint
   const [
-    gbpCategoryCounts,
-    directoryCategoryCountsMap,
-    storefrontCategories,
     businessProfile,
     businessHours,
-    featuredProducts,
     relatedProducts,
-    recommendations
+    storefrontCategories
   ] = await Promise.all([
-    getGbpCategoryCounts(),
-    getDirectoryCategoryCountsMap(),
-    getStorefrontCategories(listing.tenant_id),
-    getBusinessProfile(listing.tenant_id),
-    getBusinessHours(listing.tenant_id),
-    getFeaturedProducts(listing.tenant_id, 6),
-    primaryCategory ? getRelatedProducts(primaryCategory.slug, listing.tenant_id, 6) : Promise.resolve([]),
-    getStoreRecommendations(listing.tenant_id, primaryCategory?.slug)
+    getBusinessProfile(listing.tenantId),
+    getBusinessHours(listing.tenantId),
+    primaryCategory ? getRelatedProducts(primaryCategory.slug, listing.tenantId, 6) : Promise.resolve([]),
+    getStorefrontCategories(listing.tenantId)
   ]);
   
   // Compute store status from business hours data
   const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;
   
   // Track user behavior for recommendations (fire and forget, don't await)
-  trackStoreView(listing.tenant_id, listing.categories).catch(err => 
+  trackStoreView(listing.tenantId, listing.categories).catch(err => 
     console.error('Failed to track store view:', err)
   );
   
@@ -521,7 +382,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     listing.address,
     listing.city,
     listing.state,
-    listing.zip_code,
+    listing.zipCode,
   ].filter(Boolean).join(', ');
 
   const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
@@ -538,12 +399,12 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
         items={[
           { name: 'Home', url: baseUrl },
           { name: 'Directory', url: `${baseUrl}/directory` },
-          { name: listing.business_name, url: currentUrl },
+          { name: listing.businessName, url: currentUrl },
         ]}
       />
 
       {/* Client-side store tracking */}
-      <StoreViewTracker tenantId={listing.tenant_id} categories={listing.categories} />
+      <StoreViewTracker tenantId={listing.tenantId} categories={listing.categories} />
 
       <div className="min-h-screen bg-gray-50">
         {/* Header with Visit Storefront Banner */}
@@ -581,13 +442,13 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             <div className="mt-4 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-100 border-2 border-blue-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-6 py-8 sm:px-8 sm:py-10 text-center">
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-                  Shop {listing.business_name}
+                  Shop {listing.businessName}
                 </h2>
                 <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
-                  Browse {listing.product_count > 0 ? `${listing.product_count} products` : 'our full catalog'} and shop directly from their online storefront
+                  Browse {listing.productCount > 0 ? `${listing.productCount} products` : 'our full catalog'} and shop directly from their online storefront
                 </p>
                 <Link
-                  href={`/tenant/${listing.tenant_id}`}
+                  href={`/tenant/${listing.tenantId}`}
                   className="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg shadow-md"
                 >
                   <Globe className="w-5 h-5" />
@@ -605,16 +466,16 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               {/* Store Header */}
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-start gap-6">
-                  {listing.logo_url && (
+                  {listing.logoUrl && (
                     <img
-                      src={listing.logo_url}
-                      alt={listing.business_name}
+                      src={listing.logoUrl}
+                      alt={listing.businessName}
                       className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                     />
                   )}
                   <div className="flex-1">
                     <h1 className="text-3xl font-bold text-gray-900">
-                      {listing.business_name}
+                      {listing.businessName}
                     </h1>
                 
                     {/* GBP Categories - Clean badges below store name */}
@@ -681,7 +542,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                 <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
                   {/* Visit Storefront - Left side */}
                   <Link
-                    href={`/tenant/${listing.tenant_id}`}
+                    href={`/tenant/${listing.tenantId}`}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
                     title="Browse products on the storefront"
                   >
@@ -692,9 +553,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   {/* Share/Print Actions - Right side */}
                   <DirectoryActions 
                     listing={{
-                      business_name: listing.business_name,
+                      business_name: listing.businessName,
                       slug: listing.slug,
-                      tenantId: listing.tenant_id,
+                      tenantId: listing.tenantId,
                       id: listing.id
                     }}
                     currentUrl={currentUrl}
@@ -709,7 +570,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               {storefrontCategories.categories.length > 0 && (
                 <ProductCategoriesCollapsible
                   categories={storefrontCategories.categories}
-                  tenantId={listing.tenant_id}
+                  tenantId={listing.tenantId}
                   uncategorizedCount={storefrontCategories.uncategorizedCount}
                 />
               )}
@@ -727,7 +588,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               )}
 
               {/* Store Ratings and Reviews */}
-              <StoreRatingsSection tenantId={listing.tenant_id} showWriteReview={true} />
+              <StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />
             </div>
 
             {/* Right Column - Contact Info */}
@@ -848,68 +709,51 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
           </div>
         </div>
 
-      {/* Featured Products */}
+      {/* Featured Products - Self-Aware! */}
       {featuredProducts.length > 0 && (
-        <div className="bg-white border-t">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Featured Products</h2>
-              <Link
-                href={`/tenant/${listing.tenant_id}`}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                View All Products →
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {featuredProducts.map((product: any) => (
+        <TenantPaymentProvider tenantId={listing.tenantId}>
+          <div className="bg-white border-t">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Featured Products</h2>
                 <Link
-                  key={product.id}
-                  href={`/products/${product.id}`}
-                  className="group"
+                  href={`/tenant/${listing.tenantId}`}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                 >
-                  <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-                    {product.imageUrl || product.image_url ? (
-                      <img
-                        src={product.imageUrl || product.image_url}
-                        alt={product.name || product.title}
-                        className="w-full h-32 object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-32 bg-gray-100 flex items-center justify-center">
-                        <span className="text-gray-400 text-xs">No image</span>
-                      </div>
-                    )}
-                    <div className="p-3">
-                      <h3 className="text-sm font-medium text-gray-900 line-clamp-2 group-hover:text-blue-600">
-                        {product.name || product.title}
-                      </h3>
-                      <p className="text-sm font-semibold text-gray-900 mt-1">
-                        ${Number(product.price).toFixed(2)}
-                      </p>
-                      <div className="flex items-center justify-between mt-2">
-                        {product.tenantCategory && (
-                          <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
-                            {product.tenantCategory.name}
-                          </span>
-                        )}
-                        <span className={`text-xs font-medium ${
-                          product.stock === 0 
-                            ? 'text-red-600 dark:text-red-400' 
-                            : product.stock < 10 
-                            ? 'text-amber-600 dark:text-amber-400' 
-                            : 'text-green-600 dark:text-green-400'
-                        }`}>
-                          Stock: {product.stock}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  View All Products →
                 </Link>
-              ))}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {featuredProducts.map((product: any) => (
+                  <SmartProductCard
+                    key={product.id}
+                    product={{
+                      id: product.id,
+                      sku: product.sku || product.id,
+                      name: product.name || product.title,
+                      title: product.title || product.name,
+                      brand: product.brand,
+                      description: product.description,
+                      priceCents: product.priceCents || Math.round((product.price || 0) * 100),
+                      salePriceCents: product.salePriceCents,
+                      stock: product.stock || 999,
+                      imageUrl: product.imageUrl || product.image_url,
+                      tenantId: listing.tenantId,
+                      availability: product.availability || 'in_stock',
+                      tenantCategory: product.tenantCategory,
+                      has_variants: product.has_variants,
+                    }}
+                    tenantName={listing.businessName}
+                    tenantLogo={listing.logoUrl}
+                    variant="featured"
+                    showCategory={true}
+                    showDescription={true}
+                  />
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        </TenantPaymentProvider>
       )}
 
       {/* Related Stores */}

@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { AddToCartButton } from '@/components/products/AddToCartButton';
-import { PriceDisplay } from '@/components/products/PriceDisplay';
+import SmartProductCard from '@/components/products/SmartProductCard';
+import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 
 interface Product {
   id: string;
@@ -22,6 +22,7 @@ interface Product {
   availability: 'in_stock' | 'out_of_stock' | 'preorder';
   payment_gateway_type?: string | null;
   payment_gateway_id?: string | null;
+  has_variants?: boolean;
   tenantCategory?: {
     id: string;
     name: string;
@@ -49,8 +50,6 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
   const [currentProductIndex, setCurrentProductIndex] = useState(0);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
-  const [hasActivePaymentGateway, setHasActivePaymentGateway] = useState(false);
-  const [defaultGatewayType, setDefaultGatewayType] = useState<string | null>(null);
 
   // Initialize view mode on client-side only
   useEffect(() => {
@@ -70,40 +69,6 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
       // Ignore URL parsing errors on server
     }
   }, []);
-
-  // Fetch payment gateway status
-  useEffect(() => {
-    if (!tenantId || !mounted) return;
-    
-    const fetchPaymentGatewayStatus = async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        console.log('[ProductDisplay] Fetching payment gateway status for:', tenantId);
-        const response = await fetch(`${apiUrl}/public/tenant/${tenantId}/payment-gateways`, {
-          cache: 'no-store',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          console.log('[ProductDisplay] Payment gateway response:', data);
-          setHasActivePaymentGateway(data.hasActivePaymentGateway || false);
-          setDefaultGatewayType(data.defaultGatewayType || null);
-        } else {
-          console.error('[ProductDisplay] Payment gateway fetch failed:', response.status);
-          setHasActivePaymentGateway(false);
-          setDefaultGatewayType(null);
-        }
-      } catch (error) {
-        console.error('Failed to fetch payment gateway status:', error);
-        setHasActivePaymentGateway(false);
-        setDefaultGatewayType(null);
-      }
-    };
-
-    fetchPaymentGatewayStatus();
-  }, [tenantId, mounted]);
-
-  // Debug: Log payment gateway status
-  console.log('[ProductDisplay] hasActivePaymentGateway:', hasActivePaymentGateway, 'products:', products.length);
 
   // Persist on change and sync URL without navigation
   useEffect(() => {
@@ -187,27 +152,8 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                     {product.description}
                   </p>
                 )}
-                <div className="flex items-center justify-between">
-                  <PriceDisplay
-                    priceCents={product.priceCents || Math.round(product.price * 100)}
-                    salePriceCents={product.salePriceCents}
-                    variant="compact"
-                    showSavingsBadge={true}
-                  />
-                  <div className="text-right">
-                    <p className="text-xs text-neutral-500">
-                      SKU: {product.sku}
-                    </p>
-                    <p className={`text-xs font-medium ${
-                      product.stock === 0 
-                        ? 'text-red-600 dark:text-red-400' 
-                        : product.stock < 10 
-                        ? 'text-amber-600 dark:text-amber-400' 
-                        : 'text-green-600 dark:text-green-400'
-                    }`}>
-                      Stock: {product.stock}
-                    </p>
-                  </div>
+                <div className="text-sm font-semibold text-neutral-900 dark:text-white">
+                  ${((product.priceCents || Math.round(product.price * 100)) / 100).toFixed(2)}
                 </div>
               </div>
             </Link>
@@ -224,7 +170,8 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
   const productsWithPhotos = products.filter(product => product.imageUrl);
 
   return (
-    <div>
+    <TenantPaymentProvider tenantId={tenantId}>
+      <div>
       {/* View Toggle */}
       <div className="flex justify-end mb-6">
         <div className="inline-flex rounded-lg border border-neutral-300 dark:border-neutral-600 p-1 bg-white dark:bg-neutral-800">
@@ -273,109 +220,36 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
         </div>
       </div>
 
-      {/* Grid View */}
+      {/* Grid View - Self-Aware Products! */}
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {products.map((product: Product) => (
-            <div
+            <SmartProductCard
               key={product.id}
-              className="group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow"
-            >
-              {/* Product Image */}
-              <Link href={`/products/${product.id}`} className="block relative aspect-square bg-neutral-100 dark:bg-neutral-700">
-                {product.imageUrl ? (
-                  <Image
-                    src={product.imageUrl}
-                    alt={product.title}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
-                    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                )}
-                {/* Stock Badge */}
-                {product.availability === 'out_of_stock' && (
-                  <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
-                    Out of Stock
-                  </div>
-                )}
-                {product.availability === 'preorder' && (
-                  <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
-                    Pre-order
-                  </div>
-                )}
-              </Link>
-
-              {/* Product Info */}
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    {product.brand}
-                  </p>
-                  {product.tenantCategory && (
-                    <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
-                      {product.tenantCategory.name}
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-semibold text-neutral-900 dark:text-white line-clamp-2 mb-2">
-                  {product.title}
-                </h3>
-                {product.description && (
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-3">
-                    {product.description}
-                  </p>
-                )}
-                <div className="flex items-center justify-between mb-3">
-                  <PriceDisplay
-                    priceCents={product.priceCents || Math.round(product.price * 100)}
-                    salePriceCents={product.salePriceCents}
-                    variant="default"
-                    showSavingsBadge={true}
-                  />
-                  <div className="text-right">
-                    <p className="text-xs text-neutral-500">
-                      SKU: {product.sku}
-                    </p>
-                    <p className={`text-xs font-medium ${
-                      product.stock === 0 
-                        ? 'text-red-600 dark:text-red-400' 
-                        : product.stock < 10 
-                        ? 'text-amber-600 dark:text-amber-400' 
-                        : 'text-green-600 dark:text-green-400'
-                    }`}>
-                      Stock: {product.stock}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Add to Cart Button - Only show if tenant has payment gateway */}
-                {hasActivePaymentGateway && (
-                  <AddToCartButton
-                    product={{
-                      id: product.id,
-                      name: product.name,
-                      sku: product.sku,
-                      priceCents: Math.round(product.price * 100),
-                      salePriceCents: product.salePriceCents,
-                      imageUrl: product.imageUrl,
-                      stock: product.stock,
-                      tenantId: tenantId,
-                      payment_gateway_type: product.payment_gateway_type,
-                      payment_gateway_id: product.payment_gateway_id
-                    }}
-                    tenantName={tenantName || ''}
-                    tenantLogo={tenantLogo}
-                    defaultGatewayType={defaultGatewayType || undefined}
-                    className="w-full"
-                  />
-                )}
-              </div>
-            </div>
+              product={{
+                id: product.id,
+                sku: product.sku,
+                name: product.name,
+                title: product.title,
+                brand: product.brand,
+                description: product.description,
+                priceCents: product.priceCents || Math.round(product.price * 100),
+                salePriceCents: product.salePriceCents,
+                stock: product.stock,
+                imageUrl: product.imageUrl,
+                tenantId: tenantId,
+                payment_gateway_type: product.payment_gateway_type,
+                payment_gateway_id: product.payment_gateway_id,
+                has_variants: product.has_variants,
+                availability: product.availability,
+                tenantCategory: product.tenantCategory,
+              }}
+              tenantName={tenantName}
+              tenantLogo={tenantLogo}
+              variant="grid"
+              showCategory={true}
+              showDescription={true}
+            />
           ))}
         </div>
       )}
@@ -599,149 +473,79 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                   Stock: {productsWithPhotos[currentProductIndex].stock}
                 </span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-3">
                 <Link
                   href={`/products/${productsWithPhotos[currentProductIndex].id}`}
-                  className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                  className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-center"
                 >
                   View Full Details
                 </Link>
-                {/* Add to Cart Button - Only show if tenant has payment gateway */}
-                {hasActivePaymentGateway && (
-                  <AddToCartButton
-                    product={{
-                      id: productsWithPhotos[currentProductIndex].id,
-                      name: productsWithPhotos[currentProductIndex].name,
-                      sku: productsWithPhotos[currentProductIndex].sku,
-                      priceCents: Math.round(productsWithPhotos[currentProductIndex].price * 100),
-                      salePriceCents: productsWithPhotos[currentProductIndex].salePriceCents,
-                      imageUrl: productsWithPhotos[currentProductIndex].imageUrl,
-                      stock: productsWithPhotos[currentProductIndex].stock,
-                      tenantId: tenantId,
-                      payment_gateway_type: productsWithPhotos[currentProductIndex].payment_gateway_type,
-                      payment_gateway_id: productsWithPhotos[currentProductIndex].payment_gateway_id
-                    }}
-                    tenantName={tenantName || ''}
-                    tenantLogo={tenantLogo}
-                    defaultGatewayType={defaultGatewayType || undefined}
-                  />
-                )}
+                {/* Self-Aware Purchase UI */}
+                <SmartProductCard
+                  product={{
+                    id: productsWithPhotos[currentProductIndex].id,
+                    sku: productsWithPhotos[currentProductIndex].sku,
+                    name: productsWithPhotos[currentProductIndex].name,
+                    title: productsWithPhotos[currentProductIndex].title,
+                    brand: productsWithPhotos[currentProductIndex].brand,
+                    description: productsWithPhotos[currentProductIndex].description,
+                    priceCents: productsWithPhotos[currentProductIndex].priceCents || Math.round(productsWithPhotos[currentProductIndex].price * 100),
+                    salePriceCents: productsWithPhotos[currentProductIndex].salePriceCents,
+                    stock: productsWithPhotos[currentProductIndex].stock,
+                    imageUrl: productsWithPhotos[currentProductIndex].imageUrl,
+                    tenantId: tenantId,
+                    payment_gateway_type: productsWithPhotos[currentProductIndex].payment_gateway_type,
+                    payment_gateway_id: productsWithPhotos[currentProductIndex].payment_gateway_id,
+                    has_variants: productsWithPhotos[currentProductIndex].has_variants,
+                    availability: productsWithPhotos[currentProductIndex].availability,
+                    tenantCategory: productsWithPhotos[currentProductIndex].tenantCategory,
+                  }}
+                  tenantName={tenantName}
+                  tenantLogo={tenantLogo}
+                  variant="compact"
+                  showCategory={false}
+                  showDescription={false}
+                />
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* List View */}
+      {/* List View - Self-Aware Products! */}
       {viewMode === 'list' && (
         <div className="space-y-4">
           {products.map((product: Product) => (
-            <div
+            <SmartProductCard
               key={product.id}
-              className="group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow flex"
-            >
-              {/* Product Image */}
-              <Link href={`/products/${product.id}`} className="relative w-48 h-48 shrink-0 bg-neutral-100 dark:bg-neutral-700 block">
-                {product.imageUrl ? (
-                  <Image
-                    src={product.imageUrl}
-                    alt={product.title}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
-                    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                )}
-                {/* Stock Badge */}
-                {product.availability === 'out_of_stock' && (
-                  <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
-                    Out of Stock
-                  </div>
-                )}
-                {product.availability === 'preorder' && (
-                  <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
-                    Pre-order
-                  </div>
-                )}
-              </Link>
-
-              {/* Product Info */}
-              <div className="p-6 flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                          {product.brand}
-                        </p>
-                        {product.tenantCategory && (
-                          <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
-                            {product.tenantCategory.name}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="font-semibold text-lg text-neutral-900 dark:text-white mb-2">
-                        {product.title}
-                      </h3>
-                    </div>
-                    <div className="ml-4">
-                      <PriceDisplay
-                        priceCents={product.priceCents || Math.round(product.price * 100)}
-                        salePriceCents={product.salePriceCents}
-                        variant="default"
-                        showSavingsBadge={true}
-                      />
-                    </div>
-                  </div>
-                  {product.description && (
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-                      {product.description}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-neutral-500">
-                    <span>SKU: {product.sku}</span>
-                    <span className={`ml-4 font-medium ${
-                      product.stock === 0 
-                        ? 'text-red-600 dark:text-red-400' 
-                        : product.stock < 10 
-                        ? 'text-amber-600 dark:text-amber-400' 
-                        : 'text-green-600 dark:text-green-400'
-                    }`}>
-                      Stock: {product.stock}
-                    </span>
-                  </div>
-                  {/* Add to Cart Button - Only show if tenant has payment gateway */}
-                  {hasActivePaymentGateway && (
-                    <AddToCartButton
-                      product={{
-                        id: product.id,
-                        name: product.name,
-                        sku: product.sku,
-                        priceCents: Math.round(product.price * 100),
-                        salePriceCents: product.salePriceCents,
-                        imageUrl: product.imageUrl,
-                        stock: product.stock,
-                        tenantId: tenantId,
-                        payment_gateway_type: product.payment_gateway_type,
-                        payment_gateway_id: product.payment_gateway_id
-                      }}
-                      tenantName={tenantName || ''}
-                      tenantLogo={tenantLogo}
-                      defaultGatewayType={defaultGatewayType || undefined}
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
+              product={{
+                id: product.id,
+                sku: product.sku,
+                name: product.name,
+                title: product.title,
+                brand: product.brand,
+                description: product.description,
+                priceCents: product.priceCents || Math.round(product.price * 100),
+                salePriceCents: product.salePriceCents,
+                stock: product.stock,
+                imageUrl: product.imageUrl,
+                tenantId: tenantId,
+                payment_gateway_type: product.payment_gateway_type,
+                payment_gateway_id: product.payment_gateway_id,
+                has_variants: product.has_variants,
+                availability: product.availability,
+                tenantCategory: product.tenantCategory,
+              }}
+              tenantName={tenantName}
+              tenantLogo={tenantLogo}
+              variant="list"
+              showCategory={true}
+              showDescription={true}
+            />
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </TenantPaymentProvider>
   );
 }

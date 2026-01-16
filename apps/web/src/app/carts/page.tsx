@@ -1,19 +1,25 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCart } from '@/contexts/CartContext';
+import { useMultiCart } from '@/hooks/useMultiCart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { ShoppingCart, Store, ArrowRight, Trash2, ShoppingBag, CheckCircle2, Package, Receipt } from 'lucide-react';
+import { ShoppingCart, Store, ArrowRight, Trash2, ShoppingBag, CheckCircle2, Package, Receipt, Edit, ChevronDown, ChevronUp, Plus, Minus } from 'lucide-react';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 export default function MultiCartPage() {
   const router = useRouter();
-  const { carts, clearCart, switchCart, getTotalItemCount } = useCart();
+  const { carts, clearCart: clearSpecificCart, updateQuantity, removeItem, totalItems } = useMultiCart();
+  const [expandedCart, setExpandedCart] = useState<string | null>(null);
 
   const formatCurrency = (cents: number) => {
     return `$${(cents / 100).toFixed(2)}`;
+  };
+
+  const toggleCartExpanded = (cartKey: string) => {
+    setExpandedCart(expandedCart === cartKey ? null : cartKey);
   };
 
   const formatDate = (date: Date) => {
@@ -46,28 +52,15 @@ export default function MultiCartPage() {
     }
   };
 
-  const handleViewCart = (tenantId: string) => {
-    switchCart(tenantId);
-    router.push(`/cart/${tenantId}`);
+  const handleCheckout = (tenantId: string, gatewayType: string) => {
+    router.push(`/checkout?tenantId=${tenantId}&gatewayType=${gatewayType}`);
   };
 
-  const handleCheckout = (tenantId: string) => {
-    switchCart(tenantId);
-    router.push(`/checkout?tenantId=${tenantId}`);
-  };
-
-  const activeCarts = carts.filter(cart => cart.status === 'active');
-  const paidCarts = carts.filter(cart => cart.status === 'paid' || cart.status === 'fulfilled');
-
-  const handleClearPaidOrders = async () => {
-    if (!confirm(`Clear ${paidCarts.length} paid ${paidCarts.length === 1 ? 'order' : 'orders'} from your cart history?`)) {
+  const handleClearCart = (tenantId: string, gatewayType: string) => {
+    if (!confirm('Remove all items from this cart?')) {
       return;
     }
-
-    // Clear all paid carts
-    for (const cart of paidCarts) {
-      await clearCart(cart.tenantId);
-    }
+    clearSpecificCart(tenantId, gatewayType);
   };
 
   if (carts.length === 0) {
@@ -100,7 +93,7 @@ export default function MultiCartPage() {
     );
   }
 
-  const totalAcrossAllCarts = carts.reduce((sum, cart) => sum + cart.subtotal, 0);
+  const totalAcrossAllCarts = carts.reduce((sum, cartSummary) => sum + cartSummary.total_cents, 0);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -109,13 +102,7 @@ export default function MultiCartPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">My Shopping Carts</h1>
           <p className="text-gray-600">
-            {activeCarts.length > 0 && (
-              <span>{activeCarts.length} active {activeCarts.length === 1 ? 'cart' : 'carts'}</span>
-            )}
-            {activeCarts.length > 0 && paidCarts.length > 0 && <span> • </span>}
-            {paidCarts.length > 0 && (
-              <span>{paidCarts.length} paid {paidCarts.length === 1 ? 'order' : 'orders'}</span>
-            )}
+            {carts.length} {carts.length === 1 ? 'cart' : 'carts'} • {totalItems} items
           </p>
         </div>
 
@@ -127,7 +114,7 @@ export default function MultiCartPage() {
                 <p className="text-sm text-gray-600 mb-1">Total across all carts</p>
                 <p className="text-3xl font-bold text-gray-900">{formatCurrency(totalAcrossAllCarts)}</p>
                 <p className="text-sm text-gray-600 mt-1">
-                  {carts.length} {carts.length === 1 ? 'store' : 'stores'} • {getTotalItemCount()} items
+                  {carts.length} {carts.length === 1 ? 'cart' : 'carts'} • {totalItems} items
                 </p>
               </div>
               <ShoppingCart className="h-12 w-12 text-blue-600" />
@@ -137,163 +124,192 @@ export default function MultiCartPage() {
 
         {/* Cart List */}
         <div className="space-y-4">
-          {carts.map((cart) => (
-            <Card key={cart.tenantId} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row gap-6">
-                  {/* Store Info */}
-                  <div className="flex items-start gap-4 flex-1">
-                    {/* Store Logo */}
-                    <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                      {cart.tenantLogo ? (
-                        <img
-                          src={cart.tenantLogo}
-                          alt={cart.tenantName}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Store className="h-8 w-8 text-gray-400" />
-                      )}
-                    </div>
-
-                    {/* Store Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="text-xl font-bold text-gray-900">
-                          {cart.tenantName}
-                        </h3>
-                        {getStatusBadge(cart.status)}
-                      </div>
-                      <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
-                        <span className="flex items-center gap-1">
-                          <ShoppingBag className="h-4 w-4" />
-                          {cart.itemCount} {cart.itemCount === 1 ? 'item' : 'items'}
-                        </span>
-                        <span>•</span>
-                        <span>Updated {formatDate(cart.lastUpdated)}</span>
-                        {cart.paidAt && (
-                          <>
-                            <span>•</span>
-                            <span>Paid {formatDate(cart.paidAt)}</span>
-                          </>
+          {carts.map((cartSummary) => {
+            const { cart, item_count, total_cents } = cartSummary;
+            return (
+              <Card key={cartSummary.key} className="hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row gap-6">
+                    {/* Store Info */}
+                    <div className="flex items-start gap-4 flex-1">
+                      {/* Store Logo */}
+                      <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {cart.tenant_logo ? (
+                          <img
+                            src={cart.tenant_logo}
+                            alt={cart.tenant_name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Store className="h-8 w-8 text-gray-400" />
                         )}
                       </div>
 
-                      {/* Item Preview */}
-                      <div className="space-y-1">
-                        {cart.items.slice(0, 3).map((item) => (
-                          <p key={item.id} className="text-sm text-gray-600 truncate">
-                            {item.quantity}x {item.name}
-                          </p>
-                        ))}
-                        {cart.items.length > 3 && (
-                          <p className="text-sm text-gray-500">
-                            +{cart.items.length - 3} more items
-                          </p>
-                        )}
+                      {/* Store Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="text-xl font-bold text-gray-900">
+                            {cart.tenant_name}
+                          </h3>
+                          <div className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">
+                            {cart.gateway_type === 'square' ? 'Square' : cart.gateway_type === 'paypal' ? 'PayPal' : cart.gateway_type}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
+                          <span className="flex items-center gap-1">
+                            <ShoppingBag className="h-4 w-4" />
+                            {item_count} {item_count === 1 ? 'item' : 'items'}
+                          </span>
+                        </div>
+
+                        {/* Item Preview */}
+                        <div className="space-y-1">
+                          {cart.items.slice(0, 3).map((item) => (
+                            <p key={item.product_id} className="text-sm text-gray-600 truncate">
+                              {item.quantity}x {item.product_name}
+                            </p>
+                          ))}
+                          {cart.items.length > 3 && (
+                            <p className="text-sm text-gray-500">
+                              +{cart.items.length - 3} more items
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Actions */}
-                  <div className="flex flex-col justify-between items-end gap-4 md:w-64">
-                    {/* Total */}
+                    {/* Actions */}
+                    <div className="flex flex-col justify-between items-end gap-4 md:w-64">
+                      {/* Total */}
                     <div className="text-right">
                       <p className="text-sm text-gray-600 mb-1">Cart Total</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {formatCurrency(cart.subtotal)}
+                        {formatCurrency(total_cents)}
                       </p>
                     </div>
 
                     {/* Buttons */}
                     <div className="flex flex-col gap-2 w-full">
-                      {cart.status === 'active' ? (
-                        <>
-                          <Button
-                            onClick={() => handleCheckout(cart.tenantId)}
-                            className="w-full"
-                          >
-                            Checkout
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => handleViewCart(cart.tenantId)}
-                            className="w-full"
-                          >
-                            View Cart
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            onClick={() => {
-                              if (confirm(`Remove all items from ${cart.tenantName}?`)) {
-                                clearCart(cart.tenantId);
-                              }
-                            }}
-                            className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Clear Cart
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            variant="outline"
-                            onClick={() => handleViewCart(cart.tenantId)}
-                            className="w-full"
-                          >
-                            View Order
-                          </Button>
-                          {cart.orderId && (
-                            <div className="text-xs text-gray-500 text-center mt-1">
-                              Order: {cart.orderId.substring(0, 12)}...
-                            </div>
-                          )}
-                        </>
-                      )}
+                      <Button
+                        onClick={() => handleCheckout(cart.tenant_id, cart.gateway_type)}
+                        className="w-full"
+                      >
+                        Checkout with {cart.gateway_type === 'square' ? 'Square' : 'PayPal'}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => toggleCartExpanded(cartSummary.key)}
+                        className="w-full"
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit Cart
+                        {expandedCart === cartSummary.key ? (
+                          <ChevronUp className="ml-2 h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="ml-2 h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleClearCart(cart.tenant_id, cart.gateway_type)}
+                        className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Clear Cart
+                      </Button>
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
 
-        {/* Order Receipts for Paid Carts */}
-        <div className="space-y-6">
-          {carts.filter(cart => cart.status === 'paid' || cart.status === 'fulfilled').map((cart) => (
-            <OrderReceipt key={`receipt-${cart.tenantId}`} cart={cart} />
-          ))}
-        </div>
+                {/* Expandable Cart Items Section */}
+                {expandedCart === cartSummary.key && (
+                  <div className="border-t border-gray-200 p-6 bg-gray-50">
+                    <h4 className="font-semibold text-gray-900 mb-4">Cart Items</h4>
+                    <div className="space-y-3">
+                      {cart.items.map((item) => (
+                        <div key={item.product_id} className="flex items-center gap-4 bg-white p-4 rounded-lg">
+                          {/* Product Image */}
+                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {item.product_image ? (
+                              <img
+                                src={item.product_image}
+                                alt={item.product_name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <ShoppingBag className="h-6 w-6 text-gray-400" />
+                            )}
+                          </div>
 
-        {/* Clear Paid Orders Button */}
-        {paidCarts.length > 0 && (
-          <div className="mt-8">
-            <Card className="bg-amber-50 border-amber-200">
-              <CardContent className="p-6">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-center sm:text-left">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                      Clear Order History
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      Remove {paidCarts.length} completed {paidCarts.length === 1 ? 'order' : 'orders'} from this page
-                    </p>
+                          {/* Product Info */}
+                          <div className="flex-1 min-w-0">
+                            <h5 className="font-medium text-gray-900 truncate">{item.product_name}</h5>
+                            <p className="text-sm text-gray-600">
+                              {formatCurrency(item.price_cents)} each
+                            </p>
+                          </div>
+
+                          {/* Quantity Controls */}
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateQuantity(cart.tenant_id, cart.gateway_type, item.product_id, item.quantity - 1)}
+                              disabled={item.quantity <= 1}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-8 text-center font-medium">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateQuantity(cart.tenant_id, cart.gateway_type, item.product_id, item.quantity + 1)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          {/* Item Total */}
+                          <div className="text-right min-w-[80px]">
+                            <p className="font-semibold text-gray-900">
+                              {formatCurrency(item.price_cents * item.quantity)}
+                            </p>
+                          </div>
+
+                          {/* Remove Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeItem(cart.tenant_id, cart.gateway_type, item.product_id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Add More Items Button */}
+                    <div className="mt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push(`/tenant/${cart.tenant_id}`)}
+                        className="w-full"
+                      >
+                        <Store className="mr-2 h-4 w-4" />
+                        Add More Items from {cart.tenant_name}
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={handleClearPaidOrders}
-                    className="border-amber-300 hover:bg-amber-100 whitespace-nowrap"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Clear Paid Orders
-                  </Button>
-                </div>
+                )}
               </CardContent>
             </Card>
-          </div>
-        )}
+            );
+          })}
+        </div>
 
         {/* Continue Shopping */}
         <div className="mt-8 text-center">

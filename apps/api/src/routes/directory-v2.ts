@@ -292,30 +292,10 @@ router.get('/:identifier', async (req: Request, res: Response, next) => {
     return next();
   }
   
-  // Handle reserved paths directly
-  const reservedPaths = ['store-types', 'tenant', 'stores', 'search', 'locations', 'categories-optimized'];
+  // Handle reserved paths directly (except store-types - handled by dedicated route)
+  const reservedPaths = ['tenant', 'stores', 'search', 'locations', 'categories-optimized'];
   if (reservedPaths.includes(identifier)) {
     console.log('[DIRECTORY-V2] Handling reserved path directly:', identifier);
-    
-    // Handle store-types
-    if (identifier === 'store-types') {
-      try {
-        const { lat, lng, radius } = req.query;
-        const location = lat && lng ? { lat: parseFloat(lat as string), lng: parseFloat(lng as string) } : undefined;
-        const radiusMiles = radius ? parseFloat(radius as string) : 25;
-        
-        const { storeTypeDirectoryService } = await import('../services/store-type-directory.service');
-        const storeTypes = await storeTypeDirectoryService.getStoreTypes(location, radiusMiles);
-        
-        return res.json({
-          success: true,
-          data: { storeTypes, totalCount: storeTypes.length }
-        });
-      } catch (error) {
-        console.error('[DIRECTORY-V2] Error fetching store types:', error);
-        return res.status(500).json({ success: false, error: 'Failed to fetch store types' });
-      }
-    }
     
     // For other reserved paths, return 404 for now
     return res.status(404).json({ error: 'not_found', message: 'Route not found' });

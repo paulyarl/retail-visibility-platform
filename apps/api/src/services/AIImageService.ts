@@ -90,16 +90,18 @@ export class AIImageService {
 
   /**
    * Generate product image with AI
+   * @param useCache - If true, stores in platform cache bucket for reuse across tenants
    */
   async generateProductImage(
     productName: string,
     tenantId: string,
     inventoryItemId: string,
     provider: 'google' | 'openai' = 'google',
-    quality: 'standard' | 'hd' = 'standard'
+    quality: 'standard' | 'hd' = 'standard',
+    useCache: boolean = false
   ): Promise<GeneratedImage | null> {
     try {
-      console.log(`[AIImage] Generating image for: ${productName}`);
+      console.log(`[AIImage] Generating image for: ${productName} (cache: ${useCache})`);
       
       // Step 1: Generate image with AI
       let imageUrl: string;
@@ -118,12 +120,13 @@ export class AIImageService {
       // Step 3: Process with Sharp
       const { original, thumbnail } = await this.processImage(imageBuffer);
       
-      // Step 4: Upload to Supabase
+      // Step 4: Upload to Supabase (platform cache or tenant-specific)
       const { originalUrl, thumbnailUrl } = await this.uploadToSupabase(
         original,
         thumbnail,
         tenantId,
-        inventoryItemId
+        inventoryItemId,
+        useCache
       );
       
       // Step 5: Create photo_assets record
@@ -324,29 +327,45 @@ commercial photography, clean and professional.`;
 
   /**
    * Upload images to Supabase storage
+   * @param useCache - If true, stores in platform cache bucket for reuse across tenants
    */
   private async uploadToSupabase(
     original: { buffer: Buffer; width: number; height: number; bytes: number },
     thumbnail: { buffer: Buffer; width: number; height: number; bytes: number },
     tenantId: string,
-    inventoryItemId: string
+    inventoryItemId: string,
+    useCache: boolean = false
   ): Promise<{ originalUrl: string; thumbnailUrl: string }> {
     if (!this.supabase) {
       throw new Error('Supabase not configured');
     }
     
-    console.log('[AIImage] Uploading to Supabase...');
-    
     const timestamp = Date.now();
-    const originalPath = `${tenantId}/products/${inventoryItemId}/original-${timestamp}.jpg`;
-    const thumbnailPath = `${tenantId}/products/${inventoryItemId}/thumb-${timestamp}.jpg`;
+    let originalPath: string;
+    let thumbnailPath: string;
+    let bucket: string;
+    
+    if (useCache) {
+      // Store in platform cache for reuse across tenants
+      // Use inventoryItemId as cache key (product name hash or similar)
+      bucket = 'product-cache';
+      originalPath = `ai-generated/${inventoryItemId}/original-${timestamp}.jpg`;
+      thumbnailPath = `ai-generated/${inventoryItemId}/thumb-${timestamp}.jpg`;
+      console.log('[AIImage] Uploading to platform cache bucket for reuse...');
+    } else {
+      // Store in tenant-specific location
+      bucket = 'photos';
+      originalPath = `${tenantId}/products/${inventoryItemId}/original-${timestamp}.jpg`;
+      thumbnailPath = `${tenantId}/products/${inventoryItemId}/thumb-${timestamp}.jpg`;
+      console.log('[AIImage] Uploading to tenant-specific bucket...');
+    }
     
     // Upload original
     const { error: originalError } = await this.supabase.storage
-      .from('photos')
+      .from(bucket)
       .upload(originalPath, original.buffer, {
         contentType: 'image/jpeg',
-        cacheControl: '3600',
+        cacheControl: '31536000', // 1 year cache for platform cache
         upsert: false
       });
     
@@ -356,10 +375,10 @@ commercial photography, clean and professional.`;
     
     // Upload thumbnail
     const { error: thumbnailError } = await this.supabase.storage
-      .from('photos')
+      .from(bucket)
       .upload(thumbnailPath, thumbnail.buffer, {
         contentType: 'image/jpeg',
-        cacheControl: '3600',
+        cacheControl: '31536000', // 1 year cache for platform cache
         upsert: false
       });
     
@@ -369,11 +388,11 @@ commercial photography, clean and professional.`;
     
     // Get public URLs
     const { data: originalData } = this.supabase.storage
-      .from('photos')
+      .from(bucket)
       .getPublicUrl(originalPath);
     
     const { data: thumbnailData } = this.supabase.storage
-      .from('photos')
+      .from(bucket)
       .getPublicUrl(thumbnailPath);
     
     return {

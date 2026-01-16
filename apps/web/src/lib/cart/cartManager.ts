@@ -15,11 +15,16 @@ export interface CartItem {
   gateway_type: string;
   gateway_id?: string;
   gateway_display_name?: string;
+  // Product variant fields
+  variant_id?: string; // Variant identifier if product has variants
+  variant_name?: string; // Display name like "Large - Blue"
+  variant_attributes?: Record<string, string>; // Attributes like {size: "Large", color: "Blue"}
 }
 
 export interface Cart {
   tenant_id: string;
   tenant_name: string;
+  tenant_logo?: string;
   gateway_type: string;
   items: CartItem[];
   created_at: string;
@@ -57,6 +62,9 @@ export function parseCartKey(key: string): { tenantId: string; gatewayType: stri
  * Get a specific cart
  */
 export function getCart(tenantId: string, gatewayType: string): Cart | null {
+  // Check if we're in the browser
+  if (typeof window === 'undefined') return null;
+  
   const key = getCartKey(tenantId, gatewayType);
   const data = localStorage.getItem(key);
   
@@ -74,6 +82,9 @@ export function getCart(tenantId: string, gatewayType: string): Cart | null {
  * Get all carts (optionally filtered by tenant)
  */
 export function getAllCarts(tenantId?: string): CartSummary[] {
+  // Check if we're in the browser
+  if (typeof window === 'undefined') return [];
+  
   const carts: CartSummary[] = [];
   
   for (let i = 0; i < localStorage.length; i++) {
@@ -94,10 +105,15 @@ export function getAllCarts(tenantId?: string): CartSummary[] {
       0
     );
     
+    const item_count = cart.items.reduce(
+      (sum, item) => sum + item.quantity,
+      0
+    );
+    
     carts.push({
       key,
       cart,
-      item_count: cart.items.length,
+      item_count,
       total_cents
     });
   }
@@ -109,6 +125,9 @@ export function getAllCarts(tenantId?: string): CartSummary[] {
  * Save cart
  */
 export function saveCart(cart: Cart): void {
+  // Check if we're in the browser
+  if (typeof window === 'undefined') return;
+  
   const key = getCartKey(cart.tenant_id, cart.gateway_type);
   cart.updated_at = new Date().toISOString();
   localStorage.setItem(key, JSON.stringify(cart));
@@ -121,7 +140,8 @@ export function addToCart(
   tenantId: string,
   tenantName: string,
   gatewayType: string,
-  item: Omit<CartItem, 'gateway_type'>
+  item: Omit<CartItem, 'gateway_type'>,
+  tenantLogo?: string
 ): void {
   // Get or create cart
   let cart = getCart(tenantId, gatewayType);
@@ -131,16 +151,23 @@ export function addToCart(
     cart = {
       tenant_id: tenantId,
       tenant_name: tenantName,
+      tenant_logo: tenantLogo,
       gateway_type: gatewayType,
       items: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
+  } else if (tenantLogo && !cart.tenant_logo) {
+    // Update existing cart with logo if not already set
+    cart.tenant_logo = tenantLogo;
   }
   
   // Check if item already exists
+  // Match by product_id, gateway_id, AND variant_id to allow multiple variants of same product
   const existingIndex = cart.items.findIndex(
-    i => i.product_id === item.product_id && i.gateway_id === item.gateway_id
+    i => i.product_id === item.product_id && 
+         i.gateway_id === item.gateway_id &&
+         i.variant_id === item.variant_id
   );
   
   if (existingIndex >= 0) {
@@ -155,6 +182,13 @@ export function addToCart(
   }
   
   saveCart(cart);
+  
+  // Dispatch custom event for same-tab updates
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('cart-updated', { 
+      detail: { tenantId, gatewayType, action: 'add' } 
+    }));
+  }
 }
 
 /**
@@ -185,6 +219,13 @@ export function updateCartItemQuantity(
     clearCart(tenantId, gatewayType);
   } else {
     saveCart(cart);
+    
+    // Dispatch custom event for same-tab updates
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('cart-updated', { 
+        detail: { tenantId, gatewayType, action: 'update' } 
+      }));
+    }
   }
 }
 
@@ -203,8 +244,16 @@ export function removeFromCart(
  * Clear specific cart
  */
 export function clearCart(tenantId: string, gatewayType: string): void {
+  // Check if we're in the browser
+  if (typeof window === 'undefined') return;
+  
   const key = getCartKey(tenantId, gatewayType);
   localStorage.removeItem(key);
+  
+  // Dispatch custom event for same-tab updates
+  window.dispatchEvent(new CustomEvent('cart-updated', { 
+    detail: { tenantId, gatewayType, action: 'clear' } 
+  }));
 }
 
 /**
@@ -231,6 +280,39 @@ export function getTotalItemCount(tenantId?: string): number {
 export function getTotalValue(tenantId?: string): number {
   const carts = getAllCarts(tenantId);
   return carts.reduce((sum, { total_cents }) => sum + total_cents, 0);
+}
+
+/**
+ * Backfill tenant logos for existing carts
+ */
+export async function backfillCartLogos(): Promise<void> {
+  // Check if we're in the browser
+  if (typeof window === 'undefined') return;
+  
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  const carts = getAllCarts();
+  
+  for (const { cart } of carts) {
+    // Skip if cart already has a logo
+    if (cart.tenant_logo) continue;
+    
+    try {
+      // Fetch tenant data to get logo
+      const response = await fetch(`${apiBaseUrl}/api/tenants/${cart.tenant_id}`);
+      if (response.ok) {
+        const tenantData = await response.json();
+        const logoUrl = tenantData.metadata?.logo_url;
+        
+        if (logoUrl) {
+          // Update cart with logo
+          cart.tenant_logo = logoUrl;
+          saveCart(cart);
+        }
+      }
+    } catch (error) {
+      console.error(`[Cart] Failed to fetch logo for tenant ${cart.tenant_id}:`, error);
+    }
+  }
 }
 
 /**
