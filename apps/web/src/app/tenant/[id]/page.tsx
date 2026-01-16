@@ -43,6 +43,8 @@ interface Product {
   stock: number;
   imageUrl?: string;
   availability: 'in_stock' | 'out_of_stock' | 'preorder';
+  payment_gateway_type?: string | null;
+  has_active_payment_gateway?: boolean;
 }
 
 interface Tenant {
@@ -258,12 +260,14 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       ? (Array.isArray(productsData.items) ? productsData.items : [])
       : (Array.isArray(productsData) ? productsData : []);
 
-    // Transform products: convert priceCents to price
+    // Transform products: convert priceCents to price and include payment gateway fields
     const products: Product[] = rawProducts.map((p: any) => ({
       ...p,
       price: typeof p.price === 'number' ? p.price : (typeof p.priceCents === 'number' ? p.priceCents / 100 : 0),
       title: p.title || p.name,
       currency: p.currency || 'USD',
+      payment_gateway_type: p.defaultGatewayType ?? null, // From MV (camelCase from API)
+      has_active_payment_gateway: p.hasActivePaymentGateway ?? false, // From MV (camelCase from API)
     }));
 
     const total = productsData.pagination?.totalItems || productsData.total || products.length;

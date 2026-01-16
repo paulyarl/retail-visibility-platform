@@ -23,6 +23,7 @@ interface ProductData {
   payment_gateway_type?: string | null;
   payment_gateway_id?: string | null;
   has_variants?: boolean;
+  has_active_payment_gateway?: boolean;
   availability?: 'in_stock' | 'out_of_stock' | 'preorder';
   tenantCategory?: {
     id: string;
@@ -57,9 +58,9 @@ export default function SmartProductCard({
   const [canPurchase, setCanPurchase] = useState(false);
   const [defaultGatewayType, setDefaultGatewayType] = useState<string | undefined>();
 
-  // Use context values if available, otherwise fetch individually
-  const effectiveCanPurchase = contextPayment?.canPurchase ?? canPurchase;
-  const effectiveGatewayType = contextPayment?.defaultGatewayType ?? defaultGatewayType;
+  // Priority: product data (from MV) > context > individual API fetch
+  const effectiveCanPurchase = product.has_active_payment_gateway ?? contextPayment?.canPurchase ?? canPurchase;
+  const effectiveGatewayType = product.payment_gateway_type ?? contextPayment?.defaultGatewayType ?? defaultGatewayType;
 
   useEffect(() => {
     // Skip individual fetch if context is available
@@ -433,6 +434,7 @@ export default function SmartProductCard({
                   product={product}
                   tenantName={tenantName || ''}
                   tenantLogo={tenantLogo}
+                  hasActivePaymentGateway={effectiveCanPurchase}
                   defaultGatewayType={effectiveGatewayType}
                 />
               )
@@ -522,24 +524,25 @@ export default function SmartProductCard({
         </div>
 
         {effectiveCanPurchase && (
-          product.has_variants ? (
-            <ProductWithVariants
-              product={product}
-              tenantName={tenantName || ''}
-              tenantLogo={tenantLogo}
-              defaultGatewayType={effectiveGatewayType}
-              className="w-full"
-            />
-          ) : (
-            <AddToCartButton
-              product={product}
-              tenantName={tenantName || ''}
-              tenantLogo={tenantLogo}
-              defaultGatewayType={effectiveGatewayType}
-              className="w-full"
-            />
-          )
-        )}
+            product.has_variants ? (
+              <ProductWithVariants
+                product={product}
+                tenantName={tenantName || ''}
+                tenantLogo={tenantLogo}
+                defaultGatewayType={effectiveGatewayType}
+                className="w-full"
+              />
+            ) : (
+              <AddToCartButton
+                product={product}
+                tenantName={tenantName || ''}
+                tenantLogo={tenantLogo}
+                hasActivePaymentGateway={effectiveCanPurchase}
+                defaultGatewayType={effectiveGatewayType}
+                className="w-full"
+              />
+            )
+          )}
       </div>
     </div>
   );

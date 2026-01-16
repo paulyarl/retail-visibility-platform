@@ -200,6 +200,8 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         hasImage: row.has_image,
         inStock: row.in_stock,
         hasGallery: row.has_gallery,
+        hasActivePaymentGateway: row.has_active_payment_gateway,
+        defaultGatewayType: row.default_gateway_type,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       };

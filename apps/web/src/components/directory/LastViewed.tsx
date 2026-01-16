@@ -26,8 +26,16 @@ interface LastViewedStore {
 interface LastViewedProduct {
   productId: string;
   productName: string;
+  productTitle?: string;
+  productDescription?: string;
+  productBrand?: string;
+  productSku?: string;
   productPrice?: number;
+  productPriceCents?: number;
   productImage?: string;
+  productStock?: number;
+  productAvailability?: string;
+  productCurrency?: string;
   tenantId: string;
   businessName: string;
   slug: string;
@@ -35,6 +43,11 @@ interface LastViewedProduct {
   reason: string;
   hasActivePaymentGateway?: boolean;
   tenantLogo?: string;
+  tenantCategory?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
 }
 
 interface LastViewedItem {
@@ -116,15 +129,24 @@ export default function LastViewed({
               data: {
                 productId: item.productId,
                 productName: item.productName,
+                productTitle: item.productTitle,
+                productDescription: item.productDescription,
+                productBrand: item.productBrand,
+                productSku: item.productSku,
                 productPrice: item.productPrice,
+                productPriceCents: item.productPriceCents,
                 productImage: item.productImage,
+                productStock: item.productStock,
+                productAvailability: item.productAvailability,
+                productCurrency: item.productCurrency,
                 tenantId: item.tenantId,
                 businessName: item.businessName,
                 slug: item.slug,
                 score: item.score,
                 reason: item.reason,
                 hasActivePaymentGateway: item.hasActivePaymentGateway,
-                tenantLogo: item.tenantLogo
+                tenantLogo: item.tenantLogo,
+                tenantCategory: item.tenantCategory
               }
             };
           } else {
@@ -241,21 +263,25 @@ export default function LastViewed({
                     <SmartProductCard
                       product={{
                         id: productData.productId,
-                        sku: productData.productId,
+                        sku: productData.productSku || productData.productId,
                         name: productData.productName,
-                        title: productData.productName,
-                        brand: productData.businessName,
-                        priceCents: Math.round((productData.productPrice || 0) * 100),
-                        stock: 999,
+                        title: productData.productTitle || productData.productName,
+                        brand: productData.productBrand || productData.businessName,
+                        description: productData.productDescription,
+                        priceCents: productData.productPriceCents || Math.round((productData.productPrice || 0) * 100),
+                        stock: productData.productStock || 999,
                         imageUrl: productData.productImage,
                         tenantId: productData.tenantId,
-                        availability: 'in_stock',
+                        availability: (productData.productAvailability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                        has_active_payment_gateway: productData.hasActivePaymentGateway,
+                        tenantCategory: productData.tenantCategory,
                       }}
                       tenantName={productData.businessName}
                       tenantLogo={productData.tenantLogo}
-                      variant="compact"
-                      showCategory={false}
-                      showDescription={false}
+                      variant="grid"
+                      showCategory={true}
+                      showDescription={true}
+                      className="h-full"
                     />
                   </TenantPaymentProvider>
                 );

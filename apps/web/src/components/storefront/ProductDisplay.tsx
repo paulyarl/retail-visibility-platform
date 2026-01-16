@@ -23,6 +23,7 @@ interface Product {
   payment_gateway_type?: string | null;
   payment_gateway_id?: string | null;
   has_variants?: boolean;
+  has_active_payment_gateway?: boolean;
   tenantCategory?: {
     id: string;
     name: string;
@@ -241,6 +242,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                 payment_gateway_type: product.payment_gateway_type,
                 payment_gateway_id: product.payment_gateway_id,
                 has_variants: product.has_variants,
+                has_active_payment_gateway: product.has_active_payment_gateway,
                 availability: product.availability,
                 tenantCategory: product.tenantCategory,
               }}
@@ -533,6 +535,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                 payment_gateway_type: product.payment_gateway_type,
                 payment_gateway_id: product.payment_gateway_id,
                 has_variants: product.has_variants,
+                has_active_payment_gateway: product.has_active_payment_gateway,
                 availability: product.availability,
                 tenantCategory: product.tenantCategory,
               }}

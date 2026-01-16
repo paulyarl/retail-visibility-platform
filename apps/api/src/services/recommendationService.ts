@@ -804,14 +804,29 @@ export async function getLastViewedItems(
             SELECT json_build_object(
               'title', sp.title,
               'name', sp.name,
+              'description', sp.description,
+              'brand', sp.brand,
+              'sku', sp.sku,
               'priceCents', sp.price_cents,
               'imageUrl', sp.image_url,
               'currency', sp.currency,
+              'stock', sp.stock,
+              'availability', sp.availability,
               'storeName', dcl.business_name,
               'storeSlug', dcl.slug,
+              'storeLogo', dcl.logo_url,
               'tenantId', sp.tenant_id,
               'hasActivePaymentGateway', sp.has_active_payment_gateway,
-              'defaultGatewayType', sp.default_gateway_type
+              'defaultGatewayType', sp.default_gateway_type,
+              'tenantCategory', CASE 
+                WHEN sp.category_id IS NOT NULL THEN
+                  json_build_object(
+                    'id', sp.category_id,
+                    'name', sp.category_name,
+                    'slug', sp.category_slug
+                  )
+                ELSE NULL
+              END
             )
             FROM storefront_products sp
             JOIN directory_listings_list dcl ON sp.tenant_id = dcl.tenant_id
@@ -859,8 +874,18 @@ export async function getLastViewedItems(
             reason: `Viewed ${new Date(row.last_viewed_at).toLocaleDateString()}${data.priceCents ? ` • $${(data.priceCents / 100).toFixed(2)}` : ''}`,
             productId: row.entity_id,
             productName: data.title || data.name,
+            productTitle: data.title,
+            productDescription: data.description,
+            productBrand: data.brand,
+            productSku: data.sku,
             productPrice: data.priceCents ? data.priceCents / 100 : undefined,
+            productPriceCents: data.priceCents,
             productImage: data.imageUrl,
+            productStock: data.stock,
+            productAvailability: data.availability,
+            productCurrency: data.currency,
+            tenantLogo: data.storeLogo,
+            tenantCategory: data.tenantCategory,
             hasActivePaymentGateway: data.hasActivePaymentGateway,
             defaultGatewayType: data.defaultGatewayType
           } as Recommendation;

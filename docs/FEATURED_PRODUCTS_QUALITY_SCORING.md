@@ -2,9 +2,20 @@
 
 ## Overview
 
-A comprehensive scoring system that prioritizes featured products from high-quality, well-maintained stores in the directory. This ensures that featured products come from stores that provide the best customer experience.
+A comprehensive scoring system that **incentivizes stores to improve their quality** by rewarding complete profiles, accurate data, and professional presentation with increased featured product visibility.
 
-**Total Score Range:** 0-100 points
+### Strategic Purpose
+
+Featured products serve as a **quality incentive engine** that:
+- Rewards stores that invest in complete, accurate profiles
+- Encourages professional branding (logos, descriptions)
+- Prioritizes stores with location data (critical for local shopping)
+- Motivates stores to maintain inventory and gather reviews
+- Drives overall platform quality through competitive improvement
+
+**The more effort a store puts into their profile, the more visibility they earn.**
+
+**Total Score Range:** 0-120 points (100 base + 20 bonus)
 
 ## Scoring Breakdown (Optimized for Local Shopping)
 
@@ -242,13 +253,25 @@ GET /api/featured-products/scored?minScore=0&tier=poor
 
 ## Benefits
 
+### For Stores (Incentive Alignment)
+✅ **Clear Improvement Path:** Know exactly what to do to increase visibility  
+✅ **Competitive Motivation:** See how you rank and what to improve  
+✅ **Reward for Effort:** Time invested in profile = more featured visibility  
+✅ **No Pay-to-Win:** Based on quality, not subscription tier (mostly)  
+✅ **Transparent Scoring:** Understand why you rank where you do  
+
+### For Platform
+✅ **Quality Flywheel:** Better stores → better user experience → more stores join  
+✅ **Data Completeness:** Incentivizes location data, hours, descriptions  
+✅ **Professional Standards:** Encourages branding and presentation  
 ✅ **Local Shopping Focus:** Prioritizes stores with complete location data  
-✅ **User Experience:** Customers can easily find and visit stores  
-✅ **Store Incentive:** Encourages complete location profiles and hours  
-✅ **Platform Quality:** Maintains high standards for local discovery  
-✅ **Fair Ranking:** Objective scoring based on measurable metrics  
-✅ **Transparency:** Clear scoring breakdown helps stores improve  
 ✅ **Scalability:** Efficient SQL-based scoring handles growth  
+
+### For Customers
+✅ **Better Experience:** See products from high-quality, reliable stores  
+✅ **Complete Information:** Featured stores have location, hours, descriptions  
+✅ **Local Relevance:** Proximity bonus shows nearby stores first  
+✅ **Category Match:** See products from stores that specialize in what you want  
 
 ## Migration Path
 
@@ -269,11 +292,25 @@ GET /api/featured-products/scored?minScore=0&tier=poor
 
 ## Future Enhancements
 
+### Incentive Improvements
+1. **Store Dashboard:** Show stores their current score and improvement opportunities
+2. **Score History:** Track score improvements over time to show progress
+3. **Achievement Badges:** Reward milestones ("Complete Profile", "100 Reviews", etc.)
+4. **Competitive Leaderboards:** Show top-scoring stores by category/region
+5. **Improvement Notifications:** Alert stores when they can gain points
+
+### Algorithm Refinements
 1. **Dynamic Weights:** Adjust scoring weights based on category or region
-2. **Temporal Scoring:** Boost recently featured products for variety
+2. **Temporal Variety:** Rotate high-scoring stores to prevent staleness
 3. **User Preferences:** Personalize scoring based on user behavior
 4. **A/B Testing:** Test different scoring algorithms
-5. **Store Insights:** Provide stores with their quality score and improvement tips
+5. **New Store Boost:** Temporary bonus for new stores (first 30 days)
+
+### Gamification
+1. **Point Milestones:** Celebrate when stores reach 50, 75, 90, 100+ points
+2. **Improvement Challenges:** "Add business hours this week for +15 points"
+3. **Category Champions:** Highlight top-scoring store in each category
+4. **Quality Tiers:** Bronze/Silver/Gold/Platinum based on score ranges
 
 ## Related Files
 

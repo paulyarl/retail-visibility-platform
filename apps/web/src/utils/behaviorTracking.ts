@@ -195,18 +195,7 @@ class BehaviorTrackingCache {
 
       console.log('[BehaviorTracking] Sending batch data:', JSON.stringify(batchData, null, 2));
 
-      // Use compression for large batches to reduce network overhead
-      let requestBody: string | Blob;
-      let headers: Record<string, string> = {};
-
-      requestBody = JSON.stringify(batchData);
-      headers['Content-Type'] = 'application/json';
-      
-      const response = await api.post(`${apiUrl}/api/recommendations/track-batch`, {
-        method: 'POST',
-        headers,
-        body: requestBody
-      });
+      const response = await api.post(`${apiUrl}/api/recommendations/track-batch`, batchData);
 
       if (!response.ok) {
         // For tracking failures, handle silently - users don't need to know about behavior tracking failures
