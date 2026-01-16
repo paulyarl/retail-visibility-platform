@@ -353,16 +353,23 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   // API base URL for additional calls
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
-  // Fetch directory publish status
+  // Fetch directory publish status and actual slug
   let directoryPublished = false;
-  const tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
+  let tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
   try {
-    const directoryRes = await fetch(`${apiBaseUrl}/api/directory/${tenantSlug}`, {
+    // Use tenant ID to lookup directory listing (more reliable than generated slug)
+    // Note: id already includes 'tid-' prefix, no need to add 't-'
+    const directoryRes = await fetch(`${apiBaseUrl}/api/directory/${id}`, {
       cache: 'no-store',
     });
     if (directoryRes.ok) {
+      const directoryData = await directoryRes.json();
       // If the directory page exists, the store is published
       directoryPublished = true;
+      // Use the actual slug from the directory listing
+      if (directoryData.listing?.slug) {
+        tenantSlug = directoryData.listing.slug;
+      }
     }
   } catch (e) {
     // Directory page doesn't exist or error - store is not published

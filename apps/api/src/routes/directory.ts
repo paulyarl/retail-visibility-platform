@@ -397,17 +397,23 @@ router.get('/tenant/:tenantId', async (req, res) => {
 router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
+    console.log('[DIRECTORY] /:slug route hit with identifier:', slug);
 
     // Use a direct database connection instead of Prisma raw query
     const { getDirectPool } = await import('../utils/db-pool');
     const pool = getDirectPool();
     
-    const result = await pool.query(
-      `SELECT * FROM directory_listings_list 
-       WHERE slug = $1 AND is_published = true 
-       LIMIT 1`,
-      [slug]
-    );
+    // Try both tenant_id and slug lookups - database will determine which matches
+    // This future-proofs against tenant ID format changes
+    const query = `
+      SELECT * FROM directory_listings_list 
+      WHERE (tenant_id = $1 OR slug = $1) AND is_published = true 
+      LIMIT 1
+    `;
+    
+    console.log('[DIRECTORY] Querying by tenant_id OR slug:', slug);
+    const result = await pool.query(query, [slug]);
+    console.log('[DIRECTORY] Query result rows:', result.rows.length);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'listing_not_found' });

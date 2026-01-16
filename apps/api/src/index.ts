@@ -5534,6 +5534,11 @@ import storefrontFeaturedRoutes from './routes/storefront-featured';
 app.use('/api/storefront', storefrontFeaturedRoutes);
 console.log('✅ Storefront featured products routes mounted at /api/storefront');
 
+/* ------------------------------ featured products with quality scoring ------------------------------ */
+import featuredProductsScoredRoutes from './routes/featured-products-scored';
+app.use('/api/featured-products', featuredProductsScoredRoutes);
+console.log('✅ Featured products with quality scoring routes mounted at /api/featured-products');
+
 /* ------------------------------ OAuth (Payment Gateway Integration) ------------------------------ */
 import oauthRoutes from './routes/oauth';
 app.use('/api/oauth', oauthRoutes);

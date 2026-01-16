@@ -63,18 +63,17 @@ router.get('/categories', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/:categoryId', async (req: Request, res: Response) => {
+router.get('/:categoryId', async (req: Request, res: Response, next) => {
   try {
     const { categoryId } = req.params;
 
     // Get category path (breadcrumb)
     const path = await categoryDirectoryService.getCategoryPath(categoryId);
 
+    // If no category found, pass to next route (could be tenant ID or other identifier)
     if (path.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Category not found',
-      });
+      console.log('[DIRECTORY-CATEGORIES] No category found for:', categoryId, '- passing to next route');
+      return next();
     }
 
     // Get the current category (last in path)

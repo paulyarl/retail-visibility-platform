@@ -206,6 +206,7 @@ export default function SmartProductCard({
                     product={product}
                     tenantName={tenantName || ''}
                     tenantLogo={tenantLogo}
+                    hasActivePaymentGateway={effectiveCanPurchase}
                     defaultGatewayType={effectiveGatewayType}
                     className="w-full"
                   />
@@ -247,13 +248,71 @@ export default function SmartProductCard({
                 {displayTitle}
               </h4>
             </Link>
-            <PriceDisplay
-              priceCents={product.priceCents}
-              salePriceCents={product.salePriceCents}
-              variant="compact"
-            />
+            
+            {/* Brand if available */}
+            {product.brand && product.brand !== tenantName && (
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                by {product.brand}
+              </p>
+            )}
+            
+            <div className="flex items-center gap-1 mt-0.5">
+              <PriceDisplay
+                priceCents={product.priceCents}
+                salePriceCents={product.salePriceCents}
+                variant="compact"
+              />
+              {product.salePriceCents && (
+                <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 px-1.5 py-0.5 rounded">
+                  Sale
+                </span>
+              )}
+            </div>
+            
+            {/* Category and Stock Status */}
+            <div className="flex items-center gap-2 mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+              {showCategory && product.tenantCategory && (
+                <span className="flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  {typeof product.tenantCategory === 'string' ? product.tenantCategory : product.tenantCategory?.name || ''}
+                </span>
+              )}
+              {product.stock !== undefined && product.stock !== null && (
+                <>
+                  {showCategory && product.tenantCategory && <span>•</span>}
+                  <span className={`flex items-center gap-1 ${
+                    product.stock === 0 
+                      ? 'text-red-600 dark:text-red-400' 
+                      : product.stock <= 5 
+                        ? 'text-amber-600 dark:text-amber-400' 
+                        : 'text-green-600 dark:text-green-400'
+                  }`}>
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    {product.stock === 0 
+                      ? 'Out of Stock' 
+                      : product.stock <= 5 
+                        ? `Only ${product.stock} left` 
+                        : 'In Stock'
+                    }
+                  </span>
+                </>
+              )}
+              {product.has_variants && (
+                <>
+                  {(showCategory && product.tenantCategory) || (product.stock !== undefined && product.stock !== null) ? <span>•</span> : null}
+                  <span className="text-blue-600 dark:text-blue-400">
+                    Multiple options
+                  </span>
+                </>
+              )}
+            </div>
+            
             {effectiveCanPurchase && (
-              <div className="mt-1">
+              <div className="mt-2">
                 {product.has_variants ? (
                   <Link
                     href={`/products/${product.id}`}
@@ -266,6 +325,7 @@ export default function SmartProductCard({
                     product={product}
                     tenantName={tenantName || ''}
                     tenantLogo={tenantLogo}
+                    hasActivePaymentGateway={effectiveCanPurchase}
                     defaultGatewayType={effectiveGatewayType}
                     className="text-xs py-1"
                   />
