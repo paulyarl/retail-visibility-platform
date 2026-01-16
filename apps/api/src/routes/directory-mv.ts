@@ -333,7 +333,7 @@ router.get('/categories', async (req: Request, res: Response) => {
           category_slug,
           COUNT(*) as product_count
         FROM directory_category_products 
-        WHERE store_published = true
+        WHERE is_published = true
         GROUP BY category_slug
       ) dcp ON dcp.category_slug = pc.slug
       WHERE pc.is_active = true
@@ -427,7 +427,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
           category_slug,
           COUNT(*) as product_count
         FROM directory_category_products 
-        WHERE store_published = true
+        WHERE is_published = true
         GROUP BY category_slug
       ) dcp ON dcp.category_slug = pc.slug
       WHERE pc.is_active = true 
