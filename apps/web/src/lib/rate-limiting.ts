@@ -183,7 +183,8 @@ export async function applyRateLimit(request: NextRequest): Promise<NextResponse
     // Rate limit exceeded - store warning data for trend analysis
     try {
       // Store warning in database (fire and forget - don't block the response)
-      fetch('/api/rate-limit-warnings', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      fetch(`${apiUrl}/api/rate-limit-warnings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -227,7 +228,8 @@ export async function applyRateLimit(request: NextRequest): Promise<NextResponse
     // For other routes that hit limits, block and log
     try {
       // Store blocked warning in database
-      fetch('/api/rate-limit-warnings', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      fetch(`${apiUrl}/api/rate-limit-warnings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -31,6 +31,44 @@ router.post('/rate-limit-warnings', async (req: Request, res: Response) => {
       }
     });
 
+    // Also create a security alert for unified tracking
+    try {
+      const alertSeverity = blocked ? 'warning' : 'info';
+      const alertTitle = blocked ? 'Rate Limit Blocked' : 'Rate Limit Warning';
+      const alertMessage = blocked 
+        ? `Rate limit exceeded and blocked for ${pathname}. ${requestCount}/${maxRequests} requests.`
+        : `Rate limit warning for ${pathname}. ${requestCount}/${maxRequests} requests.`;
+
+      await prisma.$executeRaw`
+        INSERT INTO security_alerts (
+          id, type, severity, title, message, metadata, created_at
+        ) VALUES (
+          gen_random_uuid(),
+          'rate_limit_exceeded',
+          ${alertSeverity},
+          ${alertTitle},
+          ${alertMessage},
+          jsonb_build_object(
+            'client_id', ${clientId},
+            'pathname', ${pathname},
+            'request_count', ${requestCount},
+            'max_requests', ${maxRequests},
+            'window_ms', ${windowMs},
+            'ip_address', ${ipAddress},
+            'user_agent', ${userAgent},
+            'blocked', ${blocked},
+            'warning_id', ${warning.id}
+          ),
+          NOW()
+        )
+      `;
+
+      console.log('✅ Rate limit warning and security alert created:', warning.id);
+    } catch (alertError) {
+      console.error('Failed to create security alert for rate limit:', alertError);
+      // Don't fail the main request if alert creation fails
+    }
+
     res.json({ success: true, id: warning.id });
   } catch (error) {
     console.error('Failed to store rate limit warning:', error);
@@ -43,6 +81,7 @@ router.get('/rate-limit-warnings', async (req: Request, res: Response) => {
   try {
     const days = parseInt(req.query.days as string || '7');
     const pathname = req.query.pathname as string;
+    const includeAlerts = req.query.includeAlerts === 'true';
 
     // Calculate date range
     const endDate = new Date();
@@ -130,7 +169,7 @@ router.get('/rate-limit-warnings', async (req: Request, res: Response) => {
       .sort((a: any, b: any) => b.totalWarnings - a.totalWarnings)
       .slice(0, 10);
 
-    res.json({
+    const response: any = {
       aggregatedData,
       topPaths,
       totalWarnings: warnings.length,
@@ -138,7 +177,40 @@ router.get('/rate-limit-warnings', async (req: Request, res: Response) => {
         start: startDate.toISOString(),
         end: endDate.toISOString()
       }
-    });
+    };
+
+    // Optionally include security alerts for cross-reference
+    if (includeAlerts) {
+      try {
+        const securityAlerts = await prisma.$queryRaw<any[]>`
+          SELECT 
+            type,
+            COUNT(*) as count,
+            COUNT(*) FILTER (WHERE severity = 'warning') as warning_count,
+            COUNT(*) FILTER (WHERE severity = 'info') as info_count,
+            MAX(created_at) as latest_alert
+          FROM security_alerts
+          WHERE type = 'rate_limit_exceeded'
+            AND created_at >= ${startDate}
+            AND dismissed = false
+          GROUP BY type
+        `;
+
+        response.securityAlerts = {
+          totalRateLimitAlerts: securityAlerts.reduce((sum: number, alert: any) => sum + Number(alert.count), 0),
+          warningAlerts: securityAlerts.reduce((sum: number, alert: any) => sum + Number(alert.warning_count), 0),
+          infoAlerts: securityAlerts.reduce((sum: number, alert: any) => sum + Number(alert.info_count), 0),
+          latestAlert: securityAlerts[0]?.latest_alert || null
+        };
+
+        console.log('📊 Rate limit trends with security alerts cross-reference');
+      } catch (alertError) {
+        console.error('Failed to fetch security alerts cross-reference:', alertError);
+        response.securityAlerts = { error: 'Failed to fetch alerts data' };
+      }
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Failed to fetch rate limit trends:', error);
     res.status(500).json({ error: 'Failed to fetch trends' });
