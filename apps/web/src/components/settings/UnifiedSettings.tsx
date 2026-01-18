@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, AnimatedCard } from '@/components/ui';
 import PageHeader from '@/components/PageHeader';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import { CachedProtectedCard } from '@/lib/auth/CachedProtectedCard';
 import SettingsSearch from '@/components/SettingsSearch';
+import { Loader2 } from 'lucide-react';
 
 
 // Force edge runtime to prevent prerendering issues
@@ -53,14 +55,26 @@ interface UnifiedSettingsProps {
 
 export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
   const router = useRouter();
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
-  const handleCardClick = (href: string) => {
-    router.push(href);
+  const handleCardClick = async (href: string) => {
+    setNavigatingTo(href);
+    try {
+      await router.push(href);
+    } finally {
+      // Small delay to show loading state even for fast navigation
+      setTimeout(() => setNavigatingTo(null), 500);
+    }
   };
 
-  const handleSecondaryLinkClick = (e: React.MouseEvent, href: string) => {
+  const handleSecondaryLinkClick = async (e: React.MouseEvent, href: string) => {
     e.stopPropagation();
-    router.push(href);
+    setNavigatingTo(href);
+    try {
+      await router.push(href);
+    } finally {
+      setTimeout(() => setNavigatingTo(null), 500);
+    }
   };
 
   // Prepare search data from config
@@ -86,13 +100,18 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
       <div className="mb-8">
         <SettingsSearch
           settings={searchSettings}
-          onResultClick={(href) => {
+          onResultClick={async (href) => {
             if (href.startsWith('#')) {
               // Scroll to section
               const element = document.querySelector(href);
               element?.scrollIntoView({ behavior: 'smooth' });
             } else {
-              router.push(href);
+              setNavigatingTo(href);
+              try {
+                await router.push(href);
+              } finally {
+                setTimeout(() => setNavigatingTo(null), 500);
+              }
             }
           }}
         />
@@ -136,8 +155,13 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
                   >
                     <AnimatedCard
                       onClick={() => handleCardClick(card.href)}
-                      className="cursor-pointer h-full"
+                      className={`cursor-pointer h-full relative ${navigatingTo === card.href ? 'opacity-75' : ''}`}
                     >
+                      {navigatingTo === card.href && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg">
+                          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                        </div>
+                      )}
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div className={`${card.color} p-3 rounded-lg text-white`}>
@@ -155,12 +179,17 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
                           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                             <button
                               onClick={(e) => handleSecondaryLinkClick(e, card.secondaryLink!.href)}
-                              className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                              className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50"
+                              disabled={navigatingTo === card.secondaryLink!.href}
                             >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
+                              {navigatingTo === card.secondaryLink!.href ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              )}
                               {card.secondaryLink.label}
                             </button>
                           </div>

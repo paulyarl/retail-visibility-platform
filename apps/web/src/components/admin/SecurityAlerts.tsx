@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { SecurityPagination } from './SecurityPagination';
-import { AlertTriangle, Shield, TrendingUp, Users, Eye, EyeOff, Clock, User, Globe, UserCheck, UserX } from 'lucide-react';
+import { AlertTriangle, Shield, TrendingUp, Users, Eye, EyeOff, Clock, User, Globe, UserCheck, UserX, ChevronDown, ChevronUp, Cpu, Activity, MapPin, Network } from 'lucide-react';
 
 interface PaginationInfo {
   page: number;
@@ -39,6 +39,7 @@ export default function SecurityAlerts() {
   const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedAlerts, setExpandedAlerts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchAlerts(currentPage, pageSize);
@@ -72,6 +73,18 @@ export default function SecurityAlerts() {
   const handlePageSizeChange = (size: number) => {
     setPageSize(size);
     setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  const toggleAlertExpansion = (alertId: string) => {
+    setExpandedAlerts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(alertId)) {
+        newSet.delete(alertId);
+      } else {
+        newSet.add(alertId);
+      }
+      return newSet;
+    });
   };
 
   const getSeverityColor = (severity: string) => {
@@ -172,6 +185,7 @@ export default function SecurityAlerts() {
         <div className="space-y-3">
           {alerts.map((alert) => {
             const deviceInfo = extractEnhancedDeviceInfo(alert.metadata);
+            const isExpanded = expandedAlerts.has(alert.id);
             
             return (
             <Card key={alert.id} className={`border-l-4 border-l-${
@@ -180,162 +194,220 @@ export default function SecurityAlerts() {
               'blue'
             }-500`}>
               <CardContent className="pt-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge className={getSeverityColor(alert.severity)}>
-                        {getSeverityIcon(alert.severity)}
-                        <span className="ml-1">{alert.severity.toUpperCase()}</span>
-                      </Badge>
-                      
-                      {/* User Type Badge */}
-                      {alert.metadata?.application?.isPlatformUser ? (
+                {/* Clickable Header */}
+                <div 
+                  className="cursor-pointer hover:bg-gray-50 -mx-2 px-2 py-1 rounded transition-colors"
+                  onClick={() => toggleAlertExpansion(alert.id)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge className={getSeverityColor(alert.severity)}>
+                          {getSeverityIcon(alert.severity)}
+                          <span className="ml-1">{alert.severity.toUpperCase()}</span>
+                        </Badge>
                         <Badge variant="default" className="text-xs bg-gray-100 text-gray-800 border-gray-300">
-                          <UserCheck className="h-3 w-3 mr-1" />
-                          PLATFORM USER
+                          {alert.type}
                         </Badge>
-                      ) : (
-                        <Badge variant="default" className="text-xs bg-red-100 text-red-800 border-red-200">
-                          <UserX className="h-3 w-3 mr-1" />
-                          EXTERNAL ACTOR
-                        </Badge>
-                      )}
-                      
-                      {deviceInfo.isSuspicious && (
-                        <Badge variant="default" className="text-xs bg-red-100 text-red-800 border-red-200">
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          SUSPICIOUS
-                        </Badge>
-                      )}
-                      <span className="text-sm text-muted-foreground">
-                        {formatDate(alert.createdAt)}
-                      </span>
-                    </div>
-                    
-                    <h4 className="font-semibold mb-1">{alert.title}</h4>
-                    <p className="text-sm text-muted-foreground mb-2">{alert.message}</p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs text-muted-foreground">
-                      {/* Location Information */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 font-medium">
-                          <Globe className="h-3 w-3" />
-                          Location
-                        </div>
-                        <div className="ml-4">
-                          <div>📍 {deviceInfo.location}</div>
-                          {deviceInfo.timezone !== 'Unknown' && (
-                            <div>🕐 {deviceInfo.timezone}</div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Device Information */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 font-medium">
-                          <Eye className="h-3 w-3" />
-                          Device
-                        </div>
-                        <div className="ml-4">
-                          <div>🖥️ {deviceInfo.device}</div>
-                          {deviceInfo.isBot && (
-                            <div className="text-orange-600">🤖 Bot/Crawler</div>
-                          )}
-                          {deviceInfo.isMobile && (
-                            <div>📱 Mobile Device</div>
-                          )}
-                          {deviceInfo.isTablet && (
-                            <div>📱 Tablet Device</div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Network & Endpoint */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 font-medium">
-                          <Shield className="h-3 w-3" />
-                          Network
-                        </div>
-                        <div className="ml-4">
-                          <div>🌐 IP: {alert.metadata?.network?.ip || alert.metadata?.ipAddress || 'Unknown'}</div>
-                          <div>🔗 Endpoint: {alert.metadata?.application?.endpoint || alert.metadata?.endpoint || 'Unknown'}</div>
-                          {deviceInfo.threatLevel !== 'low' && (
-                            <div className={`font-medium ${
-                              deviceInfo.threatLevel === 'critical' ? 'text-red-600' :
-                              deviceInfo.threatLevel === 'high' ? 'text-orange-600' :
-                              'text-yellow-600'
-                            }`}>
-                              ⚠️ Threat: {deviceInfo.threatLevel.toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Rate Analysis - Only for rate limit alerts */}
-                      {alert.type === 'rate_limit_exceeded' && alert.metadata?.rateAnalysis && (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1 font-medium">
-                            <TrendingUp className="h-3 w-3" />
-                            Request Rate Analysis
-                          </div>
-                          <div className="ml-4">
-                            <div>📊 Current: {alert.metadata.rateAnalysis.currentRate} req/min</div>
-                            <div>📈 Trend: {alert.metadata.rateAnalysis.rateTrend === 'increasing' ? '📈 Rising' : 
-                                      alert.metadata.rateAnalysis.rateTrend === 'decreasing' ? '📉 Falling' : '➡️ Stable'}</div>
-                            <div>🎯 Limit: {alert.metadata.rateAnalysis.limitInfo?.limit || 'Unknown'} req/15min</div>
-                            <div>⚡ Used: {alert.metadata.rateAnalysis.limitInfo?.current || 'Unknown'}/{alert.metadata.rateAnalysis.limitInfo?.limit || 'Unknown'}</div>
-                            {alert.metadata.rateAnalysis.historicalAverage > 0 && (
-                              <div>📊 Avg: {alert.metadata.rateAnalysis.historicalAverage.toFixed(1)} req/min (7-day)</div>
-                            )}
-                            {alert.metadata.rateAnalysis.triggerReason && (
-                              <div className={`font-medium ${
-                                alert.metadata.rateAnalysis.triggerReason === 'limit_exceeded' ? 'text-red-600' : 'text-orange-600'
-                              }`}>
-                                🔴 Trigger: {alert.metadata.rateAnalysis.triggerReason === 'limit_exceeded' ? 'Limit Exceeded' : 'Rate Too High'}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Risk Factors */}
-                    {deviceInfo.riskFactors.length > 0 && (
-                      <div className="mt-3 pt-3 border-t">
-                        <div className="text-xs font-medium mb-1">Risk Factors:</div>
-                        <div className="flex flex-wrap gap-1">
-                          {deviceInfo.riskFactors.map((factor: string, index: number) => (
-                            <Badge key={index} variant="default" className="text-xs bg-gray-100 text-gray-800 border-gray-300">
-                              {factor}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* User Information */}
-                    {alert.userEmail && (
-                      <div className="mt-2 pt-2 border-t">
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <User className="h-3 w-3" />
-                          <span>User: {alert.userEmail}</span>
+                          {isExpanded ? (
+                            <ChevronUp className="h-3 w-3" />
+                          ) : (
+                            <ChevronDown className="h-3 w-3" />
+                          )}
+                          <span>Click to {isExpanded ? 'hide' : 'show'} details</span>
                         </div>
                       </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center gap-1 ml-4">
-                    {alert.read ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-blue-500" />
-                    )}
+                      <h4 className="font-medium text-sm">{alert.title}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {new Date(alert.createdAt).toLocaleString()}
+                        </div>
+                        {alert.userEmail && (
+                          <div className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            <span>{alert.userEmail}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-1 ml-4">
+                      {alert.read ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-blue-500" />
+                      )}
+                    </div>
                   </div>
                 </div>
+
+                {/* Expandable Details */}
+                {isExpanded && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      
+                      {/* Device Information */}
+                      {alert.metadata.device && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 font-medium text-sm">
+                            <Cpu className="h-4 w-4" />
+                            Device Information
+                          </div>
+                          <div className="space-y-1 text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                            <div><strong>OS:</strong> {alert.metadata.device.os}</div>
+                            <div><strong>Browser:</strong> {alert.metadata.device.browser}</div>
+                            <div><strong>Bot:</strong> {alert.metadata.device.isBot ? 'Yes' : 'No'}</div>
+                            <div><strong>Mobile:</strong> {alert.metadata.device.isMobile ? 'Yes' : 'No'}</div>
+                            <div><strong>Desktop:</strong> {alert.metadata.device.isDesktop ? 'Yes' : 'No'}</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Network Information */}
+                      {alert.metadata.network && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 font-medium text-sm">
+                            <Network className="h-4 w-4" />
+                            Network Information
+                          </div>
+                          <div className="space-y-1 text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                            <div><strong>IP Address:</strong> {alert.metadata.network.ip}</div>
+                            <div><strong>Behind Proxy:</strong> {alert.metadata.network.isBehindProxy ? 'Yes' : 'No'}</div>
+                            {alert.metadata.network.proxyChain?.length > 0 && (
+                              <div><strong>Proxy Chain:</strong> {alert.metadata.network.proxyChain.join(', ')}</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Location Information */}
+                      {alert.metadata.location && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 font-medium text-sm">
+                            <MapPin className="h-4 w-4" />
+                            Location Information
+                          </div>
+                          <div className="space-y-1 text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                            <div><strong>City:</strong> {alert.metadata.location.city}</div>
+                            <div><strong>Country:</strong> {alert.metadata.location.country}</div>
+                            <div><strong>Timezone:</strong> {alert.metadata.location.timezone}</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Request Information */}
+                      {(alert.metadata.endpoint || alert.metadata.method) && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 font-medium text-sm">
+                            <Activity className="h-4 w-4" />
+                            Request Information
+                          </div>
+                          <div className="space-y-1 text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                            {alert.metadata.endpoint && (
+                              <div><strong>Endpoint:</strong> {alert.metadata.endpoint}</div>
+                            )}
+                            {alert.metadata.method && (
+                              <div><strong>Method:</strong> {alert.metadata.method}</div>
+                            )}
+                            {alert.metadata.userAgent && (
+                              <div><strong>User Agent:</strong> {alert.metadata.userAgent}</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Threat Analysis */}
+                      {alert.metadata.threatLevel && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 font-medium text-sm">
+                            <AlertTriangle className="h-4 w-4" />
+                            Threat Analysis
+                          </div>
+                          <div className="space-y-1 text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                            <div><strong>Threat Level:</strong> 
+                              <span className={`ml-1 px-1 rounded text-white ${
+                                alert.metadata.threatLevel === 'critical' ? 'bg-red-500' :
+                                alert.metadata.threatLevel === 'high' ? 'bg-orange-500' :
+                                alert.metadata.threatLevel === 'medium' ? 'bg-yellow-500' :
+                                'bg-green-500'
+                              }`}>
+                                {alert.metadata.threatLevel.toUpperCase()}
+                              </span>
+                            </div>
+                            {alert.metadata.confidence && (
+                              <div><strong>Confidence:</strong> {Math.round(alert.metadata.confidence * 100)}%</div>
+                            )}
+                            {alert.metadata.riskFactors?.length > 0 && (
+                              <div><strong>Risk Factors:</strong> {alert.metadata.riskFactors.join(', ')}</div>
+                            )}
+                            {alert.metadata.incident && (
+                              <div><strong>Incident:</strong> {alert.metadata.incident}</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Rate Analysis */}
+                      {alert.metadata.rateAnalysis && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 font-medium text-sm">
+                            <TrendingUp className="h-4 w-4" />
+                            Rate Analysis
+                          </div>
+                          <div className="space-y-1 text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                            <div><strong>Current Rate:</strong> {alert.metadata.rateAnalysis.currentRate}/min</div>
+                            <div><strong>Historical Avg:</strong> {alert.metadata.rateAnalysis.historicalAverage}/min</div>
+                            <div><strong>Trend:</strong> {alert.metadata.rateAnalysis.rateTrend}</div>
+                            <div><strong>Trigger:</strong> {alert.metadata.rateAnalysis.triggerReason}</div>
+                            {alert.metadata.rateAnalysis.limitInfo && (
+                              <>
+                                <div><strong>Limit:</strong> {alert.metadata.rateAnalysis.limitInfo.limit}</div>
+                                <div><strong>Remaining:</strong> {alert.metadata.rateAnalysis.limitInfo.remaining}</div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Authentication Details */}
+                      {alert.metadata.failureReason && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 font-medium text-sm">
+                            <UserX className="h-4 w-4" />
+                            Authentication Details
+                          </div>
+                          <div className="space-y-1 text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                            <div><strong>Failure Reason:</strong> {alert.metadata.failureReason}</div>
+                            {alert.metadata.attemptedEmail && (
+                              <div><strong>Attempted Email:</strong> {alert.metadata.attemptedEmail}</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Raw Metadata */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 font-medium text-sm">
+                          <Globe className="h-4 w-4" />
+                          Raw Metadata
+                        </div>
+                        <div className="text-xs text-muted-foreground bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                          <pre className="whitespace-pre-wrap">
+                            {JSON.stringify(alert.metadata, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
-        })}  // Close alerts.map function
+        })}
         </div>
       )}
       

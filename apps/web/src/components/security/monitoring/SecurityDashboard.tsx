@@ -20,7 +20,7 @@ import { SecurityMetrics } from './SecurityMetrics';
 import { ThreatMonitor } from './ThreatMonitor';
 import { BlockedIPsTable } from './BlockedIPsTable';
 import { AdminSessionsTable } from '../admin/AdminSessionsTable';
-import { AdminAlertsTable } from '../admin/AdminAlertsTable';
+import SecurityAlerts from '@/components/admin/SecurityAlerts';
 import { PlatformStabilityDashboard } from './PlatformStabilityDashboard';
 import Link from 'next/link';
 
@@ -322,11 +322,7 @@ export function SecurityDashboard() {
               <CardDescription>Platform-wide security notifications</CardDescription>
             </CardHeader>
             <CardContent>
-              {adminLoading ? (
-                <div className="h-32 bg-muted animate-pulse rounded-lg" />
-              ) : (
-                <AdminAlertsTable alerts={alerts} />
-              )}
+              <SecurityAlerts />
             </CardContent>
           </Card>
         </TabsContent>

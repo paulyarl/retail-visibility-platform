@@ -21,6 +21,174 @@ declare global {
 }
 
 /**
+ * Check if rate limiting is globally enabled from platform settings
+ */
+async function isRateLimitingEnabled(): Promise<boolean> {
+  try {
+    // Query the rate_limiting_enabled field (now properly in schema)
+    const platformSettings = await prisma.platform_settings_list.findFirst({
+      where: { id: 1 },
+      select: { rate_limiting_enabled: true }
+    });
+    
+    return platformSettings?.rate_limiting_enabled ?? 
+           (process.env.RATE_LIMITING_ENABLED === 'false' ? false : true);
+  } catch (error) {
+    console.error('[Rate Limit] Failed to check platform settings:', error);
+    // Fallback to environment variable
+    return process.env.RATE_LIMITING_ENABLED === 'false' ? false : true;
+  }
+}
+
+/**
+ * Get rate limit configuration for a specific route type
+ */
+async function getRateLimitConfig(routeType: string) {
+  try {
+    const config = await prisma.rate_limit_configurations.findUnique({
+      where: { route_type: routeType }
+    });
+    
+    if (config) {
+      return {
+        enabled: config.enabled,
+        maxRequests: config.max_requests,
+        windowMs: config.window_minutes * 60 * 1000
+      };
+    }
+    
+    // Default configurations if no database config exists
+    const defaults = {
+      'auth': { 
+        enabled: process.env.RATE_LIMIT_AUTH_ENABLED !== 'false',
+        maxRequests: process.env.RATE_LIMIT_AUTH_MAX ? parseInt(process.env.RATE_LIMIT_AUTH_MAX) : 20,
+        windowMs: process.env.RATE_LIMIT_AUTH_WINDOW ? parseInt(process.env.RATE_LIMIT_AUTH_WINDOW) * 60 * 1000 : 15 * 60 * 1000
+      },
+      'admin': { 
+        enabled: process.env.RATE_LIMIT_ADMIN_ENABLED !== 'false',
+        maxRequests: process.env.RATE_LIMIT_ADMIN_MAX ? parseInt(process.env.RATE_LIMIT_ADMIN_MAX) : 20,
+        windowMs: process.env.RATE_LIMIT_ADMIN_WINDOW ? parseInt(process.env.RATE_LIMIT_ADMIN_WINDOW) * 60 * 1000 : 15 * 60 * 1000
+      },
+      'strict': { 
+        enabled: process.env.RATE_LIMIT_STRICT_ENABLED !== 'false',
+        maxRequests: process.env.RATE_LIMIT_STRICT_MAX ? parseInt(process.env.RATE_LIMIT_STRICT_MAX) : 20,
+        windowMs: process.env.RATE_LIMIT_STRICT_WINDOW ? parseInt(process.env.RATE_LIMIT_STRICT_WINDOW) * 60 * 1000 : 15 * 60 * 1000
+      },
+      'standard': { 
+        enabled: process.env.RATE_LIMIT_STANDARD_ENABLED !== 'false',
+        maxRequests: process.env.RATE_LIMIT_STANDARD_MAX ? parseInt(process.env.RATE_LIMIT_STANDARD_MAX) : 100,
+        windowMs: process.env.RATE_LIMIT_STANDARD_WINDOW ? parseInt(process.env.RATE_LIMIT_STANDARD_WINDOW) * 60 * 1000 : 15 * 60 * 1000
+      },
+      'exempt': { 
+        enabled: process.env.RATE_LIMIT_EXEMPT_ENABLED === 'true',
+        maxRequests: process.env.RATE_LIMIT_EXEMPT_MAX ? parseInt(process.env.RATE_LIMIT_EXEMPT_MAX) : 1000,
+        windowMs: process.env.RATE_LIMIT_EXEMPT_WINDOW ? parseInt(process.env.RATE_LIMIT_EXEMPT_WINDOW) * 60 * 1000 : 15 * 60 * 1000
+      }
+    };
+    
+    return defaults[routeType as keyof typeof defaults] || defaults['standard'];
+  } catch (error) {
+    console.error('[Rate Limit] Failed to get rate limit config:', error);
+    // Fallback to environment variables
+    const envDefaults = {
+      'auth': { 
+        enabled: process.env.RATE_LIMIT_AUTH_ENABLED !== 'false',
+        maxRequests: process.env.RATE_LIMIT_AUTH_MAX ? parseInt(process.env.RATE_LIMIT_AUTH_MAX) : 20,
+        windowMs: process.env.RATE_LIMIT_AUTH_WINDOW ? parseInt(process.env.RATE_LIMIT_AUTH_WINDOW) * 60 * 1000 : 15 * 60 * 1000
+      },
+      'admin': { 
+        enabled: process.env.RATE_LIMIT_ADMIN_ENABLED !== 'false',
+        maxRequests: process.env.RATE_LIMIT_ADMIN_MAX ? parseInt(process.env.RATE_LIMIT_ADMIN_MAX) : 20,
+        windowMs: process.env.RATE_LIMIT_ADMIN_WINDOW ? parseInt(process.env.RATE_LIMIT_ADMIN_WINDOW) * 60 * 1000 : 15 * 60 * 1000
+      },
+      'strict': { 
+        enabled: process.env.RATE_LIMIT_STRICT_ENABLED !== 'false',
+        maxRequests: process.env.RATE_LIMIT_STRICT_MAX ? parseInt(process.env.RATE_LIMIT_STRICT_MAX) : 20,
+        windowMs: process.env.RATE_LIMIT_STRICT_WINDOW ? parseInt(process.env.RATE_LIMIT_STRICT_WINDOW) * 60 * 1000 : 15 * 60 * 1000
+      },
+      'standard': { 
+        enabled: process.env.RATE_LIMIT_STANDARD_ENABLED !== 'false',
+        maxRequests: process.env.RATE_LIMIT_STANDARD_MAX ? parseInt(process.env.RATE_LIMIT_STANDARD_MAX) : 100,
+        windowMs: process.env.RATE_LIMIT_STANDARD_WINDOW ? parseInt(process.env.RATE_LIMIT_STANDARD_WINDOW) * 60 * 1000 : 15 * 60 * 1000
+      },
+      'exempt': { 
+        enabled: process.env.RATE_LIMIT_EXEMPT_ENABLED === 'true',
+        maxRequests: process.env.RATE_LIMIT_EXEMPT_MAX ? parseInt(process.env.RATE_LIMIT_EXEMPT_MAX) : 1000,
+        windowMs: process.env.RATE_LIMIT_EXEMPT_WINDOW ? parseInt(process.env.RATE_LIMIT_EXEMPT_WINDOW) * 60 * 1000 : 15 * 60 * 1000
+      }
+    };
+    
+    return envDefaults[routeType as keyof typeof envDefaults] || envDefaults['standard'];
+  }
+}
+
+/**
+ * Create a dynamic rate limiter based on database configuration
+ */
+function createDynamicRateLimit(config: { enabled: boolean; maxRequests: number; windowMs: number }) {
+  if (!config.enabled) {
+    // Return a middleware that always allows requests
+    return async (req: Request, res: Response, next: NextFunction) => {
+      // Still collect telemetry for monitoring
+      await storeRateLimitWarning(req, false);
+      next();
+    };
+  }
+  
+  // Create the actual rate limiter
+  const limiter = rateLimit({
+    windowMs: config.windowMs,
+    max: config.maxRequests,
+    message: {
+      error: 'rate_limit_exceeded',
+      message: `Too many requests, please try again after ${Math.ceil(config.windowMs / 60000)} minutes.`,
+      retryAfter: config.windowMs
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: async (req: Request, res: Response) => {
+      // Store rate limit warning for trend analysis
+      await storeRateLimitWarning(req, true);
+
+      // Collect comprehensive incident context
+      const incidentContext = await collectIncidentContext(req);
+
+      // Log security alert for rate limit violation
+      const userId = (req as any).user?.userId || (req as any).user?.user_id;
+      if (userId) {
+        createSecurityAlert({
+          userId,
+          type: 'rate_limit_exceeded',
+          severity: 'warning',
+          title: 'Rate Limit Exceeded',
+          message: `Request limit exceeded for user ${userId} on endpoint ${req.path} from ${incidentContext.ipAddress}`,
+          metadata: incidentContext,
+        });
+      } else {
+        // Create alert for unauthenticated user (system-level alert)
+        createSecurityAlert({
+          userId: 'system', // Use system ID for unauthenticated threats
+          type: 'rate_limit_exceeded',
+          severity: 'warning',
+          title: 'Rate Limit Exceeded - Unauthenticated',
+          message: `Request limit exceeded for IP ${incidentContext.ipAddress} on endpoint ${req.path}`,
+          metadata: incidentContext,
+        });
+      }
+
+      res.status(429).json({
+        error: 'rate_limit_exceeded',
+        message: `Too many requests, please try again after ${Math.ceil(config.windowMs / 60000)} minutes.`,
+        retryAfter: Math.ceil(config.windowMs / 1000)
+      });
+    }
+  });
+
+  // Return the rate limiter middleware
+  return limiter;
+}
+
+/**
  * Analyze request rate patterns for trend analysis
  */
 async function analyzeRequestRate(req: Request): Promise<{
@@ -605,9 +773,9 @@ export const storeStatusRateLimit = rateLimit({
 });
 
 /**
- * Apply appropriate rate limiting based on route path
+ * Apply appropriate rate limiting based on route path and database configuration
  */
-export function applyRateLimit(req: Request, res: Response, next: NextFunction) {
+export async function applyRateLimit(req: Request, res: Response, next: NextFunction) {
   const path = req.path;
 
   // Skip rate limiting for telemetry endpoints (test and production)
@@ -615,44 +783,33 @@ export function applyRateLimit(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
-  // Authentication endpoints
-  if (path.startsWith('/auth/') || path.includes('/login') || path.includes('/register')) {
-    authRateLimit(req, res, next);
-    return;
-  }
-
-  // File upload endpoints
-  if (path.includes('/upload') || req.method === 'POST' && req.headers['content-type']?.includes('multipart')) {
-    /* uploadRateLimit(req, res, next);
-    return; */
-     return next();
-  }
-
-  // Search endpoints
-  if (path.includes('/search') || path.includes('/directory')) {
-    searchRateLimit(req, res, next);
-    return;
-  }
-
-  // Admin endpoints
-  if (path.startsWith('/api/admin/') || path.includes('/admin')) {
-    /* adminRateLimit(req, res, next);
-    return; */
-     return next();
-  }
-
-  // Store status endpoints (cached, essential for UI - NO RATE LIMIT)
-  if (path.includes('/business-hours/status')) {
-    // Skip rate limiting entirely for store status endpoints
+  // Check if rate limiting is globally enabled
+  const isGloballyEnabled = await isRateLimitingEnabled();
+  if (!isGloballyEnabled) {
+    // Rate limiting is disabled globally, but we still want to collect telemetry
+    // Store rate limit warning for monitoring (without blocking)
+    await storeRateLimitWarning(req, false);
     return next();
   }
 
-  // Costly API endpoints (geocoding, external services)
-  if (path.includes('/geocode') || path.includes('/google') || path.includes('/external')) {
-    costlyApiRateLimit(req, res, next);
-    return;
+  // Determine route type for database lookup
+  let routeType = 'standard'; // default
+  if (path.startsWith('/auth/') || path.includes('/login') || path.includes('/register')) {
+    routeType = 'auth';
+  } else if (path.startsWith('/api/admin/') || path.includes('/admin')) {
+    routeType = 'admin';
+  } else if (path.includes('/geocode') || path.includes('/google') || path.includes('/external')) {
+    routeType = 'strict';
+  } else if (path.includes('/search') || path.includes('/directory')) {
+    routeType = 'standard';
   }
 
-  // Default general rate limit
-  generalRateLimit(req, res, next);
+  // Get rate limit configuration from database
+  const config = await getRateLimitConfig(routeType);
+  
+  // Create dynamic rate limiter based on database configuration
+  const rateLimiter = createDynamicRateLimit(config);
+  
+  // Apply the rate limiter
+  rateLimiter(req, res, next);
 }

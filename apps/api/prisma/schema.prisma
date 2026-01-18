@@ -657,81 +657,85 @@ model google_taxonomy_list {
 }
 
 model inventory_items {
-  id                    String                   @id
-  tenant_id             String
-  sku                   String
-  name                  String
-  price_cents           Int
-  stock                 Int                      @default(0)
-  image_url             String?
-  metadata              Json?
-  created_at            DateTime                 @default(now())
-  updated_at            DateTime
-  marketing_description String?
-  image_gallery         String[]                 @default([])
-  custom_cta            Json?
-  social_links          Json?
-  custom_branding       Json?
-  custom_sections       Json[]                   @default([])
-  landing_page_theme    String?                  @default("default")
-  audit_log_id          String?
-  availability          availability_status      @default(in_stock)
-  brand                 String
-  category_path         String[]                 @default([])
-  directory_category_id String?
-  condition             product_condition?       @default(brand_new)
-  currency              String                   @default("USD") @db.Char(3)
-  description           String?
-  eligibility_reason    String?
-  gtin                  String?
-  item_status           item_status?             @default(active)
-  location_id           String?
-  merchant_name         String?
-  mpn                   String?
-  price                 Decimal                  @db.Decimal(12, 2)
-  quantity              Int?
-  search_tsv            Unsupported("tsvector")?
-  sync_status           sync_status?             @default(pending)
-  synced_at             DateTime?                @db.Timestamptz(6)
-  title                 String
-  visibility            item_visibility?         @default(public)
-  manufacturer          String?
-  source                product_source           @default(MANUAL)
-  enrichment_status     enrichment_status        @default(COMPLETE)
-  enriched_at           DateTime?
-  enriched_by           String?
-  enriched_from_barcode String?
-  missing_images        Boolean                  @default(false)
-  missing_description      Boolean?                  @default(false)
-  missing_specs            Boolean?                  @default(false)
-  missing_brand            Boolean?                  @default(false)
-  has_variants             Boolean?                  @default(false)
-  sale_price_cents         Int?
-  product_type             product_type?             @default(physical)
-  digital_delivery_method  digital_delivery_method?
-  digital_assets           Json?
-  license_type             license_type?
-  access_duration_days     Int?
-  download_limit           Int?
-  is_featured              Boolean                   @default(false) @map("is_featured")
-  featured_at              DateTime?                 @map("featured_at")
-  featured_until           DateTime?                 @map("featured_until")
-  featured_priority        Int                       @default(0) @map("featured_priority")
-  photo_assets             photo_assets[]
-  product_variants      product_variants[]
-  product_performances  product_performances[]
-  shopping_cart_items   shopping_cart_items[]
-  store_reviews         store_reviews[]
-  tenants               tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  order_items           order_items[]
-  digital_access_grants digital_access_grants[]
+  id                      String                   @id
+  tenant_id               String
+  sku                     String
+  name                    String
+  price_cents             Int
+  stock                   Int                      @default(0)
+  image_url               String?
+  metadata                Json?
+  created_at              DateTime                 @default(now())
+  updated_at              DateTime
+  marketing_description   String?
+  image_gallery           String[]                 @default([])
+  custom_cta              Json?
+  social_links            Json?
+  custom_branding         Json?
+  custom_sections         Json[]                   @default([])
+  landing_page_theme      String?                  @default("default")
+  audit_log_id            String?
+  availability            availability_status      @default(in_stock)
+  brand                   String
+  category_path           String[]                 @default([])
+  directory_category_id   String?
+  condition               product_condition?       @default(brand_new)
+  currency                String                   @default("USD") @db.Char(3)
+  description             String?
+  eligibility_reason      String?
+  gtin                    String?
+  item_status             item_status?             @default(active)
+  location_id             String?
+  merchant_name           String?
+  mpn                     String?
+  price                   Decimal                  @db.Decimal(12, 2)
+  quantity                Int?
+  search_tsv              Unsupported("tsvector")?
+  sync_status             sync_status?             @default(pending)
+  synced_at               DateTime?                @db.Timestamptz(6)
+  title                   String
+  visibility              item_visibility?         @default(public)
+  manufacturer            String?
+  source                  product_source           @default(MANUAL)
+  enrichment_status       enrichment_status        @default(COMPLETE)
+  enriched_at             DateTime?
+  enriched_by             String?
+  enriched_from_barcode   String?
+  missing_images          Boolean                  @default(false)
+  missing_description     Boolean                  @default(false)
+  missing_specs           Boolean                  @default(false)
+  missing_brand           Boolean                  @default(false)
+  sale_price_cents        Int?
+  payment_gateway_type    String?                  @db.VarChar(50)
+  payment_gateway_id      String?                  @db.VarChar(255)
+  product_type            product_type             @default(physical)
+  digital_delivery_method digital_delivery_method?
+  digital_assets          Json?
+  access_duration_days    Int?
+  download_limit          Int?
+  license_type            license_type?
+  has_variants            Boolean?                 @default(false)
+  is_featured             Boolean?                 @default(false) @map("is_featured")
+  featured_at             DateTime?                @map("featured_at") @db.Timestamp(6)
+  featured_until          DateTime?                @map("featured_until") @db.Timestamp(6)
+  featured_priority       Int?                     @default(0) @map("featured_priority")
+  digital_access_grants   digital_access_grants[]
+  tenant_payment_gateways tenant_payment_gateways? @relation(fields: [payment_gateway_id], references: [id], onUpdate: NoAction, map: "fk_inventory_items_payment_gateway")
+  tenants                 tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  order_items             order_items[]
+  photo_assets            photo_assets[]
+  product_performances    product_performances[]
+  product_variants        product_variants[]
+  shopping_cart_items     shopping_cart_items[]
+  store_reviews           store_reviews[]
 
   @@unique([tenant_id, sku])
   @@index([source])
   @@index([tenant_id, enrichment_status])
   @@index([tenant_id, updated_at])
-  @@index([has_variants])
-  @@index([tenant_id, is_featured, featured_priority(sort: Desc), featured_at(sort: Desc)])
+  @@index([payment_gateway_id], map: "idx_inventory_items_payment_gateway_id")
+  @@index([payment_gateway_type], map: "idx_inventory_items_payment_gateway_type")
+  @@index([product_type], map: "idx_inventory_items_product_type")
 }
 
 model invitations {
@@ -866,31 +870,30 @@ model permission_matrix_list {
 }
 
 model photo_assets {
-  id              String            @id
-  tenantId        String
-  inventoryItemId String
-  url             String
-  width           Int?
-  height          Int?
-  contentType     String?
-  bytes           Int?
-  exifRemoved     Boolean           @default(false)
-  capturedAt      DateTime?         @db.Timestamptz(6)
-  createdAt       DateTime          @default(now()) @db.Timestamptz(6)
-  publicUrl       String?
-  signedUrl       String?
-  position        Int               @default(0)
-  alt             String?
-  caption         String?
-  variant_id      String?
-  inventory_items inventory_items   @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
-  tenants         tenants           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  product_variants product_variants? @relation(fields: [variant_id], references: [id], onDelete: Cascade)
+  id               String            @id
+  tenantId         String
+  inventoryItemId  String
+  url              String
+  width            Int?
+  height           Int?
+  contentType      String?
+  bytes            Int?
+  exifRemoved      Boolean           @default(false)
+  capturedAt       DateTime?         @db.Timestamptz(6)
+  createdAt        DateTime          @default(now()) @db.Timestamptz(6)
+  publicUrl        String?
+  signedUrl        String?
+  position         Int               @default(0)
+  alt              String?
+  caption          String?
+  variant_id       String?
+  product_variants product_variants? @relation(fields: [variant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_photo_assets_variant_id")
+  inventory_items  inventory_items   @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  tenants          tenants           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([inventoryItemId, position], map: "photo_assets_inventory_item_id_position_unique")
   @@index([inventoryItemId], map: "idx_photo_assets_inventory_item_id")
   @@index([tenantId], map: "idx_photo_assets_tenant_id")
-  @@index([variant_id], map: "idx_photo_assets_variant_id")
 }
 
 model platform_categories {
@@ -927,13 +930,14 @@ model platform_feature_flags_list {
 }
 
 model platform_settings_list {
-  id                   Int      @id @default(1)
-  platform_name        String?
-  platform_description String?
-  logo_url             String?
-  favicon_url          String?
-  created_at           DateTime @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime @db.Timestamptz(6)
+  id                    Int      @id @default(1)
+  platform_name         String?
+  platform_description  String?
+  logo_url              String?
+  favicon_url           String?
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime @db.Timestamptz(6)
+  rate_limiting_enabled Boolean? @default(true)
 }
 
 model product_performances {
@@ -1396,6 +1400,7 @@ model tenants {
   inventory_items                  inventory_items[]
   invitations                      invitations[]
   location_status_logs             location_status_logs[]
+  oauth_tokens                     oauth_tokens[]
   orders                           orders[]
   payments                         payments[]
   photo_assets                     photo_assets[]
@@ -1414,7 +1419,6 @@ model tenants {
   fulfillment_settings             tenant_fulfillment_settings?
   payment_gateways                 tenant_payment_gateways[]
   shipping_carriers                tenant_shipping_carriers[]
-  oauth_tokens                     oauth_tokens[]
   organizations_list               organizations_list?                @relation(fields: [organization_id], references: [id])
   user_tenants                     user_tenants[]
 
@@ -1690,52 +1694,52 @@ model recommendations_mv_refresh_log {
 }
 
 model orders {
-  id                     String                 @id @db.VarChar(255)
-  tenant_id              String                 @db.VarChar(255)
-  customer_id            String?                @db.VarChar(255)
-  order_number           String                 @unique @db.VarChar(255)
-  order_status           order_status           @default(draft)
-  payment_status         payment_status         @default(pending)
-  fulfillment_status     fulfillment_status     @default(unfulfilled)
-  subtotal_cents         Int                    @default(0)
-  tax_cents              Int                    @default(0)
-  shipping_cents         Int                    @default(0)
-  discount_cents         Int                    @default(0)
-  total_cents            Int                    @default(0)
-  currency               String                 @default("USD") @db.VarChar(3)
-  customer_email         String                 @db.VarChar(255)
-  customer_name          String?                @db.VarChar(255)
-  customer_phone         String?                @db.VarChar(50)
-  shipping_address_line1 String?                @db.VarChar(255)
-  shipping_address_line2 String?                @db.VarChar(255)
-  shipping_city          String?                @db.VarChar(100)
-  shipping_state         String?                @db.VarChar(100)
-  shipping_postal_code   String?                @db.VarChar(20)
-  shipping_country       String?                @default("US") @db.VarChar(2)
-  billing_address_line1  String?                @db.VarChar(255)
-  billing_address_line2  String?                @db.VarChar(255)
-  billing_city           String?                @db.VarChar(100)
-  billing_state          String?                @db.VarChar(100)
-  billing_postal_code    String?                @db.VarChar(20)
-  billing_country        String?                @default("US") @db.VarChar(2)
+  id                     String                  @id @db.VarChar(255)
+  tenant_id              String                  @db.VarChar(255)
+  customer_id            String?                 @db.VarChar(255)
+  order_number           String                  @unique @db.VarChar(255)
+  order_status           order_status            @default(draft)
+  payment_status         payment_status          @default(pending)
+  fulfillment_status     fulfillment_status      @default(unfulfilled)
+  subtotal_cents         Int                     @default(0)
+  tax_cents              Int                     @default(0)
+  shipping_cents         Int                     @default(0)
+  discount_cents         Int                     @default(0)
+  total_cents            Int                     @default(0)
+  currency               String                  @default("USD") @db.VarChar(3)
+  customer_email         String                  @db.VarChar(255)
+  customer_name          String?                 @db.VarChar(255)
+  customer_phone         String?                 @db.VarChar(50)
+  shipping_address_line1 String?                 @db.VarChar(255)
+  shipping_address_line2 String?                 @db.VarChar(255)
+  shipping_city          String?                 @db.VarChar(100)
+  shipping_state         String?                 @db.VarChar(100)
+  shipping_postal_code   String?                 @db.VarChar(20)
+  shipping_country       String?                 @default("US") @db.VarChar(2)
+  billing_address_line1  String?                 @db.VarChar(255)
+  billing_address_line2  String?                 @db.VarChar(255)
+  billing_city           String?                 @db.VarChar(100)
+  billing_state          String?                 @db.VarChar(100)
+  billing_postal_code    String?                 @db.VarChar(20)
+  billing_country        String?                 @default("US") @db.VarChar(2)
   notes                  String?
   internal_notes         String?
-  metadata               Json?                  @default("{}")
-  source                 String?                @db.VarChar(50)
-  source_id              String?                @db.VarChar(255)
-  ip_address             String?                @db.VarChar(45)
+  metadata               Json?                   @default("{}")
+  source                 String?                 @db.VarChar(50)
+  source_id              String?                 @db.VarChar(255)
+  ip_address             String?                 @db.VarChar(45)
   user_agent             String?
-  confirmed_at           DateTime?              @db.Timestamp(6)
-  paid_at                DateTime?              @db.Timestamp(6)
-  fulfilled_at           DateTime?              @db.Timestamp(6)
-  cancelled_at           DateTime?              @db.Timestamp(6)
-  created_at             DateTime               @default(now()) @db.Timestamp(6)
-  updated_at             DateTime               @default(now()) @db.Timestamp(6)
-  shipping_provider      String?                @db.VarChar(50)
+  confirmed_at           DateTime?               @db.Timestamp(6)
+  paid_at                DateTime?               @db.Timestamp(6)
+  fulfilled_at           DateTime?               @db.Timestamp(6)
+  cancelled_at           DateTime?               @db.Timestamp(6)
+  created_at             DateTime                @default(now()) @db.Timestamp(6)
+  updated_at             DateTime                @default(now()) @db.Timestamp(6)
+  shipping_provider      String?                 @db.VarChar(50)
   digital_access_grants  digital_access_grants[]
   order_items            order_items[]
   order_status_history   order_status_history[]
-  tenants                tenants                @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_orders_tenant_id")
+  tenants                tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_orders_tenant_id")
   payments               payments[]
   refunds                refunds[]
   shipments              shipments[]
@@ -1753,42 +1757,42 @@ model orders {
 }
 
 model order_items {
-  id                 String           @id @db.VarChar(255)
-  order_id           String           @db.VarChar(255)
-  inventory_item_id  String?          @db.VarChar(255)
-  sku                String           @db.VarChar(255)
-  name               String           @db.VarChar(500)
-  description        String?
-  image_url          String?
-  quantity           Int              @default(1)
-  unit_price_cents   Int
-  subtotal_cents     Int
-  tax_cents          Int              @default(0)
-  discount_cents     Int              @default(0)
-  total_cents        Int
-  quantity_fulfilled Int              @default(0)
-  quantity_refunded  Int              @default(0)
-  is_refundable      Boolean          @default(true)
-  metadata           Json?            @default("{}")
-  notes                    String?
-  created_at               DateTime                  @default(now()) @db.Timestamp(6)
-  updated_at               DateTime                  @default(now()) @db.Timestamp(6)
-  list_price_cents         Int?
-  product_type             product_type              @default(physical)
-  digital_delivery_status  digital_delivery_status?  @default(pending)
-  digital_delivered_at     DateTime?                 @db.Timestamptz(6)
-  variant_id               String?
-  variant_name             String?
-  variant_attributes       Json?
-  digital_access_grants    digital_access_grants[]
-  inventory_items          inventory_items?          @relation(fields: [inventory_item_id], references: [id], onUpdate: NoAction, map: "fk_order_items_inventory_item_id")
-  orders                   orders                    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_order_items_order_id")
-  product_variants         product_variants?         @relation(fields: [variant_id], references: [id], onDelete: SetNull)
+  id                      String                   @id @db.VarChar(255)
+  order_id                String                   @db.VarChar(255)
+  inventory_item_id       String?                  @db.VarChar(255)
+  sku                     String                   @db.VarChar(255)
+  name                    String                   @db.VarChar(500)
+  description             String?
+  image_url               String?
+  quantity                Int                      @default(1)
+  unit_price_cents        Int
+  subtotal_cents          Int
+  tax_cents               Int                      @default(0)
+  discount_cents          Int                      @default(0)
+  total_cents             Int
+  quantity_fulfilled      Int                      @default(0)
+  quantity_refunded       Int                      @default(0)
+  is_refundable           Boolean                  @default(true)
+  metadata                Json?                    @default("{}")
+  notes                   String?
+  created_at              DateTime                 @default(now()) @db.Timestamp(6)
+  updated_at              DateTime                 @default(now()) @db.Timestamp(6)
+  list_price_cents        Int?
+  product_type            product_type             @default(physical)
+  digital_delivery_status digital_delivery_status? @default(pending)
+  digital_delivered_at    DateTime?                @db.Timestamptz(6)
+  variant_id              String?
+  variant_name            String?
+  variant_attributes      Json?
+  digital_access_grants   digital_access_grants[]
+  inventory_items         inventory_items?         @relation(fields: [inventory_item_id], references: [id], onUpdate: NoAction, map: "fk_order_items_inventory_item_id")
+  orders                  orders                   @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_order_items_order_id")
+  product_variants        product_variants?        @relation(fields: [variant_id], references: [id], onUpdate: NoAction)
 
   @@index([order_id], map: "idx_order_items_order_id")
   @@index([inventory_item_id], map: "idx_order_items_inventory_item_id")
   @@index([sku], map: "idx_order_items_sku")
-  @@index([variant_id], map: "idx_order_items_variant_id")
+  @@index([product_type], map: "idx_order_items_product_type")
 }
 
 model payments {
@@ -1954,10 +1958,11 @@ model tenant_payment_gateways {
   verification_status      String?
   verification_error       String?
   metadata                 Json?             @default("{}")
-  oauth_connected          Boolean?          @default(false)
-  oauth_merchant_id        String?
   created_at               DateTime?         @default(now()) @db.Timestamp(6)
   updated_at               DateTime?         @default(now()) @updatedAt @db.Timestamp(6)
+  oauth_connected          Boolean?          @default(false)
+  oauth_merchant_id        String?           @db.VarChar(255)
+  inventory_items          inventory_items[]
   tenants                  tenants           @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_payment_gateways_tenant")
 
   @@unique([tenant_id, gateway_type], map: "uq_tenant_gateway_type")
@@ -2164,6 +2169,109 @@ model trigger_count {
   @@ignore
 }
 
+model oauth_tokens {
+  id                String    @id @default(cuid())
+  tenant_id         String
+  gateway_type      String
+  access_token      String
+  refresh_token     String?
+  token_type        String    @default("Bearer")
+  expires_at        DateTime
+  scope             String?
+  merchant_id       String?
+  merchant_email    String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @default(now()) @updatedAt
+  last_refreshed_at DateTime?
+  tenants           tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_oauth_tokens_tenant")
+
+  @@unique([tenant_id, gateway_type], map: "uq_oauth_tokens_tenant_gateway")
+  @@index([tenant_id], map: "idx_oauth_tokens_tenant")
+  @@index([gateway_type], map: "idx_oauth_tokens_gateway_type")
+  @@index([expires_at], map: "idx_oauth_tokens_expires_at")
+  @@map("oauth_tokens")
+}
+
+model digital_access_grants {
+  id                String          @id @db.VarChar(255)
+  order_id          String          @db.VarChar(255)
+  order_item_id     String          @db.VarChar(255)
+  inventory_item_id String          @db.VarChar(255)
+  customer_email    String          @db.VarChar(500)
+  access_token      String          @unique @db.VarChar(255)
+  download_count    Int             @default(0)
+  download_limit    Int?
+  expires_at        DateTime?       @db.Timestamptz(6)
+  first_accessed_at DateTime?       @db.Timestamptz(6)
+  last_accessed_at  DateTime?       @db.Timestamptz(6)
+  revoked_at        DateTime?       @db.Timestamptz(6)
+  revoked_reason    String?
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime        @default(now()) @db.Timestamptz(6)
+  inventory_items   inventory_items @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_digital_access_grants_inventory_item_id")
+  orders            orders          @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_digital_access_grants_order_id")
+  order_items       order_items     @relation(fields: [order_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_digital_access_grants_order_item_id")
+
+  @@index([customer_email], map: "idx_digital_access_grants_customer_email")
+  @@index([access_token], map: "idx_digital_access_grants_access_token")
+  @@index([order_id], map: "idx_digital_access_grants_order_id")
+  @@index([inventory_item_id], map: "idx_digital_access_grants_inventory_item_id")
+}
+
+model product_variants {
+  id               String          @id
+  parent_item_id   String
+  tenant_id        String
+  sku              String
+  variant_name     String
+  price_cents      Int?
+  sale_price_cents Int?
+  stock            Int             @default(0)
+  image_url        String?
+  attributes       Json            @default("{}")
+  sort_order       Int?            @default(0)
+  is_active        Boolean?        @default(true)
+  created_at       DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?       @default(now()) @db.Timestamp(6)
+  order_items      order_items[]
+  photo_assets     photo_assets[]
+  tenants          tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant")
+  inventory_items  inventory_items @relation(fields: [parent_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, sku], map: "unique_tenant_variant_sku")
+  @@index([parent_item_id], map: "idx_product_variants_parent")
+  @@index([sku], map: "idx_product_variants_sku")
+  @@index([tenant_id], map: "idx_product_variants_tenant")
+}
+
+model rate_limit_configurations {
+  id             String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  route_type     String    @unique(map: "idx_rate_limit_configurations_route_type")
+  max_requests   Int       @default(100)
+  window_minutes Int       @default(1)
+  enabled        Boolean   @default(true)
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime? @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model rate_limit_warnings {
+  id            String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  client_id     String
+  pathname      String
+  request_count Int
+  max_requests  Int
+  window_ms     Int
+  ip_address    String?
+  user_agent    String?
+  occurred_at   DateTime? @default(now()) @db.Timestamptz(6)
+  blocked       Boolean?  @default(false)
+
+  @@index([client_id, occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_client_id_occurred_at_desc")
+  @@index([pathname, occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_pathname_occurred_at_desc")
+  @@index([occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_occurred_at_desc")
+  @@map("rate_limit_warnings")
+}
+
 enum action {
   create
   update
@@ -2353,30 +2461,6 @@ enum shipment_status {
   cancelled
 }
 
-model oauth_tokens {
-  id                String    @id @default(cuid())
-  tenant_id         String
-  gateway_type      String    // 'paypal' | 'square'
-  access_token      String    // Encrypted with AES-256-GCM
-  refresh_token     String?   // Encrypted with AES-256-GCM
-  token_type        String    @default("Bearer")
-  expires_at        DateTime
-  scope             String?
-  merchant_id       String?
-  merchant_email    String?
-  created_at        DateTime  @default(now())
-  updated_at        DateTime  @updatedAt
-  last_refreshed_at DateTime?
-  tenants           tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-
-  @@unique([tenant_id, gateway_type], map: "uq_oauth_tokens_tenant_gateway")
-  @@index([tenant_id], map: "idx_oauth_tokens_tenant")
-  @@index([gateway_type], map: "idx_oauth_tokens_gateway_type")
-  @@index([expires_at], map: "idx_oauth_tokens_expires_at")
-  @@map("oauth_tokens")
-}
-
-// Digital Products Support
 enum product_type {
   physical
   digital
@@ -2402,91 +2486,4 @@ enum digital_delivery_status {
   delivered
   failed
   revoked
-}
-
-model digital_access_grants {
-  id                 String    @id @db.VarChar(255)
-  order_id           String    @db.VarChar(255)
-  order_item_id      String    @db.VarChar(255)
-  inventory_item_id  String    @db.VarChar(255)
-  customer_email     String    @db.VarChar(500)
-  access_token       String    @unique @db.VarChar(255)
-  download_count     Int       @default(0)
-  download_limit     Int?
-  expires_at         DateTime? @db.Timestamptz(6)
-  first_accessed_at  DateTime? @db.Timestamptz(6)
-  last_accessed_at   DateTime? @db.Timestamptz(6)
-  revoked_at         DateTime? @db.Timestamptz(6)
-  revoked_reason     String?
-  created_at         DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
-  
-  inventory_items    inventory_items @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade)
-  orders             orders          @relation(fields: [order_id], references: [id], onDelete: Cascade)
-  order_items        order_items     @relation(fields: [order_item_id], references: [id], onDelete: Cascade)
-  
-  @@index([customer_email], map: "idx_digital_access_grants_customer_email")
-  @@index([access_token], map: "idx_digital_access_grants_access_token")
-  @@index([order_id], map: "idx_digital_access_grants_order_id")
-  @@index([inventory_item_id], map: "idx_digital_access_grants_inventory_item_id")
-  @@index([expires_at], map: "idx_digital_access_grants_expires_at")
-  @@index([revoked_at], map: "idx_digital_access_grants_revoked_at")
-}
-
-model product_variants {
-  id              String           @id
-  parent_item_id  String
-  tenant_id       String
-  sku             String
-  variant_name    String
-  price_cents     Int?
-  sale_price_cents Int?
-  stock           Int              @default(0)
-  image_url       String?
-  attributes      Json             @default("{}")
-  sort_order      Int              @default(0)
-  is_active       Boolean          @default(true)
-  created_at      DateTime         @default(now())
-  updated_at      DateTime         @default(now())
-  
-  inventory_items inventory_items  @relation(fields: [parent_item_id], references: [id], onDelete: Cascade)
-  tenants         tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  order_items     order_items[]
-  photo_assets    photo_assets[]
-  
-  @@unique([tenant_id, sku])
-  @@index([parent_item_id])
-  @@index([tenant_id])
-  @@index([sku])
-  @@index([is_active])
-}
-
-model rate_limit_configurations {
-  id              String   @id @default(cuid())
-  route_type      String   // 'auth', 'admin', 'strict', 'standard', 'exempt'
-  max_requests    Int      @default(100)
-  window_minutes  Int      @default(1)
-  enabled         Boolean  @default(true)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  @@unique([route_type])
-}
-
-model rate_limit_warnings {
-  id              String   @id @default(cuid())
-  client_id       String
-  pathname        String
-  request_count   Int
-  max_requests    Int
-  window_ms       Int
-  ip_address      String?
-  user_agent      String?
-  occurred_at      DateTime @default(now())
-  blocked         Boolean  @default(false)
-
-  @@index([client_id, occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_client_id_occurred_at_desc")
-  @@index([pathname, occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_pathname_occurred_at_desc")
-  @@index([occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_occurred_at_desc")
-  @@map("rate_limit_warnings")
 }
