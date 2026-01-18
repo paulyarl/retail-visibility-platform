@@ -1,8 +1,10 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
+import { prisma } from '../prisma';
 
 // Import the enhanced createSecurityAlert function
 import { createSecurityAlert } from '../routes/admin-security';
+import { collectEnhancedSecurityContext, createSecuritySummary } from '../utils/security-context';
 
 // Extend Express Request interface to include rateLimit property
 declare global {
@@ -15,6 +17,32 @@ declare global {
         resetTime?: Date;
       };
     }
+  }
+}
+
+/**
+ * Store rate limit warning in database for trend analysis
+ */
+async function storeRateLimitWarning(req: Request, blocked: boolean = false) {
+  try {
+    const rateLimit = req.rateLimit;
+    if (!rateLimit) return;
+
+    await prisma.rate_limit_warnings.create({
+      data: {
+        client_id: `${req.ip}:${req.get('User-Agent')?.substring(0, 50) || 'unknown'}`,
+        pathname: req.path,
+        request_count: rateLimit.current,
+        max_requests: rateLimit.limit,
+        window_ms: 15 * 60, // 15 minutes in seconds
+        ip_address: req.ip,
+        user_agent: req.get('User-Agent'),
+        blocked
+      }
+    });
+  } catch (error) {
+    console.error('[Rate Limit] Failed to store warning:', error);
+    // Don't throw - this is non-critical
   }
 }
 
@@ -132,16 +160,26 @@ export const generalRateLimit = rateLimit({
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
   handler: async (req: Request, res: Response) => {
-    // Collect comprehensive incident context for security analytics
-    const incidentContext = await collectIncidentContext(req);
+    // Store rate limit warning for trend analysis
+    await storeRateLimitWarning(req, true); // blocked = true for rate limit exceeded
 
-    // Log security alert for rate limit violation with full context
+    // Collect enhanced security context with device fingerprinting and location data
+    const securityContext = collectEnhancedSecurityContext(req);
+    const securitySummary = createSecuritySummary(securityContext);
+
+    // Log security alert for rate limit violation with enhanced context
     createSecurityAlert({
       type: 'rate_limit_exceeded',
-      severity: 'warning',
+      severity: securitySummary.threatLevel === 'critical' ? 'critical' : 
+                securitySummary.threatLevel === 'high' ? 'warning' : 'info',
       title: 'Rate Limit Exceeded',
-      message: `Request limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'authenticated user' : 'IP'} ${incidentContext.ipAddress} on endpoint ${incidentContext.endpoint}`,
-      metadata: incidentContext,
+      message: `Request limit exceeded for ${securityContext.application.isAuthenticated ? 'authenticated user' : 'IP'} ${securityContext.network.ip} on endpoint ${securityContext.endpoint} from ${securitySummary.location} using ${securitySummary.device}`,
+      metadata: {
+        ...securityContext,
+        summary: securitySummary,
+        riskFactors: securitySummary.riskFactors,
+        isSuspicious: securitySummary.isSuspicious,
+      },
     });
 
     res.status(429).json({
@@ -172,6 +210,9 @@ export const authRateLimit = rateLimit({
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
   handler: async (req: Request, res: Response) => {
+    // Store rate limit warning for trend analysis
+    await storeRateLimitWarning(req, true); // blocked = true for auth rate limit exceeded
+
     // Collect comprehensive incident context for critical security analytics
     const incidentContext = await collectIncidentContext(req);
 
@@ -213,6 +254,9 @@ export const uploadRateLimit = rateLimit({
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
   handler: async (req: Request, res: Response) => {
+    // Store rate limit warning for trend analysis
+    await storeRateLimitWarning(req, true); // blocked = true for upload rate limit exceeded
+
     // Collect comprehensive incident context for upload analytics
     const incidentContext = await collectIncidentContext(req);
 
@@ -257,6 +301,9 @@ export const searchRateLimit = rateLimit({
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
   handler: async (req: Request, res: Response) => {
+    // Store rate limit warning for trend analysis
+    await storeRateLimitWarning(req, true); // blocked = true for search rate limit exceeded
+
     // Collect comprehensive incident context for search analytics
     const incidentContext = await collectIncidentContext(req);
 
@@ -327,6 +374,9 @@ export const costlyApiRateLimit = rateLimit({
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
   handler: async (req: Request, res: Response) => {
+    // Store rate limit warning for trend analysis
+    await storeRateLimitWarning(req, true); // blocked = true for costly API rate limit exceeded
+
     // Collect comprehensive incident context for costly API analytics
     const incidentContext = await collectIncidentContext(req);
 
@@ -372,6 +422,9 @@ export const storeStatusRateLimit = rateLimit({
     return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   },
   handler: async (req: Request, res: Response) => {
+    // Store rate limit warning for trend analysis
+    await storeRateLimitWarning(req, true); // blocked = true for store status rate limit exceeded
+
     // Collect comprehensive incident context for store status analytics
     const incidentContext = await collectIncidentContext(req);
 

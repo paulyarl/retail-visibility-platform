@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Switch } from '@/components/ui/Switch';
 import { Label } from '@/components/ui/Label';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Shield, Settings, BarChart3, Zap } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { useToast } from '@/components/ui/use-toast';
 import { api } from '@/lib/api';
+import { Zap, Shield, TrendingUp, Settings, Loader2, BarChart3 } from 'lucide-react';
 import RateLimitTrends from './RateLimitTrends';
+import SecurityAlerts from './SecurityAlerts';
 
 interface PlatformSettingsData {
   rateLimitingEnabled: boolean;
@@ -31,7 +33,7 @@ export default function PlatformSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rateLimitConfigs, setRateLimitConfigs] = useState<PlatformSettingsData['rateLimitConfigurations']>([]); // Use proper type
-  const { toast } = useToast();
+  const { toast: toastFunction } = useToast();
 
   useEffect(() => {
     loadSettings();
@@ -98,20 +100,13 @@ export default function PlatformSettings() {
       if (response.ok) {
         const updatedSettings = await response.json();
         setSettings(updatedSettings); // Update with server response
-        toast({
-          title: 'Settings saved',
-          description: 'Platform settings have been updated successfully.',
-        });
+        toastFunction('Settings saved successfully', { variant: 'success' });
       } else {
         throw new Error('Failed to save settings');
       }
     } catch (error) {
       console.error('Failed to save platform settings:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save platform settings. Please try again.',
-        variant: 'destructive',
-      });
+      toastFunction('Failed to save platform settings. Please try again.', { variant: 'error' });
     } finally {
       setSaving(false);
     }
@@ -303,6 +298,21 @@ export default function PlatformSettings() {
         </CardHeader>
         <CardContent>
           <RateLimitTrends />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Security Alerts
+          </CardTitle>
+          <CardDescription>
+            Monitor recent security alerts with IP addresses and threat details
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SecurityAlerts />
         </CardContent>
       </Card>
       </div>
