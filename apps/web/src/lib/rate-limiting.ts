@@ -32,8 +32,22 @@ let rateLimitConfigs: Array<{
 let configsLastUpdated = 0;
 const CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Get platform settings (reads from environment each time)
-function getPlatformSettings() {
+// Get platform settings (reads from database, falls back to environment)
+async function getPlatformSettings(): Promise<{ rateLimitingEnabled: boolean }> {
+  try {
+    // Try to get from database first (same endpoint as configurations)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/admin/platform-settings`);
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        rateLimitingEnabled: data.rateLimitingEnabled ?? true
+      };
+    }
+  } catch (error) {
+    console.log('Failed to fetch platform settings from database, using environment fallback');
+  }
+  
+  // Fallback to environment variable for backward compatibility
   return {
     rateLimitingEnabled: process.env.RATE_LIMITING_ENABLED !== 'false',
   };
@@ -138,7 +152,7 @@ async function getRateLimitForPath(pathname: string): Promise<{ maxRequests: num
 
 // Apply rate limiting to a request
 export async function applyRateLimit(request: NextRequest): Promise<NextResponse | null> {
-  const settings = getPlatformSettings();
+  const settings = await getPlatformSettings();
 
   // If rate limiting is disabled globally, skip
   if (!settings.rateLimitingEnabled) {
@@ -184,10 +198,15 @@ export async function applyRateLimit(request: NextRequest): Promise<NextResponse
     try {
       // Store warning in database (fire and forget - don't block the response)
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      
+      // Make server-to-server call without authentication headers
+      // Rate limiting warnings are internal system data, don't require user auth
       fetch(`${apiUrl}/api/rate-limit-warnings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // Note: No Authorization header - this is an internal system call
+          'X-Internal-Request': 'rate-limit-middleware', // Identify source
         },
         body: JSON.stringify({
           clientId,
@@ -229,10 +248,15 @@ export async function applyRateLimit(request: NextRequest): Promise<NextResponse
     try {
       // Store blocked warning in database
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      
+      // Make server-to-server call without authentication headers
+      // Rate limiting warnings are internal system data, don't require user auth
       fetch(`${apiUrl}/api/rate-limit-warnings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // Note: No Authorization header - this is an internal system call
+          'X-Internal-Request': 'rate-limit-middleware', // Identify source
         },
         body: JSON.stringify({
           clientId,

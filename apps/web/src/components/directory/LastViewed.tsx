@@ -30,24 +30,30 @@ interface LastViewedProduct {
   productDescription?: string;
   productBrand?: string;
   productSku?: string;
-  productPrice?: number;
   productPriceCents?: number;
-  productImage?: string;
+  productImageUrl?: string;
+  productCurrency?: string;
   productStock?: number;
   productAvailability?: string;
-  productCurrency?: string;
+  storeName?: string;
+  storeSlug?: string;
+  storeLogo?: string;
   tenantId: string;
-  businessName: string;
-  slug: string;
-  score: number;
-  reason: string;
   hasActivePaymentGateway?: boolean;
-  tenantLogo?: string;
+  defaultGatewayType?: string | null;
   tenantCategory?: {
     id: string;
     name: string;
     slug: string;
   };
+  lastViewedAt: string;
+  pageType?: string;
+  context?: string;
+  productCount?: number;
+  businessName?: string;
+  tenantLogo?: string;
+  productPrice?: number;
+  productImage?: string;
 }
 
 interface LastViewedItem {
@@ -259,32 +265,32 @@ export default function LastViewed({
                 const productData = item.data as LastViewedProduct;
                 
                 return (
-                  <TenantPaymentProvider key={`product-${productData.productId}-${index}`} tenantId={productData.tenantId}>
-                    <SmartProductCard
-                      product={{
-                        id: productData.productId,
-                        sku: productData.productSku || productData.productId,
-                        name: productData.productName,
-                        title: productData.productTitle || productData.productName,
-                        brand: productData.productBrand || productData.businessName,
-                        description: productData.productDescription,
-                        priceCents: productData.productPriceCents || Math.round((productData.productPrice || 0) * 100),
-                        stock: productData.productStock || 999,
-                        imageUrl: productData.productImage,
-                        tenantId: productData.tenantId,
-                        availability: (productData.productAvailability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
-                        has_active_payment_gateway: productData.hasActivePaymentGateway,
-                        tenantCategory: productData.tenantCategory,
-                      }}
-                      tenantName={productData.businessName}
-                      tenantLogo={productData.tenantLogo}
-                      variant="grid"
-                      showCategory={true}
-                      showDescription={true}
-                      className="h-full"
-                    />
-                  </TenantPaymentProvider>
-                );
+                <SmartProductCard
+                  key={`product-${productData.productId}-${index}`}
+                  product={{
+                    id: productData.productId,
+                    sku: productData.productSku || productData.productId,
+                    name: productData.productName,
+                    title: productData.productTitle || productData.productName,
+                    brand: productData.productBrand || productData.businessName,
+                    description: productData.productDescription,
+                    priceCents: productData.productPriceCents || Math.round((productData.productPrice || 0) * 100),
+                    stock: productData.productStock || 999,
+                    imageUrl: productData.productImage || productData.productImageUrl,
+                    tenantId: productData.tenantId,
+                    availability: (productData.productAvailability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                    has_active_payment_gateway: productData.hasActivePaymentGateway,
+                    payment_gateway_type: productData.defaultGatewayType,
+                    tenantCategory: productData.tenantCategory,
+                  }}
+                  tenantName={productData.businessName || productData.storeName}
+                  tenantLogo={productData.tenantLogo || productData.storeLogo}
+                  variant="grid"
+                  showCategory={true}
+                  showDescription={true}
+                  className="h-full"
+                />
+              );
               }
             })}
           </div>

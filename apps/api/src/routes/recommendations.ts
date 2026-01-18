@@ -952,6 +952,10 @@ router.get('/for-product-page/:productId', async (req: Request, res: Response) =
         ii.category_path,
         ii.directory_category_id,
         ii.tenant_id,
+        
+        -- Include payment gateway status from materialized view
+        COALESCE(sp.has_active_payment_gateway, false) as has_active_payment_gateway,
+        sp.default_gateway_type,
 
         -- Calculate relevance score
         (
@@ -988,6 +992,7 @@ router.get('/for-product-page/:productId', async (req: Request, res: Response) =
         ) as relevance_score
 
       FROM inventory_items ii
+      LEFT JOIN storefront_products sp ON ii.id = sp.id
       WHERE ii.id != $6  -- Exclude current product
         AND ii.item_status = 'active'
         AND ii.visibility = 'public'
@@ -1024,7 +1029,9 @@ router.get('/for-product-page/:productId', async (req: Request, res: Response) =
         imageUrl: row.image_url,
         brand: row.brand,
         relevanceScore: row.relevance_score || 0,
-        tenantId: row.tenant_id
+        tenantId: row.tenant_id,
+        has_active_payment_gateway: row.has_active_payment_gateway || false,
+        payment_gateway_type: row.payment_gateway_type || null
       }));
 
     //console.log(`[Product Recommendations] Found ${recommendations.length} recommendations with score > 0`);

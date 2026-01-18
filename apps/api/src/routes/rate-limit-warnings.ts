@@ -6,6 +6,15 @@ const router = Router();
 // POST /api/rate-limit-warnings - Store rate limit warning
 router.post('/rate-limit-warnings', async (req: Request, res: Response) => {
   try {
+    // Allow internal requests from rate limiting middleware without authentication
+    const isInternalRequest = req.headers['x-internal-request'] === 'rate-limit-middleware';
+    
+    if (!isInternalRequest) {
+      // For non-internal requests, you could add authentication here if needed
+      // For now, we'll allow all POST requests to this endpoint
+      console.log('[Rate Limit Warnings] External request detected');
+    }
+
     const {
       clientId,
       pathname,

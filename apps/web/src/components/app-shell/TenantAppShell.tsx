@@ -60,13 +60,27 @@ export default function TenantAppShell({ children, navItems }: TenantAppShellPro
       if (!tenantId) return;
       
       try {
+        // Fetch tenant basic info
         const res = await apiRequest(`/api/tenants/${tenantId}`);
         if (res.ok) {
           const data = await res.json();
+          
+          // Fetch business profile for logo
+          let logoUrl = null;
+          try {
+            const profileRes = await apiRequest(`/api/tenant/profile?tenant_id=${tenantId}`);
+            if (profileRes.ok) {
+              const profileData = await profileRes.json();
+              logoUrl = profileData.logo_url;
+            }
+          } catch (profileError) {
+            console.error('Failed to fetch business profile:', profileError);
+          }
+          
           setTenantInfo({
             id: data.id,
             name: data.name,
-            logo: data.metadata?.logo_url,
+            logo: logoUrl, // Use logo from business profile
             subdomain: data.subdomain,
           });
         }

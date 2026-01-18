@@ -15,6 +15,7 @@ import adminTenantsRoutes from '../admin/tenants';
 import platformCategoriesRoutes from '../admin/platform-categories';
 import gbpCategoriesSyncRoutes from '../admin/gbp-categories-sync';
 import securityRoutes from '../security';
+import platformSettingsRoutes from '../admin/platform-settings';
 
 /**
  * Mount admin routes
@@ -28,7 +29,7 @@ export function mountAdminRoutes(app: Express) {
   app.use('/api/admin/platform-categories', authenticateToken, requireAdmin, platformCategoriesRoutes);
   app.use('/api/admin/gbp-categories', authenticateToken, requireAdmin, gbpCategoriesSyncRoutes);
   app.use('/api/admin/feature-overrides', authenticateToken, requireAdmin, featureOverridesRoutes);
-  app.use('/api/admin/tier-management', authenticateToken, tierManagementRoutes);
+  app.use('/api/admin/tier-management', authenticateToken, requireAdmin, tierManagementRoutes);
   app.use('/api/admin/tier-system', authenticateToken, requireAdmin, tierSystemRoutes);
   app.use('/api/admin/tenants', authenticateToken, requireAdmin, adminTenantsRoutes);
   
@@ -47,6 +48,12 @@ export function mountAdminRoutes(app: Express) {
   // Effective flags: middleware applied per-route (admin for platform, tenant access for tenant)
   app.use('/admin', authenticateToken, effectiveFlagsRoutes);
   app.use('/api/admin', authenticateToken, effectiveFlagsRoutes);
+  
+  // Platform settings - mount LAST to avoid conflicts with generic /api/admin routes
+  console.log('🔧 Mounting platform settings route...');
+  // Restore original path now that we know the route works
+  app.use('/api/admin/platform-settings', authenticateToken, requireAdmin, platformSettingsRoutes);
+  console.log('✅ Platform settings route mounted at /api/admin/platform-settings');
 
   console.log('✅ Admin routes mounted');
 }

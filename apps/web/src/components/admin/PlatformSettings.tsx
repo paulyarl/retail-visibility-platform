@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Shield, Settings, BarChart3, Zap } from 'lucide-react';
+import { api } from '@/lib/api';
 import RateLimitTrends from './RateLimitTrends';
 
 interface PlatformSettingsData {
@@ -29,22 +30,23 @@ export default function PlatformSettings() {
   const [settings, setSettings] = useState<PlatformSettingsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [rateLimitConfigs, setRateLimitConfigs] = useState(settings?.rateLimitConfigurations || []);
+  const [rateLimitConfigs, setRateLimitConfigs] = useState<PlatformSettingsData['rateLimitConfigurations']>([]); // Use proper type
   const { toast } = useToast();
 
   useEffect(() => {
     loadSettings();
   }, []);
 
+  // Update rateLimitConfigs when settings are loaded (but not on every settings change)
   useEffect(() => {
-    if (settings?.rateLimitConfigurations) {
+    if (settings?.rateLimitConfigurations && rateLimitConfigs?.length === 0) {
       setRateLimitConfigs(settings.rateLimitConfigurations);
     }
-  }, [settings]);
+  }, [settings?.rateLimitConfigurations, rateLimitConfigs?.length]); // Add rateLimitConfigs.length dependency
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/admin/platform-settings');
+      const response = await api.get('/api/admin/platform-settings'); // Restore original path
       if (response.ok) {
         const data = await response.json();
         setSettings(data);
@@ -69,25 +71,33 @@ export default function PlatformSettings() {
     }
   };
 
-  const saveSettings = async (newSettings: Partial<PlatformSettingsData>) => {
+  const saveSettings = async (updates?: Partial<{ rateLimitingEnabled: boolean; rateLimitConfigurations: any[] }>) => {
     setSaving(true);
     try {
+      // Optimistic update - update local state immediately
+      if (updates) {
+        setSettings(prev => ({
+          ...prev,
+          ...updates,
+          rateLimitingEnabled: updates.rateLimitingEnabled ?? prev?.rateLimitingEnabled ?? false,
+          updatedAt: new Date().toISOString(),
+          updatedBy: 'current-user'
+        }));
+      }
+
       const payload = {
-        rateLimitingEnabled: newSettings.rateLimitingEnabled ?? settings?.rateLimitingEnabled ?? true,
-        rateLimitConfigurations: rateLimitConfigs
+        rateLimitingEnabled: settings?.rateLimitingEnabled || false,
+        rateLimitConfigurations: rateLimitConfigs,
+        ...updates, // Merge with any updates passed in
       };
 
-      const response = await fetch('/api/admin/platform-settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await api.put('/api/admin/platform-settings', {
         body: JSON.stringify(payload),
       });
 
       if (response.ok) {
         const updatedSettings = await response.json();
-        setSettings(updatedSettings);
+        setSettings(updatedSettings); // Update with server response
         toast({
           title: 'Settings saved',
           description: 'Platform settings have been updated successfully.',
@@ -108,13 +118,16 @@ export default function PlatformSettings() {
   };
 
   const updateRateLimitConfig = (routeType: string, field: string, value: any) => {
+    // Update local state immediately
     setRateLimitConfigs(prev =>
-      prev.map(config =>
+      (prev || []).map(config =>
         config.route_type === routeType
           ? { ...config, [field]: value }
           : config
       )
     );
+    
+    // Don't auto-save - wait for user to click Save button
   };
 
   const getRouteTypeDescription = (routeType: string) => {
@@ -173,7 +186,15 @@ export default function PlatformSettings() {
               <Switch
                 id="rate-limiting"
                 checked={settings?.rateLimitingEnabled ?? true}
-                onCheckedChange={(enabled) => saveSettings({ rateLimitingEnabled: enabled })}
+                onCheckedChange={(enabled) => {
+                  // Only update local state, don't auto-save
+                  setSettings(prev => ({
+                    ...prev,
+                    rateLimitingEnabled: enabled,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: 'current-user'
+                  }));
+                }}
                 disabled={saving}
               />
             </div>
@@ -208,7 +229,7 @@ export default function PlatformSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {rateLimitConfigs.map((config) => (
+            {(rateLimitConfigs || []).map((config) => (
               <div key={config.route_type} className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">

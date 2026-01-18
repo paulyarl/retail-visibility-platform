@@ -68,6 +68,11 @@ export default function SmartProductCard({
       return;
     }
 
+    // Skip if MV data is available
+    if (product.has_active_payment_gateway !== undefined) {
+      return;
+    }
+
     const checkPurchaseAbility = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -87,7 +92,7 @@ export default function SmartProductCard({
     };
 
     checkPurchaseAbility();
-  }, [product.tenantId, contextPayment]);
+  }, [product.tenantId, contextPayment, product.has_active_payment_gateway]);
 
   const displayTitle = product.title || product.name;
   const displayBrand = product.brand || '';

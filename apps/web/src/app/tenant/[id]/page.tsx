@@ -105,6 +105,22 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
 
     const tenant: Tenant & { access?: { storefront: boolean } } = await tenantRes.json();
 
+    // Fetch payment gateways (once for the entire storefront)
+    let paymentGateways: any[] = [];
+    try {
+      const paymentRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/payment-gateways`, {
+        cache: 'no-store',
+      });
+      if (paymentRes.ok) {
+        const paymentData = await paymentRes.json();
+        if (paymentData.success && paymentData.gateways) {
+          paymentGateways = paymentData.gateways.filter((g: any) => g.is_active);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch payment gateways:', e);
+    }
+
     
     // Fetch business profile
     let hasHours = false;
@@ -292,7 +308,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Find current category name if filtering
     const currentCategory = category ? categories.find((c: Category) => c.slug === category) : null;
 
-    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours: rawBusinessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory };
+    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours: rawBusinessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, paymentGateways };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -335,7 +351,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     notFound();
   }
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, paymentGateways } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
 
   // Track storefront view for recommendations (fire and forget)
@@ -644,7 +660,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
       {/* Fulfillment & Payment Options */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <FulfillmentOptionsPane tenantId={id} compact={true} />
+        <FulfillmentOptionsPane tenantId={id} compact={true} paymentGateways={paymentGateways} />
       </div>
 
       {/* Products Section */}

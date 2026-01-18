@@ -27,16 +27,43 @@ interface PaymentGateway {
 interface FulfillmentOptionsPaneProps {
   tenantId: string;
   compact?: boolean;
+  paymentGateways?: any[];
 }
 
-export default function FulfillmentOptionsPane({ tenantId, compact = false }: FulfillmentOptionsPaneProps) {
+export default function FulfillmentOptionsPane({ tenantId, compact = false, paymentGateways: propPaymentGateways }: FulfillmentOptionsPaneProps) {
   const [fulfillmentSettings, setFulfillmentSettings] = useState<FulfillmentSettings | null>(null);
-  const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>(propPaymentGateways || []);
+  const [loading, setLoading] = useState(!propPaymentGateways); // Only loading if payment gateways not provided
 
   useEffect(() => {
-    fetchFulfillmentAndPaymentInfo();
-  }, [tenantId]);
+    if (propPaymentGateways) {
+      // Payment gateways provided as prop, only fetch fulfillment settings
+      fetchFulfillmentSettings();
+    } else {
+      // Fetch both fulfillment settings and payment gateways (fallback)
+      fetchFulfillmentAndPaymentInfo();
+    }
+  }, [tenantId, propPaymentGateways]);
+
+  const fetchFulfillmentSettings = async () => {
+    try {
+      setLoading(true);
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+
+      // Fetch fulfillment settings only
+      const fulfillmentRes = await fetch(`${apiUrl}/public/tenant/${tenantId}/fulfillment-settings`);
+      if (fulfillmentRes.ok) {
+        const fulfillmentData = await fulfillmentRes.json();
+        if (fulfillmentData.success && fulfillmentData.settings) {
+          setFulfillmentSettings(fulfillmentData.settings);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching fulfillment info:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchFulfillmentAndPaymentInfo = async () => {
     try {

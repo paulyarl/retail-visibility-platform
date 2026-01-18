@@ -15,6 +15,8 @@ interface RecommendedProduct {
   brand?: string;
   relevanceScore: number;
   tenantId: string;
+  has_active_payment_gateway?: boolean;
+  payment_gateway_type?: string | null;
 }
 
 interface ProductRecommendationsProps {
@@ -58,27 +60,28 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {recommendations.map((product) => (
-          <TenantPaymentProvider key={product.id} tenantId={product.tenantId}>
-            <SmartProductCard
-              product={{
-                id: product.id,
-                sku: product.id,
-                name: product.name,
-                title: product.title,
-                brand: product.brand,
-                priceCents: Math.round(product.price * 100),
-                stock: 999,
-                imageUrl: product.imageUrl,
-                tenantId: product.tenantId,
-                availability: 'in_stock',
-              }}
-              tenantName=""
-              variant="compact"
-              showCategory={false}
-              showDescription={false}
-              className="h-full"
-            />
-          </TenantPaymentProvider>
+          <SmartProductCard
+            key={product.id}
+            product={{
+              id: product.id,
+              sku: product.id,
+              name: product.name,
+              title: product.title,
+              brand: product.brand,
+              priceCents: Math.round(product.price * 100),
+              stock: 999,
+              imageUrl: product.imageUrl,
+              tenantId: product.tenantId,
+              availability: 'in_stock',
+              has_active_payment_gateway: product.has_active_payment_gateway,
+              payment_gateway_type: product.payment_gateway_type,
+            }}
+            tenantName=""
+            variant="compact"
+            showCategory={false}
+            showDescription={false}
+            className="h-full"
+          />
         ))}
       </div>
 
