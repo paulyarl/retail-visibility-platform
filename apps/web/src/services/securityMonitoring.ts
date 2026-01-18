@@ -10,6 +10,7 @@ import {
   SecurityHealthStatus,
   ApiResponse,
   PaginatedResponse,
+  PaginationInfo,
 } from '@/types/security';
 import { api } from '@/lib/api';
 
@@ -29,15 +30,17 @@ export async function getSecurityMetrics(hours: number = 24): Promise<SecurityMe
 }
 
 /**
- * Get security threats with optional filters
+ * Get security threats with optional filters and pagination
  */
 export async function getSecurityThreats(
   limit: number = 50,
   resolved: boolean = false,
-  hours: number = 24
-): Promise<SecurityThreat[]> {
+  hours: number = 24,
+  page: number = 1
+): Promise<{ threats: SecurityThreat[]; pagination: PaginationInfo }> {
   const params = new URLSearchParams({
     limit: limit.toString(),
+    page: page.toString(),
     resolved: resolved.toString(),
     hours: hours.toString(),
   });
@@ -49,8 +52,11 @@ export async function getSecurityThreats(
   }
 
   const result: any = await response.json();
-  // API returns { success: true, data: { threats: [], count: 0, ... } }
-  return result.data?.threats || result.data || [];
+  // API returns { success: true, data: { threats: [], pagination: {...}, ... } }
+  return {
+    threats: result.data?.threats || result.data || [],
+    pagination: result.data?.pagination || { page: 1, limit, total: 0, totalPages: 0, hasNext: false, hasPrev: false }
+  };
 }
 
 /**
@@ -71,18 +77,31 @@ export async function resolveThreat(threatId: string, notes: string): Promise<Se
 }
 
 /**
- * Get blocked IP addresses
+ * Get blocked IP addresses with pagination
  */
-export async function getBlockedIPs(hours: number = 24): Promise<BlockedIP[]> {
-  const response = await api.get(`/api/security/blocked-ips?hours=${hours}`);
+export async function getBlockedIPs(
+  hours: number = 24,
+  page: number = 1,
+  limit: number = 50
+): Promise<{ blockedIPs: BlockedIP[]; pagination: PaginationInfo }> {
+  const params = new URLSearchParams({
+    hours: hours.toString(),
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+
+  const response = await api.get(`/api/security/blocked-ips?${params}`);
 
   if (!response.ok) {
     throw new Error('Failed to get blocked IPs');
   }
 
   const result: any = await response.json();
-  // API returns { success: true, data: { blockedIPs: [], count: 0, ... } }
-  return result.data?.blockedIPs || result.data || [];
+  // API returns { success: true, data: { blockedIPs: [], pagination: {...}, ... } }
+  return {
+    blockedIPs: result.data?.blockedIPs || result.data || [],
+    pagination: result.data?.pagination || { page: 1, limit, total: 0, totalPages: 0, hasNext: false, hasPrev: false }
+  };
 }
 
 /**

@@ -11,37 +11,24 @@ router.get('/alerts', authenticateToken, requireAdmin, async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 25;
     const offset = (page - 1) * limit;
 
-    // Get alerts with user info (including system-level alerts)
+    // Get all alerts (simplified query for debugging)
+    console.log('[Admin Security] Fetching alerts with limit:', limit, 'offset:', offset);
     const alerts = await prisma.security_alerts.findMany({
       take: limit,
       skip: offset,
-      orderBy: { created_at: 'desc' },
-      include: {
-        users: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-          },
-        },
-      },
-      where: {
-        // Include all alerts - both user-specific and system-level
-        OR: [
-          { user_id: { not: null } }, // User-specific alerts
-          { user_id: 'system' }, // System-level alerts
-        ]
-      }
+      orderBy: { created_at: 'desc' }
     });
+    
+    console.log('[Admin Security] Found alerts:', alerts.length);
+    console.log('[Admin Security] Sample alert:', alerts[0]);
 
     // Format for frontend
     const formattedAlerts = alerts.map((alert: any) => ({
       id: alert.id,
       userId: alert.user_id,
-      userEmail: alert.user_email || alert.users?.email || (alert.user_id === 'system' ? 'System' : 'Unknown'),
-      userFirstName: alert.user_first_name || alert.users?.first_name || (alert.user_id === 'system' ? 'System' : null),
-      userLastName: alert.user_last_name || alert.users?.last_name || (alert.user_id === 'system' ? 'Alert' : null),
+      userEmail: alert.user_email || (alert.user_id === 'system' ? 'System' : alert.user_id === null ? 'Telemetry Event' : 'Unknown'),
+      userFirstName: alert.user_first_name || (alert.user_id === 'system' ? 'System' : alert.user_id === null ? 'Telemetry' : null),
+      userLastName: alert.user_last_name || (alert.user_id === 'system' ? 'Alert' : alert.user_id === null ? 'Event' : null),
       type: alert.type,
       severity: alert.severity as 'info' | 'warning' | 'critical',
       title: alert.title,
@@ -52,9 +39,19 @@ router.get('/alerts', authenticateToken, requireAdmin, async (req, res) => {
       readAt: alert.read_at?.toISOString(),
     }));
 
+    // Get total count for pagination
+    const totalCount = await prisma.security_alerts.count();
+
     res.json({
       data: formattedAlerts,
-      total: await prisma.security_alerts.count(),
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasNext: offset + limit < totalCount,
+        hasPrev: page > 1
+      }
     });
   } catch (error) {
     console.error('Failed to fetch security alerts:', error);

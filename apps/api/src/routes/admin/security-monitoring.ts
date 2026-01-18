@@ -125,10 +125,32 @@ router.get('/sessions/stats', async (req, res) => {
 router.get('/alerts', async (req, res) => {
   try {
     const { 
-      limit = '100', 
+      limit = '25', 
+      page = '1',
       offset = '0', 
       unreadOnly = 'false' 
     } = req.query;
+
+    const limitNum = parseInt(limit as string);
+    const pageNum = parseInt(page as string);
+    const offsetNum = (pageNum - 1) * limitNum;
+
+    // Get total count for pagination
+    const totalCountQuery = unreadOnly === 'true'
+      ? await basePrisma.$queryRaw<[{ count: bigint }]>`
+          SELECT COUNT(*) as count
+          FROM security_alerts
+          WHERE dismissed = false AND read = false
+            AND (user_id IS NOT NULL OR user_id = 'system' OR user_id IS NULL)
+        `
+      : await basePrisma.$queryRaw<[{ count: bigint }]>`
+          SELECT COUNT(*) as count
+          FROM security_alerts
+          WHERE dismissed = false
+            AND (user_id IS NOT NULL OR user_id = 'system' OR user_id IS NULL)
+        `;
+
+    const totalCount = Number(totalCountQuery[0].count);
 
     // Use conditional queries instead of string interpolation
     const alerts = unreadOnly === 'true'
@@ -150,10 +172,10 @@ router.get('/alerts', async (req, res) => {
           FROM security_alerts a
           LEFT JOIN users u ON a.user_id = u.id AND a.user_id != 'system'
           WHERE a.dismissed = false AND a.read = false
-            AND (a.user_id IS NOT NULL OR a.user_id = 'system')
+            AND (a.user_id IS NOT NULL OR a.user_id = 'system' OR a.user_id IS NULL)
           ORDER BY a.created_at DESC
-          LIMIT ${parseInt(limit as string)}
-          OFFSET ${parseInt(offset as string)}
+          LIMIT ${limitNum}
+          OFFSET ${offsetNum}
         `
       : await basePrisma.$queryRaw<any[]>`
           SELECT 
@@ -173,10 +195,10 @@ router.get('/alerts', async (req, res) => {
           FROM security_alerts a
           LEFT JOIN users u ON a.user_id = u.id AND a.user_id != 'system'
           WHERE a.dismissed = false
-            AND (a.user_id IS NOT NULL OR a.user_id = 'system')
+            AND (a.user_id IS NOT NULL OR a.user_id = 'system' OR a.user_id IS NULL)
           ORDER BY a.created_at DESC
-          LIMIT ${parseInt(limit as string)}
-          OFFSET ${parseInt(offset as string)}
+          LIMIT ${limitNum}
+          OFFSET ${offsetNum}
         `;
 
     const [{ count }] = unreadOnly === 'true'
@@ -184,25 +206,32 @@ router.get('/alerts', async (req, res) => {
           SELECT COUNT(*) as count
           FROM security_alerts
           WHERE dismissed = false AND read = false
-            AND (user_id IS NOT NULL OR user_id = 'system')
+            AND (user_id IS NOT NULL OR user_id = 'system' OR user_id IS NULL)
         `
       : await basePrisma.$queryRaw<[{ count: bigint }]>`
           SELECT COUNT(*) as count
           FROM security_alerts
           WHERE dismissed = false
-            AND (user_id IS NOT NULL OR user_id = 'system')
+            AND (user_id IS NOT NULL OR user_id = 'system' OR user_id IS NULL)
         `;
 
     res.json({
       data: alerts.map(alert => ({
         ...alert,
-        // Handle system-level alerts
-        userEmail: alert.userEmail || (alert.userId === 'system' ? 'System' : 'Unknown'),
-        userFirstName: alert.userFirstName || (alert.userId === 'system' ? 'System' : null),
-        userLastName: alert.userLastName || (alert.userId === 'system' ? 'Alert' : null),
+        // Handle system-level and telemetry alerts
+        userEmail: alert.userEmail || (alert.userId === 'system' ? 'System' : alert.userId === null ? 'Telemetry Event' : 'Unknown'),
+        userFirstName: alert.userFirstName || (alert.userId === 'system' ? 'System' : alert.userId === null ? 'Telemetry' : null),
+        userLastName: alert.userLastName || (alert.userId === 'system' ? 'Alert' : alert.userId === null ? 'Event' : null),
         metadata: alert.metadata || {},
       })),
-      total: Number(count),
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limitNum),
+        hasNext: offsetNum + limitNum < totalCount,
+        hasPrev: pageNum > 1
+      }
     });
   } catch (error) {
     console.error('[GET /api/admin/security/alerts] Error:', error);
@@ -280,7 +309,7 @@ router.get('/alerts/by-type', async (req, res) => {
       FROM security_alerts
       WHERE dismissed = false
         AND created_at >= ${since}
-        AND (user_id IS NOT NULL OR user_id = 'system')
+        AND (user_id IS NOT NULL OR user_id = 'system' OR user_id IS NULL)
       GROUP BY type
       ORDER BY count DESC
     `;
@@ -305,7 +334,7 @@ router.get('/alerts/by-type', async (req, res) => {
           WHERE a.type = ${typeInfo.type}
             AND a.dismissed = false
             AND a.created_at >= ${since}
-            AND (a.user_id IS NOT NULL OR a.user_id = 'system')
+            AND (a.user_id IS NOT NULL OR a.user_id = 'system' OR a.user_id IS NULL)
           ORDER BY a.created_at DESC
           LIMIT ${limit}
         `;
@@ -317,10 +346,10 @@ router.get('/alerts/by-type', async (req, res) => {
           latestAlert: typeInfo.latest_alert,
           recentAlerts: recentAlerts.map(alert => ({
             ...alert,
-            // Handle system-level alerts
-            userEmail: alert.userEmail || (alert.userId === 'system' ? 'System' : 'Unknown'),
-            userFirstName: alert.userFirstName || (alert.userId === 'system' ? 'System' : null),
-            userLastName: alert.userLastName || (alert.userId === 'system' ? 'Alert' : null),
+            // Handle system-level and telemetry alerts
+            userEmail: alert.userEmail || (alert.userId === 'system' ? 'System' : alert.userId === null ? 'Telemetry Event' : 'Unknown'),
+            userFirstName: alert.userFirstName || (alert.userId === 'system' ? 'System' : alert.userId === null ? 'Telemetry' : null),
+            userLastName: alert.userLastName || (alert.userId === 'system' ? 'Alert' : alert.userId === null ? 'Event' : null),
             createdAt: alert.createdAt.toISOString(),
           })),
         };

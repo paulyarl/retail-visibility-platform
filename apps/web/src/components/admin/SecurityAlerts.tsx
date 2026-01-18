@@ -4,7 +4,17 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { SecurityPagination } from './SecurityPagination';
 import { AlertTriangle, Shield, TrendingUp, Users, Eye, EyeOff, Clock, User, Globe, UserCheck, UserX } from 'lucide-react';
+
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
 
 interface SecurityAlert {
   id: string;
@@ -24,18 +34,22 @@ interface SecurityAlert {
 
 export default function SecurityAlerts() {
   const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchAlerts();
-  }, []);
+    fetchAlerts(currentPage, pageSize);
+  }, [currentPage, pageSize]);
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = async (page: number = currentPage, limit: number = pageSize) => {
     try {
       setError(null);
+      setLoading(true);
       const { api } = await import('@/lib/api');
-      const response = await api.get('/api/admin/security/alerts?limit=50');
+      const response = await api.get(`/api/admin/security/alerts?page=${page}&limit=${limit}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch security alerts');
@@ -43,11 +57,21 @@ export default function SecurityAlerts() {
 
       const data = await response.json();
       setAlerts(data.data || []);
+      setPagination(data.pagination || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch alerts');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1); // Reset to first page when changing page size
   };
 
   const getSeverityColor = (severity: string) => {
@@ -119,7 +143,7 @@ export default function SecurityAlerts() {
           <div className="text-center text-red-600">
             <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
             <p>{error}</p>
-            <Button onClick={fetchAlerts} className="mt-2" size="sm">
+            <Button onClick={() => fetchAlerts()} className="mt-2" size="sm">
               Retry
             </Button>
           </div>
@@ -311,7 +335,7 @@ export default function SecurityAlerts() {
               </CardContent>
             </Card>
           );
-        })}
+        })}  // Close alerts.map function
         </div>
       )}
     </div>

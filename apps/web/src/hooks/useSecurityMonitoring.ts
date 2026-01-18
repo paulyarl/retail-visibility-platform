@@ -9,13 +9,16 @@ import {
   SecurityThreat,
   BlockedIP,
   SecurityHealthStatus,
+  PaginationInfo,
 } from '@/types/security';
 import * as monitoringService from '@/services/securityMonitoring';
 
 export function useSecurityMonitoring(hours: number = 24) {
   const [metrics, setMetrics] = useState<SecurityMetrics | null>(null);
   const [threats, setThreats] = useState<SecurityThreat[]>([]);
+  const [threatsPagination, setThreatsPagination] = useState<PaginationInfo | null>(null);
   const [blockedIPs, setBlockedIPs] = useState<BlockedIP[]>([]);
+  const [blockedIPsPagination, setBlockedIPsPagination] = useState<PaginationInfo | null>(null);
   const [health, setHealth] = useState<SecurityHealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,19 +32,21 @@ export function useSecurityMonitoring(hours: number = 24) {
     }
   }, [hours]);
 
-  const fetchThreats = useCallback(async (resolved: boolean = false) => {
+  const fetchThreats = useCallback(async (resolved: boolean = false, page: number = 1, limit: number = 50) => {
     try {
-      const data = await monitoringService.getSecurityThreats(50, resolved, hours);
-      setThreats(data);
+      const data = await monitoringService.getSecurityThreats(limit, resolved, hours, page);
+      setThreats(data.threats);
+      setThreatsPagination(data.pagination);
     } catch (err) {
       console.error('Failed to fetch threats:', err);
     }
   }, [hours]);
 
-  const fetchBlockedIPs = useCallback(async () => {
+  const fetchBlockedIPs = useCallback(async (page: number = 1, limit: number = 50) => {
     try {
-      const data = await monitoringService.getBlockedIPs(hours);
-      setBlockedIPs(data);
+      const data = await monitoringService.getBlockedIPs(hours, page, limit);
+      setBlockedIPs(data.blockedIPs);
+      setBlockedIPsPagination(data.pagination);
     } catch (err) {
       console.error('Failed to fetch blocked IPs:', err);
     }
@@ -123,7 +128,9 @@ export function useSecurityMonitoring(hours: number = 24) {
   return {
     metrics,
     threats,
+    threatsPagination,
     blockedIPs,
+    blockedIPsPagination,
     health,
     healthStatus: health, // Alias for component compatibility
     loading,
@@ -137,5 +144,7 @@ export function useSecurityMonitoring(hours: number = 24) {
       fetchBlockedIPs();
       fetchHealth();
     },
+    refreshThreats: fetchThreats,
+    refreshBlockedIPs: fetchBlockedIPs,
   };
 }

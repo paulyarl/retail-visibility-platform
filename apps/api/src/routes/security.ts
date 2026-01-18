@@ -48,11 +48,22 @@ router.get('/metrics', async (req, res) => {
 router.get('/threats', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const page = parseInt(req.query.page as string) || 1;
+    const offset = (page - 1) * limit;
     const hours = parseInt(req.query.hours as string) || 24;
     const resolved = req.query.resolved === 'true';
 
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
+    // Get total count for pagination
+    const totalCount = await require('../prisma').prisma.security_threats.count({
+      where: {
+        created_at: { gte: since },
+        resolved: resolved ? undefined : false
+      }
+    });
+
+    // Get paginated threats
     const threats = await require('../prisma').prisma.security_threats.findMany({
       where: {
         created_at: { gte: since },
@@ -60,6 +71,7 @@ router.get('/threats', async (req, res) => {
       },
       orderBy: { created_at: 'desc' },
       take: limit,
+      skip: offset,
       include: {
         users: {
           select: {
@@ -76,7 +88,14 @@ router.get('/threats', async (req, res) => {
       success: true,
       data: {
         threats,
-        count: threats.length,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          hasNext: offset + limit < totalCount,
+          hasPrev: page > 1
+        },
         timeRange: `${hours} hours`,
         resolved: resolved
       }
@@ -136,9 +155,22 @@ router.post('/threats/:id/resolve', async (req, res) => {
  */
 router.get('/blocked-ips', async (req, res) => {
   try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const page = parseInt(req.query.page as string) || 1;
+    const offset = (page - 1) * limit;
     const hours = parseInt(req.query.hours as string) || 24;
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
+    // Get total count for pagination
+    const totalCount = await require('../prisma').prisma.security_threats.count({
+      where: {
+        type: 'brute_force_attempt',
+        resolved: false,
+        created_at: { gte: since }
+      }
+    });
+
+    // Get paginated blocked IPs
     const blockedIPs = await require('../prisma').prisma.security_threats.findMany({
       where: {
         type: 'brute_force_attempt',
@@ -151,14 +183,23 @@ router.get('/blocked-ips', async (req, res) => {
         metadata: true,
         created_at: true
       },
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: 'desc' },
+      take: limit,
+      skip: offset
     });
 
     res.json({
       success: true,
       data: {
         blockedIPs,
-        count: blockedIPs.length,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          hasNext: offset + limit < totalCount,
+          hasPrev: page > 1
+        },
         timeRange: `${hours} hours`
       }
     });
