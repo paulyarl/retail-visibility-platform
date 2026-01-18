@@ -49,13 +49,27 @@ export default function StoreInventoryHeader({
   useEffect(() => {
     const fetchTenantInfo = async () => {
       try {
-        const res = await apiRequest(`/api/tenants/${tenantId}`);
-        if (res.ok) {
-          const data = await res.json();
+        // Fetch tenant basic info
+        const tenantRes = await apiRequest(`/api/tenants/${tenantId}`);
+        if (tenantRes.ok) {
+          const tenantData = await tenantRes.json();
+          
+          // Fetch business profile for logo
+          let logoUrl = null;
+          try {
+            const profileRes = await apiRequest(`/api/tenant/profile?tenant_id=${tenantId}`);
+            if (profileRes.ok) {
+              const profileData = await profileRes.json();
+              logoUrl = profileData.logo_url;
+            }
+          } catch (profileError) {
+            console.error('Failed to fetch business profile:', profileError);
+          }
+          
           setTenantInfo({
-            name: data.name,
-            logo: data.logo,
-            subdomain: data.subdomain,
+            name: tenantData.name,
+            logo: logoUrl, // Use logo from business profile
+            subdomain: tenantData.subdomain,
           });
         }
       } catch (error) {
