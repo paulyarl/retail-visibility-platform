@@ -21,8 +21,103 @@ declare global {
 }
 
 /**
- * Store rate limit warning in database for trend analysis
+ * Analyze request rate patterns for trend analysis
  */
+async function analyzeRequestRate(req: Request): Promise<{
+  currentRate: number;
+  ratePerMinute: number;
+  ratePerHour: number;
+  historicalAverage: number;
+  rateTrend: 'increasing' | 'decreasing' | 'stable';
+  peakRate: number;
+  timeWindow: string;
+}> {
+  const ipAddress = req.ip || 'unknown';
+  const now = new Date();
+  
+  try {
+    // Get recent request patterns from rate_limit_warnings table
+    const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    const [
+      requestsLastMinute,
+      requestsLastHour,
+      requestsLast24Hours,
+      historicalData
+    ] = await Promise.all([
+      // Requests in last minute
+      prisma.rate_limit_warnings.count({
+        where: {
+          ip_address: ipAddress,
+          occurred_at: { gte: oneMinuteAgo }
+        }
+      }),
+      // Requests in last hour  
+      prisma.rate_limit_warnings.count({
+        where: {
+          ip_address: ipAddress,
+          occurred_at: { gte: oneHourAgo }
+        }
+      }),
+      // Requests in last 24 hours
+      prisma.rate_limit_warnings.count({
+        where: {
+          ip_address: ipAddress,
+          occurred_at: { gte: twentyFourHoursAgo }
+        }
+      }),
+      // Historical pattern (last 7 days same time)
+      prisma.rate_limit_warnings.count({
+        where: {
+          ip_address: ipAddress,
+          occurred_at: {
+            gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+            lt: new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000)
+          }
+        }
+      })
+    ]);
+    
+    const currentRate = requestsLastMinute;
+    const ratePerMinute = requestsLastMinute;
+    const ratePerHour = requestsLastHour;
+    const historicalAverage = historicalData / (7 * 60); // Average per minute over 7 days
+    const peakRate = Math.max(requestsLastMinute, requestsLastHour / 60, historicalAverage);
+    
+    // Determine trend
+    let rateTrend: 'increasing' | 'decreasing' | 'stable' = 'stable';
+    if (currentRate > historicalAverage * 1.5) {
+      rateTrend = 'increasing';
+    } else if (currentRate < historicalAverage * 0.5) {
+      rateTrend = 'decreasing';
+    }
+    
+    return {
+      currentRate,
+      ratePerMinute,
+      ratePerHour,
+      historicalAverage,
+      rateTrend,
+      peakRate,
+      timeWindow: '1 minute'
+    };
+    
+  } catch (error) {
+    console.error('[Rate Analysis] Failed to analyze request rate:', error);
+    // Return fallback data
+    return {
+      currentRate: 1,
+      ratePerMinute: 1,
+      ratePerHour: 1,
+      historicalAverage: 0.1,
+      rateTrend: 'increasing',
+      peakRate: 1,
+      timeWindow: '1 minute'
+    };
+  }
+}
 async function storeRateLimitWarning(req: Request, blocked: boolean = false) {
   try {
     const rateLimit = req.rateLimit;
@@ -166,21 +261,57 @@ export const generalRateLimit = rateLimit({
     // Collect enhanced security context with device fingerprinting and location data
     const securityContext = collectEnhancedSecurityContext(req);
     const securitySummary = createSecuritySummary(securityContext);
+    
+    // Analyze request rate patterns for trend analysis
+    const rateAnalysis = await analyzeRequestRate(req);
+
+    // Create telemetry metadata for tracking
+    const telemetryMetadata = {
+      ...securityContext,
+      summary: securitySummary,
+      riskFactors: securitySummary.riskFactors,
+      isSuspicious: securitySummary.isSuspicious,
+      // Enhanced rate analysis
+      rateAnalysis: {
+        ...rateAnalysis,
+        limitInfo: {
+          limit: req.rateLimit?.limit,
+          current: req.rateLimit?.current,
+          remaining: req.rateLimit?.remaining,
+          resetTime: req.rateLimit?.resetTime?.toISOString(),
+          windowMs: 15 * 60 * 1000 // 15 minutes
+        },
+        triggerReason: (req.rateLimit?.limit && rateAnalysis.currentRate >= req.rateLimit.limit) ? 'limit_exceeded' : 'rate_too_high'
+      }
+    };
 
     // Log security alert for rate limit violation with enhanced context
-    createSecurityAlert({
-      type: 'rate_limit_exceeded',
-      severity: securitySummary.threatLevel === 'critical' ? 'critical' : 
-                securitySummary.threatLevel === 'high' ? 'warning' : 'info',
-      title: 'Rate Limit Exceeded',
-      message: `Request limit exceeded for ${securityContext.application.isAuthenticated ? 'authenticated user' : 'IP'} ${securityContext.network.ip} on endpoint ${securityContext.endpoint} from ${securitySummary.location} using ${securitySummary.device}`,
-      metadata: {
-        ...securityContext,
-        summary: securitySummary,
-        riskFactors: securitySummary.riskFactors,
-        isSuspicious: securitySummary.isSuspicious,
-      },
-    });
+    const userId = (req as any).user?.userId || (req as any).user?.user_id;
+    if (userId) {
+      createSecurityAlert({
+        userId,
+        type: 'rate_limit_exceeded',
+        severity: securitySummary.threatLevel === 'critical' ? 'critical' : 
+                  securitySummary.threatLevel === 'high' ? 'warning' : 'info',
+        title: 'Rate Limit Exceeded',
+        message: `Request limit exceeded for ${securityContext.application.isAuthenticated ? 'authenticated user' : 'IP'} ${securityContext.network.ip} on endpoint ${securityContext.endpoint} from ${securitySummary.location} using ${securitySummary.device}`,
+        metadata: telemetryMetadata,
+      });
+    } else {
+      // Create alert for unauthenticated user (system-level alert)
+      createSecurityAlert({
+        userId: 'system', // Use system ID for unauthenticated threats
+        type: 'rate_limit_exceeded',
+        severity: securitySummary.threatLevel === 'critical' ? 'critical' : 
+                  securitySummary.threatLevel === 'high' ? 'warning' : 'info',
+        title: 'Rate Limit Exceeded - Unauthenticated',
+        message: `Request limit exceeded for unauthenticated IP ${securityContext.network.ip} on endpoint ${securityContext.endpoint} from ${securitySummary.location} using ${securitySummary.device}`,
+        metadata: {
+          ...telemetryMetadata,
+          unauthenticated: true,
+        },
+      });
+    }
 
     res.status(429).json({
       error: 'rate_limit_exceeded',
@@ -221,13 +352,17 @@ export const authRateLimit = rateLimit({
     incidentContext.riskIndicators.authAttempt = true;
 
     // Log security alert for auth rate limit violation (highest severity)
-    createSecurityAlert({
-      type: 'auth_rate_limit_exceeded',
-      severity: 'critical',
-      title: 'Authentication Rate Limit Exceeded',
-      message: `Multiple failed authentication attempts from ${incidentContext.ipAddress}${incidentContext.userContext.isAuthenticated ? ` (user: ${incidentContext.userContext.email})` : ''} - potential brute force attack`,
-      metadata: incidentContext,
-    });
+    const userId = (req as any).user?.userId || (req as any).user?.user_id;
+    if (userId) {
+      createSecurityAlert({
+        userId,
+        type: 'auth_rate_limit_exceeded',
+        severity: 'critical',
+        title: 'Authentication Rate Limit Exceeded',
+        message: `Multiple failed authentication attempts from ${incidentContext.ipAddress}${incidentContext.userContext.isAuthenticated ? ` (user: ${incidentContext.userContext.email})` : ''} - potential brute force attack`,
+        metadata: incidentContext,
+      });
+    }
 
     res.status(429).json({
       error: 'auth_rate_limit_exceeded',
@@ -268,13 +403,17 @@ export const uploadRateLimit = rateLimit({
     };
 
     // Log security alert for upload rate limit violation
-    createSecurityAlert({
-      type: 'upload_rate_limit_exceeded',
-      severity: 'warning',
-      title: 'File Upload Rate Limit Exceeded',
-      message: `Upload limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} - potential abuse or spam`,
-      metadata: incidentContext,
-    });
+    const userId = (req as any).user?.userId || (req as any).user?.user_id;
+    if (userId) {
+      createSecurityAlert({
+        userId,
+        type: 'upload_rate_limit_exceeded',
+        severity: 'warning',
+        title: 'File Upload Rate Limit Exceeded',
+        message: `Upload limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} - potential abuse or spam`,
+        metadata: incidentContext,
+      });
+    }
 
     res.status(429).json({
       error: 'upload_rate_limit_exceeded',
@@ -316,13 +455,17 @@ export const searchRateLimit = rateLimit({
     };
 
     // Log security alert for search rate limit violation
-    createSecurityAlert({
-      type: 'search_rate_limit_exceeded',
-      severity: 'warning',
-      title: 'Search Rate Limit Exceeded',
-      message: `Search limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} - potential scraping or abuse`,
-      metadata: incidentContext,
-    });
+    const userId = (req as any).user?.userId || (req as any).user?.user_id;
+    if (userId) {
+      createSecurityAlert({
+        userId,
+        type: 'search_rate_limit_exceeded',
+        severity: 'warning',
+        title: 'Search Rate Limit Exceeded',
+        message: `Search limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} - potential scraping or abuse`,
+        metadata: incidentContext,
+      });
+    }
 
     res.status(429).json({
       error: 'search_rate_limit_exceeded',
@@ -389,13 +532,17 @@ export const costlyApiRateLimit = rateLimit({
     };
 
     // Log security alert for costly API rate limit violation
-    createSecurityAlert({
-      type: 'costly_api_rate_limit_exceeded',
-      severity: 'warning',
-      title: 'Costly API Rate Limit Exceeded',
-      message: `External API limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} - high-cost operations restricted`,
-      metadata: incidentContext,
-    });
+    const userId = (req as any).user?.userId || (req as any).user?.user_id;
+    if (userId) {
+      createSecurityAlert({
+        userId,
+        type: 'costly_api_rate_limit_exceeded',
+        severity: 'warning',
+        title: 'Costly API Rate Limit Exceeded',
+        message: `External API limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} - high-cost operations restricted`,
+        metadata: incidentContext,
+      });
+    }
 
     res.status(429).json({
       error: 'costly_api_rate_limit_exceeded',
@@ -437,13 +584,17 @@ export const storeStatusRateLimit = rateLimit({
     };
 
     // Log security alert for store status rate limit violation (lower severity since cached)
-    createSecurityAlert({
-      type: 'store_status_rate_limit_exceeded',
-      severity: 'info', // Lower severity since this is cached and UI-essential
-      title: 'Store Status Rate Limit Exceeded',
-      message: `Store status limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} on tenant ${req.params.tenantId} - cached endpoint abuse`,
-      metadata: incidentContext,
-    });
+    const userId = (req as any).user?.userId || (req as any).user?.user_id;
+    if (userId) {
+      createSecurityAlert({
+        userId,
+        type: 'store_status_rate_limit_exceeded',
+        severity: 'info', // Lower severity since this is cached and UI-essential
+        title: 'Store Status Rate Limit Exceeded',
+        message: `Store status limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} on tenant ${req.params.tenantId} - cached endpoint abuse`,
+        metadata: incidentContext,
+      });
+    }
 
     res.status(429).json({
       error: 'store_status_rate_limit_exceeded',
@@ -458,6 +609,11 @@ export const storeStatusRateLimit = rateLimit({
  */
 export function applyRateLimit(req: Request, res: Response, next: NextFunction) {
   const path = req.path;
+
+  // Skip rate limiting for telemetry endpoints (test and production)
+  if (path.startsWith('/api/security/telemetry/')) {
+    return next();
+  }
 
   // Authentication endpoints
   if (path.startsWith('/auth/') || path.includes('/login') || path.includes('/register')) {

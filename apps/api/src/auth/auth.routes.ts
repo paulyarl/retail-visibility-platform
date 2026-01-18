@@ -103,6 +103,7 @@ router.post('/login', async (req: Request, res: Response) => {
         token: result.accessToken,
         ipAddress,
         userAgent,
+        req, // Pass the request object for enhanced security context
       }).catch(err => console.error('Failed to track session:', err));
     }
     

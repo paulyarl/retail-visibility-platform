@@ -175,6 +175,11 @@ export function inputValidationMiddleware(req: Request, res: Response, next: Nex
     if (req.url === '/api/recommendations/track-batch') {
       return next();
     }
+    
+    // Skip input validation for telemetry test endpoints
+    if (req.url === '/api/security/telemetry/batch') {
+      return next();
+    }
 
     // Check for dangerous patterns in all input
     const allInput = { ...req.query, ...req.params, ...req.body };

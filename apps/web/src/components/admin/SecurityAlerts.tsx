@@ -34,15 +34,15 @@ export default function SecurityAlerts() {
   const fetchAlerts = async () => {
     try {
       setError(null);
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${apiUrl}/api/admin/security/alerts?limit=50`);
+      const { api } = await import('@/lib/api');
+      const response = await api.get('/api/admin/security/alerts?limit=50');
       
       if (!response.ok) {
         throw new Error('Failed to fetch security alerts');
       }
 
       const data = await response.json();
-      setAlerts(data.alerts || []);
+      setAlerts(data.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch alerts');
     } finally {
@@ -246,6 +246,33 @@ export default function SecurityAlerts() {
                           )}
                         </div>
                       </div>
+                      
+                      {/* Rate Analysis - Only for rate limit alerts */}
+                      {alert.type === 'rate_limit_exceeded' && alert.metadata?.rateAnalysis && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1 font-medium">
+                            <TrendingUp className="h-3 w-3" />
+                            Request Rate Analysis
+                          </div>
+                          <div className="ml-4">
+                            <div>📊 Current: {alert.metadata.rateAnalysis.currentRate} req/min</div>
+                            <div>📈 Trend: {alert.metadata.rateAnalysis.rateTrend === 'increasing' ? '📈 Rising' : 
+                                      alert.metadata.rateAnalysis.rateTrend === 'decreasing' ? '📉 Falling' : '➡️ Stable'}</div>
+                            <div>🎯 Limit: {alert.metadata.rateAnalysis.limitInfo?.limit || 'Unknown'} req/15min</div>
+                            <div>⚡ Used: {alert.metadata.rateAnalysis.limitInfo?.current || 'Unknown'}/{alert.metadata.rateAnalysis.limitInfo?.limit || 'Unknown'}</div>
+                            {alert.metadata.rateAnalysis.historicalAverage > 0 && (
+                              <div>📊 Avg: {alert.metadata.rateAnalysis.historicalAverage.toFixed(1)} req/min (7-day)</div>
+                            )}
+                            {alert.metadata.rateAnalysis.triggerReason && (
+                              <div className={`font-medium ${
+                                alert.metadata.rateAnalysis.triggerReason === 'limit_exceeded' ? 'text-red-600' : 'text-orange-600'
+                              }`}>
+                                🔴 Trigger: {alert.metadata.rateAnalysis.triggerReason === 'limit_exceeded' ? 'Limit Exceeded' : 'Rate Too High'}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Risk Factors */}

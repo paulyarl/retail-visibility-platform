@@ -25,7 +25,13 @@ export function mountAdminRoutes(app: Express) {
   console.log('👑 Mounting admin routes...');
 
   // Specific admin routes - MUST be mounted BEFORE generic routes to prevent conflicts
-  app.use('/api/security', securityRoutes); // Security routes have their own auth middleware
+  app.use('/api/security', (req, res, next) => {
+    // Skip telemetry routes - they have their own mounting
+    if (req.path.startsWith('/telemetry')) {
+      return next();
+    }
+    return securityRoutes(req, res, next);
+  }); // Security routes have their own auth middleware
   app.use('/api/admin/platform-categories', authenticateToken, requireAdmin, platformCategoriesRoutes);
   app.use('/api/admin/gbp-categories', authenticateToken, requireAdmin, gbpCategoriesSyncRoutes);
   app.use('/api/admin/feature-overrides', authenticateToken, requireAdmin, featureOverridesRoutes);

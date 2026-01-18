@@ -8,6 +8,7 @@ import { basePrisma } from '../prisma';
 import crypto from 'crypto';
 import { UAParser } from 'ua-parser-js';
 import { generateSessionId } from '../lib/id-generator';
+import { collectEnhancedSecurityContext, createSecuritySummary } from '../utils/security-context';
 
 interface SessionInfo {
   userId: string;
@@ -100,8 +101,8 @@ async function getLocationFromIP(ipAddress: string): Promise<{
 /**
  * Create or update user session
  */
-export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
-  const { userId, token, ipAddress, userAgent, deviceName, userRole } = sessionInfo;
+export async function trackSession(sessionInfo: SessionInfo & { req?: Request }): Promise<void> {
+  const { userId, token, ipAddress, userAgent, deviceName, userRole, req } = sessionInfo;
 
   try {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -215,6 +216,30 @@ export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
 
       // Create security alert for new device login
       if (isNewDevice) {
+        // Collect enhanced security context if request is available
+        let enhancedMetadata: any = {
+          device: `${deviceInfo.browser} on ${deviceInfo.os}`,
+          ip: ipAddress,
+          timestamp: new Date().toISOString(),
+        };
+
+        if (req) {
+          try {
+            const securityContext = collectEnhancedSecurityContext(req);
+            const securitySummary = createSecuritySummary(securityContext);
+            
+            // Use enhanced metadata with all security context details
+            enhancedMetadata = {
+              ...enhancedMetadata,
+              ...securityContext,
+              summary: securitySummary,
+            };
+          } catch (error) {
+            console.warn('[trackSession] Failed to collect enhanced security context:', error);
+            // Fall back to basic metadata
+          }
+        }
+
         await basePrisma.$executeRaw`
           INSERT INTO security_alerts (
             user_id,
@@ -229,11 +254,7 @@ export async function trackSession(sessionInfo: SessionInfo): Promise<void> {
             'info',
             'New Device Login',
             'You signed in from a new device.',
-            ${JSON.stringify({
-              device: `${deviceInfo.browser} on ${deviceInfo.os}`,
-              ip: ipAddress,
-              timestamp: new Date().toISOString(),
-            })}::jsonb
+            ${JSON.stringify(enhancedMetadata)}::jsonb
           )
         `;
       }
@@ -277,6 +298,7 @@ export function sessionActivityMiddleware(req: Request, res: Response, next: Nex
         userAgent,
         deviceName,
         userRole: req.user?.role,
+        req, // Pass the request object for enhanced security context
       }).catch(err => {
         console.error('[sessionActivityMiddleware] Error tracking session:', err);
       });

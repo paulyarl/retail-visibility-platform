@@ -11,7 +11,7 @@ router.get('/alerts', authenticateToken, requireAdmin, async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 25;
     const offset = (page - 1) * limit;
 
-    // Get alerts with user info
+    // Get alerts with user info (including system-level alerts)
     const alerts = await prisma.security_alerts.findMany({
       take: limit,
       skip: offset,
@@ -26,15 +26,22 @@ router.get('/alerts', authenticateToken, requireAdmin, async (req, res) => {
           },
         },
       },
+      where: {
+        // Include all alerts - both user-specific and system-level
+        OR: [
+          { user_id: { not: null } }, // User-specific alerts
+          { user_id: 'system' }, // System-level alerts
+        ]
+      }
     });
 
     // Format for frontend
     const formattedAlerts = alerts.map((alert: any) => ({
       id: alert.id,
       userId: alert.user_id,
-      userEmail: alert.user_email || alert.users?.email,
-      userFirstName: alert.user_first_name || alert.users?.first_name,
-      userLastName: alert.user_last_name || alert.users?.last_name,
+      userEmail: alert.user_email || alert.users?.email || (alert.user_id === 'system' ? 'System' : 'Unknown'),
+      userFirstName: alert.user_first_name || alert.users?.first_name || (alert.user_id === 'system' ? 'System' : null),
+      userLastName: alert.user_last_name || alert.users?.last_name || (alert.user_id === 'system' ? 'Alert' : null),
       type: alert.type,
       severity: alert.severity as 'info' | 'warning' | 'critical',
       title: alert.title,
