@@ -3,8 +3,8 @@ import { isFeatureEnabled } from '@/lib/featureFlags';
 
 interface AppLinks {
   dashboard: string;
-  inventory: string; 
   tenants: string; 
+  analytics?: string;
   settings: string;
 }
 
@@ -21,7 +21,6 @@ interface UseAppNavigationResult {
 export function useAppNavigation(tenantId: string | null): UseAppNavigationResult {
   const [links, setLinks] = useState<AppLinks>({
     dashboard: '/',
-    inventory: '/items',
     tenants: '/tenants', 
     settings: '/settings',
   });
@@ -38,7 +37,6 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
     if (tenantUrlsOn && tenantId) {
       setLinks({
         dashboard: `/t/${tenantId}/dashboard`,
-        inventory: `/t/${tenantId}/items`, 
         tenants: '/tenants',  
         settings: `/t/${tenantId}/settings`,
       });
@@ -46,9 +44,8 @@ export function useAppNavigation(tenantId: string | null): UseAppNavigationResul
     } else {
       setLinks({
         dashboard: '/',
-        inventory: '/items', 
         tenants: '/tenants',
-        settings: '/settings',  
+        settings: '/settings',
       });
       setTenantScopedLinksOn(false);
     }

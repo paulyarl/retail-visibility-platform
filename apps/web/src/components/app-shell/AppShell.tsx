@@ -72,16 +72,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
               <Link href="/" title={settings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} >{settings?.platformName || 'Visible Shelf'}</Link>
             </span>
-            {hydrated ? (
-              tenantName ? (
-                <>
-                  <span className="text-xs sm:text-sm text-neutral-500 truncate hidden sm:inline">· {tenantName}</span>
-                  <MobileCapacityIndicator tenantId={tenantId || undefined} showText={false} className="ml-1" />
-                </>
-              ) : null
-            ) : (
-              <span className="h-4 w-24 bg-neutral-200 rounded animate-pulse hidden sm:inline-block" />
-            )}
+            {/* Visual separator between branding and navigation */}
+            <div className="hidden md:block w-px h-4 bg-neutral-300 mx-2" />
             {hydrated && (
               <NavLinks
                 links={links}

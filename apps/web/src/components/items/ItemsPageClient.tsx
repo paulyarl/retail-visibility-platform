@@ -8,7 +8,7 @@ import { useItemsViewMode } from "@/hooks/useItemsViewMode";
 import { useItemsModals } from "@/hooks/useItemsModals";
 import { useItemsActions } from "@/hooks/useItemsActions";
 import { useAccessControl, AccessPresets } from "@/lib/auth/useAccessControl";
-import ItemsHeader from "@/components/items/ItemsHeader";
+import StoreInventoryHeader from "@/components/items/StoreInventoryHeader";
 import ItemsPagination from "@/components/items/ItemsPagination";
 import ItemsGrid from "@/components/items/ItemsGrid";
 import ItemsList from "@/components/items/ItemsList";
@@ -498,22 +498,13 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Store Inventory</h1>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          Manage what's on your shelf and make it visible online
-        </p>
-
-        <div className="mt-6">
-          <ItemsHeader
-            stats={stats}
-            onCreateClick={handleCreateClick}
-            onBulkUploadClick={handleBulkUploadClick}
-            tenantId={tenantId}
-          />
-        </div>
-      </div>
+      {/* Enhanced Store Inventory Header */}
+      <StoreInventoryHeader
+        stats={stats}
+        onCreateClick={handleCreateClick}
+        onBulkUploadClick={handleBulkUploadClick}
+        tenantId={tenantId}
+      />
 
       {/* Filters */}
       <div className="max-w-7xl mx-auto px-4 space-y-4">

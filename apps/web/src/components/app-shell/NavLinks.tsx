@@ -1,11 +1,8 @@
 interface NavLinksProps {
   links: {
     dashboard: string;
-    inventory: string;
-    categories?: string;
     tenants: string;
-    propagation?: string;
-    integrations?: string;
+    analytics?: string;
     settings: string;
   };
   tenantScopedLinksOn: boolean;
@@ -36,54 +33,18 @@ export default function NavLinks({
       </a>
       <a 
         className={itemClassName} 
-        href={links.inventory}
-        onClick={onClick}
-      >
-        Inventory
-      </a>
-      {links.categories && (
-        <a 
-          className={itemClassName} 
-          href={links.categories}
-          onClick={onClick}
-        >
-          Categories
-        </a>
-      )}
-      <a 
-        className={itemClassName} 
         href={links.tenants}
         onClick={onClick}
       >
         Tenants
       </a>
-      {links.propagation && (
+      {links.analytics && (
         <a 
-          className={`${itemClassName} flex items-center gap-1.5`}
-          href={links.propagation}
+          className={itemClassName} 
+          href={links.analytics}
           onClick={onClick}
         >
-          Propagation
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold">
-            ORG
-          </span>
-        </a>
-      )}
-      {links.integrations && (
-        <a 
-          className={`${itemClassName} flex items-center gap-1.5`}
-          href={links.integrations}
-          onClick={onClick}
-        >
-          Integrations
-          <span className="flex items-center gap-1">
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-600 text-white font-semibold">
-              🟢
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-600 text-white font-semibold">
-              🟦
-            </span>
-          </span>
+          Analytics
         </a>
       )}
       <a 
@@ -91,7 +52,7 @@ export default function NavLinks({
         href={links.settings}
         onClick={onClick}
       >
-        {tenantScopedLinksOn ? 'Store Settings' : 'Settings'}
+        Settings
       </a>
     </nav>
   );

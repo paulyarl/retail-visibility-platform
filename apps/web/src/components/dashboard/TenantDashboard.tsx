@@ -17,6 +17,8 @@ import VisibilityCards from "./VisibilityCards";
 import TenantLimitBadge from "@/components/tenant/TenantLimitBadge";
 import SubscriptionStateBanner from "@/components/subscription/SubscriptionStateBanner";
 import LocationStatusBanner from "@/components/tenant/LocationStatusBanner";
+import { useState, useEffect } from "react";
+import { apiRequest } from "@/lib/api";
 
 interface TenantDashboardProps {
   tenantId: string;
@@ -42,11 +44,36 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   
   // User profile (still separate since it's user-specific, not tenant-specific)
   const { profile, loading: profileLoading } = useUserProfile();
+  
+  // Business profile for logo
+  const [businessProfile, setBusinessProfile] = useState<any>(null);
+  const [businessProfileLoading, setBusinessProfileLoading] = useState(true);
 
   const canManageSettings = user ? canManageTenantSettings(user, tenantId) : false;
   
-  const loading = completeLoading || profileLoading;
+  const loading = completeLoading || profileLoading || businessProfileLoading;
   const error = completeError;
+
+  // Fetch business profile for logo
+  useEffect(() => {
+    const fetchBusinessProfile = async () => {
+      try {
+        const res = await apiRequest(`/api/tenant/profile?tenant_id=${tenantId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBusinessProfile(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch business profile:', error);
+      } finally {
+        setBusinessProfileLoading(false);
+      }
+    };
+
+    if (tenantId) {
+      fetchBusinessProfile();
+    }
+  }, [tenantId]);
 
   // Show skeleton while loading
   if (loading) {
@@ -120,6 +147,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
         <DashboardHeader 
           title={`${tenantData?.name || 'Tenant'} Dashboard`}
           subtitle="Manage your retail inventory and visibility across platforms"
+          storeLogo={businessProfile?.logo_url}
+          storeName={tenantData?.name}
         />
 
         {/* Stats */}

@@ -196,16 +196,42 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     // Validate request body - handle both camelCase and snake_case due to universal transform middleware
     console.log('[Quick Start] Request body:', req.body);
     
+    // Handle case where body might be nested or stringified
+    let parsedBody = req.body;
+    
+    // Check if the actual data is in req.body.body (nested structure)
+    if (req.body && typeof req.body.body === 'string') {
+      try {
+        parsedBody = JSON.parse(req.body.body);
+      } catch (e) {
+        console.log('[Quick Start] Failed to parse nested stringified body:', e);
+        return res.status(400).json({
+          error: 'Invalid request body',
+          message: 'Request body must be valid JSON',
+        });
+      }
+    } else if (typeof req.body === 'string') {
+      try {
+        parsedBody = JSON.parse(req.body);
+      } catch (e) {
+        console.log('[Quick Start] Failed to parse stringified body:', e);
+        return res.status(400).json({
+          error: 'Invalid request body',
+          message: 'Request body must be valid JSON',
+        });
+      }
+    }
+    
     // Normalize the request body to handle both naming conventions
     const normalizedBody = {
-      scenario: req.body.scenario,
-      productCount: req.body.productCount || req.body.product_count,
-      assignCategories: req.body.assignCategories || req.body.assign_categories,
-      createAsDrafts: req.body.createAsDrafts || req.body.create_as_drafts,
-      generateImages: req.body.generateImages || req.body.generate_images,
-      imageQuality: req.body.imageQuality || req.body.image_quality,
-      textModel: req.body.textModel || req.body.text_model,
-      imageModel: req.body.imageModel || req.body.image_model,
+      scenario: parsedBody.scenario,
+      productCount: parsedBody.productCount || parsedBody.product_count,
+      assignCategories: parsedBody.assignCategories || parsedBody.assign_categories,
+      createAsDrafts: parsedBody.createAsDrafts || parsedBody.create_as_drafts,
+      generateImages: parsedBody.generateImages || parsedBody.generate_images,
+      imageQuality: parsedBody.imageQuality || parsedBody.image_quality,
+      textModel: parsedBody.textModel || parsedBody.text_model,
+      imageModel: parsedBody.imageModel || parsedBody.image_model,
     };
     
     console.log('[Quick Start] Normalized body:', normalizedBody);
